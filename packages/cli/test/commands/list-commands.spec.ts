@@ -733,7 +733,9 @@ describe('spec list', () => {
   it('shows "no workspaces configured" when no workspaces', async () => {
     const config = makeMockConfig({ workspaces: [] })
     vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
+    const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([])
+    vi.mocked(createCliKernel).mockResolvedValue(kernel)
     const stdout = captureStdout()
     captureStderr()
     mockProcessExit()

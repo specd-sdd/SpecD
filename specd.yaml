@@ -51,6 +51,8 @@ workspaces:
         - .nuxt/
         - packages/
         - apps/
+        - specs/
+        - specd-sdd/
 
   core:
     specs:

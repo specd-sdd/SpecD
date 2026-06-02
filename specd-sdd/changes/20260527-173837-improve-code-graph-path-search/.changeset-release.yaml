@@ -1,0 +1,24 @@
+releases:
+  cli:graph-search: minor
+  cli:graph-impact: minor
+  code-graph:composition: minor
+  code-graph:workspace-integration: minor
+  code-graph:sqlite-graph-store: minor
+  code-graph:ladybug-graph-store: minor
+  cli:graph-index: minor
+  code-graph:indexer: minor
+  code-graph:symbol-model: minor
+  code-graph:graph-store: minor
+  core:config: minor
+  code-graph:document-model: minor
+  core:spec-repository-port: minor
+  core:list-workspaces: minor
+  core:list-specs: minor
+  core:search-specs: minor
+  core:get-spec-context: minor
+  core:spec-metadata: minor
+  cli:project-status: minor
+  cli:spec-list: minor
+  cli:spec-search: minor
+  cli:graph-stats: minor
+  core:workspace: minor

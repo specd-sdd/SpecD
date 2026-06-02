@@ -220,6 +220,17 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     addPlugin: { execute: vi.fn() },
     removePlugin: { execute: vi.fn() },
     listPlugins: { execute: vi.fn().mockResolvedValue([]) },
+    listWorkspaces: {
+      execute: vi.fn().mockResolvedValue([
+        {
+          name: 'default',
+          codeRoot: '/project',
+          isExternal: false,
+          ownership: 'owned',
+          specRepo: { count: vi.fn().mockResolvedValue(0) },
+        },
+      ]),
+    },
     getProjectContext: {
       execute: vi.fn().mockResolvedValue({ contextEntries: [], specs: [], warnings: [] }),
     },

@@ -14,6 +14,7 @@ import {
   makeParser,
   makeParsers,
   makeContentHasher,
+  makeListWorkspaces,
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
@@ -23,7 +24,7 @@ import {
 describe('GetProjectContext', () => {
   it('returns context entries from config', async () => {
     const schema = makeSchema([])
-    const specRepos = new Map([['default', makeSpecRepository()]])
+    const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
     const fileReader = makeFileReader({
       '/project/ARCHITECTURE.md': '# Architecture\nHexagonal design.',
     })
@@ -51,7 +52,7 @@ describe('GetProjectContext', () => {
   })
 
   it('throws SchemaNotFoundError when schema not resolved', async () => {
-    const specRepos = new Map([['default', makeSpecRepository()]])
+    const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -81,7 +82,7 @@ describe('GetProjectContext', () => {
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -124,7 +125,7 @@ describe('GetProjectContext', () => {
         }),
       },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -162,7 +163,7 @@ describe('GetProjectContext', () => {
         'billing/payments/spec.md': '# Payments',
       },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -245,7 +246,7 @@ describe('GetProjectContext', () => {
     })
 
     const uc = new GetProjectContext(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(markdownParser),
@@ -347,10 +348,12 @@ describe('GetProjectContext', () => {
     })
 
     const uc = new GetProjectContext(
-      new Map([
-        ['core', coreRepo],
-        ['default', defaultRepo],
-      ]),
+      makeListWorkspaces(
+        new Map([
+          ['core', coreRepo],
+          ['default', defaultRepo],
+        ]),
+      ),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(markdownParser),
@@ -424,7 +427,7 @@ describe('GetProjectContext', () => {
     })
 
     const uc = new GetProjectContext(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(markdownParser),

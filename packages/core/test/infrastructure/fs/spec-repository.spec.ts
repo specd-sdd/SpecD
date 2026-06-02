@@ -702,17 +702,13 @@ describe('FsSpecRepository', () => {
       )
     })
 
-    it('saveSpecLock() throws ReadOnlyWorkspaceError', async () => {
+    it('updatePersistedSchema() throws ReadOnlyWorkspaceError', async () => {
       const { ReadOnlyWorkspaceError } =
         await import('../../../src/domain/errors/read-only-workspace-error.js')
       const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
 
       await expect(
-        roCtx.repo.saveSpecLock(spec, {
-          schema: { name: 'schema-std', version: 1 },
-          dependsOn: ['core:storage'],
-          implementation: [],
-        }),
+        roCtx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 }),
       ).rejects.toThrow(ReadOnlyWorkspaceError)
     })
 
@@ -823,47 +819,31 @@ describe('FsSpecRepository', () => {
     })
   })
 
-  describe('spec-lock sidecar', () => {
-    function makeSpecLockData(
-      overrides: Partial<SpecLockData> = {},
-      originalHash?: string,
-    ): SpecLockData {
-      return {
-        schema: overrides.schema ?? { name: 'schema-std', version: 1 },
-        dependsOn: overrides.dependsOn ?? ['core:storage'],
-        implementation: overrides.implementation ?? [],
-        ...(overrides.originalHash !== undefined ? { originalHash: overrides.originalHash } : {}),
-        ...(originalHash !== undefined ? { originalHash } : {}),
-      }
-    }
-
-    it('readSpecLock() returns null when absent', async () => {
+  describe('persisted spec state', () => {
+    it('readPersistedSchema() returns null when absent', async () => {
       const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
 
-      await expect(ctx.repo.readSpecLock(spec)).resolves.toBeNull()
+      await expect(ctx.repo.readPersistedSchema(spec)).resolves.toBeNull()
     })
 
-    it('saveSpecLock() persists and readSpecLock() parses content', async () => {
+    it('updatePersistedDependsOn() persists and readPersistedDependsOn() returns content', async () => {
       const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
 
-      await ctx.repo.saveSpecLock(
-        spec,
-        makeSpecLockData({ dependsOn: ['core:storage', 'default:_global/architecture'] }),
-      )
+      await ctx.repo.updatePersistedDependsOn(spec, [
+        'core:storage',
+        'default:_global/architecture',
+      ])
 
-      const result = await ctx.repo.readSpecLock(spec)
-      expect(result).not.toBeNull()
-      expect(result!.schema).toEqual({ name: 'schema-std', version: 1 })
-      expect(result!.dependsOn).toEqual(['core:storage', 'default:_global/architecture'])
-      expect(result!.originalHash).toBeDefined()
+      const result = await ctx.repo.readPersistedDependsOn(spec)
+      expect(result).toEqual(['core:storage', 'default:_global/architecture'])
     })
 
-    it('saveSpecLock() enforces conflict detection', async () => {
+    it('updatePersistedSchema() enforces conflict detection', async () => {
       const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
 
-      await ctx.repo.saveSpecLock(spec, makeSpecLockData())
-      const original = await ctx.repo.readSpecLock(spec)
-      expect(original).not.toBeNull()
+      await ctx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 })
+      const originalHash = await ctx.repo.specHash(spec)
+      expect(originalHash).not.toBeNull()
 
       await writeSpecFile(
         ctx,
@@ -880,17 +860,18 @@ describe('FsSpecRepository', () => {
       )
 
       await expect(
-        ctx.repo.saveSpecLock(
+        ctx.repo.updatePersistedSchema(
           spec,
-          makeSpecLockData({ dependsOn: ['core:storage', 'core:auth'] }, original!.originalHash),
+          { name: 'schema-std', version: 2 },
+          { originalHash: originalHash! },
         ),
       ).rejects.toBeInstanceOf(ArtifactConflictError)
     })
 
-    it('saveSpecLock() force overwrites on hash mismatch', async () => {
+    it('updatePersistedSchema() force overwrites on hash mismatch', async () => {
       const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
 
-      await ctx.repo.saveSpecLock(spec, makeSpecLockData())
+      await ctx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 })
       await writeSpecFile(
         ctx,
         'auth/login',
@@ -905,14 +886,19 @@ describe('FsSpecRepository', () => {
         ) + '\n',
       )
 
-      await ctx.repo.saveSpecLock(
+      await ctx.repo.updatePersistedSchema(
         spec,
-        makeSpecLockData({ dependsOn: ['core:storage', 'core:auth'] }, sha256('stale')),
-        { force: true },
+        { name: 'schema-std', version: 2 },
+        { force: true, originalHash: sha256('stale') },
       )
 
-      const result = await ctx.repo.readSpecLock(spec)
-      expect(result!.dependsOn).toEqual(['core:storage', 'core:auth'])
+      const result = await ctx.repo.readPersistedSchema(spec)
+      expect(result!.version).toBe(2)
+    })
+
+    it('specHash() returns null when no sidecar exists', async () => {
+      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      await expect(ctx.repo.specHash(spec)).resolves.toBeNull()
     })
 
     it('artifact() rejects spec-lock.json through the normal artifact API', async () => {

@@ -25,60 +25,70 @@
 #### Scenario: Created plugin satisfies runtime contract
 
 - **WHEN** `create()` is called
-- **THEN** the returned plugin has `type: 'agent'` (hardcoded)
-- **AND** the returned plugin has `name` and `version` sourced from `specd-plugin.json`
-- **AND** the returned plugin exposes `install(config, options)` and `uninstall(config, options)` functions using `SpecdConfig`
+- **THEN** the returned plugin has `type: 'agent'`
+- **AND** it exposes `install(config, options)` and `uninstall(config, options)`
+- **AND** it declares only Codex-supported capability identifiers during install
+
+#### Scenario: Codex runtime does not pass capability objects
+
+- **WHEN** the plugin prepares install-time rendering data
+- **THEN** it passes capability identifiers rather than pre-normalized capability objects
 
 ### Requirement: Skill installation and frontmatter injection
 
-#### Scenario: Install injects frontmatter and reports outcome
+#### Scenario: Install passes Codex capability identifiers and frontmatter source values
 
 - **GIVEN** skills are available from `@specd/skills`
-- **WHEN** `install(projectRoot, options)` runs with a selected skill set
-- **THEN** installed markdown skill files include Codex-compatible frontmatter prepended before content
-- **AND** the install result reports installed and skipped entries
+- **WHEN** `install(config, options)` runs
+- **THEN** the plugin passes Codex capability identifiers and frontmatter source values into `@specd/skills`
 
-#### Scenario: Install routes shared files to the shared directory
+#### Scenario: Install routes shared files to the rendered sharedFolder location
 
 - **GIVEN** a resolved bundle contains files marked as shared and non-shared
 - **WHEN** `install(config, options)` writes files
-- **THEN** shared files are written under `.codex/skills/_specd-shared/`
+- **THEN** shared files are written to the rendered sharedFolder location under the project root
 - **AND** non-shared files are written under `.codex/skills/<skill-name>/`
-- **AND** frontmatter is not prepended to shared files
+- **AND** shared files do not receive frontmatter
 
 ### Requirement: Frontmatter field contract
 
-#### Scenario: Codex emitter limits fields to supported keys
+#### Scenario: Codex value model limits fields to supported keys
 
-- **WHEN** frontmatter is generated for a skill file
-- **THEN** only `name` and `description` are emitted
+- **WHEN** frontmatter values are generated for a skill file
+- **THEN** only `name` and `description` are represented
 - **AND** unsupported keys are excluded
+
+#### Scenario: Unsupported Codex keys are absent from represented values
+
+- **WHEN** a field outside the Codex-supported set is considered
+- **THEN** it is not included in the Codex frontmatter value collection
 
 ### Requirement: Install location
 
-#### Scenario: Skills are written under Codex directory
+#### Scenario: Skills are written under Codex directory and sharedFolder default
 
 - **WHEN** install writes skill files
 - **THEN** files are created only under `.codex/skills/` within the target project root
+- **AND** shared files are written to the resolved `sharedFolder` location under the project root
 
 #### Scenario: Shared directory is not discovered as a skill
 
-- **WHEN** install creates `.codex/skills/_specd-shared/`
-- **THEN** the directory does not contain a `SKILL.md` file
+- **WHEN** install writes shared files to the resolved shared location
+- **THEN** that location does not contain a `SKILL.md` file
 
 ### Requirement: Uninstall behavior
 
 #### Scenario: Uninstall removes selected skill directories and keeps shared resources
 
-- **GIVEN** multiple skills are installed and share `.codex/skills/_specd-shared/`
+- **GIVEN** multiple skills are installed and share the resolved `sharedFolder` location
 - **WHEN** `uninstall(config, { skills: ['specd'] })` is executed
 - **THEN** only `.codex/skills/specd/` is removed
-- **AND** `.codex/skills/_specd-shared/` remains
+- **AND** the resolved shared location remains
 
 #### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
 
 - **GIVEN** specd-managed skills and unrelated user skills are installed under `.codex/skills/`
 - **WHEN** `uninstall(config)` is executed without `skills`
 - **THEN** all specd-managed skill directories are removed
-- **AND** `.codex/skills/_specd-shared/` is removed
+- **AND** the resolved sharedFolder location is removed
 - **AND** unrelated user skill directories remain

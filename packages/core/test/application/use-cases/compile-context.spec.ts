@@ -33,6 +33,7 @@ import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-st
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import {
   makeChangeRepository,
+  makeListWorkspaces,
   makeSpecRepository,
   makeArtifactType as makeArtifactTypeBase,
   makeSchema as makeSchemaBase,
@@ -286,7 +287,7 @@ function makeSut(opts: {
 
   const sut = new CompileContext(
     changeRepo,
-    specRepos ?? new Map(),
+    makeListWorkspaces((specRepos ?? new Map()) as unknown as Map<string, SpecRepository>),
     schemaProvider,
     fileReader ?? makeStubFileReader(),
     parsers,
@@ -342,7 +343,7 @@ describe('CompileContext', () => {
         () =>
           new CompileContext(
             makeStubChangeRepo(),
-            new Map(),
+            makeListWorkspaces(new Map()),
             makeStubSchemaProvider(null),
             makeStubFileReader(),
             new Map() as ArtifactParserRegistry,
@@ -357,7 +358,7 @@ describe('CompileContext', () => {
     it('throws ChangeNotFoundError when change is not found', async () => {
       const sut = new CompileContext(
         makeStubChangeRepo(),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeStubSchemaProvider(makeSchema()),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
@@ -378,7 +379,7 @@ describe('CompileContext', () => {
       const change = makeChange('my-change')
       const sut = new CompileContext(
         makeStubChangeRepo(change),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeStubSchemaProvider(null),
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,

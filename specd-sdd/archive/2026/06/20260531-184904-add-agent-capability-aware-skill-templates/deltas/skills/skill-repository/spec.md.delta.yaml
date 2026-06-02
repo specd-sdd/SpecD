@@ -1,0 +1,61 @@
+- op: modified
+  description: 'Update purpose for skill metadata, shared resolution, and renderer-owned capability handling'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    Defines the `SkillRepository` interface that provides access to skills and their bundles. The repository owns skill template discovery, skill metadata loading, shared template resolution, and capability-aware bundle rendering through `@specd/skills`.
+- op: modified
+  description: 'Update getBundle contract to use structured context and skill metadata'
+  selector:
+    type: section
+    matches: '^Requirement: getBundle\(\) method$'
+  content: |
+    The `getBundle()` method MUST:
+
+    - accept `name: string` and optional structured render context
+    - return `SkillBundle` with all template files resolved
+    - load the target skill's `skill.meta.json`
+    - normalize the provided capability list into the internal template capability model
+    - validate that `requiredCapabilities` are satisfied before rendering skill templates
+    - validate that templates do not rely on undeclared shared template requirements
+    - render template content using recursive variables and normalized capabilities
+
+    The repository interface MUST NOT require callers to pass pre-normalized capability objects.
+- op: modified
+  description: 'Replace inverse shared-file discovery with skill-declared shared requirements'
+  selector:
+    type: section
+    matches: '^Requirement: listSharedFiles\(\) method$'
+  content: |
+    The `listSharedFiles()` method MUST:
+
+    - scan the `templates/shared/` directory for shared template source files
+    - return `SharedFile[]` where each `SharedFile` has:
+      - `filename: string`
+      - `content: string`
+    - avoid depending on a shared-side inverse consumer index to determine which skills use which shared template
+
+    Shared template selection for bundle resolution MUST come from each skill's `requiredSharedTemplates` declaration instead.
+- op: modified
+  description: 'Update constraints for metadata-driven shared resolution and privacy-safe rendering'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - No I/O in the interface definition — implementations handle I/O.
+    - Bundle resolution MUST support install-time rendering from structured context, not only flat string substitution.
+    - Template source filenames and emitted bundle filenames MUST remain distinct: `.md.tpl` on disk in `packages/skills/templates/`, `.md` in resolved bundle output.
+    - `variables` MUST support recursive values addressable by template path traversal.
+    - Shared-file routing metadata MUST be preserved by rendering.
+    - Shared template inclusion MUST be driven by each skill's `requiredSharedTemplates` declaration.
+    - The repository MUST support internal normalization of `sharedFolder` without exposing absolute paths in rendered output.
+- op: modified
+  description: 'Add dependency on skill template source contract'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`skills:skill`](../skill/spec.md) — base skill type
+    - [`skills:skill-bundle`](../skill-bundle/spec.md) — bundle type
+    - [`skills:skill-templates-source`](../skill-templates-source/spec.md) — skill metadata, shared template declaration, and rendering contract

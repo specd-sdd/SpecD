@@ -15,6 +15,7 @@ import {
   type MetadataArtifactInput,
 } from './extract-metadata-from-spec-artifacts.js'
 import { Schema } from '../../../domain/value-objects/schema.js'
+import { type ProjectWorkspace } from '../list-workspaces.js'
 
 /**
  * Optional fallback configuration for extracting `dependsOn` from spec content
@@ -44,7 +45,7 @@ export interface DependsOnFallback {
  * @param dependsOnAdded - Accumulates specs found only via dependsOn traversal
  * @param allSeen - All spec keys ever visited (prevents re-processing)
  * @param ancestors - Current DFS ancestry set for cycle detection
- * @param specs - Spec repositories keyed by workspace name
+ * @param workspaces - Orchestrated workspaces keyed by name
  * @param warnings - Accumulator for advisory warnings
  * @param maxDepth - Maximum traversal depth; `undefined` = unlimited
  * @param currentDepth - Current traversal depth (0 = starting spec)
@@ -57,7 +58,7 @@ export async function traverseDependsOn(
   dependsOnAdded: Map<string, ResolvedSpec>,
   allSeen: Set<string>,
   ancestors: Set<string>,
-  specs: ReadonlyMap<string, SpecRepository>,
+  workspaces: ReadonlyMap<string, ProjectWorkspace>,
   warnings: ContextWarning[],
   maxDepth: number | undefined,
   currentDepth: number,
@@ -78,8 +79,8 @@ export async function traverseDependsOn(
 
   if (maxDepth !== undefined && currentDepth >= maxDepth) return
 
-  const specRepo = specs.get(workspace)
-  if (specRepo === undefined) {
+  const ws = workspaces.get(workspace)
+  if (ws === undefined) {
     warnings.push({
       type: 'unknown-workspace',
       path: workspace,
@@ -88,6 +89,7 @@ export async function traverseDependsOn(
     return
   }
 
+  const specRepo = ws.specRepo
   let specPathObj: SpecPath
   try {
     specPathObj = SpecPath.parse(capPath)
@@ -111,7 +113,7 @@ export async function traverseDependsOn(
 
     // Attempt fallback extraction from spec content
     if (fallback !== undefined && fallback.extraction.dependsOn !== undefined) {
-      dependsOn = await extractDependsOnFromContent(specRepo, spec, specs, fallback)
+      dependsOn = await extractDependsOnFromContent(specRepo, spec, workspaces, fallback)
     }
   }
 
@@ -129,7 +131,7 @@ export async function traverseDependsOn(
       dependsOnAdded,
       allSeen,
       newAncestors,
-      specs,
+      workspaces,
       warnings,
       maxDepth,
       currentDepth + 1,
@@ -144,14 +146,14 @@ export async function traverseDependsOn(
  *
  * @param specRepo - Repository for loading spec artifacts
  * @param spec - The spec entity to extract from
- * @param repositories - Repositories keyed by workspace name
+ * @param workspaces - Orchestrated workspaces keyed by name
  * @param fallback - Fallback configuration with extraction rules and parsers
  * @returns Extracted dependsOn array, or undefined if extraction yields nothing
  */
 async function extractDependsOnFromContent(
   specRepo: SpecRepository,
   spec: Spec,
-  repositories: ReadonlyMap<string, SpecRepository>,
+  workspaces: ReadonlyMap<string, ProjectWorkspace>,
   fallback: DependsOnFallback,
 ): Promise<string[] | undefined> {
   const artifacts: MetadataArtifactInput[] = []
@@ -175,6 +177,12 @@ async function extractDependsOnFromContent(
   }
 
   if (artifacts.length === 0) return undefined
+
+  // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts
+  const repositories = new Map<string, SpecRepository>()
+  for (const ws of workspaces.values()) {
+    repositories.set(ws.name, ws.specRepo)
+  }
 
   const extracted = await extractMetadataFromSpecArtifacts({
     effectiveSpecSchema: new Schema(

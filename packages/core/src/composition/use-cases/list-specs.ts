@@ -1,14 +1,14 @@
 import * as path from 'node:path'
 import { ListSpecs } from '../../application/use-cases/list-specs.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
+import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 
 /** Filesystem adapter options for `createListSpecs(context, options)`. */
 export interface FsListSpecsOptions {
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
+  readonly listWorkspaces: ListWorkspaces
 }
 
 /**
@@ -53,11 +53,11 @@ export function createListSpecs(configOrOptions: SpecdConfig | FsListSpecsOption
         ),
       ]),
     )
-    const hasher = new NodeContentHasher()
-    const yaml = new NodeYamlSerializer()
-    return new ListSpecs(specRepos, hasher, yaml)
+    return createListSpecs({
+      listWorkspaces: new ListWorkspaces(config, specRepos),
+    })
   }
   const hasher = new NodeContentHasher()
   const yaml = new NodeYamlSerializer()
-  return new ListSpecs(configOrOptions.specRepositories, hasher, yaml)
+  return new ListSpecs(configOrOptions.listWorkspaces, hasher, yaml)
 }

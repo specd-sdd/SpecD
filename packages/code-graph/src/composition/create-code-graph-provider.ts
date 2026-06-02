@@ -52,6 +52,7 @@ export function createCodeGraphProvider(
   factoryOptions?: CodeGraphFactoryOptions,
 ): CodeGraphProvider {
   const storagePath = isSpecdConfig(options) ? options.configPath : options.storagePath
+  const projectRoot = isSpecdConfig(options) ? options.projectRoot : options.projectRoot
   const graphOptions = isSpecdConfig(options) ? factoryOptions : options
   const graphStoreRegistry = createGraphStoreRegistry(graphOptions?.graphStoreFactories)
   const graphStoreId = graphOptions?.graphStoreId ?? DEFAULT_GRAPH_STORE_ID
@@ -74,7 +75,7 @@ export function createCodeGraphProvider(
 
   const indexer = new IndexCodeGraph(store, registry)
 
-  return new CodeGraphProvider(store, indexer)
+  return new CodeGraphProvider(store, indexer, projectRoot)
 }
 
 /**
@@ -83,7 +84,7 @@ export function createCodeGraphProvider(
  * @returns True if the options object is a SpecdConfig.
  */
 function isSpecdConfig(options: SpecdConfig | CodeGraphOptions): options is SpecdConfig {
-  return 'projectRoot' in options
+  return 'configPath' in options && 'workspaces' in options
 }
 
 /**

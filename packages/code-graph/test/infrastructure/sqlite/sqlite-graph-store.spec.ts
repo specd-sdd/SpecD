@@ -206,10 +206,12 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(2)
+    expect(SQLITE_SCHEMA_VERSION).toBe(4)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS documents')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS document_fts')
   })
 
   it('pushes exact findSymbols filters into SQL while preserving wildcard semantics', async () => {
@@ -345,6 +347,7 @@ describe('SQLiteGraphStore', () => {
       const store = new SQLiteGraphStore(tempDir)
       await store.open()
       await store.upsertFile(file, [symbol], [])
+      await store.rebuildFtsIndexes()
       const results = await store.searchSymbols({ query: 'pending-parent-artifact-review' })
       expect(results).toHaveLength(1)
       expect(results[0]!.symbol.name).toBe('pending-parent-artifact-review')
@@ -379,6 +382,7 @@ describe('SQLiteGraphStore', () => {
       const store = new SQLiteGraphStore(tempDir)
       await store.open()
       await store.upsertFile(file, [symNot, symUnrelated], [])
+      await store.rebuildFtsIndexes()
       const results = await store.searchSymbols({ query: 'NOT' })
       const names = results.map((r) => r.symbol.name)
       expect(names).toContain('assertNot')
@@ -421,6 +425,7 @@ describe('SQLiteGraphStore', () => {
       await store.open()
       await store.upsertFile(file1, [sym1], [])
       await store.upsertFile(file2, [sym2], [])
+      await store.rebuildFtsIndexes()
 
       // Combined search for terms in different files
       const results = await store.searchSymbols({ query: 'effectiveStatus findBlockingParent' })
@@ -460,6 +465,7 @@ describe('SQLiteGraphStore', () => {
       const store = new SQLiteGraphStore(tempDir)
       await store.open()
       await store.upsertFile(file, [partialMatch, fullMatch], [])
+      await store.rebuildFtsIndexes()
 
       const results = await store.searchSymbols({ query: 'effective status' })
 

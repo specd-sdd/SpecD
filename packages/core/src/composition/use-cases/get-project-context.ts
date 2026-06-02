@@ -1,6 +1,5 @@
 import * as path from 'node:path'
 import { GetProjectContext } from '../../application/use-cases/get-project-context.js'
-import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
@@ -14,15 +13,12 @@ import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
 import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
+import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 
 /** Filesystem adapter options for `createGetProjectContext(options)`. */
 export interface FsGetProjectContextOptions {
-  /**
-   * Pre-built spec repositories keyed by workspace name.
-   *
-   * Must include entries for every workspace declared in the project config.
-   */
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
+  /** The project orchestrator. */
+  readonly listWorkspaces: ListWorkspaces
   /** Absolute path to the `node_modules` directory for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
@@ -66,6 +62,25 @@ export function createGetProjectContext(
 ): GetProjectContext {
   if (isSpecdConfig(configOrOptions)) {
     const config = configOrOptions
+    const specRepos = new Map(
+      config.workspaces.map((ws) => [
+        ws.name,
+        createSpecRepository(
+          'fs',
+          {
+            workspace: ws.name,
+            ownership: ws.ownership,
+            isExternal: ws.isExternal,
+            configPath: config.configPath,
+          },
+          {
+            specsPath: ws.specsPath,
+            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
+            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
+          },
+        ),
+      ]),
+    )
     const schemaRepos = new Map(
       config.workspaces
         .filter((ws) => ws.schemasPath !== null)
@@ -83,26 +98,9 @@ export function createGetProjectContext(
           ),
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
+    const listWorkspaces = new ListWorkspaces(config, specRepos)
     return createGetProjectContext({
-      specRepositories: new Map(
-        config.workspaces.map((ws) => [
-          ws.name,
-          createSpecRepository(
-            'fs',
-            {
-              workspace: ws.name,
-              ownership: ws.ownership,
-              isExternal: ws.isExternal,
-              configPath: config.configPath,
-            },
-            {
-              specsPath: ws.specsPath,
-              metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-              ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-            },
-          ),
-        ]),
-      ),
+      listWorkspaces,
       nodeModulesPaths: [
         path.join(config.projectRoot, 'node_modules'),
         ...(options?.extraNodeModulesPaths ?? []),
@@ -125,7 +123,7 @@ export function createGetProjectContext(
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
   return new GetProjectContext(
-    opts.specRepositories,
+    opts.listWorkspaces,
     schemaProvider,
     files,
     parsers,

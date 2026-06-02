@@ -32,6 +32,18 @@ describe('SymbolNode', () => {
     expect(node.id).toContain('src/domain/file.ts')
   })
 
+  it('keeps root-namespaced file paths inside the symbol id', () => {
+    const node = createSymbolNode({
+      name: 'sync',
+      kind: SymbolKind.Function,
+      filePath: 'root:dev/scripts/sync.ts',
+      line: 1,
+      column: 0,
+    })
+    expect(node.id).toBe('root:dev/scripts/sync.ts:function:sync:1:0')
+    expect(node.filePath).toBe('root:dev/scripts/sync.ts')
+  })
+
   it('same inputs produce same id', () => {
     const a = createSymbolNode({
       name: 'fn',

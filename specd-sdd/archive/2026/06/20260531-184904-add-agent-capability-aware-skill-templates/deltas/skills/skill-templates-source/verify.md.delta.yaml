@@ -1,0 +1,156 @@
+- op: modified
+  description: 'Verify template source files use .md.tpl and declare skill metadata'
+  selector:
+    type: section
+    matches: '^Requirement: Template source location$'
+  content: |
+    #### Scenario: Templates use markdown template extension
+
+    - **WHEN** files under `packages/skills/templates/<skill-name>/` are inspected
+    - **THEN** template source files end with `.md.tpl`
+    - **AND** they do not use plain `.md` as the source template extension
+
+    #### Scenario: Skill directories declare metadata
+
+    - **WHEN** a skill template directory is inspected
+    - **THEN** it contains `skill.meta.json`
+
+    #### Scenario: Rendered install files drop the template suffix
+
+    - **GIVEN** a skill template source file named `SKILL.md.tpl`
+    - **WHEN** `@specd/skills` resolves the install bundle
+    - **THEN** the emitted bundle filename is `SKILL.md`
+- op: modified
+  description: 'Verify migration reflects skill-local metadata and shared source layout'
+  selector:
+    type: section
+    matches: '^Requirement: Template migration$'
+  content: |
+    #### Scenario: Migrated template tree is complete
+
+    - **WHEN** the template source directory is validated
+    - **THEN** it contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`
+    - **AND** it contains `shared/` for shared template source files
+
+    #### Scenario: Shared consumer index is no longer authoritative
+
+    - **WHEN** shared template ownership is reviewed
+    - **THEN** `shared.meta.json` is not the source of truth for which skills require shared templates
+- op: added
+  description: 'Verify skill metadata contract'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Template migration$'
+  content: |
+    ### Requirement: Skill template metadata contract
+
+    #### Scenario: skill.meta.json declares supported, required, and shared requirements
+
+    - **WHEN** a `skill.meta.json` file is inspected
+    - **THEN** it declares `supportedCapabilities`
+    - **AND** it declares `requiredCapabilities`
+    - **AND** it declares `requiredSharedTemplates`
+
+    #### Scenario: Initial capability catalogue is declared by the contract
+
+    - **WHEN** the skill metadata contract is reviewed
+    - **THEN** the initial required capability identifiers are `mcp`, `agents`, and `frontmatter`
+
+- op: added
+  description: 'Verify capability-aware install-time rendering'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Skill template metadata contract$'
+  content: |
+
+    ### Requirement: Capability-aware install-time rendering
+
+    #### Scenario: Templates branch on provided capability identifiers
+
+    - **GIVEN** install-time render context includes capability identifiers for a target runtime
+    - **WHEN** a skill template uses a conditional block based on those capabilities
+    - **THEN** `@specd/skills` renders the branch that matches the provided capability identifiers
+
+    #### Scenario: Shared references use sharedFolder variable syntax
+
+    - **WHEN** a template references a shared template path
+    - **THEN** it uses the form `@{{sharedFolder}}/shared.md`
+
+    #### Scenario: Templates do not render absolute shared paths
+
+    - **WHEN** installed markdown is reviewed
+    - **THEN** shared template references remain relative to the project root
+    - **AND** they do not contain absolute filesystem paths
+
+    #### Scenario: Frontmatter capability controls frontmatter insertion
+
+    - **GIVEN** a template contains a frontmatter insertion point
+    - **AND** `variables.frontmatter` is present
+    - **WHEN** install-time rendering runs with `frontmatter` enabled
+    - **THEN** the final frontmatter block is inserted
+- op: modified
+  description: 'Verify frontmatter source remains structured values'
+  selector:
+    type: section
+    matches: '^Requirement: Frontmatter source$'
+  content: |
+    #### Scenario: Runtime metadata is sourced from canonical contracts
+
+    - **WHEN** plugin frontmatter models are reviewed
+    - **THEN** each model is derived from canonical skill metadata and the corresponding vendor documentation
+    - **AND** field definitions match the documented runtime contracts
+
+    #### Scenario: Plugins provide structured values instead of prebuilt YAML
+
+    - **WHEN** an agent plugin prepares install-time frontmatter input for `@specd/skills`
+    - **THEN** it passes a structured value collection
+    - **AND** it does not pass a prebuilt YAML frontmatter document
+- op: modified
+  description: 'Verify frontmatter injection is performed by skills'
+  selector:
+    type: section
+    matches: '^Requirement: Frontmatter injection$'
+  content: |
+    #### Scenario: Injection filters by target runtime support
+
+    - **WHEN** an agent plugin installs skills
+    - **THEN** the final rendered markdown includes only fields supported by that runtime
+    - **AND** unsupported fields are excluded from emitted markdown files
+
+    #### Scenario: Shared files do not receive runtime frontmatter
+
+    - **GIVEN** a resolved bundle includes files marked as shared
+    - **WHEN** `@specd/skills` renders the install output
+    - **THEN** shared files are emitted without runtime skill frontmatter
+- op: removed
+  description: 'Replace why-no-frontmatter verification section'
+  selector:
+    type: section
+    matches: '^Requirement: Why no frontmatter in skills package$'
+
+- op: added
+  description: 'Verify templates remain free of static frontmatter blocks'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Agent frontmatter matrix$'
+  content: |
+    ### Requirement: Why no frontmatter in skills package
+
+    #### Scenario: Runtime-specific metadata stays value-driven
+
+    - **WHEN** shared skill templates and installed skill outputs are compared
+    - **THEN** templates remain free of static runtime-specific frontmatter blocks
+    - **AND** runtime-specific values come from the target agent plugin
+    - **AND** the final frontmatter block is composed during skills rendering

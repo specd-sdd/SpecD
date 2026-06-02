@@ -178,7 +178,8 @@ const WorkspaceGraphZodSchema = z
 
 const ProjectGraphZodSchema = z
   .object({
-    paths: z.array(z.string()).optional(),
+    includePaths: z.array(z.string()).optional(),
+    excludePaths: z.array(z.string()).optional(),
   })
   .strict()
 
@@ -1256,7 +1257,12 @@ export class FsConfigLoader implements ConfigLoader {
       ...(data.graph !== undefined
         ? {
             graph: {
-              ...(data.graph.paths !== undefined ? { paths: data.graph.paths } : {}),
+              ...(data.graph.includePaths !== undefined
+                ? { includePaths: data.graph.includePaths }
+                : {}),
+              ...(data.graph.excludePaths !== undefined
+                ? { excludePaths: data.graph.excludePaths }
+                : {}),
             },
           }
         : {}),

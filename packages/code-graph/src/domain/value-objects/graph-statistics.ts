@@ -5,6 +5,7 @@ import { type RelationType } from './relation-type.js'
  */
 export interface GraphStatistics {
   readonly fileCount: number
+  readonly documentCount: number
   readonly symbolCount: number
   readonly specCount: number
   readonly relationCounts: Readonly<Record<RelationType, number>>

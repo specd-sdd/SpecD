@@ -445,6 +445,7 @@
       "then": ["only specs within the billing workspace are returned"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:0eaca38e8840a02705bb793d1685bfc898dc8c7f5a178ab0e4a9f51ee0acc13e",
     "verify.md": "sha256:19915ff6f2928b8879500ce6f3b70bd9f1480206a0186d50cebc6286122b6885"

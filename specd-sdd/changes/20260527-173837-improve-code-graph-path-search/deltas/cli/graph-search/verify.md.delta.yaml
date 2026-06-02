@@ -1,0 +1,12 @@
+- op: added
+  description: 'Add verification scenario for document search category.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Command signature$'
+  content: |
+    #### Scenario: Search supports document filter
+
+    - **WHEN** `specd graph search "ADR" --documents` is run
+    - **THEN** the command successfully executes
+    - **AND** it passes the document category filter to the graph provider

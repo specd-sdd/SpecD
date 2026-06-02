@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:change-manifest", "core:compile-context"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/deps.ts",
+      "symbols": ["registerChangeDeps"]
+    }
+  ]
+}

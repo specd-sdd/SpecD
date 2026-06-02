@@ -1,0 +1,126 @@
+{
+  "title": "Document Model",
+  "description": "The code graph traditionally focuses on parser-recognized source code and symbol semantics, but a complete project includes valuable textual information in non-code files such as documentation (ADRs, guides), configuration, and scripts. The `DocumentModel` defines the `DocumentNode` family, providing a way to represent and search textual project resources that do not map to symbols. It also introduces the reserved `root:` namespace for resources that exist outside of workspace code roots, ensuring every project resource has a stable, searchable graph identity.",
+  "dependsOn": ["code-graph:symbol-model", "code-graph:graph-store", "core:config"],
+  "context": [
+    "The code graph traditionally focuses on parser-recognized source code and symbol semantics, but a complete project includes valuable textual information in non-code files such as documentation (ADRs, guides), configuration, and scripts. The `DocumentModel` defines the `DocumentNode` family, providing a way to represent and search textual project resources that do not map to symbols. It also introduces the reserved `root:` namespace for resources that exist outside of workspace code roots, ensuring every project resource has a stable, searchable graph identity."
+  ],
+  "rules": [
+    {
+      "requirement": "DocumentNode properties",
+      "rules": [
+        "A `DocumentNode` SHALL represent a textual non-code project resource. It MUST include the following properties:\n\n- `path` — the unique identifier for the node (e.g., `core:docs/adr/0001.md` or `root:package.json`)\n- `configRelativePath` — the path relative to the project root used for UI rendering\n- `contentHash` — SHA-256 hash of the content used for incremental indexing\n- `content` — the raw textual content used for full-text search\n- `workspace` — the owning workspace name, or `root` for project-global documents"
+      ]
+    },
+    {
+      "requirement": "Reserved root namespace",
+      "rules": [
+        "The graph SHALL support a reserved `root:` prefix for its node identities. This namespace MUST be used for files discovered via project-global `graph.includePaths` that are not owned by a specific workspace. Identities in this namespace SHALL take the form `root:<project-relative-path>`."
+      ]
+    },
+    {
+      "requirement": "Textual classification fallback",
+      "rules": [
+        "During indexing, a file that does not match any registered language adapter SHALL be classified as a `DocumentNode` if its content is determined to be textual. Files detected as binary SHALL be skipped and MUST NOT produce a node in the graph.\n\nFilesystem-backed spec directories exposed by a repository `specsPath` capability MUST be excluded from file/document discovery. Spec artifacts enter the graph through spec indexing only; they MUST NOT also become `DocumentNode` entries."
+      ]
+    },
+    {
+      "requirement": "Search category",
+      "rules": [
+        "The document category SHALL be a first-class citizen in the graph search API. It MUST be possible to filter search results specifically to include or exclude `DocumentNode` results."
+      ]
+    }
+  ],
+  "constraints": [
+    "A DocumentNode SHALL NOT produce symbol nodes or structural relations (like CALLS or DEPENDS_ON code) by default.",
+    "The path of a DocumentNode MUST NOT collide with any FileNode path in the same workspace.",
+    "root is a reserved workspace name for the graph and cannot be used by normal spec workspaces.",
+    "A file already owned by a workspace codeRoot MUST NOT also be indexed as a root: document."
+  ],
+  "scenarios": [
+    {
+      "requirement": "DocumentNode properties",
+      "name": "DocumentNode has required graph properties",
+      "when": ["a DocumentNode is created"],
+      "then": ["it includes path, configRelativePath, contentHash, content, and workspace"]
+    },
+    {
+      "requirement": "Reserved root namespace",
+      "name": "Global file identity uses root: prefix",
+      "given": ["a file package.json discovered via project-global graph.includePaths"],
+      "when": ["its node identity is computed"],
+      "then": ["it is root:package.json", "AND its workspace is root"]
+    },
+    {
+      "requirement": "Textual classification fallback",
+      "name": "Text file with no adapter becomes a DocumentNode",
+      "given": ["a .md file with no language adapter registered"],
+      "when": ["it is indexed"],
+      "then": [
+        "it produces a DocumentNode in the graph",
+        "AND it does not produce any symbol nodes"
+      ]
+    },
+    {
+      "requirement": "Textual classification fallback",
+      "name": "Binary file is skipped",
+      "given": ["a .png file"],
+      "when": ["it is indexed"],
+      "then": ["no node is created in the graph"]
+    },
+    {
+      "requirement": "Textual classification fallback",
+      "name": "Filesystem-backed spec file is not indexed as a document",
+      "given": [
+        "a filesystem-backed repository exposes a specsPath",
+        "AND a spec.md file exists under that root"
+      ],
+      "when": ["file/document discovery runs"],
+      "then": ["no DocumentNode is created for that spec artifact"]
+    },
+    {
+      "requirement": "Textual classification fallback",
+      "name": "Workspace-owned file is not duplicated as root document",
+      "given": [
+        "a file under a configured workspace codeRoot",
+        "AND it also matches a project-global graph.includePaths pattern"
+      ],
+      "when": ["indexing runs"],
+      "then": [
+        "it is indexed only under the workspace-owned identity",
+        "AND no duplicate root: document is created"
+      ]
+    },
+    {
+      "requirement": "Search category",
+      "name": "Documents are searchable separately",
+      "when": ["the graph is queried with a document filter"],
+      "then": ["only DocumentNode results are returned"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "code-graph:document-model",
+        "file": "code-graph:test/domain/value-objects/document-node.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "code-graph:document-model",
+        "file": "code-graph:src/domain/value-objects/document-node.ts",
+        "symbol": "DocumentNode"
+      },
+      {
+        "specId": "code-graph:document-model",
+        "file": "code-graph:src/domain/value-objects/document-node.ts",
+        "symbol": "createDocumentNode"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:617126c84fa22d4ab7494d018933c58b8cd888454da3a70bf0b042c38bb97fca",
+    "verify.md": "sha256:6bee7f60208190b1a89721d49c76d08fb1ae24da9652c162dd7dab4a589d404a"
+  },
+  "generatedBy": "core"
+}

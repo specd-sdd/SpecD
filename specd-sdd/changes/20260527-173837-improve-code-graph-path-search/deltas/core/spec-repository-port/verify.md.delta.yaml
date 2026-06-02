@@ -1,0 +1,68 @@
+- op: removed
+  description: 'Remove raw spec-lock API verification in favor of semantic repository verification.'
+  selector:
+    type: section
+    matches: '^Requirement: spec-lock sidecar read and write$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+
+- op: added
+  description: 'Add Spec counting verification scenarios.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: saveMetadata persists metadata with conflict detection$'
+  content: |
+    ### Requirement: Spec counting
+
+    #### Scenario: Count returns total spec size
+
+    - **GIVEN** a workspace with a known number of specs
+    - **WHEN** `SpecRepository.count()` is called
+    - **THEN** it returns an integer equal to the number of specs in the workspace
+
+- op: added
+  description: 'Add semantic persisted-spec repository verification scenarios.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: persisted spec semantics and stable spec hash
+
+    #### Scenario: specHash remains stable when state is unchanged
+
+    - **GIVEN** a spec with existing persisted semantic state
+    - **WHEN** the repository is asked for its stable spec hash multiple times
+    - **THEN** the returned hash is identical in every call
+
+    #### Scenario: specHash changes when state is modified
+
+    - **GIVEN** a spec whose persisted schema, dependencies, or implementation links are updated
+    - **WHEN** the repository is asked for its stable spec hash again
+    - **THEN** the returned hash differs from the previous value
+
+- op: added
+  description: 'Add filesystem-backed specs capability verification scenarios.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Filesystem-backed specs capability
+
+    #### Scenario: Filesystem-backed repository exposes canonical specsPath
+
+    - **GIVEN** a repository backed by filesystem directories
+    - **WHEN** the repository is constructed
+    - **THEN** it exposes an absolute `specsPath` identifying its canonical spec root
+
+    #### Scenario: Non-filesystem repository does not require specsPath
+
+    - **GIVEN** a repository implementation not backed by a directly addressable filesystem
+    - **WHEN** it implements the `SpecRepository` contract
+    - **THEN** it is not required to expose `specsPath`

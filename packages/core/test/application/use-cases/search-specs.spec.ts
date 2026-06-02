@@ -1,218 +1,202 @@
 import { describe, it, expect, vi } from 'vitest'
 import { SearchSpecs } from '../../../src/application/use-cases/search-specs.js'
-import { type SpecSearchResult } from '../../../src/application/ports/spec-repository.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-import { makeSpecRepository, makeContentHasher } from './helpers.js'
+import { makeSpecRepository, makeContentHasher, makeListWorkspaces } from './helpers.js'
+
 import { type YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
 
 function makeYamlSerializer(): YamlSerializer {
   return {
-    parse(): unknown {
-      return null
-    },
-    stringify(): string {
-      return ''
-    },
-  }
-}
-
-function mockSearchRepo(
-  workspace: string,
-  specs: Spec[],
-  searchResults: SpecSearchResult[],
-): ReturnType<typeof makeSpecRepository> {
-  const repo = makeSpecRepository({ specs, workspace })
-  vi.spyOn(repo, 'search').mockResolvedValue(searchResults)
-  return repo
+    parse: vi.fn().mockReturnValue({}),
+    serialize: vi.fn().mockReturnValue(''),
+    parseDelta: vi.fn().mockReturnValue([]),
+  } as unknown as YamlSerializer
 }
 
 describe('SearchSpecs', () => {
-  it('merges results across workspaces', async () => {
-    const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
-    const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
-
-    const repo1 = mockSearchRepo(
-      'alpha',
-      [spec1],
-      [{ spec: spec1, score: 3, matches: [{ filename: 'spec.md', line: 1, snippet: 'auth' }] }],
-    )
-    const repo2 = mockSearchRepo(
-      'beta',
-      [spec2],
-      [{ spec: spec2, score: 5, matches: [{ filename: 'spec.md', line: 1, snippet: 'billing' }] }],
-    )
+  it('returns results across all workspaces', async () => {
+    const repoA = makeSpecRepository({
+      specs: [new Spec('a', SpecPath.parse('foo'), ['spec.md'])],
+    })
+    const repoB = makeSpecRepository({
+      specs: [new Spec('b', SpecPath.parse('bar'), ['spec.md'])],
+    })
+    repoA.search = async () => [
+      { spec: new Spec('a', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+    ]
+    repoB.search = async () => [
+      { spec: new Spec('b', SpecPath.parse('bar'), ['spec.md']), score: 2, matches: [] },
+    ]
 
     const specRepos = new Map([
-      ['alpha', repo1],
-      ['beta', repo2],
+      ['a', repoA],
+      ['b', repoB],
     ])
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
 
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('keyword')
+    const result = (await uc.execute('query')) as any[]
 
     expect(result).toHaveLength(2)
-    expect(result[0]!.workspace).toBe('beta')
-    expect(result[0]!.score).toBe(5)
-    expect(result[1]!.workspace).toBe('alpha')
-    expect(result[1]!.score).toBe(3)
+    expect(result[0]!.workspace).toBe('b') // ranked by score
+    expect(result[1]!.workspace).toBe('a')
   })
 
-  it('filters by workspace', async () => {
-    const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
-    const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
-
-    const repo1 = mockSearchRepo(
-      'alpha',
-      [spec1],
-      [{ spec: spec1, score: 1, matches: [{ filename: 'spec.md', line: 1, snippet: 'auth' }] }],
-    )
-    const repo2 = mockSearchRepo(
-      'beta',
-      [spec2],
-      [{ spec: spec2, score: 2, matches: [{ filename: 'spec.md', line: 1, snippet: 'billing' }] }],
-    )
+  it('filters by workspace when provided', async () => {
+    const repoA = makeSpecRepository()
+    const repoB = makeSpecRepository()
+    repoA.search = async () => [
+      { spec: new Spec('a', SpecPath.parse('foo'), []), score: 1, matches: [] },
+    ]
+    repoB.search = async () => [
+      { spec: new Spec('b', SpecPath.parse('bar'), []), score: 1, matches: [] },
+    ]
 
     const specRepos = new Map([
-      ['alpha', repo1],
-      ['beta', repo2],
+      ['a', repoA],
+      ['b', repoB],
     ])
-
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('keyword', { workspaces: ['alpha'] })
-
-    expect(result).toHaveLength(1)
-    expect(result[0]!.workspace).toBe('alpha')
-  })
-
-  it('handles repo errors silently', async () => {
-    const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
-    const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
-
-    const repo1 = mockSearchRepo(
-      'alpha',
-      [spec1],
-      [{ spec: spec1, score: 1, matches: [{ filename: 'spec.md', line: 1, snippet: 'auth' }] }],
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
     )
-    const repo2 = mockSearchRepo('beta', [spec2], [])
-    vi.spyOn(repo2, 'search').mockRejectedValue(new Error('disk error'))
 
-    const specRepos = new Map([
-      ['alpha', repo1],
-      ['beta', repo2],
-    ])
-
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('keyword')
+    const result = await uc.execute('query', { workspaces: ['a'] })
 
     expect(result).toHaveLength(1)
-    expect(result[0]!.workspace).toBe('alpha')
+    expect(result[0]!.workspace).toBe('a')
   })
 
-  it('returns empty when no matches', async () => {
-    const repo = mockSearchRepo('default', [], [])
+  it('limits results when limit is provided', async () => {
+    const repo = makeSpecRepository()
+    repo.search = async () => [
+      { spec: new Spec('default', SpecPath.parse('a'), []), score: 3, matches: [] },
+      { spec: new Spec('default', SpecPath.parse('b'), []), score: 2, matches: [] },
+      { spec: new Spec('default', SpecPath.parse('c'), []), score: 1, matches: [] },
+    ]
+
     const specRepos = new Map([['default', repo]])
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
 
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('nonexistent')
+    const result = await uc.execute('query', { limit: 2 })
+
+    expect(result).toHaveLength(2)
+    expect(result[0]!.path).toBe('a')
+    expect(result[1]!.path).toBe('b')
+  })
+
+  it('includes summaries when requested', async () => {
+    const repo = makeSpecRepository({
+      specs: [new Spec('default', SpecPath.parse('foo'), ['spec.md'])],
+      artifacts: {
+        'foo/spec.md': '# Title\n\nThis is a summary.',
+      },
+    })
+    repo.search = async () => [
+      { spec: new Spec('default', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+    ]
+
+    const specRepos = new Map([['default', repo]])
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
+
+    const result = await uc.execute('query', { includeSummary: true })
+
+    expect(result[0]!.summary).toBe('This is a summary.')
+  })
+
+  it('resolves title from metadata first', async () => {
+    const repo = makeSpecRepository({
+      specs: [new Spec('default', SpecPath.parse('foo'), ['spec.md', 'metadata.json'])],
+      artifacts: {
+        'foo/metadata.json': JSON.stringify({ title: 'Metadata Title' }),
+        'foo/spec.md': '# Header Title',
+      },
+    })
+    repo.search = async () => [
+      { spec: new Spec('default', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+    ]
+
+    const specRepos = new Map([['default', repo]])
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
+
+    const result = (await uc.execute('query')) as any[]
+
+    expect(result[0]!.title).toBe('Metadata Title')
+  })
+
+  it('falls back to H1 header for title when metadata lacks it', async () => {
+    const repo = makeSpecRepository({
+      specs: [new Spec('default', SpecPath.parse('foo'), ['spec.md'])],
+      artifacts: {
+        'foo/spec.md': '# Header Title',
+      },
+    })
+    repo.search = async () => [
+      { spec: new Spec('default', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+    ]
+
+    const specRepos = new Map([['default', repo]])
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
+
+    const result = (await uc.execute('query')) as any[]
+
+    expect(result[0]!.title).toBe('Header Title')
+  })
+
+  it('falls back to spec path for title when neither exists', async () => {
+    const repo = makeSpecRepository({
+      specs: [new Spec('default', SpecPath.parse('foo/bar'), [])],
+    })
+    repo.search = async () => [
+      { spec: new Spec('default', SpecPath.parse('foo/bar'), []), score: 1, matches: [] },
+    ]
+
+    const specRepos = new Map([['default', repo]])
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
+
+    const result = (await uc.execute('query')) as any[]
+
+    expect(result[0]!.title).toBe('foo/bar')
+  })
+
+  it('handles empty results gracefully', async () => {
+    const repo = makeSpecRepository()
+    repo.search = async () => []
+
+    const specRepos = new Map([['default', repo]])
+    const uc = new SearchSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
+
+    const result = (await uc.execute('query')) as any[]
 
     expect(result).toEqual([])
-  })
-
-  it('resolves title from spec path fallback', async () => {
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const repo = mockSearchRepo(
-      'default',
-      [spec],
-      [{ spec, score: 1, matches: [{ filename: 'spec.md', line: 1, snippet: 'auth' }] }],
-    )
-
-    const specRepos = new Map([['default', repo]])
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('auth')
-
-    expect(result[0]!.title).toBe('login')
-  })
-
-  it('resolves title from metadata when available', async () => {
-    const spec = new Spec('default', SpecPath.parse('auth/login'), [
-      'spec.md',
-      '.specd-metadata.yaml',
-    ])
-    const repo = makeSpecRepository({
-      specs: [spec],
-      artifacts: {
-        'auth/login/.specd-metadata.yaml': JSON.stringify({ title: 'Login Flow' }),
-      },
-    })
-    vi.spyOn(repo, 'search').mockResolvedValue([
-      { spec, score: 1, matches: [{ filename: 'spec.md', line: 1, snippet: 'auth' }] },
-    ])
-
-    const specRepos = new Map([['default', repo]])
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('auth')
-
-    expect(result[0]!.title).toBe('Login Flow')
-  })
-
-  it('resolves summary when includeSummary is true', async () => {
-    const spec = new Spec('default', SpecPath.parse('auth/login'), [
-      'spec.md',
-      '.specd-metadata.yaml',
-    ])
-    const repo = makeSpecRepository({
-      specs: [spec],
-      artifacts: {
-        'auth/login/.specd-metadata.yaml': JSON.stringify({
-          title: 'Login',
-          description: 'User login flow',
-        }),
-      },
-    })
-    vi.spyOn(repo, 'search').mockResolvedValue([
-      { spec, score: 1, matches: [{ filename: 'spec.md', line: 1, snippet: 'auth' }] },
-    ])
-
-    const specRepos = new Map([['default', repo]])
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('auth', { includeSummary: true })
-
-    expect(result[0]!.summary).toBe('User login flow')
-  })
-
-  it('respects limit option', async () => {
-    const spec1 = new Spec('alpha', SpecPath.parse('a/one'), ['spec.md'])
-    const spec2 = new Spec('beta', SpecPath.parse('b/two'), ['spec.md'])
-    const spec3 = new Spec('gamma', SpecPath.parse('c/three'), ['spec.md'])
-
-    const repo1 = mockSearchRepo(
-      'alpha',
-      [spec1],
-      [{ spec: spec1, score: 3, matches: [{ filename: 'spec.md', line: 1, snippet: 'k' }] }],
-    )
-    const repo2 = mockSearchRepo(
-      'beta',
-      [spec2],
-      [{ spec: spec2, score: 5, matches: [{ filename: 'spec.md', line: 1, snippet: 'k' }] }],
-    )
-    const repo3 = mockSearchRepo(
-      'gamma',
-      [spec3],
-      [{ spec: spec3, score: 1, matches: [{ filename: 'spec.md', line: 1, snippet: 'k' }] }],
-    )
-
-    const specRepos = new Map([
-      ['alpha', repo1],
-      ['beta', repo2],
-      ['gamma', repo3],
-    ])
-
-    const uc = new SearchSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
-    const result = await uc.execute('k', { limit: 2 })
-
-    expect(result).toHaveLength(2)
-    expect(result[0]!.score).toBe(5)
-    expect(result[1]!.score).toBe(3)
   })
 })

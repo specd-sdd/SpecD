@@ -30,6 +30,7 @@ import {
   makeActorResolver,
   makeArtifactType,
   makeChangeRepository,
+  makeListWorkspaces,
   makeParsers,
   makeRunStepHooks,
   makeSchema,
@@ -259,7 +260,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -270,7 +271,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -335,7 +335,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -346,7 +346,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -402,7 +401,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -413,7 +412,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -449,9 +447,9 @@ describe('ArchiveChange batch snapshot integration', () => {
     const specRepo = makeSpecRepository({
       specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
       artifacts: { 'auth/oauth/spec.md': '# Old' },
-      async publish(): Promise<void> {
-        throw new SpecPublicationError('default:auth/oauth', '/tmp/staging', 'fail')
-      },
+    })
+    vi.spyOn(specRepo, 'publish').mockImplementation(async (): Promise<void> => {
+      throw new SpecPublicationError('default:auth/oauth', '/tmp/staging', 'fail')
     })
     const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
     change.setArtifact(
@@ -478,7 +476,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', specRepo]]),
+      makeListWorkspaces(new Map([['default', specRepo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -489,7 +487,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       new PartialRestoreSnapshot(),
     )
 
@@ -536,7 +533,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       archiveRepo,
       makeRunStepHooks(),
       makeActorResolver(),
@@ -547,7 +544,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -619,7 +615,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', specRepo]]),
+      makeListWorkspaces(new Map([['default', specRepo]])),
       archiveRepo,
       makeRunStepHooks(),
       makeActorResolver(),
@@ -668,7 +664,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -679,7 +675,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -747,7 +742,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       runStepHooks,
       makeActorResolver(),
@@ -758,7 +753,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 

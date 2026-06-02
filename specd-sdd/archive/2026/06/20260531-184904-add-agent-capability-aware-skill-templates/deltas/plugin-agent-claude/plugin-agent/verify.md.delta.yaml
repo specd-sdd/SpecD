@@ -1,0 +1,87 @@
+- op: modified
+  description: 'Verify Claude frontmatter values stay structured'
+  selector:
+    type: section
+    matches: '^Requirement: Frontmatter type$'
+  content: |
+    #### Scenario: Frontmatter values cover Claude-supported metadata
+
+    - **WHEN** Claude frontmatter values are prepared for install
+    - **THEN** they can represent the Claude-supported metadata fields
+    - **AND** they are stored as structured values rather than a prebuilt YAML document
+
+    #### Scenario: Unsupported Claude metadata stays out of the value collection
+
+    - **WHEN** a non-Claude metadata key is proposed
+    - **THEN** it is excluded from the Claude frontmatter value collection
+- op: modified
+  description: 'Verify Claude install flow passes capability identifiers and aligned sharedFolder'
+  selector:
+    type: section
+    matches: '^Requirement: Application layer$'
+  content: |
+    #### Scenario: InstallSkills passes Claude values into skills rendering
+
+    - **GIVEN** skills are available from `@specd/skills`
+    - **WHEN** `InstallSkills` runs
+    - **THEN** it resolves Claude frontmatter source values per skill
+    - **AND** it passes only Claude capability identifiers into `@specd/skills`
+
+    #### Scenario: Shared files are written to the rendered sharedFolder location
+
+    - **GIVEN** a resolved bundle contains files marked as shared
+    - **WHEN** `InstallSkills` writes those files
+    - **THEN** they are written to the resolved sharedFolder location under the project root
+- op: modified
+  description: 'Verify Claude frontmatter is rendered by skills output'
+  selector:
+    type: section
+    matches: '^Requirement: Frontmatter injection$'
+  content: |
+    #### Scenario: Install emits Claude-compatible frontmatter through skills rendering
+
+    - **WHEN** `install()` is called
+    - **THEN** skill-local markdown files are written with Claude-compatible frontmatter already present in the rendered content
+
+    #### Scenario: Shared files do not receive Claude frontmatter
+
+    - **GIVEN** a resolved bundle includes files marked as shared
+    - **WHEN** `install()` writes those files
+    - **THEN** shared files are written without Claude skill frontmatter
+- op: modified
+  description: 'Verify Claude install location aligns with sharedFolder'
+  selector:
+    type: section
+    matches: '^Requirement: Install location$'
+  content: |
+    #### Scenario: Installs to .claude/skills/ and sharedFolder default location
+
+    - **GIVEN** a `SpecdConfig` with `projectRoot`
+    - **WHEN** install is called with that configuration
+    - **THEN** non-shared files are written to `{projectRoot}/.claude/skills/<skill-name>/`
+    - **AND** shared files are written to the resolved `sharedFolder` location under the project root
+
+    #### Scenario: Shared directory is not discovered as a skill
+
+    - **WHEN** install writes shared files to the resolved shared location
+    - **THEN** that location does not contain a `SKILL.md` file
+- op: modified
+  description: 'Verify Claude uninstall behavior aligns with sharedFolder'
+  selector:
+    type: section
+    matches: '^Requirement: Uninstall behavior$'
+  content: |
+    #### Scenario: Uninstall removes selected skill directories and keeps shared resources
+
+    - **GIVEN** multiple skills are installed and share the resolved `sharedFolder` location
+    - **WHEN** `uninstall(config, { skills: ['specd'] })` is executed
+    - **THEN** only `.claude/skills/specd/` is removed
+    - **AND** the resolved shared location remains
+
+    #### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
+
+    - **GIVEN** specd-managed skills and unrelated user skills are installed under `.claude/skills/`
+    - **WHEN** `uninstall(config)` is executed without `skills`
+    - **THEN** all specd-managed skill directories are removed
+    - **AND** the resolved sharedFolder location is removed
+    - **AND** unrelated user skill directories remain

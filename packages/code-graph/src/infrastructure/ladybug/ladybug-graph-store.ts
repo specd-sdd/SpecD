@@ -1,5 +1,6 @@
 import { Database, Connection, type QueryResult, type LbugValue } from 'lbug'
 import { GraphStore } from '../../domain/ports/graph-store.js'
+import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
@@ -9,7 +10,7 @@ import { type GraphStatistics } from '../../domain/value-objects/graph-statistic
 import { type RelationType, RelationType as RT } from '../../domain/value-objects/relation-type.js'
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
-import { SCHEMA_DDL } from './schema.js'
+import { SCHEMA_DDL, SCHEMA_VERSION } from './schema.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { mkdirSync, existsSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -130,6 +131,8 @@ export class LadybugGraphStore extends GraphStore {
       mkdirSync(this.bulkLoadTmpDir, { recursive: true })
     }
 
+    await this.migrateSchemaIfNeeded()
+
     this.db = new Database(this.dbPath)
     await this.db.init()
     this.conn = new Connection(this.db)
@@ -146,7 +149,8 @@ export class LadybugGraphStore extends GraphStore {
     await this.conn.query('INSTALL fts')
     await this.conn.query('LOAD fts')
     await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
-    await this.createFtsIndex('Spec', 'spec_fts', ['title', 'description', 'content'])
+    await this.createFtsIndex('Spec', 'spec_fts', ['specId', 'title', 'description', 'content'])
+    await this.createFtsIndex('Document', 'document_fts', ['path', 'content'])
 
     const metaRows = await exec(
       this.conn,
@@ -172,7 +176,42 @@ export class LadybugGraphStore extends GraphStore {
       this._graphFingerprint = fpRows[0]['v'] as string
     }
 
+    const versionRows = await exec(
+      this.conn,
+      `MATCH (m:Meta {key: 'schemaVersion'}) RETURN m.value AS v`,
+    )
+    if (versionRows.length === 0) {
+      await this.updateMeta(this.conn, 'schemaVersion', String(SCHEMA_VERSION))
+    }
+
     this._isOpen = true
+  }
+
+  /**
+   * Drops the database directory if the persisted schema version is outdated.
+   */
+  private async migrateSchemaIfNeeded(): Promise<void> {
+    if (!existsSync(this.dbPath)) return
+
+    try {
+      const db = new Database(this.dbPath)
+      await db.init()
+      const conn = new Connection(db)
+      await conn.init()
+
+      const rows = await exec(conn, "MATCH (m:Meta {key: 'schemaVersion'}) RETURN m.value AS v")
+      await conn.close()
+      await db.close()
+
+      if (rows.length > 0 && Number(rows[0]!['v']) < SCHEMA_VERSION) {
+        rmSync(this.graphDir, { recursive: true, force: true })
+        mkdirSync(this.graphDir, { recursive: true })
+      }
+    } catch {
+      // If we can't read version (e.g. Meta table doesn't exist), force recreate
+      rmSync(this.graphDir, { recursive: true, force: true })
+      mkdirSync(this.graphDir, { recursive: true })
+    }
   }
 
   /**
@@ -228,6 +267,21 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Deletes a document node and adjacent relations without rebuilding FTS.
+   * @param conn - The active Ladybug connection.
+   * @param documentPath - Path of the document to remove.
+   */
+  private async deleteDocumentLocalState(conn: Connection, documentPath: string): Promise<void> {
+    await runPrepared(conn, `MATCH (d:Document {path: $path})-[r]->() DELETE r`, {
+      path: documentPath,
+    })
+    await runPrepared(conn, `MATCH ()-[r]->(d:Document {path: $path}) DELETE r`, {
+      path: documentPath,
+    })
+    await runPrepared(conn, `MATCH (d:Document {path: $path}) DELETE d`, { path: documentPath })
+  }
+
+  /**
    * Drops and recreates all FTS indexes. Must be called after bulk data changes
    * because LadybugDB FTS indexes are not automatically updated on insert.
    */
@@ -249,7 +303,7 @@ export class LadybugGraphStore extends GraphStore {
 
     // Recreate
     await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
-    await this.createFtsIndex('Spec', 'spec_fts', ['title', 'description', 'content'])
+    await this.createFtsIndex('Spec', 'spec_fts', ['specId', 'title', 'description', 'content'])
   }
 
   /**
@@ -350,6 +404,51 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Inserts or updates a document node.
+   * @param document - The document node to upsert.
+   */
+  async upsertDocument(document: DocumentNode): Promise<void> {
+    this.ensureOpen()
+    const conn = this.conn!
+
+    await conn.query('BEGIN TRANSACTION')
+    try {
+      await this.deleteDocumentLocalState(conn, document.path)
+
+      await runPrepared(
+        conn,
+        `CREATE (d:Document {path: $path, configRelativePath: $configRelativePath, contentHash: $contentHash, content: $content, workspace: $workspace})`,
+        {
+          path: document.path,
+          configRelativePath: document.configRelativePath,
+          contentHash: document.contentHash,
+          content: document.content,
+          workspace: document.workspace,
+        },
+      )
+
+      const now = new Date().toISOString()
+      await this.updateMeta(conn, 'lastIndexedAt', now)
+      await conn.query('COMMIT')
+      this._lastIndexedAt = now
+    } catch (err) {
+      await conn.query('ROLLBACK').catch(() => {})
+      throw err
+    }
+    await this.rebuildFtsIndexes()
+  }
+
+  /**
+   * Removes a document node by path.
+   * @param documentPath - The path of the document to remove.
+   */
+  async removeDocument(documentPath: string): Promise<void> {
+    this.ensureOpen()
+    await this.deleteDocumentLocalState(this.conn!, documentPath)
+    await this.rebuildFtsIndexes()
+  }
+
+  /**
    * Adds relations to the store without removing existing data.
    * Uses CSV bulk import when more than 50 relations, falls back to individual inserts for small batches.
    * @param relations - The relations to add.
@@ -418,9 +517,11 @@ export class LadybugGraphStore extends GraphStore {
    * @param data.onProgress - Optional progress callback.
    * @param data.vcsRef - Optional VCS ref to persist as `lastIndexedRef`.
    * @param data.graphFingerprint - Optional fingerprint for derivation mismatch detection.
+   * @param data.documents - Optional array of document nodes.
    */
   async bulkLoad(data: {
     files: FileNode[]
+    documents?: DocumentNode[]
     symbols: SymbolNode[]
     specs: SpecNode[]
     relations: Relation[]
@@ -466,10 +567,10 @@ export class LadybugGraphStore extends GraphStore {
           const batch = data.symbols.slice(i, i + batchSize)
           const symCsv = prefix + `symbols-${i}.csv`
           csvFiles.push(symCsv)
-          const symRows = ['id,name,searchName,kind,filePath,line,col,comment']
+          const symRows = ['id,name,searchName,kind,filePath,parentId,line,col,comment']
           for (const s of batch) {
             symRows.push(
-              `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(expandSymbolName(s.name))},${csvEscape(s.kind)},${csvEscape(s.filePath)},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
+              `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(expandSymbolName(s.name))},${csvEscape(s.kind)},${csvEscape(s.filePath)},${csvEscape(s.parentId ?? '')},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
             )
           }
           writeFileSync(symCsv, symRows.join('\n') + '\n')
@@ -493,6 +594,24 @@ export class LadybugGraphStore extends GraphStore {
           }
           writeFileSync(specCsv, specRows.join('\n') + '\n')
           await conn.query(`COPY Spec FROM "${specCsv}" (HEADER=true, PARALLEL=false)`)
+        }
+      }
+
+      report(`Loading ${data.documents?.length ?? 0} documents`)
+      if ((data.documents?.length ?? 0) > 0) {
+        const batchSize = 500
+        for (let i = 0; i < data.documents!.length; i += batchSize) {
+          const batch = data.documents!.slice(i, i + batchSize)
+          const docCsv = prefix + `documents-${i}.csv`
+          csvFiles.push(docCsv)
+          const docRows = ['path,configRelativePath,contentHash,content,workspace']
+          for (const doc of batch) {
+            docRows.push(
+              `${csvEscape(doc.path)},${csvEscape(doc.configRelativePath)},${csvEscape(doc.contentHash)},${csvEscape(doc.content)},${csvEscape(doc.workspace)}`,
+            )
+          }
+          writeFileSync(docCsv, docRows.join('\n') + '\n')
+          await conn.query(`COPY Document FROM "${docCsv}" (HEADER=true, PARALLEL=false)`)
         }
       }
 
@@ -608,6 +727,20 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Removes multiple spec nodes by their IDs.
+   * @param specIds - Array of spec IDs to remove.
+   */
+  async removeSpecs(specIds: readonly string[]): Promise<void> {
+    if (specIds.length === 0) return
+    this.ensureOpen()
+    const conn = this.conn!
+    for (const specId of specIds) {
+      await this.deleteSpecLocalState(conn, specId)
+    }
+    await this.rebuildFtsIndexes()
+  }
+
+  /**
    * Retrieves a file node by its path.
    * @param path - The file path to look up.
    * @returns The file node, or undefined if not found.
@@ -629,6 +762,22 @@ export class LadybugGraphStore extends GraphStore {
       workspace: row['workspace'] as string,
       embedding: undefined,
     }
+  }
+
+  /**
+   * Retrieves a document by its exact path.
+   * @param path - The path of the document to retrieve.
+   * @returns The document node, or undefined if not found.
+   */
+  async getDocument(path: string): Promise<DocumentNode | undefined> {
+    this.ensureOpen()
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (d:Document {path: $path}) RETURN d.path AS path, d.configRelativePath AS configRelativePath, d.contentHash AS contentHash, d.content AS content, d.workspace AS workspace`,
+      { path },
+    )
+    if (rows.length === 0 || !rows[0]) return undefined
+    return this.rowToDocument(rows[0])
   }
 
   /**
@@ -654,6 +803,21 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Retrieves documents by their configRelativePath.
+   * @param configRelativePath - The config relative path to match.
+   * @returns An array of matching document nodes.
+   */
+  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
+    this.ensureOpen()
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (d:Document {configRelativePath: $configRelativePath}) RETURN d.path AS path, d.configRelativePath AS configRelativePath, d.contentHash AS contentHash, d.content AS content, d.workspace AS workspace`,
+      { configRelativePath },
+    )
+    return rows.map((row) => this.rowToDocument(row))
+  }
+
+  /**
    * Retrieves a symbol node by its unique identifier.
    * @param id - The symbol identifier.
    * @returns The symbol node, or undefined if not found.
@@ -662,7 +826,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Symbol {id: $id}) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (s:Symbol {id: $id}) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment`,
       { id },
     )
     if (rows.length === 0 || !rows[0]) return undefined
@@ -833,18 +997,10 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {path: $filePath})-[:EXPORTS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (f:File {path: $filePath})-[:EXPORTS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment`,
       { filePath },
     )
-    return rows.map((r) => ({
-      id: r['id'] as string,
-      name: r['name'] as string,
-      kind: r['kind'] as string as import('../../domain/value-objects/symbol-kind.js').SymbolKind,
-      filePath: r['filePath'] as string,
-      line: Number(r['line']),
-      column: Number(r['col']),
-      comment: (r['comment'] as string) || undefined,
-    }))
+    return rows.map((r) => this.rowToSymbol(r))
   }
 
   /**
@@ -999,6 +1155,14 @@ export class LadybugGraphStore extends GraphStore {
         params.filePath = query.filePath
       }
     }
+    if (query.filePaths !== undefined && query.filePaths.length > 0) {
+      conditions.push(`s.filePath IN $filePaths`)
+      params.filePaths = [...query.filePaths]
+    }
+    if (query.parentSymbolId !== undefined) {
+      conditions.push(`s.parentId = $parentId`)
+      params.parentId = query.parentSymbolId
+    }
     if (query.name !== undefined) {
       const ci = query.caseSensitive !== true
       if (query.name.includes('*')) {
@@ -1032,7 +1196,7 @@ export class LadybugGraphStore extends GraphStore {
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Symbol)${where} RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (s:Symbol)${where} RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment`,
       params,
     )
     return rows.map((r) => this.rowToSymbol(r))
@@ -1047,10 +1211,12 @@ export class LadybugGraphStore extends GraphStore {
     const conn = this.conn!
 
     const fileRows = await exec(conn, 'MATCH (f:File) RETURN count(f) AS c')
+    const documentRows = await exec(conn, 'MATCH (d:Document) RETURN count(d) AS c')
     const symbolRows = await exec(conn, 'MATCH (s:Symbol) RETURN count(s) AS c')
     const specRows = await exec(conn, 'MATCH (s:Spec) RETURN count(s) AS c')
 
     const fileCount = Number(fileRows[0]?.['c'] ?? 0)
+    const documentCount = Number(documentRows[0]?.['c'] ?? 0)
     const symbolCount = Number(symbolRows[0]?.['c'] ?? 0)
     const specCount = Number(specRows[0]?.['c'] ?? 0)
 
@@ -1087,6 +1253,7 @@ export class LadybugGraphStore extends GraphStore {
 
     return {
       fileCount,
+      documentCount,
       symbolCount,
       specCount,
       relationCounts: relationCounts as Record<RelationType, number>,
@@ -1115,6 +1282,19 @@ export class LadybugGraphStore extends GraphStore {
       workspace: r['workspace'] as string,
       embedding: undefined,
     }))
+  }
+
+  /**
+   * Retrieves all document nodes.
+   * @returns An array of all document nodes in the graph.
+   */
+  async getAllDocuments(): Promise<DocumentNode[]> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      'MATCH (d:Document) RETURN d.path AS path, d.configRelativePath AS configRelativePath, d.contentHash AS contentHash, d.content AS content, d.workspace AS workspace',
+    )
+    return rows.map((row) => this.rowToDocument(row))
   }
 
   /**
@@ -1205,9 +1385,11 @@ export class LadybugGraphStore extends GraphStore {
 
     params.query = query
 
+    params.rawQuery = options.query.trim()
+
     const rows = await execPrepared(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.line AS line, node.col AS col, node.comment AS comment, score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.parentId AS parentId, node.line AS line, node.col AS col, node.comment AS comment, (score + CASE WHEN node.id = $rawQuery THEN 1000000.0 ELSE 0.0 END + CASE WHEN node.name = $rawQuery THEN 1000.0 ELSE 0.0 END) AS score ORDER BY score DESC LIMIT ${String(top)}`,
       params,
     )
     return rows.map((r) => ({
@@ -1254,9 +1436,11 @@ export class LadybugGraphStore extends GraphStore {
 
     params.query = query
 
+    params.rawQuery = options.query.trim()
+
     const rows = await execPrepared(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', $query, k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', $query, k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, (score + CASE WHEN node.specId = $rawQuery THEN 1000000.0 ELSE 0.0 END) AS score ORDER BY score DESC LIMIT ${String(top)}`,
       params,
     )
 
@@ -1286,6 +1470,47 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Searches for documents using full-text search.
+   * @param options - Search options including query and filters.
+   * @returns An array of matching documents with their scores.
+   */
+  async searchDocuments(
+    options: SearchOptions,
+  ): Promise<Array<{ document: DocumentNode; score: number }>> {
+    this.ensureOpen()
+    const top = options.limit ?? 20
+    const rawQuery = options.query.trim().toLowerCase()
+    if (rawQuery.length === 0) return []
+
+    const terms = rawQuery.split(/\s+/).filter((term) => term.length > 0)
+    const documents = await this.getAllDocuments()
+    const results: Array<{ document: DocumentNode; score: number }> = []
+
+    for (const document of documents) {
+      const text =
+        `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
+      if (!terms.some((term) => text.includes(term))) continue
+      if (options.workspace && document.workspace !== options.workspace) continue
+      if (options.excludeWorkspaces?.includes(document.workspace)) continue
+      if (options.excludePaths && options.excludePaths.length > 0) {
+        const excluded = options.excludePaths.some((pattern) => {
+          const regex = new RegExp(pattern.replaceAll('.', '\\.').replaceAll('*', '.*'), 'i')
+          return regex.test(document.path)
+        })
+        if (excluded) continue
+      }
+
+      const score =
+        1 +
+        (document.path.toLowerCase() === rawQuery ? 1_000_000 : 0) +
+        (document.configRelativePath.toLowerCase() === rawQuery ? 1_000 : 0)
+      results.push({ document, score })
+    }
+
+    return results.sort((a, b) => b.score - a.score).slice(0, top)
+  }
+
+  /**
    * Returns all (symbol, caller) pairs in the graph for batch hotspot scoring.
    * @returns An array of objects containing the target symbol and the caller's file path.
    */
@@ -1293,7 +1518,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (caller:Symbol)-[:CALLS|CONSTRUCTS|USES_TYPE]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.line AS line, s.col AS col, s.comment AS comment, caller.filePath AS callerFilePath`,
+      `MATCH (caller:Symbol)-[:CALLS|CONSTRUCTS|USES_TYPE]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment, caller.filePath AS callerFilePath`,
     )
     return rows.map((r) => ({
       symbol: this.rowToSymbol(r),
@@ -1348,6 +1573,7 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     await conn.query('MATCH (f:File) DELETE f')
+    await conn.query('MATCH (d:Document) DELETE d')
     await conn.query('MATCH (s:Symbol) DELETE s')
     await conn.query('MATCH (s:Spec) DELETE s')
     await conn.query('MATCH (m:Meta) DELETE m')
@@ -1544,8 +1770,24 @@ export class LadybugGraphStore extends GraphStore {
       filePath: row['filePath'] as string,
       line: Number(row['line']),
       column: Number(row['col']),
+      parentId: (row['parentId'] as string) || undefined,
       comment: (row['comment'] as string) || undefined,
     }
+  }
+
+  /**
+   * Converts a database row record into a DocumentNode value object.
+   * @param row - The row containing document fields.
+   * @returns The constructed document node.
+   */
+  private rowToDocument(row: Record<string, LbugValue>): DocumentNode {
+    return createDocumentNode({
+      path: row['path'] as string,
+      configRelativePath: (row['configRelativePath'] as string) ?? '',
+      contentHash: row['contentHash'] as string,
+      content: (row['content'] as string) ?? '',
+      workspace: (row['workspace'] as string) ?? '',
+    })
   }
 }
 

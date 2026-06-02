@@ -7,6 +7,7 @@ import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 /** Valid section filter flags for spec context queries. */
 export type SpecContextSectionFlag = 'rules' | 'constraints' | 'scenarios'
@@ -64,25 +65,25 @@ export interface GetSpecContextResult {
 }
 
 /**
- * Builds structured context entries for a single spec, optionally following
- * `dependsOn` links transitively.
+ * Use case that builds structured context entries for a single spec, optionally
+ * following `dependsOn` links transitively.
  *
- * Checks metadata freshness using SHA-256 content hashes. When metadata is
- * stale or absent, returns a minimal stale entry. Dependency traversal uses
- * DFS with cycle detection.
+ * It uses the project orchestrator to discover repositories and checks metadata
+ * freshness using SHA-256 content hashes. Dependency traversal uses DFS with
+ * cycle detection.
  */
 export class GetSpecContext {
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _hasher: ContentHasher
 
   /**
    * Creates a new `GetSpecContext` use case instance.
    *
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param hasher - Content hasher for metadata freshness checks
    */
-  constructor(specs: ReadonlyMap<string, SpecRepository>, hasher: ContentHasher) {
-    this._specs = specs
+  constructor(listWorkspaces: ListWorkspaces, hasher: ContentHasher) {
+    this._listWorkspaces = listWorkspaces
     this._hasher = hasher
   }
 
@@ -103,11 +104,15 @@ export class GetSpecContext {
     const warnings: ContextWarning[] = []
     const entries: SpecContextEntry[] = []
 
-    const repo = this._specs.get(input.workspace)
-    if (repo === undefined) {
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    const ws = workspaceMap.get(input.workspace)
+    if (ws === undefined) {
       throw new WorkspaceNotFoundError(input.workspace)
     }
 
+    const repo = ws.specRepo
     const spec = await repo.get(input.specPath)
     if (spec === null) {
       throw new SpecNotFoundError(`${input.workspace}:${input.specPath.toString()}`)
@@ -134,6 +139,7 @@ export class GetSpecContext {
       await this._traverseDeps(
         metadata,
         input.workspace,
+        workspaceMap,
         entries,
         seen,
         warnings,
@@ -265,6 +271,7 @@ export class GetSpecContext {
    *
    * @param metadata - Parsed metadata of the current spec, or `null` if absent
    * @param defaultWorkspace - Workspace to assume when deps omit one
+   * @param workspaceMap - Orchestrated workspace map
    * @param entries - Mutable array collecting resolved entries
    * @param seen - Set of already-visited spec labels for cycle detection
    * @param warnings - Mutable array to collect warnings
@@ -276,6 +283,7 @@ export class GetSpecContext {
   private async _traverseDeps(
     metadata: SpecMetadata | null,
     defaultWorkspace: string,
+    workspaceMap: Map<string, ProjectWorkspace>,
     entries: SpecContextEntry[],
     seen: Set<string>,
     warnings: ContextWarning[],
@@ -304,8 +312,8 @@ export class GetSpecContext {
       if (seen.has(depLabel)) continue
       seen.add(depLabel)
 
-      const repo = this._specs.get(depWorkspace)
-      if (repo === undefined) {
+      const ws = workspaceMap.get(depWorkspace)
+      if (ws === undefined) {
         warnings.push({
           type: 'unknown-workspace',
           message: `Dependency workspace '${depWorkspace}' not found`,
@@ -313,6 +321,7 @@ export class GetSpecContext {
         continue
       }
 
+      const repo = ws.specRepo
       const depSpec = await repo.get(SpecPath.parse(depCapPath))
       if (depSpec === null) {
         warnings.push({
@@ -340,6 +349,7 @@ export class GetSpecContext {
       await this._traverseDeps(
         depMetadata,
         depWorkspace,
+        workspaceMap,
         entries,
         seen,
         warnings,

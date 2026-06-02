@@ -15,6 +15,7 @@ import {
   makeSchema,
   makeArtifactType,
   makeRunStepHooks,
+  makeWorkflowStep,
   testActor,
 } from './helpers.js'
 
@@ -1781,7 +1782,7 @@ describe('TransitionChange', () => {
       expect(result.change.activeSpecApproval).toBeUndefined()
     })
 
-    it('does not invalidate when transitioning to designing without active approvals', async () => {
+    it('invalidates to mark artifacts for review when transitioning to designing', async () => {
       const change = makeImplementingChange('my-change')
       expect(change.activeSpecApproval).toBeUndefined()
       expect(change.activeSignoff).toBeUndefined()
@@ -1797,7 +1798,14 @@ describe('TransitionChange', () => {
         approvalsSignoff: false,
       })
 
-      expect(invalidateSpy).not.toHaveBeenCalled()
+      expect(invalidateSpy).toHaveBeenCalledTimes(1)
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        'artifact-review-required',
+        expect.anything(),
+        'Invalidated because the change returned to designing and all artifacts require review.',
+        expect.any(Array),
+        expect.anything(),
+      )
     })
 
     it('does not trigger invalidation for drafting to designing', async () => {

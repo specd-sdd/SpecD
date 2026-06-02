@@ -2,6 +2,7 @@ import { type SpecRepository } from '../../ports/spec-repository.js'
 import { SpecPath } from '../../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../../domain/services/parse-spec-id.js'
 import { type ContextWarning } from './context-warning.js'
+import { type ProjectWorkspace } from '../list-workspaces.js'
 
 /** Internal resolved spec reference shared across context use cases. */
 export interface ResolvedSpec {
@@ -23,7 +24,7 @@ export interface ResolvedSpec {
  * @param pattern - The include/exclude pattern
  * @param defaultWorkspace - Workspace to use for unqualified paths
  * @param allWorkspacesOnBareStar - When `true`, bare `*` matches all workspaces
- * @param specs - Spec repositories keyed by workspace name
+ * @param workspaces - Orchestrated workspaces keyed by name
  * @param warnings - Accumulator for advisory warnings
  * @returns Resolved spec references matching the pattern
  */
@@ -31,7 +32,7 @@ export async function listMatchingSpecs(
   pattern: string,
   defaultWorkspace: string,
   allWorkspacesOnBareStar: boolean,
-  specs: ReadonlyMap<string, SpecRepository>,
+  workspaces: ReadonlyMap<string, ProjectWorkspace>,
   warnings: ContextWarning[],
 ): Promise<ResolvedSpec[]> {
   let wsName: string
@@ -49,12 +50,12 @@ export async function listMatchingSpecs(
   const workspacesToSearch: Array<{ name: string; repo: SpecRepository }> = []
 
   if (wsName === 'ALL') {
-    for (const [name, repo] of specs) {
-      workspacesToSearch.push({ name, repo })
+    for (const ws of workspaces.values()) {
+      workspacesToSearch.push({ name: ws.name, repo: ws.specRepo })
     }
   } else {
-    const repo = specs.get(wsName)
-    if (repo === undefined) {
+    const ws = workspaces.get(wsName)
+    if (ws === undefined) {
       warnings.push({
         type: 'unknown-workspace',
         path: wsName,
@@ -62,7 +63,7 @@ export async function listMatchingSpecs(
       })
       return []
     }
-    workspacesToSearch.push({ name: wsName, repo })
+    workspacesToSearch.push({ name: ws.name, repo: ws.specRepo })
   }
 
   const results: ResolvedSpec[] = []

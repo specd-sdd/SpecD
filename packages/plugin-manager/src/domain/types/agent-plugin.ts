@@ -2,6 +2,18 @@ import type { SpecdConfig } from '@specd/core'
 import type { SpecdPlugin } from './specd-plugin.js'
 
 /**
+ * Recursive variable values accepted by agent install rendering.
+ */
+export type TemplateVariable =
+  | string
+  | number
+  | boolean
+  | readonly TemplateVariable[]
+  | {
+      readonly [key: string]: TemplateVariable
+    }
+
+/**
  * Options used during plugin install and uninstall operations.
  */
 export interface AgentInstallOptions {
@@ -11,9 +23,14 @@ export interface AgentInstallOptions {
   readonly skills?: readonly string[]
 
   /**
-   * Variables used for template substitution.
+   * Recursive variables used for template rendering.
    */
-  readonly variables?: Record<string, string>
+  readonly variables?: Readonly<Record<string, TemplateVariable>>
+
+  /**
+   * Capability identifiers supported by the target runtime.
+   */
+  readonly capabilities?: readonly string[]
 }
 
 /**

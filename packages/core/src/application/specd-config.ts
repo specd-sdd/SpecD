@@ -64,8 +64,8 @@ export interface SpecdWorkspaceGraphConfig {
   readonly respectGitignore?: boolean
   /**
    * Gitignore-syntax exclusion patterns applied during file discovery.
-   * Supports `!` negation. When absent, built-in defaults apply.
-   * When present, replaces built-in defaults entirely.
+   * Supports `!` negation. These patterns are additive on top of the
+   * project-global graph exclusion set.
    */
   readonly excludePaths?: readonly string[]
   /**
@@ -80,12 +80,19 @@ export interface SpecdWorkspaceGraphConfig {
 /** Project-level code graph configuration from `specd.yaml`. */
 export interface SpecdGraphConfig {
   /**
-   * Optional project-global graph paths rooted at `projectRoot`.
+   * Optional project-global graph include paths rooted at `projectRoot`.
    *
    * Paths are gitignore-syntax patterns relative to the active config
    * directory and are indexed under the reserved `root:` namespace.
    */
-  readonly paths?: readonly string[]
+  readonly includePaths?: readonly string[]
+  /**
+   * Optional global exclusion patterns applied to file/document discovery.
+   *
+   * When omitted, the code-graph layer applies its built-in defaults.
+   * Workspace-local graph excludes are additive on top of this set.
+   */
+  readonly excludePaths?: readonly string[]
 }
 
 /**
@@ -260,7 +267,12 @@ const specdConfigShape = z.object({
   workspaces: z.array(z.object({ name: z.string() })),
   storage: z.object({ changesPath: z.string() }),
   approvals: z.object({ spec: z.boolean(), signoff: z.boolean() }),
-  graph: z.object({ paths: z.array(z.string()).optional() }).optional(),
+  graph: z
+    .object({
+      includePaths: z.array(z.string()).optional(),
+      excludePaths: z.array(z.string()).optional(),
+    })
+    .optional(),
   logging: z
     .object({ level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'silent']) })
     .optional(),

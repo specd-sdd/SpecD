@@ -10,7 +10,7 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
-import { buildWorkspaceTargets } from '../graph/build-workspace-targets.js'
+import { buildProjectGraphConfig } from '../graph/build-project-graph-config.js'
 import { codeGraphVersion } from '../graph/code-graph-version.js'
 
 /** Parsed options accepted by the `project status` command. */
@@ -48,18 +48,21 @@ export function registerProjectStatus(parent: Command): void {
           configPath: opts.config,
         })
 
-        const [specs, activeChanges, drafts, discarded, graphStats] = await Promise.all([
-          kernel.specs.list.execute({ includeSummary: false }),
+        const [workspaces, activeChanges, drafts, discarded, graphStats] = await Promise.all([
+          kernel.project.listWorkspaces.execute(),
           kernel.changes.list.execute(),
           kernel.changes.listDrafts.execute(),
           kernel.changes.listDiscarded.execute(),
           loadGraphStats(config),
         ])
 
-        const specsByWorkspace: Record<string, number> = {}
-        for (const s of specs) {
-          specsByWorkspace[s.workspace] = (specsByWorkspace[s.workspace] ?? 0) + 1
-        }
+        const specCounts = await Promise.all(
+          workspaces.map(async (ws) => ({
+            name: ws.name,
+            count: await ws.specRepo.count(),
+          })),
+        )
+        const totalSpecs = specCounts.reduce((acc, c) => acc + c.count, 0)
 
         const graphFreshness = graphStats?.lastIndexedAt ?? null
         let graphStale: boolean | null = null
@@ -80,12 +83,15 @@ export function registerProjectStatus(parent: Command): void {
 
           if (graphStats.graphFingerprint !== null) {
             try {
-              const workspaces = await buildWorkspaceTargets(config, kernel)
               const storedMap = parseFingerprintMap(graphStats.graphFingerprint)
+              const graphConfig = buildProjectGraphConfig(config)
+
               fingerprintMismatch = detectFingerprintMismatch(
                 storedMap,
                 codeGraphVersion,
+                config.projectRoot,
                 workspaces,
+                graphConfig,
               )
             } catch {
               fingerprintMismatch = null
@@ -142,20 +148,20 @@ export function registerProjectStatus(parent: Command): void {
         }
 
         if (fmt !== 'text') {
-          const workspaceData = config.workspaces.map((w) => ({
-            name: w.name,
-            prefix: w.prefix ?? null,
-            ownership: w.ownership,
-            codeRoot: w.codeRoot,
-            isExternal: w.isExternal,
-          }))
-
           output(
             {
               projectRoot: config.projectRoot,
               schemaRef: config.schemaRef,
-              workspaces: workspaceData,
-              specs: { total: specs.length, byWorkspace: specsByWorkspace },
+              workspaces: workspaces.map((w) => ({
+                name: w.name,
+                ownership: w.ownership,
+                codeRoot: w.codeRoot,
+                isExternal: w.isExternal,
+              })),
+              specs: {
+                total: totalSpecs,
+                byWorkspace: Object.fromEntries(specCounts.map((c) => [c.name, c.count])),
+              },
               changes: {
                 active: activeChanges.length,
                 drafts: drafts.length,
@@ -188,14 +194,14 @@ export function registerProjectStatus(parent: Command): void {
           `projectRoot: ${config.projectRoot}`,
           `schema: ${config.schemaRef}`,
           `workspaces:`,
-          ...config.workspaces.map(
+          ...workspaces.map(
             (w) =>
-              `  ${w.name} (prefix: ${w.prefix ?? '-'}) [${w.ownership}, ${
+              `  ${w.name} [${w.ownership}, ${
                 w.isExternal ? 'external' : 'local'
               }, codeRoot: ${w.codeRoot}]`,
           ),
-          `specs: ${specs.length} total`,
-          ...Object.entries(specsByWorkspace).map(([ws, n]) => `  ${ws}: ${n}`),
+          `specs: ${String(totalSpecs)} total`,
+          ...specCounts.map((c) => `  ${c.name}: ${String(c.count)}`),
           `changes: ${activeChanges.length} active, ${drafts.length} drafts, ${discarded.length} discarded`,
           `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale ? 'stale' : 'fresh'})`,
           ...(fingerprintMismatch === true

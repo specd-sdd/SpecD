@@ -1,12 +1,12 @@
 import { Change, type CreatedEvent } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeAlreadyExistsError } from '../errors/change-already-exists-error.js'
 import { type InvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 /** Result returned by the {@link CreateChange} use case. */
 export interface CreateChangeResult {
@@ -41,23 +41,19 @@ export interface CreateChangeInput {
  */
 export class CreateChange {
   private readonly _changes: ChangeRepository
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _actor: ActorResolver
 
   /**
    * Creates a new `CreateChange` use case instance.
    *
    * @param changes - Repository for persisting the new change
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param actor - Resolver for the actor identity
    */
-  constructor(
-    changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
-    actor: ActorResolver,
-  ) {
+  constructor(changes: ChangeRepository, listWorkspaces: ListWorkspaces, actor: ActorResolver) {
     this._changes = changes
-    this._specs = specs
+    this._listWorkspaces = listWorkspaces
     this._actor = actor
   }
 
@@ -77,6 +73,10 @@ export class CreateChange {
     if (existingDraft !== null) {
       throw new ChangeAlreadyExistsError(input.name)
     }
+    const existingDiscarded = await this._changes.getDiscarded(input.name)
+    if (existingDiscarded !== null) {
+      throw new ChangeAlreadyExistsError(input.name)
+    }
 
     const actor = await this._actor.identity()
     const now = new Date()
@@ -90,9 +90,12 @@ export class CreateChange {
       schemaVersion: input.schemaVersion,
     }
 
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
     const specDependsOn = new Map<string, readonly string[]>()
     for (const specId of input.specIds) {
-      const persisted = await loadPersistedSpecDependsOn(this._specs, specId)
+      const persisted = await loadPersistedSpecDependsOn(workspaceMap, specId)
       if (persisted.source !== 'empty') {
         specDependsOn.set(specId, persisted.dependsOn)
       }
@@ -111,7 +114,7 @@ export class CreateChange {
     })
 
     await this._changes.save(change)
-    await this._changes.scaffold(change, (specId) => this._specExists(specId))
+    await this._changes.scaffold(change, (specId) => this._specExists(workspaceMap, specId))
     const changePath = this._changes.changePath(change)
     return { change, changePath }
   }
@@ -119,14 +122,18 @@ export class CreateChange {
   /**
    * Checks whether a spec exists in its workspace repository.
    *
+   * @param workspaces - Orchestrated workspace map
    * @param specId - The spec identifier (e.g. `"default:auth/login"`)
    * @returns `true` if the spec exists
    */
-  private async _specExists(specId: string): Promise<boolean> {
+  private async _specExists(
+    workspaces: ReadonlyMap<string, ProjectWorkspace>,
+    specId: string,
+  ): Promise<boolean> {
     const { workspace, capPath } = parseSpecId(specId)
-    const repo = this._specs.get(workspace)
-    if (repo === undefined) return false
-    const spec = await repo.get(SpecPath.parse(capPath))
+    const ws = workspaces.get(workspace)
+    if (ws === undefined) return false
+    const spec = await ws.specRepo.get(SpecPath.parse(capPath))
     return spec !== null
   }
 }

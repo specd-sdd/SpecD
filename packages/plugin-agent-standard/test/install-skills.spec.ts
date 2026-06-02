@@ -9,11 +9,14 @@ const repositoryMock = {
   get: vi.fn((name: string) =>
     name === 'specd' ? { name, description: name, templates: [] } : undefined,
   ),
-  getBundle: vi.fn((name: string, _vars?: any, config?: any) => ({
+  getBundle: vi.fn((name: string, _context?: unknown) => ({
     name,
     description: name,
     files: [
-      { filename: 'SKILL.md', content: '# ' + name },
+      {
+        filename: 'SKILL.md',
+        content: '---\nname: "specd"\nallowed-tools: Bash(node:*)\n---\n\n# ' + name,
+      },
       { filename: 'shared.md', content: 'shared-content', shared: true },
     ],
     install: async () => {},
@@ -33,7 +36,7 @@ async function createTempProjectRoot(): Promise<string> {
 function makeMockConfig(projectRoot: string): SpecdConfig {
   return {
     projectRoot,
-    configPath: path.join(projectRoot, 'specd.yaml'),
+    configPath: path.join(projectRoot, '.specd', 'config'),
     schemaRef: '@specd/schema-std',
     workspaces: [
       {
@@ -82,9 +85,10 @@ describe('plugin-agent-standard create()', () => {
 
       const sharedFilePath = path.join(
         projectRoot,
-        '.agents',
+        '.specd',
+        'config',
         'skills',
-        '_specd-shared',
+        'shared',
         'shared.md',
       )
       const sharedContent = await readFile(sharedFilePath, 'utf8')

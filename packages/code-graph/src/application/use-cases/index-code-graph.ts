@@ -1,12 +1,15 @@
-import { readFileSync, writeFileSync, statSync, rmSync, existsSync, mkdirSync } from 'node:fs'
+import { readFileSync, statSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { type Spec } from '@specd/core'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
-import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
-import { type SpecNode } from '../../domain/value-objects/spec-node.js'
+import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
+import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
+import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
+import { type SpecNode, createSpecNode } from '../../domain/value-objects/spec-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
-import { type IndexOptions, type DiscoveredSpec } from '../../domain/value-objects/index-options.js'
+import { type IndexOptions } from '../../domain/value-objects/index-options.js'
 import {
   type IndexResult,
   type IndexError,
@@ -21,17 +24,35 @@ import {
   buildScopedBindingEnvironment,
   resolveDependencyFacts,
   type SymbolLookup,
-} from '../../domain/services/scoped-binding-environment.js'
+  getUpstream,
+  getDownstream,
+} from '../../domain/services/index.js'
 import { discoverFiles } from './discover-files.js'
 import { computeContentHash } from './compute-content-hash.js'
 import {
   computeWorkspaceFingerprint,
+  computeRootFingerprint,
   parseFingerprintMap,
   serializeFingerprintMap,
   detectFingerprintMismatch,
 } from './_shared/compute-graph-fingerprint.js'
+import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
 
 const DEFAULT_CHUNK_BYTES = 20 * 1024 * 1024
+
+/**
+ * Mutable version of WorkspaceIndexBreakdown for tracking progress.
+ */
+interface MutableWorkspaceIndexBreakdown {
+  name: string
+  filesDiscovered: number
+  filesIndexed: number
+  documentsIndexed: number
+  filesSkipped: number
+  filesRemoved: number
+  specsDiscovered: number
+  specsIndexed: number
+}
 
 /**
  * In-memory symbol index for resolving imports without store queries.
@@ -181,6 +202,7 @@ interface MethodOwnershipIndex {
  */
 interface FilesAndSymbolsStageChunk {
   readonly files: FileNode[]
+  readonly documents: DocumentNode[]
   readonly symbols: SymbolNode[]
 }
 
@@ -225,6 +247,113 @@ function readFilesAndSymbolsStageChunk(
   filename: string,
 ): FilesAndSymbolsStageChunk {
   return JSON.parse(readFileSync(join(stageDir, filename), 'utf-8')) as FilesAndSymbolsStageChunk
+}
+
+/**
+ * Attempts to decode a buffer as supported textual content.
+ * @param content - Raw file content.
+ * @returns Decoded text when the content should be treated as a document.
+ */
+function decodeTextualContent(content: Buffer): string | null {
+  if (content.length === 0) {
+    return ''
+  }
+
+  if (content[0] === 0xef && content[1] === 0xbb && content[2] === 0xbf) {
+    return new TextDecoder('utf-8', { fatal: true }).decode(content)
+  }
+
+  if (content[0] === 0xff && content[1] === 0xfe) {
+    return new TextDecoder('utf-16le', { fatal: true }).decode(content)
+  }
+
+  if (content[0] === 0xfe && content[1] === 0xff) {
+    return decodeUtf16Be(content)
+  }
+
+  try {
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(content)
+    if (!(content.includes(0) && decoded.includes('\u0000'))) {
+      return decoded
+    }
+  } catch {
+    // Fall through to the remaining encoding probes.
+  }
+
+  if (looksLikeUtf16Le(content)) {
+    try {
+      return new TextDecoder('utf-16le', { fatal: true }).decode(content)
+    } catch {
+      // Fall through to the remaining checks.
+    }
+  }
+
+  if (looksLikeUtf16Be(content)) {
+    try {
+      return decodeUtf16Be(content)
+    } catch {
+      // Fall through to the remaining checks.
+    }
+  }
+
+  if (!content.includes(0)) {
+    try {
+      return new TextDecoder('windows-1252', { fatal: true }).decode(content)
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+/**
+ * Decodes a UTF-16BE buffer by swapping byte order before decoding.
+ * @param content - Raw file content.
+ * @returns Decoded text.
+ */
+function decodeUtf16Be(content: Buffer): string {
+  const normalized =
+    content.length % 2 === 0 ? Buffer.from(content) : Buffer.concat([content, Buffer.from([0])])
+  normalized.swap16()
+  return new TextDecoder('utf-16le', { fatal: true }).decode(normalized)
+}
+
+/**
+ * Returns whether content matches the common UTF-16LE null-byte pattern.
+ * @param content - Raw file content.
+ * @returns True when odd bytes are predominantly NUL.
+ */
+function looksLikeUtf16Le(content: Buffer): boolean {
+  return hasMostlyNullBytesAtParity(content, 1)
+}
+
+/**
+ * Returns whether content matches the common UTF-16BE null-byte pattern.
+ * @param content - Raw file content.
+ * @returns True when even bytes are predominantly NUL.
+ */
+function looksLikeUtf16Be(content: Buffer): boolean {
+  return hasMostlyNullBytesAtParity(content, 0)
+}
+
+/**
+ * Checks whether one byte parity contains a dominant number of NUL bytes.
+ * @param content - Raw file content.
+ * @param parity - Byte parity to inspect.
+ * @returns True when the sampled parity is mostly NUL.
+ */
+function hasMostlyNullBytesAtParity(content: Buffer, parity: 0 | 1): boolean {
+  let samples = 0
+  let nulls = 0
+  for (let index = parity; index < content.length; index += 2) {
+    samples++
+    if (content[index] === 0) {
+      nulls++
+    }
+  }
+
+  return samples > 0 && nulls / samples >= 0.6
 }
 
 /**
@@ -278,9 +407,29 @@ function groupIntoChunks(
 }
 
 /**
+ * Returns whether an absolute file path belongs to a workspace code root.
+ * @param filePath - Absolute file path to test.
+ * @param codeRoot - Absolute workspace code root.
+ * @returns True when the file is inside the workspace tree.
+ */
+function isWithinCodeRoot(filePath: string, codeRoot: string): boolean {
+  const codeRelativePath = relative(codeRoot, filePath).replaceAll('\\', '/')
+  return (
+    codeRelativePath === '' || (codeRelativePath !== '..' && !codeRelativePath.startsWith('../'))
+  )
+}
+
+/**
  * Use case that indexes source files and specs into the code graph.
- * Multi-workspace, two-pass parsing with in-memory symbol index,
- * chunked for memory control, and CSV bulk loading for speed.
+ *
+ * Orchestrates a multi-workspace pipeline including:
+ * 1. File and document discovery (respecting .gitignore and graph config).
+ * 2. Incremental diffing via content hashing and fingerprinting.
+ * 3. Two-pass extraction using an in-memory symbol index (Pass 1: symbols, Pass 2: relations).
+ * 4. Spec metadata and implementation coverage indexing from semantic repositories.
+ * 5. Batch persistence into the GraphStore.
+ *
+ * Chunked for memory control, and bulk loaded for speed.
  */
 export class IndexCodeGraph {
   /**
@@ -294,8 +443,12 @@ export class IndexCodeGraph {
   ) {}
 
   /**
-   * Executes the indexing pipeline for the given workspaces.
-   * @param options - Options controlling the indexing run.
+   * Executes the indexing pipeline for the given project workspaces and graph config.
+   *
+   * This is the primary write path into the code graph. It handles both code files
+   * (via language adapters) and textual documents (as generic DocumentNodes).
+   *
+   * @param options - Options controlling the indexing run, including rich workspaces.
    * @returns A summary result with counts and any errors encountered.
    */
   async execute(options: IndexOptions): Promise<IndexResult> {
@@ -310,74 +463,128 @@ export class IndexCodeGraph {
         onProgress(Math.min(pct, 100), detail ? `${phase} — ${detail}` : phase)
       }
 
-      // ── Discovery (0-5%) — per workspace ──
+      // ── Discovery (0-5%) ──
       progress(0, 'Discovering files')
-      const existingFiles = await this.store.getAllFiles()
-      const existingMap = new Map(existingFiles.map((f) => [f.path, f]))
-
-      // Per-workspace tracking
-      const wsBreakdowns = new Map<
-        string,
-        {
-          filesDiscovered: number
-          filesIndexed: number
-          filesSkipped: number
-          filesRemoved: number
-          specsDiscovered: number
-          specsIndexed: number
-        }
-      >()
-
-      // [workspacePrefixedPath, absolutePath] tuples for all files to process
       const allDiscoveredPaths: string[] = []
       const fileHashes = new Map<string, string>()
-      const absolutePaths = new Map<string, string>() // prefixed path -> absolute path
-      const configRelativePaths = new Map<string, string>() // prefixed path -> configRelativePath
+      const absolutePaths = new Map<string, string>()
+      const configRelativePaths = new Map<string, string>()
+      const wsBreakdowns = new Map<string, MutableWorkspaceIndexBreakdown>()
+      const indexedWorkspaceNames = new Set(options.workspaces.map((ws) => ws.name))
+      const effectiveGraphConfig = resolveEffectiveGraphConfig(
+        options.projectRoot,
+        options.workspaces,
+        options.graphConfig,
+      )
 
+      // 1. Workspace Discovery
       for (const ws of options.workspaces) {
+        const wsGraph = effectiveGraphConfig.workspaces.get(ws.name)
+        const discovered = discoverFiles(ws.codeRoot, undefined, {
+          respectGitignore: wsGraph?.respectGitignore ?? true,
+          ...(wsGraph?.excludePaths !== undefined ? { excludePaths: wsGraph.excludePaths } : {}),
+          ...(wsGraph?.allowedPaths ? { allowedPaths: wsGraph.allowedPaths } : {}),
+        })
+
         wsBreakdowns.set(ws.name, {
-          filesDiscovered: 0,
+          name: ws.name,
+          filesDiscovered: discovered.length,
           filesIndexed: 0,
+          documentsIndexed: 0,
           filesSkipped: 0,
           filesRemoved: 0,
           specsDiscovered: 0,
           specsIndexed: 0,
         })
 
-        const relFiles = discoverFiles(
-          ws.codeRoot,
-          (filePath) => this.registry.getAdapterForFile(filePath) !== undefined,
-          {
-            ...(ws.excludePaths !== undefined ? { excludePaths: ws.excludePaths } : {}),
-            ...(ws.respectGitignore !== undefined ? { respectGitignore: ws.respectGitignore } : {}),
-          },
-        )
-
-        const breakdown = wsBreakdowns.get(ws.name)!
-        breakdown.filesDiscovered = relFiles.length
-
-        for (const relPath of relFiles) {
-          const prefixedPath = `${ws.name}:${relPath}`
-          allDiscoveredPaths.push(prefixedPath)
+        for (const relPath of discovered) {
+          const prefixed = `${ws.name}:${relPath}`
           const absPath = join(ws.codeRoot, relPath)
-          absolutePaths.set(prefixedPath, absPath)
-          const crp = relative(options.projectRoot, absPath).replaceAll('\\', '/')
-          configRelativePaths.set(prefixedPath, crp.startsWith('./') ? crp.slice(2) : crp)
+          const configRel = relative(options.projectRoot, absPath).replaceAll('\\', '/')
+
+          allDiscoveredPaths.push(prefixed)
+          absolutePaths.set(prefixed, absPath)
+          configRelativePaths.set(
+            prefixed,
+            configRel.startsWith('./') ? configRel.slice(2) : configRel,
+          )
         }
+      }
+
+      // 2. Project-Global Discovery
+      if (effectiveGraphConfig.includePaths.length > 0) {
+        const rootDiscovered = discoverFiles(options.projectRoot, undefined, {
+          allowedPaths: effectiveGraphConfig.includePaths,
+          excludePaths: effectiveGraphConfig.rootExcludePaths,
+        })
+        const filteredRootDiscovered = rootDiscovered.filter((relPath) => {
+          const absPath = join(options.projectRoot, relPath)
+          return !options.workspaces.some((workspace) =>
+            isWithinCodeRoot(absPath, workspace.codeRoot),
+          )
+        })
+
+        wsBreakdowns.set('root', {
+          name: 'root',
+          filesDiscovered: filteredRootDiscovered.length,
+          filesIndexed: 0,
+          documentsIndexed: 0,
+          filesSkipped: 0,
+          filesRemoved: 0,
+          specsDiscovered: 0,
+          specsIndexed: 0,
+        })
+        indexedWorkspaceNames.add('root')
+
+        for (const relPath of filteredRootDiscovered) {
+          const prefixed = `root:${relPath}`
+          const absPath = join(options.projectRoot, relPath)
+          allDiscoveredPaths.push(prefixed)
+          absolutePaths.set(prefixed, absPath)
+          configRelativePaths.set(prefixed, relPath.replaceAll('\\', '/'))
+        }
+      }
+
+      const existingFiles = await this.store.getAllFiles()
+      const existingDocuments = await this.store.getAllDocuments()
+      const existingArtifactHashes = new Map<string, string>()
+      for (const file of existingFiles) existingArtifactHashes.set(file.path, file.contentHash)
+      for (const document of existingDocuments) {
+        existingArtifactHashes.set(document.path, document.contentHash)
       }
 
       // ── Fingerprint comparison ──
       const version = options.codeGraphVersion ?? '0.0.0'
       const currentFingerprintMap = new Map<string, string>()
       for (const ws of options.workspaces) {
-        currentFingerprintMap.set(ws.name, computeWorkspaceFingerprint(version, ws))
+        currentFingerprintMap.set(
+          ws.name,
+          computeWorkspaceFingerprint(
+            version,
+            options.projectRoot,
+            ws,
+            options.workspaces,
+            options.graphConfig,
+          ),
+        )
       }
+      currentFingerprintMap.set(
+        'root',
+        computeRootFingerprint(
+          version,
+          options.projectRoot,
+          options.workspaces,
+          options.graphConfig,
+        ),
+      )
       const stats = await this.store.getStatistics()
       const storedFingerprintMap = parseFingerprintMap(stats.graphFingerprint)
       const fingerprintMismatch = detectFingerprintMismatch(
         storedFingerprintMap,
         version,
+        options.projectRoot,
         options.workspaces,
+        options.graphConfig,
       )
 
       // Merge stored fingerprints for workspaces NOT being indexed into the current map
@@ -392,7 +599,6 @@ export class IndexCodeGraph {
       const changedFiles: string[] = []
       const deletedFiles: string[] = []
       const skippedFiles: string[] = []
-      const indexedWorkspaceNames = new Set(options.workspaces.map((ws) => ws.name))
 
       if (fingerprintMismatch) {
         fullRebuildReason =
@@ -400,12 +606,12 @@ export class IndexCodeGraph {
         progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
         // Remove all files from mismatched workspaces so they get re-processed
         // but do NOT recreate the store — other workspaces are unaffected
-        const existingFiles = await this.store.getAllFiles()
-        for (const ef of existingFiles) {
+        for (const ef of [...existingFiles, ...existingDocuments]) {
           const storedFp = storedFingerprintMap.get(ef.workspace)
           const currentFp = currentFingerprintMap.get(ef.workspace)
           if (storedFp !== undefined && currentFp !== undefined && storedFp !== currentFp) {
             await this.store.removeFile(ef.path)
+            await this.store.removeDocument(ef.path)
           }
         }
         // Treat all discovered files as new — no content hash skip for mismatched workspaces
@@ -435,18 +641,18 @@ export class IndexCodeGraph {
 
         for (const prefixedPath of allDiscoveredPaths) {
           const hash = fileHashes.get(prefixedPath)
-          const existing = existingMap.get(prefixedPath)
-          if (!existing) {
+          const existingHash = existingArtifactHashes.get(prefixedPath)
+          if (existingHash === undefined) {
             newFiles.push(prefixedPath)
-          } else if (hash && existing.contentHash !== hash) {
+          } else if (hash && existingHash !== hash) {
             changedFiles.push(prefixedPath)
-          } else if (hash && existing.contentHash === hash) {
+          } else if (hash && existingHash === hash) {
             skippedFiles.push(prefixedPath)
           }
         }
 
         // Only consider files from the workspaces being indexed as candidates for deletion
-        for (const existing of existingFiles) {
+        for (const existing of [...existingFiles, ...existingDocuments]) {
           if (!discoveredSet.has(existing.path) && indexedWorkspaceNames.has(existing.workspace)) {
             deletedFiles.push(existing.path)
           }
@@ -465,12 +671,13 @@ export class IndexCodeGraph {
       const toRemove = [...deletedFiles, ...changedFiles, ...filesToReprocess]
       const deletedSet = new Set(deletedFiles)
       progress(6, 'Cleaning up', `${String(toRemove.length)} to remove`)
-      let filesRemoved = 0
+      let filesRemovedCount = 0
       for (const filePath of toRemove) {
         try {
           await this.store.removeFile(filePath)
+          await this.store.removeDocument(filePath)
           if (deletedSet.has(filePath)) {
-            filesRemoved++
+            filesRemovedCount++
             const wsName = filePath.substring(0, filePath.indexOf(':'))
             const breakdown = wsBreakdowns.get(wsName)
             if (breakdown) breakdown.filesRemoved++
@@ -479,7 +686,7 @@ export class IndexCodeGraph {
           errors.push({ filePath, message: String(err) })
         }
       }
-      // ── Pass 1: Extract symbols (7-50%) — all workspaces ──
+      // ── Pass 1: Extract symbols (7-50%) ──
       const fileTuples: Array<[string, string]> = filesToProcess.map((p) => [
         p,
         absolutePaths.get(p)!,
@@ -487,19 +694,17 @@ export class IndexCodeGraph {
       const chunks = groupIntoChunks(fileTuples, chunkBudget)
       const totalToProcess = filesToProcess.length
       let filesIndexed = 0
+      let documentsIndexed = 0
       const qualifiedNames = new Map<string, string>()
       const symbolIndex = new SymbolIndex()
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
-      // Each adapter reads its language's manifest (package.json, go.mod, etc.) to
-      // extract the package identity. This is language-agnostic and works for both
-      // monorepo and multirepo setups.
       const packageToWorkspace = new Map<string, string>()
       const adapters = this.registry.getAdapters()
       for (const ws of options.workspaces) {
         for (const adapter of adapters) {
           if (adapter.getPackageIdentity) {
-            const identity = adapter.getPackageIdentity(ws.codeRoot, ws.repoRoot)
+            const identity = adapter.getPackageIdentity(ws.codeRoot)
             if (identity) {
               const existingWs = packageToWorkspace.get(identity)
               if (existingWs && existingWs !== ws.name) {
@@ -527,6 +732,7 @@ export class IndexCodeGraph {
       let processed = 0
       for (const [chunkIndex, chunk] of chunks.entries()) {
         const chunkFiles: FileNode[] = []
+        const chunkDocuments: DocumentNode[] = []
         const chunkSymbols: SymbolNode[] = []
         for (const [prefixedPath, absPath] of chunk) {
           processed++
@@ -538,22 +744,44 @@ export class IndexCodeGraph {
             )
           }
           try {
-            const content = readFileSync(absPath, 'utf-8')
+            const contentBuffer = readFileSync(absPath)
+            const decodedContent = decodeTextualContent(contentBuffer)
             // Use the relative-to-codeRoot path for adapter matching (extension-based)
             const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
             const adapter = this.registry.getAdapterForFile(relPath)
-            if (!adapter) continue
+            if (!adapter) {
+              if (decodedContent === null) {
+                continue
+              }
+              const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+              const hash = fileHashes.get(prefixedPath) ?? computeContentHash(decodedContent)
+              chunkDocuments.push(
+                createDocumentNode({
+                  path: prefixedPath,
+                  configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+                  contentHash: hash,
+                  content: decodedContent,
+                  workspace: wsName,
+                }),
+              )
+              documentsIndexed++
+              const breakdown = wsBreakdowns.get(wsName)
+              if (breakdown) {
+                breakdown.filesIndexed++
+                breakdown.documentsIndexed++
+              }
+              continue
+            }
 
             const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
+            const content = contentBuffer.toString('utf-8')
             const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
-            // Extract symbols with workspace-prefixed path. Some adapters can also
-            // return the namespace from the same parse tree to avoid reparsing.
             const extracted = adapter.extractSymbolsWithNamespace?.(prefixedPath, content) ?? {
               symbols: adapter.extractSymbols(prefixedPath, content),
               namespace: adapter.extractNamespace?.(content),
             }
-            const symbols = extracted.symbols
             const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const symbols = this.assignParentIds(extracted.symbols, language)
 
             if (adapter.buildQualifiedName && extracted.namespace) {
               for (const s of symbols) {
@@ -580,7 +808,6 @@ export class IndexCodeGraph {
             }
             filesIndexed++
 
-            // Track per-workspace
             const breakdown = wsBreakdowns.get(wsName)
             if (breakdown) breakdown.filesIndexed++
           } catch (err) {
@@ -588,13 +815,17 @@ export class IndexCodeGraph {
           }
         }
         const stageFile = `pass1-${String(chunkIndex).padStart(5, '0')}.json`
-        writeStageChunk(stageDir, stageFile, { files: chunkFiles, symbols: chunkSymbols })
+        writeStageChunk(stageDir, stageFile, {
+          files: chunkFiles,
+          documents: chunkDocuments,
+          symbols: chunkSymbols,
+        })
         pass1ChunkFiles.push(stageFile)
         stagedFileCount += chunkFiles.length
+        stagedFileCount += chunkDocuments.length
         stagedSymbolCount += chunkSymbols.length
       }
-      // Populate SymbolIndex with existing symbols from unchanged files so
-      // Pass 2 can resolve imports from changed files to unchanged targets
+      // Populate SymbolIndex with existing symbols from unchanged files
       const processedPaths = new Set(filesToProcess)
       for (const prefixedPath of allDiscoveredPaths) {
         if (processedPaths.has(prefixedPath)) continue
@@ -604,11 +835,10 @@ export class IndexCodeGraph {
         }
       }
 
-      const ownershipIndex = this.buildMethodOwnershipIndex(symbolIndex, fileLanguages)
+      const ownershipIndex = this.buildMethodOwnershipIndex(symbolIndex)
       const symbolLookup = createSymbolLookup(symbolIndex)
 
       // ── Pass 2: Resolve imports + extract relations (50-80%) ──
-      const workspaceByName = new Map(options.workspaces.map((ws) => [ws.name, ws]))
       processed = 0
       for (const [chunkIndex, chunk] of chunks.entries()) {
         const chunkRelations: Relation[] = []
@@ -628,7 +858,7 @@ export class IndexCodeGraph {
             if (!adapter) continue
 
             const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
-            const ws = workspaceByName.get(wsName)
+            const ws = options.workspaces.find((w) => w.name === wsName)
 
             const symbols = symbolIndex.findByFile(prefixedPath)
             const relationSymbols = adapter.languages().includes('php')
@@ -643,7 +873,6 @@ export class IndexCodeGraph {
               qualifiedNames,
               packageToWorkspace,
               ws?.codeRoot,
-              ws?.repoRoot,
             )
             const bindingFacts =
               adapter.extractBindingFacts?.(prefixedPath, content, symbols, imports) ?? []
@@ -711,9 +940,14 @@ export class IndexCodeGraph {
         stagedRelationCount += uniqueRelations.length
       }
 
-      // ── Specs (80-83%) — per workspace ──
+      // ── Specs (80-83%) ──
       progress(80, 'Discovering specs')
-      let totalSpecsDiscovered = 0
+      let totalSpecsToProcess = 0
+      for (const ws of options.workspaces) {
+        totalSpecsToProcess += await ws.specRepo.count()
+      }
+
+      let specsProcessed = 0
       let specsIndexed = 0
       const allSpecs: SpecNode[] = []
       const specRelations: Relation[] = []
@@ -721,109 +955,153 @@ export class IndexCodeGraph {
       const existingSpecs = await this.store.getAllSpecs()
       const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
 
-      // Build a global set of all known specIds (existing + all discovered across workspaces)
-      // so cross-workspace DEPENDS_ON relations resolve correctly.
-      // Pre-prune specs that will be deleted so DEPENDS_ON edges never target stale specs.
-      const allDiscoveredSpecs = new Map<string, { ws: string; specs: DiscoveredSpec[] }>()
-      const discoveredSpecIdsByWorkspace = new Map<string, Set<string>>()
+      // 1. Discovery & Global ID set (for relation resolution)
       const knownSpecIds = new Set(existingSpecs.map((s) => s.specId))
-      for (const ws of options.workspaces) {
-        const discovered = await ws.specs()
-        allDiscoveredSpecs.set(ws.name, { ws: ws.name, specs: discovered })
-        const wsDiscoveredIds = new Set(discovered.map((d) => d.spec.specId))
-        discoveredSpecIdsByWorkspace.set(ws.name, wsDiscoveredIds)
-        for (const { spec } of discovered) {
-          knownSpecIds.add(spec.specId)
-        }
-      }
-
-      // Remove specs that will be deleted from knownSpecIds before any DEPENDS_ON emission
-      for (const existing of existingSpecs) {
-        if (!indexedWorkspaceNames.has(existing.workspace)) continue
-        const discoveredIds = discoveredSpecIdsByWorkspace.get(existing.workspace)
-        if (!discoveredIds?.has(existing.specId)) {
-          knownSpecIds.delete(existing.specId)
-        }
-      }
+      const specsByWorkspace = new Map<string, Spec[]>()
 
       for (const ws of options.workspaces) {
-        const { specs: discoveredSpecs } = allDiscoveredSpecs.get(ws.name)!
+        const repoSpecs = await ws.specRepo.list()
+        specsByWorkspace.set(ws.name, repoSpecs)
 
-        const wsBreakdown = wsBreakdowns.get(ws.name)!
-        wsBreakdown.specsDiscovered = discoveredSpecs.length
-        totalSpecsDiscovered += discoveredSpecs.length
-        progress(80, 'Discovering specs', `${String(totalSpecsDiscovered)} found`)
+        const wsBreakdown = wsBreakdowns.get(ws.name)
+        if (wsBreakdown) wsBreakdown.specsDiscovered = repoSpecs.length
 
-        const discoveredSpecIds = new Set(discoveredSpecs.map((s) => s.spec.specId))
-
-        // Remove deleted specs for this workspace (always runs, even when no specs discovered)
+        // Prune deleted specs from knownSpecIds for this workspace
+        const discoveredIds = new Set(repoSpecs.map((s) => `${ws.name}:${s.name.toString()}`))
         for (const existing of existingSpecs) {
-          if (existing.workspace === ws.name && !discoveredSpecIds.has(existing.specId)) {
-            try {
-              await this.store.removeSpec(existing.specId)
-            } catch (err) {
-              errors.push({ filePath: existing.path, message: String(err) })
-            }
+          if (existing.workspace === ws.name && !discoveredIds.has(existing.specId)) {
+            knownSpecIds.delete(existing.specId)
+          }
+        }
+        for (const id of discoveredIds) {
+          knownSpecIds.add(id)
+        }
+      }
+
+      // 2. Individual Spec Indexing
+      for (const ws of options.workspaces) {
+        const repoSpecs = specsByWorkspace.get(ws.name) ?? []
+        const wsBreakdown = wsBreakdowns.get(ws.name)
+        const specIdsToRemove: string[] = []
+
+        // Mark deleted specs for removal
+        const discoveredIds = new Set(repoSpecs.map((s) => `${ws.name}:${s.name.toString()}`))
+        for (const existing of existingSpecs) {
+          if (existing.workspace === ws.name && !discoveredIds.has(existing.specId)) {
+            specIdsToRemove.push(existing.specId)
           }
         }
 
-        for (const { spec } of discoveredSpecs) {
-          const discovered = discoveredSpecs.find((entry) => entry.spec.specId === spec.specId)
+        for (const repoSpec of repoSpecs) {
+          specsProcessed++
+          if (specsProcessed % 20 === 0 || specsProcessed === 1) {
+            progress(
+              80 + Math.round((specsProcessed / Math.max(totalSpecsToProcess, 1)) * 3),
+              'Indexing specs',
+              `${String(specsProcessed)}/${String(totalSpecsToProcess)}`,
+            )
+          }
+
           try {
-            const existing = existingSpecMap.get(spec.specId)
-            if (existing && existing.contentHash === spec.contentHash) continue
+            const specId = `${ws.name}:${repoSpec.name.toString()}`
+            const existing = existingSpecMap.get(specId)
+            const specHash = await ws.specRepo.specHash(repoSpec)
+
+            if (specHash !== null && existing?.contentHash === specHash) {
+              if (wsBreakdown) wsBreakdown.specsIndexed++
+              continue
+            }
+
+            const metadata = await ws.specRepo.metadata(repoSpec)
+            const dependsOn = await ws.specRepo.readPersistedDependsOn(repoSpec)
+            const implementationLinks = await ws.specRepo.readPersistedImplementation(repoSpec)
+
+            let content = ''
+            const artifacts = await Promise.all(
+              repoSpec.filenames.map((f) => ws.specRepo.artifact(repoSpec, f)),
+            )
+            for (const artifact of artifacts) {
+              if (artifact?.content) {
+                content += artifact.content + '\n'
+              }
+            }
+
+            const specNode = createSpecNode({
+              specId,
+              path: repoSpec.name.toString(),
+              title: metadata?.title ?? repoSpec.name.toString(),
+              description: metadata?.description ?? '',
+              contentHash: specHash ?? 'unknown',
+              content,
+              workspace: ws.name,
+            })
 
             if (existing) {
-              await this.store.removeSpec(spec.specId)
+              specIdsToRemove.push(specId)
             }
 
-            for (const depId of spec.dependsOn) {
-              if (knownSpecIds.has(depId)) {
-                specRelations.push(
-                  createRelation({
-                    source: spec.specId,
-                    target: depId,
-                    type: RelationType.DependsOn,
-                  }),
-                )
-              }
-            }
-            for (const implementation of discovered?.implementation ?? []) {
-              if (implementation.symbols === undefined || implementation.symbols.length === 0) {
-                specRelations.push(
-                  createRelation({
-                    source: spec.specId,
-                    target: implementation.file,
-                    type: RelationType.CoversFile,
-                  }),
-                )
-                continue
-              }
-              for (const symbolName of implementation.symbols) {
-                const matchingSymbols = symbolIndex
-                  .findByFile(implementation.file)
-                  .filter((symbol) => symbol.name === symbolName)
-                for (const symbol of matchingSymbols) {
+            // Create relations
+            if (dependsOn) {
+              for (const depId of dependsOn) {
+                if (knownSpecIds.has(depId)) {
                   specRelations.push(
                     createRelation({
-                      source: spec.specId,
-                      target: symbol.id,
-                      type: RelationType.CoversSymbol,
+                      source: specId,
+                      target: depId,
+                      type: RelationType.DependsOn,
                     }),
                   )
                 }
               }
             }
-            allSpecs.push(spec)
+
+            if (implementationLinks) {
+              for (const link of implementationLinks) {
+                if (!link.symbols || link.symbols.length === 0) {
+                  specRelations.push(
+                    createRelation({
+                      source: specId,
+                      target: link.file,
+                      type: RelationType.CoversFile,
+                    }),
+                  )
+                } else {
+                  for (const symbolName of link.symbols) {
+                    const matchingSymbols = symbolIndex
+                      .findByFile(link.file)
+                      .filter((s) => s.name === symbolName)
+                    for (const symbol of matchingSymbols) {
+                      specRelations.push(
+                        createRelation({
+                          source: specId,
+                          target: symbol.id,
+                          type: RelationType.CoversSymbol,
+                        }),
+                      )
+                    }
+                  }
+                }
+              }
+            }
+
+            allSpecs.push(specNode)
             specsIndexed++
-            wsBreakdown.specsIndexed++
+            if (wsBreakdown) wsBreakdown.specsIndexed++
           } catch (err) {
-            errors.push({ filePath: spec.path, message: String(err) })
+            errors.push({ filePath: repoSpec.name.toString(), message: String(err) })
+          }
+        }
+
+        if (specIdsToRemove.length > 0) {
+          try {
+            await this.store.removeSpecs([...new Set(specIdsToRemove)])
+          } catch (err) {
+            errors.push({ filePath: ws.name, message: String(err) })
           }
         }
       }
 
-      // Compute per-workspace skipped counts from explicitly tracked unchanged files
+      // Compute per-workspace skipped counts
       for (const filePath of skippedFiles) {
         const wsName = filePath.substring(0, filePath.indexOf(':'))
         const breakdown = wsBreakdowns.get(wsName)
@@ -852,6 +1130,7 @@ export class IndexCodeGraph {
           const staged = readFilesAndSymbolsStageChunk(stageDir, chunkFile)
           await this.store.bulkLoad({
             files: staged.files,
+            documents: staged.documents,
             symbols: staged.symbols,
             specs: [],
             relations: [],
@@ -861,6 +1140,7 @@ export class IndexCodeGraph {
         if (allSpecs.length > 0) {
           await this.store.bulkLoad({
             files: [],
+            documents: [],
             symbols: [],
             specs: allSpecs,
             relations: [],
@@ -912,6 +1192,7 @@ export class IndexCodeGraph {
           name: ws.name,
           filesDiscovered: breakdown.filesDiscovered,
           filesIndexed: breakdown.filesIndexed,
+          documentsIndexed: breakdown.documentsIndexed,
           filesSkipped: breakdown.filesSkipped,
           filesRemoved: breakdown.filesRemoved,
           specsDiscovered: breakdown.specsDiscovered,
@@ -919,12 +1200,27 @@ export class IndexCodeGraph {
         }
       })
 
+      if (wsBreakdowns.has('root')) {
+        const breakdown = wsBreakdowns.get('root')!
+        workspaces.push({
+          name: 'root',
+          filesDiscovered: breakdown.filesDiscovered,
+          filesIndexed: breakdown.filesIndexed,
+          documentsIndexed: breakdown.documentsIndexed,
+          filesSkipped: breakdown.filesSkipped,
+          filesRemoved: breakdown.filesRemoved,
+          specsDiscovered: 0,
+          specsIndexed: 0,
+        })
+      }
+
       return {
         filesDiscovered: allDiscoveredPaths.length,
-        filesIndexed,
-        filesRemoved,
+        filesIndexed: filesIndexed + documentsIndexed,
+        documentsIndexed,
+        filesRemoved: filesRemovedCount,
         filesSkipped: skippedFiles.length,
-        specsDiscovered: totalSpecsDiscovered,
+        specsDiscovered: totalSpecsToProcess,
         specsIndexed,
         errors,
         duration: Date.now() - start,
@@ -1057,39 +1353,20 @@ export class IndexCodeGraph {
   /**
    * Builds a lightweight method-to-owner index from the extracted symbols.
    * @param index - The in-memory symbol index.
-   * @param fileLanguages - Language id for each indexed file path.
    * @returns Owner-to-method mapping for languages with class-scoped methods.
    */
-  private buildMethodOwnershipIndex(
-    index: SymbolIndex,
-    fileLanguages: ReadonlyMap<string, string>,
-  ): MethodOwnershipIndex {
+  private buildMethodOwnershipIndex(index: SymbolIndex): MethodOwnershipIndex {
     const methodsByOwnerId = new Map<string, Map<string, string[]>>()
-    const supportedLanguages = new Set(['typescript', 'tsx', 'javascript', 'jsx', 'python', 'php'])
 
-    for (const [filePath, fileSymbols] of index.entries()) {
-      const language = fileLanguages.get(filePath)
-      if (!language || !supportedLanguages.has(language)) continue
+    for (const [, fileSymbols] of index.entries()) {
+      for (const symbol of fileSymbols) {
+        if (symbol.kind !== SymbolKind.Method || !symbol.parentId) continue
 
-      const sortedSymbols = [...fileSymbols].sort((left, right) => {
-        if (left.line !== right.line) return left.line - right.line
-        return left.column - right.column
-      })
-
-      let currentOwnerId: string | undefined
-      for (const symbol of sortedSymbols) {
-        if (symbol.kind === 'class' || symbol.kind === 'interface') {
-          currentOwnerId = symbol.id
-          continue
-        }
-
-        if (symbol.kind !== 'method' || !currentOwnerId) continue
-
-        const methodsByName = methodsByOwnerId.get(currentOwnerId) ?? new Map<string, string[]>()
+        const methodsByName = methodsByOwnerId.get(symbol.parentId) ?? new Map<string, string[]>()
         const methodIds = methodsByName.get(symbol.name) ?? []
         methodIds.push(symbol.id)
         methodsByName.set(symbol.name, methodIds)
-        methodsByOwnerId.set(currentOwnerId, methodsByName)
+        methodsByOwnerId.set(symbol.parentId, methodsByName)
       }
     }
 
@@ -1097,234 +1374,151 @@ export class IndexCodeGraph {
   }
 
   /**
-   * Derives additive cross-file `OVERRIDES` relations using persisted hierarchy edges.
-   * @param changedTypeIds - Type identifiers from files reprocessed in this indexing run.
-   * @param ownershipIndex - Method ownership information reconstructed from symbols.
-   * @param existingOverrideKeys - Override edges already emitted by adapters in this run.
-   * @returns Additional override relations to persist.
+   * Collects files that must be re-processed because they contain classes/interfaces
+   * that extend or implement modified types from the current changed set.
+   * @param changedFiles - Files that were already identified as new or changed.
+   * @returns Set of additional file paths to re-extract.
+   */
+  private async collectHierarchyDependentFiles(changedFiles: string[]): Promise<Set<string>> {
+    const toReprocess = new Set<string>()
+    if (changedFiles.length === 0) return toReprocess
+
+    const changedSymbols = await this.store.findSymbols({ filePaths: changedFiles })
+    const typeIds = new Set<string>()
+    for (const s of changedSymbols) {
+      if (s.kind === 'class' || s.kind === 'interface') {
+        typeIds.add(s.id)
+      }
+    }
+
+    if (typeIds.size === 0) return toReprocess
+
+    for (const typeId of typeIds) {
+      const dependents = await getUpstream(this.store, typeId, { maxDepth: 1 })
+      for (const level of dependents.levels.values()) {
+        for (const dep of level) {
+          // We don't have relation type in SymbolNode, but getUpstream includes hierarchy relations.
+          // This is a bit broader than strictly needed (includes CALLS), but safe for correctness.
+          toReprocess.add(dep.filePath)
+        }
+      }
+    }
+
+    return toReprocess
+  }
+
+  /**
+   * Derives COVERS_FILE and COVERS_SYMBOL relations for class methods when the
+   * owner type is linked to a spec.
+   * @param changedTypeIds - IDs of classes/interfaces that were re-extracted.
+   * @param ownershipIndex - Owner-to-method mapping.
+   * @param seenOverrideKeys - Relations already identified by Pass 2.
+   * @returns Additional relations to add.
    */
   private async deriveCrossFileOverrideRelations(
-    changedTypeIds: ReadonlySet<string>,
+    changedTypeIds: Set<string>,
     ownershipIndex: MethodOwnershipIndex,
-    existingOverrideKeys: ReadonlySet<string>,
+    seenOverrideKeys: Set<string>,
   ): Promise<Relation[]> {
-    if (changedTypeIds.size === 0) return []
-
-    const seen = new Set(existingOverrideKeys)
-    const derived: Relation[] = []
+    const relations: Relation[] = []
+    if (changedTypeIds.size === 0) return relations
 
     for (const typeId of changedTypeIds) {
-      const targetTypeIds = await this.collectExtendedTargets(typeId)
-      for (const targetTypeId of targetTypeIds) {
-        this.addCrossFileOverridePairs(typeId, targetTypeId, ownershipIndex, seen, derived)
-      }
+      // Traverse DOWN to find base types
+      const hierarchy = await getDownstream(this.store, typeId, { maxDepth: 10 })
 
-      const dependentTypeIds = await this.collectExtendingDependents(typeId)
-      for (const dependentTypeId of dependentTypeIds) {
-        this.addCrossFileOverridePairs(dependentTypeId, typeId, ownershipIndex, seen, derived)
-      }
-    }
+      for (const [, symbols] of hierarchy.levels) {
+        for (const symbol of symbols) {
+          const superTypeId = symbol.id
+          // Verify if this is actually a base type (Extends/Implements)
+          const baseTargets = await this.store.getExtendedTargets(typeId)
+          const implementedTargets = await this.store.getImplementedTargets(typeId)
 
-    return derived
-  }
+          const isBase = [...baseTargets, ...implementedTargets].some(
+            (r) => r.target === superTypeId,
+          )
+          if (!isBase) continue
 
-  /**
-   * Collects transitive hierarchy targets for a given type symbol.
-   * @param typeId - Type symbol id.
-   * @returns Reachable ancestor and contract type ids.
-   */
-  private async collectHierarchyTargets(typeId: string): Promise<Set<string>> {
-    const targets = new Set<string>()
-    const queue = [typeId]
-    const visited = new Set(queue)
+          const subMethods = ownershipIndex.methodsByOwnerId.get(typeId)
+          if (!subMethods) continue
 
-    while (queue.length > 0) {
-      const current = queue.shift()
-      if (!current) continue
-
-      const relations = [
-        ...(await this.store.getExtendedTargets(current)),
-        ...(await this.store.getImplementedTargets(current)),
-      ]
-
-      for (const relation of relations) {
-        if (targets.has(relation.target)) continue
-        targets.add(relation.target)
-        if (!visited.has(relation.target)) {
-          visited.add(relation.target)
-          queue.push(relation.target)
-        }
-      }
-    }
-
-    return targets
-  }
-
-  /**
-   * Collects transitive extended targets for a given type symbol.
-   * Cross-file override derivation only follows concrete inheritance, not interface
-   * implementation, so `IMPLEMENTS` edges are intentionally excluded here.
-   * @param typeId - Type symbol id.
-   * @returns Reachable ancestor type ids.
-   */
-  private async collectExtendedTargets(typeId: string): Promise<Set<string>> {
-    const targets = new Set<string>()
-    const queue = [typeId]
-    const visited = new Set(queue)
-
-    while (queue.length > 0) {
-      const current = queue.shift()
-      if (!current) continue
-
-      const relations = await this.store.getExtendedTargets(current)
-
-      for (const relation of relations) {
-        if (targets.has(relation.target)) continue
-        targets.add(relation.target)
-        if (!visited.has(relation.target)) {
-          visited.add(relation.target)
-          queue.push(relation.target)
-        }
-      }
-    }
-
-    return targets
-  }
-
-  /**
-   * Collects transitive hierarchy dependents for a given type symbol.
-   * @param typeId - Type symbol id.
-   * @returns Reachable child and implementing type ids.
-   */
-  private async collectHierarchyDependents(typeId: string): Promise<Set<string>> {
-    const dependents = new Set<string>()
-    const queue = [typeId]
-    const visited = new Set(queue)
-
-    while (queue.length > 0) {
-      const current = queue.shift()
-      if (!current) continue
-
-      const relations = [
-        ...(await this.store.getExtenders(current)),
-        ...(await this.store.getImplementors(current)),
-      ]
-
-      for (const relation of relations) {
-        if (dependents.has(relation.source)) continue
-        dependents.add(relation.source)
-        if (!visited.has(relation.source)) {
-          visited.add(relation.source)
-          queue.push(relation.source)
-        }
-      }
-    }
-
-    return dependents
-  }
-
-  /**
-   * Collects transitive extending dependents for a given type symbol.
-   * Cross-file override derivation only follows class inheritance, not interface
-   * implementation, so `IMPLEMENTS` edges are intentionally excluded here.
-   * @param typeId - Type symbol id.
-   * @returns Reachable child type ids.
-   */
-  private async collectExtendingDependents(typeId: string): Promise<Set<string>> {
-    const dependents = new Set<string>()
-    const queue = [typeId]
-    const visited = new Set(queue)
-
-    while (queue.length > 0) {
-      const current = queue.shift()
-      if (!current) continue
-
-      const relations = await this.store.getExtenders(current)
-
-      for (const relation of relations) {
-        if (dependents.has(relation.source)) continue
-        dependents.add(relation.source)
-        if (!visited.has(relation.source)) {
-          visited.add(relation.source)
-          queue.push(relation.source)
-        }
-      }
-    }
-
-    return dependents
-  }
-
-  /**
-   * Finds unchanged files whose hierarchy relations must be recomputed because one
-   * of their base classes or implemented contracts changed in this run.
-   * @param changedFiles - Workspace-prefixed files whose content changed.
-   * @returns Workspace-prefixed dependent file paths to reprocess.
-   */
-  private async collectHierarchyDependentFiles(
-    changedFiles: readonly string[],
-  ): Promise<Set<string>> {
-    const dependentFiles = new Set<string>()
-
-    for (const filePath of changedFiles) {
-      const symbols = await this.store.findSymbols({ filePath })
-      for (const symbol of symbols) {
-        if (symbol.kind !== 'class' && symbol.kind !== 'interface') continue
-
-        const relations = [
-          ...(await this.store.getExtenders(symbol.id)),
-          ...(await this.store.getImplementors(symbol.id)),
-        ]
-
-        for (const relation of relations) {
-          const dependent = await this.store.getSymbol(relation.source)
-          if (dependent) {
-            dependentFiles.add(dependent.filePath)
+          const superMethods = await this.fetchMethodsForType(superTypeId)
+          for (const [name, subMethodIds] of subMethods.entries()) {
+            const superMethodId = superMethods.get(name)
+            if (superMethodId) {
+              for (const subId of subMethodIds) {
+                const key = `${subId}:${RelationType.Overrides}:${superMethodId}`
+                if (!seenOverrideKeys.has(key)) {
+                  relations.push(
+                    createRelation({
+                      source: subId,
+                      target: superMethodId,
+                      type: RelationType.Overrides,
+                    }),
+                  )
+                  seenOverrideKeys.add(key)
+                }
+              }
+            }
           }
         }
       }
     }
 
-    return dependentFiles
+    return relations
   }
 
   /**
-   * Adds matching method-name override pairs between two related owner types.
-   * @param sourceOwnerId - Candidate overriding type symbol id.
-   * @param targetOwnerId - Candidate overridden type symbol id.
-   * @param ownershipIndex - Method ownership information.
-   * @param seen - Deduplication set for override edges.
-   * @param derived - Accumulator for new relations.
+   * Helper to fetch all methods of a type from the store.
+   * @param typeId - ID of the class or interface.
+   * @returns Map of method name to symbol id.
    */
-  private addCrossFileOverridePairs(
-    sourceOwnerId: string,
-    targetOwnerId: string,
-    ownershipIndex: MethodOwnershipIndex,
-    seen: Set<string>,
-    derived: Relation[],
-  ): void {
-    const sourceMethods = ownershipIndex.methodsByOwnerId.get(sourceOwnerId)
-    const targetMethods = ownershipIndex.methodsByOwnerId.get(targetOwnerId)
-    if (!sourceMethods || !targetMethods) return
+  private async fetchMethodsForType(typeId: string): Promise<Map<string, string>> {
+    const methods = await this.store.findSymbols({
+      parentSymbolId: typeId,
+      kind: SymbolKind.Method,
+    })
+    return new Map(methods.map((m) => [m.name, m.id]))
+  }
 
-    for (const [methodName, sourceMethodIds] of sourceMethods.entries()) {
-      const targetMethodIds = targetMethods.get(methodName)
-      if (!targetMethodIds) continue
+  /**
+   * Assigns parentId to symbols within a file based on line/column range.
+   * @param symbols - The symbols to process.
+   * @param language - The language of the file.
+   * @returns A new array of symbols with parentId set where applicable.
+   */
+  private assignParentIds(symbols: readonly SymbolNode[], language: string): SymbolNode[] {
+    const supportedLanguages = new Set(['typescript', 'tsx', 'javascript', 'jsx', 'python', 'php'])
+    if (!supportedLanguages.has(language)) return [...symbols]
 
-      for (const sourceMethodId of sourceMethodIds) {
-        for (const targetMethodId of targetMethodIds) {
-          const key = `${sourceMethodId}:${RelationType.Overrides}:${targetMethodId}`
-          if (seen.has(key)) continue
-          seen.add(key)
-          derived.push(
-            createRelation({
-              source: sourceMethodId,
-              target: targetMethodId,
-              type: RelationType.Overrides,
-            }),
-          )
-        }
+    const sortedSymbols = [...symbols].sort((left, right) => {
+      if (left.line !== right.line) return left.line - right.line
+      return left.column - right.column
+    })
+
+    const results: SymbolNode[] = []
+    let currentOwnerId: string | undefined
+
+    for (const symbol of sortedSymbols) {
+      if (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface) {
+        currentOwnerId = symbol.id
+        results.push(symbol)
+        continue
+      }
+
+      if (symbol.kind === SymbolKind.Method && currentOwnerId) {
+        results.push(
+          createSymbolNode({
+            ...symbol,
+            parentId: currentOwnerId,
+          }),
+        )
+      } else {
+        results.push(symbol)
       }
     }
+
+    return results
   }
 }
 

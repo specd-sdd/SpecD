@@ -13,6 +13,7 @@ export interface WorkspaceIndexBreakdown {
   readonly name: string
   readonly filesDiscovered: number
   readonly filesIndexed: number
+  readonly documentsIndexed: number
   readonly filesSkipped: number
   readonly filesRemoved: number
   readonly specsDiscovered: number
@@ -25,6 +26,7 @@ export interface WorkspaceIndexBreakdown {
 export interface IndexResult {
   readonly filesDiscovered: number
   readonly filesIndexed: number
+  readonly documentsIndexed: number
   readonly filesRemoved: number
   readonly filesSkipped: number
   readonly specsDiscovered: number

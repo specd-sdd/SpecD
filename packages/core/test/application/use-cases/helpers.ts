@@ -1,7 +1,10 @@
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
-import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
+import {
+  Change,
+  type ActorIdentity,
+  type CreatedEvent,
+} from '../../../src/domain/entities/change.js'
 import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
-import { type ArchivedChangeIndexEntry } from '../../../src/domain/archived-change-index-entry.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -10,14 +13,7 @@ import {
   ArtifactType,
   type ArtifactTypeProps,
 } from '../../../src/domain/value-objects/artifact-type.js'
-import {
-  ArtifactDag,
-  artifactDagFromChangeArtifacts,
-} from '../../../src/domain/value-objects/artifact-dag.js'
 import { Schema } from '../../../src/domain/value-objects/schema.js'
-import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
-import { type CrossArtifactValidationRule } from '../../../src/domain/value-objects/cross-artifact-validation.js'
-import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import {
   type SpecPublication,
@@ -26,189 +22,184 @@ import {
   type SpecSearchResult,
 } from '../../../src/application/ports/spec-repository.js'
 import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
-import { type SpecLockData } from '../../../src/domain/services/parse-spec-lock.js'
 import {
   ArchiveRepository,
-  type ArchiveListOptions,
+  type ArchivePathEntry,
   type ArchiveListResult,
+  type ArchiveListOptions,
 } from '../../../src/application/ports/archive-repository.js'
-import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   type ArtifactParser,
   type ArtifactParserRegistry,
   type ArtifactAST,
   type ArtifactNode,
-  type DeltaApplicationResult,
-  type DeltaEntry,
 } from '../../../src/application/ports/artifact-parser.js'
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
-import { ContentHasher } from '../../../src/application/ports/content-hasher.js'
+import { type ContentHasher } from '../../../src/application/ports/content-hasher.js'
 import { NodeContentHasher } from '../../../src/infrastructure/node/content-hasher.js'
-import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
-import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 import {
-  RunStepHooks,
+  type RunStepHooks,
   type RunStepHooksResult,
-  type RunStepHooksInput,
-  type OnHookProgress,
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
-import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import {
   toDiscardedChangeView,
   toDraftedChangeView,
-  toArchivedChangeView,
   type DiscardedChangeView,
   type DraftedChangeView,
 } from '../../../src/domain/read-only-change-view.js'
+import {
+  ListWorkspaces,
+  type ProjectWorkspace,
+} from '../../../src/application/use-cases/list-workspaces.js'
+import { type SpecdConfig } from '../../../src/application/specd-config.js'
+import { type PreviewSpec } from '../../../src/application/use-cases/preview-spec.js'
+import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
+import { type CrossArtifactValidationRule } from '../../../src/domain/value-objects/cross-artifact-validation.js'
+import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
+import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import { type HookRunner } from '../../../src/application/ports/hook-runner.js'
+import { HookResult } from '../../../src/domain/value-objects/hook-result.js'
 
 /** Default identity for test actors. */
 export const testActor: ActorIdentity = { name: 'Test User', email: 'test@example.com' }
 
 /**
- * In-memory `ChangeRepository` subclass for unit tests.
- *
- * `get`, `list`, `save`, and `delete` are wired to the map. `artifact` and
- * `saveArtifact` throw `'not implemented'` — override in specific tests that
- * need them.
+ * Creates a mock `Change` entity.
  */
-class StubChangeRepository extends ChangeRepository {
-  readonly store: Map<string, Change>
-
-  constructor(changes: Change[] = []) {
-    super({ workspace: 'default', ownership: 'owned', isExternal: false, configPath: '/test' })
-    this.store = new Map(changes.map((c) => [c.name, cloneChange(c)]))
+export function makeChange(
+  name: string,
+  overrides: Partial<import('../../../src/domain/entities/change.js').ChangeProps> = {},
+  schemaName: string = 'test-schema',
+): Change {
+  const createdAt = overrides.createdAt ?? new Date()
+  const specIds = overrides.specIds ?? []
+  const created: CreatedEvent = {
+    type: 'created',
+    at: createdAt,
+    by: testActor,
+    specIds,
+    schemaName,
+    schemaVersion: 1,
   }
 
-  override async get(name: string): Promise<Change | null> {
-    const change = this.store.get(name)
-    if (change === undefined) return null
-    const cloned = cloneChange(change)
-    if (cloned.isDrafted) return null
-    if (isDiscardedStub(cloned)) return null
-    return cloned
-  }
+  return new Change({
+    name,
+    createdAt,
+    specIds,
+    history: [created],
+    ...overrides,
+  })
+}
 
-  override async getDraft(name: string): Promise<DraftedChangeView | null> {
-    const change = this.store.get(name)
-    if (change === undefined) return null
-    const cloned = cloneChange(change)
-    if (!cloned.isDrafted || isDiscardedStub(cloned)) return null
-    return toDraftedChangeView(cloned)
-  }
+/**
+ * Stub implementation of `ChangeRepository` for testing.
+ */
+export class StubChangeRepository extends ChangeRepository {
+  readonly store = new Map<string, Change>()
 
-  override async getDiscarded(name: string): Promise<DiscardedChangeView | null> {
-    const change = this.store.get(name)
-    if (change === undefined) return null
-    const cloned = cloneChange(change)
-    if (!isDiscardedStub(cloned)) return null
-    return toDiscardedChangeView(cloned)
-  }
-
-  override async list(): Promise<Change[]> {
-    return [...this.store.values()]
-      .map((change) => cloneChange(change))
-      .filter((change) => !change.isDrafted && !isDiscardedStub(change))
-  }
-
-  override async listDrafts(): Promise<DraftedChangeView[]> {
-    return [...this.store.values()]
-      .filter((change) => change.isDrafted && !isDiscardedStub(change))
-      .map((change) => toDraftedChangeView(cloneChange(change)))
-  }
-
-  override async listDiscarded(): Promise<DiscardedChangeView[]> {
-    return [...this.store.values()]
-      .filter((change) => isDiscardedStub(change))
-      .map((change) => toDiscardedChangeView(cloneChange(change)))
-  }
-
-  override async mutateDraft<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
-    const change = await this.getDraft(name)
-    if (change === null) {
-      throw new ChangeNotFoundError(name)
+  constructor(initial: Change[] = []) {
+    super({ workspace: 'test', ownership: 'owned', isExternal: false, configPath: '/tmp' })
+    for (const c of initial) {
+      this.store.set(c.name, c)
     }
-    const stored = this.store.get(name)
-    if (stored === undefined) {
-      throw new ChangeNotFoundError(name)
-    }
-    const working = cloneChange(stored)
-    const result = await fn(working)
-    await this.save(working)
-    return result
   }
 
-  override async mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
-    const change = await this.get(name)
-    if (change === null) {
-      throw new ChangeNotFoundError(name)
-    }
+  async get(name: string): Promise<Change | null> {
+    const change = this.store.get(name)
+    if (!change || change.isDrafted || isDiscardedStub(change)) return null
+    return change
+  }
 
+  async getDraft(name: string): Promise<DraftedChangeView | null> {
+    const change = this.store.get(name)
+    if (!change || !change.isDrafted) return null
+    return toDraftedChangeView(change)
+  }
+
+  async getDiscarded(name: string): Promise<DiscardedChangeView | null> {
+    const change = this.store.get(name)
+    if (!change || !isDiscardedStub(change)) return null
+    return toDiscardedChangeView(change)
+  }
+
+  async save(change: Change): Promise<void> {
+    this.store.set(change.name, change)
+  }
+
+  async saveDraft(change: Change): Promise<void> {
+    this.store.set(change.name, change)
+  }
+
+  async delete(change: Change): Promise<void> {
+    this.store.delete(change.name)
+  }
+
+  async list(): Promise<Change[]> {
+    return Array.from(this.store.values()).filter((c) => !c.isDrafted && !isDiscardedStub(c))
+  }
+
+  async listDrafts(): Promise<DraftedChangeView[]> {
+    return Array.from(this.store.values())
+      .filter((c) => c.isDrafted)
+      .map(toDraftedChangeView)
+  }
+
+  async listDiscarded(): Promise<DiscardedChangeView[]> {
+    return Array.from(this.store.values())
+      .filter((c) => isDiscardedStub(c))
+      .map(toDiscardedChangeView)
+  }
+
+  async mutate<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<T> {
+    const change = this.store.get(name)
+    if (!change) throw new ChangeNotFoundError(name)
     const result = await fn(change)
     await this.save(change)
     return result
   }
 
-  override async save(change: Change): Promise<void> {
-    this.store.set(change.name, cloneChange(change))
+  async mutateDraft<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<T> {
+    const change = this.store.get(name)
+    if (!change) throw new ChangeNotFoundError(name)
+    const result = await fn(change)
+    await this.save(change)
+    return result
   }
 
-  override async delete(change: Change): Promise<void> {
-    this.store.delete(change.name)
+  async scaffold(
+    _change: Change,
+    _specExists: (specId: string) => Promise<boolean>,
+  ): Promise<void> {}
+  async unscaffold(_change: Change, _specIds: readonly string[]): Promise<void> {}
+  changePath(change: Change): string {
+    return `/test/changes/${change.name}`
   }
-
-  override async artifact(_change: Change, _filename: string): Promise<SpecArtifact | null> {
+  draftChangePath(_view: DraftedChangeView): string {
+    return `/test/drafts/${_view.name}`
+  }
+  async artifact(_change: Change, _filename: string): Promise<SpecArtifact | null> {
     return null
   }
-
-  override async saveArtifact(
+  async saveArtifact(
     _change: Change,
     _artifact: SpecArtifact,
     _options?: { force?: boolean },
-  ): Promise<void> {
-    // no-op in tests unless overridden
-  }
-
-  override changePath(change: Change): string {
-    return `/test/changes/${change.name}`
-  }
-
-  override draftChangePath(view: DraftedChangeView): string {
-    return `/test/drafts/${view.name}`
-  }
-
-  override async artifactExists(_change: Change, _filename: string): Promise<boolean> {
+  ): Promise<void> {}
+  async artifactExists(_change: Change, _filename: string): Promise<boolean> {
     return false
   }
-
-  override async deltaExists(
-    _change: Change,
-    _specId: string,
-    _filename: string,
-  ): Promise<boolean> {
+  async deltaExists(_change: Change, _specId: string, _filename: string): Promise<boolean> {
     return false
-  }
-
-  override async scaffold(
-    _change: Change,
-    _specExists: (specId: string) => Promise<boolean>,
-  ): Promise<void> {
-    // no-op in tests
-  }
-
-  override async unscaffold(_change: Change, _specIds: readonly string[]): Promise<void> {
-    // no-op in tests
   }
 }
 
 /**
  * Creates a fully-typed `ChangeRepository` backed by an in-memory map.
  */
-export function makeChangeRepository(
-  initial: Change[] = [],
-): ChangeRepository & { store: Map<string, Change> } {
+export function makeChangeRepository(initial: Change[] = []): StubChangeRepository {
   return new StubChangeRepository(initial)
 }
 
@@ -222,267 +213,23 @@ function isDiscardedStub(change: Change): boolean {
 }
 
 /**
- * Creates a deep copy of a `Change` suitable for in-memory repository tests.
- *
- * @param change - The change to clone
- * @returns A deep-cloned `Change`
- */
-function cloneChange(change: Change): Change {
-  const artifacts = new Map<string, ChangeArtifact>()
-  for (const [type, artifact] of change.artifacts) {
-    const files = new Map<string, ArtifactFile>()
-    for (const [key, file] of artifact.files) {
-      files.set(
-        key,
-        new ArtifactFile({
-          key: file.key,
-          filename: file.filename,
-          status: file.status,
-          ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
-          ...(file.hasDrift ? { hasDrift: true } : {}),
-        }),
-      )
-    }
-
-    artifacts.set(
-      type,
-      new ChangeArtifact({
-        type: artifact.type,
-        optional: artifact.optional,
-        requires: artifact.requires,
-        files,
-      }),
-    )
-  }
-
-  const specDependsOn = new Map<string, readonly string[]>()
-  for (const [specId, deps] of change.specDependsOn) {
-    specDependsOn.set(specId, [...deps])
-  }
-
-  return new Change({
-    name: change.name,
-    createdAt: change.createdAt,
-    ...(change.description !== undefined ? { description: change.description } : {}),
-    specIds: change.specIds,
-    history: change.history.map((event) => cloneChangeEvent(event)),
-    artifacts,
-    trackedImplementationFiles: change.trackedImplementationFiles.map((entry) => ({
-      file: entry.file,
-      state: entry.state,
-    })),
-    implementationLinks: change.implementationLinks.map((link) => ({
-      specId: link.specId,
-      file: link.file,
-      fileLinkExplicit: link.fileLinkExplicit,
-      ...(link.symbols !== undefined ? { symbols: [...link.symbols] } : {}),
-    })),
-    specDependsOn,
-    invalidationPolicy: change.invalidationPolicy,
-  })
-}
-
-/**
- * Clones a change history event, preserving its discriminated-union shape.
- *
- * @param event - The history event to clone
- * @returns A cloned event with copied dates, actors, and nested arrays
- */
-function cloneChangeEvent(event: Change['history'][number]): Change['history'][number] {
-  switch (event.type) {
-    case 'created':
-      return {
-        type: 'created',
-        at: new Date(event.at),
-        by: { ...event.by },
-        specIds: [...event.specIds],
-        schemaName: event.schemaName,
-        schemaVersion: event.schemaVersion,
-      }
-    case 'transitioned':
-      return {
-        type: 'transitioned',
-        at: new Date(event.at),
-        by: { ...event.by },
-        from: event.from,
-        to: event.to,
-      }
-    case 'spec-approved':
-      return {
-        type: 'spec-approved',
-        at: new Date(event.at),
-        by: { ...event.by },
-        reason: event.reason,
-        artifactHashes: { ...event.artifactHashes },
-      }
-    case 'signed-off':
-      return {
-        type: 'signed-off',
-        at: new Date(event.at),
-        by: { ...event.by },
-        reason: event.reason,
-        artifactHashes: { ...event.artifactHashes },
-      }
-    case 'invalidated':
-      return {
-        type: 'invalidated',
-        at: new Date(event.at),
-        by: { ...event.by },
-        cause: event.cause,
-        message: event.message,
-        affectedArtifacts: event.affectedArtifacts.map((artifact) => ({
-          type: artifact.type,
-          files: [...artifact.files],
-        })),
-      }
-    case 'drafted':
-      return event.reason !== undefined
-        ? {
-            type: 'drafted',
-            at: new Date(event.at),
-            by: { ...event.by },
-            reason: event.reason,
-          }
-        : {
-            type: 'drafted',
-            at: new Date(event.at),
-            by: { ...event.by },
-          }
-    case 'restored':
-      return {
-        type: 'restored',
-        at: new Date(event.at),
-        by: { ...event.by },
-      }
-    case 'discarded':
-      return event.supersededBy !== undefined
-        ? {
-            type: 'discarded',
-            at: new Date(event.at),
-            by: { ...event.by },
-            reason: event.reason,
-            supersededBy: [...event.supersededBy],
-          }
-        : {
-            type: 'discarded',
-            at: new Date(event.at),
-            by: { ...event.by },
-            reason: event.reason,
-          }
-    case 'artifact-skipped':
-      return event.reason !== undefined
-        ? {
-            type: 'artifact-skipped',
-            at: new Date(event.at),
-            by: { ...event.by },
-            artifactId: event.artifactId,
-            reason: event.reason,
-          }
-        : {
-            type: 'artifact-skipped',
-            at: new Date(event.at),
-            by: { ...event.by },
-            artifactId: event.artifactId,
-          }
-    case 'artifacts-synced':
-      return {
-        type: 'artifacts-synced',
-        at: new Date(event.at),
-        by: { ...event.by },
-        typesAdded: [...event.typesAdded],
-        typesRemoved: [...event.typesRemoved],
-        filesAdded: event.filesAdded.map((file) => ({ ...file })),
-        filesRemoved: event.filesRemoved.map((file) => ({ ...file })),
-      }
-    case 'description-updated':
-      return {
-        type: 'description-updated',
-        at: new Date(event.at),
-        by: { ...event.by },
-        description: event.description,
-      }
-    case 'archive-failed':
-      return {
-        type: 'archive-failed',
-        at: new Date(event.at),
-        by: { ...event.by },
-        step: event.step,
-        message: event.message,
-        commitStarted: event.commitStarted,
-      }
-  }
-}
-
-/**
- * Creates a fully-typed mock `ActorResolver`.
- *
- * Returns sensible defaults. Override individual methods as needed.
- */
-export function makeActorResolver(overrides: Partial<ActorResolver> = {}): ActorResolver {
-  return {
-    async identity(): Promise<ActorIdentity> {
-      return testActor
-    },
-    ...overrides,
-  }
-}
-
-/**
- * Builds a minimal `Change` in `drafting` state for use in tests.
- *
- * Includes a `created` event with `schemaName: 'test-schema'` by default,
- * matching the default name used by `makeSchema()`.
- */
-export function makeChange(
-  name: string,
-  opts: { specIds?: string[]; schemaName?: string } = {},
-): Change {
-  const specIds = opts.specIds ?? ['auth/login']
-  const createdAt = new Date('2024-01-01T00:00:00Z')
-  return new Change({
-    name,
-    createdAt,
-    specIds,
-    history: [
-      {
-        type: 'created',
-        at: createdAt,
-        by: { name: 'Test User', email: 'test@example.com' },
-        specIds,
-        schemaName: opts.schemaName ?? 'test-schema',
-        schemaVersion: 1,
-      },
-    ],
-  })
-}
-
-/**
  * In-memory `SpecRepository` subclass for unit tests.
  */
-class StubSpecRepository extends SpecRepository {
+export class StubSpecRepository extends SpecRepository {
   private readonly _specs: Spec[]
   private readonly _artifacts: Record<string, string | null>
-  private readonly _saveFn:
-    | ((spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>)
-    | undefined
-  private readonly _publishFn:
-    | ((spec: Spec, publication: SpecPublication) => Promise<void>)
-    | undefined
-  private readonly _deleteFn: ((spec: Spec) => Promise<void>) | undefined
-  private readonly _resolveFromPathFn:
-    | ((inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>)
-    | undefined
+  private readonly _resolveFromPath?: (
+    inputPath: string,
+    from?: SpecPath,
+  ) => Promise<ResolveFromPathResult | null>
   readonly saved = new Map<string, string>()
 
   constructor(opts: {
     specs?: Spec[]
     artifacts?: Record<string, string | null>
-    save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
-    publish?: (spec: Spec, publication: SpecPublication) => Promise<void>
-    delete?: (spec: Spec) => Promise<void>
-    resolveFromPath?: (inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>
     ownership?: 'owned' | 'shared' | 'readOnly'
     workspace?: string
+    resolveFromPath?: (inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>
   }) {
     super({
       workspace: opts.workspace ?? 'default',
@@ -492,10 +239,9 @@ class StubSpecRepository extends SpecRepository {
     })
     this._specs = opts.specs ?? []
     this._artifacts = opts.artifacts ?? {}
-    this._saveFn = opts.save
-    this._publishFn = opts.publish
-    this._deleteFn = opts.delete
-    this._resolveFromPathFn = opts.resolveFromPath
+    if (opts.resolveFromPath !== undefined) {
+      this._resolveFromPath = opts.resolveFromPath
+    }
   }
 
   override async get(name: SpecPath): Promise<Spec | null> {
@@ -504,11 +250,15 @@ class StubSpecRepository extends SpecRepository {
 
   override async list(prefix?: SpecPath): Promise<Spec[]> {
     if (prefix === undefined) return this._specs
-    const prefixStr = prefix.toString()
-    return this._specs.filter((s) => {
-      const p = s.name.toString()
-      return p === prefixStr || p.startsWith(`${prefixStr}/`)
-    })
+    return this._specs.filter((s) => prefix.equals(s.name) || prefix.isAncestorOf(s.name))
+  }
+
+  override async count(): Promise<number> {
+    return this._specs.length
+  }
+
+  override async specHash(): Promise<string | null> {
+    return 'sha256:test'
   }
 
   override async artifact(_spec: Spec, filename: string): Promise<SpecArtifact | null> {
@@ -518,74 +268,156 @@ class StubSpecRepository extends SpecRepository {
     return new SpecArtifact(filename, content)
   }
 
-  override async save(
-    spec: Spec,
-    artifact: SpecArtifact,
-    options?: { force?: boolean },
-  ): Promise<void> {
+  override async save(_spec: Spec, artifact: SpecArtifact): Promise<void> {
     this.saved.set(artifact.filename, artifact.content)
-    if (this._saveFn) return this._saveFn(spec, artifact, options)
   }
 
   override async publish(spec: Spec, publication: SpecPublication): Promise<void> {
     for (const artifact of publication.artifacts) {
+      this.saved.set(`${spec.name.toString()}/${artifact.filename}`, artifact.content)
       this.saved.set(artifact.filename, artifact.content)
     }
-    if (publication.specLock !== undefined) {
-      this.saved.set(`${spec.name.toString()}/spec-lock.json`, JSON.stringify(publication.specLock))
-      this.saved.set('spec-lock.json', JSON.stringify(publication.specLock))
-    }
-    if (this._publishFn !== undefined) {
-      return this._publishFn(spec, publication)
+    if (publication.persistedDependsOn !== undefined) {
+      const lockData = {
+        schema: publication.persistedSchema ?? { name: 'test-schema', version: 1 },
+        dependsOn: publication.persistedDependsOn,
+        implementation: publication.persistedImplementation ?? [],
+      }
+      const json = JSON.stringify(lockData)
+      this.saved.set(`${spec.name.toString()}/spec-lock.json`, json)
+      this.saved.set('spec-lock.json', json)
     }
   }
 
-  override async delete(spec: Spec): Promise<void> {
-    if (this._deleteFn) return this._deleteFn(spec)
-  }
+  override async delete(): Promise<void> {}
 
   override async metadata(spec: Spec): Promise<SpecMetadata | null> {
     const jsonKey = `${spec.name.toString()}/metadata.json`
     const legacyKey = `${spec.name.toString()}/.specd-metadata.yaml`
     const content = this._artifacts[jsonKey] ?? this._artifacts[legacyKey]
     if (content === undefined || content === null) return null
-    const parsed = JSON.parse(content)
-    if (parsed === null || parsed === undefined || typeof parsed !== 'object') return null
-    return parsed as SpecMetadata
+    return JSON.parse(content) as SpecMetadata
   }
 
-  override async saveMetadata(
-    spec: Spec,
-    content: string,
-    _options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {
+  override async saveMetadata(_spec: Spec, content: string): Promise<void> {
     this.saved.set('metadata.json', content)
     this.saved.set('.specd-metadata.yaml', content)
   }
 
-  override async readSpecLock(spec: Spec): Promise<SpecLockData | null> {
+  override async readPersistedSchema(
+    spec: Spec,
+  ): Promise<{ name: string; version: number } | null> {
     const key = `${spec.name.toString()}/spec-lock.json`
     const content = this._artifacts[key]
     if (content === undefined || content === null) return null
-    return JSON.parse(content) as SpecLockData
+    try {
+      const parsed: Record<string, unknown> = JSON.parse(content)
+      return (parsed.schema as { name: string; version: number } | undefined) ?? null
+    } catch {
+      return null
+    }
   }
 
-  override async saveSpecLock(
-    _spec: Spec,
-    content: SpecLockData,
-    _options?: { force?: boolean },
-  ): Promise<void> {
-    this.saved.set('spec-lock.json', JSON.stringify(content))
+  override async readPersistedDependsOn(spec: Spec): Promise<readonly string[] | null> {
+    const key = `${spec.name.toString()}/spec-lock.json`
+    const content = this._artifacts[key]
+    if (content === undefined || content === null) return null
+    try {
+      const parsed: Record<string, unknown> = JSON.parse(content)
+      return (parsed.dependsOn as readonly string[] | undefined) ?? null
+    } catch {
+      return null
+    }
   }
+
+  override async readPersistedImplementation(
+    spec: Spec,
+  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
+    const key = `${spec.name.toString()}/spec-lock.json`
+    const content = this._artifacts[key]
+    if (content === undefined || content === null) return null
+    try {
+      const parsed: Record<string, unknown> = JSON.parse(content)
+      return (
+        (parsed.implementation as
+          | readonly { readonly file: string; readonly symbols?: readonly string[] }[]
+          | undefined) ?? null
+      )
+    } catch {
+      return null
+    }
+  }
+
+  override async updatePersistedSchema(): Promise<void> {}
+  override async updatePersistedDependsOn(): Promise<void> {}
+  override async updatePersistedImplementation(): Promise<void> {}
 
   override async resolveFromPath(
     inputPath: string,
     from?: SpecPath,
   ): Promise<ResolveFromPathResult | null> {
-    if (this._resolveFromPathFn !== undefined) {
-      return await this._resolveFromPathFn(inputPath, from)
+    if (this._resolveFromPath !== undefined) {
+      return this._resolveFromPath(inputPath, from)
     }
-    return null
+
+    // Handle canonical IDs
+    if (inputPath.includes(':')) {
+      const parts = inputPath.split(':')
+      const ws = parts[0]!
+      const capPath = parts.slice(1).join(':')
+      if (ws === this.workspace()) {
+        try {
+          const specPath = SpecPath.parse(capPath)
+          return { specPath, specId: inputPath }
+        } catch {
+          return null
+        }
+      }
+      return { crossWorkspaceHint: [ws, ...capPath.split('/')] }
+    }
+
+    // Simple relative resolution for tests
+    let resolvedPath: string
+    let escapedWorkspace = false
+    if (inputPath.startsWith('/')) {
+      resolvedPath = inputPath.slice(1)
+    } else if (from) {
+      const segments = from.toString().split('/')
+      const inputSegments = inputPath.split('/')
+      const resultSegments = [...segments]
+
+      for (const segment of inputSegments) {
+        if (segment === '..') {
+          if (resultSegments.length === 0) {
+            escapedWorkspace = true
+          } else {
+            resultSegments.pop()
+          }
+        } else if (segment !== '.' && segment !== 'spec.md' && segment !== '.specd-metadata.yaml') {
+          resultSegments.push(segment)
+        }
+      }
+      resolvedPath = resultSegments.join('/')
+    } else {
+      resolvedPath = inputPath
+    }
+
+    if (escapedWorkspace) {
+      const segments = resolvedPath.split('/').filter((s) => s.length > 0)
+      return { crossWorkspaceHint: segments }
+    }
+
+    try {
+      const specPath = SpecPath.parse(resolvedPath)
+      const exists = this._specs.some((s) => s.name.toString() === specPath.toString())
+      if (!exists) {
+        return null
+      }
+      const specId = `${this.workspace()}:${specPath.toString()}`
+      return { specPath, specId }
+    } catch {
+      return null
+    }
   }
 
   override async search(): Promise<SpecSearchResult[]> {
@@ -597,53 +429,71 @@ class StubSpecRepository extends SpecRepository {
  * Creates a `SpecRepository` backed by in-memory arrays.
  */
 export function makeSpecRepository(
-  overridesOrOwnership?:
+  opts:
     | {
         specs?: Spec[]
         artifacts?: Record<string, string | null>
-        save?: (spec: Spec, artifact: SpecArtifact, options?: { force?: boolean }) => Promise<void>
-        publish?: (spec: Spec, publication: SpecPublication) => Promise<void>
-        delete?: (spec: Spec) => Promise<void>
+        ownership?: 'owned' | 'shared' | 'readOnly'
+        workspace?: string
         resolveFromPath?: (
           inputPath: string,
           from?: SpecPath,
         ) => Promise<ResolveFromPathResult | null>
-        ownership?: 'owned' | 'shared' | 'readOnly'
-        workspace?: string
       }
     | 'owned'
     | 'shared'
-    | 'readOnly',
-): SpecRepository & { saved: Map<string, string> } {
-  const overrides =
-    typeof overridesOrOwnership === 'string'
-      ? { ownership: overridesOrOwnership }
-      : (overridesOrOwnership ?? {})
-  return new StubSpecRepository(overrides)
+    | 'readOnly' = {},
+): StubSpecRepository {
+  const options = typeof opts === 'string' ? { ownership: opts } : opts
+  return new StubSpecRepository(options)
 }
 
 /**
- * Creates a mock `SchemaRegistry` that returns a fixed schema on `resolve()`.
+ * Creates a mock `ArchiveRepository`.
  */
-export function makeSchemaRegistry(schema: Schema | null = null): SchemaRegistry {
+export function makeArchiveRepository(initial: ArchivedChange[] = []): ArchiveRepository {
   return {
-    async resolve(): Promise<Schema | null> {
-      return schema
+    async archive(change: Change) {
+      return {
+        archivedChange: {
+          archivedName: change.name,
+          archivedAt: new Date(),
+          archivedBy: testActor,
+        } as unknown as ArchivedChange,
+        archiveDirPath: `/test/archive/${change.name}`,
+      }
     },
-    async resolveRaw() {
-      return null
+    async list(_options?: ArchiveListOptions): Promise<ArchiveListResult> {
+      return {
+        items: initial.map((c) => ({
+          name: c.name,
+          archivedName: c.archivedName,
+          archivedAt: c.archivedAt,
+          workspaces: c.workspaces,
+          artifacts: [],
+          specIds: [],
+          schemaName: '',
+          schemaVersion: 0,
+        })),
+        meta: {
+          total: initial.length,
+          count: initial.length,
+          limit: 100,
+        },
+      }
     },
-    async list() {
-      return []
+    async get(name: string): Promise<ArchivedChange | null> {
+      return initial.find((c) => c.archivedName === name) ?? null
     },
-  }
+    archivePath(entry: ArchivePathEntry) {
+      return `/test/archive/${entry.archivedName}`
+    },
+    async reindex(): Promise<void> {},
+  } as unknown as ArchiveRepository
 }
 
 /**
- * Creates a mock `SchemaProvider` that returns a fixed schema on `get()`.
- *
- * When `schema` is `null`, the provider throws `SchemaNotFoundError` to
- * match the real contract where `get()` never returns `null`.
+ * Creates a mock `SchemaProvider`.
  */
 export function makeSchemaProvider(schema: Schema | null = null): SchemaProvider {
   return {
@@ -651,36 +501,109 @@ export function makeSchemaProvider(schema: Schema | null = null): SchemaProvider
       if (schema === null) throw new SchemaNotFoundError('(test)')
       return schema
     },
-  }
+  } as unknown as SchemaProvider
 }
 
 /**
- * Creates a mock `FileReader` backed by an in-memory map.
+ * Creates a mock `Schema` entity.
  */
-export function makeFileReader(files: Record<string, string> = {}): FileReader {
+export function makeSchema(
+  artifactsOrOpts:
+    | ArtifactType[]
+    | {
+        name?: string
+        artifacts?: ArtifactType[]
+        workflow?: WorkflowStep[]
+        metadataExtraction?: MetadataExtraction
+        crossArtifactValidations?: import('../../../src/domain/value-objects/cross-artifact-validation.js').CrossArtifactValidationRule[]
+      } = [],
+  workflow: WorkflowStep[] = [],
+  overrides: {
+    name?: string
+    metadataExtraction?: MetadataExtraction
+    crossArtifactValidations?: import('../../../src/domain/value-objects/cross-artifact-validation.js').CrossArtifactValidationRule[]
+  } = {},
+): Schema {
+  if (Array.isArray(artifactsOrOpts)) {
+    return new Schema(
+      'schema',
+      overrides.name ?? 'test-schema',
+      1,
+      artifactsOrOpts,
+      workflow,
+      overrides.metadataExtraction,
+      overrides.crossArtifactValidations ?? [],
+    )
+  }
+  return new Schema(
+    'schema',
+    artifactsOrOpts.name ?? 'test-schema',
+    1,
+    artifactsOrOpts.artifacts ?? [],
+    artifactsOrOpts.workflow ?? [],
+    artifactsOrOpts.metadataExtraction,
+    artifactsOrOpts.crossArtifactValidations ?? [],
+  )
+}
+
+/**
+ * Creates a mock `ActorResolver`.
+ */
+export function makeActorResolver(actor: ActorIdentity = testActor): ActorResolver {
   return {
-    async read(absolutePath: string): Promise<string | null> {
-      return files[absolutePath] ?? null
+    async identity(): Promise<ActorIdentity> {
+      return actor
     },
   }
 }
 
 /**
- * Creates a mock `HookRunner` with a fixed exit code and stderr.
+ * Creates a mock `ArtifactParser`.
  */
-export function makeHookRunner(exitCode = 0, stderr = ''): HookRunner {
+export function makeParser(overrides: Partial<ArtifactParser> = {}): ArtifactParser {
+  const trivialNode: ArtifactNode = { type: 'root' }
+  const trivialAST: ArtifactAST = { root: trivialNode }
   return {
-    async run(): Promise<HookResult> {
-      return new HookResult(exitCode, '', stderr)
-    },
+    fileExtensions: ['.md'],
+    parse: () => trivialAST,
+    apply: (ast) => ({ ast, warnings: [] }),
+    serialize: () => 'serialized',
+    renderSubtree: () => 'rendered',
+    nodeTypes: () => [],
+    outline: () => [],
+    selectorHints: () => ({}),
+    deltaInstructions: () => '',
+    parseDelta: () => [],
+    ...overrides,
   }
+}
+
+/**
+ * Creates an `ArtifactParserRegistry` with stub parsers.
+ */
+export function makeParsers(
+  markdown: ArtifactParser = makeParser(),
+  yaml: ArtifactParser = makeParser(),
+): ArtifactParserRegistry {
+  const map = new Map<string, ArtifactParser>([
+    ['markdown', markdown],
+    ['yaml', yaml],
+  ])
+  return map
+}
+
+/**
+ * Creates a mock `ArtifactParserRegistry` that returns no-op parsers for everything.
+ */
+export function makeNoopParsers(): ArtifactParserRegistry {
+  const parser = makeParser()
+  return {
+    get: () => parser,
+  } as unknown as ArtifactParserRegistry
 }
 
 /**
  * Creates an `ArtifactType` with sensible defaults for testing.
- *
- * All required fields are populated with empty arrays / safe fallbacks.
- * Pass any `ArtifactTypeProps` partial to override.
  */
 export function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> = {}): ArtifactType {
   const defaultOutput = id === 'specs' ? 'spec.md' : id === 'verify' ? 'verify.md' : `${id}.md`
@@ -697,235 +620,165 @@ export function makeArtifactType(id: string, extra: Partial<ArtifactTypeProps> =
 }
 
 /**
- * Builds an {@link ArtifactDag} from a change's persisted artifact graph.
- *
- * @param change - Change with artifact entries
- * @returns DAG for `Change.invalidate` / `updateSpecIds` in tests
+ * Creates a mock `WorkflowStep`.
  */
-export function artifactDagFromChange(change: Change): ArtifactDag {
-  return artifactDagFromChangeArtifacts(
-    [...change.artifacts.values()].map((artifact) => ({
-      type: artifact.type,
-      requires: artifact.requires,
-    })),
-  )
-}
-
-export function makeSchema(
-  optsOrArtifacts:
-    | {
-        artifacts?: ArtifactType[]
-        workflow?: WorkflowStep[]
-        name?: string
-        metadataExtraction?: MetadataExtraction
-        crossArtifactValidations?: readonly CrossArtifactValidationRule[]
-      }
-    | ArtifactType[] = {},
-  workflow: WorkflowStep[] = [],
-): Schema {
-  if (Array.isArray(optsOrArtifacts)) {
-    return new Schema('schema', 'test-schema', 1, optsOrArtifacts, workflow)
-  }
-  return new Schema(
-    'schema',
-    optsOrArtifacts.name ?? 'test-schema',
-    1,
-    optsOrArtifacts.artifacts ?? [],
-    optsOrArtifacts.workflow ?? [],
-    optsOrArtifacts.metadataExtraction,
-    optsOrArtifacts.crossArtifactValidations ?? [],
-  )
-}
-
-/**
- * Creates a stub `ArtifactParser` with no-op defaults.
- *
- * Override individual operations as needed.
- */
-export function makeParser(
-  opts: {
-    parse?: (content: string) => ArtifactAST
-    apply?: (ast: ArtifactAST, delta: readonly DeltaEntry[]) => DeltaApplicationResult
-    serialize?: (ast: ArtifactAST) => string
-    renderSubtree?: (node: ArtifactNode) => string
-    parseDelta?: (content: string) => readonly DeltaEntry[]
-  } = {},
-): ArtifactParser {
-  const trivialNode: ArtifactNode = { type: 'root' }
-  const trivialAST: ArtifactAST = { root: trivialNode }
+export function makeWorkflowStep(step: string, extra: Partial<WorkflowStep> = {}): WorkflowStep {
   return {
-    fileExtensions: ['.md'],
-    parse: opts.parse ?? (() => trivialAST),
-    apply: opts.apply ?? ((ast) => ({ ast, warnings: [] })),
-    serialize: opts.serialize ?? (() => 'serialized'),
-    renderSubtree: opts.renderSubtree ?? (() => 'rendered'),
-    nodeTypes: () => [],
-    outline: () => [],
-    selectorHints: () => ({}),
-    deltaInstructions: () => '',
-    parseDelta: opts.parseDelta ?? (() => []),
+    step,
+    requires: [],
+    requiresTaskCompletion: [],
+    hooks: { pre: [], post: [] },
+    ...extra,
   }
 }
 
 /**
- * Creates a `ContentHasher` for use in tests.
- *
- * Uses the real `NodeContentHasher` since hashing is deterministic and cheap.
+ * Creates a mock `ContentHasher`.
  */
 export function makeContentHasher(): ContentHasher {
   return new NodeContentHasher()
 }
 
 /**
- * Creates an `ArtifactParserRegistry` with stub parsers for markdown and yaml.
+ * Creates a mock `HookRunner`.
  */
-export function makeParsers(
-  markdown: ArtifactParser = makeParser(),
-  yaml: ArtifactParser = makeParser(),
-): ArtifactParserRegistry {
-  return new Map([
-    ['markdown', markdown],
-    ['yaml', yaml],
-  ])
-}
-
-/**
- * In-memory `ArchiveRepository` subclass for unit tests.
- *
- * `get` looks up by name; `archivePath` returns a deterministic test path.
- * `archive`, `list`, and `reindex` throw — override in tests that need them.
- */
-class StubArchiveRepository extends ArchiveRepository {
-  readonly store: Map<string, ArchivedChange>
-
-  constructor(archived: ArchivedChange[] = []) {
-    super({ workspace: 'default', ownership: 'owned', isExternal: false, configPath: '/test' })
-    this.store = new Map(archived.map((a) => [a.name, a]))
-  }
-
-  override async archive(): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }> {
-    throw new Error('not implemented')
-  }
-
-  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
-    const allItems = [...this.store.values()].map((view) => ({
-      name: view.name,
-      archivedName: view.archivedName,
-      archivedAt: view.archivedAt,
-      ...(view.archivedBy !== undefined ? { archivedBy: view.archivedBy } : {}),
-      artifacts: [...view.artifacts.keys()],
-      specIds: [...view.specIds],
-      schemaName: view.schemaName,
-      schemaVersion: view.schemaVersion,
-      workspaces: [...view.workspaces],
-    }))
-
-    const limit = options?.limit ?? 100
-    let items = allItems
-    let page: number | undefined
-    let startAt: string | undefined
-
-    if (options?.startAt !== undefined) {
-      startAt = options.startAt
-      const idx = items.findIndex((i) => i.name === startAt)
-      if (idx >= 0) items = items.slice(idx + 1)
-    } else {
-      page = options?.page ?? 1
-      items = items.slice((page - 1) * limit)
-    }
-
-    const count = Math.min(items.length, limit)
-    items = items.slice(0, limit)
-
-    return {
-      items,
-      meta: {
-        total: allItems.length,
-        count,
-        limit,
-        ...(page !== undefined ? { page } : {}),
-        ...(startAt !== undefined ? { startAt } : {}),
-      },
-    }
-  }
-
-  override async get(name: string): Promise<ArchivedChange | null> {
-    return this.store.get(name) ?? null
-  }
-
-  override async reindex(): Promise<void> {}
-
-  override archivePath(archivedChange: ArchivedChange): string {
-    return `/test/archive/${archivedChange.archivedName}`
+export function makeHookRunner(exitCode = 0): HookRunner {
+  return {
+    run: async () => new HookResult(exitCode, '', ''),
   }
 }
 
 /**
- * Creates a fully-typed `ArchiveRepository` backed by an in-memory map.
- */
-export function makeArchiveRepository(
-  initial: ArchivedChange[] = [],
-): ArchiveRepository & { store: Map<string, ArchivedChange> } {
-  return new StubArchiveRepository(initial)
-}
-
-/**
- * Builds a minimal `ArchivedChange` for use in tests.
- */
-export function makeArchivedChange(
-  name: string,
-  opts: { specIds?: string[]; schemaName?: string } = {},
-): ArchivedChange {
-  const createdAt = new Date('2024-01-01T00:00:00Z')
-  const archivedName = `20240101-000000-${name}`
-  const specIds = opts.specIds ?? ['default:default']
-  const schemaName = opts.schemaName ?? 'test-schema'
-  const actor: ActorIdentity = { name: 'test', email: 'test@test.com' }
-  const change = new Change({
-    name,
-    createdAt,
-    specIds,
-    history: [
-      {
-        type: 'created',
-        at: createdAt,
-        by: actor,
-        specIds,
-        schemaName,
-        schemaVersion: 1,
-      },
-    ],
-  })
-  change.transition('designing', actor)
-  change.transition('ready', actor)
-  change.transition('implementing', actor)
-  change.transition('verifying', actor)
-  change.transition('done', actor)
-  change.transition('archivable', actor)
-
-  return toArchivedChangeView(change, {
-    archivedName,
-    archivedAt: new Date('2024-01-02T00:00:00Z'),
-  })
-}
-
-/**
- * Stub `RunStepHooks` that returns a configurable result without actually
- * running any hooks.
- *
- * By default returns `{ hooks: [], success: true, failedHook: null }`.
+ * Stub `RunStepHooks` for testing.
  */
 export function makeRunStepHooks(
   overrides?: Partial<{
-    execute: (input: RunStepHooksInput, onProgress?: OnHookProgress) => Promise<RunStepHooksResult>
+    execute: (
+      input: import('../../../src/application/use-cases/run-step-hooks.js').RunStepHooksInput,
+      onProgress?: import('../../../src/application/use-cases/run-step-hooks.js').OnHookProgress,
+    ) => Promise<RunStepHooksResult>
   }>,
 ): RunStepHooks {
-  const defaultExecute = async (): Promise<RunStepHooksResult> => ({
-    hooks: [],
-    success: true,
-    failedHook: null,
-  })
   return {
-    execute: overrides?.execute ?? defaultExecute,
+    execute:
+      overrides?.execute ??
+      (async (): Promise<RunStepHooksResult> => ({
+        success: true,
+        hooks: [],
+        failedHook: null,
+      })),
   } as unknown as RunStepHooks
+}
+
+/**
+ * Creates a mock `ListWorkspaces` use case.
+ */
+export function makeListWorkspaces(
+  repos: Map<string, SpecRepository> = new Map(),
+  ownership: Map<string, 'owned' | 'shared' | 'readOnly'> = new Map(),
+  codeRoots: Map<string, string> = new Map(),
+): ListWorkspaces {
+  const config = {
+    projectRoot: '/test',
+    workspaces: Array.from(repos.keys()).map((name) => ({
+      name,
+      specsPath: `/test/specs/${name}`,
+      codeRoot: codeRoots.get(name) ?? `/test/code/${name}`,
+      isExternal: false,
+      ownership: ownership.get(name) ?? 'owned',
+    })),
+  } as any
+
+  return new ListWorkspaces(config as unknown as SpecdConfig, repos)
+}
+
+/**
+ * Creates a ReadonlyMap of workspaces from a map of spec repositories.
+ */
+export async function makeWorkspaceMap(
+  repos: Map<string, SpecRepository>,
+): Promise<ReadonlyMap<string, ProjectWorkspace>> {
+  const listWorkspaces = makeListWorkspaces(repos)
+  const workspaces = await listWorkspaces.execute()
+  return new Map(workspaces.map((ws) => [ws.name, ws]))
+}
+
+/**
+ * Creates a mock `FileReader` backed by an in-memory map.
+ */
+export function makeFileReader(files: Record<string, string> = {}): FileReader {
+  return {
+    async read(absolutePath: string): Promise<string | null> {
+      return files[absolutePath] ?? null
+    },
+  }
+}
+
+export function makeStubChangeRepo(change: Change): ChangeRepository {
+  return makeChangeRepository([change])
+}
+
+export function makeStubSchemaProvider(schema: Schema | null): SchemaProvider {
+  return makeSchemaProvider(schema)
+}
+
+export function makeStubFileReader(files: Record<string, string> = {}): FileReader {
+  return makeFileReader(files)
+}
+
+export function makeStubPreviewSpec(): PreviewSpec {
+  return {
+    execute: async () => ({
+      files: [],
+      warnings: [],
+    }),
+  } as unknown as PreviewSpec
+}
+
+/**
+ * Creates a mock `ArchivedChange` entity.
+ */
+export function makeArchivedChange(
+  name: string,
+  overrides: Partial<ArchivedChange> = {},
+): ArchivedChange {
+  return {
+    name,
+    state: 'archivable',
+    archivedName: name,
+    archivedAt: new Date(),
+    archivedBy: testActor,
+    history: [],
+    specIds: [],
+    schemaName: 'test-schema',
+    schemaVersion: 1,
+    artifacts: new Map(),
+    workspaces: ['default'],
+    ...overrides,
+  } as unknown as ArchivedChange
+}
+
+/**
+ * Creates a mock `Change` in `archivable` state.
+ */
+export function makeArchivableChange(
+  name: string,
+  overrides: Partial<import('../../../src/domain/entities/change.js').ChangeProps> = {},
+): Change {
+  const c = makeChange(name, overrides)
+  c.transition('designing', testActor)
+  c.transition('ready', testActor)
+  c.transition('implementing', testActor)
+  c.transition('verifying', testActor)
+  c.transition('done', testActor)
+  c.transition('archivable', testActor)
+  return c
+}
+
+export function makeGenerateMetadata(): any {
+  return { execute: async () => ({ hasExtraction: true, metadata: {} }) }
+}
+
+export function makeSaveMetadata(): any {
+  return { execute: async () => ({ spec: 'test' }) }
 }

@@ -40,4 +40,6 @@ export interface CodeGraphFactoryOptions {
 export interface CodeGraphOptions extends CodeGraphFactoryOptions {
   /** Filesystem root allocated to the selected graph-store backend. */
   readonly storagePath: string
+  /** Optional project root used for selector normalization. */
+  readonly projectRoot?: string
 }

@@ -1,0 +1,79 @@
+- op: modified
+  description: 'Clarify FileNode/DocumentNode path and workspace semantics with root: namespace.'
+  selector:
+    type: section
+    matches: '^Requirement: FileNode path and workspace semantics$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    All node identities (Files and Documents) SHALL be globally unique by prefixing the owning workspace name to the relative path:
+
+    - **Workspace Identity**: `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`).
+    - **Root Identity**: `root:{projectRelativePath}` (e.g. `root:docs/adr/0001.md`).
+
+    `root` is a reserved namespace for files discovered via project-global `graph.includePaths` that are not owned by any specific workspace.
+
+    If a physical file falls under a configured workspace `codeRoot`, the workspace identity wins. The same file MUST NOT also be persisted under a `root:` identity.
+
+    `path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations.
+
+    Each node MUST also store its `configRelativePath` (relative to the directory containing the active `specd.yaml`) to enable user-facing lookups from project-relative path selectors.
+
+    This ensures that two workspaces with identical relative paths produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
+
+- op: modified
+  description: 'Update Spec resolution to consume SpecRepository directly.'
+  selector:
+    type: section
+    matches: '^Requirement: Spec resolution via SpecRepository$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    The indexer SHALL resolve specs by directly consuming the `SpecRepository` instance from each orchestrated workspace. For each spec:
+
+    1. Enumerate identities via `repo.list()`.
+    2. Check freshness via `repo.specHash()`.
+    3. Load content by concatenating artifacts from `repo.artifact()`. Artifact filenames come from `spec.filenames` and no longer include metadata files. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order.
+    4. Load metadata via `repo.metadata()` to extract `title` and `description`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
+    5. Load `dependsOn` via `repo.readPersistedDependsOn()`.
+    6. Load coverage links via `repo.readPersistedImplementation()`.
+
+    The indexer SHALL NOT rely on the CLI to precompute these semantics or provide callbacks. This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
+
+- op: modified
+  description: 'Update IndexOptions and ProjectGraphConfig.'
+  selector:
+    type: section
+    matches: '^Requirement: WorkspaceIndexTarget$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    `IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:
+
+    ```ts
+    interface ProjectGraphConfig {
+      readonly includePaths?: readonly string[]
+      readonly excludePaths?: readonly string[]
+      readonly workspaces?: ReadonlyMap<string, {
+        readonly allowedPaths?: readonly string[]
+        readonly excludePaths?: readonly string[]
+        readonly respectGitignore?: boolean
+      }>
+    }
+
+    interface IndexOptions {
+      readonly projectRoot: string
+      readonly workspaces: readonly ProjectWorkspace[]
+      readonly graphConfig: ProjectGraphConfig
+      readonly onProgress?: IndexProgressCallback
+      readonly chunkBytes?: number
+      readonly vcsRef?: string
+    }
+    ```
+
+    The `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.
+
+    `ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`.

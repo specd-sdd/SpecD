@@ -5,7 +5,7 @@ import {
 } from '../../../../src/application/use-cases/_shared/depends-on-traversal.js'
 import { type ContextWarning } from '../../../../src/application/use-cases/_shared/context-warning.js'
 import { type ResolvedSpec } from '../../../../src/application/use-cases/_shared/spec-pattern-matching.js'
-import { makeSpecRepository, makeArtifactType, makeParser } from '../helpers.js'
+import { makeSpecRepository, makeArtifactType, makeParser, makeWorkspaceMap } from '../helpers.js'
 import { Spec } from '../../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../../src/domain/value-objects/spec-path.js'
 import { type MetadataExtraction } from '../../../../src/domain/value-objects/metadata-extraction.js'
@@ -26,7 +26,8 @@ describe('traverseDependsOn', () => {
         'auth/login/.specd-metadata.yaml': metadataJson(['auth/shared']),
       },
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>()
     const added = new Map<string, ResolvedSpec>()
     const seen = new Set<string>()
@@ -39,7 +40,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       undefined,
       0,
@@ -61,7 +62,8 @@ describe('traverseDependsOn', () => {
         'a/two/.specd-metadata.yaml': metadataJson(['a/one']),
       },
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>()
     const added = new Map<string, ResolvedSpec>()
     const seen = new Set<string>()
@@ -74,7 +76,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       undefined,
       0,
@@ -95,7 +97,8 @@ describe('traverseDependsOn', () => {
         'a/two/.specd-metadata.yaml': metadataJson(['a/three']),
       },
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>()
     const added = new Map<string, ResolvedSpec>()
     const seen = new Set<string>()
@@ -108,7 +111,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       1,
       0,
@@ -127,7 +130,8 @@ describe('traverseDependsOn', () => {
         'auth/login/.specd-metadata.yaml': metadataJson(['auth/shared']),
       },
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>([
       ['default:auth/shared', { workspace: 'default', capPath: 'auth/shared' }],
     ])
@@ -142,7 +146,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       undefined,
       0,
@@ -160,7 +164,8 @@ describe('traverseDependsOn', () => {
         'auth/login/.specd-metadata.yaml': metadataJson(['unknown:something']),
       },
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>()
     const added = new Map<string, ResolvedSpec>()
     const seen = new Set<string>()
@@ -173,7 +178,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       undefined,
       0,
@@ -189,7 +194,8 @@ describe('traverseDependsOn', () => {
       specs: [makeSpec('auth/login')],
       artifacts: {},
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>()
     const added = new Map<string, ResolvedSpec>()
     const seen = new Set<string>()
@@ -202,7 +208,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       undefined,
       0,
@@ -222,7 +228,8 @@ describe('traverseDependsOn', () => {
         'auth/login/.specd-metadata.yaml': JSON.stringify({ title: 'Login' }),
       },
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>()
     const added = new Map<string, ResolvedSpec>()
     const seen = new Set<string>()
@@ -235,7 +242,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       undefined,
       0,
@@ -315,7 +322,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      await makeWorkspaceMap(specs),
       warnings,
       undefined,
       0,
@@ -340,7 +347,8 @@ describe('traverseDependsOn', () => {
         'auth/login/spec.md': '# Auth Login\n\n## Spec Dependencies\n\n- auth/shared\n',
       },
     })
-    const specs = new Map([['default', repo]])
+    const specRepos = new Map([['default', repo]])
+    const workspaces = await makeWorkspaceMap(specRepos)
     const included = new Map<string, ResolvedSpec>()
     const added = new Map<string, ResolvedSpec>()
     const seen = new Set<string>()
@@ -353,7 +361,7 @@ describe('traverseDependsOn', () => {
       added,
       seen,
       new Set(),
-      specs,
+      workspaces,
       warnings,
       undefined,
       0,

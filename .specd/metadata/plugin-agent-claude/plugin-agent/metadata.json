@@ -1,6 +1,6 @@
 {
   "title": "plugin-agent-claude:plugin-agent",
-  "description": "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection.",
+  "description": "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation by declaring Claude-supported capabilities and frontmatter source values to `@specd/skills`, which renders the final installed markdown for Claude Code.",
   "dependsOn": [
     "core:config",
     "plugin-manager:agent-plugin-type",
@@ -8,7 +8,7 @@
     "skills:skill-repository"
   ],
   "context": [
-    "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation with Claude Code frontmatter injection."
+    "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation by declaring Claude-supported capabilities and frontmatter source values to `@specd/skills`, which renders the final installed markdown for Claude Code."
   ],
   "rules": [
     {
@@ -26,31 +26,31 @@
     {
       "requirement": "Frontmatter type",
       "rules": [
-        "```typescript\ninterface Frontmatter {\n  name?: string // Display name (defaults to directory name)\n  description: string // REQUIRED\n  when_to_use?: string\n  argument_hint?: string\n  disable_model_invocation?: boolean\n  user_invocable?: boolean\n  allowed_tools?: string\n  model?: string\n  effort?: string\n  context?: string\n  agent?: string\n  hooks?: Record<string, unknown>\n  paths?: string\n  shell?: string\n}\n```"
+        "The Claude plugin MUST define a structured value model that can represent the Claude-supported metadata set:\n\n- `name`\n- `description`\n- `when_to_use`\n- `argument_hint`\n- `disable_model_invocation`\n- `user_invocable`\n- `allowed_tools`\n- `model`\n- `effort`\n- `context`\n- `agent`\n- `hooks`\n- `paths`\n- `shell`"
       ]
     },
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST have `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills` repository, passing `SpecdConfig` for built-in variable resolution\n2. Inject stored frontmatter to each skill-local markdown template\n3. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`\n4. Install files marked as shared to `.claude/skills/_specd-shared/` relative to the `projectRoot` found in `SpecdConfig`"
+        "The application layer MUST have an `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills`\n2. Resolve Claude frontmatter source values for each skill\n3. Declare only the Claude-supported capability identifiers for each install\n4. Pass `variables.sharedFolder` only when overriding the default shared path contract\n5. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`\n6. Install files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT assemble the final YAML frontmatter document itself after bundle resolution.\nThe plugin MUST NOT normalize capability objects on behalf of `@specd/skills`."
       ]
     },
     {
       "requirement": "Frontmatter injection",
       "rules": [
-        "During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file:\n\n```yaml\n---\nname: { { name } }\ndescription: { { description } }\nallowed_tools: { { allowed_tools } }\nargument_hint: { { argument_hint } }\n---\n```\n\nThe plugin MUST NOT prepend skill frontmatter to files marked as shared."
+        "During install, the plugin MUST provide Claude frontmatter values to `@specd/skills` so that the rendered skill-local markdown output includes Claude-compatible YAML frontmatter.\n\nThe plugin MUST NOT prepend YAML frontmatter itself after bundle resolution.\n\nFiles marked as shared MUST continue to be written without Claude skill frontmatter."
       ]
     },
     {
       "requirement": "Install location",
       "rules": [
-        "Skills MUST be installed to `.claude/skills/` in the project root.\n\nFor each skill, files not marked as shared MUST be installed under `.claude/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under `.claude/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file."
+        "Skills MUST be installed to `.claude/skills/` in the project root.\n\nFor each skill, files not marked as shared MUST be installed under `.claude/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under the rendered `sharedFolder` location within the project root. When no override is provided, that location MUST default to a relative path derived from the runtime config directory.\n\nThe resolved shared location MUST NOT contain a `SKILL.md` file."
       ]
     },
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.\n\nUninstall MUST NOT remove unrelated directories or files under `.claude/skills/` that are not part of the specd-managed skill set."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.claude/skills/` that are not part of the specd-managed skill set."
       ]
     }
   ],
@@ -85,39 +85,41 @@
     },
     {
       "requirement": "Frontmatter injection",
-      "name": "Install adds frontmatter",
+      "name": "Install emits Claude-compatible frontmatter through skills rendering",
       "when": ["install() is called"],
-      "then": ["YAML frontmatter is prepended to each skill-local markdown file"]
+      "then": [
+        "skill-local markdown files are written with Claude-compatible frontmatter already present in the rendered content"
+      ]
     },
     {
       "requirement": "Frontmatter injection",
-      "name": "Install does not prepend skill frontmatter to shared files",
+      "name": "Shared files do not receive Claude frontmatter",
       "given": ["a resolved bundle includes files marked as shared"],
       "when": ["install() writes those files"],
       "then": ["shared files are written without Claude skill frontmatter"]
     },
     {
       "requirement": "Install location",
-      "name": "Installs to .claude/skills/",
+      "name": "Installs to .claude/skills/ and sharedFolder default location",
       "given": ["a SpecdConfig with projectRoot"],
       "when": ["install is called with that configuration"],
       "then": [
         "non-shared files are written to {projectRoot}/.claude/skills/<skill-name>/",
-        "AND shared files are written to {projectRoot}/.claude/skills/_specd-shared/"
+        "AND shared files are written to the resolved sharedFolder location under the project root"
       ]
     },
     {
       "requirement": "Install location",
       "name": "Shared directory is not discovered as a skill",
-      "when": ["install creates .claude/skills/_specd-shared/"],
-      "then": ["the directory does not contain a SKILL.md file"]
+      "when": ["install writes shared files to the resolved shared location"],
+      "then": ["that location does not contain a SKILL.md file"]
     },
     {
       "requirement": "Uninstall behavior",
       "name": "Uninstall removes selected skill directories and keeps shared resources",
-      "given": ["multiple skills are installed and share .claude/skills/_specd-shared/"],
+      "given": ["multiple skills are installed and share the resolved sharedFolder location"],
       "when": ["uninstall(config, { skills: ['specd'] }) is executed"],
-      "then": ["only .claude/skills/specd/ is removed", "AND .claude/skills/_specd-shared/ remains"]
+      "then": ["only .claude/skills/specd/ is removed", "AND the resolved shared location remains"]
     },
     {
       "requirement": "Uninstall behavior",
@@ -128,7 +130,7 @@
       "when": ["uninstall(config) is executed without skills"],
       "then": [
         "all specd-managed skill directories are removed",
-        "AND .claude/skills/_specd-shared/ is removed",
+        "AND the resolved sharedFolder location is removed",
         "AND unrelated user skill directories remain"
       ]
     },
@@ -146,22 +148,59 @@
     },
     {
       "requirement": "Frontmatter type",
-      "name": "Frontmatter defines required and optional fields",
-      "when": ["Frontmatter is used"],
+      "name": "Frontmatter values cover Claude-supported metadata",
+      "when": ["Claude frontmatter values are prepared for install"],
       "then": [
-        "it includes description (required), and optional fields like name, when_to_use, argument_hint, etc."
+        "they can represent the Claude-supported metadata fields",
+        "AND they are stored as structured values rather than a prebuilt YAML document"
+      ]
+    },
+    {
+      "requirement": "Frontmatter type",
+      "name": "Unsupported Claude metadata stays out of the value collection",
+      "when": ["a non-Claude metadata key is proposed"],
+      "then": ["it is excluded from the Claude frontmatter value collection"]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "InstallSkills passes Claude values into skills rendering",
+      "given": ["skills are available from @specd/skills"],
+      "when": ["InstallSkills runs"],
+      "then": [
+        "it resolves Claude frontmatter source values per skill",
+        "AND it passes only Claude capability identifiers into @specd/skills"
       ]
     },
     {
       "requirement": "Application layer",
-      "name": "Application layer contains InstallSkills use case",
-      "when": ["the application layer is inspected"],
-      "then": ["InstallSkills use case exists that orchestrates skill installation"]
+      "name": "Shared files are written to the rendered sharedFolder location",
+      "given": ["a resolved bundle contains files marked as shared"],
+      "when": ["InstallSkills writes those files"],
+      "then": ["they are written to the resolved sharedFolder location under the project root"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "plugin-agent-claude:plugin-agent",
+        "file": "plugin-agent-claude:test/install-skills.spec.ts",
+        "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-claude:plugin-agent",
+        "file": "plugin-agent-claude:src/application/use-cases/install-skills.ts",
+        "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-claude:plugin-agent",
+        "file": "plugin-agent-claude:src/application/use-cases/shared-folder.ts",
+        "symbol": "resolveSharedFolder"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:46ac164143ac4928616a53c15abeca3b9f45d1cd741300c7627d095299da1385",
-    "verify.md": "sha256:e85673bb85e37fc374586193b0ec8e10c896d55c524a306fb6396c10dc30efbb"
+    "spec.md": "sha256:227768fb5d23ad012d6e1c1b492114076fe610462e4b4a537cacf3a1565cad5a",
+    "verify.md": "sha256:7d530819b83586daf70a45ef50c4b478b3818c6e16b2788563545eada62c5a6d"
   },
   "generatedBy": "core"
 }

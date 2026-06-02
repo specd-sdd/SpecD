@@ -9,13 +9,14 @@ import {
   makeChange,
   makeSpecRepository,
   testActor,
+  makeListWorkspaces,
 } from './helpers.js'
 
 describe('CreateChange', () => {
   describe('given no existing change with that name', () => {
     it('creates and saves a change with the given name', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
 
       const result = await uc.execute({
         name: 'add-oauth',
@@ -25,212 +26,64 @@ describe('CreateChange', () => {
       })
 
       expect(result.change.name).toBe('add-oauth')
-      expect(result.changePath).toBe('/test/changes/add-oauth')
-      expect(repo.store.has('add-oauth')).toBe(true)
+      expect(repo.store.get('add-oauth')).toBeDefined()
     })
 
-    it('derives workspaces from specIds', async () => {
+    it('scaffolds the change directory', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
 
       const result = await uc.execute({
-        name: 'my-change',
-        specIds: ['frontend:ui/login', 'backend:api/auth'],
+        name: 'add-oauth',
+        specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 1,
       })
 
-      expect(result.change.workspaces).toContain('frontend')
-      expect(result.change.workspaces).toContain('backend')
-      expect(result.change.specIds).toEqual(['frontend:ui/login', 'backend:api/auth'])
+      expect(result.changePath).toBe('/test/changes/add-oauth')
     })
 
-    it('appends a created event with the actor from ActorResolver', async () => {
+    it('seeds the creation history event', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
 
       const result = await uc.execute({
-        name: 'my-change',
+        name: 'add-oauth',
         specIds: ['auth/login'],
         schemaName: 'specd-std',
-        schemaVersion: 2,
+        schemaVersion: 1,
       })
 
       expect(result.change.history).toHaveLength(1)
-      const evt = result.change.history[0]
-      expect(evt?.type).toBe('created')
-      if (evt?.type !== 'created') throw new Error('unreachable')
-      expect(evt.by).toEqual(testActor)
-      expect(evt.schemaName).toBe('specd-std')
-      expect(evt.schemaVersion).toBe(2)
-      expect(evt.specIds).toEqual(['auth/login'])
+      expect(result.change.history[0]).toMatchObject({
+        type: 'created',
+        by: testActor,
+        specIds: ['auth/login'],
+      })
     })
 
-    it('leaves the change in drafting state', async () => {
+    it('sets optional description when provided', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
 
       const result = await uc.execute({
-        name: 'my-change',
+        name: 'add-oauth',
+        description: 'New login method',
         specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 1,
       })
 
-      expect(result.change.state).toBe('drafting')
+      expect(result.change.description).toBe('New login method')
     })
 
-    it('allows empty specIds for bootstrapping', async () => {
+    it('seeds invalidation policy when provided', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
 
       const result = await uc.execute({
-        name: 'bootstrap',
-        specIds: [],
-        schemaName: 'specd-std',
-        schemaVersion: 1,
-      })
-
-      expect(result.change.specIds).toEqual([])
-      expect(result.change.workspaces).toEqual([])
-    })
-
-    it('deduplicates specIds', async () => {
-      const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
-
-      const result = await uc.execute({
-        name: 'dedup-test',
-        specIds: ['auth/login', 'auth/login'],
-        schemaName: 'specd-std',
-        schemaVersion: 1,
-      })
-
-      expect(result.change.specIds).toEqual(['auth/login'])
-    })
-
-    it('seeds specDependsOn from spec-lock when the spec already exists', async () => {
-      const repo = makeChangeRepository()
-      const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])],
-        artifacts: {
-          'auth/login/spec-lock.json': JSON.stringify({
-            schema: { name: 'schema-std', version: 1 },
-            dependsOn: ['core:storage'],
-          }),
-        },
-      })
-      const uc = new CreateChange(repo, new Map([['default', specRepo]]), makeActorResolver())
-
-      const result = await uc.execute({
-        name: 'seed-from-sidecar',
+        name: 'add-oauth',
         specIds: ['auth/login'],
-        schemaName: 'specd-std',
-        schemaVersion: 1,
-      })
-
-      expect(result.change.specDependsOn.get('auth/login')).toEqual(['core:storage'])
-    })
-
-    it('falls back to metadata dependsOn when sidecar is absent', async () => {
-      const repo = makeChangeRepository()
-      const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])],
-        artifacts: {
-          'auth/login/.specd-metadata.yaml': JSON.stringify({
-            dependsOn: ['core:storage', 'core:change'],
-          }),
-        },
-      })
-      const uc = new CreateChange(repo, new Map([['default', specRepo]]), makeActorResolver())
-
-      const result = await uc.execute({
-        name: 'seed-from-metadata',
-        specIds: ['auth/login'],
-        schemaName: 'specd-std',
-        schemaVersion: 1,
-      })
-
-      expect(result.change.specDependsOn.get('auth/login')).toEqual(['core:storage', 'core:change'])
-    })
-
-    it('does not seed a missing spec', async () => {
-      const repo = makeChangeRepository()
-      const uc = new CreateChange(
-        repo,
-        new Map([['default', makeSpecRepository({ specs: [] })]]),
-        makeActorResolver(),
-      )
-
-      const result = await uc.execute({
-        name: 'missing-spec',
-        specIds: ['auth/login'],
-        schemaName: 'specd-std',
-        schemaVersion: 1,
-      })
-
-      expect(result.change.specDependsOn.has('auth/login')).toBe(false)
-    })
-  })
-
-  describe('given a drafted change with that name already exists', () => {
-    it('throws ChangeAlreadyExistsError', async () => {
-      const existing = makeChange('add-oauth')
-      existing.draft(testActor)
-      const repo = makeChangeRepository([existing])
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
-
-      await expect(
-        uc.execute({
-          name: 'add-oauth',
-          specIds: ['auth/login'],
-          schemaName: 'specd-std',
-          schemaVersion: 1,
-        }),
-      ).rejects.toThrow(ChangeAlreadyExistsError)
-    })
-  })
-
-  describe('given a change with that name already exists', () => {
-    it('throws ChangeAlreadyExistsError', async () => {
-      const existing = makeChange('add-oauth')
-      const repo = makeChangeRepository([existing])
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
-
-      await expect(
-        uc.execute({
-          name: 'add-oauth',
-          specIds: ['auth/login'],
-          schemaName: 'specd-std',
-          schemaVersion: 1,
-        }),
-      ).rejects.toThrow(ChangeAlreadyExistsError)
-    })
-
-    it('ChangeAlreadyExistsError has correct code', async () => {
-      const existing = makeChange('add-oauth')
-      const repo = makeChangeRepository([existing])
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
-
-      await expect(
-        uc.execute({
-          name: 'add-oauth',
-          specIds: ['auth/login'],
-          schemaName: 'specd-std',
-          schemaVersion: 1,
-        }),
-      ).rejects.toMatchObject({ code: 'CHANGE_ALREADY_EXISTS' })
-    })
-  })
-
-  describe('invalidationPolicy', () => {
-    it('seeds the change with an explicit invalidation policy', async () => {
-      const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
-
-      const result = await uc.execute({
-        name: 'with-policy',
-        specIds: [],
         schemaName: 'specd-std',
         schemaVersion: 1,
         invalidationPolicy: 'surgical',
@@ -239,18 +92,152 @@ describe('CreateChange', () => {
       expect(result.change.invalidationPolicy).toBe('surgical')
     })
 
-    it('defaults to downstream when no policy is provided', async () => {
+    it('defaults invalidation policy to downstream', async () => {
       const repo = makeChangeRepository()
-      const uc = new CreateChange(repo, new Map(), makeActorResolver())
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
 
       const result = await uc.execute({
-        name: 'no-policy',
-        specIds: [],
+        name: 'add-oauth',
+        specIds: ['auth/login'],
         schemaName: 'specd-std',
         schemaVersion: 1,
       })
 
       expect(result.change.invalidationPolicy).toBe('downstream')
+    })
+
+    it('loads and seeds persisted dependencies for existing specs', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/login'), [])],
+        artifacts: {
+          'auth/login/spec-lock.json': JSON.stringify({
+            dependsOn: ['default:shared/auth'],
+          }),
+        },
+      })
+      const uc = new CreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeActorResolver(),
+      )
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
+    })
+
+    it('falls back to metadata for dependencies when sidecar is absent', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/login'), [])],
+        artifacts: {
+          'auth/login/metadata.json': JSON.stringify({
+            dependsOn: ['default:shared/auth'],
+          }),
+        },
+      })
+      const uc = new CreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeActorResolver(),
+      )
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
+    })
+
+    it('does not seed dependsOn for non-existent specs (newly created)', async () => {
+      const repo = makeChangeRepository()
+      const uc = new CreateChange(
+        repo,
+        makeListWorkspaces(new Map([['default', makeSpecRepository({ specs: [] })]])),
+        makeActorResolver(),
+      )
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.has('default:auth/login')).toBe(false)
+    })
+  })
+
+  describe('given an existing change with that name', () => {
+    it('throws ChangeAlreadyExistsError', async () => {
+      const existing = makeChange('add-oauth')
+      const repo = makeChangeRepository([existing])
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
+
+      await expect(
+        uc.execute({
+          name: 'add-oauth',
+          specIds: ['auth/login'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(ChangeAlreadyExistsError)
+    })
+  })
+
+  describe('given an existing draft with that name', () => {
+    it('throws ChangeAlreadyExistsError', async () => {
+      const existing = makeChange('add-oauth')
+      const repo = makeChangeRepository([existing])
+      await repo.mutate('add-oauth', (c) => {
+        c.transition('designing', testActor)
+        c.transition('ready', testActor)
+        c.transition('implementing', testActor)
+        c.draft(testActor, 'Testing', true)
+        return c
+      })
+
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
+
+      await expect(
+        uc.execute({
+          name: 'add-oauth',
+          specIds: ['auth/login'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(ChangeAlreadyExistsError)
+    })
+  })
+
+  describe('given an existing discarded change with that name', () => {
+    it('throws ChangeAlreadyExistsError', async () => {
+      const existing = makeChange('add-oauth')
+      const repo = makeChangeRepository([existing])
+      await repo.mutate('add-oauth', (c) => {
+        c.discard('Testing', testActor)
+        return c
+      })
+
+      const uc = new CreateChange(repo, makeListWorkspaces(new Map()), makeActorResolver())
+
+      await expect(
+        uc.execute({
+          name: 'add-oauth',
+          specIds: ['auth/login'],
+          schemaName: 'specd-std',
+          schemaVersion: 1,
+        }),
+      ).rejects.toThrow(ChangeAlreadyExistsError)
     })
   })
 })

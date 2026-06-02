@@ -1007,18 +1007,17 @@ Index and query the code graph for the workspace.
 specd graph index [options]
 ```
 
-Indexes workspace source files into the code graph. When a `specd.yaml` is supplied with `--config` or discovered automatically, indexing uses the configured workspaces. When no config is available, or when `--path` is provided, the command enters bootstrap mode and indexes a synthetic `default` workspace rooted at the repository root. Bootstrap mode is intended for initial graph bootstrapping, not normal configured project operation.
+Indexes project graph inputs into the code graph. When a `specd.yaml` is supplied with `--config` or discovered automatically, indexing always uses all configured workspaces plus any configured project-global graph include paths. When no config is available, or when `--path` is provided, the command enters bootstrap mode and indexes a synthetic `default` workspace rooted at the repository root. Bootstrap mode is intended for initial graph bootstrapping, not normal configured project operation.
 
 | Option                      | Description                                                           |
 | --------------------------- | --------------------------------------------------------------------- |
-| `--workspace <name>`        | Index only the named workspace.                                       |
 | `--force`                   | Recreate the graph backend and run a full re-index.                   |
 | `--config <path>`           | Config file path. Mutually exclusive with `--path`.                   |
 | `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.        |
 | `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config). |
 | `--format text\|json\|toon` | Output format.                                                        |
 
-#### Config fields: `graph.excludePaths` and `graph.respectGitignore`
+#### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, and `workspace.graph.allowedPaths`
 
 Each workspace in `specd.yaml` may declare a `graph` block:
 
@@ -1033,15 +1032,31 @@ workspaces:
         - dist/
         - .specd/*
         - '!.specd/metadata/' # re-include .specd/metadata/ despite the wildcard above
+      allowedPaths: # optional; gitignore-syntax include surface relative to codeRoot
+        - src/**
+        - package.json
+graph:
+  includePaths: # optional; gitignore-syntax paths relative to projectRoot, indexed as root:...
+    - docs/**
+    - pnpm-workspace.yaml
+  excludePaths: # optional; global gitignore-syntax exclusions for file/document discovery
+    - specd-sdd/
+    - specs/
 ```
 
-**`graph.excludePaths`** — when set, replaces the built-in defaults entirely. Patterns follow gitignore syntax and support `!` negation. The built-in defaults are:
+**`graph.excludePaths`** — global exclusions for file/document discovery. When set in config, they replace the built-in defaults; CLI `--exclude-path` flags are appended on top. Patterns follow gitignore syntax and support `!` negation. The built-in defaults are:
 
 ```
 node_modules/   .git/   .specd/   dist/   build/   coverage/   .next/   .nuxt/
 ```
 
 **`graph.respectGitignore`** — when `true` (default), `.gitignore` rules are loaded hierarchically and applied with **absolute priority**: no `excludePaths` negation can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.
+
+**`workspace.graph.allowedPaths`** — when set, only matching paths inside that workspace `codeRoot` are graph-visible. Matching paths still flow through the normal classifier: parser-recognized files become `File`/`Symbol` nodes, parser misses with textual content become `Document` nodes, and binary files are skipped.
+
+**`graph.includePaths`** — optional project-global graph inputs rooted at `projectRoot`. Matching files are indexed under the reserved `root:` namespace only when they are outside every configured workspace `codeRoot`. Parser-recognized files become `root:` code files; textual parser misses become `Document` nodes.
+
+Filesystem-backed spec roots are excluded automatically from file/document discovery, so `spec.md`, `verify.md`, and similar spec artifacts are indexed only as specs, not again as `Document` nodes. `root` is a reserved namespace and cannot be used as a workspace name.
 
 #### `--exclude-path` merging
 
@@ -1067,7 +1082,7 @@ specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
 specd graph search <query> [options]
 ```
 
-Search for symbols or specs in the code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Search for symbols, specs, or documents in the code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
 If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
@@ -1075,6 +1090,7 @@ If a graph index is currently running, this command fails fast with: `The code g
 | ---------------------------- | ------------------------------------------------------------------------------- |
 | `--symbols`                  | Search only symbols.                                                            |
 | `--specs`                    | Search only specs.                                                              |
+| `--documents`                | Search only documents.                                                          |
 | `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.     |
 | `--config <path>`            | Config file path. Mutually exclusive with `--path`.                             |
 | `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                  |
@@ -1085,6 +1101,14 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--limit <n>`                | Maximum number of results per category (default: 10).                           |
 | `--spec-content`             | Include full spec content in `json` or `toon` output.                           |
 | `--format text\|json\|toon`  | Output format.                                                                  |
+
+Exact identifier matches are ranked ahead of fuzzy matches:
+
+- spec search boosts exact `specId` matches such as `core:change`
+- symbol search boosts exact symbol names and full symbol ids
+- document search boosts exact canonical paths and exact project-relative paths
+
+Text output renders file-bearing results using paths relative to `projectRoot`.
 
 ---
 
@@ -1127,7 +1151,7 @@ Overriding `--min-risk`, `--limit`, or `--min-score` does not disable the other 
 specd graph stats [options]
 ```
 
-Print summary statistics for the current code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Print summary statistics for the current code graph. Text output includes files, documents, symbols, specs, relation counts, and the last indexed timestamp. JSON/TOON output also includes `stale`, `currentRef`, and `fingerprintMismatch`. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
 If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
 
@@ -1155,12 +1179,20 @@ File selectors accept three forms:
 - **Workspace-prefixed canonical path**: `core:src/model.ts`
 - **Absolute path**: `/abs/path/to/packages/core/model.ts`
 
+Symbol selectors accept progressively more specific forms:
+
+- bare name: `invalidate`
+- file-qualified canonical selector: `core:src/domain/entities/change.ts:invalidate`
+- kind-qualified selector: `core:src/domain/entities/change.ts:method:invalidate`
+- full symbol id: `core:src/domain/entities/change.ts:method:invalidate:697:2`
+- project-relative and absolute file path variants for the same forms
+
 Multiple `--file` flags aggregate impact across all specified files.
 
 | Option                                                             | Description                                                                           |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
 | `--spec <id>`                                                      | Spec ID to analyze.                                                                   |
-| `--symbol <name>`                                                  | Symbol name to analyze.                                                               |
+| `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.   |
 | `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute). |
 | `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                             |
 | `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                               |
@@ -1172,12 +1204,15 @@ Multiple `--file` flags aggregate impact across all specified files.
 depends on the target. `dependencies` reports code the target depends on. The legacy
 values `upstream` and `downstream` remain accepted aliases for compatibility.
 
+Text output renders file paths relative to `projectRoot`.
+
 Examples:
 
 ```bash
 specd graph impact --spec core:change --direction dependents
 specd graph impact --symbol "mergeSpecs" --direction both
-specd graph impact --file core:src/model.ts --direction dependents
+specd graph impact --symbol "packages/core/src/domain/entities/change.ts:method:invalidate" --direction dependents
+specd graph impact --file packages/core/src/model.ts --direction dependents
 ```
 
 ---

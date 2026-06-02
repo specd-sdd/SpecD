@@ -27,7 +27,7 @@
     {
       "requirement": "Output",
       "rules": [
-        "`ListArchived.execute()` MUST return a `Promise` resolving to a result object containing the entries and metadata:\n\n```typescript\ninterface ListArchivedResult {\n  items: ArchivedChangeIndexEntry[];\n  meta: {\n    total: number;\n    count: number;\n    limit: number;\n    page?: number;\n    startAt?: string;\n  };\n}\n```\n\nThe `items` array contains the archived changes, ordered oldest first (chronological order by `archivedAt`) unless the repository implementation provides a different default order."
+        "`ListArchived.execute()` MUST return a `Promise` resolving to a result object containing the entries and metadata:\n\n```typescript\ninterface ListArchivedResult {\n  items: ArchivedChangeIndexEntry[]\n  meta: {\n    total: number\n    count: number\n    limit: number\n    page?: number\n    startAt?: string\n  }\n}\n```\n\nThe `items` array contains the archived changes, ordered oldest first (chronological order by `archivedAt`) unless the repository implementation provides a different default order."
       ]
     },
     {
@@ -103,7 +103,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3ba3cf9e9e83da7936e9e84baa052ac64854bba3028294245db417d5b26ab313",
+    "spec.md": "sha256:83d23e2dfba34a46c7f397b75006a5bb6ae709215065eece910cb97fa70a2bfb",
     "verify.md": "sha256:c3acbb9c39cacfc7cb947e44b50d5128b58341f6e91d018e2e746da7d0ac8416"
   },
   "generatedBy": "core"

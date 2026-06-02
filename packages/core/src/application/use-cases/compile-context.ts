@@ -23,6 +23,7 @@ import { compileContextFingerprint } from './_shared/compile-context-fingerprint
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { Logger } from '../logger.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
   includePattern: 0,
@@ -200,7 +201,7 @@ export interface CompileContextResult {
  */
 export class CompileContext {
   private readonly _changes: ChangeRepository
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _schemaProvider: SchemaProvider
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
@@ -214,7 +215,7 @@ export class CompileContext {
    * Creates a new `CompileContext` use case instance.
    *
    * @param changes - Repository for loading the change
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
@@ -226,7 +227,7 @@ export class CompileContext {
    */
   constructor(
     changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     files: FileReader,
     parsers: ArtifactParserRegistry,
@@ -237,7 +238,7 @@ export class CompileContext {
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
-    this._specs = specs
+    this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
     this._files = files
     this._parsers = parsers
@@ -314,10 +315,13 @@ export class CompileContext {
       }
     }
 
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
     // --- 5-step context spec collection ---
     // Step 1: Project-level include patterns (all workspaces, bare * = all)
     for (const pattern of input.config.contextIncludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
+      const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) {
         registerCollectedSpec(spec, 'includePattern')
       }
@@ -326,7 +330,7 @@ export class CompileContext {
     // Step 2: Project-level exclude patterns
     const projectExcludedKeys = new Set<string>()
     for (const pattern of input.config.contextExcludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
+      const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) {
         projectExcludedKeys.add(`${spec.workspace}:${spec.capPath}`)
       }
@@ -341,7 +345,7 @@ export class CompileContext {
     for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextIncludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
+        const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
         for (const spec of matches) {
           registerCollectedSpec(spec, 'includePattern')
         }
@@ -352,7 +356,7 @@ export class CompileContext {
     for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextExcludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
+        const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
         for (const spec of matches) {
           const key = `${spec.workspace}:${spec.capPath}`
           if (!protectedKeys.has(key)) collectedSpecs.delete(key)
@@ -378,8 +382,9 @@ export class CompileContext {
       const depSeen = new Set<string>()
       for (const specId of change.specIds) {
         const { workspace, capPath } = parseSpecId(specId)
-        const repo = this._specs.get(workspace)
-        if (!repo) continue
+        const ws = workspaceMap.get(workspace)
+        if (ws === undefined) continue
+        const repo = ws.specRepo
         let specPathObj: SpecPath
         try {
           specPathObj = SpecPath.parse(capPath)
@@ -407,7 +412,12 @@ export class CompileContext {
             })
 
             if (depFallback !== undefined && depFallback.extraction.dependsOn !== undefined) {
-              dependsOnList = await this._extractDependsOnFallback(repo, spec, depFallback)
+              dependsOnList = await this._extractDependsOnFallback(
+                repo,
+                spec,
+                workspaceMap,
+                depFallback,
+              )
             }
           }
         }
@@ -422,7 +432,7 @@ export class CompileContext {
               dependsOnAdded,
               depSeen,
               new Set<string>(),
-              this._specs,
+              workspaceMap,
               warnings,
               input.depth,
               0,
@@ -483,8 +493,9 @@ export class CompileContext {
     const showAllSections = sectionsFilter === undefined
     const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of allSpecs) {
-      const specRepo = this._specs.get(workspace)
-      if (specRepo === undefined) continue
+      const ws = workspaceMap.get(workspace)
+      if (ws === undefined) continue
+      const specRepo = ws.specRepo
 
       let specPathObj: SpecPath
       try {
@@ -595,6 +606,7 @@ export class CompileContext {
               mergedFiles,
               workspace,
               capPath,
+              workspaceMap,
               sectionsFilter,
             )
           } else {
@@ -630,6 +642,7 @@ export class CompileContext {
                 displayFiles,
                 workspace,
                 capPath,
+                workspaceMap,
                 sectionsFilter,
               )
             } else {
@@ -880,6 +893,7 @@ export class CompileContext {
    * @param files - Ordered source files to extract from
    * @param workspace - Workspace owning the spec
    * @param specPath - Capability path for transform context
+   * @param workspaces - Orchestrated workspace map
    * @param sectionsFilter - Optional selected sections
    * @returns Rendered section content
    */
@@ -888,8 +902,15 @@ export class CompileContext {
     files: readonly SpecContentFile[],
     workspace: string,
     specPath: string,
+    workspaces: Map<string, ProjectWorkspace>,
     sectionsFilter: ReadonlyArray<SpecSection> | undefined,
   ): Promise<string> {
+    // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts
+    const repositories = new Map<string, SpecRepository>()
+    for (const ws of workspaces.values()) {
+      repositories.set(ws.name, ws.specRepo)
+    }
+
     const extracted = await extractMetadataFromSpecArtifacts({
       effectiveSpecSchema: schema,
       workspace,
@@ -897,7 +918,7 @@ export class CompileContext {
       artifacts: files,
       parsers: this._parsers,
       extractorTransforms: this._extractorTransforms,
-      repositories: this._specs,
+      repositories,
       workspaceRoutes: this._workspaceRoutes,
     })
 
@@ -910,12 +931,14 @@ export class CompileContext {
    *
    * @param specRepo - Repository for loading spec artifacts
    * @param spec - The spec entity to extract from
+   * @param workspaces - Orchestrated workspace map
    * @param fallback - Fallback configuration with extraction rules and parsers
    * @returns Extracted dependsOn array, or undefined if extraction yields nothing
    */
   private async _extractDependsOnFallback(
-    specRepo: import('../ports/spec-repository.js').SpecRepository,
+    specRepo: SpecRepository,
     spec: Spec,
+    workspaces: Map<string, ProjectWorkspace>,
     fallback: DependsOnFallback,
   ): Promise<string[] | undefined> {
     const descriptors = fallback.schemaArtifacts
@@ -928,6 +951,12 @@ export class CompileContext {
       }))
     const files = await this._loadBaseSpecFiles(specRepo, spec, descriptors)
     if (files.length === 0) return undefined
+
+    // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts
+    const repositories = new Map<string, SpecRepository>()
+    for (const ws of workspaces.values()) {
+      repositories.set(ws.name, ws.specRepo)
+    }
 
     const extracted = await extractMetadataFromSpecArtifacts({
       effectiveSpecSchema: new Schema(
@@ -943,7 +972,7 @@ export class CompileContext {
       artifacts: files,
       parsers: this._parsers,
       extractorTransforms: this._extractorTransforms,
-      repositories: this._specs,
+      repositories,
       workspaceRoutes: fallback.workspaceRoutes,
     })
     return extracted.metadata.dependsOn

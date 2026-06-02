@@ -10,6 +10,7 @@ export type { CodeGraphProvider } from './composition/code-graph-provider.js'
 
 // Value objects
 export { type FileNode } from './domain/value-objects/file-node.js'
+export { type DocumentNode } from './domain/value-objects/document-node.js'
 export { type SymbolNode } from './domain/value-objects/symbol-node.js'
 export { type SpecNode } from './domain/value-objects/spec-node.js'
 export { type Relation } from './domain/value-objects/relation.js'
@@ -37,8 +38,7 @@ export {
 export {
   type IndexOptions,
   type IndexProgressCallback,
-  type WorkspaceIndexTarget,
-  type DiscoveredSpec,
+  type ProjectGraphConfig,
 } from './domain/value-objects/index-options.js'
 export {
   type IndexResult,
@@ -72,6 +72,7 @@ export {
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 export {
   computeGraphFingerprint,
+  computeRootFingerprint,
   computeWorkspaceFingerprint,
   parseFingerprintMap,
   serializeFingerprintMap,

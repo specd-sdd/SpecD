@@ -36,6 +36,7 @@ import {
   rehydrateReadyArtifactParticipant,
 } from './_shared/cross-artifact-participant-state.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
+import { type ListWorkspaces } from './list-workspaces.js'
 
 /** Input for the {@link ValidateArtifacts} use case. */
 export interface ValidateArtifactsInput {
@@ -112,7 +113,7 @@ export interface ValidateArtifactsResult {
  */
 export class ValidateArtifacts {
   private readonly _changes: ChangeRepository
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _actor: ActorResolver
@@ -125,7 +126,7 @@ export class ValidateArtifacts {
    * Creates a new `ValidateArtifacts` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
    * @param actor - Resolver for the actor identity
@@ -136,7 +137,7 @@ export class ValidateArtifacts {
    */
   constructor(
     changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     actor: ActorResolver,
@@ -146,7 +147,7 @@ export class ValidateArtifacts {
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
-    this._specs = specs
+    this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._actor = actor
@@ -257,6 +258,9 @@ export class ValidateArtifacts {
       blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
     })
 
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
     let workspace = ''
     let capabilityPath = ''
     let specRepo: SpecRepository | undefined
@@ -266,7 +270,8 @@ export class ValidateArtifacts {
       const parsed = parseSpecId(input.specPath)
       workspace = parsed.workspace
       capabilityPath = parsed.capPath
-      specRepo = this._specs.get(workspace)
+      const ws = workspaceMap.get(workspace)
+      specRepo = ws?.specRepo
       existingSpec =
         specRepo !== undefined && capabilityPath.length > 0
           ? await specRepo.get(SpecPath.parse(capabilityPath))
@@ -548,6 +553,11 @@ export class ValidateArtifacts {
 
           if (hasExtractionRules && parser !== undefined) {
             try {
+              const repositories = new Map<string, SpecRepository>()
+              for (const ws of workspaceMap.values()) {
+                repositories.set(ws.name, ws.specRepo)
+              }
+
               const extracted = await extractMetadataFromSpecArtifacts({
                 effectiveSpecSchema: schema,
                 workspace,
@@ -562,7 +572,7 @@ export class ValidateArtifacts {
                 ],
                 parsers: this._parsers,
                 extractorTransforms: this._extractorTransforms,
-                repositories: this._specs,
+                repositories,
                 workspaceRoutes: this._workspaceRoutes,
                 targetArtifactId: artifactType.id,
               })
@@ -653,6 +663,11 @@ export class ValidateArtifacts {
             const changeArtifact = change.getArtifact(participant.artifact)
             const trackedFile = changeArtifact?.getFile(participantFileKey)
             if (trackedFile?.status === 'complete') {
+              const repositories = new Map<string, SpecRepository>()
+              for (const ws of workspaceMap.values()) {
+                repositories.set(ws.name, ws.specRepo)
+              }
+
               const rehydrated = await rehydrateReadyArtifactParticipant({
                 change,
                 artifactType: participantArtifactType,
@@ -661,7 +676,7 @@ export class ValidateArtifacts {
                 capabilityPath,
                 specExists,
                 changes: this._changes,
-                specs: this._specs,
+                specs: repositories,
                 parsers: this._parsers,
                 schema,
               })

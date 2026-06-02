@@ -32,20 +32,25 @@
 
 ### Requirement: Frontmatter type contract
 
-#### Scenario: Frontmatter model enforces supported field set
+#### Scenario: Frontmatter value model enforces supported field set
 
-- **WHEN** frontmatter is generated for an installed `SKILL.md`
+- **WHEN** frontmatter values are generated for an installed `SKILL.md`
 - **THEN** required fields `name` and `description` are present
-- **AND** optional fields `license`, `compatibility`, and `metadata` are emitted only when configured
-- **AND** unknown fields are not emitted
+- **AND** optional fields `license`, `compatibility`, and `metadata` are represented only when configured
+- **AND** unknown fields are not represented
+
+#### Scenario: Unsupported Open Code metadata keys stay out of the value collection
+
+- **WHEN** unsupported metadata is proposed for Open Code frontmatter
+- **THEN** it is not represented in the Open Code frontmatter value collection
 
 ### Requirement: Frontmatter injection
 
-#### Scenario: Install prepends only Open Code-compatible fields
+#### Scenario: Install passes Open Code capability identifiers and frontmatter source values
 
 - **WHEN** skill markdown files are written during install
-- **THEN** YAML frontmatter is prepended before markdown content
-- **AND** emitted fields are limited to the configured Open Code-supported keys
+- **THEN** the plugin supplies Open Code capability identifiers and structured frontmatter values to `@specd/skills`
+- **AND** the rendered markdown includes only the configured Open Code-supported fields
 
 #### Scenario: Shared files do not receive skill frontmatter
 
@@ -55,17 +60,17 @@
 
 ### Requirement: Install location
 
-#### Scenario: Skills install into Open Code directory
+#### Scenario: Skills install into Open Code directory and sharedFolder default
 
 - **GIVEN** a `SpecdConfig` with `projectRoot`
 - **WHEN** install writes skill files
 - **THEN** non-shared files are created under `.opencode/skills/<skill-name>/`
-- **AND** shared files are created under `.opencode/skills/_specd-shared/`
+- **AND** shared files are created under the resolved `sharedFolder` location under the project root
 
 #### Scenario: Shared directory is not discovered as a skill
 
-- **WHEN** install creates `.opencode/skills/_specd-shared/`
-- **THEN** the directory does not contain a `SKILL.md` file
+- **WHEN** install writes shared files to the resolved shared location
+- **THEN** that location does not contain a `SKILL.md` file
 
 ### Requirement: Project init wizard integration
 
@@ -88,14 +93,14 @@
 - **GIVEN** a `SpecdConfig` and multiple skills installed under `.opencode/skills/`
 - **WHEN** `uninstall(config, { skills: ['specd-design'] })` is executed
 - **THEN** only the selected specd-managed skill directories are removed
-- **AND** `.opencode/skills/_specd-shared/` remains when other installed skills may still reference it
+- **AND** the resolved shared location remains when other installed skills may still reference it
 
 #### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
 
 - **GIVEN** a `SpecdConfig` with specd-managed skills and unrelated user skills installed under `.opencode/skills/`
 - **WHEN** `uninstall(config, optionsWithoutSkills)` is executed
 - **THEN** all specd-managed skill directories are removed
-- **AND** `.opencode/skills/_specd-shared/` is removed
+- **AND** the resolved sharedFolder location is removed
 - **AND** unrelated user skill directories remain
 
 ### Requirement: Application layer
@@ -104,5 +109,10 @@
 
 - **GIVEN** skills are available from `@specd/skills`
 - **WHEN** `InstallSkills` runs
-- **THEN** it reads skill templates, resolves per-skill frontmatter, prepends Open Code YAML frontmatter only to skill-local markdown files, and writes installed skill files
-- **AND** shared-marked files are written under the Open Code shared skills resource directory
+- **THEN** it reads skill templates, resolves capability identifiers and frontmatter source values, and passes them into `@specd/skills`
+- **AND** shared-marked files are written to the rendered sharedFolder location under the project root
+
+#### Scenario: Open Code application layer does not prepend YAML after resolution
+
+- **WHEN** the Open Code install flow is reviewed
+- **THEN** the plugin does not assemble a final YAML frontmatter block after bundle resolution

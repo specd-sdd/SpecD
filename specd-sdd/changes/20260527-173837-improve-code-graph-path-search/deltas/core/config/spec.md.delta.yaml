@@ -1,0 +1,144 @@
+- op: modified
+  description: 'Update workspace requirement to include root name reservation.'
+  selector:
+    type: section
+    matches: '^Requirement: Workspaces$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    `specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.
+
+    `default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.
+
+    `root` is a reserved workspace name used by the code graph for project-global resources. Declaring a workspace named `root` in `specd.yaml` MUST produce a `ConfigValidationError` at startup.
+
+    ```yaml
+    workspaces:
+      default: # required — the local project workspace
+        prefix: _global # optional — logical path prefix for all specs in this workspace
+        specs: # where this workspace's spec files live (required)
+          adapter: fs # storage adapter (required; only "fs" in v1)
+          fs:
+            path: specs/_global
+            metadataPath: .specd/metadata # optional — where metadata.yaml files live
+        schemas: # where named local schemas live (optional)
+          adapter: fs
+          fs:
+            path: .specd/schemas # default: .specd/schemas (relative to specd.yaml)
+        codeRoot: ./ # where implementation code lives (default: project root)
+        ownership: owned # owned | shared | readOnly (default: owned)
+
+      billing: # additional workspace
+        specs:
+          adapter: fs
+          fs:
+            path: ../billing/specd/specs
+        schemas:
+          adapter: fs
+          fs:
+            path: ../billing/dev/schemas
+        codeRoot: ../billing # required for non-default workspaces — no default
+        ownership: readOnly # default for non-default workspaces
+    ```
+
+    **`specs`** (required) — declares where this workspace's spec files live. Has its own `adapter` and adapter-specific config block. Only `"fs"` is supported in v1.
+
+    **`specs.fs.path`** (required for `fs` adapter) — directory where spec files live. Relative paths are resolved from the directory containing `specd.yaml`. May point outside the project repo root, in which case `RepositoryConfig.isExternal` is set to `true` by the application layer.
+
+    **`specs.fs.metadataPath`** (optional for `fs` adapter) — directory where `metadata.yaml` files live, mirroring the spec capability path structure. Relative paths are resolved from the directory containing `specd.yaml`. When absent, the config loader auto-derives the path from the VCS root of `specs.fs.path` + `/.specd/metadata/`. When the specs path is not inside any VCS, the fallback is `.specd/metadata/` relative to the specs path parent directory.
+
+    **`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.
+
+    - For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: .specd/schemas`.
+    - For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.
+
+    **`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.
+
+    - For the `default` workspace, defaults to the project root (directory containing `specd.yaml`).
+    - For non-`default` workspaces, `codeRoot` is required — there is no default.
+
+    **`ownership`** — the project's relationship to this workspace's specs.
+
+    - `owned` — the project owns these specs and can create, modify, and archive changes against them. Default for the `default` workspace.
+    - `shared` — specs can be modified, but external teams may also modify them.
+    - `readOnly` — specs are imported for context only; changes cannot target them. Default for non-`default` workspaces.
+
+    **Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters.
+
+- op: modified
+  description: 'Update workspace graph config with allowedPaths and rename to match verify requirement.'
+  selector:
+    type: section
+    matches: '^Requirement: Workspace graph config$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  rename: 'Requirement: Workspace-level graph configuration'
+  content: |
+    Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace:
+
+    ```yaml
+    workspaces:
+      default:
+        codeRoot: ./
+        graph:
+          respectGitignore: true # optional; default: true
+          allowedPaths: # optional; only files matching these patterns are indexed
+            - src/**
+          excludePaths: # optional; gitignore-syntax, supports negation with !
+            - .specd/*
+            - '!.specd/metadata/'
+      core:
+        codeRoot: packages/core
+        graph:
+          excludePaths:
+            - dist/
+    ```
+
+    **`graph.allowedPaths`** (string array, glob-syntax) — optional patterns relative to `codeRoot`. If specified, only files matching these patterns SHALL be indexed for this workspace.
+
+    **`graph.respectGitignore`** (boolean, default `true`) — whether `.gitignore` files are loaded and applied during file discovery for this workspace.
+
+    - When `true` (default): `.gitignore` rules are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with **absolute priority**. No pattern in `excludePaths` can re-include a file that `.gitignore` excludes.
+    - When `false`: `.gitignore` files are not loaded. Only `excludePaths` governs file exclusion.
+
+    **`graph.excludePaths`** (string array, gitignore-syntax) — additional exclusion rules applied on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Patterns follow `.gitignore` format and support negation with `!`.
+
+    When `graph.excludePaths` is **not** specified, the following built-in defaults apply:
+
+    ```
+    node_modules/
+    .git/
+    .specd/
+    dist/
+    build/
+    coverage/
+    .next/
+    .nuxt/
+    ```
+
+    When `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged.
+
+    Patterns are evaluated relative to the workspace's `codeRoot`.
+
+- op: added
+  description: 'Add project-level graph configuration.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Workspace graph config$'
+  content: |
+    ### Requirement: Project-level graph configuration
+
+    `specd.yaml` MAY include a `graph` section for project-global graph settings.
+
+    - **`includePaths`** — optional array of glob patterns (relative to project root) to discover project-global files outside workspace-owned graph identities (for example `docs/**`, `package.json`).
+    - **`excludePaths`** — optional array of gitignore-syntax patterns to exclude from file/document discovery globally.
+
+    Resources discovered via `graph.includePaths` SHALL be assigned to the reserved `root:` graph namespace only when they are not already owned by a configured workspace `codeRoot`.
+
+    `graph.excludePaths` SHALL apply to project-global discovery and workspace discovery alike. Workspace-level graph filters MAY add additional restrictions, but they MUST NOT remove or override global exclusions.

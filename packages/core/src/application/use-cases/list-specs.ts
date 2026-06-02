@@ -5,6 +5,7 @@ import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
 import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type ListWorkspaces } from './list-workspaces.js'
 
 export type { SpecMetadataStatus }
 
@@ -40,31 +41,27 @@ export interface SpecListEntry {
 }
 
 /**
- * Lists all specs across all configured workspaces, resolving title (always)
- * and optionally a short summary per spec.
+ * Use case that enumerates specs across all configured workspaces, resolving
+ * titles and optionally summaries and metadata status.
  *
- * Receives a map of workspace name → `SpecRepository` so that use cases that
- * coordinate across workspaces work correctly. Results are ordered by workspace
- * declaration order, then by spec name within each workspace.
+ * It uses the project orchestrator to discover repositories and aggregates
+ * results ranked by workspace declaration order, then by spec name within
+ * each workspace.
  */
 export class ListSpecs {
-  private readonly _specRepos: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _hasher: ContentHasher
   private readonly _yaml: YamlSerializer
 
   /**
    * Creates a new `ListSpecs` use case instance.
    *
-   * @param specRepos - Map of workspace name to its spec repository
+   * @param listWorkspaces - The project orchestrator
    * @param hasher - Content hasher for metadata freshness checks
    * @param yaml - YAML serializer for parsing metadata content
    */
-  constructor(
-    specRepos: ReadonlyMap<string, SpecRepository>,
-    hasher: ContentHasher,
-    yaml: YamlSerializer,
-  ) {
-    this._specRepos = specRepos
+  constructor(listWorkspaces: ListWorkspaces, hasher: ContentHasher, yaml: YamlSerializer) {
+    this._listWorkspaces = listWorkspaces
     this._hasher = hasher
     this._yaml = yaml
   }
@@ -86,6 +83,7 @@ export class ListSpecs {
     includeMetadataStatus?: boolean
     workspaces?: readonly string[]
   }): Promise<SpecListEntry[]> {
+    const workspaces = await this._listWorkspaces.execute()
     const includeSummary = options?.includeSummary ?? false
     const includeMetadataStatus = options?.includeMetadataStatus ?? false
     const workspaceFilter =
@@ -94,11 +92,13 @@ export class ListSpecs {
         : null
     const results: SpecListEntry[] = []
 
-    for (const [wsName, repo] of this._specRepos) {
-      if (workspaceFilter !== null && !workspaceFilter.has(wsName)) continue
-      const specs = await repo.list()
+    for (const ws of workspaces) {
+      if (workspaceFilter !== null && !workspaceFilter.has(ws.name)) continue
+      const specs = await ws.specRepo.list()
       for (const spec of specs) {
-        results.push(await this._resolveEntry(repo, spec, includeSummary, includeMetadataStatus))
+        results.push(
+          await this._resolveEntry(ws.specRepo, spec, includeSummary, includeMetadataStatus),
+        )
       }
     }
 

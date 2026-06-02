@@ -1,9 +1,9 @@
 {
   "title": "skills:skill-repository",
-  "description": "Defines the `SkillRepository` interface that provides access to skills and their bundles. This is the concrete implementation combining skill retrieval with bundle resolution.",
-  "dependsOn": ["skills:skill", "skills:skill-bundle"],
+  "description": "Defines the `SkillRepository` interface that provides access to skills and their bundles. The repository owns skill template discovery, skill metadata loading, shared template resolution, and capability-aware bundle rendering through `@specd/skills`.",
+  "dependsOn": ["skills:skill", "skills:skill-bundle", "skills:skill-templates-source"],
   "context": [
-    "Defines the `SkillRepository` interface that provides access to skills and their bundles. This is the concrete implementation combining skill retrieval with bundle resolution."
+    "Defines the `SkillRepository` interface that provides access to skills and their bundles. The repository owns skill template discovery, skill metadata loading, shared template resolution, and capability-aware bundle rendering through `@specd/skills`."
   ],
   "rules": [
     {
@@ -21,17 +21,25 @@
     {
       "requirement": "getBundle() method",
       "rules": [
-        "The `getBundle()` method MUST:\n\n- Accept `name: string` and optional `variables: Record<string, string>` (defaults to `{}`)\n- Return `SkillBundle` with all template files resolved\n- Replace `{{key}}` placeholders in template content with values from the variables map\n- Variables are passed at invocation time — the repository does not define predefined variables"
+        "The `getBundle()` method MUST:\n\n- accept `name: string` and optional structured render context\n- return `SkillBundle` with all template files resolved\n- load the target skill's `skill.meta.json`\n- normalize the provided capability list into the internal template capability model\n- validate that `requiredCapabilities` are satisfied before rendering skill templates\n- validate that templates do not rely on undeclared shared template requirements\n- render template content using recursive variables and normalized capabilities\n\nThe repository interface MUST NOT require callers to pass pre-normalized capability objects."
       ]
     },
     {
       "requirement": "listSharedFiles() method",
       "rules": [
-        "The `listSharedFiles()` method MUST:\n\n- Scan the `templates/shared/` directory for `.meta.json` files\n- Return `SharedFile[]` where each `SharedFile` has:\n  - `filename: string`\n  - `content: string`\n  - `skills: string[]` — which skills use this shared file"
+        "The `listSharedFiles()` method MUST:\n\n- scan the `templates/shared/` directory for shared template source files\n- return `SharedFile[]` where each `SharedFile` has:\n  - `filename: string`\n  - `content: string`\n- avoid depending on a shared-side inverse consumer index to determine which skills use which shared template\n\nShared template selection for bundle resolution MUST come from each skill's `requiredSharedTemplates` declaration instead."
       ]
     }
   ],
-  "constraints": ["No I/O in the interface definition — implementations handle I/O."],
+  "constraints": [
+    "No I/O in the interface definition — implementations handle I/O.",
+    "Bundle resolution MUST support install-time rendering from structured context, not only flat string substitution.",
+    "Template source filenames and emitted bundle filenames MUST remain distinct: .md.tpl on disk in packages/skills/templates/, .md in resolved bundle output.",
+    "variables MUST support recursive values addressable by template path traversal.",
+    "Shared-file routing metadata MUST be preserved by rendering.",
+    "Shared template inclusion MUST be driven by each skill's requiredSharedTemplates declaration.",
+    "The repository MUST support internal normalization of sharedFolder without exposing absolute paths in rendered output."
+  ],
   "scenarios": [
     {
       "requirement": "list() method",
@@ -53,23 +61,91 @@
     },
     {
       "requirement": "getBundle() method",
-      "name": "Get bundle with variables",
-      "when": ["repository.getBundle('skill-name', { key: 'value' }) is called"],
-      "then": ["placeholders {{key}} are replaced with 'value'"]
+      "name": "Get bundle with structured render context",
+      "when": [
+        "repository.getBundle('skill-name', context) is called with recursive variables and capability identifiers"
+      ],
+      "then": ["the returned bundle resolves template content using that structured context"]
+    },
+    {
+      "requirement": "getBundle() method",
+      "name": "getBundle loads skill metadata",
+      "when": ["repository.getBundle('skill-name', context) resolves a skill"],
+      "then": ["it loads that skill's skill.meta.json"]
+    },
+    {
+      "requirement": "getBundle() method",
+      "name": "Required capabilities gate skill installability",
+      "given": ["a skill declares requiredCapabilities"],
+      "when": ["one of those identifiers is absent from the provided capability list"],
+      "then": ["bundle resolution fails instead of rendering an installable bundle"]
+    },
+    {
+      "requirement": "getBundle() method",
+      "name": "Shared templates come from requiredSharedTemplates",
+      "given": ["a skill declares requiredSharedTemplates"],
+      "when": ["the bundle is resolved"],
+      "then": ["only those declared shared templates are included from templates/shared/"]
+    },
+    {
+      "requirement": "getBundle() method",
+      "name": "Get bundle strips template suffix from output filenames",
+      "given": ["a template source file named SKILL.md.tpl"],
+      "when": ["repository.getBundle('skill-name', context) resolves the bundle"],
+      "then": ["the resulting resolved file is named SKILL.md"]
+    },
+    {
+      "requirement": "getBundle() method",
+      "name": "Frontmatter data is gated by frontmatter capability",
+      "given": [
+        "context.variables.frontmatter is present",
+        "AND the frontmatter capability is absent"
+      ],
+      "when": ["the bundle is resolved"],
+      "then": ["the final frontmatter block is not emitted"]
     },
     {
       "requirement": "listSharedFiles() method",
-      "name": "Lists shared files from templates/shared/",
-      "when": ["repository.listSharedFiles() is called"],
+      "name": "listSharedFiles reads shared template source files",
+      "when": ["listSharedFiles() scans templates/shared/"],
+      "then": ["it returns shared template filenames and content"]
+    },
+    {
+      "requirement": "listSharedFiles() method",
+      "name": "listSharedFiles does not infer skill consumers from shared metadata",
+      "when": ["shared template discovery is reviewed"],
       "then": [
-        "it scans templates/shared/ for .meta.json files",
-        "AND returns SharedFile[] with filename, content, and skills properties"
+        "it does not depend on a shared-side inverse consumer index to determine which skills consume a shared template"
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "skills:skill-repository",
+        "file": "skills:test/infrastructure/skill-repository.spec.ts",
+        "symbol": "FsSkillRepository"
+      },
+      {
+        "specId": "skills:skill-repository",
+        "file": "skills:test/infrastructure/skill-repository.spec.ts",
+        "symbol": "TemplateRenderer"
+      },
+      {
+        "specId": "skills:skill-repository",
+        "file": "skills:src/infrastructure/repository/skill-template-metadata-reader.ts",
+        "symbol": "SkillTemplateMetadataReader"
+      },
+      {
+        "specId": "skills:skill-repository",
+        "file": "skills:src/infrastructure/repository/skill-repository.ts",
+        "symbol": "FsSkillRepository"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e214cba5b4b441c00661737fb628d7432b62c04f5bf9f6739b17a34df4d53baf",
-    "verify.md": "sha256:32b7fdc5a9d492b97102b21fad02186d101eba6f02f7cd182c2c726a4daaaf13"
+    "spec.md": "sha256:f86ce0203152f3f5a23796d420daf14d6c7f24cc5c1729aa806ecc7bb882a9f3",
+    "verify.md": "sha256:6995ca2af4355767355c0de1d3e282e4fa58e97769f5912b9f099900470994a4"
   },
   "generatedBy": "core"
 }

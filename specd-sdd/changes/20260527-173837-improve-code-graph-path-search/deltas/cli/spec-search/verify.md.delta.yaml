@@ -1,0 +1,27 @@
+- op: removed
+  description: 'Remove old search execution verification.'
+  selector:
+    type: section
+    matches: '^Requirement: Search execution$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+
+- op: added
+  description: 'Add new search execution verification with orchestrated fallback.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Command signature$'
+  content: |
+    ### Requirement: Search execution
+
+    #### Scenario: Fallback search uses orchestrated workspaces
+
+    - **GIVEN** the code graph is unavailable
+    - **WHEN** `specd specs search "test"` is run
+    - **THEN** `SearchSpecs.execute()` is called
+    - **AND** it obtains the list of repositories via the `ListWorkspaces` orchestrator

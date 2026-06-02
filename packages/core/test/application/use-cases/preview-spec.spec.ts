@@ -40,7 +40,7 @@ function makeChangeWithArtifacts(
   artifacts: ChangeArtifact[] = [],
   schemaName = SCHEMA_NAME,
 ): Change {
-  const change = makeChange(CHANGE_NAME, { specIds, schemaName })
+  const change = makeChange(CHANGE_NAME, { specIds }, schemaName)
   for (const artifact of artifacts) {
     change.setArtifact(artifact)
   }

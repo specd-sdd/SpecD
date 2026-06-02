@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:config", "plugin-manager:specd-plugin-type"],
+  "implementation": [
+    {
+      "file": "plugin-manager:test/domain/types/is-agent-plugin.spec.ts"
+    },
+    {
+      "file": "plugin-manager:src/domain/types/agent-plugin.ts",
+      "symbols": ["AgentInstallOptions"]
+    }
+  ]
+}

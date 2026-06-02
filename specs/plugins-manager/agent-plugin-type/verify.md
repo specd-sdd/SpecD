@@ -26,10 +26,35 @@
 
 ### Requirement: AgentInstallOptions
 
-#### Scenario: Options include skills filter and variables
+#### Scenario: Options include skills filter, recursive variables, and capability identifiers
 
 - **WHEN** `AgentInstallOptions` is used
-- **THEN** it accepts optional `skills` array and `variables` record
+- **THEN** it accepts an optional `skills` array
+- **AND** it accepts optional recursive `variables`
+- **AND** it accepts optional `capabilities` as a list of strings
+
+#### Scenario: Initial capability identifiers are required by the contract
+
+- **WHEN** the install-time agent capability contract is reviewed
+- **THEN** it defines `mcp`, `agents`, and `frontmatter` as the initial required capability identifiers
+
+#### Scenario: Plugins do not pass pre-normalized capability objects
+
+- **WHEN** an agent plugin prepares install options
+- **THEN** it passes capability identifiers only
+- **AND** it does not pass pre-normalized capability objects into `@specd/skills`
+
+#### Scenario: Frontmatter data travels through variables.frontmatter
+
+- **WHEN** an agent plugin prepares install options
+- **THEN** frontmatter data is stored under `variables.frontmatter`
+- **AND** nested frontmatter data remains addressable as template variables
+
+#### Scenario: sharedFolder travels through variables.sharedFolder
+
+- **WHEN** an agent plugin overrides the shared template install location
+- **THEN** it passes that value through `variables.sharedFolder`
+- **AND** the value remains relative to the project root
 
 ### Requirement: AgentInstallResult
 

@@ -1,6 +1,5 @@
 import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
@@ -9,6 +8,7 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 /** Input for the {@link EditChange} use case. */
 export interface EditChangeInput {
@@ -42,7 +42,7 @@ export interface EditChangeResult {
  */
 export class EditChange {
   private readonly _changes: ChangeRepository
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
 
@@ -50,18 +50,18 @@ export class EditChange {
    * Creates a new `EditChange` use case instance.
    *
    * @param changes - Repository for loading and persisting the change
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the active schema DAG
    */
   constructor(
     changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
   ) {
     this._changes = changes
-    this._specs = specs
+    this._listWorkspaces = listWorkspaces
     this._actor = actor
     this._schemaProvider = schemaProvider
   }
@@ -91,6 +91,8 @@ export class EditChange {
     }
 
     const actor = await this._actor.identity()
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
     const persisted = await this._changes.mutate(input.name, async (freshChange) => {
       let specIdsChanged = false
@@ -130,7 +132,7 @@ export class EditChange {
           freshChange.updateSpecIds(specIds, actor, schema.artifactDag())
           for (const specId of addedSpecIds) {
             if (freshChange.specDependsOn.get(specId) !== undefined) continue
-            const persistedDeps = await loadPersistedSpecDependsOn(this._specs, specId)
+            const persistedDeps = await loadPersistedSpecDependsOn(workspaceMap, specId)
             freshChange.setSpecDependsOn(specId, persistedDeps.dependsOn)
           }
         }
@@ -152,7 +154,9 @@ export class EditChange {
     }
 
     if (persisted.invalidated) {
-      await this._changes.scaffold(persisted.change, (specId) => this._specExists(specId))
+      await this._changes.scaffold(persisted.change, (specId) =>
+        this._specExists(workspaceMap, specId),
+      )
     }
 
     return { change: persisted.change, invalidated: persisted.invalidated }
@@ -161,14 +165,18 @@ export class EditChange {
   /**
    * Checks whether a spec exists in its workspace repository.
    *
+   * @param workspaces - Orchestrated workspace map
    * @param specId - The spec identifier (e.g. `"default:auth/login"`)
    * @returns `true` if the spec exists
    */
-  private async _specExists(specId: string): Promise<boolean> {
+  private async _specExists(
+    workspaces: ReadonlyMap<string, ProjectWorkspace>,
+    specId: string,
+  ): Promise<boolean> {
     const { workspace, capPath } = parseSpecId(specId)
-    const repo = this._specs.get(workspace)
-    if (repo === undefined) return false
-    const spec = await repo.get(SpecPath.parse(capPath))
+    const ws = workspaces.get(workspace)
+    if (ws === undefined) return false
+    const spec = await ws.specRepo.get(SpecPath.parse(capPath))
     return spec !== null
   }
 }

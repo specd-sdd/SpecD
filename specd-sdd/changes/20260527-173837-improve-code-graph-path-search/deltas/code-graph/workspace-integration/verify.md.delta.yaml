@@ -1,0 +1,34 @@
+- op: removed
+  description: 'Remove old spec resolution verification.'
+  selector:
+    type: section
+    matches: '^Requirement: Spec resolution via SpecRepository$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+
+- op: added
+  description: 'Add new spec resolution verification using semantic repository.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Cross-workspace import resolution$'
+  content: |
+    ### Requirement: Spec resolution via SpecRepository
+
+    #### Scenario: Spec resolution pulls from repository
+
+    - **WHEN** indexing specs
+    - **THEN** the indexer SHALL directly call `SpecRepository` methods to extract semantics
+    - **AND** it SHALL NOT rely on precomputed extraction callbacks
+
+    #### Scenario: Workspace-owned file is not duplicated under root namespace
+
+    - **GIVEN** a file under a configured workspace `codeRoot`
+    - **AND** it also matches a project-global `graph.includePaths` pattern
+    - **WHEN** the graph identity is computed
+    - **THEN** the file receives only the workspace-prefixed identity
+    - **AND** no `root:` identity is persisted for the same physical file

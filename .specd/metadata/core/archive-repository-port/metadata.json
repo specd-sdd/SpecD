@@ -54,13 +54,13 @@
     {
       "requirement": "list returns all archived changes in chronological order",
       "rules": [
-        "`list(options?)` MUST return archived changes in this workspace sorted chronologically (oldest first).\n\n```typescript\ninterface ArchiveListOptions {\n  limit?: number;\n  page?: number;\n  startAt?: string;\n}\n```\n\n- `limit`: maximum number of entries to return. Defaults to 100 if not provided.\n- `page`: 1-based page index. Mutually exclusive with `startAt`.\n- `startAt`: name of the change to start after (exclusive keyset cursor). Mutually exclusive with `page`."
+        "`list(options?)` MUST return archived changes in this workspace sorted chronologically (oldest first).\n\n```typescript\ninterface ArchiveListOptions {\n  limit?: number\n  page?: number\n  startAt?: string\n}\n```\n\n- `limit`: maximum number of entries to return. Defaults to 100 if not provided.\n- `page`: 1-based page index. Mutually exclusive with `startAt`.\n- `startAt`: name of the change to start after (exclusive keyset cursor). Mutually exclusive with `page`."
       ]
     },
     {
       "requirement": "list returns index entries",
       "rules": [
-        "`list(options?)` MUST return a result object containing the entries and metadata:\n\n```typescript\ninterface ArchiveListResult {\n  items: ArchivedChangeIndexEntry[];\n  meta: {\n    total: number;\n    count: number;\n    limit: number;\n    page?: number;\n    startAt?: string;\n  };\n}\n```\n\nThe implementation MUST satisfy this requirement without reading `manifest.json` files for every entry."
+        "`list(options?)` MUST return a result object containing the entries and metadata:\n\n```typescript\ninterface ArchiveListResult {\n  items: ArchivedChangeIndexEntry[]\n  meta: {\n    total: number\n    count: number\n    limit: number\n    page?: number\n    startAt?: string\n  }\n}\n```\n\nThe implementation MUST satisfy this requirement without reading `manifest.json` files for every entry."
       ]
     },
     {
@@ -400,7 +400,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:59b3881cc64c6b9353926a347686467f7c8fdca0e8a999ca58a7da0d4ae172dd",
+    "spec.md": "sha256:200cf94479e0f4fb75a2b69f55e615925cf9598b9e2b1369914665a6c890ae50",
     "verify.md": "sha256:df5f4d92ce072ff9c3571c5bbb83f0618d597984ef70d54207e99d075fd4c118"
   },
   "generatedBy": "core"

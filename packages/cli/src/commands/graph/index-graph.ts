@@ -1,22 +1,18 @@
-import { Command } from 'commander'
-import {
-  type IndexOptions,
-  DEFAULT_EXCLUDE_PATHS,
-  type WorkspaceIndexTarget,
-} from '@specd/code-graph'
-import { existsSync } from 'node:fs'
+import { Command, Option } from 'commander'
+import { type IndexOptions, type IndexResult } from '@specd/code-graph'
 import { spawn } from 'node:child_process'
-import { createVcsAdapter } from '@specd/core'
+import * as core from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
+import { buildProjectGraphConfig } from './build-project-graph-config.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { buildWorkspaceTargets } from './build-workspace-targets.js'
 import { acquireGraphIndexLock } from './graph-index-lock.js'
 import { codeGraphVersion } from './code-graph-version.js'
 
 const GRAPH_INDEX_WORKER_ENV = 'SPECD_GRAPH_INDEX_WORKER'
 const GRAPH_INDEX_LOCK_HELD_ENV = 'SPECD_GRAPH_INDEX_LOCK_HELD'
+const GRAPH_INDEX_NO_WORKER_ENV = 'SPECD_GRAPH_INDEX_NO_WORKER'
 
 /**
  * Registers the `graph index` command.
@@ -26,305 +22,181 @@ export function registerGraphIndex(parent: Command): void {
   parent
     .command('index')
     .allowExcessArguments(false)
-    .description('Index the workspace into the code graph')
-    .option('--force', 'full re-index, ignoring cached hashes')
+    .description('Build or update the code graph index for the project.')
+    .option('--force', 'rebuild the entire index from scratch', false)
+    .option('--concurrency <n>', 'max concurrent indexing tasks', '4')
+    .addOption(
+      new Option(
+        '--include-path <glob...>',
+        'one or more global paths to include in the index',
+      ).argParser((val, prev: string[]) => (prev ?? []).concat(val.split(','))),
+    )
+    .addOption(
+      new Option(
+        '--exclude-path <glob...>',
+        'one or more global paths to exclude from the index',
+      ).argParser((val, prev: string[]) => (prev ?? []).concat(val.split(','))),
+    )
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
-    .option(
-      '--exclude-path <pattern>',
-      'gitignore-syntax pattern to exclude (repeatable; merges with config)',
-      (val: string, prev: string[]) => [...prev, val],
-      [] as string[],
-    )
-    .addHelpText(
-      'after',
-      `
-JSON/TOON output schema:
-  {
-    filesDiscovered: number
-    filesIndexed: number
-    filesRemoved: number
-    filesSkipped: number
-    specsDiscovered: number
-    specsIndexed: number
-    errors: Array<{ filePath: string, message: string }>
-    duration: number
-    workspaces: Array<{ name, filesDiscovered, filesIndexed, filesSkipped,
-      filesRemoved, specsDiscovered, specsIndexed }>
-  }
-`,
-    )
     .action(
       async (opts: {
-        force?: boolean
+        force: boolean
+        concurrency: string
+        includePath?: string[]
+        excludePath?: string[]
         config?: string
         path?: string
         format: string
-        excludePath: string[]
       }) => {
         const fmt = parseFormat(opts.format)
-        const isTTY = process.stderr.isTTY === true && fmt === 'text'
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
 
-        const context = await resolveGraphCliContext({
-          configPath: opts.config,
-          repoPath: opts.path,
-        }).catch((err: unknown) =>
+        const isWorker = process.env[GRAPH_INDEX_WORKER_ENV] === 'true'
+        const lockHeld = process.env[GRAPH_INDEX_LOCK_HELD_ENV] === 'true'
+        const noWorker = process.env[GRAPH_INDEX_NO_WORKER_ENV] === 'true'
+
+        let context: Awaited<ReturnType<typeof resolveGraphCliContext>>
+        try {
+          context = await resolveGraphCliContext({
+            configPath: opts.config,
+            repoPath: opts.path,
+          })
+        } catch (err: unknown) {
           cliError(
             err instanceof Error ? err.message : 'failed to resolve graph context',
             opts.format,
             1,
-          ),
-        )
-        const { config } = context
-
-        if (shouldRunInWorkerParent()) {
-          const releaseLock = acquireGraphIndexLock(config)
-          try {
-            await runGraphIndexInWorker(opts)
-          } finally {
-            releaseLock()
-          }
+          )
           return
         }
 
-        const runIndex = async (): Promise<void> => {
-          await withProvider(
-            config,
-            opts.format,
-            async (provider) => {
-              const progressFn = (percent: number, phase: string): void => {
-                const clamped = Math.max(0, Math.min(100, percent))
-                const width = 20
-                const filled = Math.round((clamped / 100) * width)
-                const bar = '█'.repeat(filled) + '░'.repeat(width - filled)
-                process.stderr.write(`\r\x1b[K  ${bar} ${String(clamped).padStart(3)}% ${phase}`)
-              }
+        const { config, kernel } = context
 
-              const rawWorkspaces: WorkspaceIndexTarget[] =
-                context.mode === 'configured'
-                  ? await buildWorkspaceTargets(config, context.kernel!)
-                  : buildBootstrapWorkspaceTargets(context.vcsRoot)
+        // Only the main process acquires the lock.
+        const lockRelease = !isWorker && !lockHeld ? acquireGraphIndexLock(config) : null
 
-              const workspaces =
-                opts.excludePath.length > 0
-                  ? rawWorkspaces.map((ws) => ({
-                      ...ws,
-                      excludePaths: [
-                        ...(ws.excludePaths ?? DEFAULT_EXCLUDE_PATHS),
-                        ...opts.excludePath,
-                      ],
-                    }))
-                  : rawWorkspaces
+        try {
+          if (!isWorker && !noWorker) {
+            const workerArgs = [...process.argv.slice(2)]
+            const workerEnv = {
+              ...process.env,
+              [GRAPH_INDEX_WORKER_ENV]: 'true',
+              [GRAPH_INDEX_LOCK_HELD_ENV]: 'true',
+            }
 
-              if (workspaces.length === 0) {
-                output('No workspaces configured.', 'text')
-                return
-              }
+            const worker = spawn(process.argv[0]!, [process.argv[1]!, ...workerArgs], {
+              stdio: 'inherit',
+              env: workerEnv,
+            })
 
-              let vcsRef: string | undefined
-              try {
-                const vcs = await createVcsAdapter(config.projectRoot)
-                vcsRef = (await vcs.ref()) ?? undefined
-              } catch {
-                // No VCS or ref() failed — staleness detection unavailable
-              }
+            worker.on('exit', (code) => {
+              if (lockRelease) lockRelease()
+              process.exit(code ?? 0)
+            })
+          } else {
+            if (kernel === null) {
+              cliError('Kernel not available in worker', opts.format, 1)
+              return
+            }
 
-              const indexOpts: IndexOptions = {
-                workspaces,
-                projectRoot: config.projectRoot,
-                ...(config.graph?.paths !== undefined
-                  ? { projectGraphPaths: config.graph.paths }
-                  : {}),
-                codeGraphVersion,
-                ...(isTTY ? { onProgress: progressFn } : {}),
-                ...(vcsRef !== undefined ? { vcsRef } : {}),
-              }
+            await withProvider(
+              config,
+              opts.format,
+              async (provider) => {
+                const workspaces = await kernel.project.listWorkspaces.execute()
+                const projectRoot = config.projectRoot
 
-              const result = await provider.index(indexOpts)
+                const vcs = await Promise.resolve(core.createVcsAdapter(projectRoot)).catch(
+                  () => null,
+                )
+                const vcsRef = (await vcs?.ref()) ?? undefined
 
-              if (opts.force && result.fullRebuildReason === null) {
-                ;(result as { fullRebuildReason: string | null }).fullRebuildReason =
-                  'Explicit --force reindex requested'
-              }
+                const graphConfig = buildProjectGraphConfig(config, {
+                  ...(opts.includePath !== undefined ? { includePaths: opts.includePath } : {}),
+                  ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
+                })
 
-              if (isTTY) {
-                process.stderr.write('\r\x1b[K')
-              }
-
-              if (fmt === 'text') {
-                const lines = [
-                  `Indexed ${String(result.filesIndexed)} file(s) in ${String(result.duration)}ms`,
-                  `  discovered: ${String(result.filesDiscovered)}`,
-                  `  skipped:    ${String(result.filesSkipped)}`,
-                  `  removed:    ${String(result.filesRemoved)}`,
-                  `  specs:      ${String(result.specsIndexed)}`,
-                ]
-                if (result.fullRebuildReason !== null) {
-                  lines.push(`  rebuild:    ${result.fullRebuildReason}`)
+                const indexOptions: IndexOptions = {
+                  projectRoot,
+                  workspaces: workspaces.map((ws) => ({
+                    name: ws.name,
+                    codeRoot: ws.codeRoot,
+                    specRepo: ws.specRepo,
+                    ownership: ws.ownership,
+                    isExternal: ws.isExternal,
+                  })),
+                  graphConfig,
+                  codeGraphVersion,
+                  ...(vcsRef !== undefined ? { vcsRef } : {}),
+                  onProgress: (percent, phase) => {
+                    if (fmt === 'text') {
+                      const pct = Math.round(percent)
+                      process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
+                    }
+                  },
                 }
-                if (result.errors.length > 0) {
-                  lines.push(`  errors:     ${String(result.errors.length)}`)
-                  for (const err of result.errors) {
-                    lines.push(`    ${err.filePath}: ${err.message}`)
-                  }
-                }
-                if (result.workspaces.length > 1) {
-                  lines.push('  workspaces:')
-                  for (const ws of result.workspaces) {
-                    const specsPart =
-                      ws.specsIndexed > 0 || ws.specsDiscovered > 0
-                        ? `, ${String(ws.specsIndexed)}/${String(ws.specsDiscovered)} specs`
-                        : ''
-                    lines.push(
-                      `    ${ws.name}:    ${String(ws.filesDiscovered)} discovered, ${String(ws.filesIndexed)} indexed, ${String(ws.filesSkipped)} skipped, ${String(ws.filesRemoved)} removed${specsPart}`,
-                    )
-                  }
-                }
-                output(lines.join('\n'), 'text')
-              } else {
-                output(result, fmt)
-              }
-            },
-            {
-              beforeOpen: async (provider) => {
-                if (opts.force) {
-                  await provider.recreate()
+
+                const result = await provider.index(indexOptions)
+
+                if (fmt === 'text') {
+                  process.stdout.write('\n')
+                  output(formatTextIndexResult(result), 'text')
+                } else {
+                  output(result, fmt)
                 }
               },
-            },
-          )
-        }
-
-        if (process.env[GRAPH_INDEX_LOCK_HELD_ENV] === '1') {
-          await runIndex()
-          return
-        }
-
-        const releaseLock = acquireGraphIndexLock(config)
-        try {
-          await runIndex()
-        } finally {
-          releaseLock()
+              opts.force
+                ? {
+                    beforeOpen: async (provider) => provider.recreate(),
+                  }
+                : undefined,
+            )
+          }
+        } catch (err) {
+          if (lockRelease) lockRelease()
+          cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 1)
         }
       },
     )
 }
 
 /**
- * Returns true when `graph index` should delegate heavy work to a child process.
- * This keeps `Ctrl+C` responsive even if the worker blocks in synchronous or native code.
+ * Formats an index result according to the text-mode CLI contract.
  *
- * @returns Whether the current process should act as the worker parent.
+ * @param result - The completed indexing result.
+ * @returns Human-readable text output.
  */
-function shouldRunInWorkerParent(): boolean {
-  if (process.env[GRAPH_INDEX_WORKER_ENV] === '1') return false
-  if (process.env['VITEST'] === 'true') return false
-  if (process.env['VITEST_POOL_ID'] !== undefined) return false
-  if (process.env['VITEST_WORKER_ID'] !== undefined) return false
-  if (process.argv.some((arg) => arg.includes('vitest'))) return false
-  const scriptPath = process.argv[1]
-  return typeof scriptPath === 'string' && scriptPath.length > 0 && existsSync(scriptPath)
-}
-
-/**
- * Reconstructs CLI args for a worker `graph index` invocation.
- * @param opts - Parsed command options.
- * @param opts.force - Whether to recreate the graph before indexing.
- * @param opts.config - Optional explicit config path.
- * @param opts.path - Optional bootstrap repository path.
- * @param opts.format - Selected output format.
- * @param opts.excludePath - Extra exclude patterns from the CLI.
- * @returns Node argv entries after the script path.
- */
-function buildWorkerArgs(opts: {
-  force?: boolean
-  config?: string
-  path?: string
-  format: string
-  excludePath: string[]
-}): string[] {
-  const args = ['graph', 'index']
-  if (opts.force) args.push('--force')
-  if (opts.config !== undefined) args.push('--config', opts.config)
-  if (opts.path !== undefined) args.push('--path', opts.path)
-  if (opts.format !== 'text') args.push('--format', opts.format)
-  for (const pattern of opts.excludePath) {
-    args.push('--exclude-path', pattern)
-  }
-  return args
-}
-
-/**
- * Runs the heavy graph indexing work in a child process so the parent can hard-kill
- * it immediately on `Ctrl+C`.
- * @param opts - Parsed command options.
- * @param opts.force - Whether to recreate the graph before indexing.
- * @param opts.config - Optional explicit config path.
- * @param opts.path - Optional bootstrap repository path.
- * @param opts.format - Selected output format.
- * @param opts.excludePath - Extra exclude patterns from the CLI.
- * @returns A promise that resolves when the worker exits.
- */
-async function runGraphIndexInWorker(opts: {
-  force?: boolean
-  config?: string
-  path?: string
-  format: string
-  excludePath: string[]
-}): Promise<void> {
-  const scriptPath = process.argv[1]
-  if (typeof scriptPath !== 'string' || scriptPath.length === 0) {
-    cliError('graph index worker could not resolve the CLI entry script', opts.format, 3)
-  }
-
-  const child = spawn(process.execPath, [scriptPath, ...buildWorkerArgs(opts)], {
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      [GRAPH_INDEX_WORKER_ENV]: '1',
-      [GRAPH_INDEX_LOCK_HELD_ENV]: '1',
-    },
-  })
-
-  const terminateChild = (signal: NodeJS.Signals, exitCode: number): void => {
-    if (!child.killed) {
-      child.kill('SIGKILL')
-    }
-    process.exit(exitCode)
-  }
-
-  process.once('SIGINT', () => terminateChild('SIGINT', 130))
-  process.once('SIGTERM', () => terminateChild('SIGTERM', 143))
-
-  await new Promise<void>(() => {
-    child.once('exit', (code, signal) => {
-      if (signal === 'SIGINT') process.exit(130)
-      if (signal === 'SIGTERM') process.exit(143)
-      process.exit(code ?? 1)
-    })
-    child.once('error', (err) => {
-      cliError(err.message, opts.format, 3)
-    })
-  })
-}
-
-/**
- * Builds the synthetic workspace targets used in graph bootstrap mode.
- *
- * @param vcsRoot - Resolved repository root.
- * @returns Synthetic workspace targets for bootstrap indexing.
- */
-function buildBootstrapWorkspaceTargets(vcsRoot: string): WorkspaceIndexTarget[] {
-  return [
-    {
-      name: 'default',
-      codeRoot: vcsRoot,
-      repoRoot: vcsRoot,
-      specs: () => Promise.resolve([]),
-    },
+function formatTextIndexResult(result: IndexResult): string {
+  const lines = [
+    `Indexed ${String(result.filesIndexed)} file(s) in ${String(result.duration)}ms`,
+    `  discovered: ${String(result.filesDiscovered)}`,
+    `  documents:  ${String(result.documentsIndexed)}`,
+    `  skipped:    ${String(result.filesSkipped)}`,
+    `  removed:    ${String(result.filesRemoved)}`,
+    `  specs:      ${String(result.specsIndexed)}`,
+    `  errors:     ${String(result.errors.length)}`,
   ]
+
+  if (result.workspaces.length > 0) {
+    lines.push('  workspaces:')
+    for (const workspace of result.workspaces) {
+      lines.push(
+        `    ${workspace.name}: ${String(workspace.filesDiscovered)} discovered, ${String(workspace.filesIndexed)} indexed, ${String(workspace.documentsIndexed)} documents, ${String(workspace.filesSkipped)} skipped, ${String(workspace.filesRemoved)} removed`,
+      )
+    }
+  }
+
+  if (result.fullRebuildReason !== null) {
+    lines.push(`  full rebuild: ${result.fullRebuildReason}`)
+  }
+
+  for (const error of result.errors) {
+    lines.push(`    ${error.filePath}: ${error.message}`)
+  }
+
+  return lines.join('\n')
 }

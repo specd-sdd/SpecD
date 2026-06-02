@@ -8,7 +8,11 @@ import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-err
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { SpecPublicationError } from '../../domain/errors/spec-publication-error.js'
 import { specMetadataSchema, type SpecMetadata } from '../../domain/services/parse-metadata.js'
-import { parseSpecLock, type SpecLockData } from '../../domain/services/parse-spec-lock.js'
+import {
+  parseSpecLock,
+  type SpecLockData,
+  type SpecLockImplementationEntry,
+} from '../../domain/services/parse-spec-lock.js'
 import {
   SpecRepository,
   type SpecRepositoryConfig,
@@ -149,6 +153,15 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
+   * Returns the total number of specs in this workspace.
+   *
+   * @returns The total spec count
+   */
+  override async count(): Promise<number> {
+    return this._countSpecs(this._specsPath)
+  }
+
+  /**
    * Loads the content of a single artifact file within a spec directory.
    *
    * @param spec - The spec containing the artifact
@@ -277,12 +290,20 @@ export class FsSpecRepository extends SpecRepository {
         await writeFileAtomic(filePath, artifact.content)
       }
 
-      if (publication.specLock !== undefined) {
+      if (
+        publication.persistedSchema !== undefined ||
+        publication.persistedDependsOn !== undefined ||
+        publication.persistedImplementation !== undefined
+      ) {
         const specLockPath = this._specLockFilePathInDir(stagingDir)
-        const { originalHash, ...persisted } = publication.specLock
-        void originalHash
+        const specLock: SpecLockData = {
+          schema: publication.persistedSchema ?? { name: 'unknown', version: 0 },
+          dependsOn: publication.persistedDependsOn ?? [],
+          implementation: (publication.persistedImplementation ??
+            []) as SpecLockImplementationEntry[],
+        }
         await fs.mkdir(path.dirname(specLockPath), { recursive: true })
-        await writeFileAtomic(specLockPath, JSON.stringify(persisted, null, 2) + '\n')
+        await writeFileAtomic(specLockPath, JSON.stringify(specLock, null, 2) + '\n')
       }
     } catch (error) {
       throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
@@ -411,13 +432,135 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
+   * Returns the persisted schema identity for the given spec, or `null` if absent.
+   *
+   * @param spec - The spec whose persisted schema to load
+   * @returns The persisted schema identity, or `null` if absent
+   */
+  override async readPersistedSchema(
+    spec: Spec,
+  ): Promise<{ name: string; version: number } | null> {
+    const data = await this._readSpecLock(spec)
+    return data?.schema ?? null
+  }
+
+  /**
+   * Returns the persisted dependencies for the given spec, or `null` if absent.
+   *
+   * @param spec - The spec whose persisted dependencies to load
+   * @returns The persisted dependencies, or `null` if absent
+   */
+  override async readPersistedDependsOn(spec: Spec): Promise<readonly string[] | null> {
+    const data = await this._readSpecLock(spec)
+    return data?.dependsOn ?? null
+  }
+
+  /**
+   * Returns the persisted implementation links for the given spec, or `null` if absent.
+   *
+   * @param spec - The spec whose persisted implementation links to load
+   * @returns The persisted implementation links, or `null` if absent
+   */
+  override async readPersistedImplementation(
+    spec: Spec,
+  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
+    const data = await this._readSpecLock(spec)
+    return (
+      (data?.implementation as readonly {
+        readonly file: string
+        readonly symbols?: readonly string[]
+      }[]) ?? null
+    )
+  }
+
+  /**
+   * Returns a stable hash representing the persisted spec state.
+   *
+   * @param spec - The spec whose stable hash to compute
+   * @returns The stable hash, or `null` if absent
+   */
+  override async specHash(spec: Spec): Promise<string | null> {
+    const filePath = this._specLockFilePath(spec.name)
+    try {
+      const content = await fs.readFile(filePath, 'utf8')
+      return sha256(content)
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+  }
+
+  /**
+   * Updates the persisted schema identity for the given spec.
+   *
+   * @param spec - The spec whose persisted schema to update
+   * @param schema - The new schema identity
+   * @param schema.name - The schema name
+   * @param schema.version - The schema version
+   * @param options - Update options
+   * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the persisted spec state
+   */
+  override async updatePersistedSchema(
+    spec: Spec,
+    schema: { name: string; version: number },
+    options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    const data = (await this._readSpecLock(spec)) ?? this._emptySpecLock()
+    await this._saveSpecLock(spec, { ...data, schema }, options)
+  }
+
+  /**
+   * Updates the persisted dependencies for the given spec.
+   *
+   * @param spec - The spec whose persisted dependencies to update
+   * @param dependsOn - The new dependency list
+   * @param options - Update options
+   * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the persisted spec state
+   */
+  override async updatePersistedDependsOn(
+    spec: Spec,
+    dependsOn: readonly string[],
+    options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    const data = (await this._readSpecLock(spec)) ?? this._emptySpecLock()
+    await this._saveSpecLock(spec, { ...data, dependsOn }, options)
+  }
+
+  /**
+   * Updates the persisted implementation links for the given spec.
+   *
+   * @param spec - The spec whose persisted implementation links to update
+   * @param implementation - The new implementation link list
+   * @param options - Update options
+   * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the persisted spec state
+   */
+  override async updatePersistedImplementation(
+    spec: Spec,
+    implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
+    options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    const data = (await this._readSpecLock(spec)) ?? this._emptySpecLock()
+    await this._saveSpecLock(
+      spec,
+      {
+        ...data,
+        implementation: implementation as SpecLockImplementationEntry[],
+      },
+      options,
+    )
+  }
+
+  /**
    * Returns the parsed `spec-lock.json` sidecar for the given spec, or `null`
    * when no sidecar exists.
    *
    * @param spec - The spec whose sidecar to load
    * @returns Parsed sidecar with `originalHash`, or `null` if absent
    */
-  override async readSpecLock(spec: Spec): Promise<SpecLockData | null> {
+  private async _readSpecLock(spec: Spec): Promise<SpecLockData | null> {
     const filePath = this._specLockFilePath(spec.name)
 
     let content: string
@@ -434,18 +577,18 @@ export class FsSpecRepository extends SpecRepository {
   /**
    * Persists `spec-lock.json` for the given spec.
    *
-   * Supports the same optimistic conflict detection model as `saveMetadata()`
-   * by honoring `content.originalHash` unless `force` is enabled.
+   * Supports optimistic conflict detection via `options.originalHash`.
    *
    * @param spec - The spec whose sidecar should be written
    * @param content - Parsed sidecar payload to persist
    * @param options - Save options
    * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the persisted spec state
    */
-  override async saveSpecLock(
+  private async _saveSpecLock(
     spec: Spec,
     content: SpecLockData,
-    options?: { force?: boolean },
+    options?: { force?: boolean; originalHash?: string },
   ): Promise<void> {
     if (this.ownership() === 'readOnly') {
       throw new ReadOnlyWorkspaceError(
@@ -457,7 +600,7 @@ export class FsSpecRepository extends SpecRepository {
     const dir = path.dirname(filePath)
     await fs.mkdir(dir, { recursive: true })
 
-    if (content.originalHash !== undefined && options?.force !== true) {
+    if (options?.originalHash !== undefined && options.force !== true) {
       let currentContent: string
       try {
         currentContent = await fs.readFile(filePath, 'utf8')
@@ -470,7 +613,7 @@ export class FsSpecRepository extends SpecRepository {
       }
 
       const currentHash = sha256(currentContent)
-      if (currentHash !== content.originalHash) {
+      if (currentHash !== options.originalHash) {
         throw new ArtifactConflictError(SPEC_LOCK_FILENAME, JSON.stringify(content), currentContent)
       }
     }
@@ -478,6 +621,19 @@ export class FsSpecRepository extends SpecRepository {
     const { originalHash, ...persisted } = content
     void originalHash
     await writeFileAtomic(filePath, JSON.stringify(persisted, null, 2) + '\n')
+  }
+
+  /**
+   * Returns an empty spec lock data object.
+   *
+   * @returns An empty spec lock data object
+   */
+  private _emptySpecLock(): SpecLockData {
+    return {
+      schema: { name: 'unknown', version: 0 },
+      dependsOn: [],
+      implementation: [],
+    }
   }
 
   /**
@@ -749,6 +905,55 @@ export class FsSpecRepository extends SpecRepository {
     for (const subdir of subdirs) {
       await this._walk(path.join(dir, subdir), root, results)
     }
+  }
+
+  /**
+   * Recursively counts leaf spec directories.
+   *
+   * @param dir - Absolute path to the directory to count
+   * @returns Total number of leaf spec directories found
+   */
+  private async _countSpecs(dir: string): Promise<number> {
+    let entries: string[]
+    try {
+      entries = await fs.readdir(dir)
+    } catch (err) {
+      if (isEnoent(err)) return 0
+      throw err
+    }
+
+    const subdirs: string[] = []
+    let hasFile = false
+
+    const stats = await Promise.all(
+      entries.map(async (entry) => {
+        try {
+          const stat = await fs.lstat(path.join(dir, entry))
+          return { isDir: stat.isDirectory(), isFile: stat.isFile() }
+        } catch {
+          return { isDir: false, isFile: false }
+        }
+      }),
+    )
+
+    for (const { isDir, isFile } of stats) {
+      if (isDir)
+        subdirs.push('dummy') // we only care that it's a directory
+      else if (isFile) hasFile = true
+    }
+
+    let count = hasFile ? 1 : 0
+    const subdirCounts = await Promise.all(
+      entries
+        .filter((_, i) => stats[i]!.isDir)
+        .map((entry) => this._countSpecs(path.join(dir, entry))),
+    )
+
+    for (const subCount of subdirCounts) {
+      count += subCount
+    }
+
+    return count
   }
 }
 

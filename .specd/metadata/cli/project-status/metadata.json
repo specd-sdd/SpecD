@@ -168,6 +168,5 @@
     "spec.md": "sha256:2370896d5fd5bdd9615db40383bdad6b9e3c6d635fba4bd8b05507f310688974",
     "verify.md": "sha256:b9d67e8edc58fbfe9e0bd14f48eea08c8b6750a3ec4d6ea894ed9fa60e91e1c0"
   },
-  "generatedBy": "core",
-  "dependsOn": ["core:list-drafts", "core:list-changes"]
+  "generatedBy": "core"
 }

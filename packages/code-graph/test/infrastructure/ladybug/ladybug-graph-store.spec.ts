@@ -169,8 +169,9 @@ describe('LadybugGraphStore hierarchy persistence', () => {
     await store.close()
   })
 
-  it('exposes schema version 6 hierarchy tables in the ddl', () => {
-    expect(SCHEMA_VERSION).toBe(6)
+  it('exposes schema version 8 with document storage in the ddl', () => {
+    expect(SCHEMA_VERSION).toBe(8)
+    expect(SCHEMA_DDL).toContain('CREATE NODE TABLE IF NOT EXISTS Document')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS EXTENDS')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS IMPLEMENTS')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS OVERRIDES')

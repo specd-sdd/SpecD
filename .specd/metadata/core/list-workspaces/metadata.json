@@ -1,0 +1,100 @@
+{
+  "title": "List Workspaces",
+  "description": "The project configuration defines workspaces as isolated units of specs, code, and ownership, but consumers need a unified way to discover and interact with these workspaces alongside their initialized storage adapters. The `ListWorkspaces` use case orchestrates the project configuration with the available repository instances, providing a rich, single source of truth for project traversal. It is the foundational query for discovery UIs, CLI status reporting, and graph indexing.",
+  "dependsOn": ["core:config", "core:workspace", "core:spec-repository-port"],
+  "context": [
+    "The project configuration defines workspaces as isolated units of specs, code, and ownership, but consumers need a unified way to discover and interact with these workspaces alongside their initialized storage adapters. The `ListWorkspaces` use case orchestrates the project configuration with the available repository instances, providing a rich, single source of truth for project traversal. It is the foundational query for discovery UIs, CLI status reporting, and graph indexing."
+  ],
+  "rules": [
+    {
+      "requirement": "Orchestrate workspaces with repositories",
+      "rules": [
+        "`ListWorkspaces.execute()` SHALL iterate through all workspaces defined in the project configuration and pair each one with its corresponding `SpecRepository` instance. The results SHALL be returned as an array of `ProjectWorkspace` entities, preserving the declaration order from the configuration."
+      ]
+    },
+    {
+      "requirement": "ProjectWorkspace entity properties",
+      "rules": [
+        "Each `ProjectWorkspace` entity MUST include the following immutable properties derived from the project configuration and kernel internals:\n\n- `name` — the unique workspace identifier (e.g., `default`, `core`, `cli`)\n- `codeRoot` — the absolute path to the directory containing the implementation code\n- `isExternal` — boolean indicating if the workspace specs are stored outside the repository root\n- `ownership` — the project's relationship to the workspace (`owned`, `shared`, or `readOnly`)\n- `specRepo` — the initialized `SpecRepository` instance for reading and writing this workspace's specs"
+      ]
+    },
+    {
+      "requirement": "Handle all configured workspaces",
+      "rules": [
+        "The use case MUST include every workspace declared in the `specd.yaml` (or its local overrides). If a workspace is configured but its repository cannot be initialized, the use case SHALL still include the workspace in the list but MAY mark the repository as unavailable or throw a project-level initialization error, depending on the failure severity."
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT modify the configuration or the repository states.",
+    "The ProjectWorkspace entity SHALL be considered a read-only view of the project structure for high-level orchestration.",
+    "The use case SHALL NOT pre-load any spec content or metadata; it only provides access to the repository ports."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Orchestrate workspaces with repositories",
+      "name": "Workspaces returned in configuration order",
+      "given": ["a project with workspaces core, cli, and default configured in that order"],
+      "when": ["ListWorkspaces.execute() is called"],
+      "then": [
+        "the returned array contains three ProjectWorkspace entities",
+        "AND the order is core, then cli, then default"
+      ]
+    },
+    {
+      "requirement": "Orchestrate workspaces with repositories",
+      "name": "Each workspace has its assigned repository",
+      "given": ["workspace core is configured with its own spec storage"],
+      "when": ["ListWorkspaces.execute() is called"],
+      "then": [
+        "the ProjectWorkspace for core includes a SpecRepository instance",
+        "AND that repository is bound to the core workspace"
+      ]
+    },
+    {
+      "requirement": "ProjectWorkspace entity properties",
+      "name": "Entity contains all mandatory fields",
+      "when": ["a ProjectWorkspace is returned by the orchestrator"],
+      "then": [
+        "it includes name, codeRoot, isExternal, ownership, and specRepo",
+        "AND codeRoot is an absolute path"
+      ]
+    },
+    {
+      "requirement": "Handle all configured workspaces",
+      "name": "All workspaces from specd.yaml are present",
+      "given": ["specd.yaml declares five workspaces"],
+      "when": ["ListWorkspaces.execute() is called"],
+      "then": ["exactly five ProjectWorkspace entities are returned"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:list-workspaces",
+        "file": "core:src/composition/kernel.ts"
+      },
+      {
+        "specId": "core:list-workspaces",
+        "file": "core:src/application/index.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:list-workspaces",
+        "file": "core:src/application/use-cases/list-workspaces.ts",
+        "symbol": "ProjectWorkspace"
+      },
+      {
+        "specId": "core:list-workspaces",
+        "file": "core:src/application/use-cases/list-workspaces.ts",
+        "symbol": "ListWorkspaces"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:a0756ed43170de1e35af966851a9976c904f0d71c6d147ec140585db45cd3910",
+    "verify.md": "sha256:b0b38a167c7589f59e7fea83b4db83f4740f1e4fbebf82b3265cd839a0afc46d"
+  },
+  "generatedBy": "core"
+}

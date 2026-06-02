@@ -1,9 +1,9 @@
 {
   "title": "plugin-agent-standard:plugin-agent",
-  "description": "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's frontmatter format, complementing the existing vendor-specific plugins. This spec defines the Agent Skills standard plugin contract for skill install/uninstall, target install directory, frontmatter handling including `allowed-tools`, and integration requirements.",
+  "description": "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's metadata contract while relying on `@specd/skills` to render the final installed markdown.",
   "dependsOn": ["plugin-agent-opencode:plugin-agent", "default:_global/commits"],
   "context": [
-    "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's frontmatter format, complementing the existing vendor-specific plugins. This spec defines the Agent Skills standard plugin contract for skill install/uninstall, target install directory, frontmatter handling including `allowed-tools`, and integration requirements."
+    "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's metadata contract while relying on `@specd/skills` to render the final installed markdown."
   ],
   "rules": [
     {
@@ -21,25 +21,25 @@
     {
       "requirement": "Frontmatter type contract",
       "rules": [
-        "The Agent Skills standard frontmatter model MUST support this exact field set per the agentskills.io specification:\n\n- `name` (required)\n- `description` (required)\n- `license` (optional)\n- `compatibility` (optional)\n- `metadata` (optional `Record<string, string>`)\n- `allowed-tools` (optional, space-separated string of pre-approved tools)\n\nUnknown fields MUST NOT be emitted into generated `SKILL.md` files."
+        "The Agent Skills standard frontmatter value model MUST support this exact field set per the agentskills.io specification:\n\n- `name` (required)\n- `description` (required)\n- `license` (optional)\n- `compatibility` (optional)\n- `metadata` (optional `Record<string, string>`)\n- `allowed-tools` (optional, space-separated string of pre-approved tools)\n\nUnknown fields MUST NOT be represented in the structured value collection for generated `SKILL.md` files."
       ]
     },
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution\n2. resolves the per-skill frontmatter map\n3. prepends Agent Skills standard YAML frontmatter only to markdown files not marked as shared\n4. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n5. writes files marked as shared to the Agent Skills standard shared skills resource directory under the `projectRoot` provided in `SpecdConfig`"
+        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter source value collection\n3. declares only the Agent Skills standard-supported capability identifiers\n4. passes `variables.sharedFolder` only when overriding the default shared path contract\n5. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n6. writes files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution."
       ]
     },
     {
       "requirement": "Frontmatter injection",
       "rules": [
-        "During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file and include only configured fields supported by the Agent Skills standard.\n\nThe plugin MUST NOT prepend skill frontmatter to files marked as shared."
+        "During install, the plugin MUST provide structured Agent Skills standard frontmatter values to `@specd/skills`, and the rendered skill-local markdown output MUST include only configured fields supported by the Agent Skills standard.\n\nFiles marked as shared MUST continue to be written without Agent Skills standard frontmatter."
       ]
     },
     {
       "requirement": "Install location",
       "rules": [
-        "Project-level skill installation MUST target `.agents/skills/` under the `projectRoot` provided in `SpecdConfig`.\n\nFor each skill, files not marked as shared MUST be installed under `.agents/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under `.agents/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file."
+        "Project-level skill installation MUST target `.agents/skills/` under the `projectRoot` provided in `SpecdConfig`.\n\nFor each skill, files not marked as shared MUST be installed under `.agents/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under the rendered `sharedFolder` location within the project root. When no override is provided, that location MUST default to a relative path derived from the runtime config directory.\n\nThe resolved shared location MUST NOT contain a `SKILL.md` file."
       ]
     },
     {
@@ -63,7 +63,7 @@
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.agents/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.\n\nUninstall MUST NOT remove unrelated directories or files under `.agents/skills/` that are not part of the specd-managed skill set."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.agents/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.agents/skills/` that are not part of the specd-managed skill set."
       ]
     }
   ],
@@ -114,30 +114,30 @@
     },
     {
       "requirement": "Frontmatter type contract",
-      "name": "Frontmatter model enforces supported field set",
-      "when": ["frontmatter is generated for an installed SKILL.md"],
+      "name": "Frontmatter value model enforces supported field set",
+      "when": ["frontmatter values are generated for an installed SKILL.md"],
       "then": [
         "required fields name and description are present",
-        "AND optional fields license, compatibility, metadata, and allowed-tools are emitted only when configured",
-        "AND unknown fields are not emitted"
+        "AND optional fields license, compatibility, metadata, and allowed-tools are represented only when configured",
+        "AND unknown fields are not represented"
       ]
     },
     {
       "requirement": "Frontmatter type contract",
       "name": "allowed-tools uses hyphen not underscore",
-      "when": ["frontmatter is generated with pre-approved tools configured"],
+      "when": ["frontmatter values are generated with pre-approved tools configured"],
       "then": [
-        "the emitted key is allowed-tools (with hyphen)",
+        "the represented key is allowed-tools",
         "AND the value is a space-separated string per the agentskills.io specification"
       ]
     },
     {
       "requirement": "Frontmatter injection",
-      "name": "Install prepends only Agent Skills standard fields",
+      "name": "Install passes Agent Skills capability identifiers and frontmatter source values",
       "when": ["skill markdown files are written during install"],
       "then": [
-        "YAML frontmatter is prepended before markdown content",
-        "AND emitted fields are limited to the Agent Skills standard-supported keys"
+        "the plugin supplies Agent Skills capability identifiers and structured frontmatter values to @specd/skills",
+        "AND the rendered markdown includes only the Agent Skills standard-supported fields"
       ]
     },
     {
@@ -149,19 +149,19 @@
     },
     {
       "requirement": "Install location",
-      "name": "Skills install into agents directory",
+      "name": "Skills install into agents directory and sharedFolder default",
       "given": ["a SpecdConfig with projectRoot"],
       "when": ["install writes skill files"],
       "then": [
         "non-shared files are created under .agents/skills/<skill-name>/",
-        "AND shared files are created under .agents/skills/_specd-shared/"
+        "AND shared files are created under the resolved sharedFolder location under the project root"
       ]
     },
     {
       "requirement": "Install location",
       "name": "Shared directory is not discovered as a skill",
-      "when": ["install creates .agents/skills/_specd-shared/"],
-      "then": ["the directory does not contain a SKILL.md file"]
+      "when": ["install writes shared files to the resolved shared location"],
+      "then": ["that location does not contain a SKILL.md file"]
     },
     {
       "requirement": "allowed-tools configuration",
@@ -191,7 +191,7 @@
       "when": ["uninstall(config, { skills: ['specd-design'] }) is executed"],
       "then": [
         "only the selected specd-managed skill directories are removed",
-        "AND .agents/skills/_specd-shared/ remains when other installed skills may still reference it"
+        "AND the resolved shared location remains when other installed skills may still reference it"
       ]
     },
     {
@@ -203,7 +203,7 @@
       "when": ["uninstall(config, optionsWithoutSkills) is executed"],
       "then": [
         "all specd-managed skill directories are removed",
-        "AND .agents/skills/_specd-shared/ is removed",
+        "AND the resolved sharedFolder location is removed",
         "AND unrelated user skill directories remain"
       ]
     },
@@ -213,14 +213,41 @@
       "given": ["skills are available from @specd/skills"],
       "when": ["InstallSkills runs"],
       "then": [
-        "it reads skill templates, resolves per-skill frontmatter, prepends Agent Skills standard YAML frontmatter only to skill-local markdown files, and writes installed skill files",
-        "AND shared-marked files are written under the Agent Skills standard shared skills resource directory"
+        "it reads skill templates, resolves capability identifiers and frontmatter source values, and passes them into @specd/skills",
+        "AND shared-marked files are written to the rendered sharedFolder location under the project root"
+      ]
+    },
+    {
+      "requirement": "Application layer",
+      "name": "Agent Skills standard application layer does not prepend YAML after resolution",
+      "when": ["the Agent Skills standard install flow is reviewed"],
+      "then": [
+        "the plugin does not assemble a final YAML frontmatter block after bundle resolution"
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "plugin-agent-standard:plugin-agent",
+        "file": "plugin-agent-standard:test/install-skills.spec.ts",
+        "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-standard:plugin-agent",
+        "file": "plugin-agent-standard:src/application/use-cases/install-skills.ts",
+        "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-standard:plugin-agent",
+        "file": "plugin-agent-standard:src/application/use-cases/shared-folder.ts",
+        "symbol": "resolveSharedFolder"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:52e91bd0be2299292e344883e7e85d43641c464bb0565bc3693140a6c0204f86",
-    "verify.md": "sha256:9194a2411b745349db2c9cc7dc4c1a280b2b077dd0dcb7790cdc0ca2b43945a5"
+    "spec.md": "sha256:6a45ee468dbcf98129cf8df5cc18f3f84795f8bb18ac9b0e13efcb205dabc559",
+    "verify.md": "sha256:49c4739eedbe0e858caa7eb6ad63a85d4647bcf085b072ed64ecfb08cb289fb6"
   },
   "generatedBy": "core"
 }

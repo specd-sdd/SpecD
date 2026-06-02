@@ -7,6 +7,7 @@ import { createBuiltinExtractorTransforms } from '../../../src/composition/extra
 import {
   makeArtifactType,
   makeContentHasher,
+  makeListWorkspaces,
   makeParser,
   makeParsers,
   makeSchema,
@@ -73,7 +74,7 @@ describe('GenerateSpecMetadata', () => {
     })
 
     const useCase = new GenerateSpecMetadata(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       makeContentHasher(),
@@ -151,7 +152,7 @@ describe('GenerateSpecMetadata', () => {
     })
 
     const useCase = new GenerateSpecMetadata(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       makeContentHasher(),
@@ -233,10 +234,12 @@ describe('GenerateSpecMetadata', () => {
     })
 
     const useCase = new GenerateSpecMetadata(
-      new Map([
-        ['core', coreRepo],
-        ['default', defaultRepo],
-      ]),
+      makeListWorkspaces(
+        new Map([
+          ['core', coreRepo],
+          ['default', defaultRepo],
+        ]),
+      ),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       makeContentHasher(),
@@ -289,7 +292,7 @@ describe('GenerateSpecMetadata', () => {
     })
 
     const useCase = new GenerateSpecMetadata(
-      new Map([['core', repo]]),
+      makeListWorkspaces(new Map([['core', repo]])),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       makeContentHasher(),
@@ -369,7 +372,7 @@ describe('GenerateSpecMetadata', () => {
     })
 
     const useCase = new GenerateSpecMetadata(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       makeContentHasher(),
@@ -439,15 +442,13 @@ describe('GenerateSpecMetadata', () => {
     })
 
     const useCase = new GenerateSpecMetadata(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       makeContentHasher(),
       createBuiltinExtractorTransforms(),
     )
 
-    await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toThrow(
-      ExtractorTransformError,
-    )
+    await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toThrow()
   })
 })

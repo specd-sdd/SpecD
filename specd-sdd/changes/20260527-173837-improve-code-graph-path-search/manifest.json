@@ -1,0 +1,5742 @@
+{
+  "name": "improve-code-graph-path-search",
+  "createdAt": "2026-05-27T17:38:37.301Z",
+  "description": "Improve code-graph search, indexing, and discovery semantics across CLI, core, and store backends. The change adds exact-match-aware graph search, document indexing/search support, normalized selector handling, unified workspace orchestration, and effective fingerprinting with global include/exclude rules and automatic spec-root exclusion.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:graph-search",
+    "cli:graph-impact",
+    "code-graph:composition",
+    "code-graph:workspace-integration",
+    "code-graph:sqlite-graph-store",
+    "code-graph:ladybug-graph-store",
+    "cli:graph-index",
+    "code-graph:indexer",
+    "code-graph:symbol-model",
+    "code-graph:graph-store",
+    "core:config",
+    "code-graph:document-model",
+    "core:spec-repository-port",
+    "core:list-workspaces",
+    "core:list-specs",
+    "core:search-specs",
+    "core:get-spec-context",
+    "core:spec-metadata",
+    "cli:project-status",
+    "cli:spec-list",
+    "cli:spec-search",
+    "cli:graph-stats",
+    "core:workspace"
+  ],
+  "specDependsOn": {
+    "cli:graph-search": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model",
+      "code-graph:graph-store"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:ladybug-graph-store",
+      "code-graph:sqlite-graph-store",
+      "code-graph:language-adapter",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:document-model"
+    ],
+    "code-graph:workspace-integration": ["core:config"],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:ladybug-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:graph-store",
+      "core:list-workspaces"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model"
+    ],
+    "code-graph:symbol-model": [
+      "default:_global/conventions",
+      "default:_global/error-handling-conventions",
+      "code-graph:document-model"
+    ],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection",
+      "code-graph:document-model"
+    ],
+    "core:config": [
+      "core:schema-format",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:storage",
+      "core:spec-metadata",
+      "core:workspace",
+      "default:_global/logging"
+    ],
+    "code-graph:document-model": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "core:config"
+    ],
+    "core:spec-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-metadata",
+      "core:search-specs",
+      "default:_global/logging",
+      "core:spec-lock"
+    ],
+    "core:list-workspaces": ["core:config", "core:workspace", "core:spec-repository-port"],
+    "core:list-specs": [
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:storage",
+      "core:workspace",
+      "core:list-workspaces"
+    ],
+    "core:search-specs": [
+      "core:spec-repository-port",
+      "core:list-specs",
+      "core:workspace",
+      "core:list-workspaces"
+    ],
+    "core:get-spec-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:list-workspaces"
+    ],
+    "core:spec-metadata": [
+      "core:config",
+      "core:change",
+      "core:schema-format",
+      "core:content-extraction",
+      "core:spec-repository-port",
+      "core:spec-lock"
+    ],
+    "cli:project-status": ["core:list-workspaces", "core:list-drafts", "core:list-changes"],
+    "cli:spec-list": [
+      "cli:entrypoint",
+      "core:spec",
+      "cli:command-resource-naming",
+      "cli:spec-search",
+      "core:list-workspaces"
+    ],
+    "cli:spec-search": [
+      "cli:entrypoint",
+      "default:_global/spec-layout",
+      "core:search-specs",
+      "core:list-workspaces"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:staleness-detection",
+      "core:list-workspaces"
+    ],
+    "core:workspace": ["core:config", "core:spec-id-format"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/cli/src/commands/archive/list.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/archive/show.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/archive-list.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/list-commands.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/archive-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-archived.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/archived-change-index-entry.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-archived.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/archive-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/cli/archive-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/cli/archive-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/cli/archive-show/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/cli/archive-show/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/archive-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/archive-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/archive-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/archive-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/archived-change-index-entry/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/archived-change-index-entry/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/list-archived/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/list-archived/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/read-only-change-view/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/deltas/core/read-only-change-view/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-154619-update-archive-reporting/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-impact/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-impact/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-index/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-index/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-search/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-search/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/composition/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/composition/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/indexer/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/indexer/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/symbol-model/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/symbol-model/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/config/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/config/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/specs/code-graph/document-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/specs/code-graph/document-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/document-node.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/build-workspace-targets.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/spec-node.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/file-node.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/symbol-node.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/document-node.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/spec-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/spec-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260528-update-archive-reporting-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260528-update-archive-reporting.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/archive-list/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/archive-show/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archived-change-index-entry/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-archived/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/read-only-change-view/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/archive-show.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/.gitignore",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/cli/archive-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/cli/archive-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/cli/archive-show/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/cli/archive-show/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/archive-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/archive-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/archive-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/archive-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/archived-change-index-entry/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/archived-change-index-entry/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/list-archived/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/list-archived/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/read-only-change-view/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/deltas/core/read-only-change-view/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/reports/2026-05-28-111622/_partial-cli.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/05/20260527-154619-update-archive-reporting/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/archive-list/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/archive-list/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/archive-show/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/archive-show/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-repository-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-repository-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archived-change-index-entry/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archived-change-index-entry/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-archived/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-archived/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/read-only-change-view/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/spec-reference-resolver.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/spec-repository-port/spec.md.delta copy.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/spec-repository-port/verify.md.delta copy.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-stats/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-stats/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/project-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/project-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-search/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-search/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/get-spec-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/get-spec-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/list-specs/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/list-specs/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/search-specs/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/search-specs/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/spec-metadata/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/spec-metadata/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/workspace/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/specs/core/list-workspaces/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/specs/core/list-workspaces/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/core/workspace/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-workspaces.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-list.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-node.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-query.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/depends-on-traversal.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/spec-pattern-matching.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-spec-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/search-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-artifacts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/compile-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/create-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-spec-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-specs.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/search-specs.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-artifacts.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/depends-on-traversal.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/spec-pattern-matching.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/generate-spec-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-specs.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/search-specs.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/archive-batch-snapshot-port.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-workspaces.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-workspaces.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-standard/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-standard/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/resolve-bundle/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/resolve-bundle/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-repository/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-repository/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-templates-source/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-templates-source/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/project-structure.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/invalidate-spec-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/agent-plugin.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-manager/test/domain/types/is-agent-plugin.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/ports/skill-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/use-cases/resolve-bundle.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/errors/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/skill-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/infrastructure/skill-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/resolve-bundle.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/skills-template-rendering.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/shared-folder.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/shared-folder.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/shared-folder.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/shared-folder.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/shared-folder.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/errors/invalid-shared-folder-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/errors/invalid-skill-template-metadata-error.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/shared-folder.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/skill-template-metadata.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/template-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/skill-template-metadata-reader.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/template-renderer.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/shared/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-archive/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-archive/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-compliance/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-compliance/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-design/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-design/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-implement/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-implement/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-metadata/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-metadata/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-new/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-new/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-verify/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd-verify/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/specd/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "sesion-code-graph.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/preview-spec.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/run-step-hooks.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/reports/20260601-143301/specs-compliance-change-improve-code-graph-path-search-20260601-143301.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/build-project-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/build-project-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/graph-statistics.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/document-model/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/deltas/code-graph/document-model/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/resolve-effective-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/reports/20260601-225536/specs-compliance-change-improve-code-graph-path-search-20260601-225536.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/reports/20260602-081548/specs-compliance-change-add-agent-capability-aware-skill-templates-20260602-081548.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260527-173837-improve-code-graph-path-search/.changeset-release.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260531-184904-add-agent-capability-aware-skill-templates/.changeset-release.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-impact/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-index/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-search/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-stats/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/project-status/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-list/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-search/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/graph-store/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/indexer/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/ladybug-graph-store/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/sqlite-graph-store/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/symbol-model/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/workspace-integration/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-context/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/list-specs/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/search-specs/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/spec-repository-port/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/workspace/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/plugin-agent-claude/plugin-agent/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-agent-codex/plugin-agent/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-agent-copilot/plugin-agent/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-agent-opencode/plugin-agent/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-agent-standard/plugin-agent/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/agent-plugin-type/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/resolve-bundle/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-templates-source/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/schema-std/schema.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/schema-std/templates/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260602-add-agent-capability-aware-skill-templates-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260602-add-agent-capability-aware-skill-templates.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260602-enforce-schema-spec-dependency-registration-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260602-enforce-schema-spec-dependency-registration.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/document-model/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/list-workspaces/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/.changeset-release.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-standard/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-agent-standard/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/resolve-bundle/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/resolve-bundle/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-repository/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-repository/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-templates-source/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/deltas/skills/skill-templates-source/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/reports/20260602-081548/specs-compliance-change-add-agent-capability-aware-skill-templates-20260602-081548.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260531-184904-add-agent-capability-aware-skill-templates/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/.specd-exploration.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-deps/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-deps/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-status/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-status/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/core/get-status/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/core/get-status/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/core/update-spec-deps/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/deltas/core/update-spec-deps/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/design.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/proposal.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/tasks.md",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/change/deps.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-deps.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-status.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/src/domain/read-only-change-view.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-approve.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-archive.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-status.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-validate.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-104218-test-refinement/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/reports/20260602-125430/_partial-dependency-visibility.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/reports/20260602-125430/specs-compliance-change-improve-change-dependency-visibility-20260602-125430.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-090004-improve-change-dependency-visibility/reports/compiled-context-improve-change-dependency-visibility.md",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-deps/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-status/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-status/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/update-spec-deps/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-deps/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-deps/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-status/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-status/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-status/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-status/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-status/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-status/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/update-spec-deps/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260602-improve-change-dependency-visibility-specd.md",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260602-improve-change-dependency-visibility.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/.specd-exploration.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-deps/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-deps/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-status/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/cli/change-status/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/core/get-status/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/core/get-status/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/core/update-spec-deps/spec.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/deltas/core/update-spec-deps/verify.md.delta.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/design.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/proposal.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/reports/20260602-125430/_partial-dependency-visibility.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/reports/20260602-125430/specs-compliance-change-improve-change-dependency-visibility-20260602-125430.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/reports/compiled-context-improve-change-dependency-visibility.md",
+      "state": "open"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260602-090004-improve-change-dependency-visibility/tasks.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-deps/spec-lock.json",
+      "state": "open"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/specd-config.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["SpecdWorkspaceGraphConfig", "SpecdGraphConfig", "SpecdConfig"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["FsConfigLoader"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createCodeGraphProvider"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphProvider"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveFileSelector", "resolveSymbolSelector"]
+    },
+    {
+      "specId": "code-graph:document-model",
+      "file": "packages/code-graph/src/domain/value-objects/document-node.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DocumentNode", "createDocumentNode"]
+    },
+    {
+      "specId": "core:spec-repository-port",
+      "file": "packages/core/src/application/ports/spec-repository.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["SpecRepository", "specsPath"]
+    },
+    {
+      "specId": "core:spec-repository-port",
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsSpecRepository", "count", "_countSpecs", "specsPath"]
+    },
+    {
+      "specId": "core:spec-repository-port",
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GenerateSpecMetadata"]
+    },
+    {
+      "specId": "core:spec-repository-port",
+      "file": "packages/core/src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadPersistedSpecDependsOn"]
+    },
+    {
+      "specId": "core:spec-repository-port",
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveChange"]
+    },
+    {
+      "specId": "core:list-workspaces",
+      "file": "packages/core/src/application/use-cases/list-workspaces.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ProjectWorkspace", "ListWorkspaces"]
+    },
+    {
+      "specId": "core:list-workspaces",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/_shared/resolve-effective-graph-config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/build-project-graph-config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphImpact"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphSearch"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphIndex"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStore"]
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LadybugGraphStore"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStoreFactory"]
+    },
+    {
+      "specId": "core:list-specs",
+      "file": "packages/core/src/application/use-cases/list-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ListSpecs"]
+    },
+    {
+      "specId": "core:search-specs",
+      "file": "packages/core/src/application/use-cases/search-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SearchSpecs"]
+    },
+    {
+      "specId": "core:get-spec-context",
+      "file": "packages/core/src/application/use-cases/get-spec-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetSpecContext"]
+    },
+    {
+      "specId": "cli:spec-list",
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerSpecList"]
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/commands/build-project-graph-config.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:document-model",
+      "file": "packages/code-graph/test/domain/value-objects/document-node.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/spec-node.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSpecNode"]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/test/domain/value-objects/file-node.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/test/domain/value-objects/symbol-node.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:list-workspaces",
+      "file": "packages/core/src/application/index.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:4e7d8d1668fe7cb5af0f4003340df2ebf40dd249a5633b3e7389dec8f7ce9712"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:774f1fbf2f0bbcf64f01732aa8109570569194a3188fb86e63ddced97dcee3ca"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9dd430b6b50580a72abe10aad1f6218cd90353927afdf819f1ec1bb7d90e515f"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d6b75f22b4c0f68c7e667fd2c82cb85c0edb89e932edfd6760753b085d8d3fd1"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7c27f2f07f603a9e3305d23811932ef52d45a9770df4a5e01245b27506e2f625"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:16a4f9c7e7692aa77849d9b6534e0256243f492dfe0f8c4e592c078f9ef034a4"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9397d521fe7ae540543f379854ad5b48560a84d856be258961a4e9b995a123ca"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8597a16b85fc56c06c7eb2a9ac126151cecf9362c166809f718dd83252cf8a5c"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ef92f387d44e3b0aff61d1ce531f24a15dde1e247ba67f7a0714e4044eeb26c3"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5984a6e54f21b49fb0a91c8ecb9496e1d968c71b0210e87ff1e80e41c6f83885"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ea344667ffa84c004846929d5414d99bd8cb7b51ea4fe61db3b0e0516e22b21e"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f523d0f4aa61d4ca79b8e5bc9457c75dfbcbd13a71fbb38d2f285791315602e7"
+        },
+        {
+          "key": "code-graph:document-model",
+          "filename": "specs/code-graph/document-model/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:617126c84fa22d4ab7494d018933c58b8cd888454da3a70bf0b042c38bb97fca"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:81b997edb5d5b9fd7056b96278c3388d61a081c84baebdced517b71505f1f87d"
+        },
+        {
+          "key": "core:list-workspaces",
+          "filename": "specs/core/list-workspaces/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:a0756ed43170de1e35af966851a9976c904f0d71c6d147ec140585db45cd3910"
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c61833e468ce7f1099a80019c41e6e64e7bcc69f6a447fe85172741db9ea3634"
+        },
+        {
+          "key": "core:search-specs",
+          "filename": "deltas/core/search-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:383c7e700bdba51b3e2f16cf7bd04ecb845ba426aee52f2386754783ebcacdf0"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0e62a1757b5684722399c0db36263066bb0611efa55fdb635cd216eac3b48c45"
+        },
+        {
+          "key": "core:spec-metadata",
+          "filename": "deltas/core/spec-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bcbc757c057c346a6b536a17d39488fd4284fdea59523f98652e414c8194ebf0"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e01bd6c1d9595696f5dcd498ae8614504e0261e12c71756833a0b398f242faef"
+        },
+        {
+          "key": "cli:spec-list",
+          "filename": "deltas/cli/spec-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eab2d33365d165eb4f28240304fb3be7ed06b7423c96db278539976773ab7afc"
+        },
+        {
+          "key": "cli:spec-search",
+          "filename": "deltas/cli/spec-search/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3db841fd654b480ce22115040560ffe7d0a841d8f3175aa96839dbb05032346b"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8ad21cea1452e09640663a65a00608032fe9666cd48052401d9989fa8b1ab06a"
+        },
+        {
+          "key": "core:workspace",
+          "filename": "deltas/core/workspace/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:151a335bd6502f6ac5b85f9d01c7016021820ad03447ca31004e20432753b4c5"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f87d19bc1dc8482b6deebe86c9092873a82ea343ae924be58e5eec00f95a8bd7"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b187682af9b20c8b2d7e5285dba9f66a96bccab54c09371ab7d9d0967eb38514"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fee8d9dbde2b3816ca51e890c609c8ab4108c7709d519622ac328c33e0388e29"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1e0aa954da8a010ad8b7bc4561e4bfe613f7e5d4d5773a3172ea4cbcebb47703"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:49a23853ece06d6dddf0cb965cbcd0c4acc4466028b13ca2bc9b01846e8de20e"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:99d6bd46ca3784baadb4ee1f12f0cd0c0ef840427679238070f7f3e9728aaa40"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f45043df020204e5aad6703feb7e6780c0497a45d3cf0c91024d47c69f2a9eb6"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:678300e12d4aaa6e5c08b5e51cfdeeed9266099e86deab3cd5eff7d7d8beb2a2"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3357f73c4c496e47404e41e668b64ed93602ee24d436dbe778baef4639ccd79c"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:01143cd83c40ec7b9b5a784eaf8b2e1156cb26cfe81c9b037da9d57325b2a2da"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9b6bd4f272bb0e6abd8d489b98864adf852a87840043a261a55494afce2b3c04"
+        },
+        {
+          "key": "code-graph:document-model",
+          "filename": "specs/code-graph/document-model/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:6bee7f60208190b1a89721d49c76d08fb1ae24da9652c162dd7dab4a589d404a"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:65b445e11ca0f46dc672993cc5f20a6df833fedc06fbf2adc9ced1e8aebf224e"
+        },
+        {
+          "key": "core:list-workspaces",
+          "filename": "specs/core/list-workspaces/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:b0b38a167c7589f59e7fea83b4db83f4740f1e4fbebf82b3265cd839a0afc46d"
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4b5a6cea564d32487f65213f3af872cac658240001a0ed89312d2ff14b33fb7d"
+        },
+        {
+          "key": "core:search-specs",
+          "filename": "deltas/core/search-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:de4c13bb081aa7db4003b523ba41e692258edd3af757a555df58c3da79985bb3"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5c2cb9885fefb16ec43b1faf553e09dedebf20a888a4a4993fff2f23944450b6"
+        },
+        {
+          "key": "core:spec-metadata",
+          "filename": "deltas/core/spec-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c33794fd32860cc52434a80ca5ec3a6481cffdb13eda626ff11809355d7a953b"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3ee83521f740403dbc68419f67a9810ea736311606612f76194b92b17948b973"
+        },
+        {
+          "key": "cli:spec-list",
+          "filename": "deltas/cli/spec-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:93b89b67a0debd36a8545c41b8b425a4f12667bbb3c19b7684ac060c17349a94"
+        },
+        {
+          "key": "cli:spec-search",
+          "filename": "deltas/cli/spec-search/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:50d913cbc6c61289e05f74e36869452a400f87a1a105caad805d173a363419e5"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fce7b1f1cccdbfc0bb534bb7323f327af75973a78bed393aacd90c85be5b681c"
+        },
+        {
+          "key": "core:workspace",
+          "filename": "deltas/core/workspace/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4913b45f578182419e229cc88e33c4dcafb421afd6d20d728fd72a1fa1266371"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:421e91a36ce6471422f64b6cf831b6efb0e4a2b79e16bc4f9592a734ab546a77"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:075bbd64ecd4c0d4ee94bc3f1807b17ea7885c16103bcb7e5e7023129f930433"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-27T17:38:37.301Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "cli:graph-search",
+        "cli:graph-impact",
+        "code-graph:composition",
+        "code-graph:workspace-integration",
+        "code-graph:sqlite-graph-store",
+        "code-graph:ladybug-graph-store"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-27T17:38:37.323Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-27T17:44:10.252Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:47:00.172Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:47:58.083Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:48:38.521Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:50:28.666Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:51:23.745Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:54:35.059Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:55:26.250Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:55:56.818Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T18:58:06.953Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-27T18:58:06.960Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:document-model"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:document-model"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-27T19:06:03.137Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-search]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-search"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-27T22:33:39.075Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-27T22:34:22.674Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-28T08:33:46.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-28T08:33:46.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-28T08:35:06.274Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-28T08:35:06.279Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-repository-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-28T08:50:14.966Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-28T08:53:40.575Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-28T11:15:36.810Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-28T14:13:17.686Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-28T14:15:05.678Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-28T17:45:14.322Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-28T17:45:14.322Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T06:22:52.561Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:spec-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-29T06:23:05.995Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-29T06:23:07.226Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T06:34:38.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-29T06:34:38.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T07:51:40.170Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-29T07:51:40.180Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:list-workspaces"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:search-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-workspaces"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:search-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T08:21:05.414Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-29T08:21:05.420Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:workspace"
+        },
+        {
+          "type": "verify",
+          "key": "core:workspace"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T08:53:54.181Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:search-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:search-specs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T09:25:54.982Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:document-model, core:list-workspaces]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:document-model", "core:list-workspaces"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T09:31:33.769Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:workspace-integration, core:search-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:workspace-integration", "core:search-specs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T09:32:57.768Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:spec-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T09:34:04.208Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T09:34:29.475Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:search-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:search-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T09:39:22.961Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["code-graph:graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T09:40:50.762Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:20:13.586Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-impact]; verify [cli:graph-impact]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:23:19.441Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:37:06.533Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-search]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-search"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:37:58.146Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-impact]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:39:17.113Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:composition]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:composition"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:40:14.921Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:workspace-integration]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:workspace-integration"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:40:57.900Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:41:41.601Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-index]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-index"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:42:32.023Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:43:19.524Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:spec-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T10:43:59.321Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T11:10:39.117Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:ladybug-graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:ladybug-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T11:15:32.832Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T11:19:54.160Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-29T11:21:55.673Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-29T11:26:34.185Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-29T11:27:04.856Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-01T12:29:04.340Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-01T13:00:43.333Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-01T13:01:09.086Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-01T13:09:53.530Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-01T13:09:53.530Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-01T18:15:59.923Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-01T18:17:44.150Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-01T18:19:14.745Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-01T19:38:00.728Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T06:04:30.851Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T06:04:48.867Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:14:32.386Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"improve-code-graph-path-search\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-06-02T06:36:17.614Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Improve code-graph search, indexing, and discovery semantics across CLI, core, and store backends. The change adds exact-match-aware graph search, document indexing/search support, normalized selector handling, unified workspace orchestration, and effective fingerprinting with global include/exclude rules and automatic spec-root exclusion."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:36:17.660Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:spec-repository-port\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:36:39.505Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:spec-repository-port\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:38:36.025Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:graph-stats\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:39:18.113Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:graph-index\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:39:52.522Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-search': extracted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:document-model] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:graph-store, code-graph:document-model]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:40:47.925Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"improve-code-graph-path-search\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:41:16.749Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:composition': extracted dependencies [code-graph:symbol-model, code-graph:graph-store, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, code-graph:language-adapter, code-graph:indexer, code-graph:traversal, default:_global/architecture] do not match persisted dependencies [code-graph:symbol-model, code-graph:graph-store, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, code-graph:language-adapter, code-graph:indexer, code-graph:traversal, default:_global/architecture, code-graph:document-model]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:41:51.488Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:indexer': extracted dependencies [code-graph:graph-store, code-graph:language-adapter, code-graph:symbol-model, code-graph:workspace-integration, core:config] do not match persisted dependencies [code-graph:graph-store, code-graph:language-adapter, code-graph:symbol-model, code-graph:workspace-integration, core:config, core:spec-repository-port, core:list-workspaces, code-graph:document-model]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:42:03.851Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:symbol-model': extracted dependencies [default:_global/conventions, default:_global/error-handling-conventions] do not match persisted dependencies [default:_global/conventions, default:_global/error-handling-conventions, code-graph:document-model]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:42:19.963Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:graph-store': extracted dependencies [code-graph:symbol-model, default:_global/architecture, code-graph:staleness-detection] do not match persisted dependencies [code-graph:symbol-model, default:_global/architecture, code-graph:staleness-detection, code-graph:document-model]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:43:07.121Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:spec-repository-port': extracted dependencies [core:repository-port, default:_global/architecture, core:change, core:storage, core:workspace, core:spec-id-format, core:spec-metadata, core:search-specs, default:_global/logging] do not match persisted dependencies [core:repository-port, default:_global/architecture, core:change, core:storage, core:workspace, core:spec-id-format, core:spec-metadata, core:search-specs, default:_global/logging, core:spec-lock]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:43:24.368Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:list-specs': extracted dependencies [core:spec-metadata, core:content-extraction, core:storage, core:workspace] do not match persisted dependencies [core:spec-metadata, core:content-extraction, core:storage, core:workspace, core:list-workspaces]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:44:07.333Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:search-specs': extracted dependencies [core:spec-repository-port, core:list-specs, core:workspace] do not match persisted dependencies [core:spec-repository-port, core:list-specs, core:workspace, core:list-workspaces]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:44:25.753Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:get-spec-context': extracted dependencies [core:config, core:compile-context, core:spec-metadata, core:storage, core:workspace, core:spec-id-format] do not match persisted dependencies [core:config, core:compile-context, core:spec-metadata, core:storage, core:workspace, core:spec-id-format, core:list-workspaces]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T06:44:42.691Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:project-status': extracted dependencies [core:list-workspaces] do not match persisted dependencies [core:list-drafts, core:list-changes, core:list-workspaces]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T08:00:51.354Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"improve-code-graph-path-search\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T08:52:15.153Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-search': extracted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:document-model] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:document-model, code-graph:graph-store]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T08:53:33.142Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-search]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-search"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T08:53:33.142Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T11:21:47.209Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:project-status, code-graph:composition, code-graph:graph-store, code-graph:indexer, code-graph:symbol-model, core:get-spec-context, core:list-specs, core:search-specs, core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:project-status",
+            "code-graph:composition",
+            "code-graph:graph-store",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "core:get-spec-context",
+            "core:list-specs",
+            "core:search-specs",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "cli:graph-impact",
+            "code-graph:composition",
+            "code-graph:workspace-integration",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:graph-index",
+            "code-graph:indexer",
+            "code-graph:symbol-model",
+            "code-graph:graph-store",
+            "core:config",
+            "code-graph:document-model",
+            "core:spec-repository-port",
+            "core:list-workspaces",
+            "core:list-specs",
+            "core:search-specs",
+            "core:get-spec-context",
+            "core:spec-metadata",
+            "cli:project-status",
+            "cli:spec-list",
+            "cli:spec-search",
+            "cli:graph-stats",
+            "core:workspace"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

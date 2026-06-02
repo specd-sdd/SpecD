@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and frontmatter handling so the plugin can be implemented predictably and validated against the same standards used by other agent plugins.
+Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and metadata value handling so `@specd/skills` can render the final installed markdown predictably.
 
 ## Requirements
 
@@ -24,7 +24,7 @@ The plugin class constructor MUST accept `name` and `version` as parameters. The
 
 ### Requirement: Frontmatter type contract
 
-The Open Code frontmatter model MUST support this exact field set:
+The Open Code frontmatter value model MUST support this exact field set:
 
 - `name` (required)
 - `description` (required)
@@ -32,23 +32,26 @@ The Open Code frontmatter model MUST support this exact field set:
 - `compatibility` (optional)
 - `metadata` (optional `Record<string, string>`)
 
-Unknown fields MUST NOT be emitted into generated `SKILL.md` files.
+Unknown fields MUST NOT be represented in the structured value collection for generated `SKILL.md` files.
 
 ### Requirement: Application layer
 
 The application layer MUST include an `InstallSkills` use case that:
 
-1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution
-2. resolves the per-skill frontmatter map
-3. prepends Open Code-compatible YAML frontmatter only to markdown files not marked as shared
-4. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
-5. writes files marked as shared to the Open Code shared skills resource directory under the `projectRoot` provided in `SpecdConfig`
+1. reads skills from `@specd/skills`
+2. resolves the per-skill frontmatter source value collection
+3. declares only the Open Code-supported capability identifiers
+4. passes `variables.sharedFolder` only when overriding the default shared path contract
+5. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
+6. writes files marked as shared to the rendered `sharedFolder` location under the project root
+
+The plugin MUST NOT prepend YAML frontmatter after bundle resolution.
 
 ### Requirement: Frontmatter injection
 
-During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file and include only configured fields supported by Open Code.
+During install, the plugin MUST provide structured Open Code frontmatter values to `@specd/skills`, and the rendered skill-local markdown output MUST include only configured fields supported by Open Code.
 
-The plugin MUST NOT prepend skill frontmatter to files marked as shared.
+Files marked as shared MUST continue to be written without Open Code skill frontmatter.
 
 ### Requirement: Install location
 
@@ -56,7 +59,9 @@ Project-level skill installation MUST target `.opencode/skills/` under the `proj
 
 For each skill, files not marked as shared MUST be installed under `.opencode/skills/<skill-name>/`.
 
-Files marked as shared MUST be installed under `.opencode/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file.
+Files marked as shared MUST be installed under the rendered `sharedFolder` location within the project root. When no override is provided, that location MUST default to a relative path derived from the runtime config directory.
+
+The resolved shared location MUST NOT contain a `SKILL.md` file.
 
 ### Requirement: Project init wizard integration
 
@@ -70,9 +75,9 @@ The `@specd/specd` meta package MUST declare `@specd/plugin-agent-opencode` as a
 
 `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.
 
-When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.
+When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
 
-When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.
+When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.
 
 Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` that are not part of the specd-managed skill set.
 

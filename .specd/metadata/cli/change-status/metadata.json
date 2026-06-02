@@ -76,6 +76,18 @@
       "rules": [
         "The details section of the text output SHALL show task completion counts for each artifact that has `taskCompletion` data, appended inline after the status line in the format `tasks: N/M`."
       ]
+    },
+    {
+      "requirement": "Basic info section",
+      "rules": [
+        "In text mode, the command SHALL render a basic info block at the top of the output including the change name and its current state.\nIt SHALL NOT include a standalone `specs:` list, as spec visibility is handled by the dedicated \"Specs and dependencies\" section."
+      ]
+    },
+    {
+      "requirement": "Specs and dependencies section",
+      "rules": [
+        "The command SHALL include a \"specs and dependencies\" section in the output, listing all specs in the change's scope and their declared dependencies from the manifest's `specDependsOn` field.\n\nIn text mode, the section SHALL follow the DAG or details section and use a bulleted list format:\n\n```\nspecs and dependencies:\n  workspace:spec-path-1: dep1, dep2\n  workspace:spec-path-2: (none)\n```\n\nIn structured output (JSON/toon), the `specDependsOn` object from the change manifest SHALL be included in the top-level response."
+      ]
     }
   ],
   "constraints": [
@@ -436,19 +448,47 @@
       ],
       "when": ["specd change status <name> is run"],
       "then": ["the details section shows tasks: 5/10 appended to that artifact's status line"]
+    },
+    {
+      "requirement": "Basic info section",
+      "name": "Text output omits standalone specs list",
+      "when": ["specd change status <name> is run in text mode"],
+      "then": ["basic info includes name and state", "AND it does NOT include a specs: line"]
+    },
+    {
+      "requirement": "Specs and dependencies section",
+      "name": "Text output shows specs and dependencies section",
+      "given": [
+        "a change with specIds: ['core:a', 'core:b']",
+        "AND specDependsOn has {'core:a': ['core:c']}"
+      ],
+      "when": ["specd change status <name> is run"],
+      "then": [
+        "stdout includes a specs and dependencies: section",
+        "AND it lists core:a: core:c",
+        "AND it lists core:b: (none)"
+      ]
+    },
+    {
+      "requirement": "Specs and dependencies section",
+      "name": "JSON output includes specDependsOn",
+      "given": ["a change with declared spec dependencies"],
+      "when": ["specd change status <name> --format json is run"],
+      "then": ["the JSON output includes a specDependsOn field matching the change manifest"]
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:change-status",
-        "file": "cli:src/commands/change/status.ts"
+        "file": "cli:src/commands/change/status.ts",
+        "symbol": "registerChangeStatus"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0dceb4ec9f50042f66e96bc778cae084d00f813190c83887bb032cb9bd884a17",
-    "verify.md": "sha256:e4f57e1f7e26e390ac3c3448ccbd72f8a534775331281b0e3fc5a5c611051e3d"
+    "spec.md": "sha256:ed0e7e69fb0bd509d77e30152bc39ed43840a3bc35204902fc0f1d0ddc1519ae",
+    "verify.md": "sha256:a6bf20e677b6989e2a31b320d82948d81fa5cbfd15647ff810dc2adaddc6999a"
   },
   "generatedBy": "core"
 }

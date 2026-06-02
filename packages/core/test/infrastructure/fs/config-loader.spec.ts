@@ -1492,32 +1492,35 @@ storage:
   })
 
   describe('Requirement: Project graph config', () => {
-    it('reads graph.paths into SpecdConfig', async () => {
+    it('reads graph.includePaths and graph.excludePaths into SpecdConfig', async () => {
       const configPath = await writeConfig(
         minimalYaml(`
 graph:
-  paths:
+  includePaths:
     - docs/**
     - package.json
+  excludePaths:
+    - specd-sdd/
 `),
       )
 
       const loader = new FsConfigLoader({ configPath })
       const config = await loader.load()
 
-      expect(config.graph?.paths).toEqual(['docs/**', 'package.json'])
+      expect(config.graph?.includePaths).toEqual(['docs/**', 'package.json'])
+      expect(config.graph?.excludePaths).toEqual(['specd-sdd/'])
     })
 
-    it('rejects graph.paths when given a bare string instead of array', async () => {
+    it('rejects graph.includePaths when given a bare string instead of array', async () => {
       const configPath = await writeConfig(
         minimalYaml(`
 graph:
-  paths: "docs/**"
+  includePaths: "docs/**"
 `),
       )
 
       const loader = new FsConfigLoader({ configPath })
-      await expect(loader.load()).rejects.toThrow(/graph\.paths/)
+      await expect(loader.load()).rejects.toThrow(/graph\.includePaths/)
     })
   })
 

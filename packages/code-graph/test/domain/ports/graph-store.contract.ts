@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
+import { createDocumentNode } from '../../../src/domain/value-objects/document-node.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
@@ -50,6 +51,37 @@ export function graphStoreContractTests(
       expect(retrieved).toBeDefined()
       expect(retrieved!.path).toBe('src/main.ts')
       expect(retrieved!.language).toBe('typescript')
+    })
+
+    it('upserts and retrieves a document', async () => {
+      const document = createDocumentNode({
+        path: 'root:docs/guide.md',
+        configRelativePath: 'docs/guide.md',
+        contentHash: 'sha256:doc',
+        content: '# Guide\n\nHello graph',
+        workspace: 'root',
+      })
+
+      await store.upsertDocument(document)
+
+      const retrieved = await store.getDocument(document.path)
+      expect(retrieved).toBeDefined()
+      expect(retrieved!.configRelativePath).toBe('docs/guide.md')
+    })
+
+    it('removeDocument removes document nodes', async () => {
+      const document = createDocumentNode({
+        path: 'root:docs/guide.md',
+        configRelativePath: 'docs/guide.md',
+        contentHash: 'sha256:doc',
+        content: '# Guide\n\nHello graph',
+        workspace: 'root',
+      })
+
+      await store.upsertDocument(document)
+      await store.removeDocument(document.path)
+
+      expect(await store.getDocument(document.path)).toBeUndefined()
     })
 
     it('upserts a file with symbols and relations', async () => {
@@ -389,6 +421,27 @@ export function graphStoreContractTests(
       expect(stats.graphFingerprint).toBeNull()
     })
 
+    it('documentCount reports indexed documents separately from files', async () => {
+      await store.bulkLoad({
+        files: [],
+        documents: [
+          createDocumentNode({
+            path: 'root:docs/guide.md',
+            configRelativePath: 'docs/guide.md',
+            contentHash: 'sha256:doc',
+            content: '# Guide',
+            workspace: 'root',
+          }),
+        ],
+        symbols: [],
+        specs: [],
+        relations: [],
+      })
+      const stats = await store.getStatistics()
+      expect(stats.documentCount).toBe(1)
+      expect(stats.fileCount).toBe(0)
+    })
+
     it('graphFingerprint is set after bulkLoad', async () => {
       await store.bulkLoad({
         files: [],
@@ -428,6 +481,20 @@ export function graphStoreContractTests(
       const found = await store.findFilesByConfigRelativePath('packages/core/src/model.ts')
       expect(found).toHaveLength(1)
       expect(found[0]!.path).toBe('core:src/model.ts')
+    })
+
+    it('findDocumentsByConfigRelativePath returns exact matches', async () => {
+      const document = createDocumentNode({
+        path: 'root:docs/guide.md',
+        configRelativePath: 'docs/guide.md',
+        contentHash: 'sha256:doc',
+        content: '# Guide\n\nHello graph',
+        workspace: 'root',
+      })
+      await store.upsertDocument(document)
+      const found = await store.findDocumentsByConfigRelativePath('docs/guide.md')
+      expect(found).toHaveLength(1)
+      expect(found[0]!.path).toBe('root:docs/guide.md')
     })
 
     it('findFilesByConfigRelativePath returns empty for no match', async () => {
@@ -533,6 +600,30 @@ export function graphStoreContractTests(
       expect(all).toHaveLength(2)
     })
 
+    it('getAllDocuments returns all documents', async () => {
+      await store.upsertDocument(
+        createDocumentNode({
+          path: 'root:docs/a.md',
+          configRelativePath: 'docs/a.md',
+          contentHash: 'sha256:a',
+          content: 'alpha',
+          workspace: 'root',
+        }),
+      )
+      await store.upsertDocument(
+        createDocumentNode({
+          path: 'root:docs/b.md',
+          configRelativePath: 'docs/b.md',
+          contentHash: 'sha256:b',
+          content: 'beta',
+          workspace: 'root',
+        }),
+      )
+
+      const all = await store.getAllDocuments()
+      expect(all).toHaveLength(2)
+    })
+
     it('upserts and retrieves spec nodes with dependencies', async () => {
       const spec1 = createSpecNode({
         specId: 'core:core/config',
@@ -613,6 +704,78 @@ export function graphStoreContractTests(
       const retrieved = await store.getCoveredSymbols(spec.specId)
       expect(retrieved).toHaveLength(1)
       expect(retrieved[0]!.metadata).toEqual(metadata)
+    })
+
+    it('ranks exact symbol, spec, and document matches first', async () => {
+      const file = createFileNode({
+        path: 'core:src/change.ts',
+        configRelativePath: 'packages/core/src/change.ts',
+        language: 'typescript',
+        contentHash: 'sha256:file',
+        workspace: 'core',
+      })
+      const exactSymbol = createSymbolNode({
+        name: 'invalidate',
+        kind: SymbolKind.Method,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      })
+      const fuzzySymbol = createSymbolNode({
+        name: 'invalidateLater',
+        kind: SymbolKind.Method,
+        filePath: file.path,
+        line: 2,
+        column: 0,
+      })
+      const exactSpec = createSpecNode({
+        specId: 'core:change',
+        path: 'change',
+        title: 'Change',
+        description: 'Handles invalidation',
+        contentHash: 'sha256:spec1',
+        content: 'change spec content',
+        workspace: 'core',
+      })
+      const fuzzySpec = createSpecNode({
+        specId: 'core:change-log',
+        path: 'change-log',
+        title: 'Change log',
+        description: 'Mentions core:change',
+        contentHash: 'sha256:spec2',
+        content: 'core:change appears here too',
+        workspace: 'core',
+      })
+      const exactDocument = createDocumentNode({
+        path: 'root:docs/change.md',
+        configRelativePath: 'docs/change.md',
+        contentHash: 'sha256:doc1',
+        content: 'Change guide',
+        workspace: 'root',
+      })
+      const fuzzyDocument = createDocumentNode({
+        path: 'root:docs/change-log.md',
+        configRelativePath: 'docs/change-log.md',
+        contentHash: 'sha256:doc2',
+        content: 'This references docs/change.md',
+        workspace: 'root',
+      })
+
+      await store.bulkLoad({
+        files: [file],
+        documents: [exactDocument, fuzzyDocument],
+        symbols: [exactSymbol, fuzzySymbol],
+        specs: [exactSpec, fuzzySpec],
+        relations: [],
+      })
+
+      const symbolHits = await store.searchSymbols({ query: 'invalidate' })
+      const specHits = await store.searchSpecs({ query: 'core:change' })
+      const documentHits = await store.searchDocuments({ query: 'docs/change.md' })
+
+      expect(symbolHits[0]?.symbol.id).toBe(exactSymbol.id)
+      expect(specHits[0]?.spec.specId).toBe(exactSpec.specId)
+      expect(documentHits[0]?.document.path).toBe(exactDocument.path)
     })
   })
 }

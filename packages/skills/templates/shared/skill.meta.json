@@ -1,0 +1,5 @@
+{
+  "supportedCapabilities": ["mcp", "agents", "frontmatter"],
+  "requiredCapabilities": [],
+  "requiredSharedTemplates": []
+}
