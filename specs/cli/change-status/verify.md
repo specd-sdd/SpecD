@@ -269,3 +269,28 @@
 - **GIVEN** a change with an artifact that has `taskCompletion: { complete: 5, incomplete: 5, total: 10 }`
 - **WHEN** `specd change status <name>` is run
 - **THEN** the details section shows `tasks: 5/10` appended to that artifact's status line
+
+### Requirement: Basic info section
+
+#### Scenario: Text output omits standalone specs list
+
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** basic info includes name and state
+- **AND** it does NOT include a `specs:` line
+
+### Requirement: Specs and dependencies section
+
+#### Scenario: Text output shows specs and dependencies section
+
+- **GIVEN** a change with `specIds: ['core:a', 'core:b']`
+- **AND** `specDependsOn` has `{'core:a': ['core:c']}`
+- **WHEN** `specd change status <name>` is run
+- **THEN** stdout includes a `specs and dependencies:` section
+- **AND** it lists `core:a: core:c`
+- **AND** it lists `core:b: (none)`
+
+#### Scenario: JSON output includes specDependsOn
+
+- **GIVEN** a change with declared spec dependencies
+- **WHEN** `specd change status <name> --format json` is run
+- **THEN** the JSON output includes a `specDependsOn` field matching the change manifest

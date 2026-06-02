@@ -191,6 +191,8 @@ export interface GetStatusResult {
   readonly draftView?: DraftedChangeView
   /** Effective status for each artifact attached to the change. */
   readonly artifactStatuses: ArtifactStatusEntry[]
+  /** Per-spec declared dependencies from the change manifest. */
+  readonly specDependsOn: Record<string, string[]>
   /** Pre-computed lifecycle context. */
   readonly lifecycle: LifecycleContext
   /** Raw implementation-tracking projection. */
@@ -289,19 +291,29 @@ export class GetStatus {
       const artifactStatusByType = new Map(
         verdict.artifacts.map((artifact) => [artifact.type, artifact]),
       )
-      for (const [type, artifact] of change.artifacts) {
-        const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
-          key: file.key,
-          filename: file.filename,
-          state: file.status,
-          ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
-          hasDrift: file.hasDrift,
-          displayStatus: file.displayStatus(),
-        }))
+
+      for (const artifactType of schema.artifacts()) {
+        const type = artifactType.id
+        const artifact = change.getArtifact(type)
+        const files: ArtifactFileStatus[] = []
+
+        if (artifact !== null) {
+          for (const file of artifact.files.values()) {
+            files.push({
+              key: file.key,
+              filename: file.filename,
+              state: file.status,
+              ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+              hasDrift: file.hasDrift,
+              displayStatus: file.displayStatus(),
+            })
+          }
+        }
+
         artifactStatuses.push({
           type,
-          state: artifact.status,
-          effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? artifact.status,
+          state: artifact?.status ?? 'missing',
+          effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? 'missing',
           displayStatus: aggregateDisplayStatus(files),
           files,
         })
@@ -399,9 +411,15 @@ export class GetStatus {
       schemaInfo,
     }
 
+    const specDependsOn: Record<string, string[]> = {}
+    for (const [specId, deps] of change.specDependsOn) {
+      specDependsOn[specId] = [...deps]
+    }
+
     return {
       change,
       artifactStatuses,
+      specDependsOn,
       lifecycle,
       implementationTracking: projectImplementationTracking(change),
       review,
@@ -452,9 +470,15 @@ export class GetStatus {
       },
     }
 
+    const specDependsOn: Record<string, string[]> = {}
+    for (const [specId, deps] of draftView.specDependsOn) {
+      specDependsOn[specId] = [...deps]
+    }
+
     return {
       draftView,
       artifactStatuses,
+      specDependsOn,
       lifecycle,
       implementationTracking: { trackedFiles: [], links: [] },
       review: {

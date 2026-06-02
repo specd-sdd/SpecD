@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'UpdateSpecDeps logic for modification remains valid. Listing is handled via GetStatus or direct read in CLI.'

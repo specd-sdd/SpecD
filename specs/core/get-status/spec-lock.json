@@ -15,7 +15,7 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus"]
+      "symbols": ["GetStatusResult", "GetStatus"]
     }
   ]
 }

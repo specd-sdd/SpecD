@@ -310,6 +310,8 @@ describe('change validate', () => {
       change: { specIds: ['default:auth/login', 'default:auth/logout'] },
       artifactStatuses: [],
       lifecycle: {},
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })
@@ -332,6 +334,8 @@ describe('change validate', () => {
       change: { specIds: ['default:auth/login', 'default:auth/logout'] },
       artifactStatuses: [],
       lifecycle: {},
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute
@@ -361,6 +365,8 @@ describe('change validate', () => {
       change: { specIds: ['default:auth/login', 'default:auth/logout'] },
       artifactStatuses: [],
       lifecycle: {},
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
     kernel.specs.getActiveSchema.execute.mockResolvedValue(
       mockBatchSchema([
@@ -410,6 +416,8 @@ describe('change validate', () => {
       change: { specIds: ['default:auth/login'] },
       artifactStatuses: [],
       lifecycle: {},
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
     kernel.specs.getActiveSchema.execute.mockResolvedValue(
       mockBatchSchema([
@@ -456,6 +464,8 @@ describe('change validate', () => {
       change: { specIds: ['default:auth/login'] },
       artifactStatuses: [],
       lifecycle: {},
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
     kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
     kernel.changes.validate.execute.mockResolvedValue({ failures: [], warnings: [], files: [] })

@@ -28,6 +28,8 @@ function setup() {
   kernel.changes.status.execute.mockResolvedValue({
     change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
     artifactStatuses: [],
+    specDependsOn: {},
+    implementationTracking: { trackedFiles: [], links: [] },
   })
   const stdout = captureStdout()
   const stderr = captureStderr()

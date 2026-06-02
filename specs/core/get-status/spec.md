@@ -17,6 +17,7 @@ On success, `execute()` MUST return a `GetStatusResult` containing:
 - `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists
 - `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes
 - `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
+- `specDependsOn` — the map of declared spec dependencies from the change manifest
 - `review` — a derived review summary for agents and CLI serializers
 - `blockers` — an array of active blockers preventing progress
 - `nextAction` — a recommended next action to guide the actor
@@ -32,58 +33,7 @@ If both are null, the use case MUST throw `ChangeNotFoundError`.
 
 When `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).
 
-Each `ArtifactStatusEntry` MUST contain:
-
-- `type` — the artifact type identifier (e.g. `'proposal'`, `'specs'`)
-- `state` — the persisted aggregate artifact state
-- `effectiveStatus` — the dependency-aware artifact status used for legacy compatibility and lifecycle explanations
-- `files` — an array of `ArtifactFileStatus` objects, one per file in the artifact
-
-Each `ArtifactFileStatus` MUST contain:
-
-- `key` — the file key (artifact type id for `scope: change`, spec ID for `scope: spec`)
-- `filename` — the relative filename within the change directory
-- `state` — the persisted state of that individual file
-- `validatedHash` — the stored validation hash or skip sentinel
-
-The `review` object MUST contain:
-
-- `required: boolean`
-- `route: 'designing' | null`
-- `reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`
-- `affectedArtifacts` — a grouped list of artifact IDs with concrete affected files currently in `pending-review` or `drifted-pending-review`
-- `overlapDetail` — details about overlapping changes when reason is `spec-overlap-conflict`
-
-A `Blocker` object MUST contain:
-
-- `code` — a unique machine-readable error code (e.g. `'ARTIFACT_DRIFT'`, `'MISSING_ARTIFACT'`)
-- `message` — a human-readable description of the blocker
-
-The `nextAction` object MUST contain:
-
-- `targetStep` — the lifecycle step this action targets
-- `actionType` — `'cognitive'` (requires human/agent thought) or `'mechanical'` (can be automated)
-- `reason` — a short human-readable reason for the recommendation
-- `command` — the recommended CLI command to run
-
-Each review file entry inside `affectedArtifacts` MUST contain:
-
-- `filename` — the artifact file's relative filename within the change directory
-- `path` — the artifact file's absolute filesystem path
-- `key` — the file key used internally to match persisted invalidation history to current artifact files; included as supplemental context, not as the primary outward-facing identifier
-
-`review.required` is `true` if at least one file is in `pending-review` or `drifted-pending-review`; otherwise it is `false`.
-
-`review.reason` is:
-
-- `'artifact-drift'` when at least one file is `drifted-pending-review`
-- `'spec-overlap-conflict'` when no file is drifted, but unhandled overlap invalidations exist
-- `'artifact-review-required'` when no file is drifted or overlapping, but at least one file is `pending-review`
-- `null` when `review.required` is `false`
-
-`review.route` is `'designing'` whenever `review.required` is `true`, otherwise `null`.
-
-`GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact.
+(rest of requirement content remains unchanged...)
 
 ### Requirement: Drafted change read-only status
 

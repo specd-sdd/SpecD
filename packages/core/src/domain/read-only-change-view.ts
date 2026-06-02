@@ -16,6 +16,7 @@ export interface ReadOnlyChangeView {
   readonly state: ChangeState
   readonly specIds: readonly string[]
   readonly workspaces: readonly string[]
+  readonly specDependsOn: ReadonlyMap<string, readonly string[]>
   readonly schemaName: string
   readonly schemaVersion: number
   readonly artifacts: ReadonlyMap<string, ChangeArtifact>
@@ -90,6 +91,10 @@ class ReadOnlyChangeFacade implements ReadOnlyChangeView {
 
   get workspaces(): readonly string[] {
     return this._change.workspaces
+  }
+
+  get specDependsOn(): ReadonlyMap<string, readonly string[]> {
+    return this._change.specDependsOn
   }
 
   get schemaName(): string {

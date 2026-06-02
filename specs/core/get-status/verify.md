@@ -43,6 +43,12 @@
 - **THEN** the result includes a `blockers` array
 - **AND** it contains at least one entry with `code: 'ARTIFACT_DRIFT'`
 
+#### Scenario: Result includes specDependsOn
+
+- **GIVEN** a change with declared spec dependencies in its manifest
+- **WHEN** `execute()` is called for that change
+- **THEN** `result.specDependsOn` matches the change's `specDependsOn` map
+
 ### Requirement: Drafted change read-only status
 
 #### Scenario: Draft-only name returns draftView
