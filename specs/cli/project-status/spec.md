@@ -12,18 +12,20 @@ The CLI MUST provide a `project status` command under the `project` subcommand t
 
 ### Requirement: includes workspace information
 
-The command output MUST include:
+The command output MUST include rich workspace information obtained via the `ListWorkspaces` use case:
 
 - Project root path
 - Schema reference
-- Workspaces: for each, name, prefix, ownership (owned|shared|readOnly), isExternal (boolean), and codeRoot (absolute path)
+- Workspaces: for each, name, prefix, ownership (`owned`|`shared`|`readOnly`), `isExternal` (boolean), and `codeRoot` (absolute path).
 
 ### Requirement: includes spec counts
 
-The command output MUST include:
+The command output MUST include spec counts obtained efficiently through the `SpecRepository.count()` method for each orchestrated workspace:
 
 - Total spec count across all workspaces
 - Spec count per workspace
+
+The command SHALL NOT load full spec metadata or artifacts to perform this count.
 
 ### Requirement: includes change counts
 
@@ -93,4 +95,6 @@ When `--format toon` is provided, output MUST be TOON-formatted.
 
 ## Spec Dependencies
 
-_none_
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure and repositories
+- [`core:list-drafts`](../../core/list-drafts/spec.md) — existing draft counting behavior remains part of project status
+- [`core:list-changes`](../../core/list-changes/spec.md) — existing active-change counting behavior remains part of project status

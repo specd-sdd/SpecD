@@ -7,20 +7,16 @@
     "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
-    "skills:skill-repository"
+    "skills:skill-repository",
+    "skills:resolve-bundle"
   ],
   "implementation": [
-    {
-      "file": "plugin-agent-claude:test/install-skills.spec.ts",
-      "symbols": ["InstallSkills"]
-    },
     {
       "file": "plugin-agent-claude:src/application/use-cases/install-skills.ts",
       "symbols": ["InstallSkills"]
     },
     {
-      "file": "plugin-agent-claude:src/application/use-cases/shared-folder.ts",
-      "symbols": ["resolveSharedFolder"]
+      "file": "plugin-agent-claude:test/install-skills.spec.ts"
     }
   ]
 }

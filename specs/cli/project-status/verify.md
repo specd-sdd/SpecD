@@ -12,19 +12,19 @@
 
 ### Requirement: includes workspace information
 
-#### Scenario: Output includes all workspace details
+#### Scenario: Workspaces obtained from orchestrator
 
-- **GIVEN** a project with multiple workspaces
 - **WHEN** `specd project status` is executed
-- **THEN** each workspace shows name, prefix, ownership, isExternal status, and codeRoot path
+- **THEN** it obtains the list of workspaces via `ListWorkspaces`
+- **AND** the output includes rich information for each orchestrated workspace
 
 ### Requirement: includes spec counts
 
-#### Scenario: Output includes spec counts per workspace
+#### Scenario: Spec counts use efficient repository counting
 
-- **GIVEN** a project with multiple workspaces containing specs
-- **WHEN** `specd project status` is run
-- **THEN** output includes total spec count and per-workspace counts
+- **WHEN** `specd project status` calculates spec counts
+- **THEN** it calls `SpecRepository.count()` for each workspace
+- **AND** it does not perform full metadata extraction
 
 ### Requirement: includes change counts
 

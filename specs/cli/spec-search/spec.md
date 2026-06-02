@@ -22,11 +22,8 @@ specd specs search <query> [--workspace <name>] [--graph] [--summary] [--format 
 
 The command MUST use the following search strategy:
 
-1. **Graph-first**: Attempt to use the code graph's spec search facility. If the graph is available and not stale, use it for fast, precise search results.
-2. **Core fallback**: When the graph is stale or unavailable and `--graph` is NOT set, fall back to `SearchSpecs.execute(query, options)` from `@specd/core`, which searches spec content via `SpecRepository.search()`. The command MUST print a warning to stderr indicating the fallback and that results may be less precise.
-3. **Graph-only error**: When `--graph` is set and the graph is stale or unavailable, the command MUST exit with code 1 and print an error message to stderr.
-
-In both paths, the search MUST cover spec content (title, description, spec.md body).
+1. **Graph-first**: Attempt to use the code graph's spec search facility.
+2. **Core fallback**: When the graph is stale or unavailable, fall back to `SearchSpecs.execute()`. This use case SHALL obtain the orchestrated project structure via `ListWorkspaces` to perform the repository-based search.
 
 ### Requirement: Workspace filtering
 
@@ -100,6 +97,7 @@ When no results match, the output is `[]`.
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`default:_global/spec-layout`](../../../_global/spec-layout/spec.md) — spec directory structure and file naming conventions
-- [`core:search-specs`](../../core/search-specs/spec.md) — core use case for repository-based spec search (fallback path)
+- [`cli:entrypoint`](../entrypoint/spec.md)
+- [`default:_global/spec-layout`](../../../_global/spec-layout/spec.md)
+- [`core:search-specs`](../../core/search-specs/spec.md)
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md)

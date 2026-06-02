@@ -7,20 +7,16 @@
     "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
-    "skills:skill-templates-source"
+    "skills:skill-templates-source",
+    "skills:resolve-bundle"
   ],
   "implementation": [
-    {
-      "file": "plugin-agent-copilot:test/install-skills.spec.ts",
-      "symbols": ["InstallSkills"]
-    },
     {
       "file": "plugin-agent-copilot:src/application/use-cases/install-skills.ts",
       "symbols": ["InstallSkills"]
     },
     {
-      "file": "plugin-agent-copilot:src/application/use-cases/shared-folder.ts",
-      "symbols": ["resolveSharedFolder"]
+      "file": "plugin-agent-copilot:test/install-skills.spec.ts"
     }
   ]
 }

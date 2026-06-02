@@ -3,19 +3,18 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["plugin-agent-opencode:plugin-agent", "default:_global/commits"],
+  "dependsOn": [
+    "plugin-agent-opencode:plugin-agent",
+    "default:_global/commits",
+    "skills:resolve-bundle"
+  ],
   "implementation": [
-    {
-      "file": "plugin-agent-standard:test/install-skills.spec.ts",
-      "symbols": ["InstallSkills"]
-    },
     {
       "file": "plugin-agent-standard:src/application/use-cases/install-skills.ts",
       "symbols": ["InstallSkills"]
     },
     {
-      "file": "plugin-agent-standard:src/application/use-cases/shared-folder.ts",
-      "symbols": ["resolveSharedFolder"]
+      "file": "plugin-agent-standard:test/install-skills.spec.ts"
     }
   ]
 }

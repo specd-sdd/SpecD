@@ -6,12 +6,11 @@
   "dependsOn": ["core:config", "skills:skill-bundle", "skills:skill-repository-port"],
   "implementation": [
     {
-      "file": "skills:test/resolve-bundle.spec.ts",
-      "symbols": ["ResolveBundle"]
+      "file": "skills:src/application/use-cases/resolve-bundle.ts",
+      "symbols": ["ResolveBundle", "ResolveBundleInput", "ResolveBundleOutput"]
     },
     {
-      "file": "skills:src/application/use-cases/resolve-bundle.ts",
-      "symbols": ["ResolveBundleInput", "ResolveBundle"]
+      "file": "skills:test/resolve-bundle.spec.ts"
     }
   ]
 }

@@ -51,7 +51,7 @@
     {
       "requirement": "WorkspaceIndexTarget",
       "rules": [
-        "`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:\n\n```ts\ninterface ProjectGraphConfig {\n  readonly includePaths?: readonly string[]\n  readonly excludePaths?: readonly string[]\n  readonly workspaces?: ReadonlyMap<string, {\n    readonly allowedPaths?: readonly string[]\n    readonly excludePaths?: readonly string[]\n    readonly respectGitignore?: boolean\n  }>\n}\n\ninterface IndexOptions {\n  readonly projectRoot: string\n  readonly workspaces: readonly ProjectWorkspace[]\n  readonly graphConfig: ProjectGraphConfig\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n  readonly vcsRef?: string\n}\n```\n\nThe `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.\n\n`ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`."
+        "`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:\n\n```ts\ninterface ProjectGraphConfig {\n  readonly includePaths?: readonly string[]\n  readonly excludePaths?: readonly string[]\n  readonly workspaces?: ReadonlyMap<\n    string,\n    {\n      readonly allowedPaths?: readonly string[]\n      readonly excludePaths?: readonly string[]\n      readonly respectGitignore?: boolean\n    }\n  >\n}\n\ninterface IndexOptions {\n  readonly projectRoot: string\n  readonly workspaces: readonly ProjectWorkspace[]\n  readonly graphConfig: ProjectGraphConfig\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n  readonly vcsRef?: string\n}\n```\n\nThe `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.\n\n`ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`."
       ]
     },
     {
@@ -277,7 +277,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5835ae7f0ee4525cbddc06f5c123ce8d40d9ea93b6bd5e555c58c21b4ae5468b",
+    "spec.md": "sha256:0783697b0cc03378f2d58929ab97602910a73e121f201e8592e7020a5d9c8d53",
     "verify.md": "sha256:f39fbe63305258331b5ac34abad305822e0ee2c511f9695a3f6127ff8f9db312"
   },
   "generatedBy": "core"
