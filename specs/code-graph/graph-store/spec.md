@@ -18,7 +18,7 @@ Every `GraphStore` implementation SHALL support the code-graph package's minimum
 
 At minimum, the abstract store contract MUST support:
 
-- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths
+- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths, and the full textual **content**
 - symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries
 - spec nodes carrying the `SpecNode` data needed by spec indexing and search
 - **document nodes** carrying the `DocumentNode` data (textual non-code resources)
@@ -27,7 +27,11 @@ At minimum, the abstract store contract MUST support:
 
 `COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.
 
+The `files` storage SHALL persist the full textual content of indexed source files to enable match-aware snippet extraction without re-reading from disk at query time.
+
 The store MUST provide operations for upserting and removing `DocumentNode` entries, as well as searching them via full-text search.
+
+The store SHALL support incremental indexing by matching `contentHash` values before updating node properties or relations.
 
 Backends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape.
 
@@ -121,6 +125,8 @@ These follow the same atomic pattern as `upsertFile()` and `removeFile()`.
 - **`searchSpecs(options: SearchOptions)`** — search spec title, description, and content, returning results ranked by relevance in descending order
 - **`searchDocuments(options: SearchOptions)`** — search document paths and textual content, returning results ranked by relevance in descending order
 - **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes
+
+Search results MUST return match-aware **snippets** and the corresponding 1-based **line range** (`startLine` to `endLine`) from the source content.
 
 When a query exactly matches a canonical identity (Spec ID, Symbol Name/ID, Document Path), the store MUST prioritize that exact match at the top of the results, regardless of generic relevance scores.
 

@@ -90,11 +90,13 @@ consumers MUST depend on `code-graph:graph-store` instead of this spec.
 
 The SQLite schema SHALL persist the logical node kinds required by the abstract graph model:
 
-- `File` nodes for indexed source files
+- `File` nodes for indexed source files, including persisted source content used for symbol snippet extraction
 - `Symbol` nodes for extracted code symbols
 - `Spec` nodes for indexed specification documents
 - **`Document`** nodes for textual non-code resources
 - `Meta` records for store-level metadata
+
+The `File` table SHALL include the source content needed to derive symbol snippets from file-backed context.
 
 The `Document` table SHALL include columns for `path` (PK), `configRelativePath`, `contentHash`, `content`, and `workspace`.
 
@@ -127,8 +129,17 @@ The adapter MUST:
 - prioritize **exact identity matches** (Spec ID, Symbol Name/ID, Document Path) by boosting results where the query matches the primary identity column exactly
 - use BM25 ranking for remaining textual matches across all searchable columns
 - sanitize and join multi-token queries using `OR` logic for broad discovery
+- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches
 
-The SQLite FTS schema MUST include a **`document_fts`** virtual table covering `Document.path` and `Document.content`.
+The SQLite FTS schema MUST include:
+
+- **`symbol_fts`** virtual table covering `Symbol.name` and `Symbol.comment`
+- **`spec_fts`** virtual table covering `Spec.title`, `Spec.description`, and `Spec.content`
+- **`document_fts`** virtual table covering `Document.path` and `Document.content`
+
+The implementation MAY use stemming or other SQLite-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.
+
+Persisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change.
 
 ### Requirement: Transactional mutation model
 

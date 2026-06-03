@@ -10,17 +10,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/index.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/spec-node.ts",
-      "symbols": ["createSpecNode"]
-    },
-    {
-      "file": "code-graph:test/domain/value-objects/file-node.spec.ts"
-    },
-    {
-      "file": "code-graph:test/domain/value-objects/symbol-node.spec.ts"
+      "file": "code-graph:src/domain/value-objects/file-node.ts",
+      "symbols": ["FileNode", "createFileNode"]
     }
   ]
 }

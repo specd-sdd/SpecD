@@ -15,16 +15,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/_shared/resolve-effective-graph-config.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts"
-    },
-    {
-      "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
+      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+      "symbols": ["IndexCodeGraph"]
     }
   ]
 }

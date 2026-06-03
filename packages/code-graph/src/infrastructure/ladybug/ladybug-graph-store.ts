@@ -350,13 +350,14 @@ export class LadybugGraphStore extends GraphStore {
 
       await runPrepared(
         conn,
-        `CREATE (f:File {path: $path, configRelativePath: $configRelativePath, language: $language, contentHash: $contentHash, workspace: $workspace})`,
+        `CREATE (f:File {path: $path, configRelativePath: $configRelativePath, language: $language, contentHash: $contentHash, workspace: $workspace, content: $content})`,
         {
           path: file.path,
           configRelativePath: file.configRelativePath,
           language: file.language,
           contentHash: file.contentHash,
           workspace: file.workspace,
+          content: file.content ?? '',
         },
       )
 
@@ -548,10 +549,10 @@ export class LadybugGraphStore extends GraphStore {
           const batch = data.files.slice(i, i + batchSize)
           const fileCsv = prefix + `files-${i}.csv`
           csvFiles.push(fileCsv)
-          const fileRows = ['path,configRelativePath,language,contentHash,workspace']
+          const fileRows = ['path,configRelativePath,language,contentHash,workspace,content']
           for (const f of batch) {
             fileRows.push(
-              `${csvEscape(f.path)},${csvEscape(f.configRelativePath)},${csvEscape(f.language)},${csvEscape(f.contentHash)},${csvEscape(f.workspace)}`,
+              `${csvEscape(f.path)},${csvEscape(f.configRelativePath)},${csvEscape(f.language)},${csvEscape(f.contentHash)},${csvEscape(f.workspace)},${csvEscape(f.content ?? '')}`,
             )
           }
           writeFileSync(fileCsv, fileRows.join('\n') + '\n')
@@ -749,19 +750,11 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {path: $path}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+      `MATCH (f:File {path: $path}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace, f.content AS content`,
       { path },
     )
     if (rows.length === 0 || !rows[0]) return undefined
-    const row = rows[0]
-    return {
-      path: row['path'] as string,
-      configRelativePath: (row['configRelativePath'] as string) ?? '',
-      language: row['language'] as string,
-      contentHash: row['contentHash'] as string,
-      workspace: row['workspace'] as string,
-      embedding: undefined,
-    }
+    return this.rowToFile(rows[0])
   }
 
   /**
@@ -789,17 +782,10 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {configRelativePath: $configRelativePath}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace`,
+      `MATCH (f:File {configRelativePath: $configRelativePath}) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace, f.content AS content`,
       { configRelativePath },
     )
-    return rows.map((row) => ({
-      path: row['path'] as string,
-      configRelativePath: (row['configRelativePath'] as string) ?? '',
-      language: row['language'] as string,
-      contentHash: row['contentHash'] as string,
-      workspace: row['workspace'] as string,
-      embedding: undefined,
-    }))
+    return rows.map((row) => this.rowToFile(row))
   }
 
   /**
@@ -1272,16 +1258,9 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      'MATCH (f:File) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace',
+      'MATCH (f:File) RETURN f.path AS path, f.configRelativePath AS configRelativePath, f.language AS language, f.contentHash AS contentHash, f.workspace AS workspace, f.content AS content',
     )
-    return rows.map((r) => ({
-      path: r['path'] as string,
-      configRelativePath: (r['configRelativePath'] as string) ?? '',
-      language: r['language'] as string,
-      contentHash: r['contentHash'] as string,
-      workspace: r['workspace'] as string,
-      embedding: undefined,
-    }))
+    return rows.map((r) => this.rowToFile(r))
   }
 
   /**
@@ -1340,7 +1319,15 @@ export class LadybugGraphStore extends GraphStore {
    */
   async searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     this.ensureOpen()
     const top = options.limit ?? 20
 
@@ -1392,10 +1379,61 @@ export class LadybugGraphStore extends GraphStore {
       `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.parentId AS parentId, node.line AS line, node.col AS col, node.comment AS comment, (score + CASE WHEN node.id = $rawQuery THEN 1000000.0 ELSE 0.0 END + CASE WHEN node.name = $rawQuery THEN 1000.0 ELSE 0.0 END) AS score ORDER BY score DESC LIMIT ${String(top)}`,
       params,
     )
-    return rows.map((r) => ({
-      symbol: this.rowToSymbol(r),
-      score: r['score'] as number,
-    }))
+
+    const results: Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
+    for (const r of rows) {
+      const symbol = this.rowToSymbol(r)
+      const score = r['score'] as number
+      let snippet = ''
+      let startLine = 1
+      let endLine = 1
+
+      // Fetch file content for snippet
+      const fileRows = await execPrepared(
+        this.conn!,
+        `MATCH (f:File {path: $path}) RETURN f.content AS content`,
+        { path: symbol.filePath },
+      )
+      if (fileRows.length > 0 && fileRows[0]!['content']) {
+        const content = fileRows[0]!['content'] as string
+        const lines = content.split(/\r?\n/)
+        const targetLine = symbol.line - 1 // 1-based to 0-based
+
+        // Expand upwards for 2 non-blank lines
+        let start = targetLine
+        let nonBlankAbove = 0
+        while (start > 0 && nonBlankAbove < 2) {
+          start--
+          if (lines[start]?.trim().length !== 0) nonBlankAbove++
+        }
+
+        // Expand downwards for 2 non-blank lines
+        let end = targetLine
+        let nonBlankBelow = 0
+        while (end < lines.length - 1 && nonBlankBelow < 2) {
+          end++
+          if (lines[end]?.trim().length !== 0) nonBlankBelow++
+        }
+
+        // Trim external leading/trailing blank lines of the final range
+        while (start < end && lines[start]?.trim().length === 0) start++
+        while (end > start && lines[end]?.trim().length === 0) end--
+
+        snippet = lines.slice(start, end + 1).join('\n')
+        startLine = start + 1
+        endLine = end + 1
+      }
+
+      results.push({ symbol, score, snippet, startLine, endLine })
+    }
+
+    return results
   }
 
   /**
@@ -1404,7 +1442,11 @@ export class LadybugGraphStore extends GraphStore {
    * @param options - Search options including query, limit, and filters.
    * @returns Matching specs with BM25 scores, ordered by relevance.
    */
-  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  > {
     this.ensureOpen()
     const top = options.limit ?? 20
 
@@ -1444,7 +1486,14 @@ export class LadybugGraphStore extends GraphStore {
       params,
     )
 
-    const results: Array<{ spec: SpecNode; score: number }> = []
+    const results: Array<{
+      spec: SpecNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
+    const terms = options.query.split(/\s+/).filter((t) => t.length > 0)
     for (const row of rows) {
       const specId = row['specId'] as string
       const depRows = await execPrepared(
@@ -1452,6 +1501,8 @@ export class LadybugGraphStore extends GraphStore {
         `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
         { specId },
       )
+      const content = (row['content'] as string) ?? ''
+      const { snippet, startLine, endLine } = this.extractMatchSnippet(content, terms)
       results.push({
         spec: {
           specId,
@@ -1459,11 +1510,14 @@ export class LadybugGraphStore extends GraphStore {
           title: row['title'] as string,
           description: (row['description'] as string) ?? '',
           contentHash: row['contentHash'] as string,
-          content: (row['content'] as string) ?? '',
+          content,
           dependsOn: depRows.map((r) => r['target'] as string),
           workspace: (row['workspace'] as string) ?? '',
         },
         score: row['score'] as number,
+        snippet,
+        startLine,
+        endLine,
       })
     }
     return results
@@ -1476,7 +1530,15 @@ export class LadybugGraphStore extends GraphStore {
    */
   async searchDocuments(
     options: SearchOptions,
-  ): Promise<Array<{ document: DocumentNode; score: number }>> {
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     this.ensureOpen()
     const top = options.limit ?? 20
     const rawQuery = options.query.trim().toLowerCase()
@@ -1484,7 +1546,13 @@ export class LadybugGraphStore extends GraphStore {
 
     const terms = rawQuery.split(/\s+/).filter((term) => term.length > 0)
     const documents = await this.getAllDocuments()
-    const results: Array<{ document: DocumentNode; score: number }> = []
+    const results: Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
 
     for (const document of documents) {
       const text =
@@ -1504,7 +1572,15 @@ export class LadybugGraphStore extends GraphStore {
         1 +
         (document.path.toLowerCase() === rawQuery ? 1_000_000 : 0) +
         (document.configRelativePath.toLowerCase() === rawQuery ? 1_000 : 0)
-      results.push({ document, score })
+
+      const { snippet, startLine, endLine } = this.extractMatchSnippet(document.content, terms)
+      results.push({
+        document,
+        score,
+        snippet,
+        startLine,
+        endLine,
+      })
     }
 
     return results.sort((a, b) => b.score - a.score).slice(0, top)
@@ -1755,6 +1831,66 @@ export class LadybugGraphStore extends GraphStore {
   private async updateMeta(conn: Connection, key: string, value: string): Promise<void> {
     await runPrepared(conn, `MATCH (m:Meta {key: $key}) DELETE m`, { key })
     await runPrepared(conn, `CREATE (m:Meta {key: $key, value: $value})`, { key, value })
+  }
+
+  /**
+   * Extracts a match-centered snippet from text.
+   * @param text - The full text.
+   * @param terms - The search terms.
+   * @returns A snippet of approximately 200 characters around the best match and line range.
+   */
+  private extractMatchSnippet(
+    text: string,
+    terms: string[],
+  ): { snippet: string; startLine: number; endLine: number } {
+    if (terms.length === 0) {
+      const snippet = text.slice(0, 200)
+      return { snippet, startLine: 1, endLine: snippet.split(/\r?\n/).length }
+    }
+
+    const lowerText = text.toLowerCase()
+    let bestPos = 0
+    let bestScore = -1
+
+    for (let i = 0; i < lowerText.length; i += 20) {
+      const window = lowerText.slice(i, i + 300)
+      let score = 0
+      for (const term of terms) {
+        if (window.includes(term.toLowerCase())) score++
+      }
+      if (score > bestScore) {
+        bestScore = score
+        bestPos = i
+      }
+      if (score === terms.length) break
+    }
+
+    const start = Math.max(0, bestPos - 60)
+    const end = Math.min(text.length, bestPos + 340)
+    let snippet = text.slice(start, end)
+    const startLine = text.substring(0, start).split(/\r?\n/).length
+    const endLine = startLine + snippet.split(/\r?\n/).length - 1
+
+    if (start > 0) snippet = '...' + snippet
+    if (end < text.length) snippet = snippet + '...'
+    return { snippet, startLine, endLine }
+  }
+
+  /**
+   * Converts a database row record into a FileNode value object.
+   * @param row - The row containing file fields.
+   * @returns The constructed file node.
+   */
+  private rowToFile(row: Record<string, LbugValue>): FileNode {
+    return {
+      path: row['path'] as string,
+      configRelativePath: (row['configRelativePath'] as string) ?? '',
+      language: row['language'] as string,
+      contentHash: row['contentHash'] as string,
+      workspace: row['workspace'] as string,
+      embedding: undefined,
+      content: (row['content'] as string) || undefined,
+    }
   }
 
   /**

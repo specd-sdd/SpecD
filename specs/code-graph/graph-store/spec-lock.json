@@ -15,9 +15,6 @@
       "symbols": ["GraphStore"]
     },
     {
-      "file": "code-graph:test/domain/ports/graph-store.contract.ts"
-    },
-    {
       "file": "code-graph:test/helpers/in-memory-graph-store.ts"
     }
   ]

@@ -331,7 +331,15 @@ export class CodeGraphProvider {
    */
   async searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     return this.store.searchSymbols(options)
   }
 
@@ -339,9 +347,13 @@ export class CodeGraphProvider {
    * Full-text search across specs (title, description, and content).
    * Filters are applied at the store level before LIMIT.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching specs with BM25 scores, ordered by relevance.
+   * @returns Matching specs with BM25 scores and snippets, ordered by relevance.
    */
-  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  > {
     return this.store.searchSpecs(options)
   }
 
@@ -349,11 +361,19 @@ export class CodeGraphProvider {
    * Full-text search across documents (path and content).
    * Filters are applied at the store level before LIMIT.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching documents with scores ordered by relevance.
+   * @returns Matching documents with scores and snippets, ordered by relevance.
    */
   async searchDocuments(
     options: SearchOptions,
-  ): Promise<Array<{ document: DocumentNode; score: number }>> {
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     return this.store.searchDocuments(options)
   }
 }

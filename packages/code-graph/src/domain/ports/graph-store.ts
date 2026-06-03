@@ -317,31 +317,51 @@ export abstract class GraphStore {
    * Filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied
    * before LIMIT in the query — no post-query filtering needed.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching symbols with BM25 scores, ordered by relevance.
+   * @returns Matching symbols with BM25 scores and snippets, ordered by relevance.
    */
   abstract searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>>
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  >
 
   /**
    * Full-text search across specs (title, description, and content).
    * Filters (workspace, excludePaths, excludeWorkspaces) are applied
    * before LIMIT in the query — no post-query filtering needed.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching specs with BM25 scores, ordered by relevance.
+   * @returns Matching specs with BM25 scores and snippets, ordered by relevance.
    */
-  abstract searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>
+  abstract searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  >
 
   /**
    * Full-text search across documents (path and content).
    * Filters (filePattern, workspace, excludePaths, excludeWorkspaces) are applied
    * before LIMIT in the query — no post-query filtering needed.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching documents with scores ordered by relevance.
+   * @returns Matching documents with scores and snippets, ordered by relevance.
    */
   abstract searchDocuments(
     options: SearchOptions,
-  ): Promise<Array<{ document: DocumentNode; score: number }>>
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  >
 
   /**
    * Rebuilds full-text search indexes after data changes.

@@ -797,6 +797,7 @@ export class IndexCodeGraph {
                 language,
                 contentHash: hash,
                 workspace: wsName,
+                content,
               }),
             )
             fileLanguages.set(prefixedPath, language)

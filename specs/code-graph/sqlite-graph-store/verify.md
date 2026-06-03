@@ -64,10 +64,14 @@
 #### Scenario: Logical node kinds survive backend-specific layout choices
 
 - **WHEN** files, symbols, specs, and metadata are persisted by `SQLiteGraphStore`
-- **THEN** the abstract graph-store queries can retrieve the expected logical node
-  kinds
-- **AND** callers do not need to know whether SQLite uses one table per kind or
-  another internal layout
+- **THEN** the abstract graph-store queries can retrieve the expected logical node kinds
+- **AND** callers do not need to know whether SQLite uses one table per kind or another internal layout
+
+#### Scenario: File node persistence includes source content for symbol snippets
+
+- **WHEN** a source file is persisted by `SQLiteGraphStore`
+- **THEN** the persisted file record includes source content sufficient to derive symbol snippets from file-backed context
+- **AND** symbol preview extraction does not require a separate persisted snippet field per symbol
 
 ### Requirement: Persisted relation storage
 
@@ -89,8 +93,7 @@
 
 - **GIVEN** symbols and specs have been indexed into SQLite
 - **WHEN** abstract search methods are called
-- **THEN** results come back in descending relevance order from SQLite-backed full-text
-  search structures
+- **THEN** results come back in descending relevance order from SQLite-backed full-text search structures
 
 #### Scenario: Multi-token search uses OR logic for discovery
 
@@ -105,6 +108,12 @@
 - **WHEN** `searchSymbols({ query: 'effective status' })` is called
 - **THEN** symbol B has a higher relevance score than symbol A
 - **AND** symbol B appears first in the results
+
+#### Scenario: Symbol result derives snippet from file content even for comment-driven hit
+
+- **GIVEN** a symbol search hit is returned because of matched comment text
+- **WHEN** `searchSymbols(...)` returns the symbol
+- **THEN** the result snippet is derived from persisted file source content at the symbol location
 
 #### Scenario: FTS structures can be refreshed after bulk writes
 
@@ -131,6 +140,12 @@
 - **GIVEN** a spec with ID `core:change`
 - **WHEN** searching for `core:change` in the SQLite backend
 - **THEN** that spec is the first result returned
+
+#### Scenario: Persisted file content does not create SQLite file search category
+
+- **GIVEN** SQLite persists file source content for snippet extraction
+- **WHEN** search APIs are used through the current graph-store contract
+- **THEN** there is still no separate file full-text result category introduced by this change
 
 ### Requirement: Transactional mutation model
 

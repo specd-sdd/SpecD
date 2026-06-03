@@ -53,6 +53,11 @@
 - **THEN** the physical `Symbol` table includes both the declared `name` and the backend-specific `searchName`
 - **AND** storage-agnostic consumers still observe the symbol through the abstract `SymbolNode`
 
+#### Scenario: File table persists source content for symbol snippets
+
+- **WHEN** a source file is persisted by `LadybugGraphStore`
+- **THEN** the physical `File` table includes source content sufficient to derive symbol snippets from file-backed context
+
 ### Requirement: Relationship tables
 
 #### Scenario: COVERS_FILE and COVERS_SYMBOL are materialized in the schema
@@ -89,11 +94,23 @@
 - **THEN** symbol B has a higher relevance score than symbol A
 - **AND** symbol B appears first in the results
 
+#### Scenario: Symbol result derives snippet from file content even for comment-driven hit
+
+- **GIVEN** a symbol search hit is returned because of matched comment text
+- **WHEN** `searchSymbols(...)` returns the symbol
+- **THEN** the result snippet is derived from persisted file source content at the symbol location
+
 #### Scenario: Exact identity matches boosted in Ladybug FTS
 
 - **GIVEN** a document with path `root:package.json`
 - **WHEN** searching for `root:package.json` in the Ladybug backend
 - **THEN** that document is the first result returned
+
+#### Scenario: Persisted file content does not create Ladybug file search category
+
+- **GIVEN** Ladybug persists file source content for snippet extraction
+- **WHEN** search APIs are used through the current graph-store contract
+- **THEN** there is still no separate file full-text result category introduced by this change
 
 ### Requirement: Schema versioning
 

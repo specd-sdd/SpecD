@@ -196,7 +196,7 @@ export class SQLiteGraphStore extends GraphStore {
 
   async getFile(path: string): Promise<FileNode | undefined> {
     const row = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, embedding FROM files WHERE path = ?',
+      'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE path = ?',
     ).get(path) as
       | {
           path: string
@@ -205,6 +205,7 @@ export class SQLiteGraphStore extends GraphStore {
           content_hash: string
           workspace: string
           embedding: Buffer | null
+          content: string | null
         }
       | undefined
     return row === undefined ? undefined : this.mapFileRow(row)
@@ -227,7 +228,7 @@ export class SQLiteGraphStore extends GraphStore {
 
   async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
     const rows = this.statement(
-      'SELECT path, config_relative_path, language, content_hash, workspace, embedding FROM files WHERE config_relative_path = ?',
+      'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE config_relative_path = ?',
     ).all(configRelativePath) as Array<{
       path: string
       config_relative_path: string
@@ -235,6 +236,7 @@ export class SQLiteGraphStore extends GraphStore {
       content_hash: string
       workspace: string
       embedding: Buffer | null
+      content: string | null
     }>
     return rows.map((row) => this.mapFileRow(row))
   }
@@ -505,7 +507,7 @@ export class SQLiteGraphStore extends GraphStore {
   async getAllFiles(): Promise<FileNode[]> {
     const rows = this.ensureOpen()
       .prepare(
-        'SELECT path, config_relative_path, language, content_hash, workspace, embedding FROM files',
+        'SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files',
       )
       .all() as Array<{
       path: string
@@ -514,6 +516,7 @@ export class SQLiteGraphStore extends GraphStore {
       content_hash: string
       workspace: string
       embedding: Buffer | null
+      content: string | null
     }>
     return rows.map((row) => this.mapFileRow(row))
   }
@@ -551,7 +554,15 @@ export class SQLiteGraphStore extends GraphStore {
 
   async searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     const query = sanitizeFtsQuery(options.query)
     if (query.length === 0) return []
 
@@ -568,6 +579,7 @@ export class SQLiteGraphStore extends GraphStore {
             s.line,
             s.column_number,
             s.comment,
+            f.content as file_content,
             (
               CASE
                 WHEN lower(s.id) = ? THEN 1000000
@@ -577,6 +589,7 @@ export class SQLiteGraphStore extends GraphStore {
             ) + (-bm25(symbol_fts)) AS score
           FROM symbol_fts
           INNER JOIN symbols s ON s.id = symbol_fts.id
+          LEFT JOIN files f ON s.file_path = f.path
           WHERE symbol_fts MATCH ?
           ORDER BY score DESC
         `,
@@ -590,6 +603,7 @@ export class SQLiteGraphStore extends GraphStore {
       line: number
       column_number: number
       comment: string | null
+      file_content: string | null
       score: number
     }>
 
@@ -607,16 +621,62 @@ export class SQLiteGraphStore extends GraphStore {
       if (options.workspace !== undefined && !row.file_path.startsWith(options.workspace + ':')) {
         return false
       }
+      if (options.excludeWorkspaces !== undefined) {
+        const wsName = row.file_path.substring(0, row.file_path.indexOf(':'))
+        if (options.excludeWorkspaces.includes(wsName)) return false
+      }
       return !matchesExclude(row.file_path, options.excludePaths, options.excludeWorkspaces)
     })
 
-    return filtered.slice(0, options.limit ?? 20).map((row) => ({
-      symbol: this.mapSymbolRow(row),
-      score: row.score,
-    }))
+    return filtered.slice(0, options.limit ?? 20).map((row) => {
+      let snippet = ''
+      let startLine = 1
+      let endLine = 1
+
+      if (row.file_content !== null) {
+        const lines = row.file_content.split(/\r?\n/)
+        const targetLine = row.line - 1 // 1-based to 0-based
+
+        // Expand upwards for 2 non-blank lines
+        let start = targetLine
+        let nonBlankAbove = 0
+        while (start > 0 && nonBlankAbove < 2) {
+          start--
+          if (lines[start]?.trim().length !== 0) nonBlankAbove++
+        }
+
+        // Expand downwards for 2 non-blank lines
+        let end = targetLine
+        let nonBlankBelow = 0
+        while (end < lines.length - 1 && nonBlankBelow < 2) {
+          end++
+          if (lines[end]?.trim().length !== 0) nonBlankBelow++
+        }
+
+        // Trim external leading/trailing blank lines of the final range
+        while (start < end && lines[start]?.trim().length === 0) start++
+        while (end > start && lines[end]?.trim().length === 0) end--
+
+        snippet = lines.slice(start, end + 1).join('\n')
+        startLine = start + 1
+        endLine = end + 1
+      }
+
+      return {
+        symbol: this.mapSymbolRow(row),
+        score: row.score,
+        snippet,
+        startLine,
+        endLine,
+      }
+    })
   }
 
-  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  > {
     const query = sanitizeFtsQuery(options.query)
     if (query.length === 0) return []
 
@@ -638,7 +698,8 @@ export class SQLiteGraphStore extends GraphStore {
                 WHEN lower(s.spec_id) = ? THEN 1000000
                 ELSE 0
               END
-            ) + (-bm25(spec_fts)) AS score
+            ) + (-bm25(spec_fts)) AS score,
+            snippet(spec_fts, 3, '', '', '...', 32) as snippet
           FROM spec_fts
           INNER JOIN specs s ON s.spec_id = spec_fts.spec_id
           WHERE spec_fts MATCH ?
@@ -655,6 +716,7 @@ export class SQLiteGraphStore extends GraphStore {
       depends_on_json: string
       workspace: string
       score: number
+      snippet: string
     }>
 
     const filtered = rows.filter((row) => {
@@ -663,15 +725,29 @@ export class SQLiteGraphStore extends GraphStore {
       return !matchesExclude(row.path, options.excludePaths, options.excludeWorkspaces)
     })
 
-    return filtered.slice(0, options.limit ?? 20).map((row) => ({
-      spec: this.mapSpecRow(row),
-      score: row.score,
-    }))
+    return filtered.slice(0, options.limit ?? 20).map((row) => {
+      const { startLine, endLine } = this.calculateLineRange(row.content, row.snippet)
+      return {
+        spec: this.mapSpecRow(row),
+        score: row.score,
+        snippet: row.snippet,
+        startLine,
+        endLine,
+      }
+    })
   }
 
   async searchDocuments(
     options: SearchOptions,
-  ): Promise<Array<{ document: DocumentNode; score: number }>> {
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     const query = sanitizeFtsQuery(options.query)
     if (query.length === 0) return []
 
@@ -691,7 +767,8 @@ export class SQLiteGraphStore extends GraphStore {
                 WHEN lower(d.config_relative_path) = ? THEN 100000
                 ELSE 0
               END
-            ) + (-bm25(document_fts)) AS score
+            ) + (-bm25(document_fts)) AS score,
+            snippet(document_fts, 2, '', '', '...', 32) as snippet
           FROM document_fts
           INNER JOIN documents d ON d.path = document_fts.path
           WHERE document_fts MATCH ?
@@ -705,6 +782,7 @@ export class SQLiteGraphStore extends GraphStore {
       content: string
       workspace: string
       score: number
+      snippet: string
     }>
 
     const filtered = rows.filter((row) => {
@@ -713,10 +791,16 @@ export class SQLiteGraphStore extends GraphStore {
       return !matchesExclude(row.path, options.excludePaths, options.excludeWorkspaces)
     })
 
-    return filtered.slice(0, options.limit ?? 20).map((row) => ({
-      document: this.mapDocumentRow(row),
-      score: row.score,
-    }))
+    return filtered.slice(0, options.limit ?? 20).map((row) => {
+      const { startLine, endLine } = this.calculateLineRange(row.content, row.snippet)
+      return {
+        document: this.mapDocumentRow(row),
+        score: row.score,
+        snippet: row.snippet,
+        startLine,
+        endLine,
+      }
+    })
   }
 
   async rebuildFtsIndexes(): Promise<void> {
@@ -926,14 +1010,15 @@ export class SQLiteGraphStore extends GraphStore {
   private insertFile(db: SqliteDatabase, file: FileNode): void {
     db.prepare(
       `
-        INSERT INTO files (path, config_relative_path, language, content_hash, workspace, embedding)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO files (path, config_relative_path, language, content_hash, workspace, embedding, content)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
           config_relative_path = excluded.config_relative_path,
           language = excluded.language,
           content_hash = excluded.content_hash,
           workspace = excluded.workspace,
-          embedding = excluded.embedding
+          embedding = excluded.embedding,
+          content = excluded.content
       `,
     ).run(
       file.path,
@@ -942,6 +1027,7 @@ export class SQLiteGraphStore extends GraphStore {
       file.contentHash,
       file.workspace,
       this.serializeEmbedding(file.embedding),
+      file.content ?? null,
     )
   }
 
@@ -1209,6 +1295,31 @@ export class SQLiteGraphStore extends GraphStore {
     return prepared
   }
 
+  private calculateLineRange(
+    content: string,
+    snippet: string,
+  ): { startLine: number; endLine: number } {
+    // 1. Clean snippet of FTS artifacts if any (though we configured tags as empty)
+    // We expect snippet to be a literal excerpt from content, potentially with '...'
+    const cleanSnippet =
+      snippet
+        .split('...')
+        .find((part) => part.trim().length > 0)
+        ?.trim() ?? ''
+    if (cleanSnippet.length === 0) return { startLine: 1, endLine: 1 }
+
+    const index = content.indexOf(cleanSnippet)
+    if (index === -1) return { startLine: 1, endLine: 1 }
+
+    const linesBefore = content.substring(0, index).split(/\r?\n/).length
+    const snippetLines = snippet.split(/\r?\n/).length
+
+    return {
+      startLine: linesBefore,
+      endLine: linesBefore + snippetLines - 1,
+    }
+  }
+
   private mapFileRow(row: {
     path: string
     config_relative_path: string
@@ -1216,6 +1327,7 @@ export class SQLiteGraphStore extends GraphStore {
     content_hash: string
     workspace: string
     embedding: Buffer | null
+    content: string | null
   }): FileNode {
     return createFileNode({
       path: row.path,
@@ -1224,6 +1336,7 @@ export class SQLiteGraphStore extends GraphStore {
       contentHash: row.content_hash,
       workspace: row.workspace,
       ...(row.embedding !== null ? { embedding: this.deserializeEmbedding(row.embedding) } : {}),
+      ...(row.content !== null ? { content: row.content } : {}),
     })
   }
 

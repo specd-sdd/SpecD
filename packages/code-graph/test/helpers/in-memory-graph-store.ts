@@ -441,11 +441,25 @@ export class InMemoryGraphStore extends GraphStore {
 
   async searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     this.ensureOpen()
     const rawQuery = options.query.trim().toLowerCase()
     const terms = options.query.toLowerCase().split(/\s+/)
-    const results: Array<{ symbol: SymbolNode; score: number }> = []
+    const results: Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
     for (const sym of this.symbols.values()) {
       const text = `${expandSymbolName(sym.name)} ${sym.comment ?? ''}`.toLowerCase()
       if (!terms.some((t) => text.includes(t))) continue
@@ -463,16 +477,26 @@ export class InMemoryGraphStore extends GraphStore {
         1 +
         (sym.id.toLowerCase() === rawQuery ? 1_000_000 : 0) +
         (sym.name.toLowerCase() === rawQuery ? 1_000 : 0)
-      results.push({ symbol: sym, score })
+      results.push({ symbol: sym, score, snippet: '', startLine: 1, endLine: 1 })
     }
     return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
   }
 
-  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  > {
     this.ensureOpen()
     const rawQuery = options.query.trim().toLowerCase()
     const terms = options.query.toLowerCase().split(/\s+/)
-    const results: Array<{ spec: SpecNode; score: number }> = []
+    const results: Array<{
+      spec: SpecNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
     for (const spec of this.specs.values()) {
       const text = `${spec.specId} ${spec.title} ${spec.description} ${spec.content}`.toLowerCase()
       if (!terms.some((t) => text.includes(t))) continue
@@ -480,18 +504,32 @@ export class InMemoryGraphStore extends GraphStore {
       if (matchesExclude(spec.path, options.excludePaths, options.excludeWorkspaces)) continue
       if (options.excludeWorkspaces && options.excludeWorkspaces.includes(spec.workspace)) continue
       const score = 1 + (spec.specId.toLowerCase() === rawQuery ? 1_000_000 : 0)
-      results.push({ spec, score })
+      results.push({ spec, score, snippet: '', startLine: 1, endLine: 1 })
     }
     return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
   }
 
   async searchDocuments(
     options: SearchOptions,
-  ): Promise<Array<{ document: DocumentNode; score: number }>> {
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     this.ensureOpen()
     const rawQuery = options.query.trim().toLowerCase()
     const terms = options.query.toLowerCase().split(/\s+/)
-    const results: Array<{ document: DocumentNode; score: number }> = []
+    const results: Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
     for (const document of this.documents.values()) {
       const text =
         `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
@@ -505,7 +543,7 @@ export class InMemoryGraphStore extends GraphStore {
         1 +
         (document.path.toLowerCase() === rawQuery ? 1_000_000 : 0) +
         (document.configRelativePath.toLowerCase() === rawQuery ? 1_000 : 0)
-      results.push({ document, score })
+      results.push({ document, score, snippet: '', startLine: 1, endLine: 1 })
     }
     return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
   }

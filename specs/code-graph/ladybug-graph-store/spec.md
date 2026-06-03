@@ -60,12 +60,13 @@ The Ladybug schema SHALL define the following node tables:
 
 **File** — source files indexed from workspace code roots.
 
-| Column      | Type   | Notes                                      |
-| ----------- | ------ | ------------------------------------------ |
-| path        | STRING | Primary key. `{workspace}:{relativePath}`. |
-| language    | STRING | Language identifier (e.g. `typescript`).   |
-| contentHash | STRING | SHA-256 hash of file content.              |
-| workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |
+| Column      | Type   | Notes                                                         |
+| ----------- | ------ | ------------------------------------------------------------- |
+| path        | STRING | Primary key. `{workspace}:{relativePath}`.                    |
+| language    | STRING | Language identifier (e.g. `typescript`).                      |
+| contentHash | STRING | SHA-256 hash of file content.                                 |
+| content     | STRING | Persisted file source content used to derive symbol snippets. |
+| workspace   | STRING | Workspace name (e.g. `core`, `cli`).                          |
 
 **Symbol** — code symbols extracted from files.
 
@@ -146,6 +147,7 @@ The adapter MUST:
 - join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)
 - return results ordered from highest to lowest relevance, relying on the backend's ranking to prioritize records matching more search terms (precision mode)
 - rebuild or recreate FTS indexes when required by the backend after bulk data changes
+- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches
 
 The Ladybug FTS schema MUST include:
 
@@ -154,6 +156,8 @@ The Ladybug FTS schema MUST include:
 - **`document_fts`** — covering `Document.content` and `Document.path`
 
 The implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.
+
+Persisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change.
 
 ### Requirement: Schema versioning
 

@@ -1,0 +1,131 @@
+- op: modified
+  description: 'Clarify preview sources and include line range metadata'
+  selector:
+    type: section
+    matches: '^Requirement: Search behaviour$'
+  content: |
+    The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.
+
+    It delegates to:
+
+    - `provider.searchSymbols(options)` — search across symbol search text and symbol comments
+    - `provider.searchSpecs(options)` — search across spec title, description, and content
+    - `provider.searchDocuments(options)` — search across document paths and textual content
+
+    The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with exact identity matches boosted to the top.
+
+    Search results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content.
+
+    Preview sources SHALL follow these rules:
+
+    - symbol previews SHALL be derived from persisted source-file content addressed through the symbol's file path and line location
+    - spec previews SHALL be derived from matched spec content when available, falling back to description context only when no better body excerpt is available
+    - document previews SHALL be derived from matched document content rather than from the beginning of the document
+
+    A symbol hit MAY be ranked because of symbol identity or attached comment text, but the preferred preview SHALL still be a code snippet around the symbol location unless no useful source snippet can be produced.
+
+    The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
+
+    The validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.
+
+    Before attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors.
+- op: modified
+  description: 'Update output format to use custom markers and line range indicators, and exclude full content from structured output'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    In `text` mode, results are grouped by category.
+
+    Text mode SHALL include a category header for each category that has results. The header SHALL make the active result limit explicit.
+
+    Format: `<Category> (<N> shown, limit <limit>):`
+    Example: `Symbols (10 shown, limit 10):`
+
+    Each result SHALL render as a compact identity block:
+
+    - the first line identifies the result entry (`[workspace]`, symbol/spec/document identity, and kind when applicable)
+    - a second line MAY show location context such as `workspace`-relative file path and line number for symbols
+    - preview content SHALL render in a separate snippet block preceded by a line range indicator
+
+    Format: `snippet @ L<startLine>-L<endLine>:`
+    Example: `snippet @ L10-L15:`
+
+    To avoid collision with markdown formatting in the source text, snippets SHALL be wrapped in custom markers: `>>>` for the start and `<<<` for the end.
+
+    Text-mode symbol snippets SHALL use line-oriented source context around the matched symbol location:
+
+    - include the matched line and a small window around it, with a baseline of 2-3 non-blank lines above and 2-3 non-blank lines below
+    - blank lines do not count toward the context budget
+    - preserve the original line order
+    - expand tabs to spaces using tab width 2 before indentation normalization
+    - compute the smallest common leading indentation across non-blank snippet lines
+    - remove that common leading indentation from every snippet line before rendering
+    - apply a fixed outer indent when rendering the snippet block
+
+    Text-mode spec and document snippets SHALL also be match-centered and rendered in a separate `snippet @ L<start>-L<end>:` block with `>>>` and `<<<` markers. They do not require code-specific indentation normalization beyond preserving readable literal text.
+
+    Text mode SHALL avoid misleading fixed-field truncation and SHALL NOT rely on raw boosted score magnitudes as the primary readability cue for exact matches.
+
+    When no results are found, output `No results found.`
+
+    In `json` or `toon` mode, output remains category-grouped as `{ symbols: [...], specs: [...], documents: [...] }`. Each entry SHALL include `workspace`, `score`, `snippet`, `startLine`, and `endLine`.
+
+    Structured output details:
+
+    - symbol entries include the symbol payload plus `workspace`, `score`, `snippet`, `startLine`, and `endLine`
+    - spec entries include `specId`, `path`, `title`, `description`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full spec `content` SHALL be omitted unless `--spec-content` is passed.
+    - document entries include `path`, `configRelativePath`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full document `content` SHALL be omitted.
+- op: modified
+  description: 'Update examples with line ranges and custom snippet markers'
+  selector:
+    type: section
+    matches: '^Examples$'
+  content: |
+    ```
+    $ specd graph search "hook execution"
+    Symbols (10 shown, limit 10):
+      [core] method execute
+        src/use-cases/run-step-hooks.ts:108
+        snippet @ L105-L112:
+          >>>
+          execute(...) {
+            ...
+          }
+          <<<
+      ...
+
+    Specs (10 shown, limit 10):
+      [core] core:hook-execution-model
+        snippet @ L42-L48:
+          >>>
+          ...Workflow steps declare hooks via...
+          <<<
+      [cli] cli:change-run-hooks
+        snippet @ L12-L18:
+          >>>
+          ...Agent-driven workflow steps declare...
+          <<<
+      ...
+
+    $ specd graph search "transition" --kind method --limit 3
+    Symbols (3 shown, limit 3):
+      [core] method transition
+        src/domain/entities/change.ts:638
+        snippet @ L635-L642:
+          >>>
+          transition(...) {
+            ...
+          }
+          <<<
+      ...
+
+    $ specd graph search "Change" --documents
+    Documents (10 shown, limit 10):
+      [default] docs/cli/cli-reference.md
+        snippet @ L80-L88:
+          >>>
+          ...graph search <query> [--symbols] [--specs] [--documents]...
+          <<<
+      ...
+    ```

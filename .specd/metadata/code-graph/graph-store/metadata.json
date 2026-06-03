@@ -1,454 +1,118 @@
 {
+  "generatedBy": "agent",
   "title": "Graph Store",
-  "description": "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. This spec defines the abstract `GraphStore` contract that indexing, traversal, and CLI features depend on, without prescribing any particular storage engine or physical schema.",
+  "description": "GraphStore is the abstract port defining the contract for graph persistence operations. Concrete implementations own the physical schema, file layout, and backend-specific storage details.",
+  "keywords": [
+    "graph-store",
+    "persistence",
+    "abstract-port",
+    "code-graph",
+    "node-storage",
+    "relations",
+    "atomic-upsert"
+  ],
   "dependsOn": [
+    "core:config",
+    "code-graph:ast-model",
     "code-graph:symbol-model",
-    "default:_global/architecture",
+    "code-graph:spec-model",
     "code-graph:staleness-detection",
-    "code-graph:document-model"
+    "code-graph:document-model",
+    "default:_global/architecture"
   ],
-  "context": [
-    "The code graph needs durable persistence that supports atomic file-level updates and efficient graph queries without loading the entire graph into memory. This spec defines the abstract `GraphStore` contract that indexing, traversal, and CLI features depend on, without prescribing any particular storage engine or physical schema."
-  ],
+  "contentHashes": {
+    "spec.md": "sha256:3fa6f4907a82ed47b18af78ecd26cc47ad360659308d79fb71d1520bb969a7c8",
+    "verify.md": "sha256:01ab86dab011f0a31f7e060e5fa8e8054a7c2d973411f9005afbe028c69ca5f9"
+  },
   "rules": [
     {
       "requirement": "GraphStore port",
       "rules": [
-        "`GraphStore` SHALL be an abstract class with a `storagePath` constructor parameter specifying the filesystem root allocated to the concrete graph-store implementation. It defines the contract for all graph persistence operations. Concrete implementations own the physical schema, file layout, and backend-specific storage details.\n\nThe port follows the project's hexagonal architecture: it is defined in `domain/ports/`, and concrete adapters live in `infrastructure/`."
+        "GraphStore shall be an abstract class with a storagePath constructor parameter.",
+        "It defines the contract for all graph persistence operations following hexagonal architecture."
       ]
     },
     {
       "requirement": "Minimum graph semantics",
       "rules": [
-        "Every `GraphStore` implementation SHALL support the code-graph package's minimum persisted semantics, regardless of its backend-specific physical schema or file layout.\n\nAt minimum, the abstract store contract MUST support:\n\n- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths\n- symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries\n- spec nodes carrying the `SpecNode` data needed by spec indexing and search\n- **document nodes** carrying the `DocumentNode` data (textual non-code resources)\n- persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint\n\n`COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.\n\nThe store MUST provide operations for upserting and removing `DocumentNode` entries, as well as searching them via full-text search.\n\nBackends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape."
+        "Store must support file nodes carrying textual content and paths.",
+        "Store must support symbol, spec, and document nodes.",
+        "Store must support persisted relations including dependencies and coverage links.",
+        "Store must persist store-level metadata like derivation-freshness and fingerprints."
       ]
     },
     {
       "requirement": "Connection lifecycle",
       "rules": [
-        "`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`.\n\nThe `open()` method prepares the concrete backend for read/write operations. The `close()` method flushes pending writes and releases resources. Any backend-specific schema initialization, migrations, or index preparation remain implementation concerns."
+        "GraphStore provides explicit open and close methods.",
+        "All query and mutation methods must throw StoreNotOpenError if called before open or after close."
       ]
     },
     {
       "requirement": "Store recreation",
-      "rules": [
-        "`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset operation for backends that need to drop and rebuild their persisted graph state.\n\n`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layout rather than merely deleting graph rows from an already-open store. Callers such as `graph index --force` MUST use this abstract capability instead of deleting backend-specific files or directories directly.\n\nThe concrete backend owns how recreation is performed. A backend MAY delete files, recreate directories, rebuild schemas, reopen connections, or combine those steps, provided the observable result is the same:\n\n- all previously indexed graph data is gone\n- the persisted backend state is ready for a fresh indexing run\n- callers do not need to know backend-specific filenames, lockfiles, WAL files, or schema artifacts"
-      ]
+      "rules": ["GraphStore provides a recreate method for destructive reset operations."]
     },
     {
       "requirement": "Atomic file-level upsert",
       "rules": [
-        "`GraphStore` SHALL provide `upsertFile(file: FileNode, symbols: SymbolNode[], relations: Relation[]): Promise<void>`. This operation MUST be atomic: it removes all existing symbols and relations for the given file path and replaces them with the provided data in a single transaction. If the transaction fails, the previous state for that file is preserved."
+        "GraphStore provides upsertFile for atomic replacement of file data in a single transaction."
       ]
     },
     {
       "requirement": "Additive relation insertion",
       "rules": [
-        "`GraphStore` SHALL provide `addRelations(relations: Relation[]): Promise<void>`. This operation adds relations to the store without removing any existing data. It is used for cross-file relations (e.g. `CALLS` between symbols in different files) that must not be deleted when either file is re-upserted.\n\nUnlike `upsertFile` which replaces all data for a file, `addRelations` is purely additive."
+        "GraphStore provides addRelations for additive relation insertion without removing existing data."
       ]
     },
     {
       "requirement": "File removal",
       "rules": [
-        "`GraphStore` SHALL provide `removeFile(filePath: string): Promise<void>`. This operation MUST atomically remove the `FileNode`, all `SymbolNode` entries with that `filePath`, and all `Relation` entries where the file or any of its symbols appear as `source` or `target`."
+        "GraphStore provides removeFile to atomically remove the file node, its symbols, and relations."
       ]
     },
     {
       "requirement": "Query methods",
       "rules": [
-        "`GraphStore` SHALL provide the following query methods:\n\n- **`getFile(path: string): Promise<FileNode | undefined>`** — retrieve a file node by canonical workspace-prefixed path\n- **`findFilesByConfigRelativePath(path: string): Promise<FileNode[]>`** — retrieve all file nodes whose `configRelativePath` exactly matches the given normalized config-relative path\n- **`getSymbol(id: string): Promise<SymbolNode | undefined>`** — retrieve a symbol by id\n- **`getCallers(symbolId: string): Promise<Relation[]>`** — all incoming symbol dependency relations where `target` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.\n- **`getCallees(symbolId: string): Promise<Relation[]>`** — all outgoing symbol dependency relations where `source` matches. At minimum this includes `CALLS`, `CONSTRUCTS`, and `USES_TYPE`.\n- **`getImporters(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `target` matches\n- **`getImportees(filePath: string): Promise<Relation[]>`** — all `IMPORTS` relations where `source` matches\n- **`getExtenders(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `target` matches\n- **`getExtendedTargets(symbolId: string): Promise<Relation[]>`** — all `EXTENDS` relations where `source` matches\n- **`getImplementors(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `target` matches\n- **`getImplementedTargets(symbolId: string): Promise<Relation[]>`** — all `IMPLEMENTS` relations where `source` matches\n- **`getOverriders(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `target` matches\n- **`getOverriddenTargets(symbolId: string): Promise<Relation[]>`** — all `OVERRIDES` relations where `source` matches\n- **`getSpec(specId: string): Promise<SpecNode | undefined>`** — retrieve a spec node by id\n- **`getSpecDependencies(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `source` matches\n- **`getSpecDependents(specId: string): Promise<Relation[]>`** — all `DEPENDS_ON` relations where `target` matches\n- **`getCoveredFiles(specId: string): Promise<Relation[]>`** — all `COVERS_FILE` relations where `source` matches\n- **`getCoveringSpecsForFile(filePath: string): Promise<Relation[]>`** — all `COVERS_FILE` relations where `target` matches\n- **`getCoveredSymbols(specId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `source` matches\n- **`getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>`** — all `COVERS_SYMBOL` relations where `target` matches\n- **`findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`** — search symbols by name pattern, kind, or file path\n\n`SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive)."
+        "GraphStore provides query methods for retrieving files, symbols, relations, and specs by their IDs."
       ]
     },
     {
       "requirement": "Graph statistics",
       "rules": [
-        "`GraphStore` SHALL provide `getStatistics(): Promise<GraphStatistics>` returning:\n\n- **`fileCount`** — total number of `FileNode` entries\n- **`symbolCount`** — total number of `SymbolNode` entries\n- **`specCount`** — total number of `SpecNode` entries\n- **`relationCounts`** — a `Record<RelationType, number>` with counts per relation type, including `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`\n- **`languages`** — array of distinct language identifiers across all files\n- **`lastIndexedAt`** — ISO 8601 timestamp of the most recent `upsertFile` call\n- **`lastIndexedRef`** — VCS ref (commit hash, changeset ID) at the time of the last index, or `null` if no ref was stored. This value is persisted as a meta key alongside `lastIndexedAt` and is read-only from the statistics interface.\n- **`graphFingerprint`** — the persisted graph derivation fingerprint for the current store contents, or `null` if no fingerprint has been recorded yet"
+        "GraphStore provides getStatistics returning counts for files, symbols, specs, relations, and metadata."
       ]
     },
     {
       "requirement": "Spec upsert and removal",
-      "rules": [
-        "`GraphStore` SHALL provide:\n\n- **`upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>`** — atomically replaces all data for a spec node. Removes existing `DEPENDS_ON` relations where this spec is the source and replaces them with the provided relations.\n- **`removeSpec(specId: string): Promise<void>`** — removes the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target.\n\nThese follow the same atomic pattern as `upsertFile()` and `removeFile()`."
-      ]
+      "rules": ["GraphStore provides upsertSpec and removeSpec for atomic spec data management."]
     },
     {
       "requirement": "Search with exact-match prioritization",
       "rules": [
-        "`GraphStore` SHALL provide:\n\n- **`searchSymbols(options: SearchOptions)`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order\n- **`searchSpecs(options: SearchOptions)`** — search spec title, description, and content, returning results ranked by relevance in descending order\n- **`searchDocuments(options: SearchOptions)`** — search document paths and textual content, returning results ranked by relevance in descending order\n- **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes\n\nWhen a query exactly matches a canonical identity (Spec ID, Symbol Name/ID, Document Path), the store MUST prioritize that exact match at the top of the results, regardless of generic relevance scores.\n\n- **Exact Spec ID match**: prioritized first in Spec search.\n- **Exact Symbol Name/ID match**: prioritized first in Symbol search.\n- **Exact Document Path match**: prioritized first in Document search.\n\n`SearchOptions` is a value object with:\n\n- **query** — the search query string (required)\n- **limit** — maximum results to return (default 20)\n- **kind** — filter symbols by `SymbolKind` (symbols only)\n- **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)\n- **workspace** — filter results to a single workspace\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)\n- **excludeWorkspaces** — array of workspace names to exclude\n\nAll filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns.\n\nGeneric text matching (BM25 or equivalent) SHALL be used to rank the remaining hits."
+        "GraphStore provides search APIs for symbols, specs, and documents.",
+        "Search results must prioritize exact matches on primary identities.",
+        "Results must return match-aware snippets and 1-based line ranges."
       ]
     },
     {
       "requirement": "Bulk operations",
-      "rules": [
-        "`GraphStore` SHALL provide `clear(): Promise<void>` to remove all nodes and relations (full re-index), `getAllFiles(): Promise<FileNode[]>` to retrieve all file nodes, and `getAllSpecs(): Promise<SpecNode[]>` to retrieve all spec nodes (both for incremental diff computation)."
-      ]
+      "rules": ["GraphStore provides methods to clear all data and retrieve all files or specs."]
     }
   ],
   "constraints": [
-    "GraphStore is an abstract class, not an interface — following the project's port convention",
-    "All mutations are atomic at the file level — no partial updates",
-    "StoreNotOpenError is thrown on any operation when the store is not open",
-    "The abstract store contract does not prescribe a specific backend, physical schema, or filesystem layout",
-    "Destructive force-reset behavior is modeled through recreate(), not through caller-managed backend file deletion",
-    "No dependency on @specd/core — error types extend CodeGraphError"
+    "GraphStore is an abstract class.",
+    "All mutations are atomic at the file level.",
+    "StoreNotOpenError is thrown on any operation when the store is not open.",
+    "The abstract store contract does not prescribe a specific backend or physical schema.",
+    "No dependency on @specd/core."
   ],
   "scenarios": [
     {
-      "requirement": "GraphStore port",
-      "name": "GraphStore is an abstract class",
-      "when": ["a concrete implementation of GraphStore is instantiated"],
-      "then": [
-        "it receives storagePath as a constructor parameter",
-        "AND it is defined in domain/ports/ following hexagonal architecture"
-      ]
-    },
-    {
       "requirement": "Connection lifecycle",
       "name": "Operation before open throws",
-      "when": ["getFile() is called on a GraphStore that has not been opened"],
+      "given": [],
+      "when": ["getFile is called before opening the store"],
       "then": ["StoreNotOpenError is thrown"]
-    },
-    {
-      "requirement": "Connection lifecycle",
-      "name": "Operation after close throws",
-      "given": ["a GraphStore that was opened and then closed"],
-      "when": ["upsertFile() is called"],
-      "then": ["StoreNotOpenError is thrown"]
-    },
-    {
-      "requirement": "Connection lifecycle",
-      "name": "Open prepares the concrete backend before queries run",
-      "when": ["open() resolves for a concrete GraphStore implementation"],
-      "then": [
-        "subsequent reads and writes can proceed through the abstract contract",
-        "AND any schema initialization, index preparation, or migration work remains hidden behind the backend"
-      ]
-    },
-    {
-      "requirement": "Minimum graph semantics",
-      "name": "Backend preserves canonical and config-relative file identity",
-      "when": ["indexing and query features use the abstract GraphStore"],
-      "then": [
-        "file nodes retain both canonical workspace-prefixed path values and configRelativePath values needed for CLI lookup",
-        "AND storage-agnostic consumers do not depend on backend-specific column or label names"
-      ]
-    },
-    {
-      "requirement": "Minimum graph semantics",
-      "name": "Backend persists scoped-binding dependency relations",
-      "when": ["a backend advertises conformance to GraphStore"],
-      "then": [
-        "its persisted relation model includes CALLS, CONSTRUCTS, and USES_TYPE",
-        "AND these relations remain queryable through the abstract dependency methods"
-      ]
-    },
-    {
-      "requirement": "Minimum graph semantics",
-      "name": "Backend persists derivation metadata",
-      "when": ["a graph has been indexed successfully"],
-      "then": [
-        "the store can persist and later return lastIndexedAt, lastIndexedRef, and the graph fingerprint"
-      ]
-    },
-    {
-      "requirement": "Minimum graph semantics",
-      "name": "Backend persists spec coverage relation families",
-      "when": ["a backend advertises conformance to GraphStore"],
-      "then": [
-        "its persisted relation model includes COVERS_FILE and COVERS_SYMBOL",
-        "AND these relations remain queryable through the abstract coverage methods"
-      ]
-    },
-    {
-      "requirement": "Minimum graph semantics",
-      "name": "Symbol coverage metadata survives round-trip",
-      "given": ["a COVERS_SYMBOL relation with metadata { \"stale\": true }"],
-      "when": ["it is persisted and loaded back through the abstract GraphStore"],
-      "then": ["the returned relation preserves that metadata without backend-specific decoding"]
-    },
-    {
-      "requirement": "Store recreation",
-      "name": "Recreate drops prior persisted graph state",
-      "given": ["a backend with previously indexed files, symbols, specs, and relations"],
-      "when": ["recreate() is called through the abstract GraphStore contract"],
-      "then": [
-        "the prior persisted graph state is discarded",
-        "AND the backend is ready for a fresh indexing run"
-      ]
-    },
-    {
-      "requirement": "Store recreation",
-      "name": "Callers do not manage backend files directly",
-      "when": ["a caller needs a destructive reset before indexing"],
-      "then": [
-        "it uses GraphStore.recreate()",
-        "AND it does not need to know backend-specific database files, lock files, WAL files, or schema artifacts"
-      ]
-    },
-    {
-      "requirement": "Atomic file-level upsert",
-      "name": "Upsert replaces all data for a file",
-      "given": ["a file src/utils.ts with 3 symbols and 2 relations in the store"],
-      "when": ["upsertFile() is called for src/utils.ts with 2 symbols and 1 relation"],
-      "then": ["the store contains exactly 2 symbols and 1 relation for that file"]
-    },
-    {
-      "requirement": "Atomic file-level upsert",
-      "name": "Failed upsert preserves previous state",
-      "given": ["a file src/utils.ts with existing data in the store"],
-      "when": ["upsertFile() fails mid-transaction (e.g. invalid data)"],
-      "then": ["the previous symbols and relations for that file remain intact"]
-    },
-    {
-      "requirement": "Atomic file-level upsert",
-      "name": "Upsert creates file node if not exists",
-      "when": ["upsertFile() is called for a file path not yet in the store"],
-      "then": ["a new FileNode is created along with its symbols and relations"]
-    },
-    {
-      "requirement": "Additive relation insertion",
-      "name": "addRelations preserves existing data",
-      "given": ["a store with symbols A (in file1) and B (in file2) and no CALLS relations"],
-      "when": ["addRelations([{ source: A.id, target: B.id, type: 'CALLS' }]) is called"],
-      "then": [
-        "the CALLS relation exists in the store",
-        "AND all existing file, symbol, and relation data is preserved"
-      ]
-    },
-    {
-      "requirement": "Additive relation insertion",
-      "name": "addRelations survives file re-upsert",
-      "given": [
-        "a CALLS relation from symbol A (file1) to symbol B (file2) added via addRelations"
-      ],
-      "when": ["upsertFile is called for file2 (re-indexing it)"],
-      "then": [
-        "the CALLS relation from A to B is deleted (because B is removed and re-created)",
-        "AND this is expected — the indexer re-adds CALLS in Phase 3 after all upserts"
-      ]
-    },
-    {
-      "requirement": "File removal",
-      "name": "Remove deletes file and all associated data",
-      "given": ["a file src/auth.ts with symbols A and B, and relations involving those symbols"],
-      "when": ["removeFile('src/auth.ts') is called"],
-      "then": [
-        "the FileNode, both SymbolNode entries, and all relations referencing those symbols or that file path are removed"
-      ]
-    },
-    {
-      "requirement": "File removal",
-      "name": "Remove non-existent file is idempotent",
-      "when": ["removeFile('nonexistent.ts') is called"],
-      "then": ["the operation completes without error"]
-    },
-    {
-      "requirement": "Spec upsert and removal",
-      "name": "Upsert replaces spec DEPENDS_ON relations",
-      "given": ["a spec core:change with 2 DEPENDS_ON relations in the store"],
-      "when": ["upsertSpec() is called with 3 new DEPENDS_ON relations"],
-      "then": ["the store contains exactly 3 DEPENDS_ON relations for that spec"]
-    },
-    {
-      "requirement": "Spec upsert and removal",
-      "name": "Remove spec cleans up all relations",
-      "given": ["a spec core:config that is both a source and target of DEPENDS_ON relations"],
-      "when": ["removeSpec('core:config') is called"],
-      "then": [
-        "the SpecNode and all DEPENDS_ON relations where it appears as source or target are removed"
-      ]
-    },
-    {
-      "requirement": "Search with exact-match prioritization",
-      "name": "Symbol search matches normalized compound names",
-      "given": ["symbols createUser, deleteUser, and listOrders are indexed"],
-      "when": ["searchSymbols({ query: 'user' }) is called"],
-      "then": ["createUser and deleteUser are returned ahead of unrelated symbols"]
-    },
-    {
-      "requirement": "Search with exact-match prioritization",
-      "name": "Symbol search includes comments",
-      "given": ["a symbol with comment text containing Validates the user's authentication token"],
-      "when": ["searchSymbols({ query: 'authentication token' }) is called"],
-      "then": ["that symbol is returned"]
-    },
-    {
-      "requirement": "Search with exact-match prioritization",
-      "name": "Spec search matches description and content",
-      "given": [
-        "a spec whose description mentions adapter parsing",
-        "AND another spec whose content contains lifecycle state transition"
-      ],
-      "when": ["the corresponding queries are issued through searchSpecs"],
-      "then": ["the matching spec is returned in each case with a relevance score"]
-    },
-    {
-      "requirement": "Search with exact-match prioritization",
-      "name": "Exact Spec ID match is prioritized first",
-      "given": ["a spec with ID core:change", "AND a search query core:change"],
-      "when": ["the spec search is executed"],
-      "then": ["the spec core:change appears as the first result"]
-    },
-    {
-      "requirement": "Search with exact-match prioritization",
-      "name": "Exact Document Path match is prioritized first",
-      "given": ["a document with path root:package.json", "AND a search query root:package.json"],
-      "when": ["the document search is executed"],
-      "then": ["the document root:package.json appears as the first result"]
-    },
-    {
-      "requirement": "Search with exact-match prioritization",
-      "name": "Filters are applied before limiting results",
-      "given": ["more than 20 matching symbols exist across multiple workspaces"],
-      "when": ["searchSymbols({ query: 'hook', workspace: 'core', limit: 5 }) is called"],
-      "then": [
-        "only workspace core contributes candidates",
-        "AND at most 5 filtered results are returned"
-      ]
-    },
-    {
-      "requirement": "Search with exact-match prioritization",
-      "name": "Search indexes can be rebuilt explicitly",
-      "given": ["a backend whose search indexes are not auto-maintained during bulk writes"],
-      "when": ["rebuildFtsIndexes() is called after bulk data changes"],
-      "then": ["subsequent abstract search queries see the new symbols and specs"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "findFilesByConfigRelativePath returns exact matches",
-      "given": [
-        "indexed files core:src/index.ts with configRelativePath packages/core/src/index.ts",
-        "AND cli:src/index.ts with configRelativePath packages/cli/src/index.ts"
-      ],
-      "when": ["findFilesByConfigRelativePath('packages/core/src/index.ts') is called"],
-      "then": ["only the core:src/index.ts file node is returned"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "findFilesByConfigRelativePath may return multiple canonical files",
-      "given": ["two indexed files from different workspaces share the same configRelativePath"],
-      "when": ["findFilesByConfigRelativePath('src/index.ts') is called"],
-      "then": ["both canonical file nodes are returned so the caller can raise an ambiguity error"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "getCallers includes USES_TYPE and CONSTRUCTS dependents",
-      "given": [
-        "symbol TemplateExpander has one incoming CALLS, one incoming CONSTRUCTS, and one incoming USES_TYPE relation"
-      ],
-      "when": ["getCallers(TemplateExpander.id) is called"],
-      "then": ["all three dependency relations are returned"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "getCallees includes USES_TYPE and CONSTRUCTS dependencies",
-      "given": ["symbol createKernel has outgoing CALLS, CONSTRUCTS, and USES_TYPE relations"],
-      "when": ["getCallees(createKernel.id) is called"],
-      "then": ["all three dependency relations are returned"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "getCoveredFiles returns spec file coverage",
-      "given": ["spec core:change covers files core:src/change.ts and core:src/state.ts"],
-      "when": ["getCoveredFiles('core:change') is called"],
-      "then": ["both persisted COVERS_FILE relations are returned"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "getCoveringSpecsForFile returns specs covering a file",
-      "given": ["file core:src/change.ts is covered by specs core:change and core:change-manifest"],
-      "when": ["getCoveringSpecsForFile('core:src/change.ts') is called"],
-      "then": ["both COVERS_FILE relations are returned"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "getCoveredSymbols returns spec symbol coverage",
-      "given": ["spec core:change covers symbol core:Change.transition"],
-      "when": ["getCoveredSymbols('core:change') is called"],
-      "then": ["the persisted COVERS_SYMBOL relation is returned"]
-    },
-    {
-      "requirement": "Query methods",
-      "name": "getCoveringSpecsForSymbol returns specs covering a symbol",
-      "given": ["symbol core:Change.transition is covered by spec core:change"],
-      "when": ["getCoveringSpecsForSymbol('core:Change.transition') is called"],
-      "then": ["the persisted COVERS_SYMBOL relation is returned"]
-    },
-    {
-      "requirement": "Graph statistics",
-      "name": "Statistics include all expected fields",
-      "when": ["getStatistics() is called on a populated store"],
-      "then": [
-        "the result includes fileCount, symbolCount, specCount, relationCounts, languages, lastIndexedAt, lastIndexedRef, and graphFingerprint"
-      ]
-    },
-    {
-      "requirement": "Graph statistics",
-      "name": "graphFingerprint defaults to null",
-      "given": ["no derivation fingerprint has been stored yet"],
-      "when": ["getStatistics() is called"],
-      "then": ["graphFingerprint is null"]
-    },
-    {
-      "requirement": "Graph statistics",
-      "name": "Statistics include scoped-binding relation counts",
-      "given": ["the store contains persisted CONSTRUCTS and USES_TYPE relations"],
-      "when": ["getStatistics() is called"],
-      "then": ["relationCounts includes counts for both relation types"]
-    },
-    {
-      "requirement": "Graph statistics",
-      "name": "graphFingerprint reflects stored value",
-      "given": [
-        "the graph fingerprint meta key has been set to code-graph@0.2.0:workspaces:abc123"
-      ],
-      "when": ["getStatistics() is called"],
-      "then": ["graphFingerprint is code-graph@0.2.0:workspaces:abc123"]
-    },
-    {
-      "requirement": "Bulk operations",
-      "name": "Clear removes all data",
-      "given": ["a store with files, symbols, and relations"],
-      "when": ["clear() is called"],
-      "then": ["getStatistics() returns zero for all counts"]
-    },
-    {
-      "requirement": "Bulk operations",
-      "name": "getAllFiles returns all indexed files",
-      "given": ["a store with 5 files"],
-      "when": ["getAllFiles() is called"],
-      "then": ["5 FileNode entries are returned"]
-    },
-    {
-      "requirement": "Bulk operations",
-      "name": "getAllSpecs returns all indexed specs",
-      "given": ["a store with 12 specs"],
-      "when": ["getAllSpecs() is called"],
-      "then": ["12 SpecNode entries are returned"]
     }
-  ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:test/domain/ports/graph-store.contract.ts"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:test/helpers/in-memory-graph-store.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:src/domain/ports/graph-store.ts",
-        "symbol": "GraphStore"
-      }
-    ]
-  },
-  "contentHashes": {
-    "spec.md": "sha256:ebc5d01c2e0409f0a8ecc1704bc61fd24d862be68faf20dfe35f97706639e1f1",
-    "verify.md": "sha256:a28de05fc60670d2bbe4a830d36bb609eb13314d071ed5199e1f5564869198ae"
-  },
-  "generatedBy": "core"
+  ]
 }

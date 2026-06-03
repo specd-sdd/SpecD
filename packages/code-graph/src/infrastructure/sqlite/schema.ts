@@ -1,4 +1,4 @@
-export const SQLITE_SCHEMA_VERSION = 4
+export const SQLITE_SCHEMA_VERSION = 5
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS files (
   language TEXT NOT NULL,
   content_hash TEXT NOT NULL,
   workspace TEXT NOT NULL,
-  embedding BLOB
+  embedding BLOB,
+  content TEXT
 );
 
 CREATE TABLE IF NOT EXISTS documents (

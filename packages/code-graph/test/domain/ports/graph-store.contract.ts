@@ -774,8 +774,11 @@ export function graphStoreContractTests(
       const documentHits = await store.searchDocuments({ query: 'docs/change.md' })
 
       expect(symbolHits[0]?.symbol.id).toBe(exactSymbol.id)
+      expect(symbolHits[0]?.snippet).toBeDefined()
       expect(specHits[0]?.spec.specId).toBe(exactSpec.specId)
+      expect(specHits[0]?.snippet).toBeDefined()
       expect(documentHits[0]?.document.path).toBe(exactDocument.path)
+      expect(documentHits[0]?.snippet).toBeDefined()
     })
   })
 }
