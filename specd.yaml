@@ -157,6 +157,9 @@ workspaces:
         path: specs/public-web
     codeRoot: apps/public-web
     ownership: owned
+    graph:
+      excludePaths:
+        - '*'
 
 storage:
   changes:
