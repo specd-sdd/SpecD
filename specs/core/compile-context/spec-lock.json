@@ -16,15 +16,13 @@
     "core:get-hook-instructions",
     "core:preview-spec",
     "core:lifecycle-engine",
-    "core:refresh-implementation-tracking"
+    "core:refresh-implementation-tracking",
+    "core:core/project-metadata"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/compile-context.ts",
-      "symbols": ["CompileContext", "CompileContext.execute"]
-    },
-    {
-      "file": "core:src/composition/use-cases/compile-context.ts"
+      "symbols": ["_renderFromMetadata", "CompileContextConfig"]
     }
   ]
 }

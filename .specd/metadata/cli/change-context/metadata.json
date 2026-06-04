@@ -21,6 +21,12 @@
       ]
     },
     {
+      "requirement": "Optimization warning signal",
+      "rules": [
+        "When `llmOptimizedContext: true` is active, if any spec in the context (or the project context itself) is missing optimized fields or has stale project metadata, the command SHALL surface a warning.\n\nThe warning MUST include an instruction on how to generate the missing metadata (e.g., using `specd-spec-metadata` or a project-level equivalent).\n\nFor structured formats (`json`, `toon`), the warning state and instructions SHALL be included alongside the context data."
+      ]
+    },
+    {
       "requirement": "Implementation tracking refresh before context compilation",
       "rules": [
         "Before invoking `CompileContext`, the command MUST call `RefreshImplementationTracking` for the same change name.\n\nThe CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.\n\nWhen `--fingerprint` short-circuits the command with an unchanged context response, refresh MUST still run before the fingerprint comparison so tracked implementation state is current for that check."
@@ -252,19 +258,33 @@
         "stderr names tasks as the blocking artifact",
         "AND the CLI does not recompute a different blocking set locally"
       ]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "name": "Displays warnings when optimizations are missing",
+      "given": [
+        "llmOptimizedContext: true",
+        "AND some specs (or the project) are missing optimization"
+      ],
+      "when": ["specd change context is run"],
+      "then": [
+        "standard CLI warnings are emitted",
+        "AND they include remediation instructions for the agent"
+      ]
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:change-context",
-        "file": "cli:src/commands/change/context.ts"
+        "file": "cli:src/commands/change/context.ts",
+        "symbol": "registerChangeContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:92ae1bb8e73b6edb22704bfc5807da5e27117601691b72d4d70a706cca7f3de5",
-    "verify.md": "sha256:26d622a0e866f087ea47d9329b0b82b7ab3c954a0d5c577907260195ef46535a"
+    "spec.md": "sha256:c3b02c691094d0967d22074047ff3cfaeed6deb77620ac929248e8ab419dc11f",
+    "verify.md": "sha256:3a0f3f5da27b5027f7f882de2d8d72c44e2944427749f5e8bbdb8bdc8ffc1bba"
   },
   "generatedBy": "core"
 }

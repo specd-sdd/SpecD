@@ -5,17 +5,21 @@ import { tmpdir } from 'node:os'
 import { SpecRepository, Spec, SpecPath } from '@specd/core'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
-import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
 import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { computeContentHash } from '../../../src/application/use-cases/compute-content-hash.js'
 
 /**
  * Creates a mock spec repository.
  * @param specs - List of specs to return.
+ * @param metadataMap - Optional map of specId to metadata.
  * @returns A mock SpecRepository instance.
  */
-function makeMockRepo(specs: Spec[] = []): SpecRepository {
+function makeMockRepo(
+  specs: Spec[] = [],
+  metadataMap: Map<string, Record<string, unknown>> = new Map(),
+): SpecRepository {
   return {
     get specsPath() {
       return undefined
@@ -23,7 +27,9 @@ function makeMockRepo(specs: Spec[] = []): SpecRepository {
     list: async () => specs,
     count: async () => specs.length,
     specHash: async () => 'sha256:test',
-    metadata: async (s: Spec) => ({ title: s.name.toString() }),
+    metadata: async (s: Spec) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      (metadataMap.get(s.name.toString()) as any) ?? { title: s.name.toString() },
     readPersistedDependsOn: async () => [],
     readPersistedImplementation: async () => [],
     artifact: async () => ({ content: '# Spec Content' }),
@@ -342,5 +348,101 @@ describe('Workspace indexing', () => {
 
     expect(await store.getDocument('root:specs-ws1/changes/spec.md')).toBeUndefined()
     expect(result.documentsIndexed).toBe(0)
+  })
+
+  it('prefers optimizedDescription when indexing specs', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'src/a.ts': 'export const a = 1;',
+    })
+
+    const spec1 = new Spec('ws1', SpecPath.parse('test'), [])
+    const metadata = new Map([
+      ['test', { title: 'Test', description: 'Original', optimizedDescription: 'AI summary' }],
+    ])
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo([spec1], metadata),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
+      },
+    })
+
+    const node = await store.getSpec('ws1:test')
+    expect(node?.description).toBe('AI summary')
+  })
+
+  it('computes contentHash from content artifacts excluding sidecars with spec.md first', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {})
+
+    // Spec with multiple artifacts including sidecars
+    const spec1 = new Spec('ws1', SpecPath.parse('test'), [
+      'verify.md',
+      'spec.md',
+      'spec-lock.json',
+      'metadata.json',
+    ])
+
+    const artifactMap = new Map<string, Record<string, string>>([
+      [
+        'test',
+        {
+          'spec.md': '# Spec\n',
+          'verify.md': '# Verify\n',
+          'spec-lock.json': '{"locked": true}',
+          'metadata.json': '{"title": "Test"}',
+        },
+      ],
+    ])
+
+    const repo = {
+      list: async () => [spec1],
+      count: async () => 1,
+      specHash: async () => 'sha256:sidecar-hash',
+      metadata: async () => ({ title: 'Test' }),
+      readPersistedDependsOn: async () => [],
+      readPersistedImplementation: async () => [],
+      artifact: async (s: Spec, f: string) => ({
+        content: artifactMap.get(s.name.toString())?.[f],
+      }),
+    } as unknown as SpecRepository
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: repo,
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    })
+
+    const node = await store.getSpec('ws1:test')
+    expect(node).toBeDefined()
+
+    // contentHash should be from spec.md + verify.md (ordered)
+    // # Spec\n# Verify\n -> concatenated
+    const expectedContent = '# Spec\n\n# Verify\n\n'
+    // Wait, the implementation adds \n after each artifact
+    // Let's check the actual implementation: content += artifact.content + '\n'
+
+    expect(node!.content).toBe('# Spec\n\n# Verify\n\n')
+    expect(node!.contentHash).not.toBe('sha256:sidecar-hash')
+    expect(node!.contentHash).toBe(computeContentHash('# Spec\n\n# Verify\n\n'))
   })
 })

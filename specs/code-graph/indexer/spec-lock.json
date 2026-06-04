@@ -15,6 +15,10 @@
   ],
   "implementation": [
     {
+      "file": "code-graph:src/domain/value-objects/spec-node.ts",
+      "symbols": ["SpecNode", "createSpecNode"]
+    },
+    {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
     }

@@ -158,6 +158,12 @@
 - **WHEN** `parseMetadata` reads the file
 - **THEN** it returns `{}` without throwing — read path never blocks operations
 
+#### Scenario: Schema supports optimized fields
+
+- **GIVEN** a metadata object with `optimizedDescription` and `optimizedContext`
+- **WHEN** validated against `strictSpecMetadataSchema`
+- **THEN** validation passes
+
 ### Requirement: dependsOn overwrite protection
 
 #### Scenario: dependsOn entries removed — error thrown

@@ -5,6 +5,12 @@ export {
 } from './artifact-filename.js'
 export { hashFiles } from './hash-files.js'
 export {
+  projectMetadataSchema,
+  updateProjectMetadataSchema,
+  type ProjectMetadata,
+  type UpdateProjectMetadataPayload,
+} from './project-metadata.js'
+export {
   specMetadataSchema,
   strictSpecMetadataSchema,
   type SpecMetadata,

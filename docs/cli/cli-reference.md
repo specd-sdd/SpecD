@@ -850,6 +850,20 @@ Write a `metadata.json` file for a spec. By default reads from stdin unless `--i
 | `--format text\|json\|toon` | Output format.                                 |
 | `--config <path>`           | Config file path.                              |
 
+### spec update-metadata
+
+```
+specd specs update-metadata <specPath> [options]
+```
+
+Update spec metadata with LLM-optimized fields. Performs fresh extraction and merge.
+
+| Option                      | Description                                    |
+| --------------------------- | ---------------------------------------------- |
+| `--input <file>`            | Read metadata from this file instead of stdin. |
+| `--format text\|json\|toon` | Output format.                                 |
+| `--config <path>`           | Config file path.                              |
+
 ### spec invalidate-metadata
 
 ```
@@ -938,11 +952,30 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 
 ### project update
 
-```
+````
 specd project update [options]
-```
+### project update
 
 Update installed agent skills after upgrading SpecD. Reads the `plugins` list from `specd.yaml` and reinstalls skill files for each declared agent.
+
+| Option                      | Description       |
+| --------------------------- | ----------------- |
+| `--format text\|json\|toon` | Output format.    |
+| `--config <path>`           | Config file path. |
+
+### project update-metadata
+
+Update project-level metadata with LLM-optimized context and input hashes.
+
+| Option                      | Description                                    |
+| --------------------------- | ---------------------------------------------- |
+| `--input <file>`            | Read metadata from this file instead of stdin. |
+| `--format text\|json\|toon` | Output format.                                 |
+| `--config <path>`           | Config file path.                              |
+
+### project metadata
+
+Display the full contents of the `project-metadata.json` file.
 
 | Option                      | Description       |
 | --------------------------- | ----------------- |
@@ -953,7 +986,7 @@ Update installed agent skills after upgrading SpecD. Reads the `plugins` list fr
 
 ```text
 specd project dashboard [options]
-```
+````
 
 Display a project-level dashboard showing schema, workspaces, spec counts, and change activity. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)).
 

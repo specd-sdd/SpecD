@@ -1,0 +1,14 @@
+# deltas/core/get-spec-context/spec.md.delta.yaml
+- op: added
+  description: 'Prefer optimized context when available'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Build context entry from metadata'
+  content: |
+    ### Requirement: Prefer LLM-optimized context
+
+    If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`.

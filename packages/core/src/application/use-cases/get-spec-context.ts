@@ -26,6 +26,8 @@ export interface GetSpecContextInput {
   readonly contextMode?: 'list' | 'summary' | 'full' | 'hybrid'
   /** When present, restricts output to the listed section types. */
   readonly sections?: ReadonlyArray<SpecContextSectionFlag>
+  /** Whether to use LLM-optimized context when available. */
+  readonly llmOptimizedContext?: boolean
 }
 
 /** A resolved spec entry in the context result. */
@@ -54,6 +56,8 @@ export interface SpecContextEntry {
   }>
   /** Whether the metadata is stale or absent. */
   readonly stale: boolean
+  /** Optional LLM-optimized content string, if present and enabled. */
+  readonly optimizedContent?: string
 }
 
 /** Result returned by the {@link GetSpecContext} use case. */
@@ -130,6 +134,7 @@ export class GetSpecContext {
         metadata,
         input.sections,
         warnings,
+        input.llmOptimizedContext,
       ),
     )
 
@@ -147,6 +152,7 @@ export class GetSpecContext {
         input.sections,
         maxDepth,
         0,
+        input.llmOptimizedContext,
       )
     }
 
@@ -164,6 +170,7 @@ export class GetSpecContext {
    * @param metadata - Parsed metadata, or `null` if absent
    * @param sections - Optional section filter flags
    * @param warnings - Mutable array to collect warnings
+   * @param llmOptimizedContext - Whether to prefer optimized content
    * @returns The constructed context entry
    */
   private async _buildEntry(
@@ -175,6 +182,7 @@ export class GetSpecContext {
     metadata: SpecMetadata | null,
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
     warnings: ContextWarning[],
+    llmOptimizedContext = false,
   ): Promise<SpecContextEntry> {
     if (mode === 'list') {
       return { spec: specLabel, source, mode, stale: metadata === null }
@@ -199,6 +207,22 @@ export class GetSpecContext {
       }
 
       if (freshnessResult.allFresh) {
+        if (
+          llmOptimizedContext &&
+          metadata.optimizedContext !== undefined &&
+          metadata.optimizedContext !== ''
+        ) {
+          return {
+            spec: specLabel,
+            source,
+            mode,
+            stale: false,
+            ...(metadata.title !== undefined ? { title: metadata.title } : {}),
+            ...(metadata.description !== undefined ? { description: metadata.description } : {}),
+            optimizedContent: metadata.optimizedContext,
+          }
+        }
+
         if (mode === 'summary') {
           return {
             spec: specLabel,
@@ -223,7 +247,12 @@ export class GetSpecContext {
           mode,
           stale: false,
           ...(metadata.title !== undefined ? { title: metadata.title } : {}),
-          ...(metadata.description !== undefined ? { description: metadata.description } : {}),
+          ...(metadata.description !== undefined
+            ? {
+                description:
+                  (llmOptimizedContext && metadata.optimizedDescription) || metadata.description,
+              }
+            : {}),
           ...(effectiveSections.includes('rules') &&
           metadata.rules !== undefined &&
           metadata.rules.length > 0
@@ -279,6 +308,7 @@ export class GetSpecContext {
    * @param sections - Optional section filter flags
    * @param maxDepth - Maximum traversal depth, or undefined for unlimited
    * @param currentDepth - Current recursion depth
+   * @param llmOptimizedContext - Whether to prefer optimized content
    */
   private async _traverseDeps(
     metadata: SpecMetadata | null,
@@ -291,6 +321,7 @@ export class GetSpecContext {
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
     maxDepth: number | undefined,
     currentDepth: number,
+    llmOptimizedContext = false,
   ): Promise<void> {
     if (metadata === null) {
       warnings.push({
@@ -343,6 +374,7 @@ export class GetSpecContext {
           depMetadata,
           sections,
           warnings,
+          llmOptimizedContext,
         ),
       )
 
@@ -357,6 +389,7 @@ export class GetSpecContext {
         sections,
         maxDepth,
         currentDepth + 1,
+        llmOptimizedContext,
       )
     }
   }

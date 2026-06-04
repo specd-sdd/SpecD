@@ -395,3 +395,11 @@
 - **AND** its content contains NUL bytes but does not match the accepted UTF-16 layouts
 - **WHEN** it is indexed
 - **THEN** no node is created in the graph
+
+### Requirement: Prefer LLM-optimized description
+
+#### Scenario: Indexer uses optimized description
+
+- **GIVEN** a spec with `optimizedDescription: "AI Summary"` and `description: "Manual"`
+- **WHEN** indexing the spec
+- **THEN** the resulting `SpecNode` in the graph has `description: "AI Summary"`

@@ -27,6 +27,12 @@
       ]
     },
     {
+      "requirement": "Prefer LLM-optimized context",
+      "rules": [
+        "If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`."
+      ]
+    },
+    {
       "requirement": "Stale or absent metadata produces minimal entry",
       "rules": [
         "When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL emit a stale entry without pretending that full content is available.\n\n- In `list` mode, the entry contains only `spec`, `stale: true`, and mode/source metadata.\n- In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without fresh metadata.\n\nNo rules, constraints, or scenarios SHALL be included from stale metadata."
@@ -233,6 +239,13 @@
       "name": "Result entries include explicit display mode",
       "when": ["execute(input) is called"],
       "then": ["each returned entry includes its resolved display mode"]
+    },
+    {
+      "requirement": "Prefer LLM-optimized context",
+      "name": "Uses optimized context for single spec",
+      "given": ["llmOptimizedContext: true", "AND the spec has optimizedContext populated"],
+      "when": ["GetSpecContext is executed"],
+      "then": ["the entry uses the optimized content"]
     }
   ],
   "implementation": {
@@ -240,13 +253,28 @@
       {
         "specId": "core:get-spec-context",
         "file": "core:src/application/use-cases/get-spec-context.ts",
-        "symbol": "GetSpecContext"
+        "symbol": "GetSpecContextInput"
+      },
+      {
+        "specId": "core:get-spec-context",
+        "file": "core:src/application/use-cases/get-spec-context.ts",
+        "symbol": "SpecContextEntry"
+      },
+      {
+        "specId": "core:get-spec-context",
+        "file": "core:src/application/use-cases/get-spec-context.ts",
+        "symbol": "_buildEntry"
+      },
+      {
+        "specId": "core:get-spec-context",
+        "file": "core:src/application/use-cases/get-spec-context.ts",
+        "symbol": "_traverseDeps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c746cf07e8b164c3994ccb1cc8c6f813c1efdfbc5148a871d5b744ad34793f31",
-    "verify.md": "sha256:4e5c949bc305301a380865646edfd0f321c4d7203400806fd81ec8ef656bc35e"
+    "spec.md": "sha256:95c4f033032c3bac1a882a56cc40df1066736a0b0c048e4991d7a3f1cd0543cc",
+    "verify.md": "sha256:ffb396ee97d1c52361fd7c727a00d25e39f719b57b9af7054905afcf6792d10c"
   },
   "generatedBy": "core"
 }

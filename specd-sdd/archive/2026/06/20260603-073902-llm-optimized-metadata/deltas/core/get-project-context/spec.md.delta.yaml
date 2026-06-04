@@ -1,0 +1,29 @@
+# deltas/core/get-project-context/spec.md.delta.yaml
+- op: added
+  description: 'Implement project context cache invalidation'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Compile project-level context'
+  content: |
+    ### Requirement: Project context optimization and invalidation
+
+    If `llmOptimizedContext: true` is active, the use case SHALL attempt to load project-level metadata from `project-metadata.json`.
+
+    It SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
+    - `specd.yaml`
+    - Referenced `contextFiles`
+    - Metadata of included specs
+
+    If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, it SHALL fall back to raw compilation and emit a signal for the caller to show a warning.
+- op: added
+  description: 'Register dependency on project-metadata'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/project-metadata`](../project-metadata/spec.md) — for optimization storage and hashing rules

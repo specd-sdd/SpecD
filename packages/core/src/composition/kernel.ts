@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { CreateChange } from '../application/use-cases/create-change.js'
 import { GetStatus } from '../application/use-cases/get-status.js'
 import { TransitionChange } from '../application/use-cases/transition-change.js'
@@ -45,6 +47,9 @@ import { GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
 import { UpdateImplementationTracking } from '../application/use-cases/update-implementation-tracking.js'
 import { RefreshImplementationTracking } from '../application/use-cases/refresh-implementation-tracking.js'
 import { GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
+import { UpdateSpecMetadata } from '../application/use-cases/update-spec-metadata.js'
+import { UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
+import { GetProjectMetadata } from '../application/use-cases/get-project-metadata.js'
 import { ListWorkspaces } from '../application/use-cases/list-workspaces.js'
 import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
@@ -116,6 +121,7 @@ export interface Kernel {
     validateSchema: ValidateSchema
     validate: ValidateSpecs
     generateMetadata: GenerateSpecMetadata
+    updateMetadata: UpdateSpecMetadata
     getContext: GetSpecContext
   }
   project: {
@@ -125,6 +131,8 @@ export interface Kernel {
     listPlugins: ListPlugins
     listWorkspaces: ListWorkspaces
     getProjectContext: GetProjectContext
+    getMetadata: GetProjectMetadata
+    updateMetadata: UpdateProjectMetadata
   }
 }
 
@@ -191,6 +199,16 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   )
 
   const saveMetadata = new SaveSpecMetadata(i.specs)
+  const updateSpecMetadata = new UpdateSpecMetadata(generateMetadata, saveMetadata)
+  const updateProjectMetadata = new UpdateProjectMetadata(
+    config,
+    listWorkspaces,
+    i.specs,
+    i.files,
+    i.fileWriter,
+    i.hasher,
+  )
+  const getProjectMetadata = new GetProjectMetadata(config, i.files)
 
   return {
     registry,
@@ -297,6 +315,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       validateSchema: new ValidateSchema(i.schemas, config.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
       generateMetadata,
+      updateMetadata: updateSpecMetadata,
       getContext: new GetSpecContext(listWorkspaces, i.hasher),
     },
     project: {
@@ -314,8 +333,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.registry.extractorTransforms,
         workspaceRoutes,
       ),
+      getMetadata: getProjectMetadata,
+      updateMetadata: updateProjectMetadata,
     },
   }
 }
-import fs from 'node:fs/promises'
-import path from 'node:path'

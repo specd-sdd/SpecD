@@ -30,6 +30,14 @@ specd change context <name> <step>
 
 When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available full-mode sections are included. When one or more are passed, only those sections appear in each full-mode spec's content block. Section flags have no effect on list-mode or summary-mode entries.
 
+### Requirement: Optimization warning signal
+
+When `llmOptimizedContext: true` is active, if any spec in the context (or the project context itself) is missing optimized fields or has stale project metadata, the command SHALL surface a warning.
+
+The warning MUST include an instruction on how to generate the missing metadata (e.g., using `specd-spec-metadata` or a project-level equivalent).
+
+For structured formats (`json`, `toon`), the warning state and instructions SHALL be included alongside the context data.
+
 ### Requirement: Implementation tracking refresh before context compilation
 
 Before invoking `CompileContext`, the command MUST call `RefreshImplementationTracking` for the same change name.

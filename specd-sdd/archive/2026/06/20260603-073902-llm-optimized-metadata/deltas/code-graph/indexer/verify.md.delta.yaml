@@ -1,0 +1,15 @@
+# deltas/code-graph/indexer/verify.md.delta.yaml
+- op: added
+  description: 'Verify optimized description indexing'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Prefer LLM-optimized description
+
+    #### Scenario: Indexer uses optimized description
+
+    - **GIVEN** a spec with `optimizedDescription: "AI Summary"` and `description: "Manual"`
+    - **WHEN** indexing the spec
+    - **THEN** the resulting `SpecNode` in the graph has `description: "AI Summary"`

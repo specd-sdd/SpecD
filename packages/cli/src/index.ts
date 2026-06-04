@@ -50,6 +50,7 @@ import { registerSpecContext } from './commands/spec/context.js'
 import { registerSpecMetadata } from './commands/spec/metadata.js'
 import { registerSpecResolvePath } from './commands/spec/resolve-path.js'
 import { registerSpecWriteMetadata } from './commands/spec/write-metadata.js'
+import { registerSpecUpdateMetadata } from './commands/spec/update-metadata.js'
 import { registerSpecInvalidateMetadata } from './commands/spec/invalidate-metadata.js'
 import { registerSpecValidate } from './commands/spec/validate.js'
 import { registerSpecGenerateMetadata } from './commands/spec/generate-metadata.js'
@@ -58,6 +59,8 @@ import { registerSpecGenerateMetadata } from './commands/spec/generate-metadata.
 import { registerProjectInit } from './commands/project/init.js'
 import { registerProjectContext } from './commands/project/context.js'
 import { registerProjectUpdate } from './commands/project/update.js'
+import { registerProjectUpdateMetadata } from './commands/project/update-metadata.js'
+import { registerProjectMetadata } from './commands/project/metadata.js'
 import { registerProjectDashboard } from './commands/project/dashboard.js'
 import { registerProjectStatus } from './commands/project/status.js'
 
@@ -173,6 +176,7 @@ registerSpecContext(specCmd)
 registerSpecMetadata(specCmd)
 registerSpecResolvePath(specCmd)
 registerSpecWriteMetadata(specCmd)
+registerSpecUpdateMetadata(specCmd)
 registerSpecInvalidateMetadata(specCmd)
 registerSpecValidate(specCmd)
 registerSpecGenerateMetadata(specCmd)
@@ -186,6 +190,8 @@ const projectCmd = program
 registerProjectInit(projectCmd)
 registerProjectContext(projectCmd)
 registerProjectUpdate(projectCmd)
+registerProjectUpdateMetadata(projectCmd)
+registerProjectMetadata(projectCmd)
 registerProjectDashboard(projectCmd)
 registerProjectStatus(projectCmd)
 registerProjectInit(program)
@@ -249,4 +255,6 @@ program.action(async () => {
   await program.parseAsync(dashboardArgs, { from: 'user' })
 })
 
-program.parseAsync(process.argv).catch(handleError)
+program.parseAsync(process.argv).catch((err: unknown) => {
+  handleError(err)
+})

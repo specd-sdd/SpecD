@@ -1,0 +1,14 @@
+# deltas/code-graph/indexer/spec.md.delta.yaml
+- op: added
+  description: 'Prefer optimized description for indexing'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Spec indexing'
+  content: |
+    ### Requirement: Prefer LLM-optimized description
+
+    When indexing specs into the code graph, the indexer SHALL prefer `optimizedDescription` (if it exists and is not empty) over the standard `description` for BM25 full-text indexing and display metadata.

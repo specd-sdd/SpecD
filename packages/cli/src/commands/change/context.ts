@@ -110,6 +110,9 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           }
 
           const compileConfig: CompileContextConfig = {
+            projectRoot: config.projectRoot,
+            configPath: config.configPath,
+            llmOptimizedContext: config.llmOptimizedContext,
             ...(config.context !== undefined
               ? {
                   context: config.context.map((e) =>
@@ -146,18 +149,20 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
             )
           }
 
+          const fmt = parseFormat(opts.format)
           for (const w of result.warnings) {
             process.stderr.write(`warning: ${w.message}\n`)
           }
 
-          const fmt = parseFormat(opts.format)
           if (result.status === 'unchanged') {
             if (fmt === 'text') {
               output(
                 [
                   renderFingerprintLine(result.contextFingerprint),
                   'Context unchanged since last call.',
-                ].join('\n\n'),
+                ]
+                  .filter((p) => p !== '')
+                  .join('\n\n'),
                 'text',
               )
             } else {
@@ -167,7 +172,9 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           }
 
           if (fmt === 'text') {
-            const parts: string[] = [renderFingerprintLine(result.contextFingerprint)]
+            const parts: string[] = []
+
+            parts.push(renderFingerprintLine(result.contextFingerprint))
 
             // Project context entries
             for (const entry of result.projectContext) {

@@ -1,0 +1,29 @@
+- op: added
+  description: 'Prefer optimized context and emit warnings'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Filter by workspace'
+  content: |
+    ### Requirement: Prefer LLM-optimized context
+
+    If `llmOptimizedContext: true` is active in the project configuration, the context compiler SHALL prefer `optimizedContext` for each spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`.
+
+    ### Requirement: Optimization warning signal
+
+    When `llmOptimizedContext: true` is active, the compiler SHALL emit a warning if:
+    - The project-level optimized context is missing or stale.
+    - Any spec included in the context is missing its `optimizedContext` field.
+
+    The warning SHALL include remediation instructions for the agent.
+- op: added
+  description: 'Register dependency on project-metadata'
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:core/project-metadata`](../project-metadata/spec.md) — for project-level optimization storage

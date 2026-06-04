@@ -1,0 +1,76 @@
+{
+  "title": "core:update-project-metadata",
+  "description": "To maintain an optimized project context, we need a way for agents to save their optimizations while the system ensures the cache remains valid. The `UpdateProjectMetadata` use case accepts an optimized payload, computes the current hashes for all project context inputs, and persists the full `project-metadata.json` structure.",
+  "dependsOn": ["core:project-metadata"],
+  "context": [
+    "To maintain an optimized project context, we need a way for agents to save their optimizations while the system ensures the cache remains valid. The `UpdateProjectMetadata` use case accepts an optimized payload, computes the current hashes for all project context inputs, and persists the full `project-metadata.json` structure."
+  ],
+  "rules": [
+    {
+      "requirement": "Hash computation",
+      "rules": [
+        "The use case SHALL compute current SHA-256 hashes for:\n\n- The project's `specd.yaml`\n- All `contextFiles` defined in the configuration\n- All spec metadata for specs currently included in the project context"
+      ]
+    },
+    {
+      "requirement": "Atomicity",
+      "rules": ["The update to `project-metadata.json` SHALL be atomic to prevent corruption."]
+    },
+    {
+      "requirement": "Payload separation",
+      "rules": [
+        "The use case SHALL only accept the `optimizedContext` string (wrapped in an input object) from the caller. It SHALL NOT allow the caller to provide its own freshness hashes or versioning information. This data is mapped to the internal `optimized.context` field in the persisted file."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Hash computation",
+      "name": "Computes all hashes",
+      "when": ["UpdateProjectMetadata is executed"],
+      "then": [
+        "it uses the ContentHasher to get fresh hashes for specd.yaml, context files, and included spec metadata"
+      ]
+    },
+    {
+      "requirement": "Atomicity",
+      "name": "Atomic write",
+      "when": ["saving project-metadata.json"],
+      "then": ["the write operation is atomic (e.g., write to temp then rename)"]
+    },
+    {
+      "requirement": "Payload separation",
+      "name": "Caller cannot override hashes",
+      "when": [
+        "UpdateProjectMetadata is called with a payload containing internal fields like freshness or version"
+      ],
+      "then": [
+        "the use case ignores those fields and computes them itself, only using the provided optimizedContext"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:update-project-metadata",
+        "file": "core:src/application/use-cases/update-project-metadata.ts",
+        "symbol": "UpdateProjectMetadataInput"
+      },
+      {
+        "specId": "core:update-project-metadata",
+        "file": "core:src/application/use-cases/update-project-metadata.ts",
+        "symbol": "UpdateProjectMetadataResult"
+      },
+      {
+        "specId": "core:update-project-metadata",
+        "file": "core:src/application/use-cases/update-project-metadata.ts",
+        "symbol": "UpdateProjectMetadata"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:3362e1c94afabd12b7399c5d4426f4677c83602f252e32c7fd52582bb31119fc",
+    "verify.md": "sha256:5a049a3863b62c6971075a34ca8efd340633ceef6894703c77d18d546d563185"
+  },
+  "generatedBy": "core"
+}

@@ -25,6 +25,10 @@ For each resolved spec, the use case SHALL load all artifact files and attempt t
 
 When metadata exists and content hashes confirm freshness, the entry SHALL render from metadata according to that mode. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested.
 
+### Requirement: Prefer LLM-optimized context
+
+If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`.
+
 ### Requirement: Stale or absent metadata produces minimal entry
 
 When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL emit a stale entry without pretending that full content is available.

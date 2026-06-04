@@ -388,9 +388,17 @@ When present, this level is used for default file logging. Logs are written unde
 llmOptimizedContext: true # default: false
 ```
 
-The current use case is spec metadata generation: with `llmOptimizedContext: true`, SpecD generates richer descriptions, more precisely structured scenarios, and more accurate `dependsOn` suggestions when building `metadata.json` files. With `false`, metadata is extracted by parsing the structural conventions of `spec.md` and `verify.md` directly.
+When enabled:
 
-Leave this `false` if your pipeline has no LLM access (offline CI, air-gapped environments). Set it to `true` if you want LLM-enriched output and your tooling has access to a model.
+- **Spec Metadata**: `CompileContext` and `GetSpecContext` prefer the `optimizedContext` and `optimizedDescription` fields from `metadata.json` if they exist.
+- **Project Context**: `GetProjectContext` uses the cached, optimized version of the project-level background from `project-metadata.json` (if fresh).
+- **Code Graph**: The indexer uses the optimized descriptions for improved search results.
+
+With `llmOptimizedContext: false`, all context is assembled by joining raw artifact content and deterministic metadata.
+
+### `project-metadata.json`
+
+When `llmOptimizedContext` is active, SpecD can use a cached version of the project background context. This cache is stored in `project-metadata.json` under the resolved `configPath`. It includes SHA-256 hashes of `specd.yaml`, context files, and included spec metadata to ensure the cache remains fresh. If any input changes, the cache is invalidated and SpecD falls back to raw compilation until an agent runs the optimization skill to regenerate it.
 
 ## contextMode
 

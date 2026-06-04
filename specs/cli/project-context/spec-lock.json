@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-project-context",
+    "core:compile-context",
+    "core:config"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/project/context.ts",
+      "symbols": ["registerProjectContext"]
+    }
+  ]
+}

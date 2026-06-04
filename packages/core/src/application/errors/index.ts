@@ -15,3 +15,5 @@ export { InvalidInvalidateTargetError } from './invalid-invalidate-target-error.
 export { InvalidateRequiresForceError } from './invalidate-requires-force-error.js'
 export { ImplementationLinksExistError } from './implementation-links-exist-error.js'
 export { ImplementationFileNotFoundError } from './implementation-file-not-found-error.js'
+export { ConfigNotFoundError } from './config-not-found-error.js'
+export { ProjectMetadataNotFoundError } from './project-metadata-not-found-error.js'

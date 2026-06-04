@@ -11,5 +11,35 @@
     "core:spec-repository-port",
     "core:spec-lock"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/domain/services/parse-metadata.ts",
+      "symbols": [
+        "SpecMetadata",
+        "specMetadataSchema",
+        "strictSpecMetadataSchema",
+        "permissiveSpecMetadataSchema"
+      ]
+    },
+    {
+      "file": "core:src/application/ports/file-writer.ts",
+      "symbols": ["FileWriter"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/file-writer.ts",
+      "symbols": ["FsFileWriter"]
+    },
+    {
+      "file": "core:src/application/errors/config-not-found-error.ts",
+      "symbols": ["ConfigNotFoundError"]
+    },
+    {
+      "file": "core:src/application/errors/project-metadata-not-found-error.ts",
+      "symbols": ["ProjectMetadataNotFoundError"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/context-warning.ts",
+      "symbols": ["ContextWarning"]
+    }
+  ]
 }

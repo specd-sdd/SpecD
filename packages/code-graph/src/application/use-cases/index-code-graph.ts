@@ -1006,9 +1006,30 @@ export class IndexCodeGraph {
           try {
             const specId = `${ws.name}:${repoSpec.name.toString()}`
             const existing = existingSpecMap.get(specId)
-            const specHash = await ws.specRepo.specHash(repoSpec)
 
-            if (specHash !== null && existing?.contentHash === specHash) {
+            // Resolve and sort content artifacts (exclude sidecars)
+            const contentFilenames = repoSpec.filenames
+              .filter((f) => !f.startsWith('.') && f !== 'spec-lock.json' && f !== 'metadata.json')
+              .sort((a, b) => {
+                if (a === 'spec.md') return -1
+                if (b === 'spec.md') return 1
+                return a.localeCompare(b)
+              })
+
+            const artifacts = await Promise.all(
+              contentFilenames.map((f) => ws.specRepo.artifact(repoSpec, f)),
+            )
+
+            let content = ''
+            for (const artifact of artifacts) {
+              if (artifact?.content) {
+                content += artifact.content + '\n'
+              }
+            }
+
+            const specHash = computeContentHash(content)
+
+            if (existing?.contentHash === specHash) {
               if (wsBreakdown) wsBreakdown.specsIndexed++
               continue
             }
@@ -1017,24 +1038,15 @@ export class IndexCodeGraph {
             const dependsOn = await ws.specRepo.readPersistedDependsOn(repoSpec)
             const implementationLinks = await ws.specRepo.readPersistedImplementation(repoSpec)
 
-            let content = ''
-            const artifacts = await Promise.all(
-              repoSpec.filenames.map((f) => ws.specRepo.artifact(repoSpec, f)),
-            )
-            for (const artifact of artifacts) {
-              if (artifact?.content) {
-                content += artifact.content + '\n'
-              }
-            }
-
             const specNode = createSpecNode({
               specId,
               path: repoSpec.name.toString(),
               title: metadata?.title ?? repoSpec.name.toString(),
-              description: metadata?.description ?? '',
-              contentHash: specHash ?? 'unknown',
+              description: metadata?.optimizedDescription || metadata?.description || '',
+              contentHash: specHash,
               content,
               workspace: ws.name,
+              optimizedDescription: metadata?.optimizedDescription,
             })
 
             if (existing) {

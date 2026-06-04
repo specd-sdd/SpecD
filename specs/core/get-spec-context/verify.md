@@ -149,3 +149,12 @@
 
 - **WHEN** `execute(input)` is called
 - **THEN** each returned entry includes its resolved display mode
+
+### Requirement: Prefer LLM-optimized context
+
+#### Scenario: Uses optimized context for single spec
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** the spec has `optimizedContext` populated
+- **WHEN** `GetSpecContext` is executed
+- **THEN** the entry uses the optimized content

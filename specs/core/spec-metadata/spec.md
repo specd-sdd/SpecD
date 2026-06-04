@@ -49,6 +49,8 @@ The metadata generation process SHALL obtain persisted schema, dependencies, and
   "rules": [{ "requirement": "Lifecycle states", "rules": ["..."] }],
   "constraints": ["..."],
   "scenarios": [{ "requirement": "...", "name": "...", "given": [], "when": [], "then": [] }],
+  "optimizedDescription": "AI optimized description",
+  "optimizedContext": "AI optimized context",
   "generatedBy": "core"
 }
 ```
@@ -64,6 +66,8 @@ Fields:
 - `constraints` — extracted constraint bullets
 - `scenarios` — extracted verification scenarios
 - `context` — freeform context strings
+- `optimizedDescription` — optional concise, high-signal description for agents
+- `optimizedContext` — optional optimized representation for agent context injection
 - `generatedBy` — `"core"` for deterministic extraction, `"agent"` for LLM-optimized
 
 ### Requirement: Write-time structural validation
@@ -73,13 +77,15 @@ The `SaveSpecMetadata` use case validates JSON content against the `strictSpecMe
 - `title` (required) must be a non-empty string
 - `description` (required) must be a non-empty string
 - `keywords` must be an array of non-empty lowercase strings
-- `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)
-- `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`
-- `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)
+- `dependsOn` must be an array of strings, each matching a valid spec ID pattern
+- `contentHashes` (required) must be a non-empty record of filename to hash string
+- `rules` must be an array of objects with `requirement` and `rules`
 - `constraints` must be a non-empty array of non-empty strings
-- `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)
+- `scenarios` must be an array of objects with `requirement`, `name`, `when`, `then`, and `given`
+- `optimizedDescription` must be a non-empty string
+- `optimizedContext` must be a non-empty string
 
-If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a domain error extending `SpecdError`) with the Zod issues formatted as a human-readable message. The file is not written.
+If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError`. The file is not written.
 
 Unknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions.
 

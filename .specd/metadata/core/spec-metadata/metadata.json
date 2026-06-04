@@ -28,13 +28,13 @@
     {
       "requirement": "File format",
       "rules": [
-        "`metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:\n\n```json\n{\n  \"title\": \"Change\",\n  \"description\": \"The central domain entity in specd.\",\n  \"dependsOn\": [\"core:storage\", \"core:delta-format\"],\n  \"contentHashes\": {\n    \"spec.md\": \"sha256:abc123...\"\n  },\n  \"rules\": [{ \"requirement\": \"Lifecycle states\", \"rules\": [\"...\"] }],\n  \"constraints\": [\"...\"],\n  \"scenarios\": [{ \"requirement\": \"...\", \"name\": \"...\", \"given\": [], \"when\": [], \"then\": [] }],\n  \"generatedBy\": \"core\"\n}\n```\n\nFields:\n\n- `title` — human-readable display title\n- `description` — short summary of the spec's purpose\n- `keywords` — lowercase hyphen-separated discovery tokens\n- `dependsOn` — array of spec IDs this spec depends on\n- `contentHashes` — `{ filename: \"sha256:<hex>\" }` for staleness detection\n- `rules` — extracted requirements grouped by heading\n- `constraints` — extracted constraint bullets\n- `scenarios` — extracted verification scenarios\n- `context` — freeform context strings\n- `generatedBy` — `\"core\"` for deterministic extraction, `\"agent\"` for LLM-optimized"
+        "`metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:\n\n```json\n{\n  \"title\": \"Change\",\n  \"description\": \"The central domain entity in specd.\",\n  \"dependsOn\": [\"core:storage\", \"core:delta-format\"],\n  \"contentHashes\": {\n    \"spec.md\": \"sha256:abc123...\"\n  },\n  \"rules\": [{ \"requirement\": \"Lifecycle states\", \"rules\": [\"...\"] }],\n  \"constraints\": [\"...\"],\n  \"scenarios\": [{ \"requirement\": \"...\", \"name\": \"...\", \"given\": [], \"when\": [], \"then\": [] }],\n  \"optimizedDescription\": \"AI optimized description\",\n  \"optimizedContext\": \"AI optimized context\",\n  \"generatedBy\": \"core\"\n}\n```\n\nFields:\n\n- `title` — human-readable display title\n- `description` — short summary of the spec's purpose\n- `keywords` — lowercase hyphen-separated discovery tokens\n- `dependsOn` — array of spec IDs this spec depends on\n- `contentHashes` — `{ filename: \"sha256:<hex>\" }` for staleness detection\n- `rules` — extracted requirements grouped by heading\n- `constraints` — extracted constraint bullets\n- `scenarios` — extracted verification scenarios\n- `context` — freeform context strings\n- `optimizedDescription` — optional concise, high-signal description for agents\n- `optimizedContext` — optional optimized representation for agent context injection\n- `generatedBy` — `\"core\"` for deterministic extraction, `\"agent\"` for LLM-optimized"
       ]
     },
     {
       "requirement": "Write-time structural validation",
       "rules": [
-        "The `SaveSpecMetadata` use case validates JSON content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a JSON object. `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:\n\n- `title` (required) must be a non-empty string\n- `description` (required) must be a non-empty string\n- `keywords` must be an array of non-empty lowercase strings\n- `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)\n- `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`\n- `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)\n- `constraints` must be a non-empty array of non-empty strings\n- `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)\n\nIf validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a domain error extending `SpecdError`) with the Zod issues formatted as a human-readable message. The file is not written.\n\nUnknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions."
+        "The `SaveSpecMetadata` use case validates JSON content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a JSON object. `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:\n\n- `title` (required) must be a non-empty string\n- `description` (required) must be a non-empty string\n- `keywords` must be an array of non-empty lowercase strings\n- `dependsOn` must be an array of strings, each matching a valid spec ID pattern\n- `contentHashes` (required) must be a non-empty record of filename to hash string\n- `rules` must be an array of objects with `requirement` and `rules`\n- `constraints` must be a non-empty array of non-empty strings\n- `scenarios` must be an array of objects with `requirement`, `name`, `when`, `then`, and `given`\n- `optimizedDescription` must be a non-empty string\n- `optimizedContext` must be a non-empty string\n\nIf validation fails, `SaveSpecMetadata` throws a `MetadataValidationError`. The file is not written.\n\nUnknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions."
       ]
     },
     {
@@ -285,6 +285,13 @@
       "given": ["a .specd-metadata.yaml on disk with keywords: [123, true] (invalid types)"],
       "when": ["parseMetadata reads the file"],
       "then": ["it returns {} without throwing — read path never blocks operations"]
+    },
+    {
+      "requirement": "Write-time structural validation",
+      "name": "Schema supports optimized fields",
+      "given": ["a metadata object with optimizedDescription and optimizedContext"],
+      "when": ["validated against strictSpecMetadataSchema"],
+      "then": ["validation passes"]
     },
     {
       "requirement": "dependsOn overwrite protection",
@@ -579,10 +586,58 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "SpecMetadata"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "specMetadataSchema"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "strictSpecMetadataSchema"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/domain/services/parse-metadata.ts",
+        "symbol": "permissiveSpecMetadataSchema"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/application/ports/file-writer.ts",
+        "symbol": "FileWriter"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/infrastructure/fs/file-writer.ts",
+        "symbol": "FsFileWriter"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/application/errors/config-not-found-error.ts",
+        "symbol": "ConfigNotFoundError"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/application/errors/project-metadata-not-found-error.ts",
+        "symbol": "ProjectMetadataNotFoundError"
+      },
+      {
+        "specId": "core:spec-metadata",
+        "file": "core:src/application/use-cases/_shared/context-warning.ts",
+        "symbol": "ContextWarning"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:26f0e25742367f0ed5748c6a82faa8e692df25044adc32a714e922dab2b6459b",
-    "verify.md": "sha256:cb352c90edaa188847393ba87c783d6a89b72145c8229860fb6189cca27d1833"
+    "spec.md": "sha256:70dea8cb667d7786fcdccddc415908b1b5ff86b98ad8326849d8c7e1cd342ba2",
+    "verify.md": "sha256:6767c22925efdc129d93595cc5f564a17500bf8d3908ace0de0d6c52afaa08f3"
   },
   "generatedBy": "core"
 }

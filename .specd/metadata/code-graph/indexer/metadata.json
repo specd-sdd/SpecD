@@ -86,6 +86,12 @@
       "rules": [
         "The indexer SHALL build `SpecNode` entries and relations by directly consuming the `SpecRepository` instance from each workspace:\n\n1. Use `repo.count()` to discover the total spec volume upfront for accurate progress reporting\n2. Use `repo.list()` to enumerate spec identities\n3. For each spec, check `repo.specHash()` against the store to enable incremental skipping\n4. Load `title` and `description` via `repo.metadata()`\n5. Load `COVERS_FILE` and `COVERS_SYMBOL` relations via `repo.readPersistedImplementation()`\n6. Load `DEPENDS_ON` relations via `repo.readPersistedDependsOn()`\n\nThe indexer SHALL NOT rely on the CLI to pre-extract spec data. It owns the semantic mapping from repository data to graph nodes.\n\nSpec indexing runs as an additional phase after source file indexing."
       ]
+    },
+    {
+      "requirement": "Prefer LLM-optimized description",
+      "rules": [
+        "When indexing specs into the code graph, the indexer SHALL prefer `optimizedDescription` (if it exists and is not empty) over the standard `description` for BM25 full-text indexing and display metadata."
+      ]
     }
   ],
   "constraints": [
@@ -638,31 +644,37 @@
       ],
       "when": ["it is indexed"],
       "then": ["no node is created in the graph"]
+    },
+    {
+      "requirement": "Prefer LLM-optimized description",
+      "name": "Indexer uses optimized description",
+      "given": ["a spec with optimizedDescription: \"AI Summary\" and description: \"Manual\""],
+      "when": ["indexing the spec"],
+      "then": ["the resulting SpecNode in the graph has description: \"AI Summary\""]
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/application/use-cases/index-code-graph.ts"
+        "file": "code-graph:src/domain/value-objects/spec-node.ts",
+        "symbol": "SpecNode"
       },
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/application/use-cases/_shared/resolve-effective-graph-config.ts"
+        "file": "code-graph:src/domain/value-objects/spec-node.ts",
+        "symbol": "createSpecNode"
       },
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts"
-      },
-      {
-        "specId": "code-graph:indexer",
-        "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
+        "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+        "symbol": "IndexCodeGraph"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3eac82f28089c18c0b0ff5a5805f351e748bc6155c7478777f2ee99a39769a67",
-    "verify.md": "sha256:8ef0e52957583b1b3e4a367b118a4f101106787a4120be61639a7542696bf6a7"
+    "spec.md": "sha256:1318ae503c01fd5ef0c6c53c93ed4504e0236eb4165a307499d95b0b866cab60",
+    "verify.md": "sha256:090de860ec9bbf14544fd588d3042338537f9edcf0ba81a0c8f1d0e043c29f13"
   },
   "generatedBy": "core"
 }

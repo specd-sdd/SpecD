@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:config",
+    "core:compile-context",
+    "core:spec-metadata",
+    "core:schema-format",
+    "default:_global/architecture",
+    "core:core/project-metadata"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-project-context.ts",
+      "symbols": ["GetProjectContext"]
+    }
+  ]
+}

@@ -110,6 +110,9 @@ export function registerProjectStatus(parent: Command): void {
           | undefined
         if (opts.context) {
           const compileConfig = {
+            projectRoot: config.projectRoot,
+            configPath: config.configPath,
+            llmOptimizedContext: config.llmOptimizedContext,
             ...(config.context !== undefined
               ? {
                   context: config.context.map((e) =>

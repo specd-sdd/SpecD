@@ -133,3 +133,13 @@
 - **WHEN** `specd project context` is run
 - **THEN** stderr contains a `warning:` line for the stale spec
 - **AND** the spec content is still included using the metadataExtraction fallback
+
+### Requirement: Optimization warning signal
+
+#### Scenario: Displays warning when project cache is stale
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** project metadata is stale
+- **WHEN** `specd project context` is run
+- **THEN** a standard CLI warning is emitted
+- **AND** it includes an instruction to run the optimization skill

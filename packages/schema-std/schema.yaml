@@ -68,8 +68,10 @@ artifacts:
             it or explicitly state that it will be deferred and why after asking the user.
         - id: register-spec-deps
           instruction: |
-            Review the "Specs affected" section. For each spec (new or modified)
-            that lists dependencies, you MUST register or unregister them now.
+            Review the "Specs affected" section. You MUST register each spec (new or modified)
+            with `specd changes edit <change-name> --add-spec <workspace>:<capability-path>`
+            and if there are dependencies, you MUST register or unregister them now too with
+            `specd changes deps <change-name> <spec-id> --add/remove/set <workspace1>:<capability-path2>,<workspace2>:<capability-path2>` 
             Dependency registration affects context compilation and delta file creation
             for all downstream artifacts — do not defer this to the specs artifact.
 
@@ -82,11 +84,14 @@ artifacts:
     requires:
       - proposal
     instruction: |
-      You MUST review the "Specs affected" section from the proposal. For each spec
-      (new or modified) that lists dependencies, register or unregister them now.
+      You MUST review the "Specs affected" section. You MUST register each spec (new or modified)
+      with `specd changes edit <change-name> --add-spec <workspace>:<capability-path>`
+      and if there are dependencies, you MUST register or unregister them now too with
+      `specd changes deps <change-name> <spec-id> --add/remove/set <workspace1>:<capability-path2>,<workspace2>:<capability-path2>`
+
       Ensure no open question from the proposal affects the spec you are writing,
       and if there is an open question that could change the spec's direction,
-      you MUST resolve it with the user before proceeding. 
+      you MUST resolve it with the user before proceeding.
 
       Create new specification files for every new spec listed in the proposal's
       "Specs affected" section. Each new spec defines WHAT the system should do for
@@ -353,14 +358,12 @@ artifacts:
       - specs (spec.md and deltas) — the final requirements the implementation must satisfy
       - verify (verify.md and deltas) — the verification scenarios the implementation must pass
 
-      Create the design document that explains HOW to implement the change. This artifact
-      is the bridge between specs and tasks — it must be concrete enough that tasks can be
-      derived from it without ambiguity.
-
-      The design must be concrete, not generic. Avoid vague statements like "add a new
-      service" or "update the module" — specify the exact class name, method signatures,
-      and file paths. A developer reading the design should know precisely what to build
-      without needing to make design decisions of their own.
+      The design artifact must fully materialize the implementation context.
+      Do not assume access to previous artifacts.
+      Every technical detail required for coding, testing, validation, integration, deployment,
+      and operation must be explicitly included.
+      Summarize and consolidate information from prior artifacts rather than referencing it.
+      The design must be independently consumable by both humans and AI agents.
 
       Before writing, analyse the codebase to understand impact:
       - **Affected files discovery**: use the impact analysis to find every existing

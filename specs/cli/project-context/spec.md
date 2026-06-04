@@ -24,6 +24,14 @@ specd project context
 
 When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block.
 
+### Requirement: Optimization warning signal
+
+When `llmOptimizedContext: true` is active, if the project-level optimized context is missing or stale according to `UpdateProjectMetadata` invalidation rules, the command SHALL surface a warning.
+
+The warning MUST include an instruction to run the optimization skill.
+
+For structured formats, the warning SHALL be included in the response.
+
 ### Requirement: Behaviour
 
 The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.

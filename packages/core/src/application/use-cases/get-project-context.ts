@@ -1,4 +1,5 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { checkProjectMetadataFreshness } from './_shared/project-metadata-freshness.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
@@ -118,6 +119,27 @@ export class GetProjectContext {
     const warnings: ContextWarning[] = []
     const contextEntries: string[] = []
 
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    // Step 0: Cache Verification for LLM-optimized context
+    const {
+      metadata: projectMeta,
+      isFresh,
+      warnings: optimizationWarnings,
+    } = await checkProjectMetadataFreshness(input.config, this._files, this._hasher, workspaceMap)
+
+    warnings.push(...optimizationWarnings)
+
+    if (isFresh && projectMeta) {
+      // ALL FRESH! Return optimized context.
+      return {
+        contextEntries: [projectMeta.optimized.context],
+        specs: [], // optimized context already includes them
+        warnings: [],
+      }
+    }
+
     // Collect project-level context entries (labelled with their source)
     for (const entry of input.config.context ?? []) {
       if ('instruction' in entry) {
@@ -135,9 +157,6 @@ export class GetProjectContext {
         }
       }
     }
-
-    const workspaces = await this._listWorkspaces.execute()
-    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
     // Steps 1–2: collect included specs using project-level patterns only.
     const includedSpecs = new Map<string, ResolvedSpec>()
@@ -244,7 +263,11 @@ export class GetProjectContext {
       let content: string
 
       if (isFresh && metadata !== null) {
-        content = this._renderFromMetadata(metadata, sectionsFilter)
+        content = this._renderFromMetadata(
+          metadata,
+          sectionsFilter,
+          input.config.llmOptimizedContext,
+        )
       } else {
         if (metadata !== null) {
           warnings.push({
@@ -338,7 +361,7 @@ export class GetProjectContext {
       workspaceRoutes: this._workspaceRoutes,
     })
 
-    return this._metadataToParts(extracted.metadata, sectionsFilter)
+    return this._metadataToParts(extracted.metadata, sectionsFilter, true) // fallback extraction can also use optimized fields if they came from extraction? actually no.
   }
 
   /**
@@ -346,13 +369,22 @@ export class GetProjectContext {
    *
    * @param metadata - The fresh parsed metadata
    * @param sectionsFilter - Optional filter to include only specific sections
+   * @param llmOptimizedContext - Whether to prefer optimized fields
    * @returns Rendered content string
    */
   private _renderFromMetadata(
     metadata: SpecMetadata,
     sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    llmOptimizedContext = false,
   ): string {
-    return this._metadataToParts(metadata, sectionsFilter).join('\n\n')
+    if (
+      llmOptimizedContext &&
+      metadata.optimizedContext !== undefined &&
+      metadata.optimizedContext !== ''
+    ) {
+      return metadata.optimizedContext
+    }
+    return this._metadataToParts(metadata, sectionsFilter, llmOptimizedContext).join('\n\n')
   }
 
   /**
@@ -360,16 +392,23 @@ export class GetProjectContext {
    *
    * @param metadata - Spec metadata to convert
    * @param sectionsFilter - Optional section filter
+   * @param llmOptimizedContext - Whether to prefer optimized fields
    * @returns Array of rendered markdown strings
    */
   private _metadataToParts(
     metadata: SpecMetadata,
     sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    llmOptimizedContext = false,
   ): string[] {
     const metaParts: string[] = []
-    if (metadata.description !== undefined) {
-      metaParts.push(`**Description:** ${metadata.description}`)
+
+    // Preference for optimized description
+    const description =
+      (llmOptimizedContext && metadata.optimizedDescription) || metadata.description
+    if (description !== undefined && description !== '') {
+      metaParts.push(`**Description:** ${description}`)
     }
+
     const effectiveSections =
       sectionsFilter === undefined || sectionsFilter.length === 0
         ? (['rules', 'constraints'] as const)

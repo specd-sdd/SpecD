@@ -201,6 +201,10 @@ The indexer SHALL NOT rely on the CLI to pre-extract spec data. It owns the sema
 
 Spec indexing runs as an additional phase after source file indexing.
 
+### Requirement: Prefer LLM-optimized description
+
+When indexing specs into the code graph, the indexer SHALL prefer `optimizedDescription` (if it exists and is not empty) over the standard `description` for BM25 full-text indexing and display metadata.
+
 ## Constraints
 
 - The `GraphStore` must be opened before calling the use case — the indexer does not manage store lifecycle

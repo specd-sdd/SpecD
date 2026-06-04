@@ -156,3 +156,13 @@
 - **WHEN** `specd change context my-change implementing` is run
 - **THEN** stderr names `tasks` as the blocking artifact
 - **AND** the CLI does not recompute a different blocking set locally
+
+### Requirement: Optimization warning signal
+
+#### Scenario: Displays warnings when optimizations are missing
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** some specs (or the project) are missing optimization
+- **WHEN** `specd change context` is run
+- **THEN** standard CLI warnings are emitted
+- **AND** they include remediation instructions for the agent

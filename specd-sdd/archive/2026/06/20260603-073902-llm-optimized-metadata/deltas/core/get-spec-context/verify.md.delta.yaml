@@ -1,0 +1,16 @@
+# deltas/core/get-spec-context/verify.md.delta.yaml
+- op: added
+  description: 'Verify optimized context preference'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Prefer LLM-optimized context
+
+    #### Scenario: Uses optimized context for single spec
+
+    - **GIVEN** `llmOptimizedContext: true`
+    - **AND** the spec has `optimizedContext` populated
+    - **WHEN** `GetSpecContext` is executed
+    - **THEN** the entry uses the optimized content

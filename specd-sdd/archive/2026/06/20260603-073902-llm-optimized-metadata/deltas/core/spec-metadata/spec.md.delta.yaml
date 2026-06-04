@@ -1,0 +1,62 @@
+# deltas/core/spec-metadata/spec.md.delta.yaml
+- op: modified
+  description: 'Add optimized fields to SpecMetadata interface and schema'
+  selector:
+    type: section
+    matches: 'Requirement: File format'
+  content: |
+    `metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:
+
+    ```json
+    {
+      "title": "Change",
+      "description": "The central domain entity in specd.",
+      "dependsOn": ["core:storage", "core:delta-format"],
+      "contentHashes": {
+        "spec.md": "sha256:abc123..."
+      },
+      "rules": [{ "requirement": "Lifecycle states", "rules": ["..."] }],
+      "constraints": ["..."],
+      "scenarios": [{ "requirement": "...", "name": "...", "given": [], "when": [], "then": [] }],
+      "optimizedDescription": "AI optimized description",
+      "optimizedContext": "AI optimized context",
+      "generatedBy": "core"
+    }
+    ```
+
+    Fields:
+
+    - `title` — human-readable display title
+    - `description` — short summary of the spec's purpose
+    - `keywords` — lowercase hyphen-separated discovery tokens
+    - `dependsOn` — array of spec IDs this spec depends on
+    - `contentHashes` — `{ filename: "sha256:<hex>" }` for staleness detection
+    - `rules` — extracted requirements grouped by heading
+    - `constraints` — extracted constraint bullets
+    - `scenarios` — extracted verification scenarios
+    - `context` — freeform context strings
+    - `optimizedDescription` — optional concise, high-signal description for agents
+    - `optimizedContext` — optional optimized representation for agent context injection
+    - `generatedBy` — `"core"` for deterministic extraction, `"agent"` for LLM-optimized
+- op: modified
+  description: 'Update validation rules'
+  selector:
+    type: section
+    matches: 'Requirement: Write-time structural validation'
+  content: |
+    The `SaveSpecMetadata` use case validates JSON content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a JSON object. `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:
+
+    - `title` (required) must be a non-empty string
+    - `description` (required) must be a non-empty string
+    - `keywords` must be an array of non-empty lowercase strings
+    - `dependsOn` must be an array of strings, each matching a valid spec ID pattern
+    - `contentHashes` (required) must be a non-empty record of filename to hash string
+    - `rules` must be an array of objects with `requirement` and `rules`
+    - `constraints` must be a non-empty array of non-empty strings
+    - `scenarios` must be an array of objects with `requirement`, `name`, `when`, `then`, and `given`
+    - `optimizedDescription` must be a non-empty string
+    - `optimizedContext` must be a non-empty string
+
+    If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError`. The file is not written.
+
+    Unknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions.
