@@ -85,7 +85,7 @@ describe('RunStepHooks', () => {
     })
 
     it('throws SchemaMismatchError when schema name does not match change schema name', async () => {
-      const change = makeChange('my-change', {}, 'alpha-schema')
+      const change = makeChange('my-change', { schemaName: 'alpha-schema' })
       const schema = makeSchema({ name: 'beta-schema' })
       const uc = makeUseCase({
         changes: makeChangeRepository([change]),

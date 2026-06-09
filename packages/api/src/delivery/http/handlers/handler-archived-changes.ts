@@ -1,11 +1,7 @@
 import { safeRegex, type ArchivedChange, type Kernel } from '@specd/core'
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
-import {
-  apiRouteSchema,
-  PARAMS_CHANGE_NAME,
-  PARAMS_CHANGE_NAME_FILENAME,
-} from '../route-schema.js'
+import { apiRouteSchema, PARAMS_CHANGE_NAME, PARAMS_CHANGE_NAME_FILENAME } from '../route-schema.js'
 import { toArtifactContentDto } from '../presenters/presenter-artifact.js'
 import { toChangeDetailDto } from '../presenters/presenter-change.js'
 
@@ -49,19 +45,25 @@ export function registerArchivedChangesRoutes(app: FastifyInstance): void {
   )
 }
 
-async function toArchivedArtifactEntries(
-  ctx: { kernel: Kernel },
-  change: ArchivedChange,
-) {
+async function toArchivedArtifactEntries(ctx: { kernel: Kernel }, change: ArchivedChange) {
   const schemaResult = await ctx.kernel.specs.getActiveSchema.execute()
-  const taskCapableByType = new Map<string, { incompletePattern?: string; completePattern?: string }>()
+  const taskCapableByType = new Map<
+    string,
+    { incompletePattern?: string; completePattern?: string }
+  >()
   if (!schemaResult.raw) {
     for (const artifactType of schemaResult.schema.artifacts()) {
-      if (!artifactType.hasTasks) continue
-      taskCapableByType.set(artifactType.id, {
-        incompletePattern: artifactType.taskCompletionCheck?.incompletePattern,
-        completePattern: artifactType.taskCompletionCheck?.completePattern,
-      })
+      if (artifactType.hasTasks) {
+        const check = artifactType.taskCompletionCheck
+        taskCapableByType.set(artifactType.id, {
+          ...(check?.incompletePattern !== undefined
+            ? { incompletePattern: check.incompletePattern }
+            : {}),
+          ...(check?.completePattern !== undefined
+            ? { completePattern: check.completePattern }
+            : {}),
+        })
+      }
     }
   }
   const taskSummaryByType = new Map<string, { totalTasks: number; completedTasks: number }>()
@@ -122,10 +124,7 @@ async function toArchivedArtifactEntries(
     }))
 }
 
-async function toArchivedChangeDto(
-  ctx: { kernel: Kernel },
-  change: ArchivedChange,
-) {
+async function toArchivedChangeDto(ctx: { kernel: Kernel }, change: ArchivedChange) {
   const detail = toChangeDetailDto(change)
   const artifacts = await toArchivedArtifactEntries(ctx, change)
   return {

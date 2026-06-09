@@ -34,9 +34,7 @@ describe('Graph API', () => {
         }
       }>
       specs: unknown[]
-    }>(
-      '/graph/search?q=kernel&symbols=true&limit=5',
-    )
+    }>('/graph/search?q=kernel&symbols=true&limit=5')
     expect(res.ok).toBe(true)
     expect(Array.isArray(data.symbols)).toBe(true)
     expect(Array.isArray(data.specs)).toBe(true)
@@ -71,9 +69,13 @@ describe('Graph API', () => {
     if (symbolId === undefined) {
       return
     }
-    const { res, data } = await apiJson<{ target: string; direction: string; symbols: unknown[] }>(
-      `/graph/impact?symbol=${encodeURIComponent(symbolId)}&direction=dependents&depth=1`,
-    )
+    const { res, data } = await apiJson<{
+      target: string
+      direction: string
+      symbols: unknown[]
+      specs: unknown[]
+      files: unknown[]
+    }>(`/graph/impact?symbol=${encodeURIComponent(symbolId)}&direction=dependents&depth=1`)
     expect(res.ok).toBe(true)
     expect(data.target).toBe(symbolId)
     expect(Array.isArray(data.symbols)).toBe(true)
@@ -90,12 +92,10 @@ describe('Graph API', () => {
       specs: string[]
       symbols: unknown[]
       files: unknown[]
-    }>(
-      `/graph/impact?spec=${encodeURIComponent(specId)}&direction=dependents&depth=1`,
-    )
+    }>(`/graph/impact?spec=${encodeURIComponent(specId)}&direction=dependents&depth=1`)
     expect(res.ok).toBe(true)
     expect(data.target).toBe(specId)
-    expect(data.direction).toBe('downstream')
+    expect(data.direction).toBe('upstream')
     expect(Array.isArray(data.specs)).toBe(true)
     expect(Array.isArray(data.symbols)).toBe(true)
     expect(Array.isArray(data.files)).toBe(true)
@@ -159,9 +159,7 @@ describe('Graph API', () => {
         line: number
         column: number
       }>
-    }>(
-      `/graph/specs/${workspace}/${specPath}`,
-    )
+    }>(`/graph/specs/${workspace}/${specPath}`)
     expect(res.ok).toBe(true)
     expect(data.specId).toBe(`${workspace}:${specPath}`)
     expect(Array.isArray(data.files)).toBe(true)
@@ -198,9 +196,7 @@ describe('Graph API', () => {
         coveredFiles: Array<{ projectRelativePath: string }>
         coveredSymbols: Array<{ projectRelativePath: string }>
       }>
-    }>(
-      `/graph/changes/${encodeURIComponent(activeChangeName)}`,
-    )
+    }>(`/graph/changes/${encodeURIComponent(activeChangeName)}`)
     expect(res.ok).toBe(true)
     expect(data.changeName).toBe(activeChangeName)
     expect(Array.isArray(data.specs)).toBe(true)

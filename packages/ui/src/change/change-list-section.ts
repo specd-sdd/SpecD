@@ -1,5 +1,5 @@
 /** Which Changes sidebar list currently contains the open change. */
-export type ChangeListSection = 'active' | 'draft' | 'discarded'
+export type ChangeListSection = 'active' | 'draft' | 'discarded' | 'archived'
 
 /** Drafts and discarded are shelved read-only in Studio (distinct from archived snapshots). */
 export function isShelvedReadOnlySection(

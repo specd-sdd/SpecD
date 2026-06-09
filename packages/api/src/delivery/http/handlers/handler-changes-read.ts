@@ -1,4 +1,4 @@
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError, type Kernel } from '@specd/core'
 import { buildCompileContextConfig } from '../compile-config.js'
 import {
   formatCompiledContextMarkdown,
@@ -26,7 +26,7 @@ import {
   strictObjectSchema,
 } from '../route-schema.js'
 
-async function readArtifactTaskMaps(ctx: any) {
+async function readArtifactTaskMaps(ctx: { kernel: Kernel }) {
   const schemaResult = await ctx.kernel.specs.getActiveSchema.execute()
   if (schemaResult.raw) {
     return {
@@ -34,8 +34,10 @@ async function readArtifactTaskMaps(ctx: any) {
       taskSummaryByType: new Map<string, { totalTasks: number; completedTasks: number }>(),
     }
   }
-  const hasTasksByType = new Map(
-    schemaResult.schema.artifacts().map((artifactType) => [artifactType.id, artifactType.hasTasks]),
+  const hasTasksByType = new Map<string, boolean>(
+    schemaResult.schema
+      .artifacts()
+      .map((artifactType) => [artifactType.id, artifactType.hasTasks] as [string, boolean]),
   )
   return {
     hasTasksByType,
@@ -43,10 +45,7 @@ async function readArtifactTaskMaps(ctx: any) {
   }
 }
 
-async function readArtifactTaskMapsForChange(
-  ctx: any,
-  name: string,
-) {
+async function readArtifactTaskMapsForChange(ctx: { kernel: Kernel }, name: string) {
   const [maps, status] = await Promise.all([
     readArtifactTaskMaps(ctx),
     ctx.kernel.changes.status.execute({ name }),

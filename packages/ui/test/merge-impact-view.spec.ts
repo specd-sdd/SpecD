@@ -35,12 +35,12 @@ describe('buildImpactViewModel', () => {
         specs: [
           {
             specId: 'ui:change-tab-impact',
-            coveredFiles: ['ui:src/change/ChangeTabPanels.tsx', 'ui:src/other.ts'],
-            coveredSymbols: ['ChangeImpactTab'],
+            coveredFiles: ['ui:src/change/ChangeTabPanels.tsx', 'ui:src/other.ts'] as any,
+            coveredSymbols: ['ChangeImpactTab'] as any,
           },
           {
             specId: 'ui:shell-layout',
-            coveredFiles: ['ui:src/shell/ShellLayout.tsx'],
+            coveredFiles: ['ui:src/shell/ShellLayout.tsx'] as any,
             coveredSymbols: [],
           },
         ],

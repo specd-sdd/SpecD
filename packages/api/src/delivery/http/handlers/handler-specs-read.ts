@@ -79,7 +79,7 @@ async function handleWorkspaceSpecWildcard(ctx: ApiContext, req: FastifyRequest)
       specPath: SpecPath.parse(path),
       contextMode: 'full',
       sections: ['rules', 'constraints', 'scenarios'],
-      llmOptimizedContext: ctx.config.llmOptimizedContext,
+      llmOptimizedContext: ctx.config.llmOptimizedContext ?? false,
       ...(query.followDeps === 'true' ? { followDeps: true } : {}),
       ...(query.depth !== undefined ? { depth: Number(query.depth) } : {}),
     })

@@ -15,7 +15,6 @@ import {
   makeSchema,
   makeArtifactType,
   makeRunStepHooks,
-  makeWorkflowStep,
   testActor,
 } from './helpers.js'
 

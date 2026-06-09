@@ -55,7 +55,10 @@ import {
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
-import { ListWorkspaces, type ProjectWorkspace } from '../../../src/application/use-cases/list-workspaces.js'
+import {
+  ListWorkspaces,
+  type ProjectWorkspace,
+} from '../../../src/application/use-cases/list-workspaces.js'
 import {
   type ArchivedChange,
   toArchivedChangeView,
@@ -560,6 +563,11 @@ class StubSpecRepository extends SpecRepository {
   private readonly _resolveFromPathFn:
     | ((inputPath: string, from?: SpecPath) => Promise<ResolveFromPathResult | null>)
     | undefined
+
+  async count(): Promise<number> {
+    return this._specs.length
+  }
+
   readonly saved = new Map<string, string>()
 
   constructor(opts: {
@@ -626,10 +634,11 @@ class StubSpecRepository extends SpecRepository {
       publication.persistedImplementation !== undefined ||
       existingSpecLock !== null
     if (shouldPersistSpecLock) {
-      const persistedSchema = publication.persistedSchema ?? existingSpecLock?.schema ?? {
-        name: 'test-schema',
-        version: 1,
-      }
+      const persistedSchema = publication.persistedSchema ??
+        existingSpecLock?.schema ?? {
+          name: 'test-schema',
+          version: 1,
+        }
       const persistedDependsOn = publication.persistedDependsOn ?? existingSpecLock?.dependsOn ?? []
       const persistedImplementation =
         publication.persistedImplementation ?? existingSpecLock?.implementation ?? []
@@ -687,13 +696,20 @@ class StubSpecRepository extends SpecRepository {
   override async readPersistedImplementation(
     spec: Spec,
   ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
-    return this.readSpecLock(spec)?.implementation ?? null
+    const impl = this.readSpecLock(spec)?.implementation
+    return (
+      (impl as unknown as readonly {
+        readonly file: string
+        readonly symbols?: readonly string[]
+      }[]) ?? null
+    )
   }
 
   override async specHash(spec: Spec): Promise<string | null> {
-    const persisted = this.saved.get(`${spec.name.toString()}/spec-lock.json`)
-      ?? this.saved.get('spec-lock.json')
-      ?? this._artifacts[`${spec.name.toString()}/spec-lock.json`]
+    const persisted =
+      this.saved.get(`${spec.name.toString()}/spec-lock.json`) ??
+      this.saved.get('spec-lock.json') ??
+      this._artifacts[`${spec.name.toString()}/spec-lock.json`]
     if (persisted === undefined || persisted === null) {
       return null
     }
@@ -1043,8 +1059,6 @@ export function makeArchivedChange(
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: opts.specIds ?? ['default:default'],
-    schemaName: opts.schemaName ?? 'test-schema',
-    schemaVersion: 1,
     history: [
       {
         type: 'created',

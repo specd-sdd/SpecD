@@ -26,6 +26,7 @@ export interface GetReadOnlyChangeArtifactResult {
  * Loads a {@link ReadOnlyChangeView} for the given storage origin.
  *
  * @param changes - Change repository
+ * @param archive - Archive repository
  * @param readOnlyOrigin - Draft, discarded, or archived storage
  * @param name - Change name
  * @returns The read-only view, or `null` when not found
@@ -55,6 +56,7 @@ export class GetReadOnlyChangeArtifact {
    * Creates the use case with a change repository.
    *
    * @param changes - Change repository
+   * @param archive - Archive repository
    */
   constructor(changes: ChangeRepository, archive: ArchiveRepository) {
     this._changes = changes
@@ -85,11 +87,7 @@ export class GetReadOnlyChangeArtifact {
     const artifact =
       input.readOnlyOrigin === 'archived'
         ? await this._archive.artifact(view as ArchivedChange, input.filename)
-        : await this._changes.artifactReadOnly(
-            input.readOnlyOrigin,
-            input.name,
-            input.filename,
-          )
+        : await this._changes.artifactReadOnly(input.readOnlyOrigin, input.name, input.filename)
     if (artifact === null) {
       throw new ChangeArtifactFileNotFoundError(input.filename, input.name)
     }

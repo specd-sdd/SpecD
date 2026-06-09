@@ -1,3 +1,4 @@
+import { type SymbolKind } from '@specd/code-graph'
 import { createVcsAdapter, ChangeNotFoundError, SpecNotFoundError, SpecPath } from '@specd/core'
 import { type FastifyInstance } from 'fastify'
 import { buildProjectGraphConfig } from '../../../composition/build-project-graph-config.js'
@@ -124,7 +125,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
             ? {
                 kinds: query.kinds
                   .split(',')
-                  .map((kind) => kind.trim())
+                  .map((kind) => kind.trim() as SymbolKind)
                   .filter((kind) => kind.length > 0),
               }
             : {}),
@@ -186,9 +187,9 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       }
       const direction =
         query.direction === 'dependencies'
-          ? 'upstream'
+          ? 'downstream'
           : query.direction === 'dependents' || query.direction === undefined
-            ? 'downstream'
+            ? 'upstream'
             : (query.direction as 'upstream' | 'downstream' | 'both')
       const maxDepth = query.depth !== undefined ? Number(query.depth) : 3
       const provider = ctx.createGraphProvider()
