@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:spec-metadata",
+    "core:content-extraction",
+    "core:storage",
+    "core:workspace",
+    "core:list-workspaces"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/list-specs.ts",
+      "symbols": ["ListSpecs"]
+    }
+  ]
+}

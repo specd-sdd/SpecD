@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:config",
+    "code-graph:composition",
+    "code-graph:staleness-detection",
+    "core:list-workspaces"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/graph/stats.ts"
+    },
+    {
+      "file": "cli:test/commands/graph-stats.spec.ts"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+- op: modified
+  description: Verify Claude install flow routes bundle resolution through ResolveBundle.
+  selector:
+    type: section
+    matches: '^Requirement: Application layer$'
+  content: |
+    #### Scenario: InstallSkills passes Claude values into skills rendering
+
+    - **GIVEN** skills are available from `@specd/skills`
+    - **WHEN** `InstallSkills` runs
+    - **THEN** it resolves Claude frontmatter source values per skill
+    - **AND** it passes only Claude capability identifiers into `@specd/skills`
+    - **AND** it resolves install bundles through `ResolveBundle`
+
+    #### Scenario: Shared files are written to the rendered sharedFolder location
+
+    - **GIVEN** a resolved bundle contains files marked as shared
+    - **WHEN** `InstallSkills` writes those files
+    - **THEN** they are written to the resolved sharedFolder location under the project root
+
+    #### Scenario: Claude install does not call repository bundle resolution directly
+
+    - **WHEN** the Claude install flow is reviewed
+    - **THEN** bundle resolution goes through `ResolveBundle`
+    - **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`

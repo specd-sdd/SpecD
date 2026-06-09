@@ -1,0 +1,25 @@
+- op: added
+  description: 'Add verification scenario for broad selector normalization in file impact.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: File impact analysis$'
+  content: |
+    #### Scenario: File selectors resolved via provider normalization
+
+    - **WHEN** `specd graph impact --file` is run with an absolute or project-relative path
+    - **THEN** it resolves correctly to the canonical graph identity through the provider
+    - **AND** analysis proceeds without error
+
+- op: added
+  description: 'Add verification scenario for project-relative output rendering.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Output format$'
+  content: |
+    #### Scenario: Impact paths are rendered relative to project root
+
+    - **WHEN** `specd graph impact` is run
+    - **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root
+    - **AND** they do not include workspace-prefixed identities unless explicitly requested

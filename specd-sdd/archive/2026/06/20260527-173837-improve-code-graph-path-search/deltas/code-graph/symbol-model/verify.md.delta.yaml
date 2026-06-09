@@ -1,0 +1,13 @@
+- op: added
+  description: 'Add verification scenarios for document identities.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Document category
+
+    #### Scenario: Document identities follow workspace prefixing
+
+    - **WHEN** a document `docs/intro.md` is indexed in workspace `core`
+    - **THEN** its identity is `core:docs/intro.md`

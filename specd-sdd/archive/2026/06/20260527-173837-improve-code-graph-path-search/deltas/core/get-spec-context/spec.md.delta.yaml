@@ -1,0 +1,56 @@
+- op: modified
+  description: 'Update GetSpecContext to use the centralized ListWorkspaces orchestrator.'
+  selector:
+    type: section
+    matches: '^Requirement: Resolve workspace and spec from input$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    The use case SHALL resolve the requested spec by first obtaining the corresponding `SpecRepository` through the `ListWorkspaces` orchestrator.
+
+    1. Get the list of `ProjectWorkspace` entities via `ListWorkspaces.execute()`.
+    2. Find the workspace matching the input `workspace` name. If not found, throw `WorkspaceNotFoundError`.
+    3. Load the spec via `repo.get(specPath)`. If the spec does not exist, throw `SpecNotFoundError`.
+
+- op: modified
+  description: 'Update transitive dependency traversal to use orchestrated repositories.'
+  selector:
+    type: section
+    matches: '^Requirement: Transitive dependency traversal$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    When `input.followDeps` is `true`, the use case SHALL traverse dependencies transitively. For each unvisited spec identity:
+
+    1. Parse the ID via `parseSpecId`.
+    2. Resolve the target `SpecRepository` using the `ListWorkspaces` orchestrator.
+    3. Load the spec and its dependencies.
+
+    Traversal SHALL use DFS with cycle detection.
+
+- op: modified
+  description: 'Align constraints with ListWorkspaces-based repository resolution.'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The use case MUST obtain repository access through the orchestrated `ListWorkspaces` result and MUST NOT mutate the returned workspace entities or their repositories.
+    - Cycle detection uses the `workspace:capabilityPath` label as the identity key.
+    - The root spec is always included as the first entry, even if its metadata is stale.
+    - Empty `sections` array is treated the same as `undefined` (show all).
+
+- op: modified
+  description: 'Preserve ListWorkspaces dependency in formal spec dependencies.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:config`](../config/spec.md) — workspace routing and project-level context settings
+    - [`core:compile-context`](../compile-context/spec.md) — shared context assembly conventions
+    - [`core:spec-metadata`](../spec-metadata/spec.md) — metadata used in context output
+    - [`core:storage`](../storage/spec.md) — repository access and artifact layout assumptions
+    - [`core:workspace`](../workspace/spec.md) — workspace identity resolution
+    - [`core:spec-id-format`](../spec-id-format/spec.md) — spec identity parsing and validation
+    - [`core:list-workspaces`](../list-workspaces/spec.md) — orchestrated repository resolution source

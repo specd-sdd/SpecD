@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:repository-port",
+    "default:_global/architecture",
+    "core:change",
+    "core:storage",
+    "core:archive-change",
+    "default:_global/logging",
+    "core:read-only-change-view",
+    "core:archived-change-index-entry"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/archive-repository.ts",
+      "symbols": ["ArchiveListOptions", "ArchiveListResult", "ArchiveRepository"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/archive-repository.ts",
+      "symbols": ["FsArchiveRepository", "_updateMetaCount", "_readMetaCount", "_writeMetaCount"]
+    }
+  ]
+}

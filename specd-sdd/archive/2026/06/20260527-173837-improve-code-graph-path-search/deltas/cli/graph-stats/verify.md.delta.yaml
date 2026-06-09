@@ -1,0 +1,74 @@
+- op: removed
+  description: 'Remove old statistics retrieval verification.'
+  selector:
+    type: section
+    matches: '^Requirement: Statistics retrieval$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+
+- op: added
+  description: 'Add new statistics retrieval verification with orchestrated project structure.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Command signature$'
+  content: |
+    ### Requirement: Statistics retrieval
+
+    #### Scenario: Command obtains orchestrated project structure
+
+    - **WHEN** `specd graph stats` is executed in configured mode
+    - **THEN** it calls `ListWorkspaces` to obtain the rich workspace list
+    - **AND** it uses this list to compute the project fingerprint
+- op: modified
+  description: 'Verify text and structured stats output include document counts and fingerprint status.'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Output format
+
+    #### Scenario: Text output with fresh graph
+
+    - **GIVEN** `lastIndexedRef` equals the current VCS ref
+    - **WHEN** `graph stats` is run in text mode
+    - **THEN** no staleness warning line SHALL be shown
+
+    #### Scenario: Text output with stale graph
+
+    - **GIVEN** `lastIndexedRef` is `"abc1234def"` and the current VCS ref is `"fff9999aaa"`
+    - **WHEN** `graph stats` is run in text mode
+    - **THEN** a line `⚠ Graph is stale (indexed at abc1234, current: fff9999)` SHALL appear after `Last indexed`
+
+    #### Scenario: Text output with null ref
+
+    - **GIVEN** `lastIndexedRef` is `null`
+    - **WHEN** `graph stats` is run in text mode
+    - **THEN** no staleness line SHALL be shown
+
+    #### Scenario: Text output includes document counts
+
+    - **GIVEN** the graph contains 459 files, 18 documents, 1497 symbols, and 122 specs
+    - **WHEN** `graph stats` is run in text mode
+    - **THEN** stdout contains `Files:     459`
+    - **AND** stdout contains `Documents: 18`
+    - **AND** stdout contains `Symbols:   1497`
+
+    #### Scenario: JSON output includes staleness fields
+
+    - **WHEN** `graph stats --format json` is run
+    - **THEN** the output SHALL include `stale` (boolean or null), `currentRef` (string or null), and `fingerprintMismatch`
+
+    #### Scenario: JSON stale field values
+
+    - **GIVEN** the graph is stale
+    - **WHEN** `graph stats --format json` is run
+    - **THEN** `stale` SHALL be `true`
+    - **AND** `currentRef` SHALL be the current VCS ref string

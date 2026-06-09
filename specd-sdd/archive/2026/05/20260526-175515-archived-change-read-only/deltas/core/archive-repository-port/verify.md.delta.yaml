@@ -1,0 +1,61 @@
+- op: added
+  description: 'Add scenarios for index-entry-based list() output'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: list returns all archived changes in chronological order'
+  content: |
+    ### Requirement: list returns index entries
+
+    #### Scenario: List returns index entries ordered by archivedAt
+
+    - **GIVEN** three changes archived at different times
+    - **WHEN** `list()` is called
+    - **THEN** the result is an array of three `ArchivedChangeIndexEntry` records ordered oldest first
+
+- op: modified
+  description: 'Ensure get() scenarios describe manifest-backed ArchivedChange detail'
+  selector:
+    type: section
+    matches: 'Requirement: get returns an archived change or null'
+  content: |
+    #### Scenario: Change found in index
+
+    - **GIVEN** a change named `add-oauth-login` exists in `index.jsonl`
+    - **WHEN** `get(\"add-oauth-login\")` is called
+    - **THEN** the `ArchivedChange` is returned
+    - **AND** it is loaded from the archived directory `manifest.json`
+
+    #### Scenario: Change not in index but exists on disk
+
+    - **GIVEN** a change directory exists in the archive but its entry is missing from `index.jsonl`
+    - **WHEN** `get(\"orphaned-change\")` is called
+    - **THEN** the `ArchivedChange` is returned from the filesystem scan
+    - **AND** it is loaded from the archived directory `manifest.json`
+    - **AND** the recovered entry is appended to `index.jsonl`
+
+    #### Scenario: Change does not exist
+
+    - **WHEN** `get(\"nonexistent\")` is called and no matching change exists anywhere
+    - **THEN** `null` is returned
+
+- op: modified
+  description: 'Update archivePath scenario wording to allow index entries'
+  selector:
+    type: section
+    matches: 'Requirement: Archive path confinement'
+  content: |
+    #### Scenario: Escaping archive pattern is rejected
+
+    - **GIVEN** archive path derivation from pattern variables would resolve outside the configured archive root
+    - **WHEN** `archive(change)` or `archivePath(entry)` resolves that path
+    - **THEN** the repository rejects the path
+
+    #### Scenario: Recovered index path outside root is rejected
+
+    - **GIVEN** a stored or recovered archive location points outside the configured archive root
+    - **WHEN** the repository consumes that location
+    - **THEN** it is rejected instead of being treated as a valid archive entry

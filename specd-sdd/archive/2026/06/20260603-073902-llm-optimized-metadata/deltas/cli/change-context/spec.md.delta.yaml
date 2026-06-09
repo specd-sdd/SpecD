@@ -1,0 +1,17 @@
+- op: added
+  description: 'Surface optimization warnings'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Optimization warning signal
+
+    When `llmOptimizedContext: true` is active, if any spec in the context (or the project context itself) is missing optimized fields or has stale project metadata, the command SHALL surface a warning.
+
+    The warning MUST include an instruction on how to generate the missing metadata (e.g., using `specd-spec-metadata` or a project-level equivalent).
+
+    For structured formats (`json`, `toon`), the warning state and instructions SHALL be included alongside the context data.

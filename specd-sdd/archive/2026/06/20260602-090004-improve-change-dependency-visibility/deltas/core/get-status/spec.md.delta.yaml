@@ -1,0 +1,27 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Returns the change and its artifact statuses'
+  content: |
+    On success, `execute()` MUST return a `GetStatusResult` containing:
+
+    - `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists
+    - `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes
+    - `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
+    - `specDependsOn` — the map of declared spec dependencies from the change manifest
+    - `review` — a derived review summary for agents and CLI serializers
+    - `blockers` — an array of active blockers preventing progress
+    - `nextAction` — a recommended next action to guide the actor
+
+    Resolution order:
+
+    1. `ChangeRepository.get(name)` for active storage
+    2. If null, `ChangeRepository.getDraft(name)` for drafted storage
+
+    If both are null, the use case MUST throw `ChangeNotFoundError`.
+
+    `GetStatus` MUST NOT call `ChangeRepository.getDiscarded` or load `discarded/` storage. Discarded changes MUST be inspected via `GetDiscarded` (for example `specd discarded show`).
+
+    When `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).
+
+    (rest of requirement content remains unchanged...)

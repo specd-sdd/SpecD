@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:config", "core:workspace", "core:spec-repository-port"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/list-workspaces.ts",
+      "symbols": ["ProjectWorkspace", "ListWorkspaces"]
+    },
+    {
+      "file": "core:src/composition/kernel.ts"
+    },
+    {
+      "file": "core:src/application/index.ts"
+    }
+  ]
+}

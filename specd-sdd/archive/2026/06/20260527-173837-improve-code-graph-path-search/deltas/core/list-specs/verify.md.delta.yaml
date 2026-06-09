@@ -1,0 +1,12 @@
+- op: added
+  description: 'Add verification scenarios for ListWorkspaces integration.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Enumerate specs across all workspaces$'
+  content: |
+    #### Scenario: ListSpecs uses orchestrated project structure
+
+    - **WHEN** `ListSpecs.execute()` is called
+    - **THEN** it obtains the list of workspaces via the `ListWorkspaces` orchestrator
+    - **AND** it enumerates all specs through the provided repository instances

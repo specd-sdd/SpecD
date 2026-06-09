@@ -1,0 +1,16 @@
+- op: added
+  description: Assert list command relies on index entries not per-entry manifest reads
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format — JSON'
+    after:
+      type: section
+      matches: 'Scenario: JSON format output — no actor recorded'
+  content: |
+    #### Scenario: List uses archive index entries
+
+    - **GIVEN** the archive contains multiple archived changes with enriched `index.jsonl` entries
+    - **WHEN** `specd archive list` is run
+    - **THEN** the command completes without reading `manifest.json` for every archived change directory
+    - **AND** stdout lists changes using index-backed fields (`name`, `archivedName`, `workspace`, `archivedAt`, optional `archivedBy`, `artifacts`)

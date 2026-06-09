@@ -1,0 +1,52 @@
+- op: modified
+  description: Add verification that agent installs use ResolveBundle as the canonical entrypoint for built-in defaults.
+  selector:
+    type: section
+    matches: '^Requirement: Behavior$'
+  content: |
+    #### Scenario: Built-in safe values merge with install-time context
+
+    - **GIVEN** a `SpecdConfig`
+    - **AND** install-time context with custom variables and capabilities
+    - **WHEN** `ResolveBundle` is executed
+    - **THEN** built-in safe values remain available in the merged render context
+    - **AND** install-time context values are available to template rendering
+
+    #### Scenario: sharedFolder is injected when absent
+
+    - **GIVEN** `variables.sharedFolder` is absent
+    - **WHEN** `ResolveBundle` is executed with `SpecdConfig`
+    - **THEN** a default relative shared folder value is injected into template rendering
+
+    #### Scenario: sharedFolder trailing slash is normalized away
+
+    - **GIVEN** `variables.sharedFolder` ends with `/`
+    - **WHEN** `ResolveBundle` is executed
+    - **THEN** the rendered `sharedFolder` value omits the trailing `/`
+
+    #### Scenario: sharedFolder escaping the project root is rejected
+
+    - **GIVEN** `variables.sharedFolder` resolves outside `projectRoot`
+    - **WHEN** `ResolveBundle` is executed
+    - **THEN** bundle resolution fails
+
+    #### Scenario: projectRoot is not exposed as a template variable
+
+    - **GIVEN** `SpecdConfig` includes `projectRoot`
+    - **WHEN** `ResolveBundle` executes
+    - **THEN** `projectRoot` is used only for internal validation
+    - **AND** it is not available as a public template variable
+
+    #### Scenario: Structured context drives frontmatter composition
+
+    - **GIVEN** a render context with `variables.frontmatter`
+    - **AND** the `frontmatter` capability is present
+    - **WHEN** `ResolveBundle` resolves a skill-local markdown template with a frontmatter insertion point
+    - **THEN** the resulting bundle content includes the composed frontmatter block
+
+    #### Scenario: Agent-plugin installs route bundle resolution through ResolveBundle
+
+    - **GIVEN** an agent plugin needs built-in render defaults from `SpecdConfig`
+    - **WHEN** it resolves a skill bundle for installation
+    - **THEN** the install flow uses `ResolveBundle`
+    - **AND** bundle resolution does not depend on a direct `SkillRepository.getBundle(...)` call from the plugin adapter

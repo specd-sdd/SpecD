@@ -1,0 +1,122 @@
+- op: modified
+  description: 'Remove --workspace from command signature and update code block.'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ```text
+    specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    - `--force` — optional; recreate the graph store from scratch
+    - `--exclude-path <pattern>` — optional, repeatable; additional patterns to exclude during file discovery
+    - `--config <path>` — optional; explicit path to `specd.yaml`
+    - `--path <path>` — optional; repo-root bootstrap mode
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    `--config` and `--path` are mutually exclusive.
+
+- op: modified
+  description: 'Update indexing behavior to use orchestrated workspaces and remove partial indexing.'
+  selector:
+    type: section
+    matches: '^Requirement: Indexing behaviour$'
+  content: |
+    The command uses the shared graph CLI context model together with `withProvider`, which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.
+
+    The command:
+
+    1. Validates that `--config` and `--path` are not both present
+    2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+    3. In configured mode, obtains the orchestrated project structure via `ListWorkspaces` and uses the rich `ProjectWorkspace[]` list to build `IndexOptions`
+    4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root
+    5. Acquires the shared graph indexing lock before opening the provider for mutation work
+    6. If `--force` is passed, invokes the graph-store recreation capability before indexing
+    7. In configured mode, builds the effective graph config from `SpecdConfig.graph`, including project-global `includePaths`, global `excludePaths`, workspace graph filters, and any synthetic spec-root exclusions. Patterns from `--exclude-path` flags are appended to the effective global exclusion set.
+    8. Calls `index(options)` to perform the indexing. The indexer handles spec extraction and progress reporting using the injected repositories.
+    9. Outputs the `IndexResult` with per-workspace breakdown
+    10. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths
+    11. Closes the provider
+    12. Exits with `process.exit(0)`
+
+    In configured mode, indexing SHALL always cover the full configured project graph surface. The command MUST NOT offer a workspace-scoped partial indexing mode.
+
+    Project-global discovery MUST NOT emit `root:` entries for files already owned by a configured workspace `codeRoot`.
+
+    Archived spec implementation coverage and spec resolution SHALL be derived inside `@specd/code-graph`. The CLI SHALL NOT read `spec-lock.json` sidecars or manually construct extraction callbacks.
+
+    When output is a TTY and format is `text`, progress is displayed on stderr using `\r\x1b[K` for in-place updates (overwriting the current line).
+
+    The indexing lock is a CLI-level coordination mechanism that prevents overlapping graph commands from reaching backend lock failures first. If another indexing run already holds the lock, `graph index` fails fast with a user-facing retry-later message instead of attempting to mutate the backend concurrently.
+
+- op: modified
+  description: 'Restore the text output contract and surface indexed documents explicitly.'
+  selector:
+    type: section
+    matches: '^Requirement: Output format$'
+  content: |
+    In `text` mode (default), the output is a summary block:
+
+    ```text
+    Indexed 387 file(s) in 1234ms
+      discovered: 459
+      documents:  18
+      skipped:    72
+      removed:    0
+      specs:      122
+      errors:     3
+        path/to/file.ts: error message
+    ```
+
+    The first line shows `filesIndexed` and `duration`. The indented lines show `filesDiscovered`, `documentsIndexed`, `filesSkipped`, `filesRemoved`, `specsIndexed`, and error count. When errors are present, each error is listed below with its file path and message, indented further.
+
+    When the result includes per-workspace breakdowns, text mode also lists each workspace with discovered, indexed, document, skipped, and removed counts.
+
+    In `json` or `toon` mode, the full `IndexResult` object is output as-is, including `documentsIndexed` and the per-workspace `documentsIndexed` breakdown.
+
+- op: modified
+  description: 'Update Spec Dependencies for graph index.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
+    - [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration
+
+- op: modified
+  description: 'Update examples to remove workspace-scoped indexing and surface documents.'
+  selector:
+    type: section
+    matches: '^Examples$'
+  content: |
+    ```
+    $ specd graph index
+    Indexed 387 file(s) in 1234ms
+      discovered: 459
+      documents:  18
+      skipped:    72
+      removed:    0
+      specs:      122
+      errors:     0
+      workspaces:
+        core:    300 discovered, 250 indexed, 12 documents, 50 skipped, 0 removed
+        cli:     159 discovered, 137 indexed, 6 documents, 22 skipped, 0 removed
+
+    $ specd graph index --force
+    Indexed 459 file(s) in 2100ms
+      discovered: 459
+      documents:  18
+      skipped:    0
+      removed:    312
+      specs:      122
+      errors:     0
+
+    $ specd graph index --format json
+    {"filesDiscovered":459,"filesIndexed":387,"documentsIndexed":18,...,"workspaces":[{"name":"core",...},{"name":"cli",...}]}
+    ```

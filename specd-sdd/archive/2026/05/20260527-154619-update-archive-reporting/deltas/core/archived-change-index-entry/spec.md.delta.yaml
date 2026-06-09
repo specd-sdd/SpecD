@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Identity and core concept of ArchivedChange remains same; only display and index access patterns change.'

@@ -1,0 +1,1203 @@
+{
+  "name": "route-agent-plugin-installs-through-resolve-bundle",
+  "createdAt": "2026-06-02T12:14:38.709Z",
+  "description": "Centralize built-in install-time render defaults by routing all agent-plugin skill bundle resolutions through the ResolveBundle use case. This refactor removes duplication across five agent plugins and ensures that defaults like sharedFolder and configPath are consistently applied and protected against project-root escapes.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "skills:resolve-bundle",
+    "plugin-agent-claude:plugin-agent",
+    "plugin-agent-copilot:plugin-agent",
+    "plugin-agent-codex:plugin-agent",
+    "plugin-agent-opencode:plugin-agent",
+    "plugin-agent-standard:plugin-agent"
+  ],
+  "specDependsOn": {
+    "skills:resolve-bundle": ["core:config", "skills:skill-bundle", "skills:skill-repository-port"],
+    "plugin-agent-claude:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository",
+      "skills:resolve-bundle"
+    ],
+    "plugin-agent-copilot:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source",
+      "skills:resolve-bundle"
+    ],
+    "plugin-agent-codex:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source",
+      "skills:resolve-bundle"
+    ],
+    "plugin-agent-opencode:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source",
+      "skills:resolve-bundle"
+    ],
+    "plugin-agent-standard:plugin-agent": [
+      "plugin-agent-opencode:plugin-agent",
+      "default:_global/commits",
+      "skills:resolve-bundle"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/cli/graph-impact/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-index/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-search/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-stats/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/project-status/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-list/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-search/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/document-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/graph-store/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/indexer/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/ladybug-graph-store/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/sqlite-graph-store/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/symbol-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/workspace-integration/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-workspaces/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/search-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/workspace/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-impact/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-index/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-index/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-search/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-search/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-stats/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-stats/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/project-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/project-status/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/project-status/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-list/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-list/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-search/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-search/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-specs/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-specs/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/search-specs/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/search-specs/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-metadata/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-metadata/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-repository-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-repository-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workspace/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workspace/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260602-improve-code-graph-path-search-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260602-improve-code-graph-path-search.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/.changeset-release.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-impact/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-impact/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-index/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-index/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-search/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-search/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-stats/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/graph-stats/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/project-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/project-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-search/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/cli/spec-search/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/composition/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/composition/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/document-model/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/document-model/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/indexer/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/indexer/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/symbol-model/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/symbol-model/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/config/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/config/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/get-spec-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/get-spec-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/list-specs/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/list-specs/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/search-specs/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/search-specs/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/spec-metadata/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/spec-metadata/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/spec-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/spec-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/workspace/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/deltas/core/workspace/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/reports/20260601-143301/specs-compliance-change-improve-code-graph-path-search-20260601-143301.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/reports/20260601-225536/specs-compliance-change-improve-code-graph-path-search-20260601-225536.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/reports/20260602-160406/specs-compliance-change-improve-code-graph-path-search-20260602-160406.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/reports/compiled-context-improve-code-graph-path-search.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/reports/injectable-context-improve-code-graph-path-search.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/specs/code-graph/document-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/specs/code-graph/document-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/specs/core/list-workspaces/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/specs/core/list-workspaces/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260527-173837-improve-code-graph-path-search/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-standard/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/plugin-agent-standard/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/skills/resolve-bundle/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/deltas/skills/resolve-bundle/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-index/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-search/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/graph-stats/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-list/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-search/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/document-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/document-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/document-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-specs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-workspaces/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-workspaces/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-workspaces/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/search-specs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workspace/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/use-cases/resolve-bundle.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/resolve-bundle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/reports/20260602-173729/_partial-plugin-agents.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/reports/20260602-173729/_partial-skills-resolve-bundle.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/reports/20260602-173729/specs-compliance-change-route-agent-plugin-installs-through-resolve-bundle-20260602-173729.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/reports/20260602-compliance-audit/_partial-core-skills.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-121438-route-agent-plugin-installs-through-resolve-bundle/.changeset-release.yaml",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "skills:resolve-bundle",
+      "file": "packages/skills/src/application/use-cases/resolve-bundle.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ResolveBundle", "ResolveBundleInput", "ResolveBundleOutput"]
+    },
+    {
+      "specId": "skills:resolve-bundle",
+      "file": "packages/skills/test/resolve-bundle.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:8763ecd6019fd88a9f1ed88c16c47dce4fcea692c5c8ae30cd9523ef41cf8a13"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "deltas/skills/resolve-bundle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:057fb696d335cfe7407740d0320e30d4c8456fc3c4627388c13473125a03f92b"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c01c124a83de521fb0da1d303995c00f4ab98d4540e959df8e4cc306ff1be042"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5a18d2135fd86674598bcf3c803d87b3984814fde9fe8ae012646bd0a39ab24b"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1b1d5df9df5ebfddddbdfed999bba130a54368284667dd704ec7678140b5b68a"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ffc39ae7963fd607c2c26b5f4d9f3aab540b0f0a19e651de9e87a78bc8c5f85e"
+        },
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "deltas/plugin-agent-standard/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:82d3583ee20cfc753173cadc46f5fcf0914040be26497f6b3fb1ad742bb6b7b2"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:resolve-bundle",
+          "filename": "deltas/skills/resolve-bundle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:45eb5ddc6caf0750b55e2e98010ac817bb06a66e642e87fb064063639761c431"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b1d34b104c8ad1e58f31e96740caeeca8cfa768836ea7c0bef298524b38bee6f"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5f7ae496f25a859e347d246671a3cc08b2e038dd502690d028439e4ec462eafe"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fd28df5f1eccbc5237ccf708d59dcd428e5dbd8781e9a8d5f4cbe17c015ab643"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8cee1b28c2fcc543507eb1b69312b75ad882e2c46787b602fbffbfa104e55689"
+        },
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "deltas/plugin-agent-standard/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4310e3301c81d8d0446007106ffbc93ed3cc9468ab08942df7ac4e96db50894c"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:c348b82d29e7beedbf58803bce39f7f359d86f473aedcb2052ea1bcb02e22b00"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:d000250ce644166e98cb08888cf3c397d7636fb4f790fb4dac8f54a2c88fc674"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-02T12:14:38.709Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "skills:resolve-bundle",
+        "plugin-agent-claude:plugin-agent",
+        "plugin-agent-copilot:plugin-agent",
+        "plugin-agent-codex:plugin-agent",
+        "plugin-agent-opencode:plugin-agent",
+        "plugin-agent-standard:plugin-agent"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-02T12:14:38.726Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-standard:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "skills:resolve-bundle"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-standard:plugin-agent"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T14:01:32.283Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T14:59:41.121Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T15:25:25.193Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T15:36:18.852Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T16:08:29.958Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T16:08:47.150Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-06-02T16:11:11.662Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Centralize built-in install-time render defaults by routing all agent-plugin skill bundle resolutions through the ResolveBundle use case. This refactor removes duplication across five agent plugins and ensures that defaults like sharedFolder and configPath are consistently applied and protected against project-root escapes."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-02T16:11:38.681Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"route-agent-plugin-installs-through-resolve-bundle\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T16:11:51.602Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-02T16:11:51.701Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -1,0 +1,16 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format — text'
+    after:
+      type: section
+      matches: 'Scenario: Normal text output'
+  content: |
+    #### Scenario: Display enriched metadata
+
+    - **GIVEN** an archived change with `description: 'My cool feature'`, `specIds: ['core:change']`, and `schema: { name: 'schema-std', version: 1 }`
+    - **WHEN** `specd archive show` is run for that change
+    - **THEN** stdout includes `description: My cool feature`
+    - **AND** it includes `specs: core:change`
+    - **AND** it includes `schema: schema-std@1`

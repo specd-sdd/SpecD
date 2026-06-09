@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "core:get-archived-change", "core:archived-change-index-entry"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/archive/show.ts",
+      "symbols": ["registerArchiveShow"]
+    }
+  ]
+}

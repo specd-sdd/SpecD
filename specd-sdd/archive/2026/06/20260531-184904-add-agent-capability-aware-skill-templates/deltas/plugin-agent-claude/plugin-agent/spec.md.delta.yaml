@@ -1,0 +1,83 @@
+- op: modified
+  description: 'Update purpose for skills-owned capability normalization and shared path rendering'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation by declaring Claude-supported capabilities and frontmatter source values to `@specd/skills`, which renders the final installed markdown for Claude Code.
+- op: modified
+  description: 'Keep frontmatter model focused on runtime-supported value coverage'
+  selector:
+    type: section
+    matches: '^Requirement: Frontmatter type$'
+  content: |
+    The Claude plugin MUST define a structured value model that can represent the Claude-supported metadata set:
+
+    - `name`
+    - `description`
+    - `when_to_use`
+    - `argument_hint`
+    - `disable_model_invocation`
+    - `user_invocable`
+    - `allowed_tools`
+    - `model`
+    - `effort`
+    - `context`
+    - `agent`
+    - `hooks`
+    - `paths`
+    - `shell`
+- op: modified
+  description: 'Shift application layer to simple capability declaration and aligned shared install path'
+  selector:
+    type: section
+    matches: '^Requirement: Application layer$'
+  content: |
+    The application layer MUST have an `InstallSkills` use case that orchestrates:
+
+    1. Get skills via `@specd/skills`
+    2. Resolve Claude frontmatter source values for each skill
+    3. Declare only the Claude-supported capability identifiers for each install
+    4. Pass `variables.sharedFolder` only when overriding the default shared path contract
+    5. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`
+    6. Install files marked as shared to the rendered `sharedFolder` location under the project root
+
+    The plugin MUST NOT assemble the final YAML frontmatter document itself after bundle resolution.
+    The plugin MUST NOT normalize capability objects on behalf of `@specd/skills`.
+- op: modified
+  description: 'Move frontmatter injection responsibility to skills output'
+  selector:
+    type: section
+    matches: '^Requirement: Frontmatter injection$'
+  content: |
+    During install, the plugin MUST provide Claude frontmatter values to `@specd/skills` so that the rendered skill-local markdown output includes Claude-compatible YAML frontmatter.
+
+    The plugin MUST NOT prepend YAML frontmatter itself after bundle resolution.
+
+    Files marked as shared MUST continue to be written without Claude skill frontmatter.
+- op: modified
+  description: 'Align shared install location with sharedFolder contract'
+  selector:
+    type: section
+    matches: '^Requirement: Install location$'
+  content: |
+    Skills MUST be installed to `.claude/skills/` in the project root.
+
+    For each skill, files not marked as shared MUST be installed under `.claude/skills/<skill-name>/`.
+
+    Files marked as shared MUST be installed under the rendered `sharedFolder` location within the project root. When no override is provided, that location MUST default to a relative path derived from the runtime config directory.
+
+    The resolved shared location MUST NOT contain a `SKILL.md` file.
+- op: modified
+  description: 'Align uninstall behavior with sharedFolder contract'
+  selector:
+    type: section
+    matches: '^Requirement: Uninstall behavior$'
+  content: |
+    `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` relative to `config.projectRoot`.
+
+    When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
+
+    When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.
+
+    Uninstall MUST NOT remove unrelated directories or files under `.claude/skills/` that are not part of the specd-managed skill set.

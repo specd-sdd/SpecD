@@ -1,0 +1,28 @@
+- op: modified
+  description: Success path returns manifest-backed ArchivedChange read model
+  selector:
+    type: section
+    matches: 'Scenario: Archived change exists'
+  content: |
+    #### Scenario: Archived change exists
+
+    - **GIVEN** the archive repository contains an archived change named `'add-oauth-login'` loaded from `manifest.json`
+    - **WHEN** `getArchivedChange.execute({ name: 'add-oauth-login' })` is called
+    - **THEN** the result is the `ArchivedChange` read model returned by `ArchiveRepository.get()`
+    - **AND** the result extends `ReadOnlyChangeView` and includes `archivedAt`, `archivedName`, and archive metadata
+
+- op: added
+  description: Detail exposes manifest lifecycle state
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output on success'
+    after:
+      type: section
+      matches: 'Scenario: Archived change exists'
+  content: |
+    #### Scenario: Detail includes manifest lifecycle state
+
+    - **GIVEN** the archived manifest records lifecycle state `archivable` for `'add-oauth-login'`
+    - **WHEN** `getArchivedChange.execute({ name: 'add-oauth-login' })` is called
+    - **THEN** the result `state` equals `archivable`

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "default:_global/spec-layout",
+    "core:search-specs",
+    "core:list-workspaces"
+  ],
+  "implementation": []
+}

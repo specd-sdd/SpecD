@@ -1,0 +1,83 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Pagination flags are accepted
+
+    - **WHEN** `specd archive list --limit 10 --page 2` is run
+    - **THEN** the command parses the flags and delegates them to the use case
+
+- op: removed
+  selector:
+    type: section
+    matches: '^Scenario: Archived changes listed with correct fields$'
+    parent:
+      type: section
+      matches: 'Requirement: Output format — text'
+
+- op: removed
+  selector:
+    type: section
+    matches: '^Scenario: Rows sorted by archive date descending$'
+    parent:
+      type: section
+      matches: 'Requirement: Output format — text'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format — text'
+  content: |
+    #### Scenario: Normal text output
+
+    - **GIVEN** the archive contains 5 changes
+    - **WHEN** `specd archive list` is run
+    - **THEN** stdout contains a table with `NAME` and `DATE` columns
+    - **AND** the `WORKSPACE` column is NOT present
+    - **AND** the summary line `Showing 5 archived changes of 5.` is printed at the end
+
+- op: removed
+  selector:
+    type: section
+    matches: '^Scenario: JSON format output$'
+    parent:
+      type: section
+      matches: 'Requirement: Output format — JSON'
+
+- op: removed
+  selector:
+    type: section
+    matches: '^Scenario: JSON format output — no actor recorded$'
+    parent:
+      type: section
+      matches: 'Requirement: Output format — JSON'
+
+- op: removed
+  selector:
+    type: section
+    matches: '^Scenario: List uses archive index entries$'
+    parent:
+      type: section
+      matches: 'Requirement: Output format — JSON'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format — JSON'
+  content: |
+    #### Scenario: JSON format output with metadata
+
+    - **GIVEN** the archive contains 125 changes and `limit` is 100
+    - **WHEN** `specd archive list --format json` is run
+    - **THEN** stdout is a JSON object with `items` array and `meta` object
+    - **AND** `meta.total` is 125
+    - **AND** `meta.count` is 100
+    - **AND** `meta.limit` is 100
+    - **AND** `meta.page` is 1

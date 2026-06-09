@@ -1,0 +1,1350 @@
+{
+  "name": "improve-graph-search-snippets",
+  "createdAt": "2026-06-02T17:22:06.676Z",
+  "description": "Improve graph search result excerpts and match-context across text and structured output for symbols, specs, and documents.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:graph-search",
+    "code-graph:graph-store",
+    "code-graph:sqlite-graph-store",
+    "code-graph:ladybug-graph-store"
+  ],
+  "specDependsOn": {
+    "cli:graph-search": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model",
+      "code-graph:graph-store"
+    ],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection",
+      "code-graph:document-model"
+    ],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:ladybug-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/.specd-exploration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/cli/graph-search/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/cli/graph-search/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/code-graph/graph-store/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/code-graph/graph-store/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/design.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/manifest.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/proposal.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260602-172206-improve-graph-search-snippets/tasks.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/file-node.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/normalize-snippet.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph/normalize-snippet.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/file-node.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FileNode", "createFileNode"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStore"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL"]
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SCHEMA_VERSION", "SCHEMA_DDL"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LadybugGraphStore"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/normalize-snippet.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["normalizeSnippet"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["registerGraphSearch"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/test/commands/graph/normalize-snippet.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphProvider"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:1f8e7e27b774642a2f606ae85f5ec039d6e9b0c59f8ba55cbd28f71c60b74e6b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:01a409007a2ef77dbe2a3ec22aad4cb5e2a736137f1130e218252ac26595f0bb"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eaefe9b42626382e816908c1fd923c54bc2ab8e98aebdfdfc3d3907dd6c1944d"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:334fa52b090ffd3d422a051c7cdce134c37bc26455eee09a1cc7321ac94c508b"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:43e93a77be54da2f394e64c18600ea2b78fedf01f3ab3cc46358dea4c5d2fead"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e2b87cc8943a793328510e428157d83ba6ee7cf23381e7156344d68defb10659"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0e27465ae85db9da927058bd7e4950490c21ddd4eae0a13473067111561c967f"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a4111677bf240716ed7af8d5a8c677967766a062963e9edbec6571f1007e0399"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6677abd7213ed4802a6efbc8b0d34b66408e162d67caeacac4f61785a32faae4"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:615bf0883266654e3b42d6df950f1732ba1cb5fc5d344817461a9d85b648e1c0"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:5e78001402e77766d32126011fb9baedeb01266054e7cca1ca3cede2cabf55cb"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-02T17:22:06.676Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "cli:graph-search",
+        "code-graph:graph-store",
+        "code-graph:sqlite-graph-store",
+        "code-graph:ladybug-graph-store"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-02T17:22:06.692Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T17:24:49.504Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:29:56.539Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:31:00.938Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:40:27.951Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:43:52.520Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:45:13.384Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:50:36.981Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:51:37.614Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:52:06.232Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:53:10.479Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T17:53:50.437Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T18:05:42.464Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T18:16:41.067Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T18:19:14.331Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T18:23:02.698Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T18:25:50.766Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T18:27:28.312Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T19:15:09.186Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T19:15:09.186Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T19:16:30.241Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T19:16:31.593Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T19:25:48.293Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:graph-search]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:graph-search"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T19:25:48.293Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T19:30:35.013Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T19:31:06.601Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:sqlite-graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T19:31:31.305Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:ladybug-graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:ladybug-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T19:38:37.959Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:graph-store",
+            "code-graph:ladybug-graph-store",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-search",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-02T19:48:15.354Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-search]; verify [cli:graph-search]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-search"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-search"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T21:01:38.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T21:01:40.037Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-02T21:02:30.030Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-03T05:31:09.111Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-03T05:31:45.715Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-03T05:44:53.576Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-03T05:44:53.657Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -1,0 +1,36 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: List all dependencies in the change
+
+    - **GIVEN** a change with multiple specs and some dependencies
+    - **WHEN** `specd change deps <name>` is run without `<specId>` or flags
+    - **THEN** the command exits with code 0
+    - **AND** the output lists all specs in the change and their dependencies
+
+    #### Scenario: Display dependencies for a specific spec
+
+    - **GIVEN** a change with `specIds: ['core:a']` and some dependencies for it
+    - **WHEN** `specd change deps <name> core:a` is run without flags
+    - **THEN** the command exits with code 0
+    - **AND** the output shows the dependencies for `core:a`
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Error when no flags provided'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Error cases'
+  content: |
+    #### Scenario: Error when modification flags provided without specId
+
+    - **WHEN** `specd change deps <name> --add core:other`
+    - **THEN** the command exits with code 1
+    - **AND** stderr indicates modification flags require a specId

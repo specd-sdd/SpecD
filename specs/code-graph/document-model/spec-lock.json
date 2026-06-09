@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:symbol-model", "code-graph:graph-store", "core:config"],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/document-node.ts",
+      "symbols": ["DocumentNode", "createDocumentNode"]
+    },
+    {
+      "file": "code-graph:test/domain/value-objects/document-node.spec.ts"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+releases:
+  skills:resolve-bundle: patch
+  plugin-agent-claude:plugin-agent: patch
+  plugin-agent-copilot:plugin-agent: patch
+  plugin-agent-codex:plugin-agent: patch
+  plugin-agent-opencode:plugin-agent: patch
+  plugin-agent-standard:plugin-agent: patch

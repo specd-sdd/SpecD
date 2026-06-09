@@ -1,0 +1,15 @@
+- op: added
+  description: 'Add verification scenarios for root workspace name reservation.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    before:
+      type: section
+      matches: '^Requirement: Workspace name collision$'
+  content: |
+    #### Scenario: root workspace name is rejected
+
+    - **GIVEN** `specd.yaml` declares a workspace named `root`
+    - **WHEN** the config is loaded
+    - **THEN** a `ConfigValidationError` is thrown on startup

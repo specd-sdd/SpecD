@@ -1,0 +1,905 @@
+{
+  "name": "archived-change-read-only",
+  "createdAt": "2026-05-26T17:55:15.237Z",
+  "description": "Make archived changes readable via a full read-only ArchivedChange loaded from archive manifests, while keeping index-based ArchivedChangeIndexEntry for fast listing. This change splits the archive read models, updates the ArchiveRepository port and FsArchiveRepository implementation, and enhances the CLI archive show command to display rich details from the archived manifest.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:archive-repository-port",
+    "core:get-archived-change",
+    "core:list-archived",
+    "cli:archive-show",
+    "cli:archive-list",
+    "core:archived-change-index-entry"
+  ],
+  "specDependsOn": {
+    "core:archive-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:storage",
+      "core:archive-change",
+      "default:_global/logging",
+      "core:read-only-change-view",
+      "core:archived-change-index-entry"
+    ],
+    "core:get-archived-change": [
+      "core:archive-change",
+      "core:storage",
+      "core:change",
+      "core:kernel",
+      "default:_global/architecture",
+      "core:archived-change-index-entry",
+      "core:read-only-change-view"
+    ],
+    "core:list-archived": [
+      "core:archive-change",
+      "core:storage",
+      "core:kernel",
+      "default:_global/architecture",
+      "core:archived-change-index-entry"
+    ],
+    "cli:archive-show": [
+      "cli:entrypoint",
+      "core:get-archived-change",
+      "core:archived-change-index-entry"
+    ],
+    "cli:archive-list": ["cli:entrypoint", "core:archived-change-index-entry"],
+    "core:archived-change-index-entry": ["core:change", "core:storage"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/domain/archived-change-index-entry.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/read-only-change-view.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/archive-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest-change-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-archived.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-archived-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/archive/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/archive/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/archive-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/list-commands.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/entities/archived-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/entities/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-archived-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-archived.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/archived-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/archive-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/cli/archive-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/cli/archive-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/cli/archive-show/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/cli/archive-show/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/core/archive-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/core/archive-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/core/get-archived-change/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/core/get-archived-change/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/core/list-archived/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/deltas/core/list-archived/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/specs/core/archived-change-index-entry/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/specs/core/archived-change-index-entry/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260526-175515-archived-change-read-only/reports/20260526-212238/specs-compliance-change-archived-change-read-only-20260526-212238.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0022-split-archive-index-and-detail-models.md",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:archived-change-index-entry",
+      "file": "packages/core/src/domain/archived-change-index-entry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchivedChangeIndexEntry", "workspacesFromSpecIds"]
+    },
+    {
+      "specId": "core:get-archived-change",
+      "file": "packages/core/src/domain/read-only-change-view.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchivedChange", "toArchivedChangeView"]
+    },
+    {
+      "specId": "core:archive-repository-port",
+      "file": "packages/core/src/application/ports/archive-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveRepository", "ArchivePathEntry"]
+    },
+    {
+      "specId": "core:archive-repository-port",
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsArchiveRepository"]
+    },
+    {
+      "specId": "core:archive-repository-port",
+      "file": "packages/core/src/infrastructure/fs/manifest-change-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadChangeFromManifest"]
+    },
+    {
+      "specId": "core:list-archived",
+      "file": "packages/core/src/application/use-cases/list-archived.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ListArchived"]
+    },
+    {
+      "specId": "core:get-archived-change",
+      "file": "packages/core/src/application/use-cases/get-archived-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetArchivedChange"]
+    },
+    {
+      "specId": "cli:archive-list",
+      "file": "packages/cli/src/commands/archive/list.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerArchiveList"]
+    },
+    {
+      "specId": "cli:archive-show",
+      "file": "packages/cli/src/commands/archive/show.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerArchiveShow"]
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/adr/0022-split-archive-index-and-detail-models.md",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6e1fdb60502dab1fdb3b9542d0138fd2c0adb1794bc5cdd5ec8d2dd879d430a1"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-repository-port",
+          "filename": "deltas/core/archive-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92822f5ff51e608874fac37e780baf109f306938ab38f9b6059bf8628da28da6"
+        },
+        {
+          "key": "core:get-archived-change",
+          "filename": "deltas/core/get-archived-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:73d63ff8595f812dc33c91032572776fe4afd6116e0a675c18d1e80b2a12e97d"
+        },
+        {
+          "key": "core:list-archived",
+          "filename": "deltas/core/list-archived/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d094ae412bea5496bf7ebabc8aa3515355254be114748f2afa73a6652e10ffef"
+        },
+        {
+          "key": "cli:archive-show",
+          "filename": "deltas/cli/archive-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f467febc67b6cd4b757ac4e5876d20791818d063cd27098a29c140efdb5a9218"
+        },
+        {
+          "key": "cli:archive-list",
+          "filename": "deltas/cli/archive-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:57937ac9853f953ff149fdf7c4ae54852f90815d2949b4da908525039527ca70"
+        },
+        {
+          "key": "core:archived-change-index-entry",
+          "filename": "specs/core/archived-change-index-entry/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:f901329b8341e5e516c3e9fa9d3a256d560a049adc95ab95993c9147e84983c4"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:archive-repository-port",
+          "filename": "deltas/core/archive-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a0723d63f3d76ace12afc1992892a71d91d5310ce606f94c6edb828a51fc81a2"
+        },
+        {
+          "key": "core:get-archived-change",
+          "filename": "deltas/core/get-archived-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ab1ff157f94d8afa7abfa0ff0f30cbf4e235da51da67b7094262f96296fe6ab3"
+        },
+        {
+          "key": "core:list-archived",
+          "filename": "deltas/core/list-archived/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e39c3557f37008a8207ee4992670d9f28a4e8c877e3478f8e0fc109f1cadfffc"
+        },
+        {
+          "key": "cli:archive-show",
+          "filename": "deltas/cli/archive-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6d7f033612d567089c9bd79198d4d5b2a43b44ca30afcc2b2ba0c190fc7542ad"
+        },
+        {
+          "key": "cli:archive-list",
+          "filename": "deltas/cli/archive-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cf1be76351e9544c697cef1b6c35f6e1c257df885da5f763ab4342928cf8a2d2"
+        },
+        {
+          "key": "core:archived-change-index-entry",
+          "filename": "specs/core/archived-change-index-entry/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:35f57b7291384eb40ac806fbe0c2ea4a79a5a917ee78d3d23a3cb58e027fa901"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b6fa328936cc100c981771a8c9277289abb90c9168449e216bdb761fc4a7c357"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:b892101ac40aa8d900079772ab8ded2d084557ad2edb46d5b56991b89cbc8478"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-05-26T17:55:15.237Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:archive-repository-port",
+        "core:get-archived-change",
+        "core:list-archived",
+        "cli:archive-show",
+        "cli:archive-list"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T17:55:15.260Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-archived-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-archived"
+        },
+        {
+          "type": "specs",
+          "key": "cli:archive-show"
+        },
+        {
+          "type": "specs",
+          "key": "cli:archive-list"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-archived-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-archived"
+        },
+        {
+          "type": "verify",
+          "key": "cli:archive-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:archive-list"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T18:03:08.119Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T18:05:27.306Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-repository-port",
+            "core:get-archived-change",
+            "core:list-archived",
+            "cli:archive-show",
+            "cli:archive-list"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-repository-port",
+            "core:get-archived-change",
+            "core:list-archived",
+            "cli:archive-show",
+            "cli:archive-list"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-05-26T18:05:27.307Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:archived-change-index-entry"
+        },
+        {
+          "type": "verify",
+          "key": "core:archived-change-index-entry"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T18:33:28.098Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-repository-port",
+            "core:get-archived-change",
+            "core:list-archived",
+            "cli:archive-show",
+            "cli:archive-list",
+            "core:archived-change-index-entry"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-repository-port",
+            "core:get-archived-change",
+            "core:list-archived",
+            "cli:archive-show",
+            "cli:archive-list",
+            "core:archived-change-index-entry"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T18:50:36.650Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T19:00:55.844Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T19:18:53.285Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T19:39:22.723Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:archive-repository-port",
+            "core:get-archived-change",
+            "core:list-archived",
+            "cli:archive-show",
+            "cli:archive-list",
+            "core:archived-change-index-entry"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:archive-repository-port",
+            "core:get-archived-change",
+            "core:list-archived",
+            "cli:archive-show",
+            "cli:archive-list",
+            "core:archived-change-index-entry"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T19:39:22.723Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-05-26T19:41:18.356Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:archive-list]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:archive-list"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T20:05:07.825Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T20:44:09.313Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T20:46:27.007Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T20:46:53.979Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-26T20:47:07.580Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-05-27T13:22:09.565Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Make archived changes readable via a full read-only ArchivedChange loaded from archive manifests, while keeping index-based ArchivedChangeIndexEntry for fast listing. This change splits the archive read models, updates the ArchiveRepository port and FsArchiveRepository implementation, and enhances the CLI archive show command to display rich details from the archived manifest."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:08.660Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation sidecar updates would touch specs outside the change \"archived-change-read-only\" scope (default:_global/docs). Re-run with --allow-out-of-scope if intentional.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:12.572Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:get-archived-change': extracted dependencies [core:archive-change, core:storage, core:change, core:kernel, default:_global/architecture, core:archived-change-index-entry, core:read-only-change-view] do not match persisted dependencies [core:archive-change, core:storage, core:change, core:kernel, default:_global/architecture, core:archive-repository-port, core:read-only-change-view, core:archived-change-index-entry]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:21.253Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:get-archived-change': extracted dependencies [core:archive-change, core:storage, core:change, core:kernel, default:_global/architecture, core:archived-change-index-entry, core:read-only-change-view] do not match persisted dependencies [core:archive-change, core:storage, core:change, core:kernel, default:_global/architecture, core:read-only-change-view, core:archived-change-index-entry, core:archive-repository-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:32.758Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:get-archived-change': extracted dependencies [core:archive-change, core:storage, core:change, core:kernel, default:_global/architecture, core:archived-change-index-entry, core:read-only-change-view] do not match persisted dependencies [core:archive-change,core:storage,core:change,core:kernel,default:_global/architecture,core:archived-change-index-entry,core:read-only-change-view]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:40.273Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:list-archived': extracted dependencies [core:archive-change, core:storage, core:kernel, default:_global/architecture, core:archived-change-index-entry] do not match persisted dependencies [core:archive-change, core:storage, core:kernel, default:_global/architecture, core:archive-repository-port, core:archived-change-index-entry]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:47.283Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:archive-repository-port': extracted dependencies [core:repository-port, default:_global/architecture, core:change, core:storage, core:archive-change, default:_global/logging, core:archived-change-index-entry, core:read-only-change-view] do not match persisted dependencies [core:repository-port,default:_global/architecture,core:change,core:storage,core:archive-change,default:_global/logging,core:read-only-change-view,core:archived-change-index-entry]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:52.939Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:archive-show': extracted dependencies [cli:entrypoint, core:get-archived-change, core:archived-change-index-entry] do not match persisted dependencies [cli:entrypoint, core:change, core:get-archived-change, core:archive-repository-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-05-27T15:35:57.598Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:archive-list': extracted dependencies [cli:entrypoint, core:archived-change-index-entry] do not match persisted dependencies [cli:entrypoint, core:change, core:list-archived, core:archived-change-index-entry]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-05-27T15:36:03.125Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-05-27T15:36:03.197Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -1,0 +1,26 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Scenario: Execute called with no arguments$'
+    parent:
+      type: section
+      matches: 'Requirement: No input'
+  content: |
+    #### Scenario: Execute with pagination options
+
+    - **WHEN** `listArchived.execute({ limit: 10, page: 2 })` is called
+    - **THEN** it delegates to `archiveRepository.list({ limit: 10, page: 2 })`
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Scenario: Result matches repository output exactly$'
+    parent:
+      type: section
+      matches: 'Requirement: Delegation to ArchiveRepository'
+  content: |
+    #### Scenario: Result matches repository output exactly
+
+    - **GIVEN** `ArchiveRepository.list(options)` returns a specific `ArchiveListResult`
+    - **WHEN** `listArchived.execute(options)` is called
+    - **THEN** the result is identical to the object returned by the repository

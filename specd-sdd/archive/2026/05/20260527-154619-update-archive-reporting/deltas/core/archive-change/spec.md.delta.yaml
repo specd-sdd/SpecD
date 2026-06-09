@@ -1,0 +1,15 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Archive repository call'
+  content: |
+    ### Requirement: Archive index metadata maintenance
+
+    The `ArchiveChange` use case SHALL ensure that the archive index metadata (total count) is maintained during the archiving process.
+
+    - The implementation MUST update the `.specd-index-meta.json` file to increment the `totalCount` after a successful archival.
+    - This update MUST happen atomically or with appropriate concurrency controls to prevent corruption of the metadata.

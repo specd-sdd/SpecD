@@ -1,0 +1,44 @@
+- op: modified
+  description: 'Update agent install options to simple capability lists and recursive variables'
+  selector:
+    type: section
+    matches: '^Requirement: AgentInstallOptions$'
+  content: |
+    ```typescript
+    type TemplateVariable =
+      | string
+      | number
+      | boolean
+      | readonly TemplateVariable[]
+      | { readonly [key: string]: TemplateVariable }
+
+    interface AgentInstallOptions {
+      skills?: string[] // specific skill names; omit = all
+      variables?: Record<string, TemplateVariable> // recursive template variables, including variables.frontmatter and variables.sharedFolder
+      capabilities?: string[] // capability identifiers supported by the target runtime
+    }
+    ```
+
+    `capabilities` MUST be supplied as a simple collection of capability identifiers by the agent plugin at install time. The initial required capability identifiers are `mcp`, `agents`, and `frontmatter`.
+
+    Their initial required meanings are:
+
+    - `mcp`: the target runtime supports MCP-oriented template branches
+    - `agents`: the target runtime supports delegated-agent-oriented template branches
+    - `frontmatter`: the target runtime expects frontmatter to be composed and inserted from `variables.frontmatter`
+
+    Frontmatter data MUST be passed through `variables.frontmatter`. Plugins MUST NOT pass a prebuilt YAML frontmatter document through `AgentInstallOptions`.
+
+    `variables.sharedFolder`, when provided, MUST be relative to the project root and is subject to normalization and validation by `@specd/skills`.
+- op: modified
+  description: 'Clarify constraints around plugin-side install data'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - Agent plugins specialize the base plugin type for agent integrations.
+    - Install-time capability data MUST be passed separately from template variables.
+    - The initial required capability identifiers are `mcp`, `agents`, and `frontmatter`.
+    - Agent plugins MUST NOT pass pre-normalized capability objects into `@specd/skills`.
+    - Install-time frontmatter data MUST be passed through `variables.frontmatter`, not as a prebuilt YAML document.
+    - Agent plugins MAY pass `variables.sharedFolder`, but `@specd/skills` owns its normalization and safety validation.
