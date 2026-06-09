@@ -65,13 +65,13 @@
     {
       "requirement": "Workspaces",
       "rules": [
-        "`specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.\n\n`default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.\n\n```yaml\nworkspaces:\n  default: # required — the local project workspace\n    prefix: _global # optional — logical path prefix for all specs in this workspace\n    specs: # where this workspace's spec files live (required)\n      adapter: fs # storage adapter (required; only \"fs\" in v1)\n      fs:\n        path: specs/_global\n        metadataPath: .specd/metadata # optional — where metadata.yaml files live\n    schemas: # where named local schemas live (optional)\n      adapter: fs\n      fs:\n        path: .specd/schemas # default: .specd/schemas (relative to specd.yaml)\n    codeRoot: ./ # where implementation code lives (default: project root)\n    ownership: owned # owned | shared | readOnly (default: owned)\n\n  billing: # additional workspace\n    specs:\n      adapter: fs\n      fs:\n        path: ../billing/specd/specs\n    schemas:\n      adapter: fs\n      fs:\n        path: ../billing/dev/schemas\n    codeRoot: ../billing # required for non-default workspaces — no default\n    ownership: readOnly # default for non-default workspaces\n```\n\n**`specs`** (required) — declares where this workspace's spec files live. Has its own `adapter` and adapter-specific config block. Only `\"fs\"` is supported in v1.\n\n**`specs.fs.path`** (required for `fs` adapter) — directory where spec files live. Relative paths are resolved from the directory containing `specd.yaml`. May point outside the project repo root, in which case `RepositoryConfig.isExternal` is set to `true` by the application layer.\n\n**`specs.fs.metadataPath`** (optional for `fs` adapter) — directory where `metadata.yaml` files live, mirroring the spec capability path structure. Relative paths are resolved from the directory containing `specd.yaml`. When absent, the config loader auto-derives the path from the VCS root of `specs.fs.path` + `/.specd/metadata/`. When the specs path is not inside any VCS, the fallback is `.specd/metadata/` relative to the specs path parent directory.\n\n**`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.\n\n- For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: .specd/schemas`.\n- For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.\n\n**`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.\n\n- For the `default` workspace, defaults to the project root (directory containing `specd.yaml`).\n- For non-`default` workspaces, `codeRoot` is required — there is no default.\n\n**`ownership`** — the project's relationship to this workspace's specs.\n\n- `owned` — the project owns these specs and can create, modify, and archive changes against them. Default for the `default` workspace.\n- `shared` — specs can be modified, but external teams may also modify them.\n- `readOnly` — specs are imported for context only; changes cannot target them. Default for non-`default` workspaces.\n\n**Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters."
+        "`specd.yaml` must declare at least one workspace under the `workspaces` key. Each workspace defines where its specs live, where the implementation code lives, where its local schemas are stored, and the ownership relationship the project has with those specs.\n\n`default` is a reserved workspace name that identifies the local project workspace. Every config must contain a `default` workspace. `specd init` creates it automatically if no `workspaces` section is present.\n\n`root` is a reserved workspace name used by the code graph for project-global resources. Declaring a workspace named `root` in `specd.yaml` MUST produce a `ConfigValidationError` at startup.\n\n```yaml\nworkspaces:\n  default: # required — the local project workspace\n    prefix: _global # optional — logical path prefix for all specs in this workspace\n    specs: # where this workspace's spec files live (required)\n      adapter: fs # storage adapter (required; only \"fs\" in v1)\n      fs:\n        path: specs/_global\n        metadataPath: .specd/metadata # optional — where metadata.yaml files live\n    schemas: # where named local schemas live (optional)\n      adapter: fs\n      fs:\n        path: .specd/schemas # default: .specd/schemas (relative to specd.yaml)\n    codeRoot: ./ # where implementation code lives (default: project root)\n    ownership: owned # owned | shared | readOnly (default: owned)\n\n  billing: # additional workspace\n    specs:\n      adapter: fs\n      fs:\n        path: ../billing/specd/specs\n    schemas:\n      adapter: fs\n      fs:\n        path: ../billing/dev/schemas\n    codeRoot: ../billing # required for non-default workspaces — no default\n    ownership: readOnly # default for non-default workspaces\n```\n\n**`specs`** (required) — declares where this workspace's spec files live. Has its own `adapter` and adapter-specific config block. Only `\"fs\"` is supported in v1.\n\n**`specs.fs.path`** (required for `fs` adapter) — directory where spec files live. Relative paths are resolved from the directory containing `specd.yaml`. May point outside the project repo root, in which case `RepositoryConfig.isExternal` is set to `true` by the application layer.\n\n**`specs.fs.metadataPath`** (optional for `fs` adapter) — directory where `metadata.yaml` files live, mirroring the spec capability path structure. Relative paths are resolved from the directory containing `specd.yaml`. When absent, the config loader auto-derives the path from the VCS root of `specs.fs.path` + `/.specd/metadata/`. When the specs path is not inside any VCS, the fallback is `.specd/metadata/` relative to the specs path parent directory.\n\n**`schemas`** (optional) — declares where named local schemas for this workspace are stored. Has its own `adapter` and adapter-specific config block, independent of `specs`. Used when the `schema` field references `#workspace:name` or a bare/hash-prefixed name targeting this workspace.\n\n- For the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: .specd/schemas`.\n- For non-`default` workspaces, if omitted, the workspace has no local schemas — any schema reference targeting it (e.g. `#billing:name`) will produce a `SchemaNotFoundError`.\n\n**`codeRoot`** — directory where the implementation code for this workspace lives. Used by `CompileContext` to tell the agent where to write code.\n\n- For the `default` workspace, defaults to the project root (directory containing `specd.yaml`).\n- For non-`default` workspaces, `codeRoot` is required — there is no default.\n\n**`ownership`** — the project's relationship to this workspace's specs.\n\n- `owned` — the project owns these specs and can create, modify, and archive changes against them. Default for the `default` workspace.\n- `shared` — specs can be modified, but external teams may also modify them.\n- `readOnly` — specs are imported for context only; changes cannot target them. Default for non-`default` workspaces.\n\n**Workspace-specific context filtering:** Each workspace may optionally declare `context.includeSpecs` and `context.excludeSpecs` arrays to filter which specs appear in compiled context for changes touching that workspace's specs. These follow the same glob-like pattern syntax as the project-level `context.includeSpecs` / `context.excludeSpecs` and are combined (intersected) with the project-level filters."
       ]
     },
     {
-      "requirement": "Workspace graph config",
+      "requirement": "Workspace-level graph configuration",
       "rules": [
-        "Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace:\n\n```yaml\nworkspaces:\n  default:\n    codeRoot: ./\n    graph:\n      respectGitignore: true # optional; default: true\n      excludePaths: # optional; gitignore-syntax, supports negation with !\n        - .specd/*\n        - '!.specd/metadata/'\n  core:\n    codeRoot: packages/core\n    graph:\n      excludePaths:\n        - dist/\n```\n\n**`graph.respectGitignore`** (boolean, default `true`) — whether `.gitignore` files are loaded and applied during file discovery for this workspace.\n\n- When `true` (default): `.gitignore` rules are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with **absolute priority**. No pattern in `excludePaths` can re-include a file that `.gitignore` excludes.\n- When `false`: `.gitignore` files are not loaded. Only `excludePaths` governs file exclusion.\n\n**`graph.excludePaths`** (string array, gitignore-syntax) — additional exclusion rules applied on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Patterns follow `.gitignore` format and support negation with `!`.\n\nWhen `graph.excludePaths` is **not** specified, the following built-in defaults apply (equivalent to the previous hardcoded behaviour):\n\n```\nnode_modules/\n.git/\n.specd/\ndist/\nbuild/\ncoverage/\n.next/\n.nuxt/\n```\n\nWhen `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged. To retain standard exclusions alongside custom ones, include them explicitly:\n\n```yaml\ngraph:\n  excludePaths:\n    - node_modules/\n    - .git/\n    - dist/\n    - build/\n    - coverage/\n    - .specd/*\n    - '!.specd/metadata/'\n```\n\nPatterns are evaluated relative to the workspace's `codeRoot`."
+        "Each workspace entry in `specd.yaml` MAY declare an optional `graph` block controlling how the code graph indexer discovers files for that workspace:\n\n```yaml\nworkspaces:\n  default:\n    codeRoot: ./\n    graph:\n      respectGitignore: true # optional; default: true\n      allowedPaths: # optional; only files matching these patterns are indexed\n        - src/**\n      excludePaths: # optional; gitignore-syntax, supports negation with !\n        - .specd/*\n        - '!.specd/metadata/'\n  core:\n    codeRoot: packages/core\n    graph:\n      excludePaths:\n        - dist/\n```\n\n**`graph.allowedPaths`** (string array, glob-syntax) — optional patterns relative to `codeRoot`. If specified, only files matching these patterns SHALL be indexed for this workspace.\n\n**`graph.respectGitignore`** (boolean, default `true`) — whether `.gitignore` files are loaded and applied during file discovery for this workspace.\n\n- When `true` (default): `.gitignore` rules are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with **absolute priority**. No pattern in `excludePaths` can re-include a file that `.gitignore` excludes.\n- When `false`: `.gitignore` files are not loaded. Only `excludePaths` governs file exclusion.\n\n**`graph.excludePaths`** (string array, gitignore-syntax) — additional exclusion rules applied on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Patterns follow `.gitignore` format and support negation with `!`.\n\nWhen `graph.excludePaths` is **not** specified, the following built-in defaults apply:\n\n```\nnode_modules/\n.git/\n.specd/\ndist/\nbuild/\ncoverage/\n.next/\n.nuxt/\n```\n\nWhen `graph.excludePaths` **is** specified, it **replaces** the built-in defaults entirely. The user takes full ownership — built-in patterns are not merged.\n\nPatterns are evaluated relative to the workspace's `codeRoot`."
       ]
     },
     {
@@ -162,6 +162,12 @@
       "requirement": "Startup validation",
       "rules": [
         "Config startup validation MUST reject invalid cascade instructions before any command proceeds.\n\nValidation MUST fail with `ConfigValidationError` when:\n\n- `remove` appears in a config that does not declare `extends`\n- `extends` uses any value other than `true` or a string path\n- `extends: <path>` points outside the applicable config chain\n- `remove.root` attempts to delete a required field such as `schema`\n- `remove.workspaces` or `remove.storage` names a key that does not exist in the inherited base\n- array removal cannot resolve exactly one inherited target under that array's identity rules\n\nThese validation failures remain domain-level configuration errors and therefore MUST surface through the normal `SpecdError` / `ConfigValidationError` path."
+      ]
+    },
+    {
+      "requirement": "Project-level graph configuration",
+      "rules": [
+        "`specd.yaml` MAY include a `graph` section for project-global graph settings.\n\n- **`includePaths`** — optional array of glob patterns (relative to project root) to discover project-global files outside workspace-owned graph identities (for example `docs/**`, `package.json`).\n- **`excludePaths`** — optional array of gitignore-syntax patterns to exclude from file/document discovery globally.\n\nResources discovered via `graph.includePaths` SHALL be assigned to the reserved `root:` graph namespace only when they are not already owned by a configured workspace `codeRoot`.\n\n`graph.excludePaths` SHALL apply to project-global discovery and workspace discovery alike. Workspace-level graph filters MAY add additional restrictions, but they MUST NOT remove or override global exclusions."
       ]
     }
   ],
@@ -502,7 +508,14 @@
       "then": ["specd exits with a ConfigValidationError at startup"]
     },
     {
-      "requirement": "Workspace graph config",
+      "requirement": "Workspace-level graph configuration",
+      "name": "Allowed paths constrain workspace indexing",
+      "given": ["a workspace declares graph.allowedPaths: [\"src/**\"]"],
+      "when": ["the config is loaded"],
+      "then": ["the workspace configuration includes the allowedPaths constraint"]
+    },
+    {
+      "requirement": "Workspace-level graph configuration",
       "name": "excludePaths replaces built-in defaults",
       "given": ["a workspace with graph.excludePaths: [\"fixtures/\"]"],
       "when": ["the config is loaded"],
@@ -512,7 +525,7 @@
       ]
     },
     {
-      "requirement": "Workspace graph config",
+      "requirement": "Workspace-level graph configuration",
       "name": "graph block absent — no field on workspace config",
       "given": ["a workspace with no graph key"],
       "when": ["the config is loaded"],
@@ -522,7 +535,7 @@
       ]
     },
     {
-      "requirement": "Workspace graph config",
+      "requirement": "Workspace-level graph configuration",
       "name": "respectGitignore defaults to true",
       "given": ["a workspace with graph: {} (no respectGitignore key)"],
       "when": ["the config is loaded"],
@@ -531,11 +544,25 @@
       ]
     },
     {
-      "requirement": "Workspace graph config",
+      "requirement": "Workspace-level graph configuration",
       "name": "respectGitignore set to false",
       "given": ["a workspace with graph.respectGitignore: false"],
       "when": ["the config is loaded"],
       "then": ["SpecdWorkspaceConfig.graph.respectGitignore is false"]
+    },
+    {
+      "requirement": "Project-level graph configuration",
+      "name": "Project graph include paths discovered",
+      "given": ["specd.yaml declares graph.includePaths: [\"docs/**\"]"],
+      "when": ["the config is loaded"],
+      "then": ["config.graph.includePaths includes the docs/** pattern"]
+    },
+    {
+      "requirement": "Project-level graph configuration",
+      "name": "Project graph exclude paths discovered",
+      "given": ["specd.yaml declares graph.excludePaths: [\"specs/\"]"],
+      "when": ["the config is loaded"],
+      "then": ["config.graph.excludePaths includes the specs/ pattern"]
     },
     {
       "requirement": "Storage configuration",
@@ -1239,10 +1266,39 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:config",
+        "file": "core:test/infrastructure/fs/config-loader.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:config",
+        "file": "core:src/application/specd-config.ts",
+        "symbol": "SpecdWorkspaceGraphConfig"
+      },
+      {
+        "specId": "core:config",
+        "file": "core:src/application/specd-config.ts",
+        "symbol": "SpecdGraphConfig"
+      },
+      {
+        "specId": "core:config",
+        "file": "core:src/application/specd-config.ts",
+        "symbol": "SpecdConfig"
+      },
+      {
+        "specId": "core:config",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "FsConfigLoader"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:74ad06036d62ba7dc25d3ffe69fe7bf32882a926f629a756b7a2272feb9c80c6",
-    "verify.md": "sha256:c72d51f18d471935f5804d8a211b124c22f5d5c7366b8776d977acd69957a33e"
+    "spec.md": "sha256:fb74e0f7bb929d717b0abb39ab0971a895f3826b56b3e3c0526753c3a33bd645",
+    "verify.md": "sha256:60889d07c358b6ca2922cc1764fa25ffd18010624b0de0dbe23af374e65fea1d"
   },
   "generatedBy": "core"
 }

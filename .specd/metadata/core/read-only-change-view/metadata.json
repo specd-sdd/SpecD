@@ -152,20 +152,7 @@
       "then": ["artifact file content may be loaded separately from the view"]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:read-only-change-view",
-        "file": "core:src/domain/read-only-change-view.ts",
-        "symbol": "toDraftedChangeView"
-      },
-      {
-        "specId": "core:read-only-change-view",
-        "file": "core:src/domain/read-only-change-view.ts",
-        "symbol": "toDiscardedChangeView"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:87f4addaba1b18f315eeeaf2411fbef0588f9a81843a524a970e7492fa0da732",
     "verify.md": "sha256:c1fd442d26af47e3e6bef4b903e54c20d79f42db532c37f1c9f1fecc94585317"

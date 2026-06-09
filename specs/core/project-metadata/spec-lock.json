@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:config"],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/project-metadata.ts",
+      "symbols": [
+        "projectMetadataSchema",
+        "ProjectMetadata",
+        "updateProjectMetadataSchema",
+        "UpdateProjectMetadataPayload"
+      ]
+    },
+    {
+      "file": "core:src/application/use-cases/get-project-metadata.ts",
+      "symbols": ["GetProjectMetadata", "GetProjectMetadataResult"]
+    }
+  ]
+}

@@ -5,7 +5,8 @@
     "cli:entrypoint",
     "core:config",
     "code-graph:composition",
-    "code-graph:staleness-detection"
+    "code-graph:staleness-detection",
+    "core:list-workspaces"
   ],
   "context": [
     "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance."
@@ -20,7 +21,7 @@
     {
       "requirement": "Statistics retrieval",
       "rules": [
-        "The command:\n\n1. Validates that `--config` and `--path` are not both present\n2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n3. Creates a `CodeGraphProvider` from the resolved graph context\n4. Opens the provider\n5. Calls `getStatistics()` to retrieve the `GraphStatistics` object\n6. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.\n7. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness\n8. Outputs the statistics with staleness information\n9. Closes the provider\n10. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive\n\nIn bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root."
+        "The command:\n\n1. Resolves graph context.\n2. In configured mode, obtains the orchestrated project structure via `ListWorkspaces`.\n3. Uses the orchestrated list together with the effective graph discovery configuration to determine the project fingerprint and compare it against the graph store's metadata.\n4. Creates, opens, and queries the `CodeGraphProvider`.\n5. Resolves the current VCS ref and compares it against `statistics.lastIndexedRef` to determine staleness.\n6. Outputs the statistics.\n7. Closes the provider and exits."
       ]
     },
     {
@@ -32,7 +33,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the output is a labelled summary:\n\n```\nFiles:     459\nSymbols:   1497\nSpecs:     122\nLanguages: javascript, typescript\nRelations:\n  IMPORTS: 1227\n  DEFINES: 1497\nLast indexed: 2026-03-14T10:38:30.178Z\n```\n\n- `Files`, `Symbols`, `Specs` show `fileCount`, `symbolCount`, `specCount`\n- `Languages` shows the `languages` array joined by `, `\n- `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line\n- `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp\n\nIf the graph is stale, a warning line SHALL be appended after `Last indexed`:\n\n```\n⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)\n```\n\nWhere `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.\n\nIn `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with two additional fields:\n\n- `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown\n- `currentRef: string | null` — the current VCS ref, or `null` if unavailable"
+        "In `text` mode (default), the output is a labelled summary:\n\n```text\nFiles:     459\nDocuments: 18\nSymbols:   1497\nSpecs:     122\nLanguages: javascript, typescript\nRelations:\n  IMPORTS: 1227\n  DEFINES: 1497\nLast indexed: 2026-03-14T10:38:30.178Z\n```\n\n- `Files`, `Documents`, `Symbols`, `Specs` show `fileCount`, `documentCount`, `symbolCount`, `specCount`\n- `Languages` shows the `languages` array joined by `, `\n- `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line\n- `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp\n\nIf the graph is stale, a warning line SHALL be appended after `Last indexed`:\n\n```text\n⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)\n```\n\nWhere `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.\n\nIn `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with three additional fields:\n\n- `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown\n- `currentRef: string | null` — the current VCS ref, or `null` if unavailable\n- `fingerprintMismatch: boolean | null` — `true` when the stored derivation fingerprint differs from the current effective graph configuration, `false` when it matches, `null` when the comparison cannot be computed"
       ]
     },
     {
@@ -75,27 +76,12 @@
     },
     {
       "requirement": "Statistics retrieval",
-      "name": "Command retrieves statistics and resolves VCS ref in configured mode",
-      "when": ["graph stats is executed with discovered or explicit config"],
+      "name": "Command obtains orchestrated project structure",
+      "when": ["specd graph stats is executed in configured mode"],
       "then": [
-        "the command SHALL create a provider, open it, call getStatistics(), resolve the current VCS ref, output results, close the provider, and exit with code 0"
+        "it calls ListWorkspaces to obtain the rich workspace list",
+        "AND it uses this list to compute the project fingerprint"
       ]
-    },
-    {
-      "requirement": "Statistics retrieval",
-      "name": "Missing config falls back to bootstrap mode",
-      "given": ["no specd.yaml is found by autodiscovery"],
-      "when": ["graph stats is executed inside a repository"],
-      "then": [
-        "the command SHALL resolve the VCS root and open the graph in bootstrap mode as workspace default"
-      ]
-    },
-    {
-      "requirement": "Statistics retrieval",
-      "name": "VCS detection failure is graceful",
-      "given": ["the project has no VCS (e.g. no .git/ directory)"],
-      "when": ["graph stats is executed"],
-      "then": ["currentRef SHALL be null", "AND the command SHALL proceed without error"]
     },
     {
       "requirement": "Concurrent indexing guard",
@@ -132,10 +118,21 @@
     },
     {
       "requirement": "Output format",
+      "name": "Text output includes document counts",
+      "given": ["the graph contains 459 files, 18 documents, 1497 symbols, and 122 specs"],
+      "when": ["graph stats is run in text mode"],
+      "then": [
+        "stdout contains Files:     459",
+        "AND stdout contains Documents: 18",
+        "AND stdout contains Symbols:   1497"
+      ]
+    },
+    {
+      "requirement": "Output format",
       "name": "JSON output includes staleness fields",
       "when": ["graph stats --format json is run"],
       "then": [
-        "the output SHALL include stale (boolean or null) and currentRef (string or null) fields"
+        "the output SHALL include stale (boolean or null), currentRef (string or null), and fingerprintMismatch"
       ]
     },
     {
@@ -156,9 +153,21 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:graph-stats",
+        "file": "cli:src/commands/graph/stats.ts"
+      },
+      {
+        "specId": "cli:graph-stats",
+        "file": "cli:test/commands/graph-stats.spec.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e7ad216d3e8d443466c39f2854d140831c83cb7346863b864bbf6431f6a4c1ef",
-    "verify.md": "sha256:b992734c13d9485d94e3d4afa36af79423cc18ea81f75f23a717fb068e5da6c8"
+    "spec.md": "sha256:1e48b811cb58c8f4a35a688d81af0d16142ee4c1e365d06ca88a7741263bb9c0",
+    "verify.md": "sha256:617950380819cbbef91a4cd934602c82d69413c957563eba6527c0c9bf5481ad"
   },
   "generatedBy": "core"
 }

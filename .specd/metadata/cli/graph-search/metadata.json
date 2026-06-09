@@ -1,236 +1,90 @@
 {
+  "generatedBy": "agent",
   "title": "Graph Search",
-  "description": "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities.",
+  "description": "The code graph contains symbols and specs. The specd graph search command provides relevance-ranked search across both through abstract code-graph search capabilities.",
+  "keywords": [
+    "graph-search",
+    "symbol-search",
+    "spec-search",
+    "relevance-ranking",
+    "code-graph-cli",
+    "snippet-preview"
+  ],
   "dependsOn": [
     "cli:entrypoint",
     "core:config",
     "code-graph:composition",
+    "code-graph:document-model",
     "code-graph:graph-store"
   ],
-  "context": [
-    "The code graph contains symbols with names and comments, and specs with titles, descriptions, and full content. Users and agents need to find relevant symbols and specs by concept or keyword without knowing exact names. The `specd graph search` command provides relevance-ranked search across both through the abstract code-graph search capabilities."
-  ],
+  "contentHashes": {
+    "spec.md": "sha256:f423a65cc5ebeb2b5ebdd290ff770f4d824eca304e686eccf477c30a03d520df",
+    "verify.md": "sha256:64bf29d7c285560aabcbd0188da384f6999e3163e71b6420b06c9b5dfc8a80d4"
+  },
   "rules": [
     {
       "requirement": "Command signature",
       "rules": [
-        "```text\nspecd graph search <query> [--symbols] [--specs] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)\n- `--symbols` — optional; search only symbols\n- `--specs` — optional; search only specs\n- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`\n- `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)\n- `--workspace <name>` — optional; filter both symbols and specs to a single workspace\n- `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)\n- `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace\n- `--limit <n>` — optional; maximum results per category, defaults to `10`\n- `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\nWhen neither `--symbols` nor `--specs` is provided, both categories are searched.\n\nAll filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects."
+        "The command accepts a search query and optional flags for category filtering, kind filtering, file and workspace filtering, and output format.",
+        "Category flags include symbols, specs, and documents, defaulting to all if none are provided.",
+        "Filters are applied at the store level before the limit.",
+        "Search ranking must prioritize exact matches on primary identities regardless of generic relevance scores."
       ]
     },
     {
       "requirement": "Search behaviour",
       "rules": [
-        "The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — search across symbol search text and symbol comments, with filters applied at the store level\n- `provider.searchSpecs(options)` — search across spec title, description, and content, with filters applied at the store level\n\nThe concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first.\n\nThe `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.\n\nThe validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.\n\nBefore attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors."
+        "The command delegates to CodeGraphProvider search methods for symbols, specs, and documents.",
+        "Results are ordered by descending relevance score.",
+        "Search results must include preview context with the matched text and a 1-based line range.",
+        "Symbol previews are derived from persisted source-file content.",
+        "Spec previews are derived from matched spec content or description fallback.",
+        "Document previews are derived from matched document content.",
+        "The command validates the kind option against allowed SymbolKind values before query execution.",
+        "The command fails fast if the shared graph indexing lock is active."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode, results are grouped by category:\n\n```text\nSymbols (5):\n   8.0  [core] method execute  src/use-cases/run-hooks.ts:108 — /** Executes run hooks... */\n   5.5  [core] type OnHookProgress  src/use-cases/run-hooks.ts:21 — /** Callback for hook... */\n\nSpecs (5):\n  75.1  [core] core:hook-execution-model — Workflow steps declare hooks via...\n  57.6  [core] core:run-step-hooks — Agent-driven workflow steps declare...\n```\n\nEach line shows:\n\n- **Workspace** — in brackets (e.g. `[core]`, `[cli]`)\n- **Score** — BM25 relevance score, right-aligned\n- **Symbols**: kind, name, workspace-relative filePath:line, and comment preview (first 50 chars)\n- **Specs**: specId and description preview (first 60 chars)\n\nWhen no results are found, outputs `No results found.`\n\nIn `json` or `toon` mode, outputs `{ symbols: [...], specs: [...] }`. Each entry includes a `workspace` field and a `score` field. Spec entries include `specId`, `path`, `title`, and `description`. Full spec `content` is omitted by default — pass `--spec-content` to include it."
+        "Text mode groups results by category with a header showing the limit.",
+        "Each result in text mode renders an identity block and a separate snippet block with a line range indicator.",
+        "Snippets are wrapped in custom markers to avoid markdown formatting collisions.",
+        "Text-mode symbol snippets use line-oriented source context with normalized indentation.",
+        "Spec and document snippets are match-centered and rendered in a separate snippet block."
       ]
     },
     {
       "requirement": "Error cases",
-      "rules": [
-        "If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit."
-      ]
+      "rules": ["The command exits with code 3 if the provider cannot be opened."]
     },
     {
       "requirement": "Command signature (filters)",
       "rules": [
-        "The command accepts the following filter options applied at the store level:\n\n- `--kind <kinds>` — filter symbols by kind (e.g., `class,method`)\n- `--file <path>` — filter symbols by file path pattern (supports `*` wildcards)\n- `--workspace <name>` — filter to a single workspace\n- `--exclude-path <pattern>` — exclude symbols/specs matching the glob pattern\n- `--exclude-workspace <name>` — exclude results from the given workspace"
+        "The command accepts filters for kind, file, workspace, exclude-path, and exclude-workspace."
       ]
     }
   ],
   "constraints": [
-    "The CLI does not contain search logic — it delegates to CodeGraphProvider.searchSymbols and CodeGraphProvider.searchSpecs",
-    "Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance",
-    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress",
-    "The process.exit(0) pattern is required after closing the provider"
+    "The CLI does not contain search logic and delegates to CodeGraphProvider methods.",
+    "Search depends on the active graph-store backend having prepared its search indexes.",
+    "The command checks the shared graph indexing lock before opening the provider.",
+    "The process.exit(0) pattern is required after closing the provider."
   ],
   "scenarios": [
     {
       "requirement": "Command signature",
       "name": "Search both categories by default",
-      "when": ["specd graph search \"hook execution\" is run"],
+      "given": [],
+      "when": ["specd graph search is run without category flags"],
       "then": ["both symbol and spec results are returned"]
-    },
-    {
-      "requirement": "Command signature",
-      "name": "Search symbols only",
-      "when": ["specd graph search \"transition\" --symbols is run"],
-      "then": ["only symbol results are returned", "AND no spec results are shown"]
-    },
-    {
-      "requirement": "Command signature",
-      "name": "Search specs only",
-      "when": ["specd graph search \"workspace\" --specs is run"],
-      "then": ["only spec results are returned", "AND no symbol results are shown"]
-    },
-    {
-      "requirement": "Command signature",
-      "name": "Custom limit",
-      "when": ["specd graph search \"hook\" --limit 3 is run"],
-      "then": ["at most 3 symbols and 3 specs are returned"]
-    },
-    {
-      "requirement": "Command signature",
-      "name": "Explicit config path bypasses discovery",
-      "given": ["the current directory would autodiscover a different specd.yaml"],
-      "when": ["specd graph search \"kernel\" --config /tmp/other/specd.yaml is run"],
-      "then": ["the command uses /tmp/other/specd.yaml directly"]
-    },
-    {
-      "requirement": "Command signature",
-      "name": "Explicit path enters bootstrap mode",
-      "given": ["a specd.yaml exists under the current repository"],
-      "when": ["specd graph search \"kernel\" --path /tmp/repo is run"],
-      "then": [
-        "config discovery is ignored",
-        "AND the command searches a synthetic single workspace default rooted at /tmp/repo"
-      ]
     },
     {
       "requirement": "Search behaviour",
       "name": "Results ranked by relevance",
-      "given": [
-        "specs hook-execution-model (contains hook execution many times) and architecture (contains hook once)"
-      ],
-      "when": ["specd graph search \\\"hook execution\\\" is run"],
-      "then": [
-        "hook-execution-model appears before architecture",
-        "AND the higher-ranked result has the stronger relevance score"
-      ]
-    },
-    {
-      "requirement": "Search behaviour",
-      "name": "Search matches symbol comments",
-      "given": ["a symbol with comment containing executing the workflow hook"],
-      "when": ["specd graph search \\\"execution\\\" is run"],
-      "then": ["the symbol may be returned by the active backend's search implementation"]
-    },
-    {
-      "requirement": "Search behaviour",
-      "name": "Multi-word query matches across fields",
-      "given": ["a spec with title Workspace Integration and content containing import resolution"],
-      "when": ["specd graph search \\\"workspace import\\\" is run"],
-      "then": ["the spec is returned"]
-    },
-    {
-      "requirement": "Search behaviour",
-      "name": "No results",
-      "when": ["specd graph search \\\"xyznonexistent\\\" is run"],
-      "then": ["No results found. is output"]
-    },
-    {
-      "requirement": "Search behaviour",
-      "name": "Missing config falls back to bootstrap mode",
-      "given": ["no specd.yaml is found by autodiscovery"],
-      "when": ["specd graph search \\\"kernel\\\" is run inside a repository"],
-      "then": [
-        "the command searches in bootstrap mode against the resolved VCS root as workspace default"
-      ]
-    },
-    {
-      "requirement": "Search behaviour",
-      "name": "Multiple kinds are passed through to the query layer",
-      "when": ["specd graph search \\\"transition\\\" --kind class,method,function is run"],
-      "then": [
-        "the command trims and validates all three kind tokens",
-        "AND the provider receives the full kind list rather than only the last token"
-      ]
-    },
-    {
-      "requirement": "Search behaviour",
-      "name": "Invalid kind token fails before query execution",
-      "when": ["specd graph search \\\"transition\\\" --kind method,unknownKind is run"],
-      "then": ["the command exits with code 1", "AND the search query is not executed"]
-    },
-    {
-      "requirement": "Search behaviour",
-      "name": "Search fails fast while indexing lock is present",
-      "given": ["a graph index process currently holds the shared graph indexing lock"],
-      "when": ["specd graph search \\\"kernel\\\" is run"],
-      "then": [
-        "the command exits with code 3 before opening the provider",
-        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
-      ]
-    },
-    {
-      "requirement": "Error cases",
-      "name": "Provider cannot be opened exits with code 3",
-      "when": ["the provider fails to open"],
-      "then": ["the command exits with code 3"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Text output groups by category",
-      "when": ["results include both symbols and specs in text mode"],
-      "then": [
-        "symbols are listed under Symbols (N): header",
-        "AND specs are listed under Specs (N): header",
-        "AND each line shows score, identity, and preview"
-      ]
-    },
-    {
-      "requirement": "Output format",
-      "name": "JSON output includes workspace and scores",
-      "when": ["specd graph search \"hook\" --format json is run"],
-      "then": [
-        "output is {\"symbols\":[...],\"specs\":[...]}",
-        "AND each entry includes a workspace field and a score field",
-        "AND spec entries include specId, path, title, description but NOT content"
-      ]
-    },
-    {
-      "requirement": "Output format",
-      "name": "JSON with --spec-content includes full content",
-      "when": ["specd graph search \"hook\" --format json --spec-content is run"],
-      "then": ["spec entries include a content field with the full spec text"]
-    },
-    {
-      "requirement": "Output format",
-      "name": "--spec-content with text format fails",
-      "when": ["specd graph search \"hook\" --spec-content is run (text format)"],
-      "then": [
-        "the command exits with code 1",
-        "AND an error message explains that --spec-content requires --format json or --format toon"
-      ]
-    },
-    {
-      "requirement": "Output format",
-      "name": "Text output shows workspace in brackets",
-      "when": ["results are displayed in text mode"],
-      "then": ["each line shows [workspace] before the symbol or spec identity"]
-    },
-    {
-      "requirement": "Command signature (filters)",
-      "name": "Filter by multiple symbol kinds",
-      "when": ["specd graph search \"transition\" --kind class,method is run"],
-      "then": [
-        "only symbols with kind class or method are returned",
-        "AND symbols of other kinds are excluded"
-      ]
-    },
-    {
-      "requirement": "Command signature (filters)",
-      "name": "Filter by file path wildcard",
-      "when": ["specd graph search \"create\" --file \"*/composition/*\" is run"],
-      "then": ["only symbols in files matching the pattern are returned"]
-    },
-    {
-      "requirement": "Command signature (filters)",
-      "name": "Filter by workspace",
-      "when": ["specd graph search \"kernel\" --workspace core is run"],
-      "then": [
-        "only symbols from workspace core are returned",
-        "AND only specs from workspace core are returned"
-      ]
+      "given": ["specs matching the query to varying degrees"],
+      "when": ["specd graph search is run"],
+      "then": ["higher-ranked results have stronger relevance scores"]
     }
-  ],
-  "contentHashes": {
-    "spec.md": "sha256:4be5a23ad5d28ccde2c3343967577a7f32edc963418a8fc323d553f4056451b8",
-    "verify.md": "sha256:896eb337fee8a7dbadceccd51fa333cd1467e72b5262c7c3cc4e5fc332348d67"
-  },
-  "generatedBy": "core"
+  ]
 }

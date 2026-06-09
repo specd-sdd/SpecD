@@ -6,7 +6,8 @@
     "core:compile-context",
     "core:spec-metadata",
     "core:schema-format",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:core/project-metadata"
   ],
   "context": [
     "Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`."
@@ -70,6 +71,12 @@
       "requirement": "Construction dependencies",
       "rules": [
         "`GetProjectContext` depends on the following ports injected via constructor:\n\n- `specs` (`ReadonlyMap<string, SpecRepository>`) — per-workspace spec repositories\n- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema (replaces `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths`)\n- `files` (`FileReader`) — for reading context entry files from disk\n- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale\n- `hasher` (`ContentHasher`) — for comparing content hashes against metadata\n\nAll dependencies are injected at construction time. The schema is resolved lazily on first access."
+      ]
+    },
+    {
+      "requirement": "Project context optimization and invalidation",
+      "rules": [
+        "If `llmOptimizedContext: true` is active, the use case SHALL attempt to load project-level metadata from `project-metadata.json`.\n\nIt SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:\n\n- `specd.yaml`\n- Referenced `contextFiles`\n- Metadata of included specs\n\nIf all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, it SHALL fall back to raw compilation and emit a signal for the caller to show a warning."
       ]
     }
   ],
@@ -317,11 +324,40 @@
       "then": [
         "it requires specs (ReadonlyMap<string, SpecRepository>), schemaProvider (SchemaProvider), files (FileReader), parsers (ArtifactParserRegistry), and hasher (ContentHasher) in its constructor"
       ]
+    },
+    {
+      "requirement": "Project context optimization and invalidation",
+      "name": "Uses optimized project context when fresh",
+      "given": [
+        "llmOptimizedContext: true",
+        "AND project-metadata.json exists and all hashes match"
+      ],
+      "when": ["project context is retrieved"],
+      "then": ["the result uses optimized.context"]
+    },
+    {
+      "requirement": "Project context optimization and invalidation",
+      "name": "Falls back and warns when project context is stale",
+      "given": [
+        "llmOptimizedContext: true",
+        "AND specd.yaml has changed (hash mismatch in project-metadata.json)"
+      ],
+      "when": ["project context is retrieved"],
+      "then": ["it falls back to raw compilation", "AND emits a warning signal"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-project-context",
+        "file": "core:src/application/use-cases/get-project-context.ts",
+        "symbol": "GetProjectContext"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:1f0eb688dff0e160a5b05a96b2895273a3959c8bc09ee4671356bff778fef6ef",
-    "verify.md": "sha256:33fb6dc4672c258aa86843831e3c93b4dbe0d4a15c198178868455438a06229f"
+    "spec.md": "sha256:e223af25e80cf208789bd7c801280e695669bd29f58b08f5bfd91d94ac8570ab",
+    "verify.md": "sha256:a1e40df46d80a1fce4684d1b348fcb024ad4e0810287d9df0fe34253b779fa22"
   },
   "generatedBy": "core"
 }

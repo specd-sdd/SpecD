@@ -9,7 +9,7 @@
     {
       "requirement": "Workspace identity",
       "rules": [
-        "A workspace is identified by a unique name within a project's `specd.yaml`. Names must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved for the local project workspace — every project must declare a `default` workspace. No two workspaces in the same configuration may share the same name."
+        "A workspace is identified by a unique name within a project's `specd.yaml`. Names must match `/^[a-z][a-z0-9-]*$/`.\n\nThe following names are RESERVED and MUST NOT be used for spec workspaces:\n\n- `default` — reserved for the local project workspace (mandatory).\n- `root` — reserved for project-global graph identities.\n\nNo two workspaces in the same configuration may share the same name."
       ]
     },
     {
@@ -346,11 +346,19 @@
         "../billing-repo/specd.yaml is never read",
         "AND all workspace properties come from the local specd.yaml"
       ]
+    },
+    {
+      "requirement": "Sole source of truth",
+      "name": "root workspace name is rejected",
+      "given": ["specd.yaml declares a workspace named root"],
+      "when": ["the config is loaded"],
+      "then": ["a ConfigValidationError is thrown on startup"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:9f214485f383d509f573fbffe9cd1946620de176bc05dd7f1e6ebca501b3f0f4",
-    "verify.md": "sha256:dbc60f03bec668d2e9e70e5363d3191e03213a66f69bf172338e59648bda49e3"
+    "spec.md": "sha256:e644179411adafb4a576ac8bcd8dc9f963766fd326b437fd14423a8e0a8a5617",
+    "verify.md": "sha256:f524b926e2b055ef61a6d44e41817fef7fcee6dfa1e203714ae7c9b34a733c33"
   },
   "generatedBy": "core"
 }

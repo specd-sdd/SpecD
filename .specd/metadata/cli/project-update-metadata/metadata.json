@@ -1,0 +1,57 @@
+{
+  "title": "cli:project-update-metadata",
+  "description": "Agents need a CLI command to save optimized project context. The `specd project update-metadata` command provides this capability, ensuring that only the content is provided while the backend handles the integrity and invalidation logic.",
+  "dependsOn": ["core:update-project-metadata"],
+  "context": [
+    "Agents need a CLI command to save optimized project context. The `specd project update-metadata` command provides this capability, ensuring that only the content is provided while the backend handles the integrity and invalidation logic."
+  ],
+  "rules": [
+    {
+      "requirement": "Input payload",
+      "rules": [
+        "The command SHALL accept the payload containing `optimizedContext` as JSON/YAML from stdin or a file via the `--file` flag."
+      ]
+    },
+    {
+      "requirement": "Delegation",
+      "rules": ["The command SHALL delegate to the `UpdateProjectMetadata` use case."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input payload",
+      "name": "Accepts optimized context via stdin",
+      "when": [
+        "specd project update-metadata is called with { \"optimizedContext\": \"...\" } via stdin"
+      ],
+      "then": ["it passes the payload to the use case"]
+    },
+    {
+      "requirement": "Input payload",
+      "name": "Accepts optimized context via --file",
+      "given": ["a file payload.json with { \"optimizedContext\": \"...\" }"],
+      "when": ["specd project update-metadata --file payload.json is run"],
+      "then": ["it reads the file and passes the payload to the use case"]
+    },
+    {
+      "requirement": "Delegation",
+      "name": "Invokes use case",
+      "when": ["the command is run"],
+      "then": ["it calls UpdateProjectMetadata.execute()"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:project-update-metadata",
+        "file": "cli:src/commands/project/update-metadata.ts",
+        "symbol": "registerProjectUpdateMetadata"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:bded77ab3bd8ccc84e51490f189b97ca93b9aa5a183f98e0e89513586175db7a",
+    "verify.md": "sha256:f10325b39b27d56acbea97d04c1e55f345cb690d71a3a19dee42d299fb0fcac2"
+  },
+  "generatedBy": "core"
+}

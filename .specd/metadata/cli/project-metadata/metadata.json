@@ -1,0 +1,51 @@
+{
+  "title": "cli:project-metadata",
+  "description": "When debugging project context or verifying optimization status, users need to inspect the persisted state of project-level metadata. The `specd project metadata` command displays the full contents of the `project-metadata.json` file in a structured format.",
+  "dependsOn": ["core:project-metadata"],
+  "context": [
+    "When debugging project context or verifying optimization status, users need to inspect the persisted state of project-level metadata. The `specd project metadata` command displays the full contents of the `project-metadata.json` file in a structured format."
+  ],
+  "rules": [
+    {
+      "requirement": "Display full structure",
+      "rules": [
+        "The command SHALL print the entire contents of `project-metadata.json`, including the `optimized`, `freshness`, and `generated` blocks."
+      ]
+    },
+    {
+      "requirement": "Formatted output",
+      "rules": ["The command SHALL support standard output formats (`text`, `json`, `toon`)."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Display full structure",
+      "name": "Shows internal state",
+      "when": ["specd project metadata is run"],
+      "then": ["it prints the full JSON including the freshness hashes and generated timestamp"]
+    },
+    {
+      "requirement": "Formatted output",
+      "name": "Supports structured formats",
+      "when": ["specd project metadata --format json is run"],
+      "then": [
+        "it returns a valid JSON object",
+        "AND the output contains the version, optimized, freshness, and generated keys"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:project-metadata",
+        "file": "cli:src/commands/project/metadata.ts",
+        "symbol": "registerProjectMetadata"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:c4309b0acd7e4d57950c7cc59e81261567206dc3405b5c68e20dd0c512355f09",
+    "verify.md": "sha256:80f4f0e1ba7c1e595b3585b75b632d6c8f786e75ea75c7ff666e676d24b59b2b"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:project-metadata"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/project/metadata.ts",
+      "symbols": ["registerProjectMetadata"]
+    }
+  ]
+}

@@ -21,7 +21,7 @@
     {
       "requirement": "File impact analysis",
       "rules": [
-        "When `--file` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Resolves each requested file path to canonical graph files using the following rules:\n   - workspace-prefixed inputs resolve directly by canonical graph path\n   - unprefixed relative inputs resolve by exact match against persisted `configRelativePath`\n   - absolute inputs are normalized to a path relative to the active config directory and then resolved by exact `configRelativePath` match\n5. If an unprefixed input resolves to multiple files, the command fails with an ambiguity error listing the canonical workspace-prefixed matches\n6. For a single resolved file, calls `analyzeFileImpact(file, direction)` and outputs the `FileImpactResult`\n7. For multiple resolved files, computes per-file file impact with the same semantics as single-file analysis, then aggregates changed symbols, affected symbols, affected files, and overall risk across the requested files\n8. Outputs the aggregated result including changed-symbol detail and per-file impact breakdown\n9. Closes the provider and exits\n\nIn bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root."
+        "When `--file` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Resolves each requested file path to canonical graph files through the provider's selector normalization service. It MUST support absolute paths, project-relative paths, and workspace-prefixed paths.\n5. For a single resolved file, calls `analyzeFileImpact(file, direction)` and outputs the `FileImpactResult`\n6. For multiple resolved files, computes per-file file impact with the same semantics as single-file analysis, then aggregates changed symbols, affected symbols, affected files, and overall risk across the requested files\n7. Outputs the aggregated result including changed-symbol detail and per-file impact breakdown\n8. Closes the provider and exits"
       ]
     },
     {
@@ -45,7 +45,7 @@
     {
       "requirement": "Output format",
       "rules": [
-        "**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nChanged symbols:\n  validate:10\n  AuthService:20\n\nAffected files:\n  src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nFor multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\n**Spec impact** in `text` mode:\n\n```text\nImpact analysis for spec core:change (depth=3)\n  Risk level:       HIGH\n  Direct deps:      2\n  Indirect deps:    1\n  Transitive deps:  0\n  Affected files:   4\n```\n\nSpec impact output MUST surface files reached through `COVERS_FILE` and symbols reached through `COVERS_SYMBOL` in the same result structure used by other impact targets.\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\nIn `json` or `toon` mode, the full result object is output as-is. The `AffectedSymbol` entries in JSON include the `depth` field.\n\nThe JSON output MUST include aggregate impact fields to support automated risk assessment:\n\n- `riskLevel`\n- `directDepsCount`\n- `indirectDepsCount`\n- `transitiveDepsCount`\n- `affectedFilesCount`"
+        "All file paths rendered in the impact analysis output (both text and JSON) SHALL be formatted relative to the project root for consistency across multi-workspace projects.\n\n**File impact** in `text` mode:\n\n```text\nImpact analysis for src/auth.ts (depth=5)\n  Risk level:       HIGH\n  Direct deps:      6\n  Indirect deps:    3\n  Transitive deps:  1\n  Affected files:   8\n\nChanged symbols:\n  validate:10\n  AuthService:20\n\nAffected files:\n  packages/core/src/login.ts: handleLogin:12 (d=1), validateSession:45 (d=1)\n  packages/core/src/session.ts: createSession:8 (d=2)\n\nPer-symbol breakdown:\n  src/auth.ts:function:validate:10:0  risk=HIGH direct=4\n  src/auth.ts:class:AuthService:20:0  risk=MEDIUM direct=2\n```\n\nFor multiple files, text output SHALL show one aggregated summary plus a `Changed symbols:` block grouped by input file, an `Affected files:` block, and a `Per-file breakdown:` or equivalent structure that lets a human see which input files contributed to the overall result.\n\nWhen affected symbols are available, each file line shows the symbols grouped after a colon with depth indicators: `path: name:line (d=N), name:line (d=N)`. All paths are rendered relative to the project root. Files reached only via IMPORTS (file-level) are listed without symbols. The depth value `d=N` indicates the distance from the analysis target (1 = direct, 2 = indirect, 3+ = transitive).\n\nWhen `--direction` is omitted or set to `dependents` / `upstream`, human-facing documentation and help text SHOULD explain these counts as dependent counts. When `--direction dependencies` / `downstream` is used, documentation SHOULD explain that the same fields represent dependencies reached from the target.\n\nWhen `--depth` is not the default (3), the header line includes `(depth=N)` to show the configured depth.\n\n**Symbol impact** in `text` mode:\n\n```text\nImpact analysis for function createKernel (packages/core/src/composition/kernel.ts:147) (depth=5)\n  Risk level:       CRITICAL\n  Direct deps:      1\n  Indirect deps:    1\n  Transitive deps:  38\n  Affected files:   40\n\nAffected files:\n  packages/cli/src/kernel.ts: wireKernel:5 (d=1)\n  ...\n```\n\n**Spec impact** in `text` mode:\n\n```text\nImpact analysis for spec core:change (depth=3)\n  Risk level:       HIGH\n  Direct deps:      2\n  Indirect deps:    1\n  Transitive deps:  0\n  Affected files:   4\n```\n\nSpec impact output MUST surface files reached through `COVERS_FILE` and symbols reached through `COVERS_SYMBOL` in the same result structure used by other impact targets.\n\nWhen multiple symbols match, each analysis is listed sequentially.\n\nIn `json` or `toon` mode, the full result object is object as-is. The `AffectedSymbol` entries in JSON include the `depth` field.\n\nThe JSON output MUST include aggregate impact fields to support automated risk assessment:\n\n- `riskLevel`\n- `directDepsCount`\n- `indirectDepsCount`\n- `transitiveDepsCount`\n- `affectedFilesCount`"
       ]
     },
     {
@@ -171,6 +171,15 @@
       ]
     },
     {
+      "requirement": "File impact analysis",
+      "name": "File selectors resolved via provider normalization",
+      "when": ["specd graph impact --file is run with an absolute or project-relative path"],
+      "then": [
+        "it resolves correctly to the canonical graph identity through the provider",
+        "AND analysis proceeds without error"
+      ]
+    },
+    {
       "requirement": "Symbol impact analysis",
       "name": "Single symbol match",
       "given": ["createKernel exists once in the graph"],
@@ -291,6 +300,15 @@
       ]
     },
     {
+      "requirement": "Output format",
+      "name": "Impact paths are rendered relative to project root",
+      "when": ["specd graph impact is run"],
+      "then": [
+        "all file paths in the output (e.g., packages/core/src/index.ts) are relative to the project root",
+        "AND they do not include workspace-prefixed identities unless explicitly requested"
+      ]
+    },
+    {
       "requirement": "Error cases",
       "name": "No selector provided",
       "when": ["specd graph impact is run without --file, --symbol, or --spec"],
@@ -338,11 +356,7 @@
     "files": [
       {
         "specId": "cli:graph-impact",
-        "file": "cli:src/commands/graph/build-workspace-targets.ts"
-      },
-      {
-        "specId": "cli:graph-impact",
-        "file": "cli:src/index.ts"
+        "file": "cli:test/commands/graph-impact.spec.ts"
       }
     ],
     "symbols": [
@@ -350,27 +364,12 @@
         "specId": "cli:graph-impact",
         "file": "cli:src/commands/graph/impact.ts",
         "symbol": "registerGraphImpact"
-      },
-      {
-        "specId": "cli:graph-impact",
-        "file": "cli:src/commands/graph/impact.ts",
-        "symbol": "formatImpact"
-      },
-      {
-        "specId": "cli:graph-impact",
-        "file": "cli:src/commands/graph/impact.ts",
-        "symbol": "formatSpecImpact"
-      },
-      {
-        "specId": "cli:graph-impact",
-        "file": "cli:src/commands/graph/impact.ts",
-        "symbol": "parseImpactDirection"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4a554d54b648e17a386da942e6f1607b20d72497475e1e4a2992dc9e36bb8124",
-    "verify.md": "sha256:38236608efb3d62fe5c156b757a6177d8b5870355f029ed115c307fa98b61ee4"
+    "spec.md": "sha256:c8a38d655845b350409d48738b1e8bfc86090c1412ae979ac0292ddcd6607cad",
+    "verify.md": "sha256:49a24eb65a442ab111f05a5d47236b0fbaedc30ab8a31c904c9d93d3432a8a5a"
   },
   "generatedBy": "core"
 }

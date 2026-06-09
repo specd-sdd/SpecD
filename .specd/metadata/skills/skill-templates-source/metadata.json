@@ -1,21 +1,33 @@
 {
   "title": "skills:skill-templates-source",
-  "description": "Defines how skill templates are sourced, stored, and how frontmatter is handled across supported agent runtimes. Templates live without frontmatter in the skills package, and each agent plugin injects frontmatter that is exact for its target runtime.",
+  "description": "Defines how skill templates are sourced, stored, rendered, and linked to shared template content across supported agent runtimes. Templates live without static frontmatter in the skills package, while each skill directory declares its own metadata contract and `@specd/skills` renders the final installed markdown for each runtime.",
   "dependsOn": ["skills:skill"],
   "context": [
-    "Defines how skill templates are sourced, stored, and how frontmatter is handled across supported agent runtimes. Templates live without frontmatter in the skills package, and each agent plugin injects frontmatter that is exact for its target runtime."
+    "Defines how skill templates are sourced, stored, rendered, and linked to shared template content across supported agent runtimes. Templates live without static frontmatter in the skills package, while each skill directory declares its own metadata contract and `@specd/skills` renders the final installed markdown for each runtime."
   ],
   "rules": [
     {
       "requirement": "Template source location",
       "rules": [
-        "Template files MUST live in `packages/skills/templates/<skill-name>/` WITHOUT frontmatter YAML blocks."
+        "Template files MUST live in `packages/skills/templates/<skill-name>/` using the `.md.tpl` extension.\n\nEach skill template directory MUST also contain a `skill.meta.json` file.\n\nInstalled skill files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix."
       ]
     },
     {
       "requirement": "Template migration",
       "rules": [
-        "The template directory MUST contain:\n\n- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories\n- `shared.md` as shared content across all skills; the file MAY live in the root of the template directory or within a `shared/` subdirectory\n\nEach skill directory contains `.md` files (without frontmatter)."
+        "The template directory MUST contain:\n\n- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories\n- a `shared/` directory for shared template source files\n\nEach skill directory contains template files ending in `.md.tpl` plus a `skill.meta.json` file that declares the skill's template contract.\n\nThe current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates."
+      ]
+    },
+    {
+      "requirement": "Skill template metadata contract",
+      "rules": [
+        "Each skill template directory MUST declare a `skill.meta.json` file with this shape:\n\n```json\n{\n  \"supportedCapabilities\": [\"mcp\", \"agents\", \"frontmatter\"],\n  \"requiredCapabilities\": [],\n  \"requiredSharedTemplates\": [\"shared.md\"]\n}\n```\n\n`supportedCapabilities` declares the capability identifiers that templates in that skill directory are allowed to reference.\n\n`requiredCapabilities` declares the capability identifiers that MUST be present for the skill's templates to be installable.\n\n`requiredSharedTemplates` declares the shared template filenames that the skill requires.\n\nThe initial required capability identifiers that the system MUST recognize are:\n\n- `mcp`\n- `agents`\n- `frontmatter`"
+      ]
+    },
+    {
+      "requirement": "Capability-aware install-time rendering",
+      "rules": [
+        "Skill templates MUST support capability-aware install-time rendering.\n\nTemplates MAY use `Handlebars` conditionals and iteration over structured render context provided at install time.\n\nThe rendering model MUST remain deterministic and single-pass at install time. Templates MUST NOT execute arbitrary code or runtime-specific scripting.\n\nThe initial required capability identifiers MUST behave as follows:\n\n- `mcp`: enables template branches and content intended for runtimes that support MCP tools or MCP-connected workflows\n- `agents`: enables template branches and content intended for runtimes that support delegated agent or subagent workflows\n- `frontmatter`: enables final frontmatter composition and insertion from `variables.frontmatter`\n\nShared template references inside installed markdown MUST use the form `@{{sharedFolder}}/shared.md`.\n\n`sharedFolder` MUST be treated as a normal template variable and MUST remain relative to the project root in rendered output."
       ]
     },
     {
@@ -27,13 +39,13 @@
     {
       "requirement": "Frontmatter source",
       "rules": [
-        "Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and maps MUST reflect those documented contracts exactly."
+        "Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and value collections MUST reflect those documented contracts exactly.\n\nAgent plugins MUST provide structured frontmatter data under `variables.frontmatter`; they MUST NOT pass prebuilt YAML frontmatter documents for direct insertion."
       ]
     },
     {
       "requirement": "Frontmatter injection",
       "rules": [
-        "Each agent plugin MUST inject its stored frontmatter when installing a skill.\n\nInjection MUST be runtime-specific: each plugin emits only fields recognized by its target runtime and excludes unsupported fields."
+        "Agent plugins MUST provide their capability list when installing a skill.\n\n`@specd/skills` MUST inject the final frontmatter block when rendering skill-local markdown templates, using `variables.frontmatter` as input.\n\nFrontmatter insertion MUST occur only when the `frontmatter` capability is present. If `variables.frontmatter` is present while the `frontmatter` capability is absent, the frontmatter block MUST NOT be emitted.\n\nInjection MUST remain runtime-specific: the rendered output for each plugin emits only fields recognized by its target runtime and excludes unsupported fields.\n\nFiles marked as shared MUST NOT receive runtime skill frontmatter."
       ]
     },
     {
@@ -45,7 +57,7 @@
     {
       "requirement": "Why no frontmatter in skills package",
       "rules": [
-        "The skills package does not include frontmatter because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and inject the appropriate metadata while preserving the base skill definition."
+        "The skills package does not include static frontmatter blocks because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and provide the runtime-specific values, while `@specd/skills` composes and injects the final frontmatter block during template rendering."
       ]
     },
     {
@@ -56,19 +68,40 @@
     }
   ],
   "constraints": [
-    "Templates in skills package MUST NOT contain frontmatter YAML.",
-    "Each agent plugin is responsible for storing and injecting its own frontmatter.",
-    "Agent plugins MUST model the full supported frontmatter field set for their target runtime.",
+    "Templates in the skills package MUST NOT contain static frontmatter YAML blocks.",
+    "Template source files in the skills package MUST use the .md.tpl extension.",
+    "Each skill directory MUST contain a skill.meta.json file.",
+    "shared.meta.json MUST NOT remain the canonical source for determining which skills require shared templates.",
+    "Templates MAY contain a frontmatter insertion point that is resolved by @specd/skills at install time.",
+    "Agent plugins are responsible for declaring supported runtime capabilities and providing structured variables.frontmatter data.",
     "Agent plugins MUST NOT emit fields unsupported by their target runtime.",
+    "@specd/skills MUST perform the final frontmatter insertion for skill-local markdown files.",
+    "Installed markdown MUST NOT render absolute filesystem paths.",
     "Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer --direction dependents / --direction dependencies; upstream / downstream may appear only as compatibility values.",
     "Workflow templates MUST use specd graph impact --file for file-based blast-radius checks and MUST NOT reference specd graph impact --changes."
   ],
   "scenarios": [
     {
       "requirement": "Template source location",
-      "name": "Templates remain frontmatter-free",
-      "when": ["markdown files under packages/skills/templates/<skill-name>/ are inspected"],
-      "then": ["they do not contain YAML frontmatter blocks"]
+      "name": "Templates use markdown template extension",
+      "when": ["files under packages/skills/templates/<skill-name>/ are inspected"],
+      "then": [
+        "template source files end with .md.tpl",
+        "AND they do not use plain .md as the source template extension"
+      ]
+    },
+    {
+      "requirement": "Template source location",
+      "name": "Skill directories declare metadata",
+      "when": ["a skill template directory is inspected"],
+      "then": ["it contains skill.meta.json"]
+    },
+    {
+      "requirement": "Template source location",
+      "name": "Rendered install files drop the template suffix",
+      "given": ["a skill template source file named SKILL.md.tpl"],
+      "when": ["@specd/skills resolves the install bundle"],
+      "then": ["the emitted bundle filename is SKILL.md"]
     },
     {
       "requirement": "Template migration",
@@ -76,8 +109,64 @@
       "when": ["the template source directory is validated"],
       "then": [
         "it contains specd/, specd-archive/, specd-design/, specd-implement/, specd-new/, specd-metadata/, specd-compliance/, and specd-verify/",
-        "AND it contains shared.md"
+        "AND it contains shared/ for shared template source files"
       ]
+    },
+    {
+      "requirement": "Template migration",
+      "name": "Shared consumer index is no longer authoritative",
+      "when": ["shared template ownership is reviewed"],
+      "then": [
+        "shared.meta.json is not the source of truth for which skills require shared templates"
+      ]
+    },
+    {
+      "requirement": "Skill template metadata contract",
+      "name": "skill.meta.json declares supported, required, and shared requirements",
+      "when": ["a skill.meta.json file is inspected"],
+      "then": [
+        "it declares supportedCapabilities",
+        "AND it declares requiredCapabilities",
+        "AND it declares requiredSharedTemplates"
+      ]
+    },
+    {
+      "requirement": "Skill template metadata contract",
+      "name": "Initial capability catalogue is declared by the contract",
+      "when": ["the skill metadata contract is reviewed"],
+      "then": ["the initial required capability identifiers are mcp, agents, and frontmatter"]
+    },
+    {
+      "requirement": "Capability-aware install-time rendering",
+      "name": "Templates branch on provided capability identifiers",
+      "given": ["install-time render context includes capability identifiers for a target runtime"],
+      "when": ["a skill template uses a conditional block based on those capabilities"],
+      "then": ["@specd/skills renders the branch that matches the provided capability identifiers"]
+    },
+    {
+      "requirement": "Capability-aware install-time rendering",
+      "name": "Shared references use sharedFolder variable syntax",
+      "when": ["a template references a shared template path"],
+      "then": ["it uses the form @{{sharedFolder}}/shared.md"]
+    },
+    {
+      "requirement": "Capability-aware install-time rendering",
+      "name": "Templates do not render absolute shared paths",
+      "when": ["installed markdown is reviewed"],
+      "then": [
+        "shared template references remain relative to the project root",
+        "AND they do not contain absolute filesystem paths"
+      ]
+    },
+    {
+      "requirement": "Capability-aware install-time rendering",
+      "name": "Frontmatter capability controls frontmatter insertion",
+      "given": [
+        "a template contains a frontmatter insertion point",
+        "AND variables.frontmatter is present"
+      ],
+      "when": ["install-time rendering runs with frontmatter enabled"],
+      "then": ["the final frontmatter block is inserted"]
     },
     {
       "requirement": "Graph impact terminology in workflow templates",
@@ -127,13 +216,29 @@
       ]
     },
     {
+      "requirement": "Frontmatter source",
+      "name": "Plugins provide structured values instead of prebuilt YAML",
+      "when": ["an agent plugin prepares install-time frontmatter input for @specd/skills"],
+      "then": [
+        "it passes a structured value collection",
+        "AND it does not pass a prebuilt YAML frontmatter document"
+      ]
+    },
+    {
       "requirement": "Frontmatter injection",
       "name": "Injection filters by target runtime support",
       "when": ["an agent plugin installs skills"],
       "then": [
-        "it prepends frontmatter using only fields supported by that runtime",
+        "the final rendered markdown includes only fields supported by that runtime",
         "AND unsupported fields are excluded from emitted markdown files"
       ]
+    },
+    {
+      "requirement": "Frontmatter injection",
+      "name": "Shared files do not receive runtime frontmatter",
+      "given": ["a resolved bundle includes files marked as shared"],
+      "when": ["@specd/skills renders the install output"],
+      "then": ["shared files are emitted without runtime skill frontmatter"]
     },
     {
       "requirement": "Agent frontmatter matrix",
@@ -147,11 +252,12 @@
     },
     {
       "requirement": "Why no frontmatter in skills package",
-      "name": "Runtime-specific metadata stays in plugins",
+      "name": "Runtime-specific metadata stays value-driven",
       "when": ["shared skill templates and installed skill outputs are compared"],
       "then": [
-        "templates remain runtime-agnostic without frontmatter",
-        "AND runtime-specific frontmatter is injected by the target agent plugin during install"
+        "templates remain free of static runtime-specific frontmatter blocks",
+        "AND runtime-specific values come from the target agent plugin",
+        "AND the final frontmatter block is composed during skills rendering"
       ]
     },
     {
@@ -168,25 +274,48 @@
     "files": [
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:templates/shared/shared.md"
+        "file": "skills:README.md"
       },
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-archive/SKILL.md"
+        "file": "skills:templates/specd/SKILL.md.tpl"
       },
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-verify/SKILL.md"
+        "file": "skills:templates/specd-verify/SKILL.md.tpl"
       },
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-implement/SKILL.md"
+        "file": "skills:templates/specd-archive/SKILL.md.tpl"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/specd-implement/SKILL.md.tpl"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/specd-design/SKILL.md.tpl"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/shared/shared.md.tpl"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/specd-new/SKILL.md.tpl"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:src/domain/skill-template-metadata.ts",
+        "symbol": "SkillTemplateMetadata"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9adf80cd48b95236d0a75907ee8689cccad4785ab7c4349c98c71800bfc40bf7",
-    "verify.md": "sha256:a0c1e5f926915dbb1664145d699b674bacf4c067b282787a37eec4305756408f"
+    "spec.md": "sha256:3a51bd2dd4039d85019b6d6c58ba1bf66d7617628049ee258a4716ab6e011286",
+    "verify.md": "sha256:4e25373faff1eb1b75b4b530d12d8d2fbd407b4ad31262d31074d39a52fe2fa5"
   },
   "generatedBy": "core"
 }
