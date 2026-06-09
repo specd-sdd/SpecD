@@ -1,0 +1,74 @@
+{
+  "title": "cli:spec-update-metadata",
+  "description": "Agents need a CLI command to safely update spec metadata with LLM-optimized fields. The `specd spec update-metadata <workspace:capability-path>` command accepts a partial metadata JSON/YAML and delegates to `UpdateSpecMetadata` to ensure a safe merge with deterministic fields.",
+  "dependsOn": ["core:update-spec-metadata"],
+  "context": [
+    "Agents need a CLI command to safely update spec metadata with LLM-optimized fields. The `specd spec update-metadata <workspace:capability-path>` command accepts a partial metadata JSON/YAML and delegates to `UpdateSpecMetadata` to ensure a safe merge with deterministic fields."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": ["The command SHALL accept a qualified spec ID (`<workspace:capability-path>`)."]
+    },
+    {
+      "requirement": "Partial schema input",
+      "rules": [
+        "The command SHALL accept a partial metadata payload from stdin or a file via the `--file` flag. This payload SHALL be validated to ensure it only contains allowed fields for an update."
+      ]
+    },
+    {
+      "requirement": "Delegation",
+      "rules": ["The command SHALL delegate to the `UpdateSpecMetadata` use case."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Rejects missing spec ID",
+      "when": ["specd spec update-metadata is run without arguments"],
+      "then": ["it exits with code 1"]
+    },
+    {
+      "requirement": "Partial schema input",
+      "name": "Reads from stdin",
+      "when": [
+        "echo 'optimizedDescription: \"test\"' | specd spec update-metadata core:config is run"
+      ],
+      "then": ["it parses the YAML from stdin successfully"]
+    },
+    {
+      "requirement": "Partial schema input",
+      "name": "Reads from --file",
+      "given": ["a file payload.yaml with optimizedDescription: \"test\""],
+      "when": ["specd spec update-metadata core:config --file payload.yaml is run"],
+      "then": ["it reads the file successfully"]
+    },
+    {
+      "requirement": "Delegation",
+      "name": "Invokes use case",
+      "when": ["a valid partial payload is provided"],
+      "then": [
+        "the command invokes UpdateSpecMetadata.execute() with the correct spec ID and payload"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:spec-update-metadata",
+        "file": "cli:src/commands/spec/update-metadata.ts",
+        "symbol": "registerSpecUpdateMetadata"
+      },
+      {
+        "specId": "cli:spec-update-metadata",
+        "file": "cli:src/helpers/read-stdin.ts",
+        "symbol": "readStdin"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:3d18a631517d7f9e739c0bc20a535b446039c046e025976f3c37e8c3bf05b5b1",
+    "verify.md": "sha256:ba485a836cf9454209b0edc07adec4eb927d60900212df702cc91e260b9596f9"
+  },
+  "generatedBy": "core"
+}
