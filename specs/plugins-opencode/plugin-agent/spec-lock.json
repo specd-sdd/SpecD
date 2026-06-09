@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:config",
+    "plugin-manager:agent-plugin-type",
+    "skills:skill-bundle",
+    "skills:skill-templates-source",
+    "skills:resolve-bundle"
+  ],
+  "implementation": [
+    {
+      "file": "plugin-agent-opencode:src/application/use-cases/install-skills.ts",
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "file": "plugin-agent-opencode:test/install-skills.spec.ts"
+    }
+  ]
+}

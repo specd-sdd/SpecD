@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:config", "skills:skill-bundle", "skills:skill-repository-port"],
+  "implementation": [
+    {
+      "file": "skills:src/application/use-cases/resolve-bundle.ts",
+      "symbols": ["ResolveBundle", "ResolveBundleInput", "ResolveBundleOutput"]
+    },
+    {
+      "file": "skills:test/resolve-bundle.spec.ts"
+    }
+  ]
+}
