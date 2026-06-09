@@ -63,3 +63,12 @@
 - **WHEN** client reads JSON without optional field
 - **THEN** typed object treats field as undefined
 - **AND** UI guards optional access
+
+### Requirement: linkedChanges uses summary objects
+
+#### Scenario: linkedChanges rows include summary fields
+
+- **WHEN** a spec detail response includes linked active changes
+- **THEN** each `linkedChanges[]` row includes `name`
+- **AND** may include `description`
+- **AND** includes `state`

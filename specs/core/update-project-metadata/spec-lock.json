@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:project-metadata"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/update-project-metadata.ts",
+      "symbols": [
+        "UpdateProjectMetadataInput",
+        "UpdateProjectMetadataResult",
+        "UpdateProjectMetadata"
+      ]
+    }
+  ]
+}

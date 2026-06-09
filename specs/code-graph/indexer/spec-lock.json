@@ -8,16 +8,19 @@
     "code-graph:language-adapter",
     "code-graph:symbol-model",
     "code-graph:workspace-integration",
-    "core:config"
+    "core:config",
+    "core:spec-repository-port",
+    "core:list-workspaces",
+    "code-graph:document-model"
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
-      "symbols": ["IndexCodeGraph"]
+      "file": "code-graph:src/domain/value-objects/spec-node.ts",
+      "symbols": ["SpecNode", "createSpecNode"]
     },
     {
-      "file": "code-graph:src/domain/value-objects/index-options.ts",
-      "symbols": ["IndexOptions", "WorkspaceIndexTarget", "DiscoveredSpec"]
+      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+      "symbols": ["IndexCodeGraph"]
     }
   ]
 }

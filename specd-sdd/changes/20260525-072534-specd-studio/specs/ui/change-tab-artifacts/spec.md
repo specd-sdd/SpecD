@@ -14,7 +14,7 @@ While the Artifacts tab is visible for an **active** change, the view MUST load 
 
 **Spec scope:** files under `specs/` or `deltas/` (any artifact type). Group by `specId` (`workspace:capability-path`) using [`ui:design-system`](../design-system/spec.md) ascending order. Within each spec, list all artifact files for that spec together (specs, verify, deltas, etc.): if a `spec.md` exists among those paths it MUST be first; remaining files sort ascending by full path.
 
-Tab-scoped poll MUST adopt global ticks only while the tab is visible. For **archived** changes, the tab MUST list `archivedMeta.artifactTypes` from the archived snapshot without calling `listChangeArtifacts`.
+Tab-scoped poll MUST adopt global ticks only while the tab is visible. For **archived** changes, the tab MUST render the archived snapshot `artifacts[]` metadata from `getArchivedChange` without calling `listChangeArtifacts`, preserving the same grouped **Change** / **Spec** layout as active changes wherever the archived snapshot contains those files.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

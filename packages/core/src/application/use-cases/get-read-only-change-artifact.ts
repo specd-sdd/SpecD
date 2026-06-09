@@ -1,10 +1,12 @@
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ChangeArtifactFileNotFoundError } from '../errors/change-artifact-file-not-found-error.js'
 import {
+  type ArchivedChange,
   type ReadOnlyChangeOrigin,
   type ReadOnlyChangeView,
 } from '../../domain/read-only-change-view.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
+import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { findTrackedArtifactFileInView } from './_shared/find-tracked-artifact-file.js'
 
 /** Input for {@link GetReadOnlyChangeArtifact}. */
@@ -30,30 +32,33 @@ export interface GetReadOnlyChangeArtifactResult {
  */
 async function loadReadOnlyChangeView(
   changes: ChangeRepository,
+  archive: ArchiveRepository,
   readOnlyOrigin: ReadOnlyChangeOrigin,
   name: string,
-): Promise<ReadOnlyChangeView | null> {
+): Promise<ReadOnlyChangeView | ArchivedChange | null> {
   switch (readOnlyOrigin) {
     case 'draft':
       return changes.getDraft(name)
     case 'discarded':
       return changes.getDiscarded(name)
     case 'archived':
-      return null
+      return archive.get(name)
   }
 }
 
 /** Loads tracked artifact bytes for any {@link ReadOnlyChangeView} storage (read-only). */
 export class GetReadOnlyChangeArtifact {
   private readonly _changes: ChangeRepository
+  private readonly _archive: ArchiveRepository
 
   /**
    * Creates the use case with a change repository.
    *
    * @param changes - Change repository
    */
-  constructor(changes: ChangeRepository) {
+  constructor(changes: ChangeRepository, archive: ArchiveRepository) {
     this._changes = changes
+    this._archive = archive
   }
 
   /**
@@ -63,11 +68,12 @@ export class GetReadOnlyChangeArtifact {
    * @returns File content and `originalHash`
    */
   async execute(input: GetReadOnlyChangeArtifactInput): Promise<GetReadOnlyChangeArtifactResult> {
-    if (input.readOnlyOrigin === 'archived') {
-      throw new Error('readOnlyOrigin archived is not implemented yet')
-    }
-
-    const view = await loadReadOnlyChangeView(this._changes, input.readOnlyOrigin, input.name)
+    const view = await loadReadOnlyChangeView(
+      this._changes,
+      this._archive,
+      input.readOnlyOrigin,
+      input.name,
+    )
     if (view === null) {
       throw new ChangeNotFoundError(input.name)
     }
@@ -76,11 +82,14 @@ export class GetReadOnlyChangeArtifact {
       throw new ChangeArtifactFileNotFoundError(input.filename, input.name)
     }
 
-    const artifact = await this._changes.artifactReadOnly(
-      input.readOnlyOrigin,
-      input.name,
-      input.filename,
-    )
+    const artifact =
+      input.readOnlyOrigin === 'archived'
+        ? await this._archive.artifact(view as ArchivedChange, input.filename)
+        : await this._changes.artifactReadOnly(
+            input.readOnlyOrigin,
+            input.name,
+            input.filename,
+          )
     if (artifact === null) {
       throw new ChangeArtifactFileNotFoundError(input.filename, input.name)
     }

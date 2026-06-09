@@ -70,7 +70,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
         activeCount: active.length,
         draftCount: drafts.length,
         discardedCount: discarded.length,
-        archivedCount: archived.length,
+        archivedCount: archived.meta.total,
         specsByWorkspace,
         graphStats,
         graphStale,

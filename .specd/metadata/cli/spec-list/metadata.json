@@ -1,7 +1,13 @@
 {
   "title": "Spec List",
   "description": "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. `specd specs list` is the canonical command and lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.\n\n`specd spec list` remains supported as an alias.",
-  "dependsOn": ["cli:entrypoint", "core:spec", "cli:command-resource-naming", "cli:spec-search"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:spec",
+    "cli:command-resource-naming",
+    "cli:spec-search",
+    "core:list-workspaces"
+  ],
   "context": [
     "Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. `specd specs list` is the canonical command and lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.\n\n`specd spec list` remains supported as an alias."
   ],
@@ -15,7 +21,7 @@
     {
       "requirement": "Workspace filtering",
       "rules": [
-        "When `--workspace` is provided one or more times, the CLI MUST pass the collected workspace names to `ListSpecs.execute({ workspaces: [...] })` so that filtering is performed by the core use case, not by the CLI.\n\nWorkspace names that do not match any configured workspace MUST produce no output for that name (no error, no warning).\n\nWhen `--workspace` is not provided, the CLI calls `ListSpecs.execute()` without `workspaces`, which includes all configured workspaces (existing behavior).\n\nIn text mode, only workspace groups matching the filter are rendered. Empty filtered workspaces (no specs in the filtered set) are still shown with their heading and `(none)`.\n\nIn JSON/toon mode, the `workspaces` array contains entries for all configured workspace names; filtered-out workspaces appear with an empty `specs` array, matching the existing empty-workspace behavior."
+        "The command SHALL use `ListWorkspaces` to obtain the official project structure.\n\nWhen `--workspace` is provided one or more times, only the matching `ProjectWorkspace` entities SHALL be processed. If a requested workspace name does not exist in the orchestrated list, it SHALL be ignored.\n\nIn text mode, the command MUST group specs by workspace, displaying the workspace name and its directory root. Read-only and external workspaces SHOULD be visually flagged."
       ]
     },
     {
@@ -45,7 +51,7 @@
     {
       "requirement": "Empty output",
       "rules": [
-        "If a workspace has no specs, its heading is still printed in text mode followed by `  (none)`. In JSON/toon mode it appears as `{\"name\": \"...\", \"specs\": []}`.\n\nIf there are no workspaces configured, the command prints `no workspaces configured` and exits with code 0."
+        "If a workspace exists in the orchestrated list but has no specs, its heading MUST still be printed in text mode followed by `  (none)`. In JSON/toon mode, it MUST appear with an empty `specs` array.\n\nIf no workspaces are configured, the command MUST print `no workspaces configured`."
       ]
     },
     {
@@ -75,36 +81,19 @@
     },
     {
       "requirement": "Workspace filtering",
+      "name": "Workspaces grouped using orchestrated list",
+      "when": ["specd spec list is run"],
+      "then": [
+        "it iterates through the ProjectWorkspace entities provided by ListWorkspaces",
+        "AND it renders a group for every orchestrated workspace (even if empty)"
+      ]
+    },
+    {
+      "requirement": "Workspace filtering",
       "name": "Single workspace filter in text mode",
       "given": ["the project has workspace default with specs and workspace billing with specs"],
       "when": ["specd spec list --workspace default is run"],
       "then": ["only workspace default group is rendered", "AND workspace billing does not appear"]
-    },
-    {
-      "requirement": "Workspace filtering",
-      "name": "Multiple workspace filters",
-      "given": ["the project has workspaces default, billing, and core"],
-      "when": ["specd spec list --workspace default --workspace billing is run"],
-      "then": [
-        "workspace groups for default and billing are rendered",
-        "AND workspace core does not appear"
-      ]
-    },
-    {
-      "requirement": "Workspace filtering",
-      "name": "Workspace filter with JSON output",
-      "given": ["the project has workspaces default and billing"],
-      "when": ["specd spec list --workspace default --format json is run"],
-      "then": [
-        "the JSON workspaces array includes default with its specs and billing with an empty specs array"
-      ]
-    },
-    {
-      "requirement": "Workspace filtering",
-      "name": "Non-existent workspace name produces no output",
-      "given": ["no workspace named nonexistent is configured"],
-      "when": ["specd spec list --workspace nonexistent is run"],
-      "then": ["no workspace group is rendered", "AND no error is raised"]
     },
     {
       "requirement": "Title resolution",
@@ -283,17 +272,10 @@
     },
     {
       "requirement": "Empty output",
-      "name": "Workspace with no specs",
-      "given": ["the billing workspace exists but has no specs"],
+      "name": "Orchestrated empty workspace shown as (none)",
+      "given": ["an empty workspace billing in the orchestrated list"],
       "when": ["specd spec list is run"],
       "then": ["stdout shows the billing heading followed by   (none)"]
-    },
-    {
-      "requirement": "Empty output",
-      "name": "No workspaces at all",
-      "given": ["specd.yaml has no workspaces configured"],
-      "when": ["specd spec list is run"],
-      "then": ["stdout contains no workspaces configured", "AND the process exits with code 0"]
     },
     {
       "requirement": "Error cases",
@@ -303,9 +285,18 @@
       "then": ["the command exits with code 3"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:spec-list",
+        "file": "cli:src/commands/spec/list.ts",
+        "symbol": "registerSpecList"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e0b7ed1ccc40fbe28cb03b05fe75af403a6165ceaf145893f4a6e7d07cbe480c",
-    "verify.md": "sha256:1622b03fb33da7c8d83e94d71745139baa86920e0368ffcef472aa208fb536b6"
+    "spec.md": "sha256:b37dfdb7f854b2e91a45c8d49d19dfc358289814b3826ca18af3a1c910bceb0e",
+    "verify.md": "sha256:921da79cfe98382a2097e31779e80fa5ad5b0461e0e40cb4b52f6300f99b8a4f"
   },
   "generatedBy": "core"
 }

@@ -32,12 +32,7 @@ The file's absence is not an error — a spec with no `metadata.json` is treated
 
 ### Requirement: Sidecar separation
 
-`metadata.json` and `spec-lock.json` are distinct persisted artifacts with different responsibilities.
-
-- `metadata.json` lives under the configured metadata root and remains the compact machine-readable summary consumed by context and tooling.
-- `spec-lock.json` lives alongside the canonical persisted `scope: spec` artifacts for the spec and owns the durable archived values for schema identity and persisted `dependsOn`.
-- A missing `metadata.json` remains non-fatal.
-- A missing `spec-lock.json` on a legacy spec is tolerated until opportunistic backfill creates it.
+The metadata generation process SHALL obtain persisted schema, dependencies, and implementation links through the `SpecRepository` semantic operations. It MUST NOT read the underlying sidecar files directly.
 
 ### Requirement: File format
 
@@ -54,6 +49,8 @@ The file's absence is not an error — a spec with no `metadata.json` is treated
   "rules": [{ "requirement": "Lifecycle states", "rules": ["..."] }],
   "constraints": ["..."],
   "scenarios": [{ "requirement": "...", "name": "...", "given": [], "when": [], "then": [] }],
+  "optimizedDescription": "AI optimized description",
+  "optimizedContext": "AI optimized context",
   "generatedBy": "core"
 }
 ```
@@ -69,6 +66,8 @@ Fields:
 - `constraints` — extracted constraint bullets
 - `scenarios` — extracted verification scenarios
 - `context` — freeform context strings
+- `optimizedDescription` — optional concise, high-signal description for agents
+- `optimizedContext` — optional optimized representation for agent context injection
 - `generatedBy` — `"core"` for deterministic extraction, `"agent"` for LLM-optimized
 
 ### Requirement: Write-time structural validation
@@ -78,13 +77,15 @@ The `SaveSpecMetadata` use case validates JSON content against the `strictSpecMe
 - `title` (required) must be a non-empty string
 - `description` (required) must be a non-empty string
 - `keywords` must be an array of non-empty lowercase strings
-- `dependsOn` must be an array of strings, each matching a valid spec ID pattern (`capabilityPath` or `workspace:capabilityPath` where workspace matches `/^[a-z][a-z0-9-]*$/` and capability path segments match `/^[a-z0-9_][a-z0-9_-]*$/`)
-- `contentHashes` (required) must be a non-empty record of filename to hash string, where each hash matches `sha256:<64 hex chars>`
-- `rules` must be an array of objects with `requirement` (non-empty string) and `rules` (non-empty array of non-empty strings)
+- `dependsOn` must be an array of strings, each matching a valid spec ID pattern
+- `contentHashes` (required) must be a non-empty record of filename to hash string
+- `rules` must be an array of objects with `requirement` and `rules`
 - `constraints` must be a non-empty array of non-empty strings
-- `scenarios` must be an array of objects with `requirement` (non-empty string), `name` (non-empty string), `when` (non-empty array of strings), `then` (non-empty array of strings), and `given` (optional array of strings)
+- `scenarios` must be an array of objects with `requirement`, `name`, `when`, `then`, and `given`
+- `optimizedDescription` must be a non-empty string
+- `optimizedContext` must be a non-empty string
 
-If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError` (a domain error extending `SpecdError`) with the Zod issues formatted as a human-readable message. The file is not written.
+If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError`. The file is not written.
 
 Unknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions.
 
@@ -155,13 +156,12 @@ A spec that cannot be resolved (missing file, unknown workspace) is silently ski
 
 ### Requirement: Implementation projection
 
-Generated `metadata.json` SHALL project archived implementation traceability from `spec-lock.json` into an `implementation` field for fast machine consumption.
+Generated metadata SHALL include an `implementation` property when the spec is linked to code files or symbols. This data is projected from the repository's persisted implementation semantics.
 
-This metadata projection is derived data:
+- **File-level links** are projected as `implementation.files: Array<{ specId, file }>`.
+- **Symbol-level links** are projected as `implementation.symbols: Array<{ specId, file, symbol }>`.
 
-- it MUST preserve the archived distinction between file-level and symbol-level links
-- it MUST NOT become the authoritative source of implementation truth
-- when projection and sidecar disagree, `spec-lock.json` remains authoritative
+If a spec has no persisted implementation links, the `implementation` property SHALL be omitted from the generated metadata.
 
 ## Pending
 

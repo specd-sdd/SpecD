@@ -31,6 +31,11 @@ export interface DiscoverFilesOptions {
    * Defaults to `true`. When `false`, only `excludePaths` governs exclusion.
    */
   readonly respectGitignore?: boolean
+  /**
+   * Optional inclusion patterns (glob-syntax) relative to the root.
+   * If provided, only files matching at least one pattern SHALL be returned.
+   */
+  readonly allowedPaths?: readonly string[]
 }
 
 /**
@@ -55,17 +60,20 @@ function findGitRoot(startDir: string): string | undefined {
  * Loads .gitignore files hierarchically: from the git root (if the root is within
  * a git repo) and from any subdirectories encountered during the walk.
  *
- * Two-layer evaluation: gitignore has absolute priority. A path ignored by gitignore
- * cannot be re-included by `excludePaths` negation patterns.
+ * Two-layer evaluation:
+ * 1. Gitignore has absolute priority. A path ignored by .gitignore cannot be
+ *    re-included by `excludePaths` negation patterns.
+ * 2. `excludePaths` (or built-in defaults) apply to paths not already ignored by git.
+ * 3. `allowedPaths` (if set) acts as a final include filter.
  *
  * @param root - Absolute path to the root directory to walk (e.g. a workspace's codeRoot).
- * @param hasAdapter - Predicate that returns true if a file extension has a registered language adapter.
- * @param options - Optional exclusion options.
+ * @param hasAdapter - Optional predicate that returns true if a file extension has a registered language adapter.
+ * @param options - Optional exclusion and inclusion options.
  * @returns An array of root-relative file paths.
  */
 export function discoverFiles(
   root: string,
-  hasAdapter: (filePath: string) => boolean,
+  hasAdapter?: (filePath: string) => boolean,
   options?: DiscoverFilesOptions,
 ): string[] {
   // Each entry scopes an ignore instance to the directory containing the .gitignore.
@@ -75,6 +83,11 @@ export function discoverFiles(
   // Config-layer ignore instance: built from excludePaths ?? DEFAULT_EXCLUDE_PATHS
   const configIg = ignore()
   configIg.add([...(options?.excludePaths ?? DEFAULT_EXCLUDE_PATHS)])
+
+  const allowedIg =
+    options?.allowedPaths && options.allowedPaths.length > 0
+      ? ignore().add([...options.allowedPaths])
+      : null
 
   /**
    * Loads a `.gitignore` file from a directory and registers it scoped to that directory.
@@ -189,8 +202,11 @@ export function discoverFiles(
           walk(fullPath)
         }
       } else if (stat.isFile()) {
-        if (!isIgnored(relPath, false) && hasAdapter(relPath)) {
-          results.push(relPath)
+        const passAdapter = !hasAdapter || hasAdapter(relPath)
+        if (!isIgnored(relPath, false) && passAdapter) {
+          if (!allowedIg || allowedIg.test(relPath).ignored) {
+            results.push(relPath)
+          }
         }
       }
     }

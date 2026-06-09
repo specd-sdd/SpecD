@@ -8,9 +8,9 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 ### Requirement: wildcard spec detail route serves canonical spec detail
 
-`GET /v1/workspaces/{ws}/specs/{path}` MUST resolve the canonical workspace spec and return spec detail metadata including artifact filenames, hashes when known, declared dependencies, and active linked change names.
+`GET /v1/workspaces/{ws}/specs/{path}` MUST resolve the canonical workspace spec and return spec detail metadata including artifact filenames, hashes when known, declared dependencies, and active linked change summaries.
 
-There MUST NOT be a dedicated reverse-lookup route for “linked changes by spec”; linked active change names belong in this detail response.
+There MUST NOT be a dedicated reverse-lookup route for “linked changes by spec”; linked active change summaries belong in this detail response.
 
 ### Requirement: canonical artifact reads stay in specs-read
 
@@ -32,6 +32,17 @@ The route group MUST treat metadata as a workspace-spec read-side utility hosted
 ### Requirement: context and search follow canonical spec contracts
 
 `GET /v1/workspaces/{ws}/specs/{path}/context` MUST forward `followDeps` and `depth` query semantics to the canonical spec context use case.
+
+When the caller does not override the shape, the route MUST request the full structured context view for the root spec, enabling grouped `rules`, `constraints`, and `scenarios` sections when metadata provides them.
+
+The spec context response MUST expose the structured `GetSpecContext` shape directly:
+
+- `entries[]` with `spec`, `source`, `mode`, `stale`
+- optional `title`, `description`, `optimizedContent`
+- optional grouped `rules`, `constraints`, and `scenarios`
+- `warnings[]` objects with warning `type`, `message`, and optional `path`
+
+The route MUST NOT coerce spec context into the project/change `CompiledContextDto` markdown shape.
 
 `GET /v1/specs/search` MUST accept `q` and optional `workspace`, delegate to `kernel.specs.search`, and return canonical spec summaries.
 

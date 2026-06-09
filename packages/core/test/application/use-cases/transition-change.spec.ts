@@ -15,6 +15,7 @@ import {
   makeSchema,
   makeArtifactType,
   makeRunStepHooks,
+  makeWorkflowStep,
   testActor,
 } from './helpers.js'
 
@@ -1781,23 +1782,31 @@ describe('TransitionChange', () => {
       expect(result.change.activeSpecApproval).toBeUndefined()
     })
 
-    it('does not invalidate when transitioning to designing without active approvals', async () => {
+    it('invalidates to mark artifacts for review when transitioning to designing', async () => {
       const change = makeImplementingChange('my-change')
       expect(change.activeSpecApproval).toBeUndefined()
       expect(change.activeSignoff).toBeUndefined()
 
-      const invalidateSpy = vi.spyOn(change, 'invalidate')
-      const repo = makeChangeRepository([change])
-      const uc = makeUseCase(repo)
+      const uc = makeUseCase(makeChangeRepository([change]))
 
-      await uc.execute({
+      const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
         approvalsSpec: false,
         approvalsSignoff: false,
       })
 
-      expect(invalidateSpy).not.toHaveBeenCalled()
+      expect(result.change.state).toBe('designing')
+      expect(result.change.history.at(-2)).toMatchObject({
+        type: 'invalidated',
+        cause: 'artifact-review-required',
+        message:
+          'Invalidated because the change returned to designing and all artifacts require review.',
+      })
+      expect(result.change.history.at(-1)).toMatchObject({
+        type: 'transitioned',
+        to: 'designing',
+      })
     })
 
     it('does not trigger invalidation for drafting to designing', async () => {

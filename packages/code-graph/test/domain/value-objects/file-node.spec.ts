@@ -52,6 +52,18 @@ describe('FileNode', () => {
     expect(node.workspace).toBe('org/core')
   })
 
+  it('supports root-namespaced canonical paths', () => {
+    const node = createFileNode({
+      path: 'root:dev/scripts/sync.ts',
+      configRelativePath: 'dev/scripts/sync.ts',
+      language: 'typescript',
+      contentHash: 'sha256:abc',
+      workspace: 'root',
+    })
+    expect(node.path).toBe('root:dev/scripts/sync.ts')
+    expect(node.workspace).toBe('root')
+  })
+
   it('normalizes configRelativePath with backslashes', () => {
     const node = createFileNode({
       path: 'core:src/model.ts',

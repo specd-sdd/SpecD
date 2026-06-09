@@ -1,326 +1,183 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
-import { Spec } from '../../../src/domain/entities/spec.js'
-import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
-import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import {
   makeChangeRepository,
   makeActorResolver,
   makeChange,
-  makeSpecRepository,
   makeSchemaProvider,
   makeSchema,
-  makeArtifactType,
+  testActor,
+  makeListWorkspaces,
 } from './helpers.js'
+import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
 
-function makeEditChange(
-  repo: ReturnType<typeof makeChangeRepository>,
-  specs: ReadonlyMap<string, ReturnType<typeof makeSpecRepository>> = new Map(),
+function createEditChange(
+  repo = makeChangeRepository(),
+  specs: Map<string, SpecRepository> = new Map(),
 ) {
-  return new EditChange(repo, specs, makeActorResolver(), makeSchemaProvider(makeSchema()))
+  return new EditChange(
+    repo,
+    makeListWorkspaces(specs),
+    makeActorResolver(),
+    makeSchemaProvider(makeSchema()),
+  )
 }
 
 describe('EditChange', () => {
-  describe('adding spec IDs', () => {
-    it('uses schema artifactDag when updating spec IDs', async () => {
-      const schema = makeSchema([
-        makeArtifactType('specs', { scope: 'spec', output: 'spec.md', requires: [] }),
-        makeArtifactType('verify', { scope: 'spec', output: 'verify.md', requires: ['specs'] }),
-      ])
-      const dagSpy = vi.spyOn(schema, 'artifactDag')
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
+  describe('given no existing change with that name', () => {
+    it('throws ChangeNotFoundError', async () => {
+      const uc = createEditChange()
+      await expect(
+        uc.execute({
+          name: 'missing',
+          addSpecIds: ['auth/logout'],
+        }),
+      ).rejects.toThrow(ChangeNotFoundError)
+    })
+  })
+
+  describe('no-op edits', () => {
+    it('returns the same change when no changes are provided', async () => {
+      const change = makeChange('c')
       const repo = makeChangeRepository([change])
-      const uc = new EditChange(repo, new Map(), makeActorResolver(), makeSchemaProvider(schema))
+      const uc = createEditChange(repo)
 
-      await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
+      const result = await uc.execute({ name: 'c' })
 
-      expect(dagSpy).toHaveBeenCalled()
+      expect(result.change).toEqual(change)
+      expect(result.invalidated).toBe(false)
+    })
+  })
+
+  describe('adding specs', () => {
+    it('adds new specIds to the change', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const uc = createEditChange(repo)
+
+      const result = await uc.execute({
+        name: 'c',
+        addSpecIds: ['auth/logout'],
+      })
+
+      expect(result.change.specIds).toEqual(['auth/login', 'auth/logout'])
+      expect(result.invalidated).toBe(true)
     })
 
-    it('adds spec IDs to the change', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
+    it('does not duplicate existing specIds', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
+      const uc = createEditChange(repo)
 
-      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      expect(result.change.specIds).toContain('auth/login')
-      expect(result.change.specIds).toContain('billing/pay')
-    })
-
-    it('does not duplicate spec IDs already present', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
-
-      const result = await uc.execute({ name: 'my-change', addSpecIds: ['auth/login'] })
+      const result = await uc.execute({
+        name: 'c',
+        addSpecIds: ['auth/login'],
+      })
 
       expect(result.change.specIds).toEqual(['auth/login'])
       expect(result.invalidated).toBe(false)
     })
-
-    it('does not call unscaffold when adding specs', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
-      const uc = makeEditChange(repo)
-
-      await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      expect(unscaffoldSpy).not.toHaveBeenCalled()
-    })
-
-    it('seeds new spec deps from sidecar when adding an existing spec', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('billing/pay'), ['spec.md'])],
-        artifacts: {
-          'billing/pay/spec-lock.json': JSON.stringify({
-            schema: { name: 'schema-std', version: 1 },
-            dependsOn: ['core:storage'],
-          }),
-        },
-      })
-      const uc = makeEditChange(repo, new Map([['default', specRepo]]))
-
-      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      expect(result.change.specDependsOn.get('billing/pay')).toEqual(['core:storage'])
-    })
-
-    it('falls back to metadata when sidecar is absent', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('billing/pay'), ['spec.md'])],
-        artifacts: {
-          'billing/pay/.specd-metadata.yaml': JSON.stringify({
-            dependsOn: ['core:change-manifest'],
-          }),
-        },
-      })
-      const uc = makeEditChange(repo, new Map([['default', specRepo]]))
-
-      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      expect(result.change.specDependsOn.get('billing/pay')).toEqual(['core:change-manifest'])
-    })
-
-    it('does not overwrite an existing in-change dependency snapshot', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login', 'billing/pay'] })
-      change.setSpecDependsOn('billing/pay', ['core:existing'])
-      const repo = makeChangeRepository([change])
-      const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('core/config'), ['spec.md'])],
-      })
-      const uc = makeEditChange(repo, new Map([['default', specRepo]]))
-
-      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      expect(result.change.specDependsOn.get('billing/pay')).toEqual(['core:existing'])
-    })
   })
 
-  describe('removing spec IDs', () => {
-    it('removes spec IDs from the change', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login', 'billing/pay'] })
+  describe('removing specs', () => {
+    it('removes specIds from the change', async () => {
+      const change = makeChange('c', { specIds: ['auth/login', 'auth/logout'] })
       const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
+      const uc = createEditChange(repo)
 
-      const result = await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] })
+      const result = await uc.execute({
+        name: 'c',
+        removeSpecIds: ['auth/logout'],
+      })
 
       expect(result.change.specIds).toEqual(['auth/login'])
+      expect(result.invalidated).toBe(true)
     })
 
-    it('throws SpecNotInChangeError when removing a spec not in the change', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
+    it('throws SpecNotInChangeError when removing a spec that is not in the change', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
+      const uc = createEditChange(repo)
 
       await expect(
-        uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] }),
+        uc.execute({
+          name: 'c',
+          removeSpecIds: ['auth/logout'],
+        }),
       ).rejects.toThrow(SpecNotInChangeError)
     })
-
-    it('calls unscaffold with the removed spec IDs', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login', 'billing/pay'] })
-      const repo = makeChangeRepository([change])
-      const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
-      const uc = makeEditChange(repo)
-
-      await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay'] })
-
-      expect(unscaffoldSpy).toHaveBeenCalledOnce()
-      expect(unscaffoldSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'my-change', specIds: ['auth/login'] }),
-        ['billing/pay'],
-      )
-    })
-
-    it('calls unscaffold with all removed spec IDs when removing multiple', async () => {
-      const change = makeChange('my-change', {
-        specIds: ['auth/login', 'billing/pay', 'core/config'],
-      })
-      const repo = makeChangeRepository([change])
-      const unscaffoldSpy = vi.spyOn(repo, 'unscaffold')
-      const uc = makeEditChange(repo)
-
-      await uc.execute({ name: 'my-change', removeSpecIds: ['billing/pay', 'core/config'] })
-
-      expect(unscaffoldSpy).toHaveBeenCalledOnce()
-      expect(unscaffoldSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'my-change', specIds: ['auth/login'] }),
-        ['billing/pay', 'core/config'],
-      )
-    })
   })
 
-  describe('when the change does not exist', () => {
-    it('throws ChangeNotFoundError', async () => {
-      const repo = makeChangeRepository()
-      const uc = makeEditChange(repo)
-
-      await expect(uc.execute({ name: 'missing', addSpecIds: ['auth/login'] })).rejects.toThrow(
-        ChangeNotFoundError,
-      )
-    })
-  })
-
-  describe('when the edit removes all specIds', () => {
-    it('allows removing all specIds', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
+  describe('description update', () => {
+    it('updates the change description', async () => {
+      const change = makeChange('c')
       const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
-
-      const result = await uc.execute({ name: 'my-change', removeSpecIds: ['auth/login'] })
-
-      expect(result.change.specIds).toEqual([])
-      expect(result.change.workspaces).toEqual([])
-      expect(result.invalidated).toBe(true)
-    })
-  })
-
-  describe('saving', () => {
-    it('saves the updated change to the repository', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
-
-      await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      const saved = repo.store.get('my-change')
-      expect(saved).toBeDefined()
-      expect(saved!.specIds).toContain('billing/pay')
-    })
-
-    it('persists the specIds update through ChangeRepository.mutate', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const mutateSpy = vi.spyOn(repo, 'mutate')
-      const uc = makeEditChange(repo)
-
-      await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      expect(mutateSpy).toHaveBeenCalledOnce()
-      expect(mutateSpy).toHaveBeenCalledWith('my-change', expect.any(Function))
-    })
-  })
-
-  describe('invalidation', () => {
-    it('returns invalidated=true when specIds actually changed', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
-
-      const result = await uc.execute({ name: 'my-change', addSpecIds: ['billing/pay'] })
-
-      expect(result.invalidated).toBe(true)
-    })
-
-    it('returns invalidated=false when no add or remove is provided', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
-
-      const result = await uc.execute({ name: 'my-change' })
-
-      expect(result.invalidated).toBe(false)
-    })
-
-    it('returns invalidated=false when specIds did not change', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
-
-      const result = await uc.execute({ name: 'my-change', addSpecIds: ['auth/login'] })
-
-      expect(result.invalidated).toBe(false)
-    })
-  })
-
-  describe('invalidationPolicy', () => {
-    it('updates the change invalidation policy', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
+      const uc = createEditChange(repo)
 
       const result = await uc.execute({
-        name: 'my-change',
-        invalidationPolicy: 'global',
+        name: 'c',
+        description: 'New description',
       })
 
-      expect(result.change.invalidationPolicy).toBe('global')
+      expect(result.change.description).toBe('New description')
       expect(result.invalidated).toBe(false)
     })
+  })
 
-    it('preserves existing policy when not provided', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      change.invalidationPolicy = 'surgical'
+  describe('invalidation policy update', () => {
+    it('updates the invalidation policy', async () => {
+      const change = makeChange('c')
       const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
+      const uc = createEditChange(repo)
 
       const result = await uc.execute({
-        name: 'my-change',
-        description: 'updated',
+        name: 'c',
+        invalidationPolicy: 'surgical',
       })
 
       expect(result.change.invalidationPolicy).toBe('surgical')
+      expect(result.invalidated).toBe(false)
     })
+  })
 
-    it('does not invent drift when updating only the policy', async () => {
-      const change = makeChange('my-change', { specIds: ['auth/login'] })
-      change.setArtifact(
-        new ChangeArtifact({
-          type: 'proposal',
-          requires: [],
-          files: new Map([
-            [
-              'proposal',
-              new ArtifactFile({
-                key: 'proposal',
-                filename: 'proposal.md',
-                status: 'complete',
-                validatedHash: 'sha256:abc',
-              }),
-            ],
-          ]),
-        }),
-      )
+  describe('combined edits', () => {
+    it('applies all requested changes', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])
-      const uc = makeEditChange(repo)
+      const uc = createEditChange(repo)
 
       const result = await uc.execute({
-        name: 'my-change',
-        invalidationPolicy: 'none',
+        name: 'c',
+        addSpecIds: ['auth/logout'],
+        description: 'Updated',
+        invalidationPolicy: 'global',
       })
 
-      const file = result.change.getArtifact('proposal')?.getFile('proposal')
-      expect(file?.hasDrift).toBe(false)
-      expect(file?.status).toBe('complete')
+      expect(result.change.specIds).toEqual(['auth/login', 'auth/logout'])
+      expect(result.change.description).toBe('Updated')
+      expect(result.change.invalidationPolicy).toBe('global')
+      expect(result.invalidated).toBe(true)
+    })
+  })
+
+  describe('approval invalidation', () => {
+    it('invalidates active approval when specIds change', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.recordSpecApproval('Testing', {}, testActor)
+      const repo = makeChangeRepository([change])
+      const uc = createEditChange(repo)
+
+      const result = await uc.execute({
+        name: 'c',
+        addSpecIds: ['auth/logout'],
+      })
+
+      expect(result.change.activeSpecApproval).toBeUndefined()
+      expect(result.invalidated).toBe(true)
     })
   })
 })

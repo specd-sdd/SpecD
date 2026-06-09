@@ -1,6 +1,6 @@
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { type SpecdConfig } from '../../../src/application/specd-config.js'
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
-import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { type Spec } from '../../../src/domain/entities/spec.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -26,7 +26,11 @@ import {
 } from '../../../src/application/ports/spec-repository.js'
 import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
 import { type SpecLockData } from '../../../src/domain/services/parse-spec-lock.js'
-import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import {
+  ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
+} from '../../../src/application/ports/archive-repository.js'
 import { type SchemaRegistry } from '../../../src/application/ports/schema-registry.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
@@ -51,7 +55,10 @@ import {
 import { type ActorResolver } from '../../../src/application/ports/actor-resolver.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import { ListWorkspaces, type ProjectWorkspace } from '../../../src/application/use-cases/list-workspaces.js'
 import {
+  type ArchivedChange,
+  toArchivedChangeView,
   toDiscardedChangeView,
   toDraftedChangeView,
   type DiscardedChangeView,
@@ -231,6 +238,65 @@ export function makeChangeRepository(
   initial: Change[] = [],
 ): ChangeRepository & { store: Map<string, Change> } {
   return new StubChangeRepository(initial)
+}
+
+/**
+ * Creates a `ListWorkspaces` use case for test repositories.
+ *
+ * @param repos - Workspace repositories keyed by workspace name
+ * @returns `ListWorkspaces` wired to a synthetic owned-workspace config
+ */
+export function makeListWorkspaces(
+  repos: ReadonlyMap<string, SpecRepository>,
+  ownerships?: ReadonlyMap<string, 'owned' | 'shared' | 'readOnly'>,
+  codeRoots?: ReadonlyMap<string, string>,
+): ListWorkspaces {
+  const normalizedRepos = new Map(repos)
+  if (!normalizedRepos.has('default')) {
+    normalizedRepos.set('default', makeSpecRepository())
+  }
+  const workspaceNames = [...normalizedRepos.keys()]
+  const config = {
+    projectRoot: '/test',
+    configPath: '/test',
+    schemaRef: '@specd/schema-std',
+    workspaces: workspaceNames.map((name) => ({
+      name,
+      specsPath: `/test/specs/${name}`,
+      specsAdapter: { adapter: 'fs', config: {} },
+      schemasPath: name === 'default' ? '/test/schemas' : null,
+      schemasAdapter: name === 'default' ? { adapter: 'fs', config: {} } : null,
+      codeRoot: codeRoots?.get(name) ?? `/test/code/${name}`,
+      ownership: ownerships?.get(name) ?? ('owned' as const),
+      isExternal: false,
+    })),
+    storage: {
+      changesPath: '/test/changes',
+      changesAdapter: { adapter: 'fs', config: {} },
+      draftsPath: '/test/drafts',
+      draftsAdapter: { adapter: 'fs', config: {} },
+      discardedPath: '/test/discarded',
+      discardedAdapter: { adapter: 'fs', config: {} },
+      archivePath: '/test/archive',
+      archiveAdapter: { adapter: 'fs', config: {} },
+    },
+    approvals: { spec: false, signoff: false },
+  } as unknown as SpecdConfig
+
+  return new ListWorkspaces(config, normalizedRepos)
+}
+
+/**
+ * Executes `ListWorkspaces` and returns a map keyed by workspace name.
+ *
+ * @param repos - Workspace repositories keyed by workspace name
+ * @returns Orchestrated workspace map for context helpers
+ */
+export async function makeWorkspaceMap(
+  repos: ReadonlyMap<string, SpecRepository>,
+): Promise<ReadonlyMap<string, ProjectWorkspace>> {
+  const workspaces = await makeListWorkspaces(repos).execute()
+  return new Map(workspaces.map((workspace) => [workspace.name, workspace]))
 }
 
 /**
@@ -553,9 +619,25 @@ class StubSpecRepository extends SpecRepository {
     for (const artifact of publication.artifacts) {
       this.saved.set(artifact.filename, artifact.content)
     }
-    if (publication.specLock !== undefined) {
-      this.saved.set(`${spec.name.toString()}/spec-lock.json`, JSON.stringify(publication.specLock))
-      this.saved.set('spec-lock.json', JSON.stringify(publication.specLock))
+    const existingSpecLock = this.readSpecLock(spec)
+    const shouldPersistSpecLock =
+      publication.persistedSchema !== undefined ||
+      publication.persistedDependsOn !== undefined ||
+      publication.persistedImplementation !== undefined ||
+      existingSpecLock !== null
+    if (shouldPersistSpecLock) {
+      const persistedSchema = publication.persistedSchema ?? existingSpecLock?.schema ?? {
+        name: 'test-schema',
+        version: 1,
+      }
+      const persistedDependsOn = publication.persistedDependsOn ?? existingSpecLock?.dependsOn ?? []
+      const persistedImplementation =
+        publication.persistedImplementation ?? existingSpecLock?.implementation ?? []
+      this._persistSpecLock(spec, {
+        schema: persistedSchema,
+        dependsOn: [...persistedDependsOn],
+        implementation: [...persistedImplementation],
+      })
     }
     if (this._publishFn !== undefined) {
       return this._publishFn(spec, publication)
@@ -585,19 +667,88 @@ class StubSpecRepository extends SpecRepository {
     this.saved.set('.specd-metadata.yaml', content)
   }
 
-  override async readSpecLock(spec: Spec): Promise<SpecLockData | null> {
+  private readSpecLock(spec: Spec): SpecLockData | null {
     const key = `${spec.name.toString()}/spec-lock.json`
-    const content = this._artifacts[key]
+    const content = this.saved.get(key) ?? this.saved.get('spec-lock.json') ?? this._artifacts[key]
     if (content === undefined || content === null) return null
     return JSON.parse(content) as SpecLockData
   }
 
-  override async saveSpecLock(
-    _spec: Spec,
-    content: SpecLockData,
-    _options?: { force?: boolean },
+  override async readPersistedSchema(
+    spec: Spec,
+  ): Promise<{ name: string; version: number } | null> {
+    return this.readSpecLock(spec)?.schema ?? null
+  }
+
+  override async readPersistedDependsOn(spec: Spec): Promise<readonly string[] | null> {
+    return this.readSpecLock(spec)?.dependsOn ?? null
+  }
+
+  override async readPersistedImplementation(
+    spec: Spec,
+  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
+    return this.readSpecLock(spec)?.implementation ?? null
+  }
+
+  override async specHash(spec: Spec): Promise<string | null> {
+    const persisted = this.saved.get(`${spec.name.toString()}/spec-lock.json`)
+      ?? this.saved.get('spec-lock.json')
+      ?? this._artifacts[`${spec.name.toString()}/spec-lock.json`]
+    if (persisted === undefined || persisted === null) {
+      return null
+    }
+    return new NodeContentHasher().hash(persisted)
+  }
+
+  override async updatePersistedSchema(
+    spec: Spec,
+    schema: { name: string; version: number },
+    _options?: { force?: boolean; originalHash?: string },
   ): Promise<void> {
-    this.saved.set('spec-lock.json', JSON.stringify(content))
+    const current = this.readSpecLock(spec) ?? {
+      schema,
+      dependsOn: [],
+      implementation: [],
+    }
+    this._persistSpecLock(spec, { ...current, schema })
+  }
+
+  override async updatePersistedDependsOn(
+    spec: Spec,
+    dependsOn: readonly string[],
+    _options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    const current = this.readSpecLock(spec) ?? {
+      schema: { name: 'test-schema', version: 1 },
+      dependsOn: [],
+      implementation: [],
+    }
+    this._persistSpecLock(spec, { ...current, dependsOn: [...dependsOn] })
+  }
+
+  override async updatePersistedImplementation(
+    spec: Spec,
+    implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
+    _options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {
+    const current = this.readSpecLock(spec) ?? {
+      schema: { name: 'test-schema', version: 1 },
+      dependsOn: [],
+      implementation: [],
+    }
+    this._persistSpecLock(spec, {
+      ...current,
+      implementation: implementation.map((entry) => ({
+        file: entry.file,
+        ...(entry.symbols !== undefined ? { symbols: [...entry.symbols] } : {}),
+      })),
+    })
+  }
+
+  private _persistSpecLock(spec: Spec, content: SpecLockData): void {
+    const serialized = JSON.stringify(content)
+    this.saved.set(`${spec.name.toString()}/spec-lock.json`, serialized)
+    this.saved.set('spec-lock.json', serialized)
   }
 
   override async resolveFromPath(
@@ -829,12 +980,40 @@ class StubArchiveRepository extends ArchiveRepository {
     throw new Error('not implemented')
   }
 
-  override async list(): Promise<ArchivedChange[]> {
-    return [...this.store.values()]
+  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+    const items = [...this.store.values()]
+    return {
+      items: items.map((change) => ({
+        name: change.name,
+        archivedName: change.archivedName,
+        archivedAt: change.archivedAt,
+        ...(change.description !== undefined ? { description: change.description } : {}),
+        ...(change.archivedBy !== undefined ? { archivedBy: change.archivedBy } : {}),
+        specIds: [...change.specIds],
+        schemaName: change.schemaName,
+        schemaVersion: change.schemaVersion,
+        workspaces: [...change.workspaces],
+        artifacts: [...change.artifacts.keys()],
+      })),
+      meta: {
+        total: items.length,
+        count: items.length,
+        limit: options?.limit ?? 100,
+        ...(options?.page !== undefined ? { page: options.page } : {}),
+        ...(options?.startAt !== undefined ? { startAt: options.startAt } : {}),
+      },
+    }
   }
 
   override async get(name: string): Promise<ArchivedChange | null> {
     return this.store.get(name) ?? null
+  }
+
+  override async artifact(
+    _change: ArchivedChange,
+    _filename: string,
+  ): Promise<SpecArtifact | null> {
+    return null
   }
 
   override async reindex(): Promise<void> {}
@@ -860,16 +1039,34 @@ export function makeArchivedChange(
   name: string,
   opts: { specIds?: string[]; schemaName?: string } = {},
 ): ArchivedChange {
-  const createdAt = new Date('2024-01-01T00:00:00Z')
-  const archivedName = `20240101-000000-${name}`
-  return new ArchivedChange({
+  const change = new Change({
     name,
-    archivedName,
-    archivedAt: new Date('2024-01-02T00:00:00Z'),
-    artifacts: [],
+    createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: opts.specIds ?? ['default:default'],
     schemaName: opts.schemaName ?? 'test-schema',
     schemaVersion: 1,
+    history: [
+      {
+        type: 'created',
+        at: new Date('2024-01-01T00:00:00Z'),
+        by: testActor,
+        specIds: opts.specIds ?? ['default:default'],
+        schemaName: opts.schemaName ?? 'test-schema',
+        schemaVersion: 1,
+      },
+    ],
+  })
+  change.transition('designing', testActor)
+  change.transition('ready', testActor)
+  change.transition('implementing', testActor)
+  change.transition('verifying', testActor)
+  change.transition('done', testActor)
+  change.transition('archivable', testActor)
+
+  return toArchivedChangeView(change, {
+    archivedName: `20240101-000000-${name}`,
+    archivedAt: new Date('2024-01-02T00:00:00Z'),
+    archivedBy: testActor,
   })
 }
 

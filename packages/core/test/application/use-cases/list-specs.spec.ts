@@ -4,7 +4,7 @@ import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { type YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
-import { makeSpecRepository, makeContentHasher } from './helpers.js'
+import { makeSpecRepository, makeContentHasher, makeListWorkspaces } from './helpers.js'
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -44,7 +44,11 @@ describe('ListSpecs', () => {
       ['billing', repo2],
     ])
 
-    const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+    const uc = new ListSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
     const result = await uc.execute()
 
     expect(result).toHaveLength(2)
@@ -58,7 +62,11 @@ describe('ListSpecs', () => {
     const repo = makeSpecRepository({ specs: [] })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+    const uc = new ListSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
     const result = await uc.execute()
 
     expect(result).toEqual([])
@@ -69,7 +77,11 @@ describe('ListSpecs', () => {
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['billing', repo]])
 
-    const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+    const uc = new ListSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
     const result = await uc.execute()
 
     expect(result).toHaveLength(1)
@@ -81,7 +93,11 @@ describe('ListSpecs', () => {
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+    const uc = new ListSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
     const result = await uc.execute()
 
     expect(result[0]!.title).toBe('login')
@@ -103,7 +119,11 @@ describe('ListSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+    const uc = new ListSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
     const result = await uc.execute()
 
     expect(result[0]!.title).toBe('Login Flow')
@@ -122,7 +142,11 @@ describe('ListSpecs', () => {
         ['beta', repo2],
       ])
 
-      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const uc = new ListSpecs(
+        makeListWorkspaces(specRepos),
+        makeContentHasher(),
+        makeYamlSerializer(),
+      )
       const result = await uc.execute({ workspaces: ['alpha'] })
 
       expect(result).toHaveLength(1)
@@ -145,7 +169,11 @@ describe('ListSpecs', () => {
         ['gamma', repo3],
       ])
 
-      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const uc = new ListSpecs(
+        makeListWorkspaces(specRepos),
+        makeContentHasher(),
+        makeYamlSerializer(),
+      )
       const result = await uc.execute({ workspaces: ['alpha', 'gamma'] })
 
       expect(result).toHaveLength(2)
@@ -157,7 +185,11 @@ describe('ListSpecs', () => {
       const repo = makeSpecRepository({ specs: [spec], workspace: 'alpha' })
 
       const specRepos = new Map([['alpha', repo]])
-      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const uc = new ListSpecs(
+        makeListWorkspaces(specRepos),
+        makeContentHasher(),
+        makeYamlSerializer(),
+      )
       const result = await uc.execute({ workspaces: ['nonexistent'] })
 
       expect(result).toEqual([])
@@ -175,7 +207,11 @@ describe('ListSpecs', () => {
         ['beta', repo2],
       ])
 
-      const uc = new ListSpecs(specRepos, makeContentHasher(), makeYamlSerializer())
+      const uc = new ListSpecs(
+        makeListWorkspaces(specRepos),
+        makeContentHasher(),
+        makeYamlSerializer(),
+      )
       const result = await uc.execute({ workspaces: [] })
 
       expect(result).toHaveLength(2)

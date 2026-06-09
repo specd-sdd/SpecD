@@ -1,15 +1,20 @@
 {
   "title": "Search Specs",
   "description": "Consumers need a core-level use case to search spec content by keyword without depending on the code graph. `SearchSpecs` provides content-based search across all configured workspaces by delegating to each workspace's `SpecRepository.search()` method. It is the fallback search path when the code graph is unavailable, and the primary search path for consumers that do not have graph access.",
-  "dependsOn": ["core:spec-repository-port", "core:list-specs", "core:workspace"],
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:list-specs",
+    "core:workspace",
+    "core:list-workspaces"
+  ],
   "context": [
     "Consumers need a core-level use case to search spec content by keyword without depending on the code graph. `SearchSpecs` provides content-based search across all configured workspaces by delegating to each workspace's `SpecRepository.search()` method. It is the fallback search path when the code graph is unavailable, and the primary search path for consumers that do not have graph access."
   ],
   "rules": [
     {
-      "requirement": "Search across all configured workspaces",
+      "requirement": "Multi-workspace search orchestration",
       "rules": [
-        "`SearchSpecs.execute(query, options?)` SHALL iterate every configured workspace in declaration order and call `SpecRepository.search(query, options)` on each repository. Results from all workspaces MUST be merged into a single flat array sorted by score descending across all workspaces."
+        "`SearchSpecs.execute()` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case. It SHALL perform substring matching across all spec artifacts in each workspace using the provided `SpecRepository.search()` method.\n\nResults from all workspaces SHALL be aggregated, ranked by relevance score, and returned to the caller."
       ]
     },
     {
@@ -44,13 +49,12 @@
     }
   ],
   "constraints": [
-    "The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories",
-    "Search quality depends on the adapter implementation; the use case defines the orchestration contract, not the matching algorithm",
-    "Title resolution reuses the same logic as ListSpecs — no separate title extraction in this use case"
+    "The use case SHALL depend on ListWorkspaces for consistent project traversal during fallback search.",
+    "Results MUST be returned sorted by descending relevance score."
   ],
   "scenarios": [
     {
-      "requirement": "Search across all configured workspaces",
+      "requirement": "Multi-workspace search orchestration",
       "name": "Results merged and sorted by score",
       "given": [
         "workspace alpha has a spec scoring 0.8 and workspace beta has a spec scoring 0.9 for the same query"
@@ -59,11 +63,20 @@
       "then": ["the result array has two entries sorted with the beta entry first (higher score)"]
     },
     {
-      "requirement": "Search across all configured workspaces",
+      "requirement": "Multi-workspace search orchestration",
       "name": "Empty result when nothing matches",
       "given": ["no spec in any workspace matches the query"],
       "when": ["execute(\"zzzznonexistent\") is called"],
       "then": ["the result array is empty"]
+    },
+    {
+      "requirement": "Multi-workspace search orchestration",
+      "name": "SearchSpecs uses orchestrated project structure",
+      "when": ["SearchSpecs.execute() is called"],
+      "then": [
+        "it obtains the list of workspaces via the ListWorkspaces orchestrator",
+        "AND it performs the content search through the provided repository instances"
+      ]
     },
     {
       "requirement": "Optional workspace filter",
@@ -117,9 +130,18 @@
       "then": ["the result is an empty array (not an error)"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:search-specs",
+        "file": "core:src/application/use-cases/search-specs.ts",
+        "symbol": "SearchSpecs"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:0f40d528e06e7222067eb499c1f2db4d8634260f0a2efd7ab85f4bd27cdc821d",
-    "verify.md": "sha256:d0b29dd0b549e50bc7d75e9d6f5d7b3a9e872a914ceb2f3ea97bc02cdc19e746"
+    "spec.md": "sha256:a059d24c054d32dc2975108847622822807f071963fada05969565dee8bee198",
+    "verify.md": "sha256:9d371182732856f300f1f016db6dcfc9dda73553ab4f01eae1bc904f99fe8ec3"
   },
   "generatedBy": "core"
 }

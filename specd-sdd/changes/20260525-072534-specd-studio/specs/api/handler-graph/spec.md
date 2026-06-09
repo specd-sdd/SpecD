@@ -17,10 +17,6 @@ Business rules for lifecycle, validation, approvals, and conflicts MUST live in 
 - `createCodeGraphProvider` → stats, index, search, impact, hotspots
 - change-scoped graph view composed from change `specIds`
 
-### Requirement: artifact GET and PUT use dedicated core use cases
-
-For `/changes/{name}/artifacts/{filename}`, `GET` MUST call `GetChangeArtifact` and `PUT` MUST call `SaveChangeArtifact`. The handler MUST NOT call `ChangeRepository.artifact` or `saveArtifact` directly.
-
 ### Requirement: successful responses use presenters and DTO wire shapes
 
 Successful responses MUST be produced by the matching `api:presenter-*` module and conform to the corresponding `api:dto-*` spec.
@@ -29,9 +25,15 @@ Successful responses MUST be produced by the matching `api:presenter-*` module a
 
 Thrown kernel errors and validation failures MUST be converted through `api:problem-json` to `application/problem+json` responses with appropriate HTTP status codes.
 
-### Requirement: mutations pass the request-scoped actor into kernel
+### Requirement: graph indexing uses CLI-aligned project assembly
 
-Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field.
+For `POST /v1/graph/index`, the handler MUST assemble the provider input from orchestrated project state:
+
+- `kernel.project.listWorkspaces.execute()`
+- effective graph config derived from `SpecdConfig`
+- optional project VCS ref when available
+
+It MUST NOT build a parallel legacy workspace-target shape that bypasses the merged graph input model.
 
 ## Constraints
 

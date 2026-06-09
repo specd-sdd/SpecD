@@ -92,6 +92,18 @@ If extraction finds values for transformed fields but transform execution cannot
 
 All dependencies are injected at construction time. The schema is resolved lazily on first access.
 
+### Requirement: Project context optimization and invalidation
+
+If `llmOptimizedContext: true` is active, the use case SHALL attempt to load project-level metadata from `project-metadata.json`.
+
+It SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
+
+- `specd.yaml`
+- Referenced `contextFiles`
+- Metadata of included specs
+
+If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, it SHALL fall back to raw compilation and emit a signal for the caller to show a warning.
+
 ## Constraints
 
 - The use case operates without a change context — it treats all workspaces as active.
@@ -109,3 +121,4 @@ All dependencies are injected at construction time. The schema is resolved lazil
 - [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
 - [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
 - `default:_global/architecture` — port/adapter design constraints
+- [`core:core/project-metadata`](../project-metadata/spec.md) — for optimization storage and hashing rules

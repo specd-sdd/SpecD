@@ -1,0 +1,80 @@
+{
+  "title": "core:update-spec-metadata",
+  "description": "Agents and external tools that generate LLM-optimized metadata need a safe way to save these fields without managing the entire machine-readable summary or risking overwriting deterministic fields. The `UpdateSpecMetadata` use case performs a fresh deterministic extraction of spec metadata and merges it with agent-provided optimized fields before persisting, ensuring the metadata file is always up-to-date and consistent.",
+  "dependsOn": ["core:spec-metadata", "core:save-spec-metadata"],
+  "context": [
+    "Agents and external tools that generate LLM-optimized metadata need a safe way to save these fields without managing the entire machine-readable summary or risking overwriting deterministic fields. The `UpdateSpecMetadata` use case performs a fresh deterministic extraction of spec metadata and merges it with agent-provided optimized fields before persisting, ensuring the metadata file is always up-to-date and consistent."
+  ],
+  "rules": [
+    {
+      "requirement": "Deterministic extraction before merge",
+      "rules": [
+        "The use case SHALL perform a fresh extraction of metadata using the schema's `metadataExtraction` rules from the current spec files."
+      ]
+    },
+    {
+      "requirement": "Merging optimized fields",
+      "rules": [
+        "The use case SHALL merge the provided partial metadata payload into the freshly extracted deterministic metadata. The merge SHALL specifically target `optimizedDescription` and `optimizedContext`."
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "rules": [
+        "The resulting merged metadata SHALL be validated against `strictSpecMetadataSchema` and persisted via `SaveSpecMetadata`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Deterministic extraction before merge",
+      "name": "Merges with latest deterministic data",
+      "given": ["a spec whose title was changed in spec.md but metadata.json is not yet updated"],
+      "when": ["UpdateSpecMetadata is called with an optimized payload"],
+      "then": [
+        "it performs a fresh extraction",
+        "AND the resulting metadata contains the NEW title from spec.md merged with the optimized fields"
+      ]
+    },
+    {
+      "requirement": "Merging optimized fields",
+      "name": "Partial update preserves other fields",
+      "given": ["existing metadata with dependsOn: [\"core:config\"]"],
+      "when": ["UpdateSpecMetadata is called with { \"optimizedDescription\": \"New desc\" }"],
+      "then": [
+        "the resulting metadata has the new optimizedDescription",
+        "AND it still contains dependsOn: [\"core:config\"]"
+      ]
+    },
+    {
+      "requirement": "Persistence",
+      "name": "Merged metadata is saved",
+      "when": ["UpdateSpecMetadata completes the merge"],
+      "then": ["it calls SaveSpecMetadata with the complete merged object"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:update-spec-metadata",
+        "file": "core:src/application/use-cases/update-spec-metadata.ts",
+        "symbol": "UpdateSpecMetadataInput"
+      },
+      {
+        "specId": "core:update-spec-metadata",
+        "file": "core:src/application/use-cases/update-spec-metadata.ts",
+        "symbol": "UpdateSpecMetadataResult"
+      },
+      {
+        "specId": "core:update-spec-metadata",
+        "file": "core:src/application/use-cases/update-spec-metadata.ts",
+        "symbol": "UpdateSpecMetadata"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:ec2eaf2f2cbe0fa235268741e5edf6f85c60216f6150ae0e04aa171d59063431",
+    "verify.md": "sha256:bc2fb60095be13125d26d2d760992d7e1c665ce3c37960708386bfd8f14ccaac"
+  },
+  "generatedBy": "core"
+}

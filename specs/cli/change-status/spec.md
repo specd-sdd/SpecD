@@ -129,6 +129,25 @@ This fallback is best-effort only. It MUST NOT rewrite the stored symbol string,
 
 The details section of the text output SHALL show task completion counts for each artifact that has `taskCompletion` data, appended inline after the status line in the format `tasks: N/M`.
 
+### Requirement: Basic info section
+
+In text mode, the command SHALL render a basic info block at the top of the output including the change name and its current state.
+It SHALL NOT include a standalone `specs:` list, as spec visibility is handled by the dedicated "Specs and dependencies" section.
+
+### Requirement: Specs and dependencies section
+
+The command SHALL include a "specs and dependencies" section in the output, listing all specs in the change's scope and their declared dependencies from the manifest's `specDependsOn` field.
+
+In text mode, the section SHALL follow the DAG or details section and use a bulleted list format:
+
+```
+specs and dependencies:
+  workspace:spec-path-1: dep1, dep2
+  workspace:spec-path-2: (none)
+```
+
+In structured output (JSON/toon), the `specDependsOn` object from the change manifest SHALL be included in the top-level response.
+
 ## Constraints
 
 - The output includes all artifacts declared by the schema, not only those present on disk

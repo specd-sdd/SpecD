@@ -23,11 +23,12 @@
 - **WHEN** `GET /v1/discarded` is called
 - **THEN** each row includes name, state, and `updatedAt`
 
-#### Scenario: GET archived-changes returns name and archivedName
+#### Scenario: GET archived-changes returns archive index payload
 
 - **WHEN** client calls `GET /v1/archived-changes`
 - **THEN** HTTP status is 2xx
-- **AND** each array element includes `name` and `archivedName`
+- **AND** body contains `items` and `meta`
+- **AND** each item includes `name` and `archivedName`
 
 #### Scenario: Undocumented path returns 404
 
@@ -91,16 +92,17 @@
 - **THEN** summary includes blocker count or flag
 - **AND** full findings are not inlined
 
-### Requirement: archived-changes list returns name and archivedName pairs
+### Requirement: archived-changes list returns paginated archive index rows
 
-#### Scenario: GET archived-changes returns both identifiers
+#### Scenario: GET archived-changes returns both identifiers and pagination metadata
 
 - **WHEN** client calls `GET /v1/archived-changes`
-- **THEN** each array element includes `name` and `archivedName`
+- **THEN** each `items` element includes `name` and `archivedName`
+- **AND** the response includes `meta.total`, `meta.count`, and `meta.limit`
 - **AND** Studio can render archive rows without an additional lookup
 
 #### Scenario: Empty archive returns an empty list
 
 - **WHEN** there are no archived changes
-- **THEN** HTTP 200 is returned with `[]`
+- **THEN** HTTP 200 is returned with `items: []`
 - **AND** no synthetic placeholder rows are added

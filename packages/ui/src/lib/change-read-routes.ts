@@ -9,13 +9,13 @@ import type {
 } from '@specd/client'
 import type { ChangeListSection } from '../change/change-list-section.js'
 
-export type ChangeReadSection = ChangeListSection | null | undefined
+export type ChangeReadSection = ChangeListSection | 'archived' | null | undefined
 
 /** Maps shell list section to read-only storage when applicable. */
 export function readOnlyOriginFromListSection(
   section: ChangeReadSection,
 ): ReadOnlyChangeOrigin | null {
-  if (section === 'draft' || section === 'discarded') return section
+  if (section === 'draft' || section === 'discarded' || section === 'archived') return section
   return null
 }
 
@@ -47,6 +47,9 @@ export function listChangeArtifactsForSection(
 ): Promise<readonly ChangeArtifactListItemDto[]> {
   if (section === 'draft') return port.listDraftArtifacts(name)
   if (section === 'discarded') return port.listDiscardedArtifacts(name)
+  if (section === 'archived') {
+    throw new Error('Archived artifact lists must come from archived change detail.')
+  }
   return port.listChangeArtifacts(name)
 }
 
@@ -64,7 +67,14 @@ export function loadChangeArtifactForSection(
 }
 
 export function changeReadCacheKey(section: ChangeReadSection, suffix: string): string {
-  const bucket = section === 'draft' ? 'draft' : section === 'discarded' ? 'discarded' : 'active'
+  const bucket =
+    section === 'draft'
+      ? 'draft'
+      : section === 'discarded'
+        ? 'discarded'
+        : section === 'archived'
+          ? 'archived'
+          : 'active'
   return `${bucket}:${suffix}`
 }
 

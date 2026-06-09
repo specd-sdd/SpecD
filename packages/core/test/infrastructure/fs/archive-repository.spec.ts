@@ -165,7 +165,7 @@ describe('FsArchiveRepository', () => {
       expect(archivedChange.archivedName).toBe(changeDirName('add-auth', change.createdAt))
       expect(archivedChange.workspaces[0]).toBe('default')
       expect(archivedChange.archivedAt).toBeInstanceOf(Date)
-      expect(archivedChange.artifacts).toEqual([])
+      expect([...archivedChange.artifacts.keys()]).toEqual([])
     })
 
     it('augments the manifest with archivedAt', async () => {
@@ -340,9 +340,10 @@ describe('FsArchiveRepository', () => {
   // ---- list ----
 
   describe('list', () => {
-    it('returns empty array when archive is empty', async () => {
-      const results = await ctx.archive.list()
-      expect(results).toHaveLength(0)
+    it('returns empty result when archive is empty', async () => {
+      const result = await ctx.archive.list()
+      expect(result.items).toHaveLength(0)
+      expect(result.meta.total).toBe(0)
     })
 
     it('returns archived changes in order after archiving', async () => {
@@ -359,11 +360,12 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.archive(older)
       await ctx.archive.archive(newer)
 
-      const results = await ctx.archive.list()
+      const result = await ctx.archive.list()
 
-      expect(results).toHaveLength(2)
-      expect(results[0]!.name).toBe('older-change')
-      expect(results[1]!.name).toBe('newer-change')
+      expect(result.items).toHaveLength(2)
+      expect(result.items[0]!.name).toBe('older-change')
+      expect(result.items[1]!.name).toBe('newer-change')
+      expect(result.meta.total).toBe(2)
     })
 
     it('deduplicates by name — last entry wins', async () => {
@@ -376,9 +378,9 @@ describe('FsArchiveRepository', () => {
       const existing = await fs.readFile(indexPath, 'utf8')
       await fs.appendFile(indexPath, existing.trim() + '\n', 'utf8')
 
-      const results = await ctx.archive.list()
-      expect(results).toHaveLength(1)
-      expect(results[0]!.name).toBe('dedup-change')
+      const result = await ctx.archive.list()
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.name).toBe('dedup-change')
     })
 
     it('auto-rebuilds index when new manifests appear on disk', async () => {
@@ -397,9 +399,9 @@ describe('FsArchiveRepository', () => {
       await fs.writeFile(indexPath, lines[0]! + '\n', 'utf8')
 
       // list() should detect staleness and rebuild
-      const results = await ctx.archive.list()
-      expect(results).toHaveLength(2)
-      const names = results.map((r) => r.name)
+      const result = await ctx.archive.list()
+      expect(result.items).toHaveLength(2)
+      const names = result.items.map((r) => r.name)
       expect(names).toContain('first-change')
       expect(names).toContain('second-change')
     })
@@ -529,10 +531,10 @@ describe('FsArchiveRepository', () => {
 
       await ctx.archive.reindex()
 
-      const results = await ctx.archive.list()
-      expect(results).toHaveLength(2)
-      expect(results[0]!.name).toBe('old-change')
-      expect(results[1]!.name).toBe('new-change')
+      const result = await ctx.archive.list()
+      expect(result.items).toHaveLength(2)
+      expect(result.items[0]!.name).toBe('old-change')
+      expect(result.items[1]!.name).toBe('new-change')
     })
 
     it('creates an empty index file when archive is empty', async () => {

@@ -10,11 +10,16 @@ import { SpecOverlapError } from '../../../src/domain/errors/spec-overlap-error.
 import { ArchiveDependencyMismatchError } from '../../../src/domain/errors/archive-dependency-mismatch-error.js'
 import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
-import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
+import {
+  ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
+} from '../../../src/application/ports/archive-repository.js'
 import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -27,6 +32,7 @@ import {
 } from '../../../src/application/use-cases/run-step-hooks.js'
 import {
   makeChangeRepository,
+  makeListWorkspaces,
   makeActorResolver,
   makeRunStepHooks,
   makeSchemaProvider,
@@ -70,23 +76,32 @@ class StubArchiveRepository extends ArchiveRepository {
     const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
     const archivedChange = this._override
       ? this._override(change)
-      : new ArchivedChange({
-          name: change.name,
+      : toArchivedChangeView(change, {
           archivedName,
           archivedAt: new Date(),
-          artifacts: [],
-          specIds: [...change.specIds],
-          schemaName: change.schemaName,
-          schemaVersion: change.schemaVersion,
         })
     return { archivedChange, archiveDirPath: `/archive/${archivedName}` }
   }
 
-  override async list(): Promise<ArchivedChange[]> {
-    return []
+  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+    return {
+      items: [],
+      meta: {
+        total: 0,
+        count: 0,
+        limit: options?.limit ?? 100,
+      },
+    }
   }
 
   override async get(): Promise<ArchivedChange | null> {
+    return null
+  }
+
+  override async artifact(
+    _change: ArchivedChange,
+    _filename: string,
+  ): Promise<SpecArtifact | null> {
     return null
   }
 
@@ -140,7 +155,7 @@ describe('ArchiveChange', () => {
     it('throws ChangeNotFoundError', async () => {
       const uc = new ArchiveChange(
         makeChangeRepository([]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -158,7 +173,7 @@ describe('ArchiveChange', () => {
       const change = makeArchivableChange('my-change')
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -214,7 +229,7 @@ describe('ArchiveChange', () => {
       })
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -232,7 +247,7 @@ describe('ArchiveChange', () => {
       const change = makeArchivableChange('my-change', { schemaName: 'schema-a' })
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -250,7 +265,7 @@ describe('ArchiveChange', () => {
       const change = makeArchivableChange('my-change')
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -270,7 +285,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -287,7 +302,7 @@ describe('ArchiveChange', () => {
     it('returns an ArchivedChange with no approval or wasStructural fields', async () => {
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -335,7 +350,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -346,7 +361,8 @@ describe('ArchiveChange', () => {
       )
       const result = await uc.execute({ name: 'my-change' })
 
-      expect(result.archivedChange).toBeInstanceOf(ArchivedChange)
+      expect(result.archivedChange.name).toBe('my-change')
+      expect(result.archivedChange.archivedName).toBeTruthy()
       expect(result.postHookFailures).toEqual([])
       expect(result.staleMetadataSpecPaths).toContain('default:auth/oauth')
     })
@@ -396,7 +412,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -408,7 +424,7 @@ describe('ArchiveChange', () => {
 
       await uc.execute({ name: 'my-change' })
 
-      expect(JSON.parse(specRepo.saved.get('spec-lock.json')!)).toEqual({
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json') ?? '')).toEqual({
         schema: { name: 'test-schema', version: 1 },
         dependsOn: ['core:storage'],
         implementation: [],
@@ -465,7 +481,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -477,7 +493,7 @@ describe('ArchiveChange', () => {
 
       await uc.execute({ name: 'my-change' })
 
-      expect(JSON.parse(specRepo.saved.get('spec-lock.json')!)).toEqual({
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json') ?? '')).toEqual({
         schema: { name: 'schema-std', version: 1 },
         dependsOn: ['core:new'],
         implementation: [],
@@ -516,9 +532,9 @@ describe('ArchiveChange', () => {
             ],
           },
         }),
-        renderSubtree: (node) =>
+        renderSubtree: (node): string =>
           (node.value as string | undefined) ??
-          (node.children ?? [])
+          ((node.children as any[]) ?? [])
             .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
             .join('\n'),
       })
@@ -561,7 +577,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -611,9 +627,9 @@ describe('ArchiveChange', () => {
           'auth/oauth/spec.md': '# OAuth',
           'auth/shared/spec.md': '# Shared',
         },
-        async publish(spec): Promise<void> {
-          publishCalls.push(spec.name.toString())
-        },
+      })
+      vi.spyOn(specRepo, 'publish').mockImplementation(async (spec): Promise<void> => {
+        publishCalls.push(spec.name.toString())
       })
       const markdownParser = makeParser({
         parse: (content) => ({
@@ -628,9 +644,9 @@ describe('ArchiveChange', () => {
             ],
           },
         }),
-        renderSubtree: (node) =>
+        renderSubtree: (node): string =>
           (node.value as string | undefined) ??
-          (node.children ?? [])
+          ((node.children as any[]) ?? [])
             .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
             .join('\n'),
       })
@@ -678,7 +694,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -728,9 +744,9 @@ describe('ArchiveChange', () => {
             },
           }
         },
-        renderSubtree: (node) =>
+        renderSubtree: (node): string =>
           (node.value as string | undefined) ??
-          (node.children ?? [])
+          ((node.children as any[]) ?? [])
             .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
             .join('\n'),
       })
@@ -743,9 +759,9 @@ describe('ArchiveChange', () => {
           'auth/oauth/spec.md': '# OAuth',
           'auth/shared/spec.md': '# Shared',
         },
-        async publish(spec): Promise<void> {
-          events.push(`publish:${spec.name.toString()}`)
-        },
+      })
+      vi.spyOn(specRepo, 'publish').mockImplementation(async (spec): Promise<void> => {
+        events.push(`publish:${spec.name.toString()}`)
       })
       const change = makeArchivableChange('my-change', {
         specIds: ['default:auth/oauth', 'default:auth/shared'],
@@ -791,7 +807,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -867,7 +883,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -950,7 +966,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -971,14 +987,14 @@ describe('ArchiveChange', () => {
       const change = makeArchivableChange('my-change')
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         archiveRepo,
         makeRunStepHooks(),
-        makeActorResolver({
+        {
           async identity(): Promise<typeof testActor> {
             throw new Error('missing actor identity')
           },
-        }),
+        },
         makeParsers(),
         makeSchemaProvider(makeSchema()),
         makeGenerateMetadata(),
@@ -997,13 +1013,13 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository({
         specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
         artifacts: { 'auth/oauth/spec.md': '# Old' },
-        async publish(): Promise<void> {
-          throw new SpecPublicationError(
-            'default:auth/oauth',
-            '/tmp/specd-staging/auth-oauth',
-            'rename failed',
-          )
-        },
+      })
+      vi.spyOn(specRepo, 'publish').mockImplementation(async (): Promise<void> => {
+        throw new SpecPublicationError(
+          'default:auth/oauth',
+          '/tmp/specd-staging/auth-oauth',
+          'rename failed',
+        )
       })
 
       const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
@@ -1031,7 +1047,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         repo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         archiveRepo,
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1104,7 +1120,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1153,7 +1169,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1200,7 +1216,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1229,7 +1245,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1257,7 +1273,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1303,7 +1319,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1348,7 +1364,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1369,7 +1385,7 @@ describe('ArchiveChange', () => {
       // stub (which returns success with no hooks executed) is correct.
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1416,7 +1432,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1461,7 +1477,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1508,7 +1524,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1534,7 +1550,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1562,7 +1578,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1594,7 +1610,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -1661,7 +1677,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1718,9 +1734,11 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([
-          ['default', makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': '# Base' } })],
-        ]),
+        makeListWorkspaces(
+          new Map([
+            ['default', makeSpecRepository({ artifacts: { 'auth/oauth/spec.md': '# Base' } })],
+          ]),
+        ),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1782,7 +1800,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1847,7 +1865,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1915,7 +1933,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -1980,7 +1998,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2045,7 +2063,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2097,7 +2115,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2151,7 +2169,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2215,7 +2233,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         changeRepo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2241,7 +2259,7 @@ describe('ArchiveChange', () => {
         makeChangeRepository([
           makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] }),
         ]),
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2283,7 +2301,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2320,7 +2338,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         archiveRepo,
         runStepHooks,
         makeActorResolver(),
@@ -2375,7 +2393,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         archiveRepo,
         runStepHooks,
         makeActorResolver(),
@@ -2403,7 +2421,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -2428,7 +2446,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -2484,7 +2502,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         runStepHooks,
         makeActorResolver(),
@@ -2541,7 +2559,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([makeArchivableChange('my-change')]),
-        new Map(),
+        makeListWorkspaces(new Map()),
         archiveRepo,
         runStepHooks,
         makeActorResolver(),
@@ -2572,7 +2590,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         repo,
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         hookSpy,
         makeActorResolver(),
@@ -2593,7 +2611,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         repo,
-        new Map(),
+        makeListWorkspaces(new Map()),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2608,7 +2626,7 @@ describe('ArchiveChange', () => {
       expect(mutateSpy.mock.calls.some((call) => call[0] === 'my-change')).toBe(true)
       const archivingMutate = mutateSpy.mock.calls.find((call) => {
         const draft = makeArchivableChange('my-change')
-        const updated = call[1](draft) as Change
+        const updated = (call[1] as (c: Change) => Change)(draft)
         return updated.state === 'archiving'
       })
       expect(archivingMutate).toBeDefined()
@@ -2639,7 +2657,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository()
       const uc = new ArchiveChange(
         repo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2675,7 +2693,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository()
       const uc = new ArchiveChange(
         repo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2735,7 +2753,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository()
       const uc = new ArchiveChange(
         repo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2760,7 +2778,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository()
       const uc = new ArchiveChange(
         repo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2782,7 +2800,7 @@ describe('ArchiveChange', () => {
       const specRepo = makeSpecRepository()
       const uc = new ArchiveChange(
         repo,
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(new Map([['default', specRepo]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2814,7 +2832,10 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map([['platform', readOnlySpecRepo]]),
+        makeListWorkspaces(
+          new Map([['platform', readOnlySpecRepo]]),
+          new Map([['platform', 'readOnly']]),
+        ),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2835,7 +2856,7 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map([['default', makeSpecRepository()]]),
+        makeListWorkspaces(new Map([['default', makeSpecRepository()]])),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2863,17 +2884,19 @@ describe('ArchiveChange', () => {
 
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map([
-          [
-            'default',
-            makeSpecRepository({
-              specs: [
-                new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
-                new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
-              ],
-            }),
-          ],
-        ]),
+        makeListWorkspaces(
+          new Map([
+            [
+              'default',
+              makeSpecRepository({
+                specs: [
+                  new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
+                  new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+                ],
+              }),
+            ],
+          ]),
+        ),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2884,7 +2907,6 @@ describe('ArchiveChange', () => {
         new Map(),
         [],
         '/project',
-        new Map([['default', { codeRoot: '/project/specs/default', excludePaths: [] }]]),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
@@ -2911,7 +2933,11 @@ describe('ArchiveChange', () => {
       })
       const uc = new ArchiveChange(
         makeChangeRepository([change]),
-        new Map([['default', specRepo]]),
+        makeListWorkspaces(
+          new Map([['default', specRepo]]),
+          new Map(),
+          new Map([['default', '/project/specs/default']]),
+        ),
         makeArchiveRepository(),
         makeRunStepHooks(),
         makeActorResolver(),
@@ -2922,7 +2948,6 @@ describe('ArchiveChange', () => {
         new Map(),
         [],
         '/project',
-        new Map([['default', { codeRoot: '/project/specs/default', excludePaths: [] }]]),
       )
 
       await uc.execute({ name: 'my-change', allowOutOfScope: true })

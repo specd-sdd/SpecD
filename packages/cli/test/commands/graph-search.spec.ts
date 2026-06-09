@@ -38,6 +38,9 @@ function setup() {
   const mockProvider = {
     searchSymbols: vi.fn().mockResolvedValue([]),
     searchSpecs: vi.fn().mockResolvedValue([]),
+    searchDocuments: vi.fn().mockResolvedValue([]),
+    getFile: vi.fn().mockResolvedValue(undefined),
+    getDocument: vi.fn().mockResolvedValue(undefined),
   }
   vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
     await fn(mockProvider as never)
@@ -137,6 +140,51 @@ describe('graph search', () => {
     )
   })
 
+  it('routes document-only search through searchDocuments', async () => {
+    const { mockProvider } = setup()
+
+    const program = makeSearchProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'guide', '--documents'])
+
+    expect(mockProvider.searchDocuments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: 'guide',
+      }),
+    )
+    expect(mockProvider.searchSymbols).not.toHaveBeenCalled()
+    expect(mockProvider.searchSpecs).not.toHaveBeenCalled()
+  })
+
+  it('renders document results in text output', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchDocuments.mockResolvedValue([
+      {
+        document: {
+          path: 'root:docs/guide.md',
+          configRelativePath: 'docs/guide.md',
+          contentHash: 'sha256:doc',
+          content: '# Guide',
+          workspace: 'root',
+        },
+        score: 1000,
+        snippet: '# Guide',
+        startLine: 1,
+        endLine: 1,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'docs/guide.md', '--documents'])
+
+    const out = getStdout()
+    expect(out).toContain('Documents (1 shown, limit 10):')
+    expect(out).toContain('docs/guide.md')
+    expect(out).toContain('snippet @ L1-L1:')
+    expect(out).toContain('>>>')
+    expect(out).toContain('# Guide')
+    expect(out).toContain('<<<')
+  })
+
   it('rejects invalid kind values before querying', async () => {
     const { getStderr, mockProvider } = setup()
 
@@ -181,5 +229,40 @@ describe('graph search', () => {
     }
 
     expect(getStderr()).toContain('--config and --path are mutually exclusive')
+  })
+
+  it('renders normalized symbol snippets in text output', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchSymbols.mockResolvedValue([
+      {
+        symbol: {
+          id: 'core:src/test.ts:fn:foo',
+          name: 'foo',
+          kind: 'function',
+          filePath: 'core:src/test.ts',
+          line: 10,
+          column: 1,
+        },
+        score: 10,
+        snippet: '  function foo() {\n    return 1\n  }',
+        startLine: 8,
+        endLine: 12,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'foo', '--symbols'])
+
+    const out = getStdout()
+    expect(out).toContain('Symbols (1 shown, limit 10):')
+    expect(out).toContain('[core] function foo')
+    expect(out).toContain('src/test.ts:10')
+    expect(out).toContain('snippet @ L8-L12:')
+    expect(out).toContain('>>>')
+    // Normalized: common indent (2 spaces) removed, then margin (6 spaces) added
+    expect(out).toContain('      function foo() {')
+    expect(out).toContain('        return 1')
+    expect(out).toContain('      }')
+    expect(out).toContain('<<<')
   })
 })

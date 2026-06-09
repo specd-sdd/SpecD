@@ -47,10 +47,13 @@ describe('Changes API', () => {
       expect(Array.isArray(data)).toBe(true)
     })
 
-    it('given api server, when GET /archived-changes, then returns archive names', async () => {
-      const { res, data } = await apiJson<Array<{ name: string }>>('/archived-changes')
+    it('given api server, when GET /archived-changes, then returns archive index entries', async () => {
+      const { res, data } = await apiJson<{ items: Array<{ name: string }>; meta: { total: number } }>(
+        '/archived-changes',
+      )
       expect(res.ok).toBe(true)
-      expect(Array.isArray(data)).toBe(true)
+      expect(Array.isArray(data.items)).toBe(true)
+      expect(typeof data.meta.total).toBe('number')
     })
 
     it('given api server, when GET /changes/overlaps, then returns overlap map', async () => {
@@ -249,11 +252,40 @@ describe('Changes API', () => {
       if (archivedChangeName === null) {
         return
       }
-      const { res, data } = await apiJson<{ name: string }>(
+      const { res, data } = await apiJson<{
+        name: string
+        state: string
+        workspaces: string[]
+        artifacts: Array<{ filename: string; type: string; state: string }>
+      }>(
         `/archived-changes/${encodeURIComponent(archivedChangeName)}`,
       )
       expect(res.ok).toBe(true)
       expect(data.name).toBe(archivedChangeName)
+      expect(data.state).toBe('archived')
+      expect(Array.isArray(data.workspaces)).toBe(true)
+      expect(Array.isArray(data.artifacts)).toBe(true)
+      expect(data.artifacts.every((artifact) => artifact.state !== 'missing')).toBe(true)
+    })
+
+    it('given an archived change artifact, when GET /archived-changes/:name/artifacts/:filename, then returns content', async () => {
+      const { archivedChangeName } = await loadProjectSamples()
+      if (archivedChangeName === null) {
+        return
+      }
+      const { data: detail } = await apiJson<{
+        artifacts: Array<{ filename: string }>
+      }>(`/archived-changes/${encodeURIComponent(archivedChangeName)}`)
+      const filename = detail.artifacts[0]?.filename
+      if (filename === undefined) {
+        return
+      }
+      const { res, data } = await apiJson<{ content: string }>(
+        `/archived-changes/${encodeURIComponent(archivedChangeName)}/artifacts/${encodeURIComponent(filename)}`,
+      )
+      expect(res.ok).toBe(true)
+      expect(typeof data.content).toBe('string')
+      expect(data.content.length).toBeGreaterThan(0)
     })
   })
 
@@ -316,6 +348,49 @@ describe('Changes API', () => {
         400,
       )
       expect(body.code).toBe('INVALID_REQUEST')
+    })
+
+    it('given add action without specId, when PATCH implementation-tracking, then returns problem+json', async () => {
+      const { activeChangeName } = await loadProjectSamples()
+      if (activeChangeName === null) {
+        return
+      }
+      const body = await expectProblem(
+        `/changes/${encodeURIComponent(activeChangeName)}/implementation-tracking`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add',
+            file: 'packages/api/src/index.ts',
+          }),
+        },
+        400,
+      )
+      expect(body.code).toBe('INVALID_REQUEST')
+    })
+
+    it('given resolve action, when PATCH implementation-tracking, then returns projection dto', async () => {
+      const { activeChangeName } = await loadProjectSamples()
+      if (activeChangeName === null) {
+        return
+      }
+      const { res, data } = await apiJson<{
+        implementationTracking: {
+          trackedFiles: Array<{ file: string; state: string }>
+          links: unknown[]
+        }
+      }>(`/changes/${encodeURIComponent(activeChangeName)}/implementation-tracking`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'resolve',
+          file: 'packages/api/src/index.ts',
+        }),
+      })
+      expect(res.ok).toBe(true)
+      expect(Array.isArray(data.implementationTracking.trackedFiles)).toBe(true)
+      expect(Array.isArray(data.implementationTracking.links)).toBe(true)
     })
 
     it('given ephemeral change, when POST validate-all, then returns batch DTO', async () => {

@@ -25,6 +25,8 @@ Business rules for lifecycle, validation, approvals, and conflicts MUST live in 
 - `GetImplementationReview`
 - change detail via repository get (metadata only, no artifact bodies inline)
 
+When serving change or read-only artifact lists, the handler MAY combine repository/view metadata with `GetStatus` and active schema metadata in order to expose `hasTasks`, `totalTasks`, and `completedTasks` without duplicating task-completion rules in the UI.
+
 ### Requirement: artifact GET and PUT use dedicated core use cases
 
 For `/changes/{name}/artifacts/{filename}`, `GET` MUST call `GetChangeArtifact` and `PUT` MUST call `SaveChangeArtifact`. For `/drafts/{name}/artifacts/{filename}` and `/discarded/{name}/artifacts/{filename}`, `GET` MUST call `GetReadOnlyChangeArtifact` with the matching `readOnlyOrigin`. The handler MUST NOT call `ChangeRepository.artifact` or `saveArtifact` directly.

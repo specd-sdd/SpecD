@@ -234,17 +234,67 @@ describe('Error cases', () => {
     expect(stderr()).toContain('mutually exclusive')
   })
 
-  it('Error when no flags provided', async () => {
+  it('List all dependencies in the change', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: {
+        name: 'add-auth',
+        specIds: ['auth/login', 'auth/logout'],
+      },
+      specDependsOn: {
+        'auth/login': ['auth/shared'],
+      },
+      artifactStatuses: [],
+      lifecycle: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+    })
+
+    const program = makeProgram()
+    registerChangeDeps(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'deps', 'add-auth'])
+
+    const out = stdout()
+    expect(out).toContain('spec dependencies for change add-auth:')
+    expect(out).toContain('- auth/login: auth/shared')
+    expect(out).toContain('- auth/logout: (none)')
+  })
+
+  it('Display dependencies for a specific spec', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: {
+        name: 'add-auth',
+        specIds: ['auth/login'],
+      },
+      specDependsOn: {
+        'auth/login': ['auth/shared'],
+      },
+      artifactStatuses: [],
+      lifecycle: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+    })
+
+    const program = makeProgram()
+    registerChangeDeps(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'deps', 'add-auth', 'auth/login'])
+
+    const out = stdout()
+    expect(out).toContain('spec dependencies for auth/login in change add-auth:')
+    expect(out).toContain('dependsOn: auth/shared')
+  })
+
+  it('Error when modification flags provided without specId', async () => {
     const { stderr } = setup()
 
     const program = makeProgram()
     registerChangeDeps(program.command('change'))
     await program
-      .parseAsync(['node', 'specd', 'change', 'deps', 'add-auth', 'auth/login'])
+      .parseAsync(['node', 'specd', 'change', 'deps', 'add-auth', '--add', 'auth/shared'])
       .catch(() => {})
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+    expect(stderr()).toContain('require a specId')
   })
 
   it('Error when removing non-existent dep', async () => {

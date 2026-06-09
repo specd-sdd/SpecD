@@ -22,25 +22,5 @@
     "core:spec-lock",
     "default:_global/error-handling-conventions"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChange", "_handleCommitFailure"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/archive-batch-snapshot.ts",
-      "symbols": ["FsArchiveBatchSnapshot"]
-    },
-    {
-      "file": "core:src/composition/use-cases/archive-change.ts",
-      "symbols": ["resolveArchiveBatchSnapshotPort", "buildWorkspaceSpecLayouts"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": ["specsPath"]
-    },
-    {
-      "file": "core:test/application/use-cases/archive-change-batch-restore.spec.ts"
-    }
-  ]
+  "implementation": []
 }

@@ -1,6 +1,7 @@
 {
   "title": "project status command",
   "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.",
+  "dependsOn": ["core:list-workspaces", "core:list-drafts", "core:list-changes"],
   "context": [
     "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information."
   ],
@@ -14,13 +15,13 @@
     {
       "requirement": "includes workspace information",
       "rules": [
-        "The command output MUST include:\n\n- Project root path\n- Schema reference\n- Workspaces: for each, name, prefix, ownership (owned|shared|readOnly), isExternal (boolean), and codeRoot (absolute path)"
+        "The command output MUST include rich workspace information obtained via the `ListWorkspaces` use case:\n\n- Project root path\n- Schema reference\n- Workspaces: for each, name, prefix, ownership (`owned`|`shared`|`readOnly`), `isExternal` (boolean), and `codeRoot` (absolute path)."
       ]
     },
     {
       "requirement": "includes spec counts",
       "rules": [
-        "The command output MUST include:\n\n- Total spec count across all workspaces\n- Spec count per workspace"
+        "The command output MUST include spec counts obtained efficiently through the `SpecRepository.count()` method for each orchestrated workspace:\n\n- Total spec count across all workspaces\n- Spec count per workspace\n\nThe command SHALL NOT load full spec metadata or artifacts to perform this count."
       ]
     },
     {
@@ -86,17 +87,21 @@
     },
     {
       "requirement": "includes workspace information",
-      "name": "Output includes all workspace details",
-      "given": ["a project with multiple workspaces"],
+      "name": "Workspaces obtained from orchestrator",
       "when": ["specd project status is executed"],
-      "then": ["each workspace shows name, prefix, ownership, isExternal status, and codeRoot path"]
+      "then": [
+        "it obtains the list of workspaces via ListWorkspaces",
+        "AND the output includes rich information for each orchestrated workspace"
+      ]
     },
     {
       "requirement": "includes spec counts",
-      "name": "Output includes spec counts per workspace",
-      "given": ["a project with multiple workspaces containing specs"],
-      "when": ["specd project status is run"],
-      "then": ["output includes total spec count and per-workspace counts"]
+      "name": "Spec counts use efficient repository counting",
+      "when": ["specd project status calculates spec counts"],
+      "then": [
+        "it calls SpecRepository.count() for each workspace",
+        "AND it does not perform full metadata extraction"
+      ]
     },
     {
       "requirement": "includes change counts",
@@ -163,11 +168,17 @@
       "then": ["output is TOON-formatted"]
     }
   ],
-  "implementation": {},
-  "contentHashes": {
-    "spec.md": "sha256:2370896d5fd5bdd9615db40383bdad6b9e3c6d635fba4bd8b05507f310688974",
-    "verify.md": "sha256:b9d67e8edc58fbfe9e0bd14f48eea08c8b6750a3ec4d6ea894ed9fa60e91e1c0"
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:project-status",
+        "file": "cli:src/commands/project/status.ts"
+      }
+    ]
   },
-  "generatedBy": "core",
-  "dependsOn": ["core:list-drafts", "core:list-changes"]
+  "contentHashes": {
+    "spec.md": "sha256:8b189fad179f6cc5aec12a3736834a8e2e7954e508747678b584bf4551da7c36",
+    "verify.md": "sha256:884c6455704ee7c66581c8eb12b2343f1b0a29485be33c041fc17c1c05c7d46c"
+  },
+  "generatedBy": "core"
 }

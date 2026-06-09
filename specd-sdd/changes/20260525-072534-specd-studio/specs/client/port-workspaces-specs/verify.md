@@ -10,6 +10,12 @@
 - **THEN** each method maps to documented `/v1` route
 - **AND** types match DTO specs
 
+#### Scenario: getSpecContext returns structured entries
+
+- **WHEN** UI requests spec context through this port
+- **THEN** the returned value exposes `entries[]` and `warnings[]`
+- **AND** entry metadata like `title`, `rules`, `constraints`, `scenarios`, and `optimizedContent` remains addressable by the UI
+
 #### Scenario: List changes hits collection HTTP route
 
 - **WHEN** `listChanges()` is called on remote adapter

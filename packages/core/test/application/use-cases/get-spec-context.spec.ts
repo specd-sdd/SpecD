@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { GetSpecContext } from '../../../src/application/use-cases/get-spec-context.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-import { makeSpecRepository, makeContentHasher } from './helpers.js'
+import { makeSpecRepository, makeContentHasher, makeListWorkspaces } from './helpers.js'
 import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
 
@@ -32,7 +32,7 @@ describe('GetSpecContext', () => {
         'auth/login/.specd-metadata.yaml': metadataContent,
       },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetSpecContext(specRepos, hasher)
     const result = await uc.execute({
@@ -49,7 +49,7 @@ describe('GetSpecContext', () => {
   })
 
   it('throws WorkspaceNotFoundError when workspace not found', async () => {
-    const specRepos = new Map([['default', makeSpecRepository()]])
+    const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
 
     const uc = new GetSpecContext(specRepos, makeContentHasher())
     await expect(
@@ -62,7 +62,7 @@ describe('GetSpecContext', () => {
 
   it('throws SpecNotFoundError when spec not found', async () => {
     const repo = makeSpecRepository({ specs: [] })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetSpecContext(specRepos, makeContentHasher())
     await expect(
@@ -90,7 +90,7 @@ describe('GetSpecContext', () => {
         'auth/login/.specd-metadata.yaml': metadataContent,
       },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetSpecContext(specRepos, makeContentHasher())
     const result = await uc.execute({

@@ -1,10 +1,10 @@
-import type { ArtifactContentDto, CompiledContextDto, SpecDetailDto } from '@specd/client'
+import type { ArtifactContentDto, SpecContextDto, SpecDetailDto } from '@specd/client'
 import * as React from 'react'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
 import { useAsyncResource } from './use-async-resource.js'
 
 /**
- * Loads spec detail, optional artifact body, and compiled context for a workspace path.
+ * Loads spec detail, optional artifact body, and structured spec context for a workspace path.
  */
 export function useSpecRead(
   workspace: string | undefined,
@@ -21,7 +21,7 @@ export function useSpecRead(
 ): {
   detail: ReturnType<typeof useAsyncResource<SpecDetailDto>>
   artifact: ReturnType<typeof useAsyncResource<ArtifactContentDto>>
-  context: ReturnType<typeof useAsyncResource<CompiledContextDto>>
+  context: ReturnType<typeof useAsyncResource<SpecContextDto>>
 } {
   const port = useSpecdDataPort()
   const enabled = Boolean(workspace && specPath)

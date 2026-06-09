@@ -1,4 +1,5 @@
 import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
+import type { GraphSpecCoverageDto } from './dto/graph-spec-coverage.js'
 import type { GraphImpactDto } from './dto/graph-impact.js'
 import type { GraphIndexResultDto } from './dto/graph-index-result.js'
 import type { GraphSearchResultDto } from './dto/graph-search.js'
@@ -16,6 +17,6 @@ export interface PortGraph {
     workspace: string,
     specPath: string,
     signal?: AbortSignal,
-  ): Promise<Record<string, unknown>>
+  ): Promise<GraphSpecCoverageDto>
   getChangeGraphView(name: string, signal?: AbortSignal): Promise<ChangeGraphViewDto>
 }

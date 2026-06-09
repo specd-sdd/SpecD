@@ -4,10 +4,22 @@
 
 ### Requirement: Template source location
 
-#### Scenario: Templates remain frontmatter-free
+#### Scenario: Templates use markdown template extension
 
-- **WHEN** markdown files under `packages/skills/templates/<skill-name>/` are inspected
-- **THEN** they do not contain YAML frontmatter blocks
+- **WHEN** files under `packages/skills/templates/<skill-name>/` are inspected
+- **THEN** template source files end with `.md.tpl`
+- **AND** they do not use plain `.md` as the source template extension
+
+#### Scenario: Skill directories declare metadata
+
+- **WHEN** a skill template directory is inspected
+- **THEN** it contains `skill.meta.json`
+
+#### Scenario: Rendered install files drop the template suffix
+
+- **GIVEN** a skill template source file named `SKILL.md.tpl`
+- **WHEN** `@specd/skills` resolves the install bundle
+- **THEN** the emitted bundle filename is `SKILL.md`
 
 ### Requirement: Template migration
 
@@ -15,7 +27,52 @@
 
 - **WHEN** the template source directory is validated
 - **THEN** it contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`
-- **AND** it contains `shared.md`
+- **AND** it contains `shared/` for shared template source files
+
+#### Scenario: Shared consumer index is no longer authoritative
+
+- **WHEN** shared template ownership is reviewed
+- **THEN** `shared.meta.json` is not the source of truth for which skills require shared templates
+
+### Requirement: Skill template metadata contract
+
+#### Scenario: skill.meta.json declares supported, required, and shared requirements
+
+- **WHEN** a `skill.meta.json` file is inspected
+- **THEN** it declares `supportedCapabilities`
+- **AND** it declares `requiredCapabilities`
+- **AND** it declares `requiredSharedTemplates`
+
+#### Scenario: Initial capability catalogue is declared by the contract
+
+- **WHEN** the skill metadata contract is reviewed
+- **THEN** the initial required capability identifiers are `mcp`, `agents`, and `frontmatter`
+
+### Requirement: Capability-aware install-time rendering
+
+#### Scenario: Templates branch on provided capability identifiers
+
+- **GIVEN** install-time render context includes capability identifiers for a target runtime
+- **WHEN** a skill template uses a conditional block based on those capabilities
+- **THEN** `@specd/skills` renders the branch that matches the provided capability identifiers
+
+#### Scenario: Shared references use sharedFolder variable syntax
+
+- **WHEN** a template references a shared template path
+- **THEN** it uses the form `@{{sharedFolder}}/shared.md`
+
+#### Scenario: Templates do not render absolute shared paths
+
+- **WHEN** installed markdown is reviewed
+- **THEN** shared template references remain relative to the project root
+- **AND** they do not contain absolute filesystem paths
+
+#### Scenario: Frontmatter capability controls frontmatter insertion
+
+- **GIVEN** a template contains a frontmatter insertion point
+- **AND** `variables.frontmatter` is present
+- **WHEN** install-time rendering runs with `frontmatter` enabled
+- **THEN** the final frontmatter block is inserted
 
 ### Requirement: Graph impact terminology in workflow templates
 
@@ -51,13 +108,25 @@
 - **THEN** each model is derived from canonical skill metadata and the corresponding vendor documentation
 - **AND** field definitions match the documented runtime contracts
 
+#### Scenario: Plugins provide structured values instead of prebuilt YAML
+
+- **WHEN** an agent plugin prepares install-time frontmatter input for `@specd/skills`
+- **THEN** it passes a structured value collection
+- **AND** it does not pass a prebuilt YAML frontmatter document
+
 ### Requirement: Frontmatter injection
 
 #### Scenario: Injection filters by target runtime support
 
 - **WHEN** an agent plugin installs skills
-- **THEN** it prepends frontmatter using only fields supported by that runtime
+- **THEN** the final rendered markdown includes only fields supported by that runtime
 - **AND** unsupported fields are excluded from emitted markdown files
+
+#### Scenario: Shared files do not receive runtime frontmatter
+
+- **GIVEN** a resolved bundle includes files marked as shared
+- **WHEN** `@specd/skills` renders the install output
+- **THEN** shared files are emitted without runtime skill frontmatter
 
 ### Requirement: Agent frontmatter matrix
 
@@ -70,11 +139,12 @@
 
 ### Requirement: Why no frontmatter in skills package
 
-#### Scenario: Runtime-specific metadata stays in plugins
+#### Scenario: Runtime-specific metadata stays value-driven
 
 - **WHEN** shared skill templates and installed skill outputs are compared
-- **THEN** templates remain runtime-agnostic without frontmatter
-- **AND** runtime-specific frontmatter is injected by the target agent plugin during install
+- **THEN** templates remain free of static runtime-specific frontmatter blocks
+- **AND** runtime-specific values come from the target agent plugin
+- **AND** the final frontmatter block is composed during skills rendering
 
 ### Requirement: Implementation tracking instructions in templates
 

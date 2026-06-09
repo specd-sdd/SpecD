@@ -1,3 +1,5 @@
+import type { ArtifactListEntryDto } from './artifact-list.js'
+
 /** History event on {@link ChangeDetailDto}. */
 export interface ChangeHistoryEventDto {
   readonly type: string
@@ -29,4 +31,8 @@ export interface ChangeDetailDto {
     readonly archivedAt: string
     readonly artifactTypes: readonly string[]
   }
+  /** Present on archived change detail snapshots. */
+  readonly workspaces?: readonly string[]
+  /** Present on archived change detail snapshots. */
+  readonly artifacts?: readonly ArtifactListEntryDto[]
 }

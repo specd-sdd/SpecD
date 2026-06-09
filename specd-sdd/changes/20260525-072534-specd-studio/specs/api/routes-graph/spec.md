@@ -20,15 +20,41 @@ When the request body includes `force: true`, the handler MUST recreate persiste
 
 `POST /v1/graph/index` MUST accept only the documented body shape `{ force?: boolean }`. Unknown properties such as `workspaces` MUST be rejected with HTTP 400 `application/problem+json` and code `INVALID_REQUEST`.
 
+### Requirement: graph index preparation mirrors the CLI assembly flow
+
+Before invoking the provider index operation, the API MUST assemble index input the same way the current CLI does:
+
+- obtain orchestrated workspaces from `kernel.project.listWorkspaces.execute()`
+- derive effective graph config from project `SpecdConfig`
+- pass that assembled project-level input into the code-graph provider
+
+The API MUST NOT maintain a separate legacy workspace-target bootstrap path that can drift from CLI behavior.
+
 ### Requirement: search impact and hotspots mirror CLI graph commands
 
 `GET /v1/graph/search`, `/graph/impact`, and `/graph/hotspots` MUST accept the same query parameters as the CLI graph commands and return presenter-mapped DTOs.
+
+For graph search, the API MUST support at least:
+
+- `q`
+- `workspace`
+- `kinds`
+- `filePattern`
+- `excludePaths`
+- `excludeWorkspaces`
+- `symbols`
+- `specs`
+- `limit`
+
+For graph impact, the API MUST support `symbol`, `file`, and `spec` selectors, matching the CLI capability surface.
+
+For graph impact, the API MUST surface aggregate blast-radius metrics, affected spec ids, affected files, and per-symbol traversal `depth` from the underlying graph result.
 
 ### Requirement: graph-route inputs are schema-validated
 
 Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.
 
-Search queries MUST require `q`. Impact queries MUST require exactly one of `symbol` or `file`, and `direction` / `depth` MUST reject values outside the documented contract. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
+Search queries MUST require `q`. Impact queries MUST require exactly one of `symbol`, `file`, or `spec`, and `direction` / `depth` MUST reject values outside the documented contract. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.
 
 ### Requirement: spec and change linkage endpoints compose graph with spec scope
 

@@ -34,6 +34,12 @@
 - **WHEN** `execute({ workspaces: [] })` is called
 - **THEN** entries from both workspaces are returned
 
+#### Scenario: ListSpecs uses orchestrated project structure
+
+- **WHEN** `ListSpecs.execute()` is called
+- **THEN** it obtains the list of workspaces via the `ListWorkspaces` orchestrator
+- **AND** it enumerates all specs through the provided repository instances
+
 ### Requirement: Always resolve a title for each entry
 
 #### Scenario: Title from metadata

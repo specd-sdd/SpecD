@@ -24,18 +24,13 @@ specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 
 The command:
 
-1. Validates that `--config` and `--path` are not both present
-2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
-3. Creates a `CodeGraphProvider` from the resolved graph context
-4. Opens the provider
-5. Calls `getStatistics()` to retrieve the `GraphStatistics` object
-6. Resolves the current VCS ref via `createVcsAdapter(projectRoot)` and `vcs.ref()`. If VCS detection fails or `ref()` throws, `currentRef` is `null`.
-7. Compares `currentRef` against `statistics.lastIndexedRef` to determine staleness
-8. Outputs the statistics with staleness information
-9. Closes the provider
-10. Exits with `process.exit(0)` — required because the LadybugDB native addon keeps the Node process alive
-
-In bootstrap mode, the command SHALL behave as if there were a single `default` workspace whose `codeRoot` is the resolved VCS root.
+1. Resolves graph context.
+2. In configured mode, obtains the orchestrated project structure via `ListWorkspaces`.
+3. Uses the orchestrated list together with the effective graph discovery configuration to determine the project fingerprint and compare it against the graph store's metadata.
+4. Creates, opens, and queries the `CodeGraphProvider`.
+5. Resolves the current VCS ref and compares it against `statistics.lastIndexedRef` to determine staleness.
+6. Outputs the statistics.
+7. Closes the provider and exits.
 
 ### Requirement: Concurrent indexing guard
 
@@ -49,8 +44,9 @@ This guard exists so the command does not surface backend lock failures opportun
 
 In `text` mode (default), the output is a labelled summary:
 
-```
+```text
 Files:     459
+Documents: 18
 Symbols:   1497
 Specs:     122
 Languages: javascript, typescript
@@ -60,23 +56,24 @@ Relations:
 Last indexed: 2026-03-14T10:38:30.178Z
 ```
 
-- `Files`, `Symbols`, `Specs` show `fileCount`, `symbolCount`, `specCount`
+- `Files`, `Documents`, `Symbols`, `Specs` show `fileCount`, `documentCount`, `symbolCount`, `specCount`
 - `Languages` shows the `languages` array joined by `, `
 - `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line
 - `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp
 
 If the graph is stale, a warning line SHALL be appended after `Last indexed`:
 
-```
+```text
 ⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)
 ```
 
 Where `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.
 
-In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with two additional fields:
+In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with three additional fields:
 
 - `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown
 - `currentRef: string | null` — the current VCS ref, or `null` if unavailable
+- `fingerprintMismatch: boolean | null` — `true` when the stored derivation fingerprint differs from the current effective graph configuration, `false` when it matches, `null` when the comparison cannot be computed
 
 ### Requirement: Error cases
 
@@ -121,7 +118,8 @@ Last indexed: 2026-03-13T09:00:00.000Z
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, GraphStatistics
-- [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md) — staleness semantics, warn-not-block policy
+- [`cli:entrypoint`](../entrypoint/spec.md)
+- [`core:config`](../../core/config/spec.md)
+- [`code-graph:composition`](../../code-graph/composition/spec.md)
+- [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md)

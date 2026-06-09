@@ -27,13 +27,13 @@ export async function loadProjectSamples(): Promise<ProjectSamples> {
     'architecture/spec'
 
   const { data: changes } = await apiJson<Array<{ name: string }>>('/changes')
-  const { data: archived } = await apiJson<Array<{ name: string }>>('/archived-changes')
+  const { data: archived } = await apiJson<{ items: Array<{ name: string }> }>('/archived-changes')
 
   cached = {
     workspace,
     specPath,
     activeChangeName: changes[0]?.name ?? null,
-    archivedChangeName: archived[0]?.name ?? null,
+    archivedChangeName: archived.items[0]?.name ?? null,
   }
   return cached
 }

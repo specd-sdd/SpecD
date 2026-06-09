@@ -21,10 +21,6 @@ Business rules for lifecycle, validation, approvals, and conflicts MUST live in 
 - `kernel.changes.listArchived`
 - `DetectOverlap`
 
-### Requirement: artifact GET and PUT use dedicated core use cases
-
-For `/changes/{name}/artifacts/{filename}`, `GET` MUST call `GetChangeArtifact` and `PUT` MUST call `SaveChangeArtifact`. The handler MUST NOT call `ChangeRepository.artifact` or `saveArtifact` directly.
-
 ### Requirement: successful responses use presenters and DTO wire shapes
 
 Successful responses MUST be produced by the matching `api:presenter-*` module and conform to the corresponding `api:dto-*` spec.
@@ -33,9 +29,9 @@ Successful responses MUST be produced by the matching `api:presenter-*` module a
 
 Thrown kernel errors and validation failures MUST be converted through `api:problem-json` to `application/problem+json` responses with appropriate HTTP status codes.
 
-### Requirement: mutations pass the request-scoped actor into kernel
+### Requirement: archived list serializes list-result structure instead of legacy arrays
 
-Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field.
+When mapping `kernel.changes.listArchived`, the handler MUST preserve the split `items/meta` shape introduced by the merged archive index contract. It MUST NOT flatten archive rows into a bare array that loses pagination metadata.
 
 ## Constraints
 

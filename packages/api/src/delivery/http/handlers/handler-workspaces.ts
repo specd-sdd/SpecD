@@ -12,15 +12,19 @@ export function registerWorkspacesRoutes(app: FastifyInstance): void {
   app.get(
     '/workspaces',
     { ...apiRouteSchema({ response: { 200: 'WorkspaceList' } }) },
-    apiHandler((ctx) => {
-      const workspaces: WorkspaceDto[] = ctx.config.workspaces.map((w) => ({
-        name: w.name,
-        ...(w.prefix !== undefined ? { prefix: w.prefix } : {}),
-        ...(w.ownership !== undefined ? { ownership: w.ownership } : {}),
-        specsPath: w.specsPath,
-        codeRoots: [w.codeRoot],
-      }))
-      return Promise.resolve(workspaces)
+    apiHandler(async (ctx) => {
+      const workspaces = await ctx.kernel.project.listWorkspaces.execute()
+      const descriptors = new Map(ctx.config.workspaces.map((workspace) => [workspace.name, workspace]))
+      return workspaces.map((workspace): WorkspaceDto => {
+        const descriptor = descriptors.get(workspace.name)
+        return {
+          name: workspace.name,
+          ...(descriptor?.prefix !== undefined ? { prefix: descriptor.prefix } : {}),
+          ownership: workspace.ownership,
+          specsPath: descriptor?.specsPath ?? '',
+          codeRoots: [workspace.codeRoot],
+        }
+      })
     }),
   )
 

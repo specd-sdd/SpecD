@@ -51,6 +51,8 @@ workspaces:
         - .nuxt/
         - packages/
         - apps/
+        - specs/
+        - specd-sdd/
 
   core:
     specs:
@@ -155,6 +157,9 @@ workspaces:
         path: specs/public-web
     codeRoot: apps/public-web
     ownership: owned
+    graph:
+      excludePaths:
+        - '*'
 
   api:
     specs:

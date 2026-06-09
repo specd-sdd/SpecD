@@ -21,9 +21,13 @@ export function registerArchiveShow(parent: Command): void {
 JSON/TOON output schema:
   {
     name: string
-    state: "archivable"
+    description?: string
+    state: string
+    archivedAt: string
+    archivedBy?: { name: string, email: string }
     specIds: string[]
-    schema: { name: string, version: string }
+    schema: { name: string, version: number }
+    artifacts: string[]
   }
 `,
     )
@@ -33,22 +37,40 @@ JSON/TOON output schema:
         const archived = await kernel.changes.getArchived.execute({ name })
         const fmt = parseFormat(opts.format)
         const specIds = [...archived.specIds]
+        const artifactTypes = [...archived.artifacts.keys()]
 
         if (fmt === 'text') {
           const lines = [
-            `name:    ${archived.name}`,
-            `state:   archivable`,
-            `specs:   ${specIds.join(', ') || '(none)'}`,
-            `schema:  ${archived.schemaName}@${archived.schemaVersion}`,
+            `name:        ${archived.name}`,
+            ...(archived.description ? [`description: ${archived.description}`] : []),
+            `state:       ${archived.state}`,
+            `archivedAt:  ${archived.archivedAt.toISOString()}`,
+            ...(archived.archivedBy
+              ? [`archivedBy:  ${archived.archivedBy.name} <${archived.archivedBy.email}>`]
+              : []),
+            `specs:       ${specIds.join(', ') || '(none)'}`,
+            `schema:      ${archived.schemaName}@${archived.schemaVersion}`,
+            `artifacts:   ${artifactTypes.join(', ') || '(none)'}`,
           ]
           output(lines.join('\n'), 'text')
         } else {
           output(
             {
               name: archived.name,
-              state: 'archivable',
+              ...(archived.description ? { description: archived.description } : {}),
+              state: archived.state,
+              archivedAt: archived.archivedAt.toISOString(),
+              ...(archived.archivedBy
+                ? {
+                    archivedBy: {
+                      name: archived.archivedBy.name,
+                      email: archived.archivedBy.email,
+                    },
+                  }
+                : {}),
               specIds,
               schema: { name: archived.schemaName, version: archived.schemaVersion },
+              artifacts: artifactTypes,
             },
             fmt,
           )

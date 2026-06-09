@@ -1,7 +1,13 @@
 {
   "title": "List Specs",
   "description": "Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It supports optional workspace filtering so callers can restrict results to one or more named workspaces. It is the primary query for discovery UIs and CLI listing commands.",
-  "dependsOn": ["core:spec-metadata", "core:content-extraction", "core:storage", "core:workspace"],
+  "dependsOn": [
+    "core:spec-metadata",
+    "core:content-extraction",
+    "core:storage",
+    "core:workspace",
+    "core:list-workspaces"
+  ],
   "context": [
     "Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It supports optional workspace filtering so callers can restrict results to one or more named workspaces. It is the primary query for discovery UIs and CLI listing commands."
   ],
@@ -9,7 +15,7 @@
     {
       "requirement": "Enumerate specs across all workspaces",
       "rules": [
-        "`ListSpecs.execute()` SHALL iterate every configured workspace in declaration order and call `SpecRepository.list()` on each. The returned `SpecListEntry[]` MUST preserve workspace declaration order, with specs within each workspace ordered by repository order.\n\nWhen `options.workspaces` is provided as a non-empty array of workspace names, only entries belonging to those workspaces SHALL be included. Workspace names that do not match any configured workspace SHALL be silently ignored (no error, no warning). When `options.workspaces` is omitted or empty, all configured workspaces are included."
+        "`ListSpecs.execute()` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities to enumerate all specs across all configured workspaces.\n\nThe returned `SpecListEntry[]` MUST preserve the workspace order and spec repository order. Workspace filtering SHALL be performed by matching workspace names against the orchestrated list."
       ]
     },
     {
@@ -44,10 +50,9 @@
     }
   ],
   "constraints": [
-    "The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories.",
-    "The use case defaults includeSummary and includeMetadataStatus to false when the options object or individual flags are not provided.",
-    "Title and description values from metadata MUST be trimmed before use; empty-after-trim values MUST be treated as absent.",
-    "Workspace filtering is performed at the use-case level; individual SpecRepository.list() calls are not affected by the filter."
+    "The use case MUST NOT modify the repositories.",
+    "It SHALL depend on ListWorkspaces for consistent project traversal.",
+    "Title and description values MUST be trimmed before use."
   ],
   "scenarios": [
     {
@@ -84,6 +89,15 @@
       "given": ["specs exist in workspaces alpha and beta"],
       "when": ["execute({ workspaces: [] }) is called"],
       "then": ["entries from both workspaces are returned"]
+    },
+    {
+      "requirement": "Enumerate specs across all workspaces",
+      "name": "ListSpecs uses orchestrated project structure",
+      "when": ["ListSpecs.execute() is called"],
+      "then": [
+        "it obtains the list of workspaces via the ListWorkspaces orchestrator",
+        "AND it enumerates all specs through the provided repository instances"
+      ]
     },
     {
       "requirement": "Always resolve a title for each entry",
@@ -200,9 +214,18 @@
       "then": ["entries may contain summary and metadataStatus in addition to required fields"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:list-specs",
+        "file": "core:src/application/use-cases/list-specs.ts",
+        "symbol": "ListSpecs"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:9c918b01b56918de6b1ec5636aea7983d87a2ca60abd2108c9a2b634d694a80a",
-    "verify.md": "sha256:3cd734966ab1aff5b166aacea31cd6913a8261fcd84e894ce330780a7b00c47c"
+    "spec.md": "sha256:f3dc9f6d7df93b016c9b2dc9c626346ae6de89d76eb5f66e395175eb991ebd35",
+    "verify.md": "sha256:b395fba595928634da16c247b8eb85b6d2109b4a6dea7bb6835f98674a396620"
   },
   "generatedBy": "core"
 }

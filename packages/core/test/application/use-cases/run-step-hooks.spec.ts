@@ -85,7 +85,7 @@ describe('RunStepHooks', () => {
     })
 
     it('throws SchemaMismatchError when schema name does not match change schema name', async () => {
-      const change = makeChange('my-change', { schemaName: 'alpha-schema' })
+      const change = makeChange('my-change', {}, 'alpha-schema')
       const schema = makeSchema({ name: 'beta-schema' })
       const uc = makeUseCase({
         changes: makeChangeRepository([change]),
@@ -678,7 +678,7 @@ describe('RunStepHooks', () => {
       ).rejects.toThrow(ChangeNotFoundError)
     })
 
-it('builds template variables from ArchivedChange properties', async () => {
+    it('builds template variables from ArchivedChange properties', async () => {
       const archived = makeArchivedChange('my-change', { specIds: ['core:test'] })
       let capturedVars: unknown = null
       const hookRunner = {

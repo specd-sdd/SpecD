@@ -1,0 +1,89 @@
+{
+  "title": "core:project-metadata",
+  "description": "Project-level context can be large and benefit from LLM optimization. To avoid repeated manual assembly and allow for efficient agent consumption, we need a dedicated storage and schema for project-level metadata. The `project-metadata.json` file stores optimized context alongside freshness hashes to ensure the cached content remains valid as the project configuration or included specs change.",
+  "dependsOn": ["core:config"],
+  "context": [
+    "Project-level context can be large and benefit from LLM optimization. To avoid repeated manual assembly and allow for efficient agent consumption, we need a dedicated storage and schema for project-level metadata. The `project-metadata.json` file stores optimized context alongside freshness hashes to ensure the cached content remains valid as the project configuration or included specs change."
+  ],
+  "rules": [
+    {
+      "requirement": "Persistence location",
+      "rules": [
+        "Project metadata SHALL be stored in a file named `project-metadata.json` within the resolved `configPath` of the project."
+      ]
+    },
+    {
+      "requirement": "Data schema",
+      "rules": [
+        "The file SHALL use a structured schema containing:\n\n- `version`: schema versioning\n- `optimized`: a block containing LLM-generated content (e.g., `context`)\n- `freshness`: a block containing SHA-256 hashes of all inputs used to generate the optimized content\n- `generated`: timestamp and metadata about the generation event"
+      ]
+    },
+    {
+      "requirement": "Input tracking",
+      "rules": [
+        "The `freshness` block SHALL track:\n\n- The hash of the `specd.yaml` configuration file\n- The hashes of any `contextFiles` referenced in the configuration\n- The metadata hashes of all specs included in the project context"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Persistence location",
+      "name": "Saved in configPath",
+      "when": ["project metadata is saved"],
+      "then": ["it is written to {resolvedConfigPath}/project-metadata.json"]
+    },
+    {
+      "requirement": "Data schema",
+      "name": "Schema validation",
+      "given": ["a project metadata file"],
+      "then": ["it MUST match the versioned schema with optimized, freshness, and generated blocks"]
+    },
+    {
+      "requirement": "Input tracking",
+      "name": "Tracks all dependencies",
+      "when": ["freshness hashes are computed"],
+      "then": [
+        "they include specd.yaml, all context files, and metadata hashes of all resolved project context specs"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:project-metadata",
+        "file": "core:src/domain/services/project-metadata.ts",
+        "symbol": "projectMetadataSchema"
+      },
+      {
+        "specId": "core:project-metadata",
+        "file": "core:src/domain/services/project-metadata.ts",
+        "symbol": "ProjectMetadata"
+      },
+      {
+        "specId": "core:project-metadata",
+        "file": "core:src/domain/services/project-metadata.ts",
+        "symbol": "updateProjectMetadataSchema"
+      },
+      {
+        "specId": "core:project-metadata",
+        "file": "core:src/domain/services/project-metadata.ts",
+        "symbol": "UpdateProjectMetadataPayload"
+      },
+      {
+        "specId": "core:project-metadata",
+        "file": "core:src/application/use-cases/get-project-metadata.ts",
+        "symbol": "GetProjectMetadata"
+      },
+      {
+        "specId": "core:project-metadata",
+        "file": "core:src/application/use-cases/get-project-metadata.ts",
+        "symbol": "GetProjectMetadataResult"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:caec1b1681691d9fb27f5e43ec489afe21dfac7ef91f2c85e322282c0ee0f6c2",
+    "verify.md": "sha256:25b7c1235a9c8b88a713b0f76e478ae67b72103ad1c4e7af45e6fe7360dda674"
+  },
+  "generatedBy": "core"
+}

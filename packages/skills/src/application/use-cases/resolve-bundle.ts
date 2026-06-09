@@ -1,5 +1,7 @@
 import type { SpecdConfig } from '@specd/core'
 import type { SkillBundle } from '../../domain/skill-bundle.js'
+import type { SkillTemplateContext } from '../../domain/template-context.js'
+import { resolveSharedFolder, toRelativeProjectPath } from '../../domain/shared-folder.js'
 import type { SkillRepository } from '../ports/skill-repository.js'
 
 /**
@@ -17,9 +19,9 @@ export interface ResolveBundleInput {
   readonly config?: SpecdConfig
 
   /**
-   * Optional placeholder-substitution variables.
+   * Optional install-time render context.
    */
-  readonly variables?: Readonly<Record<string, string>>
+  readonly context?: SkillTemplateContext
 }
 
 /**
@@ -50,18 +52,32 @@ export class ResolveBundle {
    * @returns Resolved bundle.
    */
   async execute(input: ResolveBundleInput): Promise<ResolveBundleOutput> {
-    let variables = input.variables ?? {}
+    let variables = input.context?.variables ?? {}
 
     if (input.config) {
+      const safeConfigPath = toRelativeProjectPath(
+        input.config.projectRoot,
+        input.config.configPath,
+      )
+      const resolvedSharedFolder = resolveSharedFolder(
+        input.config.projectRoot,
+        input.config.configPath,
+        typeof variables['sharedFolder'] === 'string' ? variables['sharedFolder'] : undefined,
+      )
       variables = {
-        projectRoot: input.config.projectRoot,
-        configPath: input.config.configPath,
+        configPath: safeConfigPath,
         schemaRef: input.config.schemaRef,
         ...variables,
+        sharedFolder: resolvedSharedFolder.relativePath,
       }
     }
 
-    const bundle = this.repository.getBundle(input.name, variables, input.config)
+    const mergedContext: SkillTemplateContext = {
+      variables,
+      capabilities: input.context?.capabilities ?? [],
+    }
+
+    const bundle = this.repository.getBundle(input.name, mergedContext)
     return { bundle }
   }
 }

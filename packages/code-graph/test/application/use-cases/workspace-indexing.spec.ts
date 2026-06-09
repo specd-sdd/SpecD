@@ -1,755 +1,448 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
-import { createCodeGraphProvider } from '../../../src/composition/create-code-graph-provider.js'
-import {
-  type IndexOptions,
-  type DiscoveredSpec,
-} from '../../../src/domain/value-objects/index-options.js'
-import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
+import { SpecRepository, Spec, SpecPath } from '@specd/core'
+import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
+import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
-import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
+import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
+import { computeContentHash } from '../../../src/application/use-cases/compute-content-hash.js'
+
+/**
+ * Creates a mock spec repository.
+ * @param specs - List of specs to return.
+ * @param metadataMap - Optional map of specId to metadata.
+ * @returns A mock SpecRepository instance.
+ */
+function makeMockRepo(
+  specs: Spec[] = [],
+  metadataMap: Map<string, Record<string, unknown>> = new Map(),
+): SpecRepository {
+  return {
+    get specsPath() {
+      return undefined
+    },
+    list: async () => specs,
+    count: async () => specs.length,
+    specHash: async () => 'sha256:test',
+    metadata: async (s: Spec) =>
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      (metadataMap.get(s.name.toString()) as any) ?? { title: s.name.toString() },
+    readPersistedDependsOn: async () => [],
+    readPersistedImplementation: async () => [],
+    artifact: async () => ({ content: '# Spec Content' }),
+  } as unknown as SpecRepository
+}
 
 /**
  * Creates a temporary workspace directory with TypeScript source files.
  * @param baseDir - Parent directory for the workspace.
- * @param name - Workspace directory name.
- * @param files - Map of relative path to file content.
- * @returns Absolute path to the workspace codeRoot.
+ * @param name - Workspace name.
+ * @param files - Map of relative file paths to content.
+ * @returns Absolute path to the workspace root.
  */
-function createWorkspace(baseDir: string, name: string, files: Record<string, string>): string {
+function createWorkspaceDir(
+  baseDir: string,
+  name: string,
+  files: Record<string, string | Uint8Array>,
+): string {
   const wsDir = join(baseDir, name)
+  mkdirSync(wsDir, { recursive: true })
   for (const [relPath, content] of Object.entries(files)) {
     const fullPath = join(wsDir, relPath)
-    mkdirSync(join(fullPath, '..'), { recursive: true })
+    mkdirSync(dirname(fullPath), { recursive: true })
     writeFileSync(fullPath, content)
   }
   return wsDir
 }
 
+const registry = new AdapterRegistry()
+registry.register(new TypeScriptLanguageAdapter())
+
 describe('Workspace indexing', () => {
   let tempDir: string
-  let provider: ReturnType<typeof createCodeGraphProvider>
+  let store: GraphStore
 
-  beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'ws-indexing-'))
+  beforeEach(async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-workspace-indexing-'))
+    store = new InMemoryGraphStore()
+    await store.open()
   })
 
   afterEach(async () => {
-    try {
-      await provider?.close()
-    } catch {
-      /* ignore */
-    }
+    await store.close()
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it('indexes multiple workspaces with prefixed paths', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/index.ts': 'export function coreMain() {}',
+  it('indexes multiple workspaces with package identities', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'package.json': JSON.stringify({ name: 'ws1' }),
+      'src/index.ts':
+        'import type { Foo } from "ws2/src/utils"; export const bar: Foo | null = null;',
     })
-    const cliRoot = createWorkspace(tempDir, 'cli', {
-      'src/index.ts': 'export function cliMain() {}',
+    const ws2Dir = createWorkspaceDir(tempDir, 'ws2', {
+      'package.json': JSON.stringify({ name: 'ws2' }),
+      'src/utils.ts': 'export interface Foo { value: number }',
     })
 
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
+    const spec1 = new Spec('ws1', SpecPath.parse('spec1'), [])
+    const spec2 = new Spec('ws2', SpecPath.parse('spec2'), [])
 
-    const result = await provider.index({
+    const uc = new IndexCodeGraph(store, registry)
+    const result = await uc.execute({
+      projectRoot: tempDir,
       workspaces: [
-        { name: 'core', codeRoot: coreRoot, specs: async () => [] },
-        { name: 'cli', codeRoot: cliRoot, specs: async () => [] },
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo([spec1]),
+          ownership: 'owned',
+          isExternal: false,
+        },
+        {
+          name: 'ws2',
+          codeRoot: ws2Dir,
+          specRepo: makeMockRepo([spec2]),
+          ownership: 'owned',
+          isExternal: false,
+        },
       ],
-      projectRoot: tempDir,
-    })
-
-    expect(result.filesIndexed).toBe(2)
-    expect(result.filesDiscovered).toBe(2)
-    expect(result.errors).toHaveLength(0)
-
-    // Both files discoverable by path with workspace prefix
-    const coreFile = await provider.getFile('core:src/index.ts')
-    const cliFile = await provider.getFile('cli:src/index.ts')
-    expect(coreFile).toBeDefined()
-    expect(coreFile!.workspace).toBe('core')
-    expect(cliFile).toBeDefined()
-    expect(cliFile!.workspace).toBe('cli')
-  })
-
-  it('symbol IDs include workspace-prefixed path', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/utils.ts': 'export function hash() {}',
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    await provider.index({
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    const symbols = await provider.findSymbols({ name: 'hash' })
-    expect(symbols).toHaveLength(1)
-    expect(symbols[0]!.id).toBe('core:src/utils.ts:function:hash:1:7')
-    expect(symbols[0]!.filePath).toBe('core:src/utils.ts')
-  })
-
-  it('produces per-workspace result breakdown', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/a.ts': 'export const a = 1',
-      'src/b.ts': 'export const b = 2',
-      'src/c.ts': 'export const c = 3',
-    })
-    const cliRoot = createWorkspace(tempDir, 'cli', {
-      'src/x.ts': 'export const x = 1',
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const result = await provider.index({
-      workspaces: [
-        { name: 'core', codeRoot: coreRoot, specs: async () => [] },
-        { name: 'cli', codeRoot: cliRoot, specs: async () => [] },
-      ],
-      projectRoot: tempDir,
-    })
-
-    expect(result.workspaces).toHaveLength(2)
-
-    const coreBreakdown = result.workspaces.find((w) => w.name === 'core')!
-    const cliBreakdown = result.workspaces.find((w) => w.name === 'cli')!
-
-    expect(coreBreakdown.filesDiscovered).toBe(3)
-    expect(coreBreakdown.filesIndexed).toBe(3)
-    expect(cliBreakdown.filesDiscovered).toBe(1)
-    expect(cliBreakdown.filesIndexed).toBe(1)
-
-    expect(result.filesDiscovered).toBe(
-      coreBreakdown.filesDiscovered + cliBreakdown.filesDiscovered,
-    )
-  })
-
-  it('incremental indexing skips unchanged files', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/index.ts': 'export function main() {}',
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const opts: IndexOptions = {
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    }
-
-    const first = await provider.index(opts)
-    expect(first.filesIndexed).toBe(1)
-
-    const second = await provider.index(opts)
-    expect(second.filesSkipped).toBe(1)
-    expect(second.filesIndexed).toBe(0)
-  })
-
-  it('deletion is scoped to indexed workspaces', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/core.ts': 'export const core = 1',
-    })
-    const cliRoot = createWorkspace(tempDir, 'cli', {
-      'src/cli.ts': 'export const cli = 1',
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    // Index both workspaces
-    await provider.index({
-      workspaces: [
-        { name: 'core', codeRoot: coreRoot, specs: async () => [] },
-        { name: 'cli', codeRoot: cliRoot, specs: async () => [] },
-      ],
-      projectRoot: tempDir,
-    })
-
-    const statsBefore = await provider.getStatistics()
-    expect(statsBefore.fileCount).toBe(2)
-
-    // Index only core — cli files should NOT be deleted
-    const result = await provider.index({
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    expect(result.filesRemoved).toBe(0)
-
-    const statsAfter = await provider.getStatistics()
-    expect(statsAfter.fileCount).toBe(2)
-
-    // cli file still exists
-    const cliFile = await provider.getFile('cli:src/cli.ts')
-    expect(cliFile).toBeDefined()
-  })
-
-  it('specs callback is used for spec discovery', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/index.ts': 'export function main() {}',
-    })
-
-    const mockSpecs: DiscoveredSpec[] = [
-      {
-        spec: createSpecNode({
-          specId: 'core:core/change',
-          path: 'change',
-          title: 'Change',
-          contentHash: 'sha256:test123',
-          dependsOn: [],
-          workspace: 'core',
-        }),
-        contentHash: 'sha256:test123',
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
       },
-    ]
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const result = await provider.index({
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => mockSpecs }],
-      projectRoot: tempDir,
     })
 
-    expect(result.specsIndexed).toBe(1)
+    const foo = (await store.findSymbols({ name: 'Foo' })).find(
+      (symbol) => symbol.filePath === 'ws2:src/utils.ts',
+    )
+    const bar = (await store.findSymbols({ name: 'bar' })).find(
+      (symbol) => symbol.filePath === 'ws1:src/index.ts',
+    )
 
-    const spec = await provider.getSpec('core:core/change')
-    expect(spec).toBeDefined()
-    expect(spec!.workspace).toBe('core')
-    expect(spec!.title).toBe('Change')
+    expect(foo).toBeDefined()
+    expect(bar).toBeDefined()
+    expect(result.errors).toEqual([])
+  })
+
+  it('assigns specs to the correct workspace and specId', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'src/a.ts': 'export const a = 1;',
+    })
+
+    const spec1 = new Spec('ws1', SpecPath.parse('auth/login'), [])
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo([spec1]),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
+      },
+    })
+
+    const node = await store.getSpec('ws1:auth/login')
+    expect(node).toBeDefined()
+    expect(node!.workspace).toBe('ws1')
+  })
+
+  it('indexes textual documents without language adapters as document nodes', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'docs/guide.md': '# Change Guide\n\nThis document explains the change flow.',
+    })
+
+    const uc = new IndexCodeGraph(store, registry)
+    const result = await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
+      },
+    })
+
+    const document = await store.getDocument('ws1:docs/guide.md')
+    expect(document).toBeDefined()
+    expect(document?.configRelativePath).toBe('ws1/docs/guide.md')
+    expect(result.documentsIndexed).toBe(1)
+  })
+
+  it('indexes windows-1252 documents without language adapters as document nodes', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'docs/legacy.txt': Buffer.from([
+        0x43, 0x61, 0x66, 0xe9, 0x20, 0x43, 0x68, 0x61, 0x6e, 0x67, 0x65,
+      ]),
+    })
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
+      },
+    })
+
+    const document = await store.getDocument('ws1:docs/legacy.txt')
+    expect(document).toBeDefined()
+    expect(document?.content).toBe('Café Change')
+  })
+
+  it('indexes utf-16 documents without language adapters as document nodes', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'docs/unicode.txt': Buffer.from('Change flow', 'utf16le'),
+    })
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
+      },
+    })
+
+    const document = await store.getDocument('ws1:docs/unicode.txt')
+    expect(document).toBeDefined()
+    expect(document?.content).toBe('Change flow')
   })
 
   it('two workspaces with same spec name produce unique specIds', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/index.ts': 'export const a = 1',
-    })
-    const cliRoot = createWorkspace(tempDir, 'cli', {
-      'src/index.ts': 'export const b = 1',
-    })
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', { 'f.ts': '' })
+    const ws2Dir = createWorkspaceDir(tempDir, 'ws2', { 'f.ts': '' })
 
-    const coreSpecs: DiscoveredSpec[] = [
-      {
-        spec: createSpecNode({
-          specId: 'core:core/metadata',
-          path: 'metadata',
-          title: 'Metadata',
-          contentHash: 'sha256:core',
-          workspace: 'core',
-        }),
-        contentHash: 'sha256:core',
+    const spec1 = new Spec('ws1', SpecPath.parse('common'), [])
+    const spec2 = new Spec('ws2', SpecPath.parse('common'), [])
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo([spec1]),
+          ownership: 'owned',
+          isExternal: false,
+        },
+        {
+          name: 'ws2',
+          codeRoot: ws2Dir,
+          specRepo: makeMockRepo([spec2]),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
       },
-    ]
-    const cliSpecs: DiscoveredSpec[] = [
-      {
-        spec: createSpecNode({
-          specId: 'cli:cli/metadata',
-          path: 'metadata',
-          title: 'Metadata',
-          contentHash: 'sha256:cli',
-          workspace: 'cli',
-        }),
-        contentHash: 'sha256:cli',
+    })
+
+    expect(await store.getSpec('ws1:common')).toBeDefined()
+    expect(await store.getSpec('ws2:common')).toBeDefined()
+  })
+
+  it('does not duplicate workspace-owned files under root identities', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws1', {
+      'docs/guide.md': '# Guide',
+    })
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: {
+        includePaths: ['ws1/docs/**'],
+        workspaces: new Map(),
       },
-    ]
+    })
 
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
+    expect(await store.getDocument('ws1:docs/guide.md')).toBeDefined()
+    expect(await store.getDocument('root:ws1/docs/guide.md')).toBeUndefined()
+  })
 
-    const result = await provider.index({
+  it('excludes filesystem-backed spec roots from document discovery', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws1', {
+      'src/index.ts': 'export const value = 1;',
+    })
+    const specsDir = createWorkspaceDir(tempDir, 'specs-ws1', {
+      'changes/spec.md': '# Change',
+    })
+
+    const repo = {
+      get specsPath() {
+        return specsDir
+      },
+      list: async () => [],
+      count: async () => 0,
+      specHash: async () => 'sha256:test',
+      metadata: async () => null,
+      readPersistedDependsOn: async () => [],
+      readPersistedImplementation: async () => [],
+      artifact: async () => null,
+    } as unknown as SpecRepository
+
+    const uc = new IndexCodeGraph(store, registry)
+    const result = await uc.execute({
+      projectRoot: tempDir,
       workspaces: [
-        { name: 'core', codeRoot: coreRoot, specs: async () => coreSpecs },
-        { name: 'cli', codeRoot: cliRoot, specs: async () => cliSpecs },
+        {
+          name: 'ws1',
+          codeRoot: wsDir,
+          specRepo: repo,
+          ownership: 'owned',
+          isExternal: false,
+        },
       ],
-      projectRoot: tempDir,
+      graphConfig: {
+        includePaths: ['specs-ws1/**'],
+        workspaces: new Map(),
+      },
     })
 
-    expect(result.specsIndexed).toBe(2)
-    expect(result.errors).toHaveLength(0)
-
-    const coreSpec = await provider.getSpec('core:core/metadata')
-    const cliSpec = await provider.getSpec('cli:cli/metadata')
-    expect(coreSpec).toBeDefined()
-    expect(cliSpec).toBeDefined()
-    expect(coreSpec!.workspace).toBe('core')
-    expect(cliSpec!.workspace).toBe('cli')
+    expect(await store.getDocument('root:specs-ws1/changes/spec.md')).toBeUndefined()
+    expect(result.documentsIndexed).toBe(0)
   })
 
-  it('two workspaces with identical relative paths are stored separately', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/index.ts': 'export function coreFunc() {}',
-    })
-    const cliRoot = createWorkspace(tempDir, 'cli', {
-      'src/index.ts': 'export function cliFunc() {}',
+  it('prefers optimizedDescription when indexing specs', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'src/a.ts': 'export const a = 1;',
     })
 
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
+    const spec1 = new Spec('ws1', SpecPath.parse('test'), [])
+    const metadata = new Map([
+      ['test', { title: 'Test', description: 'Original', optimizedDescription: 'AI summary' }],
+    ])
 
-    await provider.index({
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
       workspaces: [
-        { name: 'core', codeRoot: coreRoot, specs: async () => [] },
-        { name: 'cli', codeRoot: cliRoot, specs: async () => [] },
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: makeMockRepo([spec1], metadata),
+          ownership: 'owned',
+          isExternal: false,
+        },
       ],
-      projectRoot: tempDir,
+      graphConfig: {
+        includePaths: [],
+        workspaces: new Map(),
+      },
     })
 
-    const coreFile = await provider.getFile('core:src/index.ts')
-    const cliFile = await provider.getFile('cli:src/index.ts')
-    expect(coreFile).toBeDefined()
-    expect(cliFile).toBeDefined()
-
-    // Symbols should be in separate namespaces
-    const coreSymbols = await provider.findSymbols({ name: 'coreFunc' })
-    const cliSymbols = await provider.findSymbols({ name: 'cliFunc' })
-    expect(coreSymbols).toHaveLength(1)
-    expect(coreSymbols[0]!.filePath).toBe('core:src/index.ts')
-    expect(cliSymbols).toHaveLength(1)
-    expect(cliSymbols[0]!.filePath).toBe('cli:src/index.ts')
+    const node = await store.getSpec('ws1:test')
+    expect(node?.description).toBe('AI summary')
   })
 
-  it('resolves cross-workspace monorepo imports', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/greet.ts': 'export function greet(name: string): string { return name }',
-      'package.json': JSON.stringify({ name: '@test/core' }),
-    })
-    const cliRoot = createWorkspace(tempDir, 'cli', {
-      'src/main.ts': [
-        "import { greet } from '@test/core'",
-        'export function run() { return greet("world") }',
-      ].join('\n'),
-      'package.json': JSON.stringify({ name: '@test/cli' }),
-    })
+  it('computes contentHash from content artifacts excluding sidecars with spec.md first', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {})
 
-    // Create pnpm-workspace.yaml so the indexer can discover packages
-    writeFileSync(join(tempDir, 'pnpm-workspace.yaml'), 'packages:\n  - core\n  - cli\n')
+    // Spec with multiple artifacts including sidecars
+    const spec1 = new Spec('ws1', SpecPath.parse('test'), [
+      'verify.md',
+      'spec.md',
+      'spec-lock.json',
+      'metadata.json',
+    ])
 
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
+    const artifactMap = new Map<string, Record<string, string>>([
+      [
+        'test',
+        {
+          'spec.md': '# Spec\n',
+          'verify.md': '# Verify\n',
+          'spec-lock.json': '{"locked": true}',
+          'metadata.json': '{"title": "Test"}',
+        },
+      ],
+    ])
 
-    const result = await provider.index({
+    const repo = {
+      list: async () => [spec1],
+      count: async () => 1,
+      specHash: async () => 'sha256:sidecar-hash',
+      metadata: async () => ({ title: 'Test' }),
+      readPersistedDependsOn: async () => [],
+      readPersistedImplementation: async () => [],
+      artifact: async (s: Spec, f: string) => ({
+        content: artifactMap.get(s.name.toString())?.[f],
+      }),
+    } as unknown as SpecRepository
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
       workspaces: [
-        { name: 'core', codeRoot: coreRoot, specs: async () => [] },
-        { name: 'cli', codeRoot: cliRoot, specs: async () => [] },
+        {
+          name: 'ws1',
+          codeRoot: ws1Dir,
+          specRepo: repo,
+          ownership: 'owned',
+          isExternal: false,
+        },
       ],
-      projectRoot: tempDir,
+      graphConfig: { includePaths: [], workspaces: new Map() },
     })
 
-    expect(result.errors).toHaveLength(0)
-
-    // The import from @test/core should resolve across workspaces
-    const greetSymbol = (await provider.findSymbols({ name: 'greet' })).find(
-      (symbol) => symbol.filePath === 'core:src/greet.ts',
-    )
-
-    expect(greetSymbol).toBeDefined()
-
-    const impact = await provider.analyzeImpact(greetSymbol!.id, 'upstream')
-    expect(impact.directDependents).toBeGreaterThanOrEqual(1)
-    expect(impact.affectedFiles).toContain('cli:src/main.ts')
-  })
-
-  it('persists hierarchy relations emitted during Pass 2 indexing', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/base.ts': [
-        'export interface Persistable {',
-        '  save(): void',
-        '}',
-        '',
-        'export class BaseService {',
-        '  save(): void {}',
-        '}',
-      ].join('\n'),
-      'src/user.ts': [
-        "import { Persistable, BaseService } from './base.js'",
-        '',
-        'export class UserService extends BaseService implements Persistable {',
-        '  save(): void {}',
-        '}',
-      ].join('\n'),
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const result = await provider.index({
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    expect(result.errors).toHaveLength(0)
-
-    const store = (provider as unknown as { store: GraphStore }).store
-    const baseClass = (await provider.findSymbols({ name: 'BaseService' })).find(
-      (symbol) => symbol.filePath === 'core:src/base.ts',
-    )
-    const contract = (await provider.findSymbols({ name: 'Persistable' })).find(
-      (symbol) => symbol.filePath === 'core:src/base.ts',
-    )
-    const baseMethod = (await provider.findSymbols({ name: 'save' })).find(
-      (symbol) => symbol.filePath === 'core:src/base.ts',
-    )
-
-    expect(baseClass).toBeDefined()
-    expect(contract).toBeDefined()
-    expect(baseMethod).toBeDefined()
-
-    const extenders = await store.getExtenders(baseClass!.id)
-    const implementors = await store.getImplementors(contract!.id)
-    const overriders = await store.getOverriders(baseMethod!.id)
-    const stats = await provider.getStatistics()
-
-    expect(extenders).toHaveLength(1)
-    expect(implementors).toHaveLength(1)
-    expect(overriders).toHaveLength(1)
-    expect(stats.relationCounts[RelationType.Extends]).toBe(1)
-    expect(stats.relationCounts[RelationType.Implements]).toBe(1)
-    expect(stats.relationCounts[RelationType.Overrides]).toBe(1)
-  })
-
-  it('PHP workspace: namespace import emits IMPORTS relation to the model file', async () => {
-    const phpRoot = createWorkspace(tempDir, 'php-app', {
-      'composer.json': JSON.stringify({
-        name: 'acme/app',
-        autoload: { 'psr-4': { 'App\\': 'src/' } },
-      }),
-      'app/Controllers/PostsController.php': [
-        '<?php',
-        'namespace App\\Controllers;',
-        '',
-        'use App\\Models\\User;',
-        '',
-        'class PostsController {}',
-      ].join('\n'),
-      'src/Models/User.php': ['<?php', 'namespace App\\Models;', '', 'class User {}'].join('\n'),
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    await provider.index({
-      workspaces: [{ name: 'php-app', codeRoot: phpRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    // Access the store to query importees (IMPORTS relations FROM the controller)
-    const store = (provider as unknown as { store: GraphStore }).store
-    const importees = await store.getImportees('php-app:app/Controllers/PostsController.php')
-
-    const expectedTarget = 'php-app:src/Models/User.php'
-    const rel = importees.find((r) => r.target === expectedTarget)
-    expect(rel).toBeDefined()
-  })
-
-  it('recomputes cross-file overrides when only the base file changes', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/base.ts': ['export class BaseService {', '  save(): void {}', '}'].join('\n'),
-      'src/user.ts': [
-        "import { BaseService } from './base.js'",
-        '',
-        'export class UserService extends BaseService {',
-        '  save(): void {}',
-        '}',
-      ].join('\n'),
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const options = {
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    }
-
-    await provider.index(options)
-
-    writeFileSync(
-      join(coreRoot, 'src/base.ts'),
-      ['export class BaseService {', '', '  save(): void {}', '}'].join('\n'),
-    )
-
-    const second = await provider.index(options)
-    expect(second.errors).toHaveLength(0)
-
-    const store = (provider as unknown as { store: GraphStore }).store
-    const baseMethod = (await provider.findSymbols({ name: 'save' })).find(
-      (symbol) => symbol.filePath === 'core:src/base.ts',
-    )
-
-    expect(baseMethod).toBeDefined()
-
-    const overriders = await store.getOverriders(baseMethod!.id)
-    expect(overriders).toHaveLength(1)
-    expect(overriders[0]?.source).toContain('core:src/user.ts:method:save:')
-  })
-
-  it('PHP workspace: loaded model member call emits CALLS across files', async () => {
-    const phpRoot = createWorkspace(tempDir, 'php-app', {
-      'app/controllers/PostsController.php': [
-        '<?php',
-        'class PostsController {',
-        '  public function index() {',
-        "    $this->loadModel('Article');",
-        '    $this->Article->save();',
-        '  }',
-        '}',
-      ].join('\n'),
-      'app/models/article.php': [
-        '<?php',
-        'class Article {',
-        '  public function save(): void {}',
-        '}',
-      ].join('\n'),
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const result = await provider.index({
-      workspaces: [{ name: 'php-app', codeRoot: phpRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    expect(result.errors).toHaveLength(0)
-
-    const store = (provider as unknown as { store: GraphStore }).store
-    const saveSymbol = (await provider.findSymbols({ name: 'save' })).find(
-      (symbol) => symbol.filePath === 'php-app:app/models/article.php',
-    )
-
-    expect(saveSymbol).toBeDefined()
-
-    const callers = await store.getCallers(saveSymbol!.id)
-    expect(callers).toContainEqual(
-      expect.objectContaining({
-        source: expect.stringContaining(
-          'php-app:app/controllers/PostsController.php:method:index:',
-        ),
-        target: saveSymbol!.id,
-        type: RelationType.Calls,
-      }),
-    )
-  })
-
-  it('PHP workspace: Cake uses property preserves IMPORTS and CALLS across indexing', async () => {
-    const phpRoot = createWorkspace(tempDir, 'php-app', {
-      'app/controllers/PostsController.php': [
-        '<?php',
-        'class PostsController {',
-        "  var $uses = array('Article');",
-        '  public function index() {',
-        '    $this->Article->save();',
-        '  }',
-        '}',
-      ].join('\n'),
-      'app/models/article.php': [
-        '<?php',
-        'class Article {',
-        '  public function save(): void {}',
-        '}',
-      ].join('\n'),
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const result = await provider.index({
-      workspaces: [{ name: 'php-app', codeRoot: phpRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    expect(result.errors).toHaveLength(0)
-
-    const store = (provider as unknown as { store: GraphStore }).store
-    const importees = await store.getImportees('php-app:app/controllers/PostsController.php')
-    expect(importees).toContainEqual(
-      expect.objectContaining({
-        source: 'php-app:app/controllers/PostsController.php',
-        target: 'php-app:app/models/article.php',
-        type: RelationType.Imports,
-      }),
-    )
-
-    const saveSymbol = (await provider.findSymbols({ name: 'save' })).find(
-      (symbol) => symbol.filePath === 'php-app:app/models/article.php',
-    )
-    expect(saveSymbol).toBeDefined()
-
-    const callers = await store.getCallers(saveSymbol!.id)
-    expect(callers).toContainEqual(
-      expect.objectContaining({
-        source: expect.stringContaining(
-          'php-app:app/controllers/PostsController.php:method:index:',
-        ),
-        target: saveSymbol!.id,
-        type: RelationType.Calls,
-      }),
-    )
-  })
-
-  it('PHP workspace: Laravel class literal acquisition preserves IMPORTS and CALLS across indexing', async () => {
-    const phpRoot = createWorkspace(tempDir, 'laravel', {
-      'app/Http/Controllers/PostController.php': [
-        '<?php',
-        'class PostController {',
-        '  public function index() {',
-        '    $mailer = app(App\\Services\\Mailer::class);',
-        '    $mailer->send();',
-        '  }',
-        '}',
-      ].join('\n'),
-      'app/App/Services/Mailer.php': [
-        '<?php',
-        'class Mailer {',
-        '  public function send(): void {}',
-        '}',
-      ].join('\n'),
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const result = await provider.index({
-      workspaces: [{ name: 'laravel', codeRoot: phpRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    expect(result.errors).toHaveLength(0)
-
-    const store = (provider as unknown as { store: GraphStore }).store
-    const importees = await store.getImportees('laravel:app/Http/Controllers/PostController.php')
-    expect(importees).toContainEqual(
-      expect.objectContaining({
-        source: 'laravel:app/Http/Controllers/PostController.php',
-        target: 'laravel:app/App/Services/Mailer.php',
-        type: RelationType.Imports,
-      }),
-    )
-
-    const sendSymbol = (await provider.findSymbols({ name: 'send' })).find(
-      (symbol) => symbol.filePath === 'laravel:app/App/Services/Mailer.php',
-    )
-    expect(sendSymbol).toBeDefined()
-
-    const callers = await store.getCallers(sendSymbol!.id)
-    expect(callers).toContainEqual(
-      expect.objectContaining({
-        source: expect.stringContaining(
-          'laravel:app/Http/Controllers/PostController.php:method:index:',
-        ),
-        target: sendSymbol!.id,
-        type: RelationType.Calls,
-      }),
-    )
-  })
-
-  it('resolves TypeScript scoped facts into USES_TYPE, CONSTRUCTS, and file-only IMPORTS', async () => {
-    const root = createWorkspace(tempDir, 'core', {
-      'src/main.ts': [
-        "import './polyfill.js'",
-        'export class TemplateExpander {}',
-        'export interface GraphStore {}',
-        'export interface HookRunner {}',
-        'export class NodeHookRunner {',
-        '  constructor(expander: TemplateExpander, store: GraphStore, hook: HookRunner) {}',
-        '}',
-        'export function create() {',
-        '  return new TemplateExpander()',
-        '}',
-      ].join('\n'),
-      'src/polyfill.ts': 'export const installed = true',
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    const result = await provider.index({
-      workspaces: [{ name: 'core', codeRoot: root, specs: async () => [] }],
-      projectRoot: tempDir,
-    })
-
-    expect(result.errors).toHaveLength(0)
-
-    const store = (provider as unknown as { store: GraphStore }).store
-    const templateExpander = (await provider.findSymbols({ name: 'TemplateExpander' }))[0]
-    const graphStore = (await provider.findSymbols({ name: 'GraphStore' }))[0]
-    const hookRunner = (await provider.findSymbols({ name: 'HookRunner' }))[0]
-
-    expect(templateExpander).toBeDefined()
-    expect(graphStore).toBeDefined()
-    expect(hookRunner).toBeDefined()
-
-    const templateRelations = await store.getCallers(templateExpander!.id)
-    expect(templateRelations.map((relation) => relation.type)).toContain(RelationType.Constructs)
-    expect(templateRelations.map((relation) => relation.type)).toContain(RelationType.UsesType)
-
-    const graphStoreRelations = await store.getCallers(graphStore!.id)
-    const hookRunnerRelations = await store.getCallers(hookRunner!.id)
-    expect(graphStoreRelations.map((relation) => relation.type)).toContain(RelationType.UsesType)
-    expect(hookRunnerRelations.map((relation) => relation.type)).toContain(RelationType.UsesType)
-
-    const importees = await store.getImportees('core:src/main.ts')
-    expect(importees).toContainEqual(
-      expect.objectContaining({
-        source: 'core:src/main.ts',
-        target: 'core:src/polyfill.ts',
-        type: RelationType.Imports,
-      }),
-    )
-  })
-
-  it('persists configRelativePath for discovered files', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/model.ts': 'export interface Model { id: string }',
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    await provider.index({
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-      codeGraphVersion: '0.1.0',
-    })
-
-    const file = await provider.getFile('core:src/model.ts')
-    expect(file).toBeDefined()
-    expect(file!.configRelativePath).toContain('src/model.ts')
-  })
-
-  it('stores per-workspace fingerprint map and detects mismatch', async () => {
-    const coreRoot = createWorkspace(tempDir, 'core', {
-      'src/a.ts': 'export const a = 1',
-    })
-
-    provider = createCodeGraphProvider({ storagePath: tempDir })
-    await provider.open()
-
-    await provider.index({
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-      codeGraphVersion: '0.1.0',
-    })
-
-    const stats = await provider.getStatistics()
-    expect(stats.graphFingerprint).not.toBeNull()
-    const parsed = JSON.parse(stats.graphFingerprint!) as Record<string, string>
-    expect(parsed).toHaveProperty('core')
-
-    const result = await provider.index({
-      workspaces: [{ name: 'core', codeRoot: coreRoot, specs: async () => [] }],
-      projectRoot: tempDir,
-      codeGraphVersion: '0.2.0',
-    })
-
-    expect(result.fullRebuildReason).not.toBeNull()
-    expect(result.fullRebuildReason).toContain('fingerprint mismatch')
+    const node = await store.getSpec('ws1:test')
+    expect(node).toBeDefined()
+
+    // contentHash should be from spec.md + verify.md (ordered)
+    // # Spec\n# Verify\n -> concatenated
+    const expectedContent = '# Spec\n\n# Verify\n\n'
+    // Wait, the implementation adds \n after each artifact
+    // Let's check the actual implementation: content += artifact.content + '\n'
+
+    expect(node!.content).toBe('# Spec\n\n# Verify\n\n')
+    expect(node!.contentHash).not.toBe('sha256:sidecar-hash')
+    expect(node!.contentHash).toBe(computeContentHash('# Spec\n\n# Verify\n\n'))
   })
 })

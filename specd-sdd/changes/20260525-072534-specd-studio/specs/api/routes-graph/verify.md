@@ -63,11 +63,19 @@
 - **THEN** request rejected or queued
 - **AND** corrupt index not written
 
+### Requirement: graph index preparation mirrors the CLI assembly flow
+
+#### Scenario: Index preparation uses orchestrated workspaces and project graph config
+
+- **WHEN** `POST /v1/graph/index` prepares provider input
+- **THEN** workspaces come from `ListWorkspaces`
+- **AND** effective graph config is assembled before indexing
+
 ### Requirement: search impact and hotspots mirror CLI graph commands
 
 #### Scenario: Search endpoint accepts CLI-equivalent query
 
-- **WHEN** `POST /v1/graph/search` with symbol query
+- **WHEN** `GET /v1/graph/search` with symbol query and graph filters
 - **THEN** results match `specd graph search` shape
 - **AND** BM25 ordering preserved
 
@@ -76,6 +84,18 @@
 - **WHEN** impact endpoint called with dependents direction
 - **THEN** dependent symbols returned
 - **AND** same filters as CLI
+
+#### Scenario: Search result includes snippet and line range
+
+- **WHEN** graph search returns hits
+- **THEN** each hit includes preview `snippet`
+- **AND** `startLine` and `endLine` identify the matched range
+
+#### Scenario: Impact result includes traversal depth and aggregate metrics
+
+- **WHEN** graph impact returns affected symbols
+- **THEN** each symbol includes `depth`
+- **AND** the response includes risk level, dependency counts, affected specs, and affected files
 
 #### Scenario: Hotspots endpoint exposes risk tiers
 
@@ -87,10 +107,16 @@
 
 #### Scenario: Impact rejects missing selector
 
-- **WHEN** client calls `GET /v1/graph/impact` without `symbol` or `file`
+- **WHEN** client calls `GET /v1/graph/impact` without `symbol`, `file`, or `spec`
 - **THEN** HTTP 400 is returned
 - **AND** body is `application/problem+json`
 - **AND** code is `INVALID_REQUEST`
+
+#### Scenario: Spec impact selector is accepted
+
+- **WHEN** client calls `GET /v1/graph/impact?spec=core:change&direction=dependents`
+- **THEN** the route resolves spec impact
+- **AND** the response uses the shared graph impact DTO
 
 #### Scenario: Impact rejects unsupported direction
 

@@ -2,18 +2,23 @@ import type {
   ChangeDetailDto,
   ChangeHistoryEventDto,
   ChangeStatusDto,
+  GraphFileRefDto,
+  GraphSymbolRefDto,
 } from '@specd/client'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import * as React from 'react'
 import { cn } from '../lib/cn.js'
-import type { ChangeListSection } from './change-list-section.js'
-import { useChangeArtifact } from '../hooks/use-change-artifact.js'
+import type { ChangeReadSection } from '../lib/change-read-routes.js'
+import { useChangeArtifacts } from '../hooks/use-change-artifact.js'
 import { formatChangeArtifactError } from '../lib/change-read-routes.js'
 import { useChangeContext } from '../hooks/use-change-context.js'
 import { useChangeGraphView } from '../hooks/use-change-graph-view.js'
 import { useImplementationReview } from '../hooks/use-implementation-review.js'
 import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
+import { useChangeArtifactList } from '../hooks/use-change-artifact-list.js'
 import { buildImpactViewModel, type ImpactSpecTracked } from './merge-impact-view.js'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 function formatHistoryActor(by: ChangeHistoryEventDto['by']): string {
   if (by === undefined) return ''
@@ -120,24 +125,101 @@ export function ChangeTasksTab({
   changeName,
   listSection = null,
   status,
+  artifactItems,
   refreshKey,
   tabActive,
 }: {
   changeName: string
-  listSection?: ChangeListSection | null
-  status: ChangeStatusDto | undefined
+  listSection?: ChangeReadSection
+  status?: ChangeStatusDto | undefined
+  artifactItems?: readonly {
+    readonly filename: string
+    readonly type: string
+    readonly hasTasks?: boolean
+    readonly totalTasks?: number
+    readonly completedTasks?: number
+    readonly state: string
+    readonly displayStatus: string
+  }[]
   refreshKey: number
   tabActive: boolean
 }): React.ReactElement {
   const pollKey = useTabScopedPollKey(tabActive, refreshKey)
-  const tasksEntry = status?.artifacts?.find((a) => a.type === 'tasks')
+  const readOnlyTaskArtifacts = useChangeArtifactList(
+    artifactItems === undefined && listSection !== null ? changeName : undefined,
+    pollKey,
+    {
+      poll: tabActive,
+      listSection,
+    },
+  )
+  const readOnlyTaskItems = artifactItems ?? readOnlyTaskArtifacts.items
+  const taskSummary = React.useMemo(() => {
+    if (typeof status?.totalTasks === 'number') {
+      return {
+        totalTasks: status.totalTasks,
+        completedTasks: status.completedTasks ?? 0,
+      }
+    }
+    const byType = new Map<string, { totalTasks: number; completedTasks: number }>()
+    for (const item of readOnlyTaskItems) {
+      if (!item.hasTasks || typeof item.totalTasks !== 'number') continue
+      const type = item.type ?? 'tasks'
+      if (byType.has(type)) continue
+      byType.set(type, {
+        totalTasks: item.totalTasks,
+        completedTasks: item.completedTasks ?? 0,
+      })
+    }
+    if (byType.size === 0) return undefined
+    return [...byType.values()].reduce(
+      (acc, entry) => ({
+        totalTasks: acc.totalTasks + entry.totalTasks,
+        completedTasks: acc.completedTasks + entry.completedTasks,
+      }),
+      { totalTasks: 0, completedTasks: 0 },
+    )
+  }, [readOnlyTaskItems, status?.completedTasks, status?.totalTasks])
+  const statusTaskArtifacts = status?.artifacts?.filter((a) => a.hasTasks) ?? []
+  const tasksEntry =
+    statusTaskArtifacts.length > 0
+      ? {
+          type: statusTaskArtifacts[0]?.type ?? 'tasks',
+          hasTasks: true,
+          state: statusTaskArtifacts.some((a) => a.state !== 'missing') ? 'complete' : 'missing',
+          displayStatus: statusTaskArtifacts.some((a) => a.displayStatus !== 'missing')
+            ? 'complete'
+            : 'missing',
+          files: statusTaskArtifacts.flatMap((artifact) => artifact.files),
+        }
+      :
+    (readOnlyTaskItems.length > 0
+      ? {
+          type: readOnlyTaskItems.find((a) => a.hasTasks)?.type ?? 'tasks',
+          hasTasks: readOnlyTaskItems.some((a) => a.hasTasks),
+          state: readOnlyTaskItems.some((a) => a.hasTasks) ? 'complete' : 'missing',
+          displayStatus: readOnlyTaskItems.some((a) => a.hasTasks) ? 'complete' : 'missing',
+          files: readOnlyTaskItems
+            .filter((a) => a.hasTasks)
+            .map((a) => ({
+              key: a.filename,
+              filename: a.filename,
+              state: a.state ?? 'missing',
+              hasDrift: false,
+              displayStatus: a.displayStatus ?? (a.state ?? 'missing'),
+            })),
+        }
+      : undefined)
+  const selectedTaskFiles = tasksEntry?.files
+    .filter((f) => f.state !== 'missing')
+    .map((f) => f.filename) ?? []
   const tasksFileReady =
     tasksEntry !== undefined &&
     tasksEntry.state !== 'missing' &&
     tasksEntry.displayStatus !== 'missing' &&
     tasksEntry.files.some((f) => f.state !== 'missing')
 
-  const tasksArtifact = useChangeArtifact(changeName, 'tasks.md', pollKey, {
+  const tasksArtifacts = useChangeArtifacts(changeName, selectedTaskFiles, pollKey, {
     poll: tabActive,
     listSection,
     enabled: tasksFileReady,
@@ -154,6 +236,14 @@ export function ChangeTasksTab({
             Status: <span className="text-foreground">{tasksEntry.displayStatus}</span>
             {' · '}
             {tasksEntry.files.length} file(s)
+            {taskSummary !== undefined ? (
+              <>
+                {' · '}
+                <span className="text-foreground">
+                  {taskSummary.completedTasks}/{taskSummary.totalTasks} tasks complete
+                </span>
+              </>
+            ) : null}
           </p>
           <ul className="mt-2 space-y-0.5 font-mono text-muted-foreground">
             {tasksEntry.files.map((f) => (
@@ -166,23 +256,38 @@ export function ChangeTasksTab({
         </section>
       ) : null}
 
-      {tasksArtifact.isLoading && !tasksArtifact.data ? (
-        <div className="text-muted-foreground">Loading tasks.md…</div>
+      {tasksArtifacts.isLoading && !tasksArtifacts.data ? (
+        <div className="text-muted-foreground">Loading tasks artifact…</div>
       ) : !tasksFileReady ? (
-        <p className="text-muted-foreground">No tasks.md for this change yet.</p>
-      ) : tasksArtifact.error ? (
+        <p className="text-muted-foreground">No task-capable artifact for this change yet.</p>
+      ) : tasksArtifacts.error ? (
         <div className="text-destructive">
-          {formatChangeArtifactError(tasksArtifact.error, {
+          {formatChangeArtifactError(tasksArtifacts.error, {
             changeName,
-            filename: 'tasks.md',
+            filename: selectedTaskFiles[0] ?? 'tasks',
           })}
         </div>
-      ) : tasksArtifact.data?.content ? (
-        <pre className="studio-card overflow-auto whitespace-pre-wrap p-3 font-mono text-xs text-foreground/90">
-          {tasksArtifact.data.content}
-        </pre>
+      ) : tasksArtifacts.data && tasksArtifacts.data.length > 0 ? (
+        <div className="space-y-3">
+          {tasksArtifacts.data.map((artifact) => (
+            <section key={artifact.filename} className="studio-card overflow-hidden">
+              <header className="border-b border-border/60 bg-background/40 px-3 py-2 font-mono text-[11px] text-foreground">
+                {artifact.filename}
+              </header>
+              {artifact.filename.endsWith('.md') ? (
+                <div className="studio-markdown-preview max-w-none px-3 py-3 text-sm text-foreground">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <pre className="overflow-auto whitespace-pre-wrap p-3 font-mono text-xs text-foreground/90">
+                  {artifact.content}
+                </pre>
+              )}
+            </section>
+          ))}
+        </div>
       ) : (
-        <p className="text-muted-foreground">No tasks.md for this change yet.</p>
+        <p className="text-muted-foreground">No task-capable artifact for this change yet.</p>
       )}
     </div>
   )
@@ -267,6 +372,14 @@ function TrackedFileList({
       ))}
     </ul>
   )
+}
+
+function formatGraphFileRef(file: GraphFileRefDto): string {
+  return `${file.workspace}:${file.workspaceRelativePath}`
+}
+
+function formatGraphSymbolRef(symbol: GraphSymbolRefDto): string {
+  return `${symbol.name} (${symbol.kind})`
 }
 
 export function ChangeImpactTab({
@@ -358,9 +471,14 @@ export function ChangeImpactTab({
                       {row.graphFiles.length > 0 || row.graphSymbols.length > 0 ? (
                         <p className="mt-1 text-[10px] text-muted-foreground">
                           <span className="text-foreground/80">Graph: </span>
-                          {row.graphFiles.length > 0 ? row.graphFiles.join(', ') : null}
+                          {row.graphFiles.length > 0
+                            ? row.graphFiles.map(formatGraphFileRef).join(', ')
+                            : null}
                           {row.graphSymbols.length > 0
-                            ? `${row.graphFiles.length > 0 ? ' · ' : ''}${row.graphSymbols.slice(0, 12).join(', ')}${row.graphSymbols.length > 12 ? ` (+${row.graphSymbols.length - 12})` : ''}`
+                            ? `${row.graphFiles.length > 0 ? ' · ' : ''}${row.graphSymbols
+                                .slice(0, 12)
+                                .map(formatGraphSymbolRef)
+                                .join(', ')}${row.graphSymbols.length > 12 ? ` (+${row.graphSymbols.length - 12})` : ''}`
                             : null}
                         </p>
                       ) : (
@@ -374,25 +492,28 @@ export function ChangeImpactTab({
               {(group.graphOnlyFiles.length > 0 || group.graphOnlySymbols.length > 0) ? (
                 <ImpactSubsection
                   title="Graph (not linked)"
-                  count={group.graphOnlyFiles.length}
+                  count={group.graphOnlySymbols.length + group.graphOnlyFiles.length}
                   empty=""
                 >
-                  {group.graphOnlyFiles.length > 0 ? (
-                    <ul className="max-h-24 space-y-0.5 overflow-auto font-mono text-[10px] text-muted-foreground">
-                      {group.graphOnlyFiles.map((f) => (
-                        <li key={f} className="truncate">
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
                   {group.graphOnlySymbols.length > 0 ? (
                     <p className="mt-1 text-[10px] text-muted-foreground">
-                      Symbols: {group.graphOnlySymbols.slice(0, 16).join(', ')}
+                      Symbols: {group.graphOnlySymbols
+                        .slice(0, 16)
+                        .map(formatGraphSymbolRef)
+                        .join(', ')}
                       {group.graphOnlySymbols.length > 16
                         ? ` (+${group.graphOnlySymbols.length - 16})`
                         : ''}
                     </p>
+                  ) : null}
+                  {group.graphOnlyFiles.length > 0 ? (
+                    <ul className="mt-1 max-h-24 space-y-0.5 overflow-auto font-mono text-[10px] text-muted-foreground">
+                      {group.graphOnlyFiles.map((f) => (
+                        <li key={f.id} className="truncate">
+                          {formatGraphFileRef(f)}
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
                 </ImpactSubsection>
               ) : null}

@@ -115,6 +115,7 @@
 - **WHEN** user opens a change from Archive sidebar section
 - **THEN** shell loads via `getArchivedChange`
 - **AND** inspector save and validate are disabled
+- **AND** archived artifact reads use the read-only archived artifact path rather than active `getChangeArtifact`
 
 #### Scenario: Archived change skips getChange polling
 
@@ -176,6 +177,15 @@
 - **WHEN** global poll increments
 - **THEN** Artifacts tab hooks do not refetch
 - **AND** visible Overview may refetch detail when applicable
+
+### Requirement: opening a spec auto-selects the primary artifact
+
+#### Scenario: Opening a spec preselects spec.md in the inspector
+
+- **GIVEN** workspace spec `ui:foo` exposes canonical `spec.md`
+- **WHEN** user opens that spec from the workspace tree
+- **THEN** the right inspector opens automatically
+- **AND** the selected file is `spec.md`
 
 ### Requirement: bottom panel polls only the remote logs channel
 

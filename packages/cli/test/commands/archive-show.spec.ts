@@ -47,9 +47,12 @@ describe('Output format — text', () => {
     const { kernel, stdout } = setup()
     kernel.changes.getArchived.execute.mockResolvedValue({
       name: 'add-oauth-login',
-      specIds: new Set(['auth/oauth']),
+      state: 'archivable',
+      archivedAt: new Date('2024-01-15T12:00:00.000Z'),
+      specIds: ['auth:oauth'],
       schemaName: 'schema-std',
       schemaVersion: 1,
+      artifacts: new Map([['proposal', {}]]),
     })
 
     const program = makeProgram()
@@ -61,10 +64,37 @@ describe('Output format — text', () => {
     expect(out).toContain('add-oauth-login')
     expect(out).toContain('state:')
     expect(out).toContain('archivable')
+    expect(out).toContain('archivedAt:')
+    expect(out).toContain('2024-01-15')
     expect(out).toContain('specs:')
-    expect(out).toContain('auth/oauth')
+    expect(out).toContain('auth:oauth')
     expect(out).toContain('schema:')
     expect(out).toContain('schema-std@1')
+    expect(out).toContain('artifacts:')
+    expect(out).toContain('proposal')
+  })
+
+  it('Display enriched metadata', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.getArchived.execute.mockResolvedValue({
+      name: 'add-oauth-login',
+      description: 'My cool feature',
+      state: 'archivable',
+      archivedAt: new Date('2024-01-15T12:00:00.000Z'),
+      specIds: ['core:change'],
+      schemaName: 'schema-std',
+      schemaVersion: 1,
+      artifacts: new Map(),
+    })
+
+    const program = makeProgram()
+    registerArchiveShow(program.command('archive'))
+    await program.parseAsync(['node', 'specd', 'archive', 'show', 'add-oauth-login'])
+
+    const out = stdout()
+    expect(out).toContain('description: My cool feature')
+    expect(out).toContain('specs:       core:change')
+    expect(out).toContain('schema:      schema-std@1')
   })
 })
 
@@ -73,9 +103,12 @@ describe('Output format — JSON', () => {
     const { kernel, stdout } = setup()
     kernel.changes.getArchived.execute.mockResolvedValue({
       name: 'add-oauth-login',
-      specIds: new Set(['auth/oauth']),
+      state: 'archivable',
+      archivedAt: new Date('2024-01-15T12:00:00.000Z'),
+      specIds: ['auth:oauth'],
       schemaName: 'schema-std',
       schemaVersion: 1,
+      artifacts: new Map([['proposal', {}]]),
     })
 
     const program = makeProgram()
@@ -93,12 +126,14 @@ describe('Output format — JSON', () => {
     const parsed = JSON.parse(stdout()) as Record<string, unknown>
     expect(parsed).toHaveProperty('name', 'add-oauth-login')
     expect(parsed).toHaveProperty('state', 'archivable')
+    expect(parsed).toHaveProperty('archivedAt', '2024-01-15T12:00:00.000Z')
     expect(parsed).toHaveProperty('specIds')
-    expect((parsed as { specIds: string[] }).specIds).toContain('auth/oauth')
+    expect((parsed as { specIds: string[] }).specIds).toContain('auth:oauth')
     expect(parsed).toHaveProperty('schema')
     const schema = parsed['schema'] as Record<string, unknown>
     expect(schema).toHaveProperty('name', 'schema-std')
     expect(schema).toHaveProperty('version', 1)
+    expect(parsed).toHaveProperty('artifacts', ['proposal'])
   })
 })
 

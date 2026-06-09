@@ -22,6 +22,12 @@
 - **THEN** `indexGraph` port method runs
 - **AND** status refetch follows
 
+#### Scenario: Spec tabs use graph hooks for coverage and impact
+
+- **WHEN** user opens spec `Coverage` or `Impact`
+- **THEN** the hooks call `getSpecGraphView` and `getImpact({ spec })` through `client:port-graph`
+- **AND** the view does not import graph or core logic directly
+
 ### Requirement: stale graph index shows warning affordances
 
 #### Scenario: Stale flag shows warning badge

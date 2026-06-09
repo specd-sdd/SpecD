@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { SpecdConfig } from '@specd/core'
 import { isAgentPlugin } from '../../../src/index.js'
 import type { SpecdPlugin } from '../../../src/index.js'
+import type { AgentInstallOptions } from '../../../src/index.js'
 
 function makeSpecdPlugin(overrides: Record<string, unknown> = {}): SpecdPlugin {
   return {
@@ -37,5 +39,28 @@ describe('isAgentPlugin', () => {
       uninstall: async () => {},
     })
     expect(isAgentPlugin(plugin)).toBe(false)
+  })
+
+  it('given recursive variables and capabilities in install options, when install is typed, then the type guard remains valid', () => {
+    const installOptions: AgentInstallOptions = {
+      variables: {
+        sharedFolder: '.specd/config/skills/shared',
+        frontmatter: {
+          name: 'specd',
+          metadata: { owner: 'specd' },
+        },
+      },
+      capabilities: ['mcp', 'frontmatter'],
+    }
+
+    const plugin = makeSpecdPlugin({
+      install: async (_config: SpecdConfig, options?: AgentInstallOptions) => {
+        expect(options).toEqual(installOptions)
+        return { installed: [], skipped: [] }
+      },
+      uninstall: async () => {},
+    })
+
+    expect(isAgentPlugin(plugin)).toBe(true)
   })
 })

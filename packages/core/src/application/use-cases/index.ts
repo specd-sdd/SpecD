@@ -46,6 +46,7 @@ export { type InitProject } from './init-project.js'
 export { type AddPlugin, type AddPluginInput } from './add-plugin.js'
 export { type RemovePlugin, type RemovePluginInput } from './remove-plugin.js'
 export { type ListPlugins, type ListPluginsInput, type ListPluginsEntry } from './list-plugins.js'
+export { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 export {
   type GetProjectContext,
   type GetProjectContextInput,

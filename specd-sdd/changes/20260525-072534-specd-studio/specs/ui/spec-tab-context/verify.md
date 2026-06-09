@@ -65,3 +65,56 @@
 - **WHEN** inspector save hook completes with error
 - **THEN** UI shows the conflict message
 - **AND** editor buffer is not silently replaced
+
+### Requirement: view renders structured spec context entries
+
+#### Scenario: Structured context entry is visible
+
+- **GIVEN** port returns a root entry with title, description, and grouped rules
+- **WHEN** user opens the spec Context tab
+- **THEN** the spec id/source metadata is shown
+- **AND** rules are rendered as grouped lists instead of hidden raw JSON
+
+#### Scenario: Entry fields are separated into accordions
+
+- **GIVEN** a context entry includes description, constraints, and scenarios
+- **WHEN** the tab renders that entry
+- **THEN** each field group is shown in its own collapsible section
+- **AND** the user can expand one group without forcing all other groups open
+
+#### Scenario: Sections start open and missing fields stay visible
+
+- **GIVEN** a context entry is missing optimized content or description
+- **WHEN** the tab renders
+- **THEN** those sections still appear at the top of the entry
+- **AND** each missing section explicitly states that the field is unavailable
+- **AND** the sections start expanded by default
+
+#### Scenario: Markdown fields render as Markdown
+
+- **GIVEN** description or optimized content includes Markdown lists or emphasis
+- **WHEN** the field accordion is opened
+- **THEN** the content is rendered as Markdown
+- **AND** the user does not see the field as a raw plain-text blob
+
+#### Scenario: Grouped rule and scenario text render as Markdown
+
+- **GIVEN** rules, constraints, or scenario clause lines include Markdown formatting
+- **WHEN** the corresponding accordion sections are opened
+- **THEN** those grouped entries are rendered as Markdown too
+- **AND** formatting is preserved consistently across all structured content fields
+
+#### Scenario: Constraints render as a normal list
+
+- **GIVEN** a context entry contains multiple constraints
+- **WHEN** the Constraints section is rendered
+- **THEN** the constraints appear as a list
+- **AND** each item still preserves its Markdown formatting
+- **AND** the UI does not wrap each constraint inside a separate padded card
+
+#### Scenario: Warnings are shown separately from entry bodies
+
+- **GIVEN** context response includes warnings
+- **WHEN** the tab renders
+- **THEN** warnings appear in a dedicated warning area
+- **AND** entry content remains visible below

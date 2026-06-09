@@ -252,7 +252,13 @@
 - **WHEN** a non-`default` workspace entry omits `codeRoot`
 - **THEN** specd exits with a `ConfigValidationError` at startup
 
-### Requirement: Workspace graph config
+### Requirement: Workspace-level graph configuration
+
+#### Scenario: Allowed paths constrain workspace indexing
+
+- **GIVEN** a workspace declares `graph.allowedPaths: ["src/**"]`
+- **WHEN** the config is loaded
+- **THEN** the workspace configuration includes the `allowedPaths` constraint
 
 #### Scenario: excludePaths replaces built-in defaults
 
@@ -279,6 +285,20 @@
 - **GIVEN** a workspace with `graph.respectGitignore: false`
 - **WHEN** the config is loaded
 - **THEN** `SpecdWorkspaceConfig.graph.respectGitignore` is `false`
+
+### Requirement: Project-level graph configuration
+
+#### Scenario: Project graph include paths discovered
+
+- **GIVEN** `specd.yaml` declares `graph.includePaths: ["docs/**"]`
+- **WHEN** the config is loaded
+- **THEN** `config.graph.includePaths` includes the `docs/**` pattern
+
+#### Scenario: Project graph exclude paths discovered
+
+- **GIVEN** `specd.yaml` declares `graph.excludePaths: ["specs/"]`
+- **WHEN** the config is loaded
+- **THEN** `config.graph.excludePaths` includes the `specs/` pattern
 
 ### Requirement: Storage configuration
 

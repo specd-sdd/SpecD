@@ -18,6 +18,12 @@
       ]
     },
     {
+      "requirement": "Optimization warning signal",
+      "rules": [
+        "When `llmOptimizedContext: true` is active, if the project-level optimized context is missing or stale according to `UpdateProjectMetadata` invalidation rules, the command SHALL surface a warning.\n\nThe warning MUST include an instruction to run the optimization skill.\n\nFor structured formats, the warning SHALL be included in the response."
+      ]
+    },
+    {
       "requirement": "Behaviour",
       "rules": [
         "The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.\n\nConcretely:\n\n1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)\n2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)\n3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set\n4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present\n5. The collected specs are rendered according to the configured `contextMode`"
@@ -206,11 +212,30 @@
         "stderr contains a warning: line for the stale spec",
         "AND the spec content is still included using the metadataExtraction fallback"
       ]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "name": "Displays warning when project cache is stale",
+      "given": ["llmOptimizedContext: true", "AND project metadata is stale"],
+      "when": ["specd project context is run"],
+      "then": [
+        "a standard CLI warning is emitted",
+        "AND it includes an instruction to run the optimization skill"
+      ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:project-context",
+        "file": "cli:src/commands/project/context.ts",
+        "symbol": "registerProjectContext"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:69f625c2bda7ceea13a65c35cb76b527e45b1c4d93e3f719c61e987fccfc97f8",
-    "verify.md": "sha256:f17ff0193a629b340791ec158e440e420a076bfbbae355780f6802e08f6cee01"
+    "spec.md": "sha256:a059ac476e15d47cb65e2f4dec38e71f3755e868072d9f690dad4f76ed62a757",
+    "verify.md": "sha256:3523247a1a01d86d5e40455731425350cce7049044fef791cf996bb5f8eecafd"
   },
   "generatedBy": "core"
 }

@@ -71,6 +71,7 @@ JSON/TOON output schema:
     description?: string
     blockers: Array<{ code: string, message: string }>
     nextAction: { targetStep: string, actionType: string, reason: string, command: string | null }
+    specDependsOn: Record<string, string[]>
     artifactDag: Array<{ id: string, scope: string, state: string, requires: string[], children: string[] }>
     artifacts: Array<{
       type: string
@@ -105,13 +106,20 @@ JSON/TOON output schema:
 
           if (statusResult.draftView !== undefined) {
             const draftView = statusResult.draftView
-            const { artifactStatuses, lifecycle, nextAction } = statusResult
+            const { artifactStatuses, lifecycle, nextAction, specDependsOn } = statusResult
             const fmt = parseFormat(opts.format)
             if (fmt === 'text') {
               const lines = [
                 `change:      ${draftView.name}`,
                 `state:       ${draftView.state} (drafted)`,
-                `specs:       ${[...draftView.specIds].join(', ') || '(none)'}`,
+                '',
+                'specs and dependencies:',
+              ]
+              for (const specId of draftView.specIds) {
+                const deps = specDependsOn[specId]
+                lines.push(`  ${specId}: ${deps?.length ? deps.join(', ') : '(none)'}`)
+              }
+              lines.push(
                 '',
                 'next action:',
                 `  target:  ${nextAction.targetStep}`,
@@ -121,7 +129,7 @@ JSON/TOON output schema:
                 'lifecycle:',
                 '  transitions:  (none — change is drafted)',
                 `  path:          ${lifecycle.changePath}`,
-              ]
+              )
               output(lines.join('\n'), 'text')
             } else {
               output(
@@ -131,6 +139,7 @@ JSON/TOON output schema:
                   isDrafted: true,
                   specIds: [...draftView.specIds],
                   schema: { name: draftView.schemaName, version: draftView.schemaVersion },
+                  specDependsOn,
                   availableTransitions: lifecycle.availableTransitions,
                   nextAction,
                   artifacts: artifactStatuses,
@@ -161,11 +170,7 @@ JSON/TOON output schema:
           const fmt = parseFormat(opts.format)
 
           if (fmt === 'text') {
-            const lines = [
-              `change:      ${change.name}`,
-              `state:       ${change.state}`,
-              `specs:       ${[...change.specIds].join(', ') || '(none)'}`,
-            ]
+            const lines = [`change:      ${change.name}`, `state:       ${change.state}`]
             if (change.description !== undefined) {
               lines.push(`description: ${change.description}`)
             }
@@ -186,6 +191,14 @@ JSON/TOON output schema:
               lines.push(...renderDag(dag, artifactTypes, artifactStatuses))
               lines.push('')
             }
+
+            // Specs and Dependencies Section
+            lines.push('specs and dependencies:')
+            for (const specId of change.specIds) {
+              const deps = statusResult.specDependsOn[specId]
+              lines.push(`  ${specId}: ${deps?.length ? deps.join(', ') : '(none)'}`)
+            }
+            lines.push('')
 
             // Blockers Section
             if (blockers.length > 0) {
@@ -328,6 +341,7 @@ JSON/TOON output schema:
                   reason: nextAction.reason,
                   command: nextAction.command,
                 },
+                specDependsOn: statusResult.specDependsOn,
                 artifactDag:
                   statusDag === null
                     ? []

@@ -18,11 +18,12 @@
 - **THEN** returns UTF-8 content
 - **AND** `originalHash` is present
 
-#### Scenario: Archived origin is not implemented
+#### Scenario: Archived tracked file returns content and hash
 
-- **WHEN** `readOnlyOrigin` is `archived`
-- **THEN** use case fails with explicit not-implemented semantics
-- **AND** does not call active-change `get` or `mutate`
+- **GIVEN** archived change `baz` with tracked `tasks.md`
+- **WHEN** `GetReadOnlyChangeArtifact` runs with `readOnlyOrigin` `archived`
+- **THEN** returns UTF-8 content
+- **AND** `originalHash` is present
 
 ### Requirement: GetReadOnlyChangeArtifact does not expose Change
 
@@ -35,7 +36,7 @@
 
 #### Scenario: HTTP handler delegates to use case
 
-- **WHEN** `GET /v1/drafts/:name/artifacts/:filename` succeeds
+- **WHEN** `GET /v1/drafts/:name/artifacts/:filename` or archived artifact GET succeeds
 - **THEN** handler called `getReadOnlyChangeArtifact.execute`
 - **AND** handler did not call `ChangeRepository.artifact` directly
 

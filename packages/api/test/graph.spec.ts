@@ -19,15 +19,37 @@ describe('Graph API', () => {
   })
 
   it('given a query, when GET /graph/search, then returns symbol and spec hits', async () => {
-    const { res, data } = await apiJson<{ symbols: unknown[]; specs: unknown[] }>(
+    const { res, data } = await apiJson<{
+      symbols: Array<{
+        workspace: string
+        symbol: {
+          id: string
+          workspace: string
+          workspaceRelativePath: string
+          projectRelativePath: string
+          name: string
+          kind: string
+          line: number
+          column: number
+        }
+      }>
+      specs: unknown[]
+    }>(
       '/graph/search?q=kernel&symbols=true&limit=5',
     )
     expect(res.ok).toBe(true)
     expect(Array.isArray(data.symbols)).toBe(true)
     expect(Array.isArray(data.specs)).toBe(true)
+    const hit = data.symbols[0]
+    if (hit !== undefined) {
+      expect(hit.workspace.length).toBeGreaterThan(0)
+      expect(hit.symbol.id.length).toBeGreaterThan(0)
+      expect(hit.symbol.workspaceRelativePath.length).toBeGreaterThan(0)
+      expect(hit.symbol.projectRelativePath.length).toBeGreaterThan(0)
+    }
   })
 
-  it('given missing symbol and file, when GET /graph/impact, then returns problem+json', async () => {
+  it('given missing symbol file and spec, when GET /graph/impact, then returns problem+json', async () => {
     const body = await expectProblem('/graph/impact', undefined, 400)
     expect(body.code).toBe('INVALID_REQUEST')
   })
@@ -55,6 +77,28 @@ describe('Graph API', () => {
     expect(res.ok).toBe(true)
     expect(data.target).toBe(symbolId)
     expect(Array.isArray(data.symbols)).toBe(true)
+    expect(Array.isArray(data.specs)).toBe(true)
+    expect(Array.isArray(data.files)).toBe(true)
+  })
+
+  it('given a spec query, when GET /graph/impact, then returns spec impact DTO', async () => {
+    const { workspace, specPath } = await loadProjectSamples()
+    const specId = `${workspace}:${specPath}`
+    const { res, data } = await apiJson<{
+      target: string
+      direction: string
+      specs: string[]
+      symbols: unknown[]
+      files: unknown[]
+    }>(
+      `/graph/impact?spec=${encodeURIComponent(specId)}&direction=dependents&depth=1`,
+    )
+    expect(res.ok).toBe(true)
+    expect(data.target).toBe(specId)
+    expect(data.direction).toBe('downstream')
+    expect(Array.isArray(data.specs)).toBe(true)
+    expect(Array.isArray(data.symbols)).toBe(true)
+    expect(Array.isArray(data.files)).toBe(true)
   })
 
   it('given api server, when GET /graph/hotspots, then returns hotspot ranking', async () => {
@@ -97,13 +141,49 @@ describe('Graph API', () => {
 
   it('given a known spec, when GET /graph/specs/:ws/*, then returns coverage', async () => {
     const { workspace, specPath } = await loadProjectSamples()
-    const { res, data } = await apiJson<{ specId: string; files: string[]; symbols: string[] }>(
+    const { res, data } = await apiJson<{
+      specId: string
+      files: Array<{
+        id: string
+        workspace: string
+        workspaceRelativePath: string
+        projectRelativePath: string
+      }>
+      symbols: Array<{
+        id: string
+        workspace: string
+        workspaceRelativePath: string
+        projectRelativePath: string
+        name: string
+        kind: string
+        line: number
+        column: number
+      }>
+    }>(
       `/graph/specs/${workspace}/${specPath}`,
     )
     expect(res.ok).toBe(true)
     expect(data.specId).toBe(`${workspace}:${specPath}`)
     expect(Array.isArray(data.files)).toBe(true)
     expect(Array.isArray(data.symbols)).toBe(true)
+    const file = data.files[0]
+    if (file !== undefined) {
+      expect(file.id.length).toBeGreaterThan(0)
+      expect(file.workspace).toBe(workspace)
+      expect(file.workspaceRelativePath.length).toBeGreaterThan(0)
+      expect(file.projectRelativePath.length).toBeGreaterThan(0)
+    }
+    const symbol = data.symbols[0]
+    if (symbol !== undefined) {
+      expect(symbol.id.length).toBeGreaterThan(0)
+      expect(symbol.workspaceRelativePath.length).toBeGreaterThan(0)
+      expect(symbol.projectRelativePath.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('given an unknown spec, when GET /graph/specs/:ws/*, then returns problem+json', async () => {
+    const body = await expectProblem('/graph/specs/default/does-not-exist', undefined, 404)
+    expect(body.code).toBe('SPEC_NOT_FOUND')
   })
 
   it('given an active change, when GET /graph/changes/:name, then returns per-spec graph view', async () => {
@@ -111,7 +191,14 @@ describe('Graph API', () => {
     if (activeChangeName === null) {
       return
     }
-    const { res, data } = await apiJson<{ changeName: string; specs: unknown[] }>(
+    const { res, data } = await apiJson<{
+      changeName: string
+      specs: Array<{
+        specId: string
+        coveredFiles: Array<{ projectRelativePath: string }>
+        coveredSymbols: Array<{ projectRelativePath: string }>
+      }>
+    }>(
       `/graph/changes/${encodeURIComponent(activeChangeName)}`,
     )
     expect(res.ok).toBe(true)

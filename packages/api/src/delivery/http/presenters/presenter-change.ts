@@ -13,6 +13,11 @@ import { type ChangeSummaryDto } from '../dto/change-summary.js'
 import { type ArtifactListDto, type ArtifactListEntryDto } from '../dto/artifact-list.js'
 import { type ImplementationReviewDto } from '../dto/implementation-review.js'
 
+type TaskSummaryByType = ReadonlyMap<
+  string,
+  { readonly totalTasks: number; readonly completedTasks: number }
+>
+
 /**
  *
  * @param d
@@ -70,7 +75,7 @@ export function toChangeSummaryDto(
   const updatedAt = resolveUpdatedAt(change)
   return {
     name: change.name,
-    ...(change.description !== undefined ? { title: change.description } : {}),
+    ...(change.description !== undefined ? { description: change.description } : {}),
     state: change.state,
     specIds: [...change.specIds],
     updatedAt: iso(updatedAt),
@@ -126,6 +131,16 @@ export function toChangeStatusDto(result: GetStatusResult): ChangeStatusDto {
     }
   }
 
+  const taskArtifacts = result.artifactStatuses.filter((artifact) => artifact.hasTasks)
+  const totalTasks = taskArtifacts.reduce(
+    (sum, artifact) => sum + (artifact.taskCompletion?.total ?? 0),
+    0,
+  )
+  const completedTasks = taskArtifacts.reduce(
+    (sum, artifact) => sum + (artifact.taskCompletion?.complete ?? 0),
+    0,
+  )
+
   return {
     name: base.name,
     state: base.state,
@@ -138,8 +153,16 @@ export function toChangeStatusDto(result: GetStatusResult): ChangeStatusDto {
       reason: result.nextAction.reason,
       command: result.nextAction.command,
     },
+    ...(taskArtifacts.length > 0 ? { totalTasks, completedTasks } : {}),
     artifacts: result.artifactStatuses.map((a) => ({
       type: a.type,
+      hasTasks: a.hasTasks,
+      ...(a.taskCompletion !== undefined
+        ? {
+            totalTasks: a.taskCompletion.total,
+            completedTasks: a.taskCompletion.complete,
+          }
+        : {}),
       state: a.state,
       effectiveStatus: a.effectiveStatus,
       displayStatus: a.displayStatus,
@@ -176,13 +199,27 @@ export function toArtifactListDto(change: Change): ArtifactListDto {
  * Lists tracked artifacts from a read-only change view (metadata only).
  * @param view
  */
-export function toArtifactListDtoFromView(view: ReadOnlyChangeView): ArtifactListDto {
+export function toArtifactListDtoFromView(
+  view: ReadOnlyChangeView,
+  options: {
+    omitMissing?: boolean
+    hasTasksByType?: ReadonlyMap<string, boolean>
+    taskSummaryByType?: TaskSummaryByType
+  } = {},
+): ArtifactListDto {
   const entries: ArtifactListEntryDto[] = []
   for (const artifact of view.artifacts.values()) {
     for (const file of artifact.files.values()) {
+      if (options.omitMissing === true && file.status === 'missing') {
+        continue
+      }
       entries.push({
         filename: file.filename,
         type: artifact.type,
+        hasTasks: options.hasTasksByType?.get(artifact.type) ?? false,
+        ...(options.taskSummaryByType?.get(artifact.type) !== undefined
+          ? options.taskSummaryByType.get(artifact.type)
+          : {}),
         state: file.status,
         displayStatus: file.displayStatus(),
       })

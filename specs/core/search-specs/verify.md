@@ -2,7 +2,7 @@
 
 ## Requirements
 
-### Requirement: Search across all configured workspaces
+### Requirement: Multi-workspace search orchestration
 
 #### Scenario: Results merged and sorted by score
 
@@ -15,6 +15,12 @@
 - **GIVEN** no spec in any workspace matches the query
 - **WHEN** `execute("zzzznonexistent")` is called
 - **THEN** the result array is empty
+
+#### Scenario: SearchSpecs uses orchestrated project structure
+
+- **WHEN** `SearchSpecs.execute()` is called
+- **THEN** it obtains the list of workspaces via the `ListWorkspaces` orchestrator
+- **AND** it performs the content search through the provided repository instances
 
 ### Requirement: Optional workspace filter
 

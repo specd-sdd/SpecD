@@ -37,6 +37,12 @@
 - **THEN** file nodes retain both canonical workspace-prefixed `path` values and `configRelativePath` values needed for CLI lookup
 - **AND** storage-agnostic consumers do not depend on backend-specific column or label names
 
+#### Scenario: Backend persists file source content for preview extraction
+
+- **WHEN** a backend advertises conformance to `GraphStore`
+- **THEN** persisted file nodes carry source content sufficient to derive symbol snippets from file-backed context
+- **AND** consumers do not need per-symbol persisted snippet blobs to render symbol previews
+
 #### Scenario: Backend persists scoped-binding dependency relations
 
 - **WHEN** a backend advertises conformance to `GraphStore`
@@ -137,7 +143,7 @@
 - **WHEN** `removeSpec('core:config')` is called
 - **THEN** the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target are removed
 
-### Requirement: Full-text search
+### Requirement: Search with exact-match prioritization
 
 #### Scenario: Symbol search matches normalized compound names
 
@@ -151,12 +157,37 @@
 - **WHEN** `searchSymbols({ query: 'authentication token' })` is called
 - **THEN** that symbol is returned
 
+#### Scenario: Symbol search result includes file-backed snippet
+
+- **GIVEN** a matching symbol with a persisted source file and recorded location
+- **WHEN** `searchSymbols(...)` returns that symbol
+- **THEN** the result includes a `snippet` preview derived from persisted file source content around the symbol location
+
 #### Scenario: Spec search matches description and content
 
 - **GIVEN** a spec whose description mentions `adapter parsing`
 - **AND** another spec whose content contains `lifecycle state transition`
 - **WHEN** the corresponding queries are issued through `searchSpecs`
 - **THEN** the matching spec is returned in each case with a relevance score
+
+#### Scenario: Spec search result includes snippet
+
+- **WHEN** `searchSpecs(...)` returns a matching spec
+- **THEN** each result includes a `snippet` preview explaining the hit
+
+#### Scenario: Exact Spec ID match is prioritized first
+
+- **GIVEN** a spec with ID `core:change`
+- **AND** a search query `core:change`
+- **WHEN** the spec search is executed
+- **THEN** the spec `core:change` appears as the first result
+
+#### Scenario: Exact Document Path match is prioritized first
+
+- **GIVEN** a document with path `root:package.json`
+- **AND** a search query `root:package.json`
+- **WHEN** the document search is executed
+- **THEN** the document `root:package.json` appears as the first result
 
 #### Scenario: Filters are applied before limiting results
 
@@ -170,6 +201,13 @@
 - **GIVEN** a backend whose search indexes are not auto-maintained during bulk writes
 - **WHEN** `rebuildFtsIndexes()` is called after bulk data changes
 - **THEN** subsequent abstract search queries see the new symbols and specs
+
+#### Scenario: Persisted file content does not introduce file search surface
+
+- **GIVEN** a backend persists file source content for symbol snippet extraction
+- **WHEN** consumers use the abstract search contract
+- **THEN** the contract exposes search across symbols, specs, and documents only
+- **AND** no separate file full-text search category is implied by persisted file content
 
 ### Requirement: Query methods
 

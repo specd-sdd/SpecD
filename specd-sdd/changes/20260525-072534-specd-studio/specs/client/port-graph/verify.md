@@ -16,6 +16,24 @@
 - **THEN** remote adapter POSTs that `force` flag to `/v1/graph/index`
 - **AND** the returned data shape is the graph-index result DTO
 
+#### Scenario: searchGraph forwards rich graph filters
+
+- **WHEN** `searchGraph(query)` includes `kinds`, `filePattern`, or exclusion filters
+- **THEN** the adapter forwards those query fields to `/v1/graph/search`
+- **AND** the returned data shape preserves snippets and line ranges
+
+#### Scenario: getImpact forwards traversal depth
+
+- **WHEN** `getImpact(query)` includes `depth`
+- **THEN** the adapter forwards that value to `/v1/graph/impact`
+- **AND** the returned DTO preserves aggregate impact metrics
+
+#### Scenario: getImpact forwards spec selectors
+
+- **WHEN** `getImpact(query)` includes `spec`
+- **THEN** the adapter forwards that selector to `/v1/graph/impact`
+- **AND** the returned DTO preserves affected spec ids
+
 #### Scenario: List changes hits collection HTTP route
 
 - **WHEN** `listChanges()` is called on remote adapter

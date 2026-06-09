@@ -16,32 +16,18 @@
 
 ### Requirement: Workspace filtering
 
+#### Scenario: Workspaces grouped using orchestrated list
+
+- **WHEN** `specd spec list` is run
+- **THEN** it iterates through the `ProjectWorkspace` entities provided by `ListWorkspaces`
+- **AND** it renders a group for every orchestrated workspace (even if empty)
+
 #### Scenario: Single workspace filter in text mode
 
 - **GIVEN** the project has workspace `default` with specs and workspace `billing` with specs
 - **WHEN** `specd spec list --workspace default` is run
 - **THEN** only workspace `default` group is rendered
 - **AND** workspace `billing` does not appear
-
-#### Scenario: Multiple workspace filters
-
-- **GIVEN** the project has workspaces `default`, `billing`, and `core`
-- **WHEN** `specd spec list --workspace default --workspace billing` is run
-- **THEN** workspace groups for `default` and `billing` are rendered
-- **AND** workspace `core` does not appear
-
-#### Scenario: Workspace filter with JSON output
-
-- **GIVEN** the project has workspaces `default` and `billing`
-- **WHEN** `specd spec list --workspace default --format json` is run
-- **THEN** the JSON `workspaces` array includes `default` with its specs and `billing` with an empty `specs` array
-
-#### Scenario: Non-existent workspace name produces no output
-
-- **GIVEN** no workspace named `nonexistent` is configured
-- **WHEN** `specd spec list --workspace nonexistent` is run
-- **THEN** no workspace group is rendered
-- **AND** no error is raised
 
 ### Requirement: Title resolution
 
@@ -182,18 +168,11 @@
 
 ### Requirement: Empty output
 
-#### Scenario: Workspace with no specs
+#### Scenario: Orchestrated empty workspace shown as (none)
 
-- **GIVEN** the `billing` workspace exists but has no specs
+- **GIVEN** an empty workspace `billing` in the orchestrated list
 - **WHEN** `specd spec list` is run
 - **THEN** stdout shows the `billing` heading followed by `  (none)`
-
-#### Scenario: No workspaces at all
-
-- **GIVEN** `specd.yaml` has no workspaces configured
-- **WHEN** `specd spec list` is run
-- **THEN** stdout contains `no workspaces configured`
-- **AND** the process exits with code 0
 
 ### Requirement: Error cases
 

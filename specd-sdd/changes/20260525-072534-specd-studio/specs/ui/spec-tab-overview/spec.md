@@ -10,9 +10,19 @@ Studio UI for **Spec Tab Overview**: user-visible layout and actions driven excl
 
 While the Overview tab is visible, the view MUST refresh spec detail via `getSpec` on tab-scoped poll ticks. New specs in the tree are already discovered by the global workspace poll.
 
-### Requirement: linked changes tab lists overlaps for current spec
+The Overview presentation MUST also serve as the primary place for spec metadata summary; Studio MUST NOT require a separate **Metadata** tab to read the current spec's identity and description.
 
-When the user selects the **Linked Changes** center tab, Studio MUST call `detectOverlaps` and MUST render only changes whose overlap entry matches the open spec's `specId`. The list MUST NOT show all active and draft changes unfiltered.
+### Requirement: linked changes tab lists active changes referencing the current spec
+
+When the user selects the **Linked Changes** center tab, Studio MUST read the embedded `linkedChanges[]` summaries from the current `getSpec()` detail response and list the active changes whose `specIds` include the open spec's `specId`.
+
+Each row SHOULD show:
+
+- change name
+- description when present
+- lifecycle state with its corresponding state color
+
+The list MUST NOT show unrelated active changes, drafts, or archived items. If no active change references the current spec, the UI MUST show an explicit empty state instead of throwing.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

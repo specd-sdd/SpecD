@@ -10,6 +10,8 @@ Studio UI for **Spec Tab Artifacts**: user-visible layout and actions driven exc
 
 While the spec tab is visible, the view MUST refresh spec metadata for that path on a light interval. New specs in the tree are already discovered by the global workspace poll.
 
+Canonical spec artifacts are inherently complete/read-only in Studio v1. Their list rows MUST keep neutral filename text, but the leading artifact icon SHOULD use the success/green treatment to signal that complete state.
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`.

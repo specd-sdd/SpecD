@@ -34,6 +34,7 @@ export {
   type FsSkipArtifactOptions,
 } from './skip-artifact.js'
 export { createListSpecs, type FsListSpecsOptions } from './list-specs.js'
+export { createListWorkspaces, type FsListWorkspacesOptions } from './list-workspaces.js'
 export { createSearchSpecs, type FsSearchSpecsOptions } from './search-specs.js'
 export { createGetSpec, type FsGetSpecOptions } from './get-spec.js'
 export { createSaveSpecMetadata, type FsSaveSpecMetadataOptions } from './save-spec-metadata.js'

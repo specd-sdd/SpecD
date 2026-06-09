@@ -27,6 +27,8 @@ function setup() {
   kernel.changes.status.execute.mockResolvedValue({
     change: { workspaces: ['default'] },
     artifactStatuses: [],
+    specDependsOn: {},
+    implementationTracking: { trackedFiles: [], links: [] },
   })
   const stdout = captureStdout()
   const stderr = captureStderr()

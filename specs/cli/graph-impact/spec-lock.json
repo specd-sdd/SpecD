@@ -12,14 +12,11 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/build-workspace-targets.ts"
-    },
-    {
       "file": "cli:src/commands/graph/impact.ts",
-      "symbols": ["registerGraphImpact", "formatImpact", "formatSpecImpact", "parseImpactDirection"]
+      "symbols": ["registerGraphImpact"]
     },
     {
-      "file": "cli:src/index.ts"
+      "file": "cli:test/commands/graph-impact.spec.ts"
     }
   ]
 }

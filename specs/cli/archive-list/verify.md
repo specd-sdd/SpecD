@@ -10,6 +10,11 @@
 - **THEN** the command proceeds without positional arguments
 - **AND** output format defaults to text
 
+#### Scenario: Pagination flags are accepted
+
+- **WHEN** `specd archive list --limit 10 --page 2` is run
+- **THEN** the command parses the flags and delegates them to the use case
+
 ### Requirement: Output format — toon
 
 #### Scenario: TOON format output
@@ -20,37 +25,25 @@
 
 ### Requirement: Output format — text
 
-#### Scenario: Archived changes listed with correct fields
+#### Scenario: Normal text output
 
-- **GIVEN** the archive directory contains two changes: `add-oauth-login` (workspace `default`, archived `2024-01-15`, actor `alice`) and `update-billing` (workspace `billing`, archived `2024-01-10`, no actor recorded)
+- **GIVEN** the archive contains 5 changes
 - **WHEN** `specd archive list` is run
-- **THEN** stdout contains one row for each change showing name, workspace, and date
-- **AND** the row for `add-oauth-login` includes `by alice`
-- **AND** the row for `update-billing` does not include a `by` segment
-- **AND** the process exits with code 0
-
-#### Scenario: Rows sorted by archive date descending
-
-- **GIVEN** the archive contains change `older-change` archived before `newer-change`
-- **WHEN** `specd archive list` is run
-- **THEN** `newer-change` appears before `older-change` in the output
+- **THEN** stdout contains a table with `NAME` and `DATE` columns
+- **AND** the `WORKSPACE` column is NOT present
+- **AND** the summary line `Showing 5 archived changes of 5.` is printed at the end
 
 ### Requirement: Output format — JSON
 
-#### Scenario: JSON format output
+#### Scenario: JSON format output with metadata
 
-- **GIVEN** the archive directory contains one change named `add-oauth-login` with workspace `default`, archived at `2024-01-15T12:00:00.000Z`, actor `alice`, and artifacts `['spec']`
+- **GIVEN** the archive contains 125 changes and `limit` is 100
 - **WHEN** `specd archive list --format json` is run
-- **THEN** stdout is a JSON array with one object containing `name`, `archivedName`, `workspace`, `archivedAt`, `archivedBy`, and `artifacts` fields
-- **AND** the object does not contain `state` or `specIds` fields
-- **AND** the process exits with code 0
-
-#### Scenario: JSON format output — no actor recorded
-
-- **GIVEN** the archive directory contains one change named `update-billing` with no `archivedBy` recorded
-- **WHEN** `specd archive list --format json` is run
-- **THEN** the JSON object for `update-billing` does not contain an `archivedBy` field
-- **AND** the process exits with code 0
+- **THEN** stdout is a JSON object with `items` array and `meta` object
+- **AND** `meta.total` is 125
+- **AND** `meta.count` is 100
+- **AND** `meta.limit` is 100
+- **AND** `meta.page` is 1
 
 ### Requirement: Empty archive
 

@@ -7,23 +7,33 @@ import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 export type { SpecSearchMatch }
 
 /** A spec entry returned by {@link SearchSpecs}, with resolved title, score, and matches. */
 export interface SpecSearchEntry {
+  /** The workspace name where the spec lives. */
   readonly workspace: string
+  /** The spec path within the workspace (slash-separated). */
   readonly path: string
+  /** The resolved title from metadata or H1 extraction. */
   readonly title: string
-  readonly score: number
-  readonly matches: readonly SpecSearchMatch[]
+  /** The resolved summary from metadata or first paragraph. */
   readonly summary?: string
+  /** The relevance score (e.g. from BM25). */
+  readonly score: number
+  /** The match locations found in the artifacts. */
+  readonly matches: readonly SpecSearchMatch[]
 }
 
-/** Options for {@link SearchSpecs.execute}. */
+/** Optional filters and enrichment flags for {@link SearchSpecs}. */
 export interface SearchSpecsOptions {
+  /** When provided, only search within these workspace names. */
   readonly workspaces?: readonly string[]
+  /** When `true`, resolves a summary for each result result. Default: `false`. */
   readonly includeSummary?: boolean
+  /** Maximum number of total results to return across all workspaces. */
   readonly limit?: number
 }
 
@@ -31,53 +41,52 @@ export interface SearchSpecsOptions {
  * Searches spec content across all configured workspaces, resolving title and
  * optionally summary per result.
  *
- * Receives a map of workspace name → `SpecRepository` so that search
- * coordinates across workspaces. Results are ordered by score descending.
+ * It uses the project orchestrator to discover repositories and aggregates
+ * results ranked by score descending.
  */
 export class SearchSpecs {
-  private readonly _specRepos: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _hasher: ContentHasher
   private readonly _yaml: YamlSerializer
 
   /**
    * Creates a new SearchSpecs instance.
-   * @param specRepos - Map of workspace name to SpecRepository.
+   *
+   * @param listWorkspaces - The project orchestrator.
    * @param hasher - Content hasher for spec hashing.
    * @param yaml - YAML serializer for parsing artifacts.
    */
-  constructor(
-    specRepos: ReadonlyMap<string, SpecRepository>,
-    hasher: ContentHasher,
-    yaml: YamlSerializer,
-  ) {
-    this._specRepos = specRepos
+  constructor(listWorkspaces: ListWorkspaces, hasher: ContentHasher, yaml: YamlSerializer) {
+    this._listWorkspaces = listWorkspaces
     this._hasher = hasher
     this._yaml = yaml
   }
 
   /**
    * Executes the spec search across all workspaces.
+   *
    * @param query - The search query string.
    * @param options - Optional search options (workspaces, includeSummary, limit).
    * @returns Array of search results ordered by score descending.
    */
   async execute(query: string, options?: SearchSpecsOptions): Promise<SpecSearchEntry[]> {
+    const workspaces = await this._listWorkspaces.execute()
     const workspaceFilter =
       options?.workspaces !== undefined && options.workspaces.length > 0
         ? new Set(options.workspaces)
         : null
     const includeSummary = options?.includeSummary ?? false
-    const allResults: Array<{ result: SpecSearchResult; workspace: string }> = []
+    const allResults: Array<{ result: SpecSearchResult; workspace: ProjectWorkspace }> = []
 
-    for (const [wsName, repo] of this._specRepos) {
-      if (workspaceFilter !== null && !workspaceFilter.has(wsName)) continue
+    for (const ws of workspaces) {
+      if (workspaceFilter !== null && !workspaceFilter.has(ws.name)) continue
       try {
-        const results = await repo.search(
+        const results = await ws.specRepo.search(
           query,
           options?.limit !== undefined ? { limit: options.limit } : undefined,
         )
         for (const result of results) {
-          allResults.push({ result, workspace: wsName })
+          allResults.push({ result, workspace: ws })
         }
       } catch {
         // Silent error handling — skip this workspace
@@ -87,12 +96,11 @@ export class SearchSpecs {
     allResults.sort((a, b) => b.result.score - a.result.score)
 
     const entries = allResults.map(async ({ result, workspace }) => {
-      const repo = repoForWorkspace(this._specRepos, workspace)
       const spec = result.spec
       const pathStr = spec.name.toFsPath('/')
-      const title = await this._resolveTitle(repo, spec)
+      const title = await this._resolveTitle(workspace.specRepo, spec)
       const entry: SpecSearchEntry = {
-        workspace,
+        workspace: workspace.name,
         path: pathStr,
         title,
         score: result.score,
@@ -100,7 +108,7 @@ export class SearchSpecs {
       }
 
       if (includeSummary) {
-        const summary = await this._resolveSummary(repo, spec)
+        const summary = await this._resolveSummary(workspace.specRepo, spec)
         if (summary !== undefined) {
           return { ...entry, summary }
         }
@@ -120,7 +128,8 @@ export class SearchSpecs {
 
   /**
    * Resolves the display title for a spec.
-   * @param repo - The spec repository.
+   *
+   * @param repo - Repository to read metadata or artifacts from.
    * @param spec - The spec to resolve title for.
    * @returns The resolved title string.
    */
@@ -133,15 +142,30 @@ export class SearchSpecs {
     } catch {
       // fall through
     }
-    const pathStr = spec.name.toFsPath('/')
-    return pathStr.split('/').at(-1) ?? pathStr
+
+    if (spec.filenames.includes('spec.md')) {
+      try {
+        const specArtifact = await repo.artifact(spec, 'spec.md')
+        if (specArtifact !== null) {
+          const headingMatch = /^#\s+(.+)/m.exec(specArtifact.content)
+          if (headingMatch !== null && headingMatch[1] !== undefined) {
+            return headingMatch[1].trim()
+          }
+        }
+      } catch {
+        // fall through
+      }
+    }
+
+    return spec.name.toString()
   }
 
   /**
-   * Resolves the summary/description for a spec.
-   * @param repo - The spec repository.
+   * Resolves the display summary for a spec.
+   *
+   * @param repo - Repository to read metadata or artifacts from.
    * @param spec - The spec to resolve summary for.
-   * @returns The resolved summary string or undefined.
+   * @returns The resolved summary string, or undefined if not found.
    */
   private async _resolveSummary(repo: SpecRepository, spec: Spec): Promise<string | undefined> {
     try {
@@ -167,20 +191,4 @@ export class SearchSpecs {
 
     return undefined
   }
-}
-
-/**
- * Looks up a SpecRepository by workspace name.
- * @param repos - Map of workspace name to repository.
- * @param workspace - The workspace name to look up.
- * @returns The SpecRepository for that workspace.
- * @throws Error if no repository exists for the workspace.
- */
-function repoForWorkspace(
-  repos: ReadonlyMap<string, SpecRepository>,
-  workspace: string,
-): SpecRepository {
-  const repo = repos.get(workspace)
-  if (repo === undefined) throw new Error(`no repository for workspace "${workspace}"`)
-  return repo
 }

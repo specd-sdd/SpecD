@@ -14,6 +14,10 @@
   ],
   "implementation": [
     {
+      "file": "core:src/application/use-cases/get-status.ts",
+      "symbols": ["GetStatusResult", "GetStatus"]
+    },
+    {
       "file": "core:test/application/use-cases/get-status.spec.ts"
     },
     {

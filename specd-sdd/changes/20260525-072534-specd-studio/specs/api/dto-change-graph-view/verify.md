@@ -50,6 +50,8 @@
 - **WHEN** client calls `GET /v1/graph/changes/{name}` successfully
 - **THEN** body includes `specs` as an array
 - **AND** each element has `specId`, `coveredFiles`, and `coveredSymbols`
+- **AND** `coveredFiles[]` satisfy [`api:dto-graph-file-ref`](../dto-graph-file-ref/spec.md)
+- **AND** `coveredSymbols[]` satisfy [`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md)
 - **AND** body does not include a `links` property
 
 #### Scenario: specIds matches change scope

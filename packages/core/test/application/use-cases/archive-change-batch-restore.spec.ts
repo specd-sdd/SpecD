@@ -30,6 +30,7 @@ import {
   makeActorResolver,
   makeArtifactType,
   makeChangeRepository,
+  makeListWorkspaces,
   makeParsers,
   makeRunStepHooks,
   makeSchema,
@@ -41,8 +42,13 @@ import {
   type RunStepHooksInput,
   type RunStepHooksResult,
 } from '../../../src/application/use-cases/run-step-hooks.js'
-import { ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
-import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import {
+  ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
+} from '../../../src/application/ports/archive-repository.js'
+import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 
 function makeGenerateMetadata(): GenerateSpecMetadata {
@@ -87,22 +93,30 @@ function makeArchiveRepo(): ArchiveRepository {
       const p = (n: number) => String(n).padStart(2, '0')
       const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
       return {
-        archivedChange: new ArchivedChange({
-          name: change.name,
+        archivedChange: toArchivedChangeView(change, {
           archivedName,
           archivedAt: new Date(),
-          artifacts: [],
-          specIds: [...change.specIds],
-          schemaName: change.schemaName,
-          schemaVersion: change.schemaVersion,
         }),
         archiveDirPath: `/archive/${archivedName}`,
       }
     }
-    override async list() {
-      return []
+    override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+      return {
+        items: [],
+        meta: {
+          total: 0,
+          count: 0,
+          limit: options?.limit ?? 100,
+        },
+      }
     }
     override async get() {
+      return null
+    }
+    override async artifact(
+      _change: ArchivedChange,
+      _filename: string,
+    ): Promise<SpecArtifact | null> {
       return null
     }
     override async reindex() {}
@@ -252,7 +266,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -263,7 +277,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -328,7 +341,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -339,7 +352,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -395,7 +407,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -406,7 +418,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -442,9 +453,9 @@ describe('ArchiveChange batch snapshot integration', () => {
     const specRepo = makeSpecRepository({
       specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
       artifacts: { 'auth/oauth/spec.md': '# Old' },
-      async publish(): Promise<void> {
-        throw new SpecPublicationError('default:auth/oauth', '/tmp/staging', 'fail')
-      },
+    })
+    vi.spyOn(specRepo, 'publish').mockImplementation(async (): Promise<void> => {
+      throw new SpecPublicationError('default:auth/oauth', '/tmp/staging', 'fail')
     })
     const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
     change.setArtifact(
@@ -471,7 +482,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', specRepo]]),
+      makeListWorkspaces(new Map([['default', specRepo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -482,7 +493,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       new PartialRestoreSnapshot(),
     )
 
@@ -529,7 +539,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       archiveRepo,
       makeRunStepHooks(),
       makeActorResolver(),
@@ -540,7 +550,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -567,14 +576,9 @@ describe('ArchiveChange batch snapshot integration', () => {
       const p = (n: number) => String(n).padStart(2, '0')
       const archivedName = `${ts.getUTCFullYear()}${p(ts.getUTCMonth() + 1)}${p(ts.getUTCDate())}-${p(ts.getUTCHours())}${p(ts.getUTCMinutes())}${p(ts.getUTCSeconds())}-${change.name}`
       return {
-        archivedChange: new ArchivedChange({
-          name: change.name,
+        archivedChange: toArchivedChangeView(change, {
           archivedName,
           archivedAt: new Date(),
-          artifacts: [],
-          specIds: [...change.specIds],
-          schemaName: change.schemaName,
-          schemaVersion: change.schemaVersion,
         }),
         archiveDirPath: `/archive/${archivedName}`,
       }
@@ -617,7 +621,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', specRepo]]),
+      makeListWorkspaces(new Map([['default', specRepo]])),
       archiveRepo,
       makeRunStepHooks(),
       makeActorResolver(),
@@ -666,7 +670,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       makeRunStepHooks(),
       makeActorResolver(),
@@ -677,7 +681,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 
@@ -745,7 +748,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const uc = new ArchiveChange(
       repoChanges,
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
       runStepHooks,
       makeActorResolver(),
@@ -756,7 +759,6 @@ describe('ArchiveChange batch snapshot integration', () => {
       undefined,
       [],
       process.cwd(),
-      new Map(),
       snapshot,
     )
 

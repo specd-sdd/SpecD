@@ -55,6 +55,12 @@ Repeated status polls with unchanged drift scope MUST NOT append additional `inv
 - **THEN** the history length after the second call equals the history length after the first call
 - **AND** the change remains in `designing`
 
+#### Scenario: Result includes specDependsOn
+
+- **GIVEN** a change with declared spec dependencies in its manifest
+- **WHEN** `execute()` is called for that change
+- **THEN** `result.specDependsOn` matches the change's `specDependsOn` map
+
 ### Requirement: Drafted change read-only status
 
 #### Scenario: Draft-only name returns draftView

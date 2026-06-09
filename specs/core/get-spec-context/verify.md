@@ -15,6 +15,11 @@
 - **WHEN** `execute(input)` is called
 - **THEN** a `SpecNotFoundError` is thrown
 
+#### Scenario: Repository resolved through orchestrator
+
+- **WHEN** `GetSpecContext.execute()` is called for a specific workspace
+- **THEN** it resolves the corresponding `SpecRepository` using the `ListWorkspaces` orchestrator
+
 ### Requirement: Build context entry from metadata
 
 #### Scenario: Full mode produces full entry from fresh metadata
@@ -98,6 +103,11 @@
 - **WHEN** `execute(input)` is called without `followDeps`
 - **THEN** `entries` contains only the root spec
 
+#### Scenario: Transitive dependencies resolved via orchestrator
+
+- **WHEN** `GetSpecContext.execute()` traverses dependencies
+- **THEN** it resolves each target `SpecRepository` using the `ListWorkspaces` orchestrator
+
 ### Requirement: Depth limiting
 
 #### Scenario: Depth 0 returns only root
@@ -139,3 +149,12 @@
 
 - **WHEN** `execute(input)` is called
 - **THEN** each returned entry includes its resolved display mode
+
+### Requirement: Prefer LLM-optimized context
+
+#### Scenario: Uses optimized context for single spec
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** the spec has `optimizedContext` populated
+- **WHEN** `GetSpecContext` is executed
+- **THEN** the entry uses the optimized content

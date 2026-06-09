@@ -33,11 +33,11 @@ All data MUST flow through `SpecdDataPort` hooks; direct `@specd/core` imports a
 
 ### Requirement: shell routes archived changes through archived read port
 
-When the user opens a change from the Archive sidebar section, the shell MUST load detail via `getArchivedChange`, MUST skip active-change status polling, and MUST disable inspector save, validate, and `getChangeArtifact` loads.
+When the user opens a change from the Archive sidebar section, the shell MUST load detail via `getArchivedChange`, MUST skip active-change status polling, and MUST disable inspector save and validate. Archived artifact body reads MUST use the archived read-only artifact route, not active `getChangeArtifact`.
 
 ### Requirement: shell routes drafted and discarded changes through read-only ports
 
-When the open change name appears in the **Drafts** or **Discarded** sidebar collection (and not archived), the shell MUST set `listSection` to `draft` or `discarded` and MUST pass it to [`ui:hooks-changes-read`](../hooks-changes-read/spec.md) (`useChangesRead`, `useChangeArtifact`, and artifact list hooks). The shell MUST NOT call `getChange` or `getChangeStatus` for that name while it is shelved or discarded. Shelved read-only MUST mirror archived UX boundaries: banner in the center column, no Save/Validate in the inspector, Monaco `readOnly`, Overview editors disabled — without altering the existing archived snapshot flow (`getArchivedChange`, archived banner, archived artifact list).
+When the open change name appears in the **Drafts** or **Discarded** sidebar collection (and not archived), the shell MUST set `listSection` to `draft` or `discarded` and MUST pass it to [`ui:hooks-changes-read`](../hooks-changes-read/spec.md) (`useChangesRead`, `useChangeArtifact`, and artifact list hooks). The shell MUST NOT call `getChange` or `getChangeStatus` for that name while it is shelved or discarded. Shelved read-only MUST mirror archived UX boundaries: banner in the center column, no Save/Validate in the inspector, Monaco `readOnly`, Overview editors disabled — without altering the archived snapshot flow (`getArchivedChange`, archived banner, archived artifact list/body reads).
 
 ### Requirement: read-only change tabs load once (no per-change polling)
 
@@ -45,11 +45,15 @@ Global sidebar polling continues to refresh the lists, but the open drafted/disc
 
 ### Requirement: validate requires drift confirmation
 
-**Validate** and **Validate All** MUST show [`ui:validate-confirm-dialog`](../validate-confirm-dialog/spec.md) before calling `validateChange`. Scoped validate MUST pass `specId` and `artifactId` derived from the open change artifact; **Validate All** MUST validate each spec in `change.specIds` and MUST be offered from the change **Artifacts** tab (not the global top bar). Change tabs that require live change APIs (Tasks, Impact, Context) MUST show read-only messaging for archived context. Workflow and validation status from `getChangeStatus` MUST appear on the Overview tab only (not a separate Validation tab).
+**Validate** and **Validate All** MUST show [`ui:validate-confirm-dialog`](../validate-confirm-dialog/spec.md) before calling `validateChange`. Scoped validate MUST pass `specId` and `artifactId` derived from the open change artifact; **Validate All** MUST validate each spec in `change.specIds` and MUST be offered from the change **Artifacts** tab (not the global top bar). Change tabs that require live change APIs (Tasks, Coverage, Context) MUST show read-only messaging for archived context. Workflow and validation status from `getChangeStatus` MUST appear on the Overview tab only (not a separate Validation tab).
 
 ### Requirement: shell delegates tab-scoped polling to visible center tabs
 
-The global poll refresh key MUST NOT force every change or spec tab to refetch. Child views MUST adopt the latest global tick only while their tab is visible (frozen refresh key while hidden) so Artifacts, Tasks, spec Metadata, and similar tabs do not reload in the background.
+The global poll refresh key MUST NOT force every change or spec tab to refetch. Child views MUST adopt the latest global tick only while their tab is visible (frozen refresh key while hidden) so Artifacts, Tasks, spec Overview/Dependencies, and similar tabs do not reload in the background.
+
+### Requirement: opening a spec auto-selects the primary artifact
+
+When the user opens a spec in the workspace tree and that spec exposes a canonical `spec.md` artifact, the shell MUST preselect that `spec.md` artifact in the right inspector automatically.
 
 ### Requirement: bottom panel polls only the remote logs channel
 

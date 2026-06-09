@@ -73,6 +73,8 @@ export const specMetadataSchema = z
       })
       .optional(),
     generatedBy: z.enum(['core', 'agent']).optional(),
+    optimizedDescription: z.string().optional(),
+    optimizedContext: z.string().optional(),
   })
   .passthrough()
 
@@ -142,6 +144,8 @@ export const strictSpecMetadataSchema = z
       })
       .optional(),
     generatedBy: z.enum(['core', 'agent']).optional(),
+    optimizedDescription: z.string().min(1).optional(),
+    optimizedContext: z.string().min(1).optional(),
   })
   .passthrough()
 
@@ -212,6 +216,8 @@ export const permissiveSpecMetadataSchema = z
       })
       .optional(),
     generatedBy: z.enum(['core', 'agent']).optional(),
+    optimizedDescription: z.string().min(1).optional(),
+    optimizedContext: z.string().min(1).optional(),
   })
   .passthrough()
 
@@ -242,4 +248,6 @@ export interface SpecMetadata {
   }
   readonly generatedBy?: 'core' | 'agent'
   readonly originalHash?: string
+  readonly optimizedDescription?: string
+  readonly optimizedContext?: string
 }

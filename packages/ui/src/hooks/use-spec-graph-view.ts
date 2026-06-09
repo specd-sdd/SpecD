@@ -1,4 +1,5 @@
 import * as React from 'react'
+import type { GraphSpecCoverageDto } from '@specd/client'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
 import { useAsyncResource } from './use-async-resource.js'
 
@@ -6,7 +7,7 @@ export function useSpecGraphView(
   workspace: string | undefined,
   specPath: string | undefined,
   options: { refreshKey?: number; poll?: boolean } = {},
-): ReturnType<typeof useAsyncResource<Record<string, unknown>>> {
+): ReturnType<typeof useAsyncResource<GraphSpecCoverageDto>> {
   const port = useSpecdDataPort()
   const poll = options.poll ?? true
 
@@ -15,7 +16,7 @@ export function useSpecGraphView(
     [port, workspace, specPath],
   )
 
-  return useAsyncResource(`spec-graph-view:${workspace}:${specPath}`, load, {
+  return useAsyncResource<GraphSpecCoverageDto>(`spec-graph-view:${workspace}:${specPath}`, load, {
     enabled: Boolean(workspace && specPath),
     refreshKey: poll ? options.refreshKey : undefined,
   })

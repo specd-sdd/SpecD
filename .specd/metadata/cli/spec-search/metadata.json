@@ -1,7 +1,12 @@
 {
   "title": "Spec Search",
   "description": "Users need a dedicated command to search spec content by keyword. `specd specs search` provides relevance-ranked results by first attempting the code graph for fast, precise search, and falling back to `@specd/core`'s `SearchSpecs` use case (repository-based content search) when the graph is unavailable. Results are presented with titles, summaries, and workspace attribution in the same columnar style as `specs list`.",
-  "dependsOn": ["cli:entrypoint", "default:_global/spec-layout", "core:search-specs"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "default:_global/spec-layout",
+    "core:search-specs",
+    "core:list-workspaces"
+  ],
   "context": [
     "Users need a dedicated command to search spec content by keyword. `specd specs search` provides relevance-ranked results by first attempting the code graph for fast, precise search, and falling back to `@specd/core`'s `SearchSpecs` use case (repository-based content search) when the graph is unavailable. Results are presented with titles, summaries, and workspace attribution in the same columnar style as `specs list`."
   ],
@@ -15,7 +20,7 @@
     {
       "requirement": "Search execution",
       "rules": [
-        "The command MUST use the following search strategy:\n\n1. **Graph-first**: Attempt to use the code graph's spec search facility. If the graph is available and not stale, use it for fast, precise search results.\n2. **Core fallback**: When the graph is stale or unavailable and `--graph` is NOT set, fall back to `SearchSpecs.execute(query, options)` from `@specd/core`, which searches spec content via `SpecRepository.search()`. The command MUST print a warning to stderr indicating the fallback and that results may be less precise.\n3. **Graph-only error**: When `--graph` is set and the graph is stale or unavailable, the command MUST exit with code 1 and print an error message to stderr.\n\nIn both paths, the search MUST cover spec content (title, description, spec.md body)."
+        "The command MUST use the following search strategy:\n\n1. **Graph-first**: Attempt to use the code graph's spec search facility.\n2. **Core fallback**: When the graph is stale or unavailable, fall back to `SearchSpecs.execute()`. This use case SHALL obtain the orchestrated project structure via `ListWorkspaces` to perform the repository-based search."
       ]
     },
     {
@@ -72,27 +77,13 @@
     },
     {
       "requirement": "Search execution",
-      "name": "Graph available returns graph results",
-      "given": ["the code graph is indexed and fresh"],
-      "when": ["specd specs search \"config\" is run"],
-      "then": ["results are returned from the graph search", "AND no warning is printed to stderr"]
-    },
-    {
-      "requirement": "Search execution",
-      "name": "Graph unavailable falls back to core",
-      "given": ["the code graph is stale or unavailable"],
-      "when": ["specd specs search \"config\" is run"],
+      "name": "Fallback search uses orchestrated workspaces",
+      "given": ["the code graph is unavailable"],
+      "when": ["specd specs search \"test\" is run"],
       "then": [
-        "results are returned from SearchSpecs.execute()",
-        "AND a warning is printed to stderr indicating the fallback"
+        "SearchSpecs.execute() is called",
+        "AND it obtains the list of repositories via the ListWorkspaces orchestrator"
       ]
-    },
-    {
-      "requirement": "Search execution",
-      "name": "Graph-only flag with stale graph errors",
-      "given": ["the code graph is stale or unavailable"],
-      "when": ["specd specs search \"config\" --graph is run"],
-      "then": ["the command exits with code 1", "AND an error message is printed to stderr"]
     },
     {
       "requirement": "Workspace filtering",
@@ -180,9 +171,10 @@
       "then": ["the command exits with code 3"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:c8b7c69b475fa48b4387ca5450ae1d744e29aa5b9116a11baaa37ff5239bce7c",
-    "verify.md": "sha256:9d21264b7aa5e46d10f6fd5692cfe0fbcfa4bb28469186b6c318c42def4cf434"
+    "spec.md": "sha256:94ae0a514eb256d518639f58df931383174366ff38173a804bd392e82698af5d",
+    "verify.md": "sha256:af82b044b54989f9203e897dad7e08c4448d2b9be4331aaa0647356510aeaa35"
   },
   "generatedBy": "core"
 }

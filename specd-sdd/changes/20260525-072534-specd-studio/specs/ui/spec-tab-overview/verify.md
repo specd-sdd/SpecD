@@ -11,6 +11,13 @@
 - **THEN** spec metadata hook refetches
 - **AND** tree discovery still uses global poll
 
+#### Scenario: Overview replaces a dedicated metadata tab
+
+- **GIVEN** a loaded spec
+- **WHEN** user stays on Overview
+- **THEN** the user can read the current spec summary there
+- **AND** no separate **Metadata** tab is required
+
 #### Scenario: Hidden spec tab stops metadata poll
 
 - **GIVEN** user switches away from spec tab
@@ -25,20 +32,35 @@
 - **THEN** tree shows new node
 - **AND** spec tab poll does not scan filesystem directly
 
-### Requirement: linked changes tab lists overlaps for current spec
+### Requirement: linked changes tab lists active changes referencing the current spec
 
-#### Scenario: Linked Changes filters detectOverlaps by specId
+#### Scenario: Linked Changes filters active changes by specId
 
-- **GIVEN** open spec `core:kernel` and overlaps include other specs
+- **GIVEN** open spec `core:kernel`
+- **AND** active changes include one that contains `core:kernel` and another that does not
 - **WHEN** user selects Linked Changes tab
-- **THEN** UI calls `detectOverlaps`
-- **AND** lists only changes overlapping `core:kernel`
+- **THEN** UI lists only the change that references `core:kernel`
+- **AND** the data comes from the current spec detail payload
+- **AND** unrelated active changes are excluded
 
 #### Scenario: Linked Changes hidden tab pauses overlap poll
 
 - **GIVEN** user leaves Linked Changes tab
 - **WHEN** global poll ticks
-- **THEN** overlap list does not refetch until tab visible again
+- **THEN** linked-change list does not refetch until tab visible again
+
+#### Scenario: Linked Changes shows description and colored state
+
+- **GIVEN** a referenced active change has a description and lifecycle state
+- **WHEN** user selects Linked Changes
+- **THEN** the row shows the description text
+- **AND** the state badge uses the state color
+
+#### Scenario: No referencing active changes shows empty state
+
+- **GIVEN** no active change contains the current spec's `specId`
+- **WHEN** user selects Linked Changes
+- **THEN** the UI renders an explicit empty state
 
 ### Requirement: view uses SpecdDataPort hooks only
 

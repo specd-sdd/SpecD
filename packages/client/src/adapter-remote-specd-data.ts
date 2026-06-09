@@ -1,9 +1,10 @@
 import { withBearerAuth } from './adapter-bearer-auth.js'
 import { withProblemJsonErrors } from './adapter-problem-json-errors.js'
 import type { ArtifactContentDto } from './dto/artifact-content.js'
-import type { ArchivedChangeDetailDto, ArchivedChangeListItemDto } from './dto/archived-change.js'
+import type { ArchivedChangeDetailDto, ArchivedChangeListDto } from './dto/archived-change.js'
 import type { ChangeDetailDto } from './dto/change-detail.js'
 import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
+import type { GraphSpecCoverageDto } from './dto/graph-spec-coverage.js'
 import type {
   ImplementationReviewDto,
   UpdateImplementationTrackingResultDto,
@@ -20,6 +21,7 @@ import type { PreviewResultDto } from './dto/preview-result.js'
 import type { ProjectDto } from './dto/project.js'
 import type { ProjectStatusDto } from './dto/project-status.js'
 import type { SpecDetailDto } from './dto/spec-detail.js'
+import type { SpecContextDto } from './dto/spec-context.js'
 import type { ValidateBatchResultDto } from './dto/validate-batch-result.js'
 import type { ValidateResultDto } from './dto/validate-result.js'
 import type { WorkspaceSpecTreeDto } from './dto/workspace-spec-tree.js'
@@ -68,16 +70,19 @@ function archivedDetailToChangeDetail(dto: ArchivedChangeDetailDto): ChangeDetai
   return {
     name: dto.name,
     state: 'archived',
+    ...(dto.description !== undefined ? { description: dto.description } : {}),
     specIds: [...dto.specIds],
+    ...(dto.specDependsOn !== undefined ? { specDependsOn: dto.specDependsOn } : {}),
     schemaName: dto.schemaName,
     schemaVersion: dto.schemaVersion,
-    updatedAt: dto.archivedAt,
-    description: `Archived as ${dto.archivedName}`,
-    history: [{ type: 'archived', at: dto.archivedAt }],
+    updatedAt: dto.updatedAt,
+    history: dto.history,
+    workspaces: [...dto.workspaces],
+    artifacts: dto.artifacts.map((artifact) => ({ ...artifact })),
     archivedMeta: {
       archivedName: dto.archivedName,
       archivedAt: dto.archivedAt,
-      artifactTypes: [...dto.artifacts],
+      artifactTypes: dto.archivedMeta?.artifactTypes ?? [],
     },
   }
 }
@@ -86,6 +91,17 @@ function buildTransport(options: RemoteSpecdDataAdapterOptions): HttpTransport {
   const base = createHttpTransport({ apiBaseUrl: options.apiBaseUrl })
   const withAuth = withBearerAuth(base, options.bearerToken)
   return withProblemJsonErrors(withAuth)
+}
+
+function withArtifactFilename(
+  filename: string,
+  dto: Omit<ArtifactContentDto, 'filename'> | ArtifactContentDto,
+): ArtifactContentDto {
+  return {
+    filename,
+    content: dto.content,
+    originalHash: dto.originalHash,
+  }
 }
 
 /**
@@ -119,16 +135,20 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
   }
 
   async listArchived(signal?: AbortSignal): Promise<readonly ChangeSummaryDto[]> {
-    const items = await this._transport.request<readonly ArchivedChangeListItemDto[]>({
+    const archived = await this._transport.request<ArchivedChangeListDto>({
       method: 'GET',
       path: '/archived-changes',
       signal,
     })
-    return items.map((item) => ({
+    return archived.items.map((item) => ({
       name: item.name,
       state: 'archived',
-      description: item.archivedName,
-      updatedAt: undefined,
+      ...(item.description !== undefined
+        ? { description: item.description }
+        : { description: item.archivedName }),
+      specIds: [...item.specIds],
+      updatedAt: item.archivedAt,
+      blockerCount: 0,
     }))
   }
 
@@ -225,11 +245,13 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     filename: string,
     signal?: AbortSignal,
   ): Promise<ArtifactContentDto> {
-    return this._transport.request({
+    return this._transport
+      .request<Omit<ArtifactContentDto, 'filename'>>({
       method: 'GET',
       path: `/changes/${enc(name)}/artifacts/${enc(filename)}`,
       signal,
     })
+      .then((dto) => withArtifactFilename(filename, dto))
   }
 
   getReadOnlyChangeArtifact(
@@ -243,12 +265,14 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
         ? 'drafts'
         : readOnlyOrigin === 'discarded'
           ? 'discarded'
-          : 'archived'
-    return this._transport.request({
+          : 'archived-changes'
+    return this._transport
+      .request<Omit<ArtifactContentDto, 'filename'>>({
       method: 'GET',
       path: `/${base}/${enc(name)}/artifacts/${enc(filename)}`,
       signal,
     })
+      .then((dto) => withArtifactFilename(filename, dto))
   }
 
   getDraftArtifact(
@@ -527,7 +551,7 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
   }
 
   getSpec(workspace: string, specPath: string, signal?: AbortSignal): Promise<SpecDetailDto> {
-    return this._transport.request({
+    return this._transport.request<SpecDetailDto>({
       method: 'GET',
       path: `/workspaces/${enc(workspace)}/specs/${specPathSegments(specPath)}`,
       signal,
@@ -564,7 +588,7 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     workspace: string,
     specPath: string,
     query?: { readonly signal?: AbortSignal },
-  ): Promise<CompiledContextDto> {
+  ): Promise<SpecContextDto> {
     return this._transport.request({
       method: 'GET',
       path: `/workspaces/${enc(workspace)}/specs/${specPathSegments(specPath)}/context`,
@@ -615,7 +639,19 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     return this._transport.request({
       method: 'GET',
       path: '/graph/search',
-      query: { q: query.q, workspace: query.workspace, kind: query.kind, limit: query.limit },
+      query: {
+        q: query.q,
+        workspace: query.workspace,
+        limit: query.limit,
+        ...(query.kinds !== undefined ? { kinds: query.kinds.join(',') } : {}),
+        ...(query.filePattern !== undefined ? { filePattern: query.filePattern } : {}),
+        ...(query.excludePaths !== undefined ? { excludePaths: query.excludePaths.join(',') } : {}),
+        ...(query.excludeWorkspaces !== undefined
+          ? { excludeWorkspaces: query.excludeWorkspaces.join(',') }
+          : {}),
+        ...(query.symbols !== undefined ? { symbols: query.symbols } : {}),
+        ...(query.specs !== undefined ? { specs: query.specs } : {}),
+      },
       signal: query.signal,
     })
   }
@@ -627,7 +663,9 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
       query: {
         symbol: query.symbol,
         file: query.file,
+        spec: query.spec,
         direction: query.direction,
+        depth: query.depth,
       },
       signal: query.signal,
     })
@@ -641,7 +679,7 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     workspace: string,
     specPath: string,
     signal?: AbortSignal,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<GraphSpecCoverageDto> {
     return this._transport.request({
       method: 'GET',
       path: `/graph/specs/${enc(workspace)}/${specPathSegments(specPath)}`,

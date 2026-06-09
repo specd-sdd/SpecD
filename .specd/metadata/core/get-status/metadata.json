@@ -23,7 +23,7 @@
     {
       "requirement": "Returns the change and its artifact statuses",
       "rules": [
-        "On success, `execute()` MUST return a `GetStatusResult` containing:\n\n- `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists\n- `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes\n- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change\n- `review` — a derived review summary for agents and CLI serializers\n- `blockers` — an array of active blockers preventing progress\n- `nextAction` — a recommended next action to guide the actor\n\nResolution order:\n\n1. `ChangeRepository.get(name)` for active storage\n2. If null, `ChangeRepository.getDraft(name)` for drafted storage\n\nIf both are null, the use case MUST throw `ChangeNotFoundError`.\n\n`GetStatus` MUST NOT call `ChangeRepository.getDiscarded` or load `discarded/` storage. Discarded changes MUST be inspected via `GetDiscarded` (for example `specd discarded show`).\n\nWhen `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).\n\nEach `ArtifactStatusEntry` MUST contain:\n\n- `type` — the artifact type identifier (e.g. `'proposal'`, `'specs'`)\n- `state` — the persisted aggregate artifact state\n- `effectiveStatus` — the dependency-aware artifact status used for legacy compatibility and lifecycle explanations\n- `files` — an array of `ArtifactFileStatus` objects, one per file in the artifact\n\nEach `ArtifactFileStatus` MUST contain:\n\n- `key` — the file key (artifact type id for `scope: change`, spec ID for `scope: spec`)\n- `filename` — the relative filename within the change directory\n- `state` — the persisted state of that individual file\n- `validatedHash` — the stored validation hash or skip sentinel\n\nThe `review` object MUST contain:\n\n- `required: boolean`\n- `route: 'designing' | null`\n- `reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`\n- `affectedArtifacts` — a grouped list of artifact IDs with concrete affected files currently in `pending-review` or `drifted-pending-review`\n- `overlapDetail` — details about overlapping changes when reason is `spec-overlap-conflict`\n\nA `Blocker` object MUST contain:\n\n- `code` — a unique machine-readable error code (e.g. `'ARTIFACT_DRIFT'`, `'MISSING_ARTIFACT'`)\n- `message` — a human-readable description of the blocker\n\nThe `nextAction` object MUST contain:\n\n- `targetStep` — the lifecycle step this action targets\n- `actionType` — `'cognitive'` (requires human/agent thought) or `'mechanical'` (can be automated)\n- `reason` — a short human-readable reason for the recommendation\n- `command` — the recommended CLI command to run\n\nEach review file entry inside `affectedArtifacts` MUST contain:\n\n- `filename` — the artifact file's relative filename within the change directory\n- `path` — the artifact file's absolute filesystem path\n- `key` — the file key used internally to match persisted invalidation history to current artifact files; included as supplemental context, not as the primary outward-facing identifier\n\n`review.required` is `true` if at least one file is in `pending-review` or `drifted-pending-review`; otherwise it is `false`.\n\n`review.reason` is:\n\n- `'artifact-drift'` when at least one file is `drifted-pending-review`\n- `'spec-overlap-conflict'` when no file is drifted, but unhandled overlap invalidations exist\n- `'artifact-review-required'` when no file is drifted or overlapping, but at least one file is `pending-review`\n- `null` when `review.required` is `false`\n\n`review.route` is `'designing'` whenever `review.required` is `true`, otherwise `null`.\n\n`GetStatus` MUST resolve `review.affectedArtifacts` against the current artifact file entries so agent-facing consumers can inspect the actual file directly. The outward-facing review summary MUST prioritize `filename` and `path`; consumers must not need to understand manifest-internal file keys in order to locate the affected artifact."
+        "On success, `execute()` MUST return a `GetStatusResult` containing:\n\n- `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists\n- `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes\n- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change\n- `specDependsOn` — the map of declared spec dependencies from the change manifest\n- `review` — a derived review summary for agents and CLI serializers\n- `blockers` — an array of active blockers preventing progress\n- `nextAction` — a recommended next action to guide the actor\n\nResolution order:\n\n1. `ChangeRepository.get(name)` for active storage\n2. If null, `ChangeRepository.getDraft(name)` for drafted storage\n\nIf both are null, the use case MUST throw `ChangeNotFoundError`.\n\n`GetStatus` MUST NOT call `ChangeRepository.getDiscarded` or load `discarded/` storage. Discarded changes MUST be inspected via `GetDiscarded` (for example `specd discarded show`).\n\nWhen `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).\n\n(rest of requirement content remains unchanged...)"
       ]
     },
     {
@@ -170,6 +170,13 @@
         "the history length after the second call equals the history length after the first call",
         "AND the change remains in designing"
       ]
+    },
+    {
+      "requirement": "Returns the change and its artifact statuses",
+      "name": "Result includes specDependsOn",
+      "given": ["a change with declared spec dependencies in its manifest"],
+      "when": ["execute() is called for that change"],
+      "then": ["result.specDependsOn matches the change's specDependsOn map"]
     },
     {
       "requirement": "Drafted change read-only status",
@@ -490,6 +497,16 @@
       }
     ],
     "symbols": [
+      {
+        "specId": "core:get-status",
+        "file": "core:src/application/use-cases/get-status.ts",
+        "symbol": "GetStatusResult"
+      },
+      {
+        "specId": "core:get-status",
+        "file": "core:src/application/use-cases/get-status.ts",
+        "symbol": "GetStatus"
+      },
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",

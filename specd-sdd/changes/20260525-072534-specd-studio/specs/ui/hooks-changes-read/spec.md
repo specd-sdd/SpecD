@@ -10,7 +10,11 @@ Shelved drafts and discarded changes live outside the active change store; read 
 
 ### Requirement: read hooks route by sidebar list section
 
-`useChangesRead`, `useChangeArtifact`, and `useChangeArtifactList` MUST accept an optional `listSection` (`active` | `draft` | `discarded` | null). When `listSection` is `draft`, hooks MUST call `getDraft`, `getDraftStatus`, `listDraftArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `draft`. When `listSection` is `discarded`, hooks MUST call `getDiscarded`, `getDiscardedStatus`, `listDiscardedArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `discarded`. Otherwise hooks MUST call the active-change methods (`getChange`, `getChangeStatus`, `listChangeArtifacts`, `getChangeArtifact`).
+`useChangesRead`, `useChangeArtifact`, `useChangeArtifactList`, and multi-file change artifact readers MUST accept an optional `listSection` (`active` | `draft` | `discarded` | null). When `listSection` is `draft`, hooks MUST call `getDraft`, `getDraftStatus`, `listDraftArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `draft`. When `listSection` is `discarded`, hooks MUST call `getDiscarded`, `getDiscardedStatus`, `listDiscardedArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `discarded`. Otherwise hooks MUST call the active-change methods (`getChange`, `getChangeStatus`, `listChangeArtifacts`, `getChangeArtifact`).
+
+Archived change detail remains loaded through `getArchivedChange`, but artifact body reads for archived snapshots MUST route through `getReadOnlyChangeArtifact(..., 'archived')`. Archived artifact lists MAY come directly from archived detail instead of `listChangeArtifacts`.
+
+Artifact list hooks MUST preserve task metadata (`hasTasks`, optional task counters) from the port so downstream UI can resolve task-capable files without relying on a fixed filename.
 
 Shared routing logic MAY live in `change-read-routes` under `@specd/ui`. Cache keys MUST include the section bucket so switching lists does not reuse stale active-change data.
 

@@ -5,6 +5,7 @@ import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createVcsActorResolver } from '../actor-resolver.js'
 import { createSpecRepository } from '../spec-repository.js'
+import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -32,6 +33,8 @@ export interface FsCreateChangeOptions {
   readonly draftsPath: string
   /** Absolute path to the `discarded/` directory for abandoned changes. */
   readonly discardedPath: string
+  /** The project orchestrator. */
+  readonly listWorkspaces: ListWorkspaces
 }
 
 /**
@@ -100,18 +103,9 @@ export function createCreateChange(
       ]),
     )
     const actor = createVcsActorResolver()
-    return new CreateChange(changeRepo, specRepos, actor)
+    return new CreateChange(changeRepo, new ListWorkspaces(config, specRepos), actor)
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const specRepos = new Map([
-    [
-      configOrContext.workspace,
-      createSpecRepository('fs', configOrContext, {
-        specsPath: path.join(options!.changesPath, '..', '..', 'specs'),
-        metadataPath: path.join(options!.changesPath, '..', '.specd', 'metadata'),
-      }),
-    ],
-  ])
   const actor = createVcsActorResolver()
-  return new CreateChange(changeRepo, specRepos, actor)
+  return new CreateChange(changeRepo, options!.listWorkspaces, actor)
 }

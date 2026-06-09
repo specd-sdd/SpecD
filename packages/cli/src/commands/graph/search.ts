@@ -6,6 +6,7 @@ import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { assertGraphIndexUnlocked } from './graph-index-lock.js'
+import { normalizeSnippet } from './normalize-snippet.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -25,9 +26,10 @@ export function registerGraphSearch(parent: Command): void {
   parent
     .command('search <query>')
     .allowExcessArguments(false)
-    .description('Full-text search across symbols and specs')
+    .description('Full-text search across symbols, specs, and documents')
     .option('--symbols', 'search only symbols')
     .option('--specs', 'search only specs')
+    .option('--documents', 'search only documents')
     .addOption(new Option('--kind <kinds>', 'filter symbols by kind (comma-separated)'))
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
@@ -81,6 +83,7 @@ Exclude examples:
         opts: {
           symbols?: boolean
           specs?: boolean
+          documents?: boolean
           kind?: string
           config?: string
           path?: string
@@ -104,7 +107,7 @@ Exclude examples:
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
-        const searchBoth = !opts.symbols && !opts.specs
+        const searchBoth = !opts.symbols && !opts.specs && !opts.documents
         const kinds = (() => {
           try {
             return parseGraphKinds(opts.kind)
@@ -141,32 +144,65 @@ Exclude examples:
             searchBoth || opts.symbols ? await provider.searchSymbols(searchOptions) : []
           const specResults =
             searchBoth || opts.specs ? await provider.searchSpecs(searchOptions) : []
+          const documentResults =
+            searchBoth || opts.documents ? await provider.searchDocuments(searchOptions) : []
+
+          const toDisplayPath = async (canonicalPath: string): Promise<string> => {
+            const file = await provider.getFile(canonicalPath)
+            if (file) return file.configRelativePath
+            const document = await provider.getDocument(canonicalPath)
+            if (document) return document.configRelativePath
+            const idx = canonicalPath.indexOf(':')
+            return idx === -1 ? canonicalPath : canonicalPath.substring(idx + 1)
+          }
 
           if (fmt === 'text') {
             const lines: string[] = []
 
             if (symbolResults.length > 0) {
-              lines.push(`Symbols (${String(symbolResults.length)}):`)
-              for (const { symbol, score } of symbolResults) {
+              lines.push(`Symbols (${String(symbolResults.length)} shown, limit ${String(limit)}):`)
+              for (const { symbol, snippet, startLine, endLine } of symbolResults) {
                 const sepIndex = symbol.filePath.indexOf(':')
                 const ws = sepIndex !== -1 ? symbol.filePath.substring(0, sepIndex) : ''
-                const relPath =
-                  sepIndex !== -1 ? symbol.filePath.substring(sepIndex + 1) : symbol.filePath
-                const comment = symbol.comment ? ` — ${symbol.comment.substring(0, 50)}` : ''
-                lines.push(
-                  `  ${score.toFixed(1).padStart(5)}  [${ws}] ${symbol.kind} ${symbol.name}  ${relPath}:${String(symbol.line)}${comment}`,
-                )
+                const relPath = await toDisplayPath(symbol.filePath)
+                lines.push(`  [${ws}] ${symbol.kind} ${symbol.name}`)
+                lines.push(`    ${relPath}:${String(symbol.line)}`)
+                if (snippet) {
+                  lines.push(`    snippet @ L${String(startLine)}-L${String(endLine)}:`)
+                  lines.push('      >>>')
+                  lines.push(normalizeSnippet(snippet, { margin: 6 }))
+                  lines.push('      <<<')
+                }
               }
             }
 
             if (specResults.length > 0) {
               if (lines.length > 0) lines.push('')
-              lines.push(`Specs (${String(specResults.length)}):`)
-              for (const { spec, score } of specResults) {
-                const desc = spec.description ? ` — ${spec.description.substring(0, 60)}` : ''
-                lines.push(
-                  `  ${score.toFixed(1).padStart(5)}  [${spec.workspace}] ${spec.specId}${desc}`,
-                )
+              lines.push(`Specs (${String(specResults.length)} shown, limit ${String(limit)}):`)
+              for (const { spec, snippet, startLine, endLine } of specResults) {
+                lines.push(`  [${spec.workspace}] ${spec.specId}`)
+                if (snippet) {
+                  lines.push(`    snippet @ L${String(startLine)}-L${String(endLine)}:`)
+                  lines.push('      >>>')
+                  lines.push(normalizeSnippet(snippet, { margin: 6 }))
+                  lines.push('      <<<')
+                }
+              }
+            }
+
+            if (documentResults.length > 0) {
+              if (lines.length > 0) lines.push('')
+              lines.push(
+                `Documents (${String(documentResults.length)} shown, limit ${String(limit)}):`,
+              )
+              for (const { document, snippet, startLine, endLine } of documentResults) {
+                lines.push(`  [${document.workspace}] ${document.configRelativePath}`)
+                if (snippet) {
+                  lines.push(`    snippet @ L${String(startLine)}-L${String(endLine)}:`)
+                  lines.push('      >>>')
+                  lines.push(normalizeSnippet(snippet, { margin: 6 }))
+                  lines.push('      <<<')
+                }
               }
             }
 
@@ -178,14 +214,17 @@ Exclude examples:
           } else {
             output(
               {
-                symbols: symbolResults.map(({ symbol, score }) => ({
+                symbols: symbolResults.map(({ symbol, score, snippet, startLine, endLine }) => ({
                   workspace: symbol.filePath.includes(':')
                     ? symbol.filePath.substring(0, symbol.filePath.indexOf(':'))
                     : '',
                   symbol,
                   score,
+                  snippet,
+                  startLine,
+                  endLine,
                 })),
-                specs: specResults.map(({ spec, score }) => ({
+                specs: specResults.map(({ spec, score, snippet, startLine, endLine }) => ({
                   workspace: spec.workspace,
                   specId: spec.specId,
                   path: spec.path,
@@ -193,7 +232,21 @@ Exclude examples:
                   description: spec.description,
                   ...(opts.specContent ? { content: spec.content } : {}),
                   score,
+                  snippet,
+                  startLine,
+                  endLine,
                 })),
+                documents: documentResults.map(
+                  ({ document, score, snippet, startLine, endLine }) => ({
+                    workspace: document.workspace,
+                    path: document.path,
+                    configRelativePath: document.configRelativePath,
+                    score,
+                    snippet,
+                    startLine,
+                    endLine,
+                  }),
+                ),
               },
               fmt,
             )

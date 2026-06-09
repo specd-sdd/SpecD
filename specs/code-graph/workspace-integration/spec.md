@@ -8,15 +8,20 @@
 
 ### Requirement: FileNode path and workspace semantics
 
-`FileNode.path` SHALL be globally unique by prefixing the workspace name to the code-root-relative path:
+All node identities (Files and Documents) SHALL be globally unique by prefixing the owning workspace name to the relative path:
 
-- **`path`** = `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`)
-- **`workspace`** = workspace name string (e.g. `core`, `cli`, `default`)
-- **`configRelativePath`** = path from the directory containing the active `specd.yaml` to the same file on disk (e.g. `packages/core/src/index.ts`)
+- **Workspace Identity**: `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`).
+- **Root Identity**: `root:{projectRelativePath}` (e.g. `root:docs/adr/0001.md`).
 
-`path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations. `configRelativePath` exists for user-facing lookup when commands receive file paths without an explicit workspace prefix.
+`root` is a reserved namespace for files discovered via project-global `graph.includePaths` that are not owned by any specific workspace.
 
-This ensures that two workspaces with identical relative paths (e.g. both having `src/index.ts`) produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
+If a physical file falls under a configured workspace `codeRoot`, the workspace identity wins. The same file MUST NOT also be persisted under a `root:` identity.
+
+`path` remains the canonical graph identity used by `SymbolNode.filePath`, symbol ids, and persisted relations.
+
+Each node MUST also store its `configRelativePath` (relative to the directory containing the active `specd.yaml`) to enable user-facing lookups from project-relative path selectors.
+
+This ensures that two workspaces with identical relative paths produce distinct `FileNode.path` values while still allowing CLI users to resolve file arguments using repository-style paths relative to the active config. The workspace name is the `SpecdWorkspaceConfig.name` from the specd configuration.
 
 ### Requirement: SymbolNode ID includes workspace
 
@@ -55,27 +60,16 @@ This lookup is in addition to canonical workspace-prefixed graph identity; it do
 
 ### Requirement: Spec resolution via SpecRepository
 
-Instead of brute-walking a `specs/` directory, each workspace provides a callback function that returns discovered specs:
+The indexer SHALL resolve specs by directly consuming the `SpecRepository` instance from each orchestrated workspace. For each spec:
 
-```typescript
-interface WorkspaceIndexTarget {
-  readonly name: string
-  readonly codeRoot: string
-  readonly specs: () => Promise<DiscoveredSpec[]>
-}
-```
+1. Enumerate identities via `repo.list()`.
+2. Check freshness via `repo.specHash()`.
+3. Load content by concatenating artifacts from `repo.artifact()`. Artifact filenames come from `spec.filenames` and no longer include metadata files. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order.
+4. Load metadata via `repo.metadata()` to extract `title` and `description`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
+5. Load `dependsOn` via `repo.readPersistedDependsOn()`.
+6. Load coverage links via `repo.readPersistedImplementation()`.
 
-The `specs` callback is implemented by the CLI/MCP integration layer using `SpecRepository` from `@specd/core`:
-
-1. Call `repo.list()` to get all `Spec` entities in the workspace
-2. For each spec, load all artifacts via `repo.artifact(spec, filename)` — artifact filenames come from `spec.filenames` and no longer include metadata files
-3. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order
-4. Load metadata via `repo.metadata(spec)` to extract `title`, `description`, and `dependsOn`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
-5. Build the `specId` as `{workspace}:{specPath}` (e.g. `core:change`), matching the format produced by `SpecRepository.resolveFromPath`
-
-This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
-
-The `DiscoveredSpec` type is re-exported from `@specd/code-graph` for use by integration layers.
+The indexer SHALL NOT rely on the CLI to precompute these semantics or provide callbacks. This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
 
 ### Requirement: Cross-workspace import resolution
 
@@ -89,33 +83,35 @@ The in-memory `SymbolIndex` holds symbols from ALL workspaces before Pass 2 begi
 
 ### Requirement: WorkspaceIndexTarget
 
-`IndexOptions` SHALL accept an array of `WorkspaceIndexTarget` objects instead of a single `workspacePath`:
+`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:
 
-```typescript
-interface WorkspaceIndexTarget {
-  readonly name: string
-  readonly codeRoot: string
-  readonly specs: () => Promise<DiscoveredSpec[]>
-  readonly repoRoot?: string
+```ts
+interface ProjectGraphConfig {
+  readonly includePaths?: readonly string[]
   readonly excludePaths?: readonly string[]
-  readonly respectGitignore?: boolean
+  readonly workspaces?: ReadonlyMap<
+    string,
+    {
+      readonly allowedPaths?: readonly string[]
+      readonly excludePaths?: readonly string[]
+      readonly respectGitignore?: boolean
+    }
+  >
 }
 
 interface IndexOptions {
-  readonly workspaces: readonly WorkspaceIndexTarget[]
   readonly projectRoot: string
+  readonly workspaces: readonly ProjectWorkspace[]
+  readonly graphConfig: ProjectGraphConfig
   readonly onProgress?: IndexProgressCallback
   readonly chunkBytes?: number
   readonly vcsRef?: string
 }
 ```
 
-- **`workspaces`** — one entry per workspace to index
-- **`projectRoot`** — absolute path to the monorepo/project root (for monorepo package resolution)
-- **`excludePaths`** — optional gitignore-syntax patterns passed through to `discoverFiles`. When absent, built-in defaults apply. When present, replaces built-in defaults entirely.
-- **`respectGitignore`** — optional boolean passed through to `discoverFiles`. Defaults to `true`.
+The `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.
 
-These fields are populated by the CLI/MCP integration layer from `SpecdWorkspaceConfig.graph`. When `SpecdWorkspaceConfig.graph` is absent, the fields are omitted from `WorkspaceIndexTarget` (triggering built-in defaults in `discoverFiles`).
+`ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`.
 
 ### Requirement: Per-workspace IndexResult breakdown
 

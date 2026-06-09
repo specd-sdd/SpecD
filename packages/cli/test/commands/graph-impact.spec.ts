@@ -47,10 +47,32 @@ function setup() {
     detectChanges: vi.fn(),
     findSymbols: vi.fn(),
     getSpec: vi.fn(),
-    getFile: vi.fn().mockResolvedValue({ path: 'src/auth.ts', workspace: 'core' }),
+    getSymbol: vi.fn().mockImplementation(async (id: string) => ({
+      id,
+      name: id.includes(':') ? (id.split(':').at(-3) ?? 'symbol') : 'symbol',
+      kind: 'function',
+      filePath: id.includes(':') ? id.split(':').slice(0, 2).join(':') : 'core:src/auth.ts',
+      line: 10,
+      column: 0,
+    })),
+    getFile: vi.fn().mockResolvedValue({
+      path: 'core:src/auth.ts',
+      configRelativePath: 'packages/core/src/auth.ts',
+      workspace: 'core',
+    }),
+    getDocument: vi.fn().mockResolvedValue(undefined),
     findFilesByConfigRelativePath: vi
       .fn()
       .mockResolvedValue([{ path: 'src/auth.ts', workspace: 'core' }]),
+    resolveFileSelector: vi.fn().mockResolvedValue([
+      {
+        canonicalPath: 'core:src/auth.ts',
+        configRelativePath: 'packages/core/src/auth.ts',
+        workspace: 'core',
+        kind: 'file',
+      },
+    ]),
+    resolveSymbolSelector: vi.fn().mockResolvedValue([]),
   }
   vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
     await fn(mockProvider as never)
@@ -120,7 +142,7 @@ describe('graph impact', () => {
         'dependents',
       ])
 
-      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('src/auth.ts', 'upstream', 3)
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('core:src/auth.ts', 'upstream', 3)
     })
 
     it('maps dependencies alias to downstream provider direction', async () => {
@@ -148,7 +170,11 @@ describe('graph impact', () => {
         'dependencies',
       ])
 
-      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('src/auth.ts', 'downstream', 3)
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith(
+        'core:src/auth.ts',
+        'downstream',
+        3,
+      )
     })
 
     it('keeps compatibility direction values accepted', async () => {
@@ -188,11 +214,16 @@ describe('graph impact', () => {
 
       expect(mockProvider.analyzeFileImpact).toHaveBeenNthCalledWith(
         1,
-        'src/auth.ts',
+        'core:src/auth.ts',
         'downstream',
         3,
       )
-      expect(mockProvider.analyzeFileImpact).toHaveBeenNthCalledWith(2, 'src/auth.ts', 'both', 3)
+      expect(mockProvider.analyzeFileImpact).toHaveBeenNthCalledWith(
+        2,
+        'core:src/auth.ts',
+        'both',
+        3,
+      )
     })
 
     it('rejects invalid direction before resolving graph context', async () => {
@@ -239,7 +270,7 @@ describe('graph impact', () => {
       const program = makeImpactProgram()
       await program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts'])
 
-      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('src/auth.ts', 'upstream', 3)
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('core:src/auth.ts', 'upstream', 3)
     })
 
     it('passes custom depth to analyzeFileImpact', async () => {
@@ -268,7 +299,7 @@ describe('graph impact', () => {
         '5',
       ])
 
-      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('src/auth.ts', 'upstream', 5)
+      expect(mockProvider.analyzeFileImpact).toHaveBeenCalledWith('core:src/auth.ts', 'upstream', 5)
     })
 
     it('passes depth to analyzeImpact for --symbol', async () => {
@@ -281,7 +312,13 @@ describe('graph impact', () => {
         line: 10,
         column: 0,
       }
-      mockProvider.findSymbols.mockResolvedValue([sym])
+      mockProvider.resolveSymbolSelector.mockResolvedValue([
+        {
+          symbolId: sym.id,
+          filePath: sym.filePath,
+          matchKind: 'full-id',
+        },
+      ])
       mockProvider.analyzeImpact.mockResolvedValue({
         target: sym.id,
         directDependents: 0,
@@ -427,7 +464,7 @@ describe('graph impact', () => {
       await program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts'])
 
       const out = getStdout()
-      expect(out).toContain('Impact analysis for src/auth.ts')
+      expect(out).toContain('Impact analysis for packages/core/src/auth.ts')
       expect(out).not.toContain('depth=')
     })
   })
@@ -599,7 +636,13 @@ describe('graph impact', () => {
         line: 10,
         column: 0,
       }
-      mockProvider.findSymbols.mockResolvedValue([sym])
+      mockProvider.resolveSymbolSelector.mockResolvedValue([
+        {
+          symbolId: sym.id,
+          filePath: 'core:src/auth.ts',
+          matchKind: 'qualified',
+        },
+      ])
       mockProvider.analyzeImpact.mockResolvedValue({
         target: sym.id,
         directDependents: 2,
@@ -621,7 +664,7 @@ describe('graph impact', () => {
       ])
 
       const out = getStdout()
-      expect(out).toContain('Impact analysis for function validate (src/auth.ts:10)')
+      expect(out).toContain('Impact analysis for function validate (packages/core/src/auth.ts:10)')
     })
 
     it('reports multiple matching symbols', async () => {
@@ -652,7 +695,13 @@ describe('graph impact', () => {
           column: 0,
         },
       ]
-      mockProvider.findSymbols.mockResolvedValue(symbols)
+      mockProvider.resolveSymbolSelector.mockResolvedValue(
+        symbols.map((symbol) => ({
+          symbolId: symbol.id,
+          filePath: symbol.filePath,
+          matchKind: 'name',
+        })),
+      )
       mockProvider.analyzeImpact.mockResolvedValue({
         target: 'sym',
         directDependents: 0,
@@ -679,7 +728,7 @@ describe('graph impact', () => {
 
     it('reports no matching symbol without error exit', async () => {
       const { mockProvider, getStdout } = setup()
-      mockProvider.findSymbols.mockResolvedValue([])
+      mockProvider.resolveSymbolSelector.mockResolvedValue([])
 
       await makeImpactProgram().parseAsync([
         'node',
@@ -699,15 +748,26 @@ describe('graph impact', () => {
   describe('multi-file aggregation', () => {
     it('resolves multiple file selectors and aggregates results', async () => {
       const { mockProvider, getStdout } = setup()
-      mockProvider.getFile.mockImplementation(async (raw: string) => {
-        if (raw === 'src/auth.ts') return { path: 'src/auth.ts', workspace: 'core' }
-        if (raw === 'src/model.ts') return { path: 'src/model.ts', workspace: 'core' }
-        return null
-      })
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/auth.ts',
+          configRelativePath: 'packages/core/src/auth.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/model.ts',
+          configRelativePath: 'packages/core/src/model.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
       mockProvider.analyzeFileImpact.mockImplementation(async (filePath: string) => {
-        if (filePath === 'src/auth.ts') {
+        if (filePath === 'core:src/auth.ts') {
           return {
-            target: 'src/auth.ts',
+            target: 'core:src/auth.ts',
             directDependents: 2,
             indirectDependents: 0,
             transitiveDependents: 0,
@@ -717,7 +777,7 @@ describe('graph impact', () => {
             affectedProcesses: [],
             symbols: [
               {
-                target: 'src/auth.ts:function:validate:10:0',
+                target: 'core:src/auth.ts:function:validate:10:0',
                 riskLevel: 'LOW',
                 directDependents: 1,
               },
@@ -725,7 +785,7 @@ describe('graph impact', () => {
           }
         }
         return {
-          target: 'src/model.ts',
+          target: 'core:src/model.ts',
           directDependents: 1,
           indirectDependents: 0,
           transitiveDependents: 0,
@@ -735,7 +795,7 @@ describe('graph impact', () => {
           affectedProcesses: [],
           symbols: [
             {
-              target: 'src/model.ts:function:create:20:0',
+              target: 'core:src/model.ts:function:create:20:0',
               riskLevel: 'LOW',
               directDependents: 0,
             },
@@ -755,22 +815,33 @@ describe('graph impact', () => {
       ])
 
       const out = getStdout()
-      expect(out).toContain('src/auth.ts, src/model.ts')
+      expect(out).toContain('packages/core/src/auth.ts, packages/core/src/model.ts')
       expect(out).toContain('Changed symbols:')
       expect(mockProvider.analyzeFileImpact).toHaveBeenCalledTimes(2)
     })
 
     it('includes aggregated affected files from all targets', async () => {
       const { mockProvider, getStdout } = setup()
-      mockProvider.getFile.mockImplementation(async (raw: string) => {
-        if (raw === 'src/a.ts') return { path: 'src/a.ts', workspace: 'core' }
-        if (raw === 'src/b.ts') return { path: 'src/b.ts', workspace: 'core' }
-        return null
-      })
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/a.ts',
+          configRelativePath: 'packages/core/src/a.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/b.ts',
+          configRelativePath: 'packages/core/src/b.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
       mockProvider.analyzeFileImpact.mockImplementation(async (filePath: string) => {
-        if (filePath === 'src/a.ts') {
+        if (filePath === 'core:src/a.ts') {
           return {
-            target: 'src/a.ts',
+            target: 'core:src/a.ts',
             directDependents: 1,
             indirectDependents: 0,
             transitiveDependents: 0,
@@ -782,7 +853,7 @@ describe('graph impact', () => {
           }
         }
         return {
-          target: 'src/b.ts',
+          target: 'core:src/b.ts',
           directDependents: 1,
           indirectDependents: 0,
           transitiveDependents: 0,
@@ -848,15 +919,26 @@ describe('graph impact', () => {
 
     it('outputs valid JSON with per-file breakdown for multiple files', async () => {
       const { mockProvider, getStdout } = setup()
-      mockProvider.getFile.mockImplementation(async (raw: string) => {
-        if (raw === 'src/a.ts') return { path: 'src/a.ts', workspace: 'core' }
-        if (raw === 'src/b.ts') return { path: 'src/b.ts', workspace: 'core' }
-        return null
-      })
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/a.ts',
+          configRelativePath: 'packages/core/src/a.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
+      mockProvider.resolveFileSelector.mockResolvedValueOnce([
+        {
+          canonicalPath: 'core:src/b.ts',
+          configRelativePath: 'packages/core/src/b.ts',
+          workspace: 'core',
+          kind: 'file',
+        },
+      ])
       mockProvider.analyzeFileImpact.mockImplementation(async (filePath: string) => {
-        if (filePath === 'src/a.ts') {
+        if (filePath === 'core:src/a.ts') {
           return {
-            target: 'src/a.ts',
+            target: 'core:src/a.ts',
             directDependents: 1,
             indirectDependents: 0,
             transitiveDependents: 0,
@@ -868,7 +950,7 @@ describe('graph impact', () => {
           }
         }
         return {
-          target: 'src/b.ts',
+          target: 'core:src/b.ts',
           directDependents: 0,
           indirectDependents: 0,
           transitiveDependents: 0,
@@ -898,7 +980,49 @@ describe('graph impact', () => {
       expect(parsed).toHaveProperty('targets')
       expect(parsed).toHaveProperty('affectedFiles')
       expect(parsed).toHaveProperty('perFile')
-      expect(parsed.targets).toEqual(['src/a.ts', 'src/b.ts'])
+      expect(parsed.targets).toEqual(['core:src/a.ts', 'core:src/b.ts'])
+    })
+
+    it('resolves project-relative symbol selectors through provider normalization', async () => {
+      const { mockProvider } = setup()
+      const sym = {
+        id: 'core:src/auth.ts:function:validate:10:0',
+        name: 'validate',
+        kind: 'function',
+        filePath: 'core:src/auth.ts',
+        line: 10,
+        column: 0,
+      }
+      mockProvider.resolveSymbolSelector.mockResolvedValue([
+        {
+          symbolId: sym.id,
+          filePath: sym.filePath,
+          matchKind: 'qualified',
+        },
+      ])
+      mockProvider.analyzeImpact.mockResolvedValue({
+        target: sym.id,
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--symbol',
+        'packages/core/src/auth.ts:function:validate',
+      ])
+
+      expect(mockProvider.resolveSymbolSelector).toHaveBeenCalledWith(
+        'packages/core/src/auth.ts:function:validate',
+      )
     })
   })
 })

@@ -12,5 +12,9 @@ export interface SpecDetailDto {
     readonly filename: string
     readonly hash?: string
   }[]
-  readonly linkedChanges: readonly string[]
+  readonly linkedChanges: readonly {
+    readonly name: string
+    readonly description?: string
+    readonly state: string
+  }[]
 }

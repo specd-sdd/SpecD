@@ -1,9 +1,9 @@
-import type { SpecdConfig } from '@specd/core'
 import type { Skill } from '../../domain/skill.js'
 import type { SkillBundle } from '../../domain/skill-bundle.js'
+import type { SkillTemplateContext } from '../../domain/template-context.js'
 
 /**
- * Shared template file referenced by one or more skills.
+ * Shared template file available to skills that require it.
  */
 export interface SharedFile {
   /**
@@ -15,11 +15,6 @@ export interface SharedFile {
    * Shared file content.
    */
   readonly content: string
-
-  /**
-   * Skill names that consume this shared file.
-   */
-  readonly skills: readonly string[]
 }
 
 /**
@@ -45,18 +40,13 @@ export interface SkillRepository {
    * Resolves a concrete bundle for installation.
    *
    * @param name - Skill name.
-   * @param variables - Placeholder substitution values.
-   * @param config - Optional project configuration for built-in variables.
+   * @param context - Structured install-time render context.
    * @returns Resolved install bundle.
    *
    * Shared files included from `templates/shared` MUST preserve their shared
    * origin metadata in the resolved bundle output.
    */
-  getBundle(
-    name: string,
-    variables?: Readonly<Record<string, string>>,
-    config?: SpecdConfig,
-  ): SkillBundle
+  getBundle(name: string, context?: SkillTemplateContext): SkillBundle
 
   /**
    * Lists shared files declared under `templates/shared`.

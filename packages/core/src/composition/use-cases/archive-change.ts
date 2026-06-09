@@ -1,6 +1,5 @@
 import * as path from 'node:path'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
-import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
@@ -26,32 +25,31 @@ import {
   FsArchiveBatchSnapshot,
   type ArchiveBatchSnapshotWorkspaceLayout,
 } from '../../infrastructure/fs/archive-batch-snapshot.js'
-import { createNoopArchiveBatchSnapshot } from '../../application/archive-batch-snapshot-noop.js'
 import { type ArchiveBatchSnapshotPort } from '../../application/ports/archive-batch-snapshot.js'
 import { FsSpecRepository } from '../../infrastructure/fs/spec-repository.js'
+import {
+  ListWorkspaces,
+  type ProjectWorkspace,
+} from '../../application/use-cases/list-workspaces.js'
 
 /**
  * Builds workspace spec layout map for {@link FsArchiveBatchSnapshot}.
  *
- * @param entries - Workspace name and specs root path per workspace
+ * @param workspaces - Orchestrated list of workspaces
  * @returns Layout map keyed by workspace name
  */
 export function buildWorkspaceSpecLayouts(
-  entries: readonly {
-    readonly name: string
-    readonly specsPath: string
-    readonly prefix?: string
-  }[],
+  workspaces: readonly ProjectWorkspace[],
 ): ReadonlyMap<string, ArchiveBatchSnapshotWorkspaceLayout> {
-  return new Map(
-    entries.map((entry) => [
-      entry.name,
-      {
-        specsPath: entry.specsPath,
-        ...(entry.prefix !== undefined ? { prefix: entry.prefix } : {}),
-      },
-    ]),
-  )
+  const layouts = new Map<string, ArchiveBatchSnapshotWorkspaceLayout>()
+  for (const ws of workspaces) {
+    const fsRepo = ws.specRepo as FsSpecRepository
+    layouts.set(ws.name, {
+      specsPath: fsRepo.specsPath,
+      ...(fsRepo.prefix !== undefined ? { prefix: fsRepo.prefix } : {}),
+    } as ArchiveBatchSnapshotWorkspaceLayout)
+  }
+  return layouts
 }
 
 /**
@@ -60,33 +58,50 @@ export function buildWorkspaceSpecLayouts(
  * Uses explicit layouts when provided; otherwise derives from {@link FsSpecRepository}
  * instances in the spec repository map; falls back to a no-op adapter for stub-only tests.
  *
- * @param specRepositories - Spec repositories keyed by workspace
+ * @param listWorkspaces - Orchestrated list of workspaces
  * @param layouts - Optional explicit workspace layouts
  * @returns Batch snapshot port for {@link ArchiveChange}
  */
 export function resolveArchiveBatchSnapshotPort(
-  specRepositories: ReadonlyMap<string, SpecRepository>,
+  listWorkspaces: ListWorkspaces,
   layouts?: ReadonlyMap<string, ArchiveBatchSnapshotWorkspaceLayout>,
 ): ArchiveBatchSnapshotPort {
   if (layouts !== undefined && layouts.size > 0) {
     return new FsArchiveBatchSnapshot(layouts)
   }
 
-  const derived = new Map<string, ArchiveBatchSnapshotWorkspaceLayout>()
-  for (const [workspace, repo] of specRepositories) {
-    if (repo instanceof FsSpecRepository) {
-      derived.set(workspace, {
-        specsPath: repo.specsPath,
-        ...(repo.prefix !== undefined ? { prefix: repo.prefix } : {}),
-      })
-    }
+  return {
+    snapshot: async (specId, changeName) => {
+      const workspaces = await listWorkspaces.execute()
+      const derived = buildWorkspaceSpecLayouts(workspaces)
+      const port = new FsArchiveBatchSnapshot(derived)
+      return port.snapshot(specId, changeName)
+    },
+    restoreBatch: async (specIds, publishOrder) => {
+      const workspaces = await listWorkspaces.execute()
+      const derived = buildWorkspaceSpecLayouts(workspaces)
+      const port = new FsArchiveBatchSnapshot(derived)
+      return port.restoreBatch(specIds, publishOrder)
+    },
+    detectOrphans: async (specIds, changeName) => {
+      const workspaces = await listWorkspaces.execute()
+      const derived = buildWorkspaceSpecLayouts(workspaces)
+      const port = new FsArchiveBatchSnapshot(derived)
+      return port.detectOrphans(specIds, changeName)
+    },
+    recordCreatedFile: async (specId, filename) => {
+      const workspaces = await listWorkspaces.execute()
+      const derived = buildWorkspaceSpecLayouts(workspaces)
+      const port = new FsArchiveBatchSnapshot(derived)
+      return port.recordCreatedFile(specId, filename)
+    },
+    cleanup: async (specIds) => {
+      const workspaces = await listWorkspaces.execute()
+      const derived = buildWorkspaceSpecLayouts(workspaces)
+      const port = new FsArchiveBatchSnapshot(derived)
+      return port.cleanup(specIds)
+    },
   }
-
-  if (derived.size > 0) {
-    return new FsArchiveBatchSnapshot(derived)
-  }
-
-  return createNoopArchiveBatchSnapshot()
 }
 
 /**
@@ -117,13 +132,8 @@ export interface FsArchiveChangeOptions {
   readonly archivePath: string
   /** Optional archive directory pattern (e.g. `'{{year}}/{{change.archivedName}}'`). */
   readonly archivePattern?: string
-  /**
-   * Pre-built spec repositories keyed by workspace name.
-   *
-   * Must include entries for every workspace declared in the project config.
-   * `ArchiveChange` looks up the correct repo for each workspace by name.
-   */
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
+  /** The project orchestrator. */
+  readonly listWorkspaces: ListWorkspaces
   /** Absolute path to the `node_modules` directory for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
@@ -134,11 +144,6 @@ export interface FsArchiveChangeOptions {
   readonly projectRoot: string
   /** Workspace routing metadata for cross-workspace spec reference resolution. */
   readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
-  /** Workspace implementation materialization config keyed by workspace name. */
-  readonly workspaceImplementationConfigs?: ReadonlyMap<
-    string,
-    { readonly codeRoot: string; readonly excludePaths: readonly string[] }
-  >
   /** Workspace spec directory layouts for batch snapshot restore. */
   readonly workspaceSpecLayouts?: ReadonlyMap<string, ArchiveBatchSnapshotWorkspaceLayout>
 }
@@ -146,39 +151,9 @@ export interface FsArchiveChangeOptions {
 /**
  * Constructs an `ArchiveChange` use case wired to all configured workspaces.
  *
- * The `SpecdConfig` overload builds the workspace spec repository map, the
- * archive repository, the schema registry, the parser registry, the hook
- * runner, and the git adapter internally.
- *
- * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel-level overrides
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
- * @returns The pre-wired use case instance
- */
-export function createArchiveChange(
-  config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
-): ArchiveChange
-/**
- * Constructs an `ArchiveChange` use case with explicit context and options.
- *
- * Use this form in tests or integration scenarios where custom paths or
- * pre-built repositories are needed.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths and pre-built spec repositories
- * @returns The pre-wired use case instance
- */
-export function createArchiveChange(
-  context: ArchiveChangeContext,
-  options: FsArchiveChangeOptions,
-): ArchiveChange
-/**
- * Constructs an `ArchiveChange` instance wired with filesystem adapters.
- *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
- * @returns The pre-wired use case instance
+ * @param configOrContext - Full project config or workspace-specific context
+ * @param options - Filesystem adapter paths and pre-built port instances
+ * @returns Fully-wired `ArchiveChange` use case
  */
 export function createArchiveChange(
   configOrContext: SpecdConfig | ArchiveChangeContext,
@@ -224,6 +199,7 @@ export function createArchiveChange(
           ),
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
+    const listWorkspaces = new ListWorkspaces(config, specRepos)
     return createArchiveChange(
       {
         workspace: defaultWs.name,
@@ -239,7 +215,7 @@ export function createArchiveChange(
         ...(config.storage.archivePattern !== undefined
           ? { archivePattern: config.storage.archivePattern }
           : {}),
-        specRepositories: specRepos,
+        listWorkspaces,
         nodeModulesPaths: [
           path.join(config.projectRoot, 'node_modules'),
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
@@ -249,18 +225,19 @@ export function createArchiveChange(
         schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
         workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
-        workspaceSpecLayouts: new Map(
-          config.workspaces.map((ws) => [
-            ws.name,
-            {
-              specsPath: ws.specsPath,
-              ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-            },
-          ]),
+        workspaceSpecLayouts: buildWorkspaceSpecLayouts(
+          Array.from(config.workspaces).map((w) => ({
+            name: w.name,
+            codeRoot: w.codeRoot,
+            isExternal: w.isExternal,
+            ownership: w.ownership,
+            specRepo: specRepos.get(w.name)!,
+          })),
         ),
       },
     )
   }
+
   const opts = options as FsArchiveChangeOptions
   const changeRepo = createChangeRepository('fs', configOrContext, {
     changesPath: opts.changesPath,
@@ -286,22 +263,22 @@ export function createArchiveChange(
   const actor = createVcsActorResolver()
   const hasher = new NodeContentHasher()
   const generateMetadata = new GenerateSpecMetadata(
-    opts.specRepositories,
+    opts.listWorkspaces,
     schemaProvider,
     parsers,
     hasher,
     createBuiltinExtractorTransforms(),
     opts.workspaceRoutes ?? [],
   )
-  const saveMetadata = new SaveSpecMetadata(opts.specRepositories)
+  const saveMetadata = new SaveSpecMetadata(opts.listWorkspaces.repos)
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)
   const batchSnapshot = resolveArchiveBatchSnapshotPort(
-    opts.specRepositories,
+    opts.listWorkspaces,
     opts.workspaceSpecLayouts,
   )
   return new ArchiveChange(
     changeRepo,
-    opts.specRepositories,
+    opts.listWorkspaces,
     archiveRepo,
     runStepHooks,
     actor,
@@ -312,7 +289,6 @@ export function createArchiveChange(
     createBuiltinExtractorTransforms(),
     opts.workspaceRoutes ?? [],
     opts.projectRoot,
-    opts.workspaceImplementationConfigs ?? new Map(),
     batchSnapshot,
   )
 }

@@ -43,6 +43,22 @@
 - **WHEN** presenter serializes twice
 - **THEN** both JSON bodies are byte-identical
 
+### Requirement: symbol hits use reusable graph symbol refs
+
+#### Scenario: Search hit symbol payload matches graph symbol ref shape
+
+- **WHEN** graph search returns symbol hits
+- **THEN** each hit includes a nested `symbol` object
+- **AND** that object satisfies [`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md)
+
+### Requirement: spec hits expose preview context
+
+#### Scenario: Search hits expose preview snippet and line range
+
+- **WHEN** graph search returns symbol or spec hits
+- **THEN** each hit includes `snippet`, `startLine`, and `endLine`
+- **AND** preview context is available without a secondary fetch
+
 ### Requirement: optional fields are omitted rather than null
 
 #### Scenario: Optional keys omitted when absent

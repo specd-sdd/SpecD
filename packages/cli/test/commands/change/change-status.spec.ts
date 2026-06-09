@@ -73,6 +73,8 @@ function makeStatusResult(overrides: Record<string, unknown> = {}) {
       reason: 'Proceed to next lifecycle step',
       command: '/specd-implement',
     },
+    specDependsOn: {},
+    implementationTracking: { trackedFiles: [], links: [] },
     ...overrides,
   }
 }
@@ -80,6 +82,52 @@ function makeStatusResult(overrides: Record<string, unknown> = {}) {
 afterEach(() => vi.restoreAllMocks())
 
 describe('change status', () => {
+  it('renders spec dependencies in text output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue(
+      makeStatusResult({
+        change: {
+          name: 'my-change',
+          state: 'designing',
+          specIds: ['core:a', 'core:b'],
+        },
+        specDependsOn: {
+          'core:a': ['core:c'],
+        },
+      }),
+    )
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    const out = stdout()
+    expect(out).toContain('specs and dependencies:')
+    expect(out).toContain('  core:a: core:c')
+    expect(out).toContain('  core:b: (none)')
+    expect(out).not.toContain('specs:       core:a, core:b')
+  })
+
+  it('includes specDependsOn in JSON output', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.status.execute.mockResolvedValue(
+      makeStatusResult({
+        specDependsOn: {
+          'core:a': ['core:c'],
+        },
+      }),
+    )
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.specDependsOn).toEqual({
+      'core:a': ['core:c'],
+    })
+  })
+
   it('renders displayStatus in text output for artifact details', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.status.execute.mockResolvedValue(
@@ -219,6 +267,6 @@ describe('change status', () => {
     const out = stdout()
     expect(out).toContain('change:      my-change')
     expect(out).toContain('state:       designing')
-    expect(out).toContain('specs:       default:auth/login')
+    expect(out).not.toContain('specs:       default:auth/login')
   })
 })

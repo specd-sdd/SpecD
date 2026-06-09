@@ -23,6 +23,23 @@
 - **THEN** build or contract test fails
 - **AND** prevents silent UI breakage
 
+### Requirement: symbol hits use reusable graph symbol refs
+
+#### Scenario: Client deserializes nested symbol refs without duplicate fields
+
+- **GIVEN** API JSON with graph search symbol hits
+- **WHEN** the client deserializes the response
+- **THEN** the nested `symbol` object satisfies
+  [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md)
+- **AND** the client does not declare duplicate inline location fields for search hits
+
+#### Scenario: Client preserves graph-search preview fields
+
+- **GIVEN** API JSON with `snippet`, `startLine`, and `endLine`
+- **WHEN** the client deserializes the response
+- **THEN** those fields remain available on symbol and spec hits
+- **AND** Studio can render previews directly from the DTO
+
 ### Requirement: types are shared or generated from API schemas
 
 #### Scenario: Types imported from shared package

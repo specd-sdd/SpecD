@@ -72,6 +72,9 @@ JSON/TOON output schema:
               : config.contextMode)
 
           const compileConfig: CompileContextConfig = {
+            projectRoot: config.projectRoot,
+            configPath: config.configPath,
+            llmOptimizedContext: config.llmOptimizedContext,
             ...(config.context !== undefined
               ? {
                   context: config.context.map((e) =>
@@ -100,7 +103,9 @@ JSON/TOON output schema:
           }
 
           if (fmt === 'text') {
-            const parts: string[] = [...result.contextEntries]
+            const parts: string[] = []
+
+            parts.push(...result.contextEntries)
             const fullSpecs = result.specs.filter((s) => s.mode === 'full')
             const nonFullSpecs = result.specs.filter((s) => s.mode !== 'full')
 

@@ -11,6 +11,8 @@ export interface SymbolNode {
   readonly filePath: string
   readonly line: number
   readonly column: number
+  /** ID of the enclosing symbol (e.g. class ID for a method). */
+  readonly parentId: string | undefined
   readonly comment: string | undefined
 }
 
@@ -42,6 +44,7 @@ function computeSymbolId(
  * @param params.line - The 1-based line number.
  * @param params.column - The 0-based column offset.
  * @param params.comment - Optional raw comment text preceding the symbol.
+ * @param params.parentId - Optional ID of the parent symbol (e.g. class for a method).
  * @returns A SymbolNode value object with a computed id.
  * @throws {InvalidSymbolKindError} If the kind string is not a valid SymbolKind.
  */
@@ -51,6 +54,7 @@ export function createSymbolNode(params: {
   filePath: string
   line: number
   column: number
+  parentId?: string | undefined
   comment?: string | undefined
 }): SymbolNode {
   if (!isSymbolKind(params.kind)) {
@@ -66,6 +70,7 @@ export function createSymbolNode(params: {
     filePath,
     line: params.line,
     column: params.column,
+    parentId: params.parentId,
     comment: params.comment,
   }
 }

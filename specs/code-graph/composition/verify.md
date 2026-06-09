@@ -13,8 +13,8 @@
 #### Scenario: Index delegates to IndexCodeGraph
 
 - **GIVEN** an opened `CodeGraphProvider`
-- **WHEN** `index({ workspaces: [...], projectRoot: '/project' })` is called
-- **THEN** `IndexCodeGraph.execute()` is invoked with the workspace targets and the result is returned
+- **WHEN** `index(options)` is called
+- **THEN** `IndexCodeGraph.execute()` is invoked and the result is returned
 
 #### Scenario: Clear removes all data for full re-index
 
@@ -22,17 +22,10 @@
 - **WHEN** `clear()` is called followed by `index()`
 - **THEN** all files and symbols are re-processed (none skipped)
 
-#### Scenario: Coverage query methods delegate through the provider
+#### Scenario: Provider normalizes file selectors
 
-- **GIVEN** an opened `CodeGraphProvider`
-- **WHEN** `getCoveredFiles('core:change')`, `getCoveringSpecsForFile('core:src/change.ts')`, `getCoveredSymbols('core:change')`, and `getCoveringSpecsForSymbol('core:Change.transition')` are called
-- **THEN** each method delegates to the corresponding `GraphStore` coverage query
-
-#### Scenario: Spec impact delegates through traversal services
-
-- **GIVEN** an opened `CodeGraphProvider`
-- **WHEN** `analyzeSpecImpact('core:change', 'downstream')` is called
-- **THEN** the provider delegates to the traversal-layer spec impact analysis and returns its result
+- **WHEN** `resolveFileSelector()` is called with a project-relative path
+- **THEN** it resolves correctly to the canonical graph identity
 
 ### Requirement: Factory function
 
@@ -41,57 +34,6 @@
 - **WHEN** `createCodeGraphProvider(config)` is called with a `SpecdConfig`
 - **THEN** the graph storage root is derived from `config.configPath`
 - **AND** the returned provider can be opened, used for indexing and queries, and closed without error
-
-#### Scenario: Legacy factory with CodeGraphOptions
-
-- **WHEN** `createCodeGraphProvider({ storagePath: '/project' })` is called
-- **THEN** the returned provider can be opened, used for indexing and queries, and closed without error
-
-#### Scenario: Factory detects overload by property
-
-- **GIVEN** an object with `projectRoot` property
-- **WHEN** passed to `createCodeGraphProvider`
-- **THEN** it is treated as `SpecdConfig`
-- **GIVEN** an object with `storagePath` property
-- **WHEN** passed to `createCodeGraphProvider`
-- **THEN** it is treated as `CodeGraphOptions`
-
-#### Scenario: Default backend is sqlite
-
-- **GIVEN** no explicit `graphStoreId`
-- **WHEN** a provider is created from either factory overload
-- **THEN** the built-in backend id `sqlite` is selected
-
-#### Scenario: Explicit backend id overrides the default
-
-- **GIVEN** a provider factory call with `graphStoreId: 'ladybug'`
-- **WHEN** the provider is constructed
-- **THEN** the Ladybug-backed store is used as the single active backend for that provider
-
-#### Scenario: Additive graph-store registrations extend the built-ins
-
-- **GIVEN** a custom graph-store factory registered through `graphStoreFactories`
-- **WHEN** `graphStoreId` selects that custom backend id
-- **THEN** the provider uses the custom backend
-- **AND** the built-in `sqlite` and `ladybug` backends remain available
-
-#### Scenario: Unknown graph-store id fails clearly
-
-- **GIVEN** a provider factory call with `graphStoreId: 'missing-backend'`
-- **WHEN** the graph-store registry is resolved
-- **THEN** provider construction fails with a clear unknown-backend error
-
-#### Scenario: Custom adapters registered (legacy)
-
-- **GIVEN** a custom adapter for Python
-- **WHEN** `createCodeGraphProvider({ storagePath: '/project', adapters: [pythonAdapter] })` is called
-- **THEN** the provider can index `.py` files using the custom adapter
-- **AND** the built-in TypeScript adapter is still available
-
-#### Scenario: Direct construction not supported
-
-- **WHEN** a caller attempts to construct `CodeGraphProvider` via `new CodeGraphProvider()`
-- **THEN** the constructor is not available in the public API (not exported or marked internal)
 
 ### Requirement: Package exports
 

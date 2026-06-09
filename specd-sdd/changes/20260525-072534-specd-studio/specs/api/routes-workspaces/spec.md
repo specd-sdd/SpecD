@@ -6,9 +6,11 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 ## Requirements
 
-### Requirement: GET workspaces lists configured workspaces
+### Requirement: GET workspaces lists orchestrated project workspaces
 
-`GET /v1/workspaces` MUST return the workspace list from `SpecdConfig.workspaces` including name, path prefix, ownership, and code roots.
+`GET /v1/workspaces` MUST use `ListWorkspaces` as the source of truth for workspace identity, ownership, code roots, and declaration order.
+
+The response MAY enrich those rows with static descriptor fields from `SpecdConfig` such as `prefix` and `specsPath`, but it MUST NOT bypass `ListWorkspaces` by rebuilding the workspace list from raw config alone.
 
 ### Requirement: GET workspace spec tree lists canonical specs without artifact bodies
 

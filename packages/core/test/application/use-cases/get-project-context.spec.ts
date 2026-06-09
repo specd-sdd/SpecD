@@ -14,6 +14,7 @@ import {
   makeParser,
   makeParsers,
   makeContentHasher,
+  makeListWorkspaces,
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
@@ -23,7 +24,7 @@ import {
 describe('GetProjectContext', () => {
   it('returns context entries from config', async () => {
     const schema = makeSchema([])
-    const specRepos = new Map([['default', makeSpecRepository()]])
+    const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
     const fileReader = makeFileReader({
       '/project/ARCHITECTURE.md': '# Architecture\nHexagonal design.',
     })
@@ -51,7 +52,7 @@ describe('GetProjectContext', () => {
   })
 
   it('throws SchemaNotFoundError when schema not resolved', async () => {
-    const specRepos = new Map([['default', makeSpecRepository()]])
+    const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -81,7 +82,7 @@ describe('GetProjectContext', () => {
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -124,7 +125,7 @@ describe('GetProjectContext', () => {
         }),
       },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -162,7 +163,7 @@ describe('GetProjectContext', () => {
         'billing/payments/spec.md': '# Payments',
       },
     })
-    const specRepos = new Map([['default', repo]])
+    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
     const uc = new GetProjectContext(
       specRepos,
@@ -245,7 +246,7 @@ describe('GetProjectContext', () => {
     })
 
     const uc = new GetProjectContext(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(markdownParser),
@@ -347,10 +348,12 @@ describe('GetProjectContext', () => {
     })
 
     const uc = new GetProjectContext(
-      new Map([
-        ['core', coreRepo],
-        ['default', defaultRepo],
-      ]),
+      makeListWorkspaces(
+        new Map([
+          ['core', coreRepo],
+          ['default', defaultRepo],
+        ]),
+      ),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(markdownParser),
@@ -424,7 +427,7 @@ describe('GetProjectContext', () => {
     })
 
     const uc = new GetProjectContext(
-      new Map([['default', repo]]),
+      makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(markdownParser),
@@ -435,10 +438,166 @@ describe('GetProjectContext', () => {
     await expect(
       uc.execute({
         config: {
+          projectRoot: '/project',
+          configPath: '/project/.specd',
           contextIncludeSpecs: ['default:auth/login'],
         },
         followDeps: true,
       }),
     ).rejects.toThrow(ExtractorTransformError)
+  })
+
+  describe('cache verification (llmOptimizedContext)', () => {
+    const configPath = '/project/.specd'
+    const metadataPath = '/project/.specd/project-metadata.json'
+    const configYamlPath = '/project/specd.yaml'
+
+    it('returns optimized context when cache is fresh', async () => {
+      const schema = makeSchema([])
+      const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
+      const hasher = makeContentHasher()
+      const fileReader = makeFileReader({
+        [metadataPath]: JSON.stringify({
+          version: 1,
+          optimized: { context: 'Optimized project summary' },
+          freshness: {
+            algorithm: 'sha256',
+            inputs: {
+              config: { path: 'specd.yaml', hash: hasher.hash('config content') },
+              contextFiles: [],
+              specMetadata: [],
+            },
+            combinedHash: 'combined',
+          },
+          generated: { at: new Date().toISOString() },
+        }),
+        [configYamlPath]: 'config content',
+      })
+
+      const uc = new GetProjectContext(
+        specRepos,
+        makeSchemaProvider(schema),
+        fileReader,
+        makeParsers(),
+        hasher,
+      )
+
+      const result = await uc.execute({
+        config: {
+          projectRoot: '/project',
+          configPath,
+          llmOptimizedContext: true,
+        },
+      })
+
+      expect(result.contextEntries).toEqual(['Optimized project summary'])
+      expect(result.specs).toHaveLength(0)
+      expect(result.warnings).toHaveLength(0)
+    })
+
+    it('falls back and warns when config hash mismatches', async () => {
+      const schema = makeSchema([])
+      const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
+      const hasher = makeContentHasher()
+      const fileReader = makeFileReader({
+        [metadataPath]: JSON.stringify({
+          version: 1,
+          optimized: { context: 'Optimized project summary' },
+          freshness: {
+            algorithm: 'sha256',
+            inputs: {
+              config: { path: 'specd.yaml', hash: 'OLD_HASH' },
+              contextFiles: [],
+              specMetadata: [],
+            },
+            combinedHash: 'combined',
+          },
+          generated: { at: new Date().toISOString() },
+        }),
+        [configYamlPath]: 'NEW config content',
+      })
+
+      const uc = new GetProjectContext(
+        specRepos,
+        makeSchemaProvider(schema),
+        fileReader,
+        makeParsers(),
+        hasher,
+      )
+
+      const result = await uc.execute({
+        config: {
+          projectRoot: '/project',
+          configPath,
+          llmOptimizedContext: true,
+          context: [{ instruction: 'Fallback' }],
+        },
+      })
+
+      expect(result.contextEntries).toContain('**Source: instruction**\n\nFallback')
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]!.type).toBe('stale-optimization')
+    })
+
+    it('falls back and warns when spec metadata hash mismatches', async () => {
+      const specType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema([specType])
+      const hasher = makeContentHasher()
+
+      const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const repo = makeSpecRepository({
+        specs: [spec],
+        artifacts: {
+          'auth/login/.specd-metadata.yaml': JSON.stringify({
+            title: 'Title',
+            description: 'Desc',
+            contentHashes: { 'spec.md': hasher.hash('NEW CONTENT') },
+          }),
+        },
+      })
+      const specRepos = makeListWorkspaces(new Map([['default', repo]]))
+
+      const fileReader = makeFileReader({
+        [metadataPath]: JSON.stringify({
+          version: 1,
+          optimized: { context: 'Optimized' },
+          freshness: {
+            algorithm: 'sha256',
+            inputs: {
+              config: { path: 'specd.yaml', hash: hasher.hash('config') },
+              contextFiles: [],
+              specMetadata: [{ id: 'default:auth/login', hash: hasher.hash('OLD_METADATA_HASH') }],
+            },
+            combinedHash: 'combined',
+          },
+          generated: { at: new Date().toISOString() },
+        }),
+        [configYamlPath]: 'config',
+      })
+
+      const uc = new GetProjectContext(
+        specRepos,
+        makeSchemaProvider(schema),
+        fileReader,
+        makeParsers(),
+        hasher,
+      )
+
+      const result = await uc.execute({
+        config: {
+          projectRoot: '/project',
+          configPath,
+          llmOptimizedContext: true,
+          contextIncludeSpecs: ['*'],
+        },
+      })
+
+      expect(result.warnings.some((w) => w.type === 'stale-optimization')).toBe(true)
+      expect(result.specs).toHaveLength(1) // processed normally
+    })
   })
 })

@@ -8,7 +8,7 @@
 
 - **GIVEN** an active change is open in the center panel
 - **WHEN** the change tab strip renders
-- **THEN** tabs are Overview, Artifacts, Tasks, Events, Context, and Impact only
+- **THEN** tabs are Overview, Artifacts, Tasks, Events, Context, and Coverage only
 - **AND** no Validation tab is shown
 
 ### Requirement: overview owns status polling semantics

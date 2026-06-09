@@ -43,6 +43,19 @@
 - **WHEN** `useChangeArtifact` loads content
 - **THEN** port receives `getReadOnlyChangeArtifact(name, filename, 'discarded')`
 
+#### Scenario: Archived artifact body uses archived route when archived
+
+- **GIVEN** archived change and user selects an artifact file
+- **WHEN** `useChangeArtifact` loads content
+- **THEN** port receives `getReadOnlyChangeArtifact(name, filename, 'archived')`
+
+#### Scenario: Task-capable artifact lists preserve metadata for downstream tabs
+
+- **GIVEN** change artifact list contains task-capable rows
+- **WHEN** `useChangeArtifactList` resolves
+- **THEN** the hook preserves `hasTasks`
+- **AND** optional task counters remain available to tabs that need them
+
 ### Requirement: shelved and archived views do not poll change status or artifacts
 
 #### Scenario: Drafted detail loads once (no poll refreshKey)

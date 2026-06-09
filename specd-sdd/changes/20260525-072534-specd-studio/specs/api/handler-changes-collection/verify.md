@@ -42,26 +42,13 @@
 - **THEN** `kernel.changes.listDrafts` runs inside @specd/core
 - **AND** handler does not reimplement lifecycle or validation rules
 
-### Requirement: artifact GET and PUT use dedicated core use cases
+### Requirement: archived list serializes list-result structure instead of legacy arrays
 
-#### Scenario: Stale originalHash on PUT returns 409
+#### Scenario: Archived list preserves items/meta shape
 
-- **GIVEN** artifact content changed after the client read `originalHash`
-- **WHEN** PUT sends an outdated hash
-- **THEN** HTTP 409 problem+json is returned
-- **AND** on-disk artifact is not overwritten
-
-#### Scenario: GET artifact delegates to GetChangeArtifact
-
-- **WHEN** `GET /v1/changes/{name}/artifacts/{file}` succeeds
-- **THEN** `GetChangeArtifact` executes
-- **AND** handler does not call `ChangeRepository` directly
-
-#### Scenario: PUT artifact delegates to SaveChangeArtifact
-
-- **WHEN** `PUT /v1/changes/{name}/artifacts/{file}` with a current `originalHash`
-- **THEN** `SaveChangeArtifact` executes
-- **AND** manifest `updatedAt` advances on success
+- **WHEN** `kernel.changes.listArchived` returns a paginated result
+- **THEN** the handler serializes `items` and `meta`
+- **AND** it does not flatten archive rows into a bare array
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 
@@ -79,10 +66,10 @@
 - **THEN** both JSON bodies are identical
 - **AND** presenter did not mutate kernel state
 
-#### Scenario: Unknown change name returns 404 before presenter
+#### Scenario: Invalid create payload fails before presenter
 
-- **WHEN** route targets a change that does not exist
-- **THEN** HTTP 404 problem+json is returned
+- **WHEN** `POST /v1/changes` request validation fails
+- **THEN** HTTP 400 problem+json is returned
 - **AND** presenter is not invoked
 
 ### Requirement: failures map to RFC 7807 problem+json
@@ -105,12 +92,10 @@
 - **THEN** response is not `text/plain` HTML
 - **AND** client receives problem+json or framework 500 mapping
 
-### Requirement: mutations pass the request-scoped actor into kernel
-
-#### Scenario: Mutating kernel call receives request actor
+#### Scenario: Create change mutation receives request actor
 
 - **GIVEN** `createApiContext` attached an actor to the request
-- **WHEN** handler triggers a mutating kernel use case
+- **WHEN** the handler triggers change creation
 - **THEN** kernel input includes that `actor`
 - **AND** history `by` matches the resolved identity
 
@@ -119,10 +104,3 @@
 - **WHEN** handler serves a read-only GET that does not write history
 - **THEN** kernel read use case still succeeds
 - **AND** no history event is written for the call
-
-#### Scenario: Actor is stable for the lifetime of the request
-
-- **GIVEN** one HTTP request triggers multiple kernel mutations
-- **WHEN** each mutation runs through the same context
-- **THEN** the same `actor` is passed to every mutating call
-- **AND** history entries share the same `by`

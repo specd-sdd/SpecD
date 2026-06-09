@@ -1,7 +1,7 @@
 {
   "title": "Archive List",
   "description": "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).",
-  "dependsOn": ["cli:entrypoint", "core:change"],
+  "dependsOn": ["cli:entrypoint", "core:archived-change-index-entry"],
   "context": [
     "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first)."
   ],
@@ -9,19 +9,19 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd archive list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
+        "```\nspecd archive list [--format text|json|toon] [--limit <n>] [--page <p>] [--start-at <name>]\n```\n\n- `--format` — controls output encoding; defaults to `text`\n- `--limit` — maximum number of entries to return; defaults to `100`\n- `--page` — 1-based page number (requires `--limit`)\n- `--start-at` — exclusive cursor for keyset pagination; name of the change to start after\n\n`--page` and `--start-at` are mutually exclusive."
       ]
     },
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints a human-readable table to stdout. Changes are sorted by archive date descending (most recently archived first).\n\nThe output has an inverse-video column header row `NAME  DATE` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group)."
+        "The command prints a human-readable table to stdout. Changes are sorted by archive date descending (most recently archived first).\n\nThe output has an inverse-video column header row `NAME  DATE` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).\n\nAt the end of the table, a summary line SHALL be printed:\n`Showing <count> archived changes of <total>. Increase limit or specify another page.`"
       ]
     },
     {
       "requirement": "Output format — JSON",
       "rules": [
-        "When `--format json` is passed, the command writes a JSON array to stdout:\n\n```json\n[\n  {\n    \"name\": \"...\",\n    \"archivedName\": \"...\",\n    \"workspace\": \"...\",\n    \"archivedAt\": \"...\",\n    \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },\n    \"artifacts\": [\"...\"]\n  }\n]\n```\n\nOne object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs."
+        "When `--format json` is passed, the command writes a JSON object to stdout containing the list and metadata:\n\n```json\n{\n  \"items\": [\n    {\n      \"name\": \"...\",\n      \"archivedName\": \"...\",\n      \"archivedAt\": \"...\",\n      \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },\n      \"artifacts\": [\"...\"],\n      \"specIds\": [\"...\"]\n    }\n  ],\n  \"meta\": {\n    \"total\": 125,\n    \"count\": 100,\n    \"limit\": 100,\n    \"page\": 1\n  }\n}\n```\n\nOne object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.\n\nThe command MUST NOT read every archived change `manifest.json` to produce this listing; it SHOULD rely on archive index entries."
       ]
     },
     {
@@ -33,7 +33,7 @@
     {
       "requirement": "Empty archive",
       "rules": [
-        "If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0."
+        "If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` (or equivalent empty paginated envelope) in JSON/toon mode, and exits with code 0."
       ]
     },
     {
@@ -59,6 +59,12 @@
       ]
     },
     {
+      "requirement": "Command signature",
+      "name": "Pagination flags are accepted",
+      "when": ["specd archive list --limit 10 --page 2 is run"],
+      "then": ["the command parses the flags and delegates them to the use case"]
+    },
+    {
       "requirement": "Output format — toon",
       "name": "TOON format output",
       "given": ["the archive directory contains changes"],
@@ -67,48 +73,26 @@
     },
     {
       "requirement": "Output format — text",
-      "name": "Archived changes listed with correct fields",
-      "given": [
-        "the archive directory contains two changes: add-oauth-login (workspace default, archived 2024-01-15, actor alice) and update-billing (workspace billing, archived 2024-01-10, no actor recorded)"
-      ],
+      "name": "Normal text output",
+      "given": ["the archive contains 5 changes"],
       "when": ["specd archive list is run"],
       "then": [
-        "stdout contains one row for each change showing name, workspace, and date",
-        "AND the row for add-oauth-login includes by alice",
-        "AND the row for update-billing does not include a by segment",
-        "AND the process exits with code 0"
-      ]
-    },
-    {
-      "requirement": "Output format — text",
-      "name": "Rows sorted by archive date descending",
-      "given": ["the archive contains change older-change archived before newer-change"],
-      "when": ["specd archive list is run"],
-      "then": ["newer-change appears before older-change in the output"]
-    },
-    {
-      "requirement": "Output format — JSON",
-      "name": "JSON format output",
-      "given": [
-        "the archive directory contains one change named add-oauth-login with workspace default, archived at 2024-01-15T12:00:00.000Z, actor alice, and artifacts ['spec']"
-      ],
-      "when": ["specd archive list --format json is run"],
-      "then": [
-        "stdout is a JSON array with one object containing name, archivedName, workspace, archivedAt, archivedBy, and artifacts fields",
-        "AND the object does not contain state or specIds fields",
-        "AND the process exits with code 0"
+        "stdout contains a table with NAME and DATE columns",
+        "AND the WORKSPACE column is NOT present",
+        "AND the summary line Showing 5 archived changes of 5. is printed at the end"
       ]
     },
     {
       "requirement": "Output format — JSON",
-      "name": "JSON format output — no actor recorded",
-      "given": [
-        "the archive directory contains one change named update-billing with no archivedBy recorded"
-      ],
+      "name": "JSON format output with metadata",
+      "given": ["the archive contains 125 changes and limit is 100"],
       "when": ["specd archive list --format json is run"],
       "then": [
-        "the JSON object for update-billing does not contain an archivedBy field",
-        "AND the process exits with code 0"
+        "stdout is a JSON object with items array and meta object",
+        "AND meta.total is 125",
+        "AND meta.count is 100",
+        "AND meta.limit is 100",
+        "AND meta.page is 1"
       ]
     },
     {
@@ -133,9 +117,18 @@
       "then": ["the command exits with code 3", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:archive-list",
+        "file": "cli:src/commands/archive/list.ts",
+        "symbol": "registerArchiveList"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:18e2c4c2cd252a75eff414b01229829c8e6d296cec36f20e916869e9f9f648cc",
-    "verify.md": "sha256:27d4e999cc40c003c756d73a85b143542b83b2b09a620537581a24cb1a6d430f"
+    "spec.md": "sha256:185a30b301e8a4c4a108e1f54352eb6e7cb8da3babdd2c3845a024c36352b111",
+    "verify.md": "sha256:5b35ea8d21df1a623420152cb0918a215318d08a8d7ce877efd1a5f52e7ac222"
   },
   "generatedBy": "core"
 }

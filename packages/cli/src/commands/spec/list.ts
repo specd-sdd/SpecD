@@ -166,7 +166,7 @@ JSON/TOON output schema:
         config?: string
       }) => {
         try {
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
           const includeSummary = opts.summary === true
           const includeMetadataStatus = opts.metadataStatus !== undefined
           const metadataStatusFilter = parseMetadataStatusFilter(opts.metadataStatus)
@@ -184,7 +184,8 @@ JSON/TOON output schema:
             )
           }
 
-          const workspaceNames = config.workspaces.map((w) => w.name)
+          const workspaces = await kernel.project.listWorkspaces.execute()
+          const workspaceNames = workspaces.map((w) => w.name)
           const workspaceFilter = opts.workspace.length > 0 ? new Set(opts.workspace) : null
           const visibleWorkspaces =
             workspaceFilter !== null

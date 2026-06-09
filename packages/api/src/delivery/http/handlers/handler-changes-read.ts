@@ -7,7 +7,6 @@ import {
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import {
-  toArtifactListDto,
   toArtifactListDtoFromView,
   toChangeDetailDto,
   toChangeStatusDto,
@@ -26,6 +25,42 @@ import {
   POSITIVE_INTEGER_QUERY_SCHEMA,
   strictObjectSchema,
 } from '../route-schema.js'
+
+async function readArtifactTaskMaps(ctx: any) {
+  const schemaResult = await ctx.kernel.specs.getActiveSchema.execute()
+  if (schemaResult.raw) {
+    return {
+      hasTasksByType: new Map<string, boolean>(),
+      taskSummaryByType: new Map<string, { totalTasks: number; completedTasks: number }>(),
+    }
+  }
+  const hasTasksByType = new Map(
+    schemaResult.schema.artifacts().map((artifactType) => [artifactType.id, artifactType.hasTasks]),
+  )
+  return {
+    hasTasksByType,
+    taskSummaryByType: new Map<string, { totalTasks: number; completedTasks: number }>(),
+  }
+}
+
+async function readArtifactTaskMapsForChange(
+  ctx: any,
+  name: string,
+) {
+  const [maps, status] = await Promise.all([
+    readArtifactTaskMaps(ctx),
+    ctx.kernel.changes.status.execute({ name }),
+  ])
+  const taskSummaryByType = new Map<string, { totalTasks: number; completedTasks: number }>()
+  for (const artifact of status.artifactStatuses) {
+    if (!artifact.hasTasks || artifact.taskCompletion === undefined) continue
+    taskSummaryByType.set(artifact.type, {
+      totalTasks: artifact.taskCompletion.total,
+      completedTasks: artifact.taskCompletion.complete,
+    })
+  }
+  return { ...maps, taskSummaryByType }
+}
 
 const STATUS_QUERY = strictObjectSchema({
   properties: { ifModifiedSince: DATE_TIME_STRING_SCHEMA },
@@ -187,7 +222,8 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       if (view === null) {
         throw new ChangeNotFoundError(name)
       }
-      return toArtifactListDtoFromView(view)
+      const taskMaps = await readArtifactTaskMapsForChange(ctx, name)
+      return toArtifactListDtoFromView(view, taskMaps)
     }),
   )
 
@@ -205,7 +241,8 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       if (view === null) {
         throw new ChangeNotFoundError(name)
       }
-      return toArtifactListDtoFromView(view)
+      const taskMaps = await readArtifactTaskMapsForChange(ctx, name)
+      return toArtifactListDtoFromView(view, taskMaps)
     }),
   )
 
@@ -223,7 +260,8 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       if (change === null) {
         throw new ChangeNotFoundError(name)
       }
-      return toArtifactListDto(change)
+      const taskMaps = await readArtifactTaskMapsForChange(ctx, name)
+      return toArtifactListDtoFromView(change, taskMaps)
     }),
   )
 

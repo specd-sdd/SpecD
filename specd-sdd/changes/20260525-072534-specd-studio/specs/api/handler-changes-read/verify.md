@@ -48,6 +48,12 @@
 - **THEN** `GetReadOnlyChangeArtifact` runs with `readOnlyOrigin` `discarded`
 - **AND** handler does not call `GetChangeArtifact`
 
+#### Scenario: Artifact list enrichment preserves task metadata
+
+- **WHEN** handler serves change, draft, or discarded artifact lists
+- **THEN** task-capable rows preserve `hasTasks`
+- **AND** available task counters are mapped from core status without UI-side inference
+
 #### Scenario: Handler invokes CompileContext
 
 - **WHEN** a valid request for this handler is processed

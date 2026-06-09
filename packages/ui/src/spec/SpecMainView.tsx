@@ -1,9 +1,19 @@
-import type { SpecDetailDto } from '@specd/client'
-import { ChevronRight, FileText } from 'lucide-react'
+import type {
+  GraphFileRefDto,
+  GraphImpactDto,
+  GraphSpecCoverageDto,
+  GraphSymbolRefDto,
+  SpecContextDto,
+  SpecContextEntryDto,
+  SpecDetailDto,
+} from '@specd/client'
+import { FileText } from 'lucide-react'
 import * as React from 'react'
-import { useSpecLinkedChanges } from '../hooks/use-spec-linked-changes.js'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useSpecRead } from '../hooks/use-spec-read.js'
 import { useSpecOutline } from '../hooks/use-spec-outline.js'
+import { useSpecImpact } from '../hooks/use-spec-impact.js'
 import { useSpecGraphView } from '../hooks/use-spec-graph-view.js'
 import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
 import { cn } from '../lib/cn.js'
@@ -27,12 +37,13 @@ export function SpecMainView({
 }: SpecMainViewProps): React.ReactElement {
   const [view, setView] = React.useState<SpecView>('Overview')
 
-  const pollDetailTab = view === 'Overview' || view === 'Metadata' || view === 'Dependencies'
+  const pollDetailTab = view === 'Overview' || view === 'Dependencies'
   const pollContextTab = view === 'Context'
   const detailPollKey = useTabScopedPollKey(pollDetailTab, refreshKey)
   const contextPollKey = useTabScopedPollKey(pollContextTab, refreshKey)
   const outlinePollKey = useTabScopedPollKey(view === 'Outline', refreshKey)
-  const graphPollKey = useTabScopedPollKey(view === 'Graph', refreshKey)
+  const coveragePollKey = useTabScopedPollKey(view === 'Coverage', refreshKey)
+  const impactPollKey = useTabScopedPollKey(view === 'Impact', refreshKey)
 
   const specRead = useSpecRead(workspace, specPath, {
     detailRefreshKey: detailPollKey,
@@ -47,15 +58,12 @@ export function SpecMainView({
     poll: view === 'Outline',
   })
   const specGraph = useSpecGraphView(workspace, specPath, {
-    refreshKey: graphPollKey,
-    poll: view === 'Graph',
+    refreshKey: coveragePollKey,
+    poll: view === 'Coverage',
   })
-
-  const specId = specRead.detail.data?.specId
-  const linkedPollKey = useTabScopedPollKey(view === 'Linked Changes', refreshKey)
-  const linkedChanges = useSpecLinkedChanges(specId, {
-    poll: view === 'Linked Changes',
-    refreshKey: linkedPollKey,
+  const specImpact = useSpecImpact(workspace, specPath, {
+    refreshKey: impactPollKey,
+    poll: view === 'Impact',
   })
 
   React.useEffect(() => {
@@ -70,40 +78,10 @@ export function SpecMainView({
     )
   }
 
-  const pathSegments = specPath.split('/')
   const spec = specRead.detail.data
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-border bg-panel-header px-3 py-1.5">
-        <div className="mb-0.5 flex items-center gap-1 text-[10px] text-muted-foreground/60">
-          <span>Workspaces</span>
-          <ChevronRight className="h-2.5 w-2.5" />
-          <span>{workspace}</span>
-          {pathSegments.slice(0, -1).map((segment) => (
-            <React.Fragment key={segment}>
-              <ChevronRight className="h-2.5 w-2.5" />
-              <span>{segment}</span>
-            </React.Fragment>
-          ))}
-          <ChevronRight className="h-2.5 w-2.5" />
-          <span className="text-foreground/80">{pathSegments[pathSegments.length - 1]}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <h1 className="truncate text-xs font-semibold text-foreground">
-            {spec?.title ?? specPath}
-          </h1>
-          <span className="inline-flex items-center rounded-sm bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
-            active
-          </span>
-          {spec?.specId ? (
-            <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">
-              {spec.specId}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
       <SpecTabs workspace={workspace} specPath={specPath} active={view} onActiveChange={setView} />
 
       {specRead.detail.error ? (
@@ -139,27 +117,16 @@ export function SpecMainView({
         ) : specRead.context.error ? (
           <div className="p-3 text-xs text-destructive">{specRead.context.error.message}</div>
         ) : (
-          <pre className="studio-scrollbar min-h-0 flex-1 overflow-auto p-3 font-mono text-xs text-foreground/90">
-            {specRead.context.data?.content ??
-              specRead.context.data?.entries
-                ?.map((e) => e.content ?? '')
-                .filter(Boolean)
-                .join('\n\n') ??
-              'No context entries'}
-          </pre>
+          <SpecContextPanel context={specRead.context.data} />
         )
       ) : null}
 
       {view === 'Linked Changes' ? (
         <LinkedChangesPanel
-          linkedChanges={linkedChanges.data ?? []}
-          loading={linkedChanges.isLoading}
-          error={linkedChanges.error}
+          linkedChanges={specRead.detail.data?.linkedChanges ?? []}
+          loading={specRead.detail.isLoading}
+          error={specRead.detail.error}
         />
-      ) : null}
-
-      {view === 'Metadata' ? (
-        <SpecMetadataPanel spec={specRead.detail.data} loading={specRead.detail.isLoading} />
       ) : null}
 
       {view === 'Dependencies' ? (
@@ -177,13 +144,288 @@ export function SpecMainView({
         />
       ) : null}
 
-      {view === 'Graph' ? (
+      {view === 'Coverage' ? (
         <SpecGraphPanel
           data={specGraph.data}
           loading={specGraph.isLoading}
           error={specGraph.error}
         />
       ) : null}
+
+      {view === 'Impact' ? (
+        <SpecImpactPanel
+          data={specImpact.data}
+          loading={specImpact.isLoading}
+          error={specImpact.error}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Renders structured spec context entries and warnings.
+ *
+ * @param context - Structured spec context payload
+ * @returns Context panel content
+ */
+function SpecContextPanel({
+  context,
+}: {
+  context: SpecContextDto | undefined
+}): React.ReactElement {
+  const entries = context?.entries ?? []
+  const warnings = context?.warnings ?? []
+
+  if (entries.length === 0 && warnings.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        No context entries
+      </div>
+    )
+  }
+
+  return (
+    <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-3 text-xs">
+      {warnings.length > 0 ? (
+        <section className="mb-3 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
+          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200/80">
+            Warnings
+          </h2>
+          <ul className="space-y-2">
+            {warnings.map((warning) => (
+              <li key={`${warning.type}:${warning.path ?? warning.message}`}>
+                <div className="font-mono text-[11px] text-amber-100">{warning.message}</div>
+                {warning.path ? (
+                  <div className="text-[10px] text-amber-200/70">{warning.path}</div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <div className="space-y-3">
+        {entries.map((entry) => (
+          <SpecContextEntryCard key={`${entry.source}:${entry.spec}`} entry={entry} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Renders one structured spec context entry.
+ *
+ * @param entry - Spec context entry
+ * @returns One rendered context card
+ */
+function SpecContextEntryCard({
+  entry,
+}: {
+  entry: SpecContextEntryDto
+}): React.ReactElement {
+  const headerTone = entry.source === 'root' ? 'text-sky-300' : 'text-muted-foreground'
+
+  return (
+    <section className="studio-card p-3">
+      <div className="mb-2 flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className={`font-mono text-[11px] ${headerTone}`}>{entry.spec}</div>
+          <div className="mt-1 flex flex-wrap gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <span>{entry.source}</span>
+            <span>{entry.mode}</span>
+            {entry.stale ? <span className="text-amber-400">stale metadata</span> : null}
+          </div>
+        </div>
+      </div>
+
+      {entry.title ? <h2 className="text-sm font-semibold text-foreground">{entry.title}</h2> : null}
+
+      <div className="mt-3 space-y-2">
+        <ContextAccordion title="Optimized Content" defaultOpen>
+          {entry.optimizedContent ? (
+            <MarkdownSection content={entry.optimizedContent} compact />
+          ) : (
+            <EmptyContextField label="Optimized content" />
+          )}
+        </ContextAccordion>
+
+        <ContextAccordion title="Description" defaultOpen>
+          {entry.description ? (
+            <MarkdownSection content={entry.description} />
+          ) : (
+            <EmptyContextField label="Description" />
+          )}
+        </ContextAccordion>
+
+        <ContextAccordion title={`Rules${entry.rules ? ` (${entry.rules.length})` : ''}`} defaultOpen>
+          {entry.rules && entry.rules.length > 0 ? (
+            <div className="space-y-2">
+              {entry.rules.map((group) => (
+                <div key={group.requirement}>
+                  <div className="mb-1 text-base font-bold text-foreground">
+                    <MarkdownSection content={group.requirement} />
+                  </div>
+                  <div className="space-y-2">
+                    {group.rules.map((rule) => (
+                      <div key={rule}>
+                        <MarkdownSection content={rule} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyContextField label="Rules" />
+          )}
+        </ContextAccordion>
+
+        <ContextAccordion
+          title={`Constraints${entry.constraints ? ` (${entry.constraints.length})` : ''}`}
+          defaultOpen
+        >
+          {entry.constraints && entry.constraints.length > 0 ? (
+            <ul className="list-disc space-y-1 pl-5">
+              {entry.constraints.map((constraint) => (
+                <li key={constraint}>
+                  <MarkdownSection content={constraint} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyContextField label="Constraints" />
+          )}
+        </ContextAccordion>
+
+        <ContextAccordion
+          title={`Scenarios${entry.scenarios ? ` (${entry.scenarios.length})` : ''}`}
+          defaultOpen
+        >
+          {entry.scenarios && entry.scenarios.length > 0 ? (
+            <div className="space-y-4">
+              {entry.scenarios.map((scenario) => (
+                <div key={`${scenario.requirement}:${scenario.name}`}>
+                  <div className="text-base font-bold text-foreground">
+                    <MarkdownSection content={scenario.name} />
+                  </div>
+                  <div className="mb-2 text-muted-foreground">
+                    <MarkdownSection content={scenario.requirement} compact />
+                  </div>
+                  {scenario.given && scenario.given.length > 0 ? (
+                    <ScenarioList label="Given" items={scenario.given} />
+                  ) : null}
+                  {scenario.when && scenario.when.length > 0 ? (
+                    <ScenarioList label="When" items={scenario.when} />
+                  ) : null}
+                  {scenario.then && scenario.then.length > 0 ? (
+                    <ScenarioList label="Then" items={scenario.then} />
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyContextField label="Scenarios" />
+          )}
+        </ContextAccordion>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Small native accordion used by the spec context panel.
+ *
+ * @param title - Section heading
+ * @param children - Section body
+ * @param defaultOpen - Whether the section starts open
+ * @returns Collapsible section
+ */
+function ContextAccordion({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}): React.ReactElement {
+  return (
+    <details
+      open={defaultOpen}
+      className="overflow-hidden rounded border border-border bg-background/20"
+    >
+      <summary className="cursor-pointer list-none px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {title}
+      </summary>
+      <div className="border-t border-border px-3 py-3">{children}</div>
+    </details>
+  )
+}
+
+/**
+ * Renders a markdown field inside the spec context panel.
+ *
+ * @param content - Markdown content
+ * @param compact - Whether to use compact body styling
+ * @returns Markdown-rendered section body
+ */
+function MarkdownSection({
+  content,
+  compact = false,
+}: {
+  content: string
+  compact?: boolean
+}): React.ReactElement {
+  return (
+    <article
+      className={cn(
+        'studio-markdown-preview max-w-none text-foreground',
+        compact ? 'text-[11px]' : 'text-xs',
+      )}
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </article>
+  )
+}
+
+/**
+ * Renders a placeholder when a structured context field is absent.
+ *
+ * @param label - Missing field label
+ * @returns Empty field marker
+ */
+function EmptyContextField({ label }: { label: string }): React.ReactElement {
+  return <p className="text-xs italic text-muted-foreground">{label} not available.</p>
+}
+
+/**
+ * Renders one clause group inside a scenario card.
+ *
+ * @param label - Clause heading
+ * @param items - Clause lines
+ * @returns Scenario clause list
+ */
+function ScenarioList({
+  label,
+  items,
+}: {
+  label: string
+  items: readonly string[]
+}): React.ReactElement {
+  return (
+    <div className="mt-2">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 space-y-2">
+        {items.map((item) => (
+          <div key={item}>
+            <MarkdownSection content={item} />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -234,7 +476,7 @@ function SpecArtifactsList({
                 )}
                 onClick={() => onSelect?.(a.filename)}
               >
-                <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+                <FileText className="h-3 w-3 shrink-0 text-studio-success" />
                 <span className="min-w-0 flex-1 truncate font-mono text-muted-foreground">
                   {a.filename}
                 </span>
@@ -266,7 +508,7 @@ function LinkedChangesPanel({
   loading,
   error,
 }: {
-  linkedChanges: readonly { name: string; state: string }[]
+  linkedChanges: readonly { name: string; description?: string; state: string }[]
   loading: boolean
   error?: Error
 }): React.ReactElement {
@@ -278,22 +520,27 @@ function LinkedChangesPanel({
       {error ? (
         <p className="text-destructive">{error.message}</p>
       ) : loading && linkedChanges.length === 0 ? (
-        <p className="text-muted-foreground">Loading overlaps…</p>
+        <p className="text-muted-foreground">Loading linked changes…</p>
       ) : linkedChanges.length === 0 ? (
-        <p className="text-muted-foreground">No changes overlap this spec.</p>
+        <p className="text-muted-foreground">No active changes reference this spec.</p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="space-y-2">
           {linkedChanges.map((c) => (
             <li
               key={c.name}
-              className="studio-card flex items-center gap-3 p-2"
+              className="studio-card flex items-start gap-3 p-3"
             >
-              <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                {c.name}
-              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium text-foreground">{c.name}</div>
+                <div className="mt-1 text-muted-foreground">
+                  {c.description && c.description.trim().length > 0
+                    ? c.description
+                    : 'No description.'}
+                </div>
+              </div>
               <span
                 className={cn(
-                  'capitalize',
+                  'shrink-0 capitalize',
                   STATE_COLOR[c.state] ?? 'text-muted-foreground',
                 )}
               >
@@ -303,50 +550,6 @@ function LinkedChangesPanel({
           ))}
         </ul>
       )}
-    </div>
-  )
-}
-
-function SpecMetadataPanel({
-  spec,
-  loading,
-}: {
-  spec: SpecDetailDto | undefined
-  loading: boolean
-}): React.ReactElement {
-  if (loading && !spec) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-        Loading metadata…
-      </div>
-    )
-  }
-  if (!spec) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-        No spec metadata
-      </div>
-    )
-  }
-  const rows: { label: string; value: string }[] = [
-    { label: 'Spec ID', value: spec.specId },
-    { label: 'Workspace', value: spec.workspace },
-    { label: 'Path', value: spec.path },
-    { label: 'Title', value: spec.title ?? '—' },
-    { label: 'Description', value: spec.description ?? '—' },
-  ]
-  return (
-    <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-4 text-xs">
-      <dl className="studio-card space-y-3 p-4">
-        {rows.map(({ label, value }) => (
-          <div key={label}>
-            <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {label}
-            </dt>
-            <dd className="mt-0.5 break-all text-foreground">{value}</dd>
-          </div>
-        ))}
-      </dl>
     </div>
   )
 }
@@ -414,7 +617,7 @@ function SpecGraphPanel({
   loading,
   error,
 }: {
-  data: Record<string, unknown> | undefined
+  data: GraphSpecCoverageDto | undefined
   loading: boolean
   error?: Error
 }): React.ReactElement {
@@ -428,9 +631,224 @@ function SpecGraphPanel({
   if (error) {
     return <div className="p-3 text-xs text-destructive">{error.message}</div>
   }
+  if (!data || (data.files.length === 0 && data.symbols.length === 0)) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        No graph coverage for this spec.
+      </div>
+    )
+  }
   return (
-    <pre className="studio-scrollbar min-h-0 flex-1 overflow-auto p-3 font-mono text-xs text-foreground/90">
-      {data ? JSON.stringify(data, null, 2) : 'No graph view for this spec.'}
-    </pre>
+    <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-4 text-xs">
+      <section className="studio-card overflow-hidden">
+        <div className="border-b border-border bg-muted/30 px-3 py-2 font-mono text-sm text-foreground">
+          {data.specId}
+        </div>
+        <div className="space-y-3 p-3">
+          <ImpactSection
+            title="Symbols"
+            count={data.symbols.length}
+            empty="No covered symbols for this spec."
+          >
+            <ul className="space-y-1 text-[10px] text-muted-foreground">
+              {data.symbols.map((symbol) => (
+                <li
+                  key={symbol.id}
+                  className="rounded border border-border/60 bg-background px-2 py-1.5"
+                >
+                  <div className="font-mono text-foreground">{formatGraphSymbolRef(symbol)}</div>
+                  <div className="mt-0.5 font-mono text-muted-foreground">
+                    {formatGraphFileRef(symbol)}:{symbol.line}:{symbol.column}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </ImpactSection>
+
+          <ImpactSection
+            title="Files"
+            count={data.files.length}
+            empty="No covered files for this spec."
+          >
+            <ul className="space-y-1 font-mono text-[10px] text-muted-foreground">
+              {data.files.map((file) => (
+                <li key={file.id} className="truncate">
+                  {formatGraphFileRef(file)}
+                </li>
+              ))}
+            </ul>
+          </ImpactSection>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function SpecImpactPanel({
+  data,
+  loading,
+  error,
+}: {
+  data: GraphImpactDto | undefined
+  loading: boolean
+  error?: Error
+}): React.ReactElement {
+  if (loading && !data) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        Loading graph impact…
+      </div>
+    )
+  }
+  if (error) {
+    return <div className="p-3 text-xs text-destructive">{error.message}</div>
+  }
+  if (
+    !data ||
+    (data.specs.length === 0 &&
+      data.symbols.length === 0 &&
+      data.files.length === 0 &&
+      data.affectedProcesses.length === 0)
+  ) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+        No graph impact for this spec.
+      </div>
+    )
+  }
+
+  return (
+    <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-4 text-xs">
+      <section className="studio-card overflow-hidden">
+        <div className="border-b border-border bg-muted/30 px-3 py-2 font-mono text-sm text-foreground">
+          {data.target}
+        </div>
+        <div className="grid gap-2 border-b border-border/60 px-3 py-2 text-[10px] text-muted-foreground md:grid-cols-3 xl:grid-cols-6">
+          <div>
+            <span className="text-foreground/80">Risk: </span>
+            {data.riskLevel}
+          </div>
+          <div>
+            <span className="text-foreground/80">Direct: </span>
+            {data.directDepsCount}
+          </div>
+          <div>
+            <span className="text-foreground/80">Indirect: </span>
+            {data.indirectDepsCount}
+          </div>
+          <div>
+            <span className="text-foreground/80">Transitive: </span>
+            {data.transitiveDepsCount}
+          </div>
+          <div>
+            <span className="text-foreground/80">Affected files: </span>
+            {data.affectedFilesCount}
+          </div>
+          <div>
+            <span className="text-foreground/80">Affected specs: </span>
+            {data.specs.length}
+          </div>
+        </div>
+        <div className="space-y-3 p-3">
+          <ImpactSection
+            title="Specs"
+            count={data.specs.length}
+            empty="No affected specs for this spec."
+          >
+            <ul className="space-y-1 font-mono text-[10px] text-muted-foreground">
+              {data.specs.map((specId) => (
+                <li key={specId} className="truncate">
+                  {specId}
+                </li>
+              ))}
+            </ul>
+          </ImpactSection>
+
+          <ImpactSection
+            title="Symbols"
+            count={data.symbols.length}
+            empty="No affected symbols for this spec."
+          >
+            <ul className="space-y-1 text-[10px] text-muted-foreground">
+              {data.symbols.map((symbol) => (
+                <li
+                  key={symbol.id}
+                  className="rounded border border-border/60 bg-background px-2 py-1.5"
+                >
+                  <div className="font-mono text-foreground">{formatGraphSymbolRef(symbol)}</div>
+                  <div className="mt-0.5 font-mono text-muted-foreground">
+                    {formatGraphFileRef(symbol)}:{symbol.line}:{symbol.column}
+                  </div>
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    Depth {symbol.depth}
+                    {symbol.risk ? ` · ${symbol.risk}` : ''}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </ImpactSection>
+
+          <ImpactSection
+            title="Files"
+            count={data.files.length}
+            empty="No affected files for this spec."
+          >
+            <ul className="space-y-1 font-mono text-[10px] text-muted-foreground">
+              {data.files.map((file) => (
+                <li key={file.id} className="truncate">
+                  {formatGraphFileRef(file)}
+                </li>
+              ))}
+            </ul>
+          </ImpactSection>
+
+          {data.affectedProcesses.length > 0 ? (
+            <ImpactSection
+              title="Processes"
+              count={data.affectedProcesses.length}
+              empty=""
+            >
+              <ul className="space-y-1 font-mono text-[10px] text-muted-foreground">
+                {data.affectedProcesses.map((processName) => (
+                  <li key={processName} className="truncate">
+                    {processName}
+                  </li>
+                ))}
+              </ul>
+            </ImpactSection>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function formatGraphFileRef(file: GraphFileRefDto): string {
+  return `${file.workspace}:${file.workspaceRelativePath}`
+}
+
+function formatGraphSymbolRef(symbol: GraphSymbolRefDto): string {
+  return `${symbol.name} (${symbol.kind})`
+}
+
+function ImpactSection({
+  title,
+  count,
+  empty,
+  children,
+}: {
+  title: string
+  count: number
+  empty: string
+  children: React.ReactNode
+}): React.ReactElement {
+  return (
+    <section>
+      <h2 className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+        <span className="ml-2 studio-badge">{count}</span>
+      </h2>
+      {count > 0 ? children : <p className="text-[10px] text-muted-foreground">{empty}</p>}
+    </section>
   )
 }

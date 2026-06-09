@@ -9,6 +9,7 @@ import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type ArtifactParserRegistry } from '../application/ports/artifact-parser.js'
 import { type ContentHasher } from '../application/ports/content-hasher.js'
 import { type FileReader } from '../application/ports/file-reader.js'
+import { type FileWriter } from '../application/ports/file-writer.js'
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
 import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
 import { type HookRunner } from '../application/ports/hook-runner.js'
@@ -19,6 +20,7 @@ import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
 import { NodeContentHasher } from '../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../infrastructure/node/yaml-serializer.js'
 import { FsFileReader } from '../infrastructure/fs/file-reader.js'
+import { FsFileWriter } from '../infrastructure/fs/file-writer.js'
 import { createArtifactParserRegistry } from '../infrastructure/artifact-parser/registry.js'
 import { FsConfigWriter } from '../infrastructure/fs/config-writer.js'
 import { createChangeRepository } from './change-repository.js'
@@ -296,6 +298,8 @@ export interface KernelInternals {
   readonly hasher: ContentHasher
   /** File reader for context file resolution. */
   readonly files: FileReader
+  /** File writer for project metadata and other on-disk operations. */
+  readonly fileWriter: FileWriter
   /** Actor resolver for identity resolution. */
   readonly actor: ActorResolver
   /** VCS adapter for repository queries (rootDir, branch, isClean, ref, show). */
@@ -487,6 +491,7 @@ export async function createKernelInternals(
     parsers: registry.parsers,
     hasher: new NodeContentHasher(),
     files: new FsFileReader(),
+    fileWriter: new FsFileWriter(),
     actor: config.privacy ? new PrivacyActorResolver(baseActor, config.privacy) : baseActor,
     vcs: await createVcsAdapter(config.projectRoot, registry.vcsProviders),
     hooks: new NodeHookRunner(expander),

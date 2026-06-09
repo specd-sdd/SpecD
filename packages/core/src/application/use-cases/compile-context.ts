@@ -14,6 +14,7 @@ import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
+import { checkProjectMetadataFreshness } from './_shared/project-metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type PreviewSpec } from './preview-spec.js'
 import { type ContextWarning } from './_shared/context-warning.js'
@@ -23,6 +24,7 @@ import { compileContextFingerprint } from './_shared/compile-context-fingerprint
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { Logger } from '../logger.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
   includePattern: 0,
@@ -61,6 +63,10 @@ export interface WorkspaceContextConfig {
 
 /** Project configuration subset used by `CompileContext`. */
 export interface CompileContextConfig {
+  /** Absolute path to the directory containing the active `specd.yaml`. */
+  readonly projectRoot?: string
+  /** Absolute path to the specd-owned config root. */
+  readonly configPath?: string
   /** Ordered list of project-level context entries injected verbatim at the top. */
   readonly context?: ContextEntry[]
   /** Project-level include patterns; always applied regardless of active workspace. */
@@ -78,6 +84,8 @@ export interface CompileContextConfig {
   readonly contextMode?: 'list' | 'summary' | 'full' | 'hybrid'
   /** Per-workspace context include/exclude patterns. */
   readonly workspaces?: Record<string, WorkspaceContextConfig>
+  /** When `true`, specd may prefer LLM-optimized context when available. */
+  readonly llmOptimizedContext?: boolean | undefined
 }
 
 /** Metadata section names that can be individually selected for output. */
@@ -200,7 +208,7 @@ export interface CompileContextResult {
  */
 export class CompileContext {
   private readonly _changes: ChangeRepository
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _schemaProvider: SchemaProvider
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
@@ -214,7 +222,7 @@ export class CompileContext {
    * Creates a new `CompileContext` use case instance.
    *
    * @param changes - Repository for loading the change
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
@@ -226,7 +234,7 @@ export class CompileContext {
    */
   constructor(
     changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     files: FileReader,
     parsers: ArtifactParserRegistry,
@@ -237,7 +245,7 @@ export class CompileContext {
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
-    this._specs = specs
+    this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
     this._files = files
     this._parsers = parsers
@@ -268,6 +276,30 @@ export class CompileContext {
     }
 
     const warnings: ContextWarning[] = []
+
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    // --- Step 0: Cache Verification for LLM-optimized project context ---
+    const {
+      metadata: projectMeta,
+      isFresh,
+      warnings: optimizationWarnings,
+    } = await checkProjectMetadataFreshness(input.config, this._files, this._hasher, workspaceMap)
+
+    warnings.push(...optimizationWarnings)
+
+    // Only use optimized project context if it's fresh AND none of the specs in it are being modified in this change.
+    let useOptimizedProjectContext = false
+    if (isFresh && projectMeta) {
+      const optimizedSpecIds = new Set(projectMeta.freshness.inputs.specMetadata.map((s) => s.id))
+      const changeSpecIds = new Set(change.specIds)
+      const hasOverlap = [...optimizedSpecIds].some((id) => changeSpecIds.has(id))
+
+      if (!hasOverlap) {
+        useOptimizedProjectContext = true
+      }
+    }
 
     // --- Source tracking: build seed sets for collection and source classification ---
     const includeChangeSpecs = input.includeChangeSpecs === true
@@ -315,24 +347,26 @@ export class CompileContext {
     }
 
     // --- 5-step context spec collection ---
-    // Step 1: Project-level include patterns (all workspaces, bare * = all)
-    for (const pattern of input.config.contextIncludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
-      for (const spec of matches) {
-        registerCollectedSpec(spec, 'includePattern')
+    if (!useOptimizedProjectContext) {
+      // Step 1: Project-level include patterns (all workspaces, bare * = all)
+      for (const pattern of input.config.contextIncludeSpecs ?? []) {
+        const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
+        for (const spec of matches) {
+          registerCollectedSpec(spec, 'includePattern')
+        }
       }
-    }
 
-    // Step 2: Project-level exclude patterns
-    const projectExcludedKeys = new Set<string>()
-    for (const pattern of input.config.contextExcludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
-      for (const spec of matches) {
-        projectExcludedKeys.add(`${spec.workspace}:${spec.capPath}`)
+      // Step 2: Project-level exclude patterns
+      const projectExcludedKeys = new Set<string>()
+      for (const pattern of input.config.contextExcludeSpecs ?? []) {
+        const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
+        for (const spec of matches) {
+          projectExcludedKeys.add(`${spec.workspace}:${spec.capPath}`)
+        }
       }
-    }
-    for (const key of projectExcludedKeys) {
-      if (!protectedKeys.has(key)) collectedSpecs.delete(key)
+      for (const key of projectExcludedKeys) {
+        if (!protectedKeys.has(key)) collectedSpecs.delete(key)
+      }
     }
 
     // Step 3: Workspace-level include patterns (active workspaces only)
@@ -341,7 +375,7 @@ export class CompileContext {
     for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextIncludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
+        const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
         for (const spec of matches) {
           registerCollectedSpec(spec, 'includePattern')
         }
@@ -352,7 +386,7 @@ export class CompileContext {
     for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextExcludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, wsName, false, this._specs, warnings)
+        const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
         for (const spec of matches) {
           const key = `${spec.workspace}:${spec.capPath}`
           if (!protectedKeys.has(key)) collectedSpecs.delete(key)
@@ -378,8 +412,9 @@ export class CompileContext {
       const depSeen = new Set<string>()
       for (const specId of change.specIds) {
         const { workspace, capPath } = parseSpecId(specId)
-        const repo = this._specs.get(workspace)
-        if (!repo) continue
+        const ws = workspaceMap.get(workspace)
+        if (ws === undefined) continue
+        const repo = ws.specRepo
         let specPathObj: SpecPath
         try {
           specPathObj = SpecPath.parse(capPath)
@@ -407,7 +442,12 @@ export class CompileContext {
             })
 
             if (depFallback !== undefined && depFallback.extraction.dependsOn !== undefined) {
-              dependsOnList = await this._extractDependsOnFallback(repo, spec, depFallback)
+              dependsOnList = await this._extractDependsOnFallback(
+                repo,
+                spec,
+                workspaceMap,
+                depFallback,
+              )
             }
           }
         }
@@ -422,7 +462,7 @@ export class CompileContext {
               dependsOnAdded,
               depSeen,
               new Set<string>(),
-              this._specs,
+              workspaceMap,
               warnings,
               input.depth,
               0,
@@ -460,19 +500,24 @@ export class CompileContext {
 
     // --- Part 1: Project context entries ---
     const projectContext: ProjectContextEntry[] = []
-    for (const entry of input.config.context ?? []) {
-      if ('instruction' in entry) {
-        projectContext.push({ source: 'instruction', content: entry.instruction })
-      } else {
-        const content = await this._files.read(entry.file)
-        if (content === null) {
-          warnings.push({
-            type: 'missing-file',
-            path: entry.file,
-            message: `Context file '${entry.file}' not found`,
-          })
+
+    if (useOptimizedProjectContext && projectMeta) {
+      projectContext.push({ source: 'instruction', content: projectMeta.optimized.context })
+    } else {
+      for (const entry of input.config.context ?? []) {
+        if ('instruction' in entry) {
+          projectContext.push({ source: 'instruction', content: entry.instruction })
         } else {
-          projectContext.push({ source: 'file', path: entry.file, content })
+          const content = await this._files.read(entry.file)
+          if (content === null) {
+            warnings.push({
+              type: 'missing-file',
+              path: entry.file,
+              message: `Context file '${entry.file}' not found`,
+            })
+          } else {
+            projectContext.push({ source: 'file', path: entry.file, content })
+          }
         }
       }
     }
@@ -483,8 +528,9 @@ export class CompileContext {
     const showAllSections = sectionsFilter === undefined
     const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of allSpecs) {
-      const specRepo = this._specs.get(workspace)
-      if (specRepo === undefined) continue
+      const ws = workspaceMap.get(workspace)
+      if (ws === undefined) continue
+      const specRepo = ws.specRepo
 
       let specPathObj: SpecPath
       try {
@@ -497,6 +543,17 @@ export class CompileContext {
       const metadata = await specRepo.metadata(spec)
       const specId = `${workspace}:${capPath}`
       const source = sourceMap.get(specId) ?? 'includePattern'
+
+      // Check for missing optimization if enabled
+      if (input.config.llmOptimizedContext && metadata !== null) {
+        if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
+          warnings.push({
+            type: 'stale-optimization',
+            path: specId,
+            message: `Spec '${specId}' is missing LLM-optimized context. Run specd-spec-metadata skill to refresh.`,
+          })
+        }
+      }
 
       // Determine entry mode from configured context mode and source.
       const mode: ContextSpecEntry['mode'] = (() => {
@@ -525,7 +582,10 @@ export class CompileContext {
 
       if (metadata !== null) {
         title = metadata.title ?? ''
-        description = metadata.description ?? ''
+        description =
+          (input.config.llmOptimizedContext && metadata.optimizedDescription) ||
+          metadata.description ||
+          ''
       }
 
       let baseFiles: SpecContentFile[] | undefined
@@ -595,7 +655,9 @@ export class CompileContext {
               mergedFiles,
               workspace,
               capPath,
+              workspaceMap,
               sectionsFilter,
+              input.config.llmOptimizedContext,
             )
           } else {
             content = ''
@@ -607,7 +669,11 @@ export class CompileContext {
           }
 
           if (isFresh && metadata !== null) {
-            content = this._renderFromMetadata(metadata, sectionsFilter)
+            content = this._renderFromMetadata(
+              metadata,
+              sectionsFilter,
+              input.config.llmOptimizedContext,
+            )
           } else {
             if (metadata !== null) {
               warnings.push({
@@ -630,7 +696,9 @@ export class CompileContext {
                 displayFiles,
                 workspace,
                 capPath,
+                workspaceMap,
                 sectionsFilter,
+                input.config.llmOptimizedContext,
               )
             } else {
               content = ''
@@ -706,18 +774,30 @@ export class CompileContext {
    *
    * @param metadata - The fresh parsed metadata
    * @param sectionsFilter - Optional filter to include only specific sections
+   * @param llmOptimizedContext - Whether to prefer optimized fields
    * @returns Rendered content string
    */
   private _renderFromMetadata(
     metadata: SpecMetadata,
     sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    llmOptimizedContext = false,
   ): string {
+    if (
+      llmOptimizedContext &&
+      metadata.optimizedContext !== undefined &&
+      metadata.optimizedContext !== ''
+    ) {
+      return metadata.optimizedContext
+    }
+
     const metaParts: string[] = []
 
     // Description is always included in full mode as part of the content string
     // if it exists in metadata (header persistence).
-    if (metadata.description !== undefined && metadata.description !== '') {
-      metaParts.push(`**Description:** ${metadata.description}`)
+    const description =
+      (llmOptimizedContext && metadata.optimizedDescription) || metadata.description
+    if (description !== undefined && description !== '') {
+      metaParts.push(`**Description:** ${description}`)
     }
 
     // If no sections are provided, default to Rules + Constraints.
@@ -880,7 +960,9 @@ export class CompileContext {
    * @param files - Ordered source files to extract from
    * @param workspace - Workspace owning the spec
    * @param specPath - Capability path for transform context
+   * @param workspaces - Orchestrated workspace map
    * @param sectionsFilter - Optional selected sections
+   * @param llmOptimizedContext - Whether to prefer optimized fields
    * @returns Rendered section content
    */
   private async _renderExtractedSectionsFromFiles(
@@ -888,8 +970,16 @@ export class CompileContext {
     files: readonly SpecContentFile[],
     workspace: string,
     specPath: string,
+    workspaces: Map<string, ProjectWorkspace>,
     sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    llmOptimizedContext = false,
   ): Promise<string> {
+    // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts
+    const repositories = new Map<string, SpecRepository>()
+    for (const ws of workspaces.values()) {
+      repositories.set(ws.name, ws.specRepo)
+    }
+
     const extracted = await extractMetadataFromSpecArtifacts({
       effectiveSpecSchema: schema,
       workspace,
@@ -897,11 +987,11 @@ export class CompileContext {
       artifacts: files,
       parsers: this._parsers,
       extractorTransforms: this._extractorTransforms,
-      repositories: this._specs,
+      repositories,
       workspaceRoutes: this._workspaceRoutes,
     })
 
-    return this._renderFromMetadata(extracted.metadata, sectionsFilter)
+    return this._renderFromMetadata(extracted.metadata, sectionsFilter, llmOptimizedContext)
   }
 
   /**
@@ -910,12 +1000,14 @@ export class CompileContext {
    *
    * @param specRepo - Repository for loading spec artifacts
    * @param spec - The spec entity to extract from
+   * @param workspaces - Orchestrated workspace map
    * @param fallback - Fallback configuration with extraction rules and parsers
    * @returns Extracted dependsOn array, or undefined if extraction yields nothing
    */
   private async _extractDependsOnFallback(
-    specRepo: import('../ports/spec-repository.js').SpecRepository,
+    specRepo: SpecRepository,
     spec: Spec,
+    workspaces: Map<string, ProjectWorkspace>,
     fallback: DependsOnFallback,
   ): Promise<string[] | undefined> {
     const descriptors = fallback.schemaArtifacts
@@ -928,6 +1020,12 @@ export class CompileContext {
       }))
     const files = await this._loadBaseSpecFiles(specRepo, spec, descriptors)
     if (files.length === 0) return undefined
+
+    // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts
+    const repositories = new Map<string, SpecRepository>()
+    for (const ws of workspaces.values()) {
+      repositories.set(ws.name, ws.specRepo)
+    }
 
     const extracted = await extractMetadataFromSpecArtifacts({
       effectiveSpecSchema: new Schema(
@@ -943,7 +1041,7 @@ export class CompileContext {
       artifacts: files,
       parsers: this._parsers,
       extractorTransforms: this._extractorTransforms,
-      repositories: this._specs,
+      repositories,
       workspaceRoutes: fallback.workspaceRoutes,
     })
     return extracted.metadata.dependsOn

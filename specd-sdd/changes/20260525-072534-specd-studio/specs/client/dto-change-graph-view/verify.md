@@ -30,6 +30,8 @@
 - **GIVEN** API JSON with `specs` array
 - **WHEN** remote adapter parses graph view
 - **THEN** `ChangeGraphViewDto.specs` is populated
+- **AND** `coveredFiles[]` match [`client:dto-graph-file-ref`](../dto-graph-file-ref/spec.md)
+- **AND** `coveredSymbols[]` match [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md)
 - **AND** no `links` property is read
 
 ### Requirement: types are shared or generated from API schemas

@@ -25,6 +25,13 @@
 - **THEN** tree shows new node
 - **AND** spec tab poll does not scan filesystem directly
 
+#### Scenario: Canonical artifact rows use green icon only
+
+- **GIVEN** a spec with canonical artifacts in the Artifacts tab
+- **WHEN** the file list renders
+- **THEN** each row shows a success/green file icon
+- **AND** the artifact filename text remains neutral
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

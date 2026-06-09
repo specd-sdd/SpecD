@@ -19,9 +19,21 @@ Drafted and discarded changes are read-only and MUST use dedicated read entry po
 
 - `getDraft(name)`, `getDraftStatus(name, { ifModifiedSince? })`, `listDraftArtifacts(name)`
 - `getDiscarded(name)`, `getDiscardedStatus(name, { ifModifiedSince? })`, `listDiscardedArtifacts(name)`
-- `getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)` where `readOnlyOrigin` is `draft` | `discarded` | `archived` (reserved)
+- `getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)` where `readOnlyOrigin` is `draft` | `discarded` | `archived`
 
 `getDraftArtifact` and `getDiscardedArtifact` MAY delegate to `getReadOnlyChangeArtifact` with the matching origin. These methods map to `/drafts/{name}/*` and `/discarded/{name}/*` and MUST NOT call active `/changes/{name}/*` routes.
+
+Artifact list responses consumed through this port MUST preserve task metadata from the API, including `hasTasks` and optional `totalTasks` / `completedTasks`, so Studio can resolve the Tasks tab without relying on a fixed filename such as `tasks.md`.
+
+### Requirement: port exposes read-only artifact by origin
+
+The port MUST expose `getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)` as the canonical artifact reader for drafted, discarded, and archived read-only change views.
+
+Adapters MUST map:
+
+- `draft` → `/drafts/{name}/artifacts/{filename}`
+- `discarded` → `/discarded/{name}/artifacts/{filename}`
+- `archived` → `/archived-changes/{name}/artifacts/{filename}`
 
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
@@ -35,7 +47,7 @@ HTTP failures MUST be translated by `adapter-problem-json-errors` into errors th
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
-- Active artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact`. Read-only draft/discarded bodies MUST use `core:get-read-only-change-artifact` via `getReadOnlyChangeArtifact` — not `getChangeArtifact` or raw repository access.
+- Active artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact`. Read-only draft/discarded/archived bodies MUST use `core:get-read-only-change-artifact` via `getReadOnlyChangeArtifact` — not `getChangeArtifact` or raw repository access.
 - There is no `GET /changes/{name}/validation` resource; use `GET .../status` and `POST .../validate`.
 - Canonical workspace spec artifacts are read-only in Studio v1.
 

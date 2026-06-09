@@ -310,7 +310,12 @@ describe('FsChangeRepository', () => {
         return loaded.state
       })
 
-      await new Promise((resolve) => setTimeout(resolve, 75))
+      await expect(
+        Promise.race([
+          mutateBeta.then(() => 'completed'),
+          new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 500)),
+        ]),
+      ).resolves.toBe('completed')
       expect(betaCompleted).toBe(true)
 
       releaseAlpha?.()

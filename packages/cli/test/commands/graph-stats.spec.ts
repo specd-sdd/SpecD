@@ -3,6 +3,7 @@ import {
   captureStderr,
   captureStdout,
   makeMockConfig,
+  makeMockKernel,
   makeProgram,
   mockProcessExit,
 } from './helpers.js'
@@ -33,10 +34,13 @@ import { createVcsAdapter } from '@specd/core'
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
+import { buildProjectGraphConfig } from '../../src/commands/graph/build-project-graph-config.js'
+import { codeGraphVersion } from '../../src/commands/graph/code-graph-version.js'
 import { registerGraphStats } from '../../src/commands/graph/stats.js'
 
 const DEFAULT_STATS = {
   fileCount: 1,
+  documentCount: 1,
   symbolCount: 2,
   specCount: 0,
   relationCounts: {},
@@ -50,13 +54,26 @@ const { lastIndexedRef: _, ...DEFAULT_STATS_NO_REF } = DEFAULT_STATS
 function setup(
   mode: 'configured' | 'bootstrap' = 'configured',
   statOverrides: Record<string, unknown> = {},
+  options: { withKernel?: boolean } = {},
 ) {
   const config = makeMockConfig()
+  const kernel = options.withKernel ? makeMockKernel() : null
+  if (kernel !== null) {
+    kernel.project.listWorkspaces.execute.mockResolvedValue(
+      config.workspaces.map((workspace) => ({
+        name: workspace.name,
+        codeRoot: workspace.codeRoot,
+        ownership: workspace.ownership,
+        isExternal: workspace.isExternal,
+        specRepo: {} as never,
+      })),
+    )
+  }
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode,
     config,
     configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
-    kernel: null,
+    kernel,
     projectRoot: '/project',
     vcsRoot: '/project',
   })
@@ -233,6 +250,7 @@ describe('graph stats — staleness detection', () => {
 
     const stdout = getStdout()
     expect(stdout).toContain('Files:     1')
+    expect(stdout).toContain('Documents: 1')
     expect(stdout).toContain('Symbols:   2')
     expect(stdout).toContain('Specs:     0')
     expect(stdout).toContain('⚠ Graph is stale')
@@ -290,5 +308,64 @@ describe('graph stats — staleness detection', () => {
     expect(stdout).toContain('stale')
     expect(stdout).toContain('currentRef')
     expect(stdout).toContain('fingerprintMismatch')
+  })
+
+  it('reports fingerprintMismatch false after recomputing the same effective graph config', async () => {
+    const config = makeMockConfig()
+    const { computeWorkspaceFingerprint, computeRootFingerprint, serializeFingerprintMap } =
+      await import('@specd/code-graph')
+    const graphConfig = buildProjectGraphConfig(config)
+    const graphFingerprintEntries: Array<readonly [string, string]> = [
+      ...config.workspaces.map((workspace): readonly [string, string] => [
+        workspace.name,
+        computeWorkspaceFingerprint(
+          codeGraphVersion,
+          config.projectRoot,
+          {
+            name: workspace.name,
+            codeRoot: workspace.codeRoot,
+            ownership: workspace.ownership,
+            isExternal: workspace.isExternal,
+            specRepo: {} as never,
+          },
+          config.workspaces.map((candidate) => ({
+            name: candidate.name,
+            codeRoot: candidate.codeRoot,
+            ownership: candidate.ownership,
+            isExternal: candidate.isExternal,
+            specRepo: {} as never,
+          })),
+          graphConfig,
+        ),
+      ]),
+      [
+        'root',
+        computeRootFingerprint(
+          codeGraphVersion,
+          config.projectRoot,
+          config.workspaces.map((workspace) => ({
+            name: workspace.name,
+            codeRoot: workspace.codeRoot,
+            ownership: workspace.ownership,
+            isExternal: workspace.isExternal,
+            specRepo: {} as never,
+          })),
+          graphConfig,
+        ),
+      ],
+    ]
+    const graphFingerprint = serializeFingerprintMap(new Map(graphFingerprintEntries))
+
+    const { getStdout } = setup(
+      'configured',
+      { graphFingerprint, lastIndexedRef: 'abc1234def' },
+      { withKernel: true },
+    )
+
+    const program = makeStatsProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'stats', '--format', 'json'])
+
+    const parsed = JSON.parse(getStdout())
+    expect(parsed.fingerprintMismatch).toBe(false)
   })
 })

@@ -8,6 +8,7 @@ export interface FileNode {
   readonly contentHash: string
   readonly workspace: string
   readonly embedding: Float32Array | undefined
+  readonly content?: string | undefined
 }
 
 /**
@@ -28,6 +29,7 @@ function normalizePath(filePath: string): string {
  * @param params.contentHash - Content hash for incremental diffing.
  * @param params.workspace - Workspace name (e.g. 'core', 'cli').
  * @param params.embedding - Optional vector embedding.
+ * @param params.content - Optional full textual content.
  * @returns A FileNode value object.
  */
 export function createFileNode(params: {
@@ -37,6 +39,7 @@ export function createFileNode(params: {
   contentHash: string
   workspace: string
   embedding?: Float32Array | undefined
+  content?: string
 }): FileNode {
   return {
     path: normalizePath(params.path),
@@ -45,5 +48,6 @@ export function createFileNode(params: {
     contentHash: params.contentHash,
     workspace: params.workspace,
     embedding: params.embedding ? new Float32Array(params.embedding) : undefined,
+    content: params.content,
   }
 }

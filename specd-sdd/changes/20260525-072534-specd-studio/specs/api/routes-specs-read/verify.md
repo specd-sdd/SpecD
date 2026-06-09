@@ -16,11 +16,11 @@
 - **THEN** HTTP 404 is returned
 - **AND** body is `application/problem+json`
 
-#### Scenario: Detail payload includes linked active change names
+#### Scenario: Detail payload includes linked active change summaries
 
 - **WHEN** client calls `GET /v1/workspaces/{ws}/specs/{path}`
 - **THEN** response includes canonical spec detail fields
-- **AND** linked active change names are embedded in the response
+- **AND** linked active changes are embedded in the response with `name`, `state`, and optional `description`
 
 #### Scenario: There is no linked-changes reverse-lookup endpoint
 
@@ -72,6 +72,19 @@
 - **WHEN** client calls `GET /v1/workspaces/{ws}/specs/{path}/context?followDeps=true&depth=1`
 - **THEN** HTTP 200 is returned
 - **AND** response contains context entries and warnings from the canonical spec context use case
+
+#### Scenario: GET context returns structured spec context payload
+
+- **WHEN** client calls `GET /v1/workspaces/{ws}/specs/{path}/context`
+- **THEN** each entry includes `spec`, `source`, `mode`, and `stale`
+- **AND** grouped fields like `rules`, `constraints`, `scenarios`, or `optimizedContent` are preserved when present
+- **AND** response is not flattened into `CompiledContextDto.content`
+
+#### Scenario: GET context defaults to full structured mode
+
+- **WHEN** client calls `GET /v1/workspaces/{ws}/specs/{path}/context` without extra shape flags
+- **THEN** the root entry uses `mode = full`
+- **AND** the route requests `rules`, `constraints`, and `scenarios` sections from the use case
 
 #### Scenario: Search with q returns canonical spec summaries
 

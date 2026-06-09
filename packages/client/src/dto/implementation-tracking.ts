@@ -23,3 +23,14 @@ export interface ImplementationReviewDto {
   readonly implementationTracking: ImplementationTrackingDto
   readonly specIds: readonly string[]
 }
+
+/** `PATCH /v1/changes/{name}/spec-dependencies` wire shape. */
+export interface UpdateSpecDependenciesResultDto {
+  readonly specId: string
+  readonly dependsOn: readonly string[]
+}
+
+/** `PATCH /v1/changes/{name}/implementation-tracking` wire shape. */
+export interface UpdateImplementationTrackingResultDto {
+  readonly implementationTracking: ImplementationTrackingDto
+}

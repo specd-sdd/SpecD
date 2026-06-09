@@ -25,6 +25,8 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@specd/core": "workspace:*"
+    "@specd/core": "workspace:*",
+    "handlebars": "^4.7.9",
+    "yaml": "^2.0.0"
   }
 }

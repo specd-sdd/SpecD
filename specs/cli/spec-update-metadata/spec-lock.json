@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:update-spec-metadata"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/update-metadata.ts",
+      "symbols": ["registerSpecUpdateMetadata"]
+    },
+    {
+      "file": "cli:src/helpers/read-stdin.ts",
+      "symbols": ["readStdin"]
+    }
+  ]
+}

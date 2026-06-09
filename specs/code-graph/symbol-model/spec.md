@@ -39,12 +39,21 @@ Two `SpecNode` values are equal if their `specId` fields match.
 A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
 
 - **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line + column` (e.g. `core:src/index.ts:function:main:1:0`). Since `filePath` is workspace-prefixed, the id is globally unique across workspaces. The same symbol at the same location always produces the same id.
-- **`name`** (`string`) — the symbol's declared name (e.g. `createUser`, `AuthService`).
+- **`name`** (`string`) — the symbol's declared name.
 - **`kind`** (`SymbolKind`) — the category of this symbol.
-- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol (e.g. `core:src/index.ts`).
+- **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol.
 - **`line`** (`number`) — 1-based line number of the symbol's declaration.
 - **`column`** (`number`) — 0-based column offset of the symbol's declaration.
-- **`comment`** (`string | undefined`) — the raw comment or JSDoc text immediately preceding the symbol's declaration. Stored verbatim (no parsing) to enable full-text search. Language adapters extract this from the AST; symbols without a preceding comment have `undefined`.
+- **`comment`** (`string | undefined`) — the raw comment text.
+
+All node families (Specs, Files, Symbols, Documents) SHALL use workspace-qualified canonical identities as their unique primary keys.
+
+### Requirement: Document category
+
+The graph SHALL support a `document` category for textual non-code nodes.
+
+- **`DocumentNode`** represents a file that does not map to symbol semantics but is searchable via full-text content and identifiable by path.
+- Identities for documents follow the same format as `FileNode` (`workspace:path`), including the reserved `root:` namespace.
 
 ### Requirement: SymbolKind enum
 
@@ -235,5 +244,6 @@ const specRelation: Relation = {
 
 ## Spec Dependencies
 
-- [`default:_global/conventions`](../../_global/conventions/spec.md) — naming conventions, immutability patterns
-- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+- [`default:_global/conventions`](../../../_global/conventions/spec.md) — shared type and naming conventions
+- [`default:_global/error-handling-conventions`](../../../_global/error-handling-conventions/spec.md) — invariant and error-shape expectations
+- [`code-graph:document-model`](../document-model/spec.md) — concrete document-node category layered onto the shared graph vocabulary

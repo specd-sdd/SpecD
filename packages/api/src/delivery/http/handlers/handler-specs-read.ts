@@ -77,6 +77,9 @@ async function handleWorkspaceSpecWildcard(ctx: ApiContext, req: FastifyRequest)
     const result = await ctx.kernel.specs.getContext.execute({
       workspace: ws,
       specPath: SpecPath.parse(path),
+      contextMode: 'full',
+      sections: ['rules', 'constraints', 'scenarios'],
+      llmOptimizedContext: ctx.config.llmOptimizedContext,
       ...(query.followDeps === 'true' ? { followDeps: true } : {}),
       ...(query.depth !== undefined ? { depth: Number(query.depth) } : {}),
     })
@@ -93,7 +96,13 @@ async function handleWorkspaceSpecWildcard(ctx: ApiContext, req: FastifyRequest)
   }
   const { spec, artifacts } = got
   const active = await ctx.kernel.changes.list.execute()
-  const linked = active.filter((c: Change) => c.specIds.includes(specId)).map((c: Change) => c.name)
+  const linked = active
+    .filter((c: Change) => c.specIds.includes(specId))
+    .map((c: Change) => ({
+      name: c.name,
+      ...(c.description !== undefined ? { description: c.description } : {}),
+      state: c.state,
+    }))
   const meta = await ctx.kernel.specs.repos.get(ws)?.metadata(spec)
   return toSpecDetailDto(
     {
@@ -122,7 +131,9 @@ const WORKSPACE_SPEC_WILDCARD_SCHEMA = {
 const WORKSPACE_SPEC_WILDCARD_POST_SCHEMA = {
   ...apiRouteSchema({
     params: PARAMS_WORKSPACE_WILDCARD,
-    body: 'SpecMetadataBody',
+    body: {
+      anyOf: [{ $ref: 'SpecMetadataBody#' }, { $ref: 'SpecOutlineDraftBody#' }],
+    },
     response: { 200: 'JsonObjectDto' },
   }),
 }

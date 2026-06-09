@@ -173,7 +173,7 @@ export const PARAMS_GRAPH_WORKSPACE_WILDCARD: JsonSchema = {
  * Builds a Fastify route `schema` block with standard problem+json error responses.
  */
 export function apiRouteSchema(options: {
-  body?: string
+  body?: string | JsonSchema
   querystring?: JsonSchema
   params?: JsonSchema
   response: Record<number, string>
@@ -184,7 +184,14 @@ export function apiRouteSchema(options: {
   }
   return {
     schema: {
-      ...(options.body !== undefined ? { body: { $ref: `${options.body}#` } } : {}),
+      ...(options.body !== undefined
+        ? {
+            body:
+              typeof options.body === 'string'
+                ? { $ref: `${options.body}#` }
+                : options.body,
+          }
+        : {}),
       ...(options.querystring !== undefined ? { querystring: options.querystring } : {}),
       ...(options.params !== undefined ? { params: options.params } : {}),
       response,

@@ -16,26 +16,12 @@
 
 ### Requirement: Search execution
 
-#### Scenario: Graph available returns graph results
+#### Scenario: Fallback search uses orchestrated workspaces
 
-- **GIVEN** the code graph is indexed and fresh
-- **WHEN** `specd specs search "config"` is run
-- **THEN** results are returned from the graph search
-- **AND** no warning is printed to stderr
-
-#### Scenario: Graph unavailable falls back to core
-
-- **GIVEN** the code graph is stale or unavailable
-- **WHEN** `specd specs search "config"` is run
-- **THEN** results are returned from `SearchSpecs.execute()`
-- **AND** a warning is printed to stderr indicating the fallback
-
-#### Scenario: Graph-only flag with stale graph errors
-
-- **GIVEN** the code graph is stale or unavailable
-- **WHEN** `specd specs search "config" --graph` is run
-- **THEN** the command exits with code 1
-- **AND** an error message is printed to stderr
+- **GIVEN** the code graph is unavailable
+- **WHEN** `specd specs search "test"` is run
+- **THEN** `SearchSpecs.execute()` is called
+- **AND** it obtains the list of repositories via the `ListWorkspaces` orchestrator
 
 ### Requirement: Workspace filtering
 

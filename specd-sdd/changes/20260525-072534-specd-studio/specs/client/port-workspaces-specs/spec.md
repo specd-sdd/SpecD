@@ -12,6 +12,8 @@ The interface MUST declare asynchronous methods equivalent to the HTTP routes in
 
 - `listWorkspaces()`, `listSpecs(ws)`, `getSpec(ws, path)`, `getSpecOutline(ws, path, { filename? })`, `outlineSpecDraft(ws, path, { filename, content })`, context/search, canonical artifact read
 
+`getSpecContext(ws, path)` MUST return the structured spec-context DTO for a single spec, not the project/change compiled-markdown DTO.
+
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
 Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types.

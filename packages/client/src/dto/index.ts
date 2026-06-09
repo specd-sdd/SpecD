@@ -1,6 +1,10 @@
 export type { ArtifactContentDto } from './artifact-content.js'
+export type { ArtifactListDto, ArtifactListEntryDto } from './artifact-list.js'
 export type { ChangeDetailDto, ChangeHistoryEventDto } from './change-detail.js'
 export type { ChangeGraphViewDto } from './change-graph-view.js'
+export type { GraphFileRefDto } from './graph-file-ref.js'
+export type { GraphSymbolRefDto } from './graph-symbol-ref.js'
+export type { GraphSpecCoverageDto } from './graph-spec-coverage.js'
 export type {
   ImplementationLinkDto,
   ImplementationReviewDto,
@@ -18,12 +22,13 @@ export type {
   GraphIndexResultDto,
   WorkspaceGraphIndexBreakdownDto,
 } from './graph-index-result.js'
-export type { GraphSearchHitDto, GraphSearchResultDto } from './graph-search.js'
+export type { GraphSearchResultDto } from './graph-search.js'
 export type { GraphStatusDto } from './graph-status.js'
 export type { PreviewResultDto, PreviewResultFileDto } from './preview-result.js'
 export type { ProjectDto, WorkspaceSummaryDto } from './project.js'
 export type { ProjectGraphSummaryDto, ProjectStatusDto } from './project-status.js'
 export type { SpecDetailDto } from './spec-detail.js'
+export type { SpecContextDto, SpecContextEntryDto, SpecContextWarningDto } from './spec-context.js'
 export type { SpecSummaryDto } from './spec-summary.js'
 export type { ValidateBatchResultDto, ValidateBatchStepResultDto } from './validate-batch-result.js'
 export type { ValidateResultDto } from './validate-result.js'

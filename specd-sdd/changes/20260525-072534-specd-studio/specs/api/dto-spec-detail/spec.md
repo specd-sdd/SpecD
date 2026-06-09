@@ -18,6 +18,14 @@ The **Dto Spec Detail** wire shape MUST use camelCase property names stable acro
 
 Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`.
 
+### Requirement: linkedChanges uses summary objects
+
+When linked active changes are present, `linkedChanges[]` MUST contain summary objects with:
+
+- `name`
+- optional `description`
+- `state`
+
 ## Constraints
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.

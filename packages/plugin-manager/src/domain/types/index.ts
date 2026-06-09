@@ -1,6 +1,11 @@
 export type { ConfigSchemaEntry, PluginContext, PluginType, SpecdPlugin } from './specd-plugin.js'
 export { PLUGIN_TYPES, isSpecdPlugin } from './specd-plugin.js'
-export type { AgentPlugin, AgentInstallOptions, AgentInstallResult } from './agent-plugin.js'
+export type {
+  AgentPlugin,
+  AgentInstallOptions,
+  AgentInstallResult,
+  TemplateVariable,
+} from './agent-plugin.js'
 export type { UiPlugin, UiInstallOptions, UiInstallResult, UiServeContext } from './ui-plugin.js'
 export { isUiPlugin } from './ui-plugin.js'
 export { isAgentPlugin } from './agent-plugin.js'

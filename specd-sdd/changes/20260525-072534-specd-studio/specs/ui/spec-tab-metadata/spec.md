@@ -1,14 +1,23 @@
-# Spec Tab Metadata
+# Spec Metadata Presentation
 
 ## Purpose
 
-Studio UI for **Spec Tab Metadata**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tab Metadata**.
+Studio UI for spec metadata presentation: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio MUST present spec identity and descriptive metadata without a dedicated **Metadata** center tab.
 
 ## Requirements
 
-### Requirement: spec tab polls metadata while visible
+### Requirement: overview owns spec metadata presentation
 
-While the Metadata tab is visible, the view MUST refresh spec detail via `getSpec` on tab-scoped poll ticks. New specs in the tree are already discovered by the global workspace poll. The tab MUST render spec ID, workspace, path, title, and description from `SpecDetailDto`.
+Studio MUST NOT expose a separate **Metadata** center tab for specs.
+
+The spec **Overview** tab MUST surface the metadata that matters for normal reading:
+
+- spec identity (`specId`)
+- title
+- description
+- workspace/path context when relevant inside the overview content itself, not in a dedicated spec header bar
+
+Tab-scoped detail polling remains owned by the visible Overview and sibling detail tabs; there is no metadata-only poll loop.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

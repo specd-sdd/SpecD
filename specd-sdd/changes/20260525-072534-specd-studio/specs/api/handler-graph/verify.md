@@ -36,32 +36,13 @@
 - **THEN** change-scoped graph view composed from change `specIds` runs inside @specd/core
 - **AND** handler does not reimplement lifecycle or validation rules
 
-#### Scenario: Payload includes createCodeGraphProvider
+### Requirement: graph indexing uses CLI-aligned project assembly
 
-- **WHEN** handler serializes a successful response
-- **THEN** JSON includes `createCodeGraphProvider`
-- **AND** value matches kernel or manifest data
+#### Scenario: Graph index builds provider input from ListWorkspaces and project graph config
 
-### Requirement: artifact GET and PUT use dedicated core use cases
-
-#### Scenario: Stale originalHash on PUT returns 409
-
-- **GIVEN** artifact content changed after the client read `originalHash`
-- **WHEN** PUT sends an outdated hash
-- **THEN** HTTP 409 problem+json is returned
-- **AND** on-disk artifact is not overwritten
-
-#### Scenario: GET artifact delegates to GetChangeArtifact
-
-- **WHEN** `GET /v1/changes/{name}/artifacts/{file}` succeeds
-- **THEN** `GetChangeArtifact` executes
-- **AND** handler does not call `ChangeRepository` directly
-
-#### Scenario: PUT artifact delegates to SaveChangeArtifact
-
-- **WHEN** `PUT /v1/changes/{name}/artifacts/{file}` with a current `originalHash`
-- **THEN** `SaveChangeArtifact` executes
-- **AND** manifest `updatedAt` advances on success
+- **WHEN** `POST /v1/graph/index` is handled
+- **THEN** the handler loads workspaces from `kernel.project.listWorkspaces.execute()`
+- **AND** it assembles effective graph config from project configuration before calling the provider
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 
@@ -105,24 +86,8 @@
 - **THEN** response is not `text/plain` HTML
 - **AND** client receives problem+json or framework 500 mapping
 
-### Requirement: mutations pass the request-scoped actor into kernel
-
-#### Scenario: Mutating kernel call receives request actor
-
-- **GIVEN** `createApiContext` attached an actor to the request
-- **WHEN** handler triggers a mutating kernel use case
-- **THEN** kernel input includes that `actor`
-- **AND** history `by` matches the resolved identity
-
 #### Scenario: Read-only routes may omit actor on kernel calls
 
 - **WHEN** handler serves a read-only GET that does not write history
 - **THEN** kernel read use case still succeeds
 - **AND** no history event is written for the call
-
-#### Scenario: Actor is stable for the lifetime of the request
-
-- **GIVEN** one HTTP request triggers multiple kernel mutations
-- **WHEN** each mutation runs through the same context
-- **THEN** the same `actor` is passed to every mutating call
-- **AND** history entries share the same `by`

@@ -1,5 +1,7 @@
 import type {
   ChangeGraphViewDto,
+  GraphFileRefDto,
+  GraphSymbolRefDto,
   ImplementationLinkDto,
   ImplementationTrackingDto,
   TrackedImplementationFileDto,
@@ -9,8 +11,8 @@ import { sortSpecIds } from '../lib/sort-spec-ids.js'
 /** Accepted manifest link merged with optional code-graph coverage for the same spec/file. */
 export type MergedAcceptedLink = {
   readonly link: ImplementationLinkDto
-  readonly graphFiles: readonly string[]
-  readonly graphSymbols: readonly string[]
+  readonly graphFiles: readonly GraphFileRefDto[]
+  readonly graphSymbols: readonly GraphSymbolRefDto[]
 }
 
 /** Tracked files for one spec, split by review state. */
@@ -24,8 +26,8 @@ export type ImpactSpecTracked = {
 export type ImpactSpecGroup = {
   readonly specId: string
   readonly accepted: readonly MergedAcceptedLink[]
-  readonly graphOnlyFiles: readonly string[]
-  readonly graphOnlySymbols: readonly string[]
+  readonly graphOnlyFiles: readonly GraphFileRefDto[]
+  readonly graphOnlySymbols: readonly GraphSymbolRefDto[]
   readonly tracked: ImpactSpecTracked
 }
 
@@ -40,14 +42,20 @@ export type ImpactViewModel = {
  */
 export function implementationFileMatchesGraphTarget(
   manifestFile: string,
-  graphTarget: string,
+  graphTarget: string | GraphFileRefDto,
 ): boolean {
   const raw = manifestFile.replace(/\\/g, '/')
-  const graph = graphTarget.replace(/\\/g, '/')
-  if (raw === graph || graph === raw) return true
-  if (graph.endsWith(raw) || raw.endsWith(graph)) return true
+  const target =
+    typeof graphTarget === 'string'
+      ? graphTarget
+      : `${graphTarget.workspace}:${graphTarget.workspaceRelativePath}`
+  const graphNormalized = target.replace(/\\/g, '/')
+  if (raw === graphNormalized || graphNormalized === raw) return true
+  if (graphNormalized.endsWith(raw) || raw.endsWith(graphNormalized)) return true
 
-  const graphPath = graph.includes(':') ? graph.slice(graph.indexOf(':') + 1) : graph
+  const graphPath = graphNormalized.includes(':')
+    ? graphNormalized.slice(graphNormalized.indexOf(':') + 1)
+    : graphNormalized
   if (raw.endsWith(graphPath) || graphPath.endsWith(raw)) return true
 
   const rawBase = raw.split('/').pop()

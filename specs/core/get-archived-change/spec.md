@@ -26,7 +26,9 @@ The `ArchiveRepository` instance is scoped to the default workspace and is injec
 
 ### Requirement: Output on success
 
-When the archive contains a change matching the given name, `GetArchivedChange.execute()` MUST return `Promise<ArchivedChange>` -- the matching archived change entity.
+When the archive contains a change matching the given name, `GetArchivedChange.execute()` MUST return `Promise<ArchivedChange>` — the matching archived change read model loaded from the archived directory `manifest.json`.
+
+The returned `ArchivedChange` MUST extend `ReadOnlyChangeView` (shared read-only surface) and MUST include archive metadata (`archivedAt`, `archivedBy`, `archivedName`) so callers can inspect archived work without restoring it.
 
 ### Requirement: Delegation to ArchiveRepository
 
@@ -48,8 +50,10 @@ When `ArchiveRepository.get(name)` returns `null`, `GetArchivedChange` MUST thro
 
 ## Spec Dependencies
 
-- [`core:archive-change`](../archive-change/spec.md) -- `ArchiveChange` use case that produces archived changes; `ArchivedChange` entity
-- [`core:storage`](../storage/spec.md) -- `ArchiveRepository` port, `get()` lookup strategy with index search and fallback glob scan
-- [`core:change`](../change/spec.md) -- `ChangeNotFoundError` shared error type
-- [`core:kernel`](../kernel/spec.md) -- kernel wiring under `changes.getArchived`
-- [`default:_global/architecture`](../../_global/architecture/spec.md) -- port-based architecture, manual DI
+- [`core:archive-change`](../archive-change/spec.md) — `ArchiveChange` use case that produces archived changes; `ArchivedChange` read model
+- [`core:storage`](../storage/spec.md) — `ArchiveRepository` port, `get()` lookup strategy with index search and fallback glob scan
+- [`core:change`](../change/spec.md) — `ChangeNotFoundError` shared error type
+- [`core:kernel`](../kernel/spec.md) — kernel wiring under `changes.getArchived`
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — port-based architecture, manual DI
+- `core:archived-change-index-entry` — index row type used by archive listing APIs
+- [`core:read-only-change-view`](../read-only-change-view/spec.md) — shared read-only surface for manifest-backed archive reads

@@ -393,6 +393,8 @@ describe('change status', () => {
         reason: '...',
         command: '/specd-design',
       },
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
 
     const program = makeProgram()
@@ -402,6 +404,7 @@ describe('change status', () => {
     const out = stdout()
     expect(out).toContain('feat')
     expect(out).toContain('designing')
+    expect(out).toContain('specs and dependencies:')
     expect(out).toContain('auth/login')
     expect(out).toContain('spec')
   })
@@ -429,6 +432,8 @@ describe('change status', () => {
         reason: '...',
         command: '/specd-design',
       },
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
 
     const program = makeProgram()
@@ -482,6 +487,8 @@ describe('change status', () => {
         reason: '...',
         command: '/specd-design',
       },
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
 
     const program = makeProgram()
@@ -538,6 +545,8 @@ describe('change status', () => {
         reason: '...',
         command: '/specd-design',
       },
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
 
     const program = makeProgram()
@@ -594,6 +603,8 @@ describe('change status', () => {
         reason: '...',
         command: '/specd-design',
       },
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
     })
 
     const program = makeProgram()
@@ -636,6 +647,8 @@ describe('change transition', () => {
         reason: '...',
         command: '/specd-design',
       },
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       lifecycle: {
         validTransitions: [],
         availableTransitions: [],
@@ -776,6 +789,8 @@ describe('change transition', () => {
         reason: '...',
         command: '/specd-design',
       },
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       lifecycle: {
         validTransitions: [],
         availableTransitions: [],

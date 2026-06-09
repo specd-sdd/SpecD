@@ -13,16 +13,16 @@
 
 #### Scenario: Execute called with no arguments
 
-- **WHEN** `listArchived.execute()` is called
-- **THEN** it does not require any input parameters
+- **WHEN** `listArchived.execute({ limit: 10, page: 2 })` is called
+- **THEN** it delegates to `archiveRepository.list({ limit: 10, page: 2 })`
 
 ### Requirement: Output
 
 #### Scenario: Archive contains multiple changes
 
-- **GIVEN** the archive repository contains three archived changes with distinct `archivedAt` timestamps
+- **GIVEN** the archive repository contains three archived changes with distinct `archivedAt` timestamps as index entries
 - **WHEN** `listArchived.execute()` is called
-- **THEN** the result is an array of three `ArchivedChange` instances ordered oldest first
+- **THEN** the result is an array of three `ArchivedChangeIndexEntry` records ordered oldest first
 
 #### Scenario: Archive is empty
 
@@ -33,9 +33,9 @@
 
 #### Scenario: Result matches repository output exactly
 
-- **GIVEN** `ArchiveRepository.list()` returns a specific array of `ArchivedChange` instances
-- **WHEN** `listArchived.execute()` is called
-- **THEN** the result is identical to the array returned by `ArchiveRepository.list()` -- no filtering, sorting, or transformation is applied
+- **GIVEN** `ArchiveRepository.list(options)` returns a specific `ArchiveListResult`
+- **WHEN** `listArchived.execute(options)` is called
+- **THEN** the result is identical to the object returned by the repository
 
 ### Requirement: No side effects
 

@@ -5,6 +5,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
+import { readStdin } from '../../helpers/read-stdin.js'
 
 /**
  * Registers the `spec write-metadata` subcommand on the given parent command.
@@ -76,18 +77,4 @@ JSON/TOON output schema:
         }
       },
     )
-}
-
-/**
- * Reads all of stdin until EOF and returns the content as a string.
- *
- * @returns The full stdin content.
- */
-function readStdin(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    process.stdin.on('data', (chunk: Buffer) => chunks.push(chunk))
-    process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
-    process.stdin.on('error', reject)
-  })
 }
