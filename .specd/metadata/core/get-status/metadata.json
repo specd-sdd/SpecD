@@ -172,7 +172,7 @@
       ]
     },
     {
-      "requirement": "Returns the change and its artifact statuses",
+      "requirement": "Read paths do not amplify artifact-drift invalidation",
       "name": "Result includes specDependsOn",
       "given": ["a change with declared spec dependencies in its manifest"],
       "when": ["execute() is called for that change"],
@@ -515,8 +515,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9488d152750a2abe5b769266ad69c97dfced050e9404261964b477d3fa0ac295",
-    "verify.md": "sha256:a4bc173ed4603227892d0d293dcbb42eebef6fac9018feff6d7292f8fac302fe"
+    "spec.md": "sha256:be9a8c647ef1cde4542f96089f6e23d26f2480137983336d91675a1b3717ec34",
+    "verify.md": "sha256:9c775aef24fd62966e49cebe1570f01b8a4d0986f0a5db8b7d1b24ab9d4d2bda"
   },
   "generatedBy": "core"
 }

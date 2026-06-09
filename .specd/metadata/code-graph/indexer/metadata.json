@@ -673,8 +673,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1318ae503c01fd5ef0c6c53c93ed4504e0236eb4165a307499d95b0b866cab60",
-    "verify.md": "sha256:090de860ec9bbf14544fd588d3042338537f9edcf0ba81a0c8f1d0e043c29f13"
+    "spec.md": "sha256:94adcb097294fd63a1f58a264d6538a836c959c2b1f47c37a22712274f009b0c",
+    "verify.md": "sha256:f55f46ba93552e098c5f97d1b042a05dc17b5da58deb76d398f4018db5fbada5"
   },
   "generatedBy": "core"
 }
