@@ -24,23 +24,11 @@
 
 ### Requirement: Statistics retrieval
 
-#### Scenario: Command retrieves statistics and resolves VCS ref in configured mode
+#### Scenario: Command obtains orchestrated project structure
 
-- **WHEN** `graph stats` is executed with discovered or explicit config
-- **THEN** the command SHALL create a provider, open it, call `getStatistics()`, resolve the current VCS ref, output results, close the provider, and exit with code 0
-
-#### Scenario: Missing config falls back to bootstrap mode
-
-- **GIVEN** no `specd.yaml` is found by autodiscovery
-- **WHEN** `graph stats` is executed inside a repository
-- **THEN** the command SHALL resolve the VCS root and open the graph in bootstrap mode as workspace `default`
-
-#### Scenario: VCS detection failure is graceful
-
-- **GIVEN** the project has no VCS (e.g. no `.git/` directory)
-- **WHEN** `graph stats` is executed
-- **THEN** `currentRef` SHALL be `null`
-- **AND** the command SHALL proceed without error
+- **WHEN** `specd graph stats` is executed in configured mode
+- **THEN** it calls `ListWorkspaces` to obtain the rich workspace list
+- **AND** it uses this list to compute the project fingerprint
 
 ### Requirement: Concurrent indexing guard
 
@@ -71,10 +59,18 @@
 - **WHEN** `graph stats` is run in text mode
 - **THEN** no staleness line SHALL be shown
 
+#### Scenario: Text output includes document counts
+
+- **GIVEN** the graph contains 459 files, 18 documents, 1497 symbols, and 122 specs
+- **WHEN** `graph stats` is run in text mode
+- **THEN** stdout contains `Files:     459`
+- **AND** stdout contains `Documents: 18`
+- **AND** stdout contains `Symbols:   1497`
+
 #### Scenario: JSON output includes staleness fields
 
 - **WHEN** `graph stats --format json` is run
-- **THEN** the output SHALL include `stale` (boolean or null) and `currentRef` (string or null) fields
+- **THEN** the output SHALL include `stale` (boolean or null), `currentRef` (string or null), and `fingerprintMismatch`
 
 #### Scenario: JSON stale field values
 

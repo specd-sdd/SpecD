@@ -30,8 +30,9 @@ artifacts:
           Run `specd spec list --format json --summary` to discover existing specs, and
           `specd spec show <workspace>:<capability-path> --format json` for full review.
           Format: `<workspace>:<capability-path>`: what requirement is changing and why.
-          Under each spec, list any new dependencies this change introduces:
+          Under each spec, list any new or removed dependencies this change introduces:
           `Depends on (added): <specId>, ...` or `Depends on (added): none`.
+          `Depends on (removed): <specId>, ...` or `Depends on (removed): none`.
       - **Impact**: Affected code areas, APIs, data models, or external dependencies.
       - **Technical context**: Technical insights, constraints, and decisions discussed
         during the proposal conversation. Record what was actually discussed — if concrete
@@ -60,15 +61,19 @@ artifacts:
         - id: resolve-open-questions
           instruction: |
             Review the "Open questions" section of the proposal. If any question
-            affects downstream artifacts (specs, design, tasks), it must be resolved
+            affects downstream artifacts (specs, design, tasks), it MUST be resolved
             with the user before proceeding. Do not write specs or design while
             unresolved questions could change the direction of those artifacts.
+            No open question should be left unaddressed at this stage — either resolve
+            it or explicitly state that it will be deferred and why after asking the user.
         - id: register-spec-deps
           instruction: |
-            Review the "Specs affected" section. For each spec (new or modified)
-            that lists dependencies, register them now. Dependency registration
-            affects context compilation for all downstream artifacts — do not
-            defer this to the specs artifact.
+            Review the "Specs affected" section. You MUST register each spec (new or modified)
+            with `specd changes edit <change-name> --add-spec <workspace>:<capability-path>`
+            and if there are dependencies, you MUST register or unregister them now too with
+            `specd changes deps <change-name> <spec-id> --add/remove/set <workspace1>:<capability-path2>,<workspace2>:<capability-path2>` 
+            Dependency registration affects context compilation and delta file creation
+            for all downstream artifacts — do not defer this to the specs artifact.
 
   # ── specs ──────────────────────────────────────────────────────────────────
   - id: specs
@@ -79,6 +84,15 @@ artifacts:
     requires:
       - proposal
     instruction: |
+      You MUST review the "Specs affected" section. You MUST register each spec (new or modified)
+      with `specd changes edit <change-name> --add-spec <workspace>:<capability-path>`
+      and if there are dependencies, you MUST register or unregister them now too with
+      `specd changes deps <change-name> <spec-id> --add/remove/set <workspace1>:<capability-path2>,<workspace2>:<capability-path2>`
+
+      Ensure no open question from the proposal affects the spec you are writing,
+      and if there is an open question that could change the spec's direction,
+      you MUST resolve it with the user before proceeding.
+
       Create new specification files for every new spec listed in the proposal's
       "Specs affected" section. Each new spec defines WHAT the system should do for
       one capability. The template contains `<!-- ... -->` comments with guidance —
@@ -238,7 +252,8 @@ artifacts:
 
       Only write scenarios that add information beyond what the requirement prose already
       states. Do not restate the happy path if it is obvious from the requirement itself.
-      Focus on edge cases, error conditions, and non-obvious interactions.
+      Focus on normal and edge cases, error conditions, and non-obvious interactions,
+      there is no limit on number of scenarios, add all needed.
 
       Every requirement in spec.md should have at least one scenario unless its behaviour
       is fully described by a parent requirement's scenarios.
@@ -343,14 +358,12 @@ artifacts:
       - specs (spec.md and deltas) — the final requirements the implementation must satisfy
       - verify (verify.md and deltas) — the verification scenarios the implementation must pass
 
-      Create the design document that explains HOW to implement the change. This artifact
-      is the bridge between specs and tasks — it must be concrete enough that tasks can be
-      derived from it without ambiguity.
-
-      The design must be concrete, not generic. Avoid vague statements like "add a new
-      service" or "update the module" — specify the exact class name, method signatures,
-      and file paths. A developer reading the design should know precisely what to build
-      without needing to make design decisions of their own.
+      The design artifact must fully materialize the implementation context.
+      Do not assume access to previous artifacts.
+      Every technical detail required for coding, testing, validation, integration, deployment,
+      and operation must be explicitly included.
+      Summarize and consolidate information from prior artifacts rather than referencing it.
+      The design must be independently consumable by both humans and AI agents.
 
       Before writing, analyse the codebase to understand impact:
       - **Affected files discovery**: use the impact analysis to find every existing
@@ -380,10 +393,10 @@ artifacts:
       post:
         - id: specs-design-coverage
           instruction: |
-            Cross-reference the spec and verify artifacts against the design
-            just written. Every requirement in spec.md must have a clear path
+            Cross-reference the `specs` and `verify` artifacts against the design
+            just written. Every requirement in `specs` and `verify` MUST have a clear path
             to implementation in design.md (mentioned in Affected areas, New
-            constructs, or Approach). Every scenario in verify.md must map to
+            constructs, or Approach). Every scenario in `verify` must map to
             at least one entry in the Testing section. If any requirement or
             scenario lacks design coverage, add it before proceeding.
         - id: resolve-open-questions
@@ -588,6 +601,16 @@ workflow:
             The compiled context could include project-level specs with coding conventions,
             documentation requirements, and linting rules. You MUST follow these
             constraints while writing artifacts — they are as binding as the change specs.
+      post:
+        - id: basic-compliance-check
+          instruction: |
+            Review the artifact just created for basic compliance.
+            Check the `specs` and `verify` artifacts against the proposal for coverage.
+            Confirm that the design is concrete and specific enough to derive unambiguous
+            tasks from it.
+            Ensure that all spec dependencies are correctly registered in the change and
+            that merged `specs` artifacts includes the corresponding dependency declarations.
+            If any issues are found, fix them before proceeding to the next step.
 
   - step: ready
     requires: [proposal, specs, verify, design, tasks]
@@ -606,10 +629,13 @@ workflow:
       pre:
         - id: implementing-guidance
           instruction: |
-            Read all change artifacts before starting:
+            Read design.md and tasks.md before writing any code.
+            These documents are the primary reference for what to build and how to build it.
+            Also keep proposal.md, specs, and verify handy for motivation, requirements, and verification scenarios.
+            This step includes all upstream artifacts, so:
             - proposal.md — the problem being solved and why
-            - specs (spec.md and deltas) — the final specification of what the system should do
-            - verify (verify.md and deltas) — the verification scenarios that the
+            - specs/ (spec.md and deltas) — the final specification of what the system should do
+            - verify/ (verify.md and deltas) — the verification scenarios that the
               implementation must satisfy
             - design.md — the implementation approach, key decisions, affected areas,
               and code snippets. This is the primary technical reference, you MUST read it.

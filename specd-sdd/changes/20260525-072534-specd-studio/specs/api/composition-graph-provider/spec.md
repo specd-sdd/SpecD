@@ -10,6 +10,16 @@ Graph routes must not construct `@specd/code-graph` providers ad hoc with diverg
 
 The factory MUST accept the resolved `SpecdConfig` (workspaces, code roots) and return a provider exposing index, search, impact, stats, and linkage operations used by `api:routes-graph`.
 
+### Requirement: indexing preparation follows the merged project-assembly model
+
+API graph composition MUST support the same project-level indexing preparation used by CLI:
+
+- orchestrated workspaces from `ListWorkspaces`
+- effective graph config assembled from project config
+- one project-level provider index call
+
+Any helper kept in `api` for this flow MUST mirror the CLI assembly semantics rather than reconstructing an older workspace-target contract.
+
 ### Requirement: stale state is observable
 
 The provider (or its stats call) MUST expose freshness/stale signals consumed by `GET /v1/graph/status` so the UI can warn when the index is out of date.

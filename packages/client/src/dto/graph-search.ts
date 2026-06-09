@@ -1,15 +1,24 @@
-/** Single graph search hit. */
-export interface GraphSearchHitDto {
-  readonly id: string
-  readonly kind: string
-  readonly name: string
-  readonly file?: string
-  readonly workspace?: string
-  readonly score?: number
-}
+import type { GraphSymbolRefDto } from './graph-symbol-ref.js'
 
 /** `GET /v1/graph/search` wire shape. */
 export interface GraphSearchResultDto {
-  readonly query: string
-  readonly hits: readonly GraphSearchHitDto[]
+  readonly symbols: readonly {
+    readonly workspace: string
+    readonly symbol: GraphSymbolRefDto
+    readonly score: number
+    readonly snippet: string
+    readonly startLine: number
+    readonly endLine: number
+  }[]
+  readonly specs: readonly {
+    readonly workspace: string
+    readonly specId: string
+    readonly path: string
+    readonly title: string
+    readonly description: string
+    readonly score: number
+    readonly snippet: string
+    readonly startLine: number
+    readonly endLine: number
+  }[]
 }

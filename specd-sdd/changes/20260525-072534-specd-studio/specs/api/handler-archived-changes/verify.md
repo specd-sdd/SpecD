@@ -24,17 +24,17 @@
 
 ### Requirement: handler delegates to kernel without duplicating domain rules
 
-#### Scenario: List archived calls kernel use case
+#### Scenario: Archived detail delegates to GetArchivedChange
 
-- **WHEN** `GET /v1/changes/archived` is handled
-- **THEN** handler invokes kernel list use case
+- **WHEN** `GET /v1/archived-changes/{name}` is handled
+- **THEN** handler invokes `GetArchivedChange`
 - **AND** no local filtering duplicates kernel rules
 
-#### Scenario: Restore archived delegates to kernel
+#### Scenario: Archived artifact GET delegates to GetReadOnlyChangeArtifact
 
-- **WHEN** `POST /v1/changes/archived/foo/restore` runs
-- **THEN** kernel restore use case executes
-- **AND** handler does not rewrite lifecycle state
+- **WHEN** `GET /v1/archived-changes/{name}/artifacts/{filename}` is handled
+- **THEN** handler invokes `GetReadOnlyChangeArtifact`
+- **AND** no local file-system reads bypass kernel rules
 
 #### Scenario: Presenter only maps kernel output
 
@@ -43,26 +43,13 @@
 - **THEN** presenter maps fields
 - **AND** no extra business validation in handler
 
-### Requirement: artifact GET and PUT use dedicated core use cases
+### Requirement: archived detail preserves read-only change fields
 
-#### Scenario: Stale originalHash on PUT returns 409
+#### Scenario: Detail keeps read-only change metadata
 
-- **GIVEN** artifact content changed after the client read `originalHash`
-- **WHEN** PUT sends an outdated hash
-- **THEN** HTTP 409 problem+json is returned
-- **AND** on-disk artifact is not overwritten
-
-#### Scenario: GET artifact delegates to GetChangeArtifact
-
-- **WHEN** `GET /v1/changes/{name}/artifacts/{file}` succeeds
-- **THEN** `GetChangeArtifact` executes
-- **AND** handler does not call `ChangeRepository` directly
-
-#### Scenario: PUT artifact delegates to SaveChangeArtifact
-
-- **WHEN** `PUT /v1/changes/{name}/artifacts/{file}` with a current `originalHash`
-- **THEN** `SaveChangeArtifact` executes
-- **AND** manifest `updatedAt` advances on success
+- **WHEN** archived detail is serialized
+- **THEN** response includes `history`, `workspaces`, and artifact metadata
+- **AND** the handler does not collapse the result to legacy archive-only fields
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 
@@ -106,24 +93,8 @@
 - **THEN** response is not `text/plain` HTML
 - **AND** client receives problem+json or framework 500 mapping
 
-### Requirement: mutations pass the request-scoped actor into kernel
-
-#### Scenario: Mutating kernel call receives request actor
-
-- **GIVEN** `createApiContext` attached an actor to the request
-- **WHEN** handler triggers a mutating kernel use case
-- **THEN** kernel input includes that `actor`
-- **AND** history `by` matches the resolved identity
-
 #### Scenario: Read-only routes may omit actor on kernel calls
 
 - **WHEN** handler serves a read-only GET that does not write history
 - **THEN** kernel read use case still succeeds
 - **AND** no history event is written for the call
-
-#### Scenario: Actor is stable for the lifetime of the request
-
-- **GIVEN** one HTTP request triggers multiple kernel mutations
-- **WHEN** each mutation runs through the same context
-- **THEN** the same `actor` is passed to every mutating call
-- **AND** history entries share the same `by`

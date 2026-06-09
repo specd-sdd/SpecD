@@ -10,6 +10,12 @@
 - **THEN** each method maps to documented `/v1` route
 - **AND** types match DTO specs
 
+#### Scenario: Typed patch helpers preserve result DTOs
+
+- **WHEN** `updateSpecDependencies(...)` or `updateImplementationTracking(...)` is called
+- **THEN** adapters return the documented mutation result DTOs
+- **AND** callers do not need `Record<string, unknown>` casts
+
 #### Scenario: List changes hits collection HTTP route
 
 - **WHEN** `listChanges()` is called on remote adapter

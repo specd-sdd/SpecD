@@ -50,4 +50,16 @@ describe('SpecNode', () => {
     })
     expect(node.workspace).toBe('default')
   })
+
+  it('preserves optimizedDescription field', () => {
+    const node = createSpecNode({
+      specId: 'core:test',
+      path: 'test',
+      title: 'Test',
+      contentHash: 'sha256:test',
+      workspace: 'core',
+      optimizedDescription: 'AI summary',
+    })
+    expect(node.optimizedDescription).toBe('AI summary')
+  })
 })

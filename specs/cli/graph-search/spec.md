@@ -9,12 +9,13 @@ The code graph contains symbols with names and comments, and specs with titles, 
 ### Requirement: Command signature
 
 ```text
-specd graph search <query> [--symbols] [--specs] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph search <query> [--symbols] [--specs] [--documents] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
 - `--symbols` — optional; search only symbols
 - `--specs` — optional; search only specs
+- `--documents` — optional; search only textual non-code resources
 - `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`
 - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
 - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
@@ -28,11 +29,13 @@ specd graph search <query> [--symbols] [--specs] [--kind <kinds>] [--file <path>
 
 `--config` and `--path` are mutually exclusive.
 
-When neither `--symbols` nor `--specs` is provided, both categories are searched.
+When no category flags (`--symbols`, `--specs`, `--documents`) are provided, all categories are searched.
 
 All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.
 
 `--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
+
+Search ranking MUST prioritize **exact matches** on primary identities (Spec IDs, Symbol Names, Document Paths) at the top of the result set, regardless of generic relevance scores.
 
 ### Requirement: Search behaviour
 
@@ -40,10 +43,21 @@ The command uses the shared graph CLI context model to resolve explicit config, 
 
 It delegates to:
 
-- `provider.searchSymbols(options)` — search across symbol search text and symbol comments, with filters applied at the store level
-- `provider.searchSpecs(options)` — search across spec title, description, and content, with filters applied at the store level
+- `provider.searchSymbols(options)` — search across symbol search text and symbol comments
+- `provider.searchSpecs(options)` — search across spec title, description, and content
+- `provider.searchDocuments(options)` — search across document paths and textual content
 
-The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first.
+The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with exact identity matches boosted to the top.
+
+Search results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content.
+
+Preview sources SHALL follow these rules:
+
+- symbol previews SHALL be derived from persisted source-file content addressed through the symbol's file path and line location
+- spec previews SHALL be derived from matched spec content when available, falling back to description context only when no better body excerpt is available
+- document previews SHALL be derived from matched document content rather than from the beginning of the document
+
+A symbol hit MAY be ranked because of symbol identity or attached comment text, but the preferred preview SHALL still be a code snippet around the symbol location unless no useful source snippet can be produced.
 
 The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
 
@@ -53,28 +67,47 @@ Before attempting to open the provider, the command SHALL check the shared graph
 
 ### Requirement: Output format
 
-In `text` mode, results are grouped by category:
+In `text` mode, results are grouped by category.
 
-```text
-Symbols (5):
-   8.0  [core] method execute  src/use-cases/run-hooks.ts:108 — /** Executes run hooks... */
-   5.5  [core] type OnHookProgress  src/use-cases/run-hooks.ts:21 — /** Callback for hook... */
+Text mode SHALL include a category header for each category that has results. The header SHALL make the active result limit explicit.
 
-Specs (5):
-  75.1  [core] core:hook-execution-model — Workflow steps declare hooks via...
-  57.6  [core] core:run-step-hooks — Agent-driven workflow steps declare...
-```
+Format: `<Category> (<N> shown, limit <limit>):`
+Example: `Symbols (10 shown, limit 10):`
 
-Each line shows:
+Each result SHALL render as a compact identity block:
 
-- **Workspace** — in brackets (e.g. `[core]`, `[cli]`)
-- **Score** — BM25 relevance score, right-aligned
-- **Symbols**: kind, name, workspace-relative filePath:line, and comment preview (first 50 chars)
-- **Specs**: specId and description preview (first 60 chars)
+- the first line identifies the result entry (`[workspace]`, symbol/spec/document identity, and kind when applicable)
+- a second line MAY show location context such as `workspace`-relative file path and line number for symbols
+- preview content SHALL render in a separate snippet block preceded by a line range indicator
 
-When no results are found, outputs `No results found.`
+Format: `snippet @ L<startLine>-L<endLine>:`
+Example: `snippet @ L10-L15:`
 
-In `json` or `toon` mode, outputs `{ symbols: [...], specs: [...] }`. Each entry includes a `workspace` field and a `score` field. Spec entries include `specId`, `path`, `title`, and `description`. Full spec `content` is omitted by default — pass `--spec-content` to include it.
+To avoid collision with markdown formatting in the source text, snippets SHALL be wrapped in custom markers: `>>>` for the start and `<<<` for the end.
+
+Text-mode symbol snippets SHALL use line-oriented source context around the matched symbol location:
+
+- include the matched line and a small window around it, with a baseline of 2-3 non-blank lines above and 2-3 non-blank lines below
+- blank lines do not count toward the context budget
+- preserve the original line order
+- expand tabs to spaces using tab width 2 before indentation normalization
+- compute the smallest common leading indentation across non-blank snippet lines
+- remove that common leading indentation from every snippet line before rendering
+- apply a fixed outer indent when rendering the snippet block
+
+Text-mode spec and document snippets SHALL also be match-centered and rendered in a separate `snippet @ L<start>-L<end>:` block with `>>>` and `<<<` markers. They do not require code-specific indentation normalization beyond preserving readable literal text.
+
+Text mode SHALL avoid misleading fixed-field truncation and SHALL NOT rely on raw boosted score magnitudes as the primary readability cue for exact matches.
+
+When no results are found, output `No results found.`
+
+In `json` or `toon` mode, output remains category-grouped as `{ symbols: [...], specs: [...], documents: [...] }`. Each entry SHALL include `workspace`, `score`, `snippet`, `startLine`, and `endLine`.
+
+Structured output details:
+
+- symbol entries include the symbol payload plus `workspace`, `score`, `snippet`, `startLine`, and `endLine`
+- spec entries include `specId`, `path`, `title`, `description`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full spec `content` SHALL be omitted unless `--spec-content` is passed.
+- document entries include `path`, `configRelativePath`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full document `content` SHALL be omitted.
 
 ### Requirement: Error cases
 
@@ -92,7 +125,7 @@ The command accepts the following filter options applied at the store level:
 
 ## Constraints
 
-- The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols` and `CodeGraphProvider.searchSpecs`
+- The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols`, `CodeGraphProvider.searchSpecs`, and `CodeGraphProvider.searchDocuments`
 - Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance
 - The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
 - The `process.exit(0)` pattern is required after closing the provider
@@ -101,75 +134,56 @@ The command accepts the following filter options applied at the store level:
 
 ```
 $ specd graph search "hook execution"
-Symbols (10):
-    8.0  [core] method execute  src/use-cases/run-step-hooks.ts:108 — /** Executes run hooks... */
-    ...
+Symbols (10 shown, limit 10):
+  [core] method execute
+    src/use-cases/run-step-hooks.ts:108
+    snippet @ L105-L112:
+      >>>
+      execute(...) {
+        ...
+      }
+      <<<
+  ...
 
-Specs (10):
-   75.1  [core] core:hook-execution-model — Workflow steps declare hooks via...
-   57.6  [cli] cli:change-run-hooks — Agent-driven workflow steps declare...
-    ...
-
-$ specd graph search "createKernel" --symbols --limit 3
-Symbols (3):
-    5.6  [core] interface KernelOptions  src/composition/kernel.ts:134 — /** Options for createKernel */
-    1.4  [cli] function createCliKernel  src/kernel.ts:32 — /** Creates a fully-wired kernel... */
-    1.2  [core] interface Kernel  src/composition/kernel.ts:49
-
-$ specd graph search "workspace import" --specs
-Specs (10):
-   24.4  [code-graph] code-graph:workspace-integration — @specd/code-graph must integrate...
-   23.1  [core] core:workspace — Projects often span multiple code...
-    ...
-
-$ specd graph search "nonexistent term"
-No results found.
-
-$ specd graph search "hook" --specs --limit 1 --format json
-{"symbols":[],"specs":[{"workspace":"core","specId":"core:hook-execution-model","path":"core/hook-execution-model","title":"Hook Execution Model","description":"Workflow steps declare...","score":61.0}]}
+Specs (10 shown, limit 10):
+  [core] core:hook-execution-model
+    snippet @ L42-L48:
+      >>>
+      ...Workflow steps declare hooks via...
+      <<<
+  [cli] cli:change-run-hooks
+    snippet @ L12-L18:
+      >>>
+      ...Agent-driven workflow steps declare...
+      <<<
+  ...
 
 $ specd graph search "transition" --kind method --limit 3
-Symbols (3):
-    5.7  [core] method transition  src/domain/entities/change.ts:361 — /** Attempts a lifecycle state...
-    3.7  [core] method state  src/domain/entities/change.ts:224 — /** The current lifecycle state...
-    2.6  [core] method execute  src/application/use-cases/transition-change.ts:170
+Symbols (3 shown, limit 3):
+  [core] method transition
+    src/domain/entities/change.ts:638
+    snippet @ L635-L642:
+      >>>
+      transition(...) {
+        ...
+      }
+      <<<
+  ...
 
-$ specd graph search "kernel" --workspace core --limit 3
-Symbols (3):
-    5.6  [core] interface Kernel  src/composition/kernel.ts:49
-    2.5  [core] function createKernel  src/composition/kernel.ts:156
-    1.5  [core] interface KernelInternals  src/composition/kernel-internals.ts:38
-
-Specs (3):
-   30.7  [core] core:kernel — Consumers of @specd/core need a single...
-    ...
-
-$ specd graph search "create" --file "*/composition/*" --symbols --limit 3
-Symbols (1):
-    1.8  [code-graph] interface CodeGraphOptions  src/composition/create-code-graph-provider.ts:13
-
-$ specd graph search "hook" --specs --limit 1 --format json --spec-content
-{"symbols":[],"specs":[{"workspace":"core","specId":"core:hook-execution-model",...,"content":"# Hook Execution Model\n\n## Purpose\n...","score":61.0}]}
-
-$ specd graph search "handle" --exclude-path "test/*" --symbols --limit 5
-Symbols (5):
-    5.7  [core] function handleError  src/handle-error.ts:10 — /** Handles CLI errors...
-    ...
-
-$ specd graph search "config" --exclude-workspace cli --exclude-workspace mcp
-Symbols (10):
-    ...
-Specs (10):
-    ...
-
-$ specd graph search "create" --exclude-path "*.spec.ts" --exclude-path "test/*" --symbols
-Symbols (10):
-    ...
+$ specd graph search "Change" --documents
+Documents (10 shown, limit 10):
+  [default] docs/cli/cli-reference.md
+    snippet @ L80-L88:
+      >>>
+      ...graph search <query> [--symbols] [--specs] [--documents]...
+      <<<
+  ...
 ```
 
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
-- [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+- [`core:config`](../../core/config/spec.md) — configured operation and graph discovery config
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
+- [`code-graph:document-model`](../../code-graph/document-model/spec.md) — defines document node category
 - [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities

@@ -1,12 +1,14 @@
-# Change Tab Impact
+# Change Tab Coverage
 
 ## Purpose
 
-Studio UI for **Change Tab Impact**: implementation footprint for an active change — manifest **accepted links** and **tracked files**, merged with change-scoped **code-graph** coverage. Studio UI component: **Change Tab Impact**.
+Studio UI for **Change Tab Coverage**: implementation footprint for an active change — manifest
+**accepted links** and **tracked files**, merged with change-scoped **code-graph** coverage.
+Studio UI component: **Change Tab Coverage**.
 
 ## Requirements
 
-### Requirement: impact tab loads manifest tracking and graph view
+### Requirement: coverage tab loads manifest tracking and graph view
 
 While this change tab is visible for an **active** change, the view MUST load:
 
@@ -15,14 +17,17 @@ While this change tab is visible for an **active** change, the view MUST load:
 
 Both MUST refresh on tab-scoped poll ticks. Polling MUST pause when the tab is hidden or the window lacks focus. Archived changes MUST NOT call these endpoints (read-only messaging only).
 
-For **drafted**, **discarded**, and **archived** changes, implementation impact is not available in Studio v1. The Impact tab MUST be hidden (not selectable) for these sections.
+The visible tab label MUST be `Coverage`.
 
-### Requirement: impact is grouped by spec
+For **drafted**, **discarded**, and **archived** changes, implementation coverage is not available
+in Studio v1. The Coverage tab MUST be hidden (not selectable) for these sections.
+
+### Requirement: coverage is grouped by spec
 
 The UI MUST render one card per spec ID (union of change `specIds`, manifest links, and graph coverage), ordered per [`ui:design-system`](../design-system/spec.md). Within each card, subsections appear in order:
 
 1. **Accepted links** — manifest links for that spec, merged with matching code-graph files/symbols for the link file
-2. **Graph (not linked)** — graph files/symbols for that spec not covered by an accepted link (omitted when empty)
+2. **Graph (not linked)** — graph symbols first, then graph files, for that spec not covered by an accepted link (omitted when empty)
 3. **Tracked · resolved**, then **open**, then **ignored** — tracked files assigned to that spec when uniquely matchable via links or graph paths
 
 Tracked files that match zero or multiple specs MUST appear under a final **Tracked files (unassigned)** section.

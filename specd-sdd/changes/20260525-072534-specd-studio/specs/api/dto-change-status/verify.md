@@ -30,6 +30,13 @@
 - **THEN** all mandatory properties exist
 - **AND** types match spec
 
+#### Scenario: Task-capable artifacts expose aggregate counters
+
+- **GIVEN** kernel returns one or more task-capable artifacts
+- **WHEN** presenter maps the status DTO
+- **THEN** each task-capable artifact row includes `hasTasks`
+- **AND** the DTO includes change-level `completedTasks` / `totalTasks` summed across those artifacts
+
 #### Scenario: Partial kernel data still maps required fields
 
 - **GIVEN** kernel returns minimal valid object

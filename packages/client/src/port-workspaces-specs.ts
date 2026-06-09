@@ -1,6 +1,6 @@
 import type { ArtifactContentDto } from './dto/artifact-content.js'
-import type { CompiledContextDto } from './dto/compiled-context.js'
 import type { SpecDetailDto } from './dto/spec-detail.js'
+import type { SpecContextDto } from './dto/spec-context.js'
 import type { WorkspaceSpecTreeDto } from './dto/workspace-spec-tree.js'
 import type { WorkspaceSummaryDto } from './dto/project.js'
 import type { GraphSearchResultDto } from './dto/graph-search.js'
@@ -24,7 +24,7 @@ export interface PortWorkspacesSpecs {
     workspace: string,
     specPath: string,
     query?: { readonly signal?: AbortSignal },
-  ): Promise<CompiledContextDto>
+  ): Promise<SpecContextDto>
   getSpecArtifact(
     workspace: string,
     specPath: string,

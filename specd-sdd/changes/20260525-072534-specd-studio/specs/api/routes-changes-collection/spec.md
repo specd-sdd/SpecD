@@ -28,9 +28,14 @@ After request validation succeeds, the handler MUST load the active schema and r
 
 List endpoints MUST return `name`, description snippet, derived lifecycle state, `updatedAt` when known, and blocker count sufficient for Studio sidebars.
 
-### Requirement: archived-changes list returns name and archivedName pairs
+### Requirement: archived-changes list returns paginated archive index rows
 
-`GET /v1/archived-changes` MUST return a JSON array of objects each containing at least `name` (original change name) and `archivedName` (archive directory name). Studio maps these rows to sidebar summaries with `state: 'archived'`.
+`GET /v1/archived-changes` MUST mirror the merged `ListArchived` contract by returning an object with:
+
+- `items`: archive index rows
+- `meta`: pagination metadata
+
+Each archive index row MUST include at least `name`, `archivedName`, `archivedAt`, `specIds`, `schemaName`, `schemaVersion`, `workspaces`, and `artifacts`. Studio maps those rows to archived sidebar summaries without fetching full archived detail first.
 
 ## Constraints
 

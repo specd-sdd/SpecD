@@ -6,9 +6,11 @@ Consumers need a core-level use case to search spec content by keyword without d
 
 ## Requirements
 
-### Requirement: Search across all configured workspaces
+### Requirement: Multi-workspace search orchestration
 
-`SearchSpecs.execute(query, options?)` SHALL iterate every configured workspace in declaration order and call `SpecRepository.search(query, options)` on each repository. Results from all workspaces MUST be merged into a single flat array sorted by score descending across all workspaces.
+`SearchSpecs.execute()` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case. It SHALL perform substring matching across all spec artifacts in each workspace using the provided `SpecRepository.search()` method.
+
+Results from all workspaces SHALL be aggregated, ranked by relevance score, and returned to the caller.
 
 ### Requirement: Optional workspace filter
 
@@ -44,12 +46,12 @@ When no specs match across all searched workspaces, the use case MUST return an 
 
 ## Constraints
 
-- The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories
-- Search quality depends on the adapter implementation; the use case defines the orchestration contract, not the matching algorithm
-- Title resolution reuses the same logic as `ListSpecs` — no separate title extraction in this use case
+- The use case SHALL depend on `ListWorkspaces` for consistent project traversal during fallback search.
+- Results MUST be returned sorted by descending relevance score.
 
 ## Spec Dependencies
 
-- [`core:spec-repository-port`](../spec-repository-port/spec.md) — `SpecRepository.search()` method and `SpecSearchResult` type
-- [`core:list-specs`](../list-specs/spec.md) — title and summary resolution algorithm
-- [`core:workspace`](../workspace/spec.md) — workspace ordering semantics
+- [`core:spec-repository-port`](../spec-repository-port/spec.md) — repository-backed search contract
+- [`core:list-specs`](../list-specs/spec.md) — shared listing and result-shaping model
+- [`core:workspace`](../workspace/spec.md) — workspace attribution in search results
+- [`core:list-workspaces`](../list-workspaces/spec.md) — orchestrated workspace source for fallback search

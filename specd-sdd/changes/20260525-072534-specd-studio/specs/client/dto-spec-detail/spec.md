@@ -14,6 +14,8 @@ Field names, optional/required semantics, and nesting MUST match the paired `api
 
 DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI.
 
+For spec detail this includes the embedded `linkedChanges[]` summary objects mirrored from `api:dto-spec-detail`.
+
 ## Constraints
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.

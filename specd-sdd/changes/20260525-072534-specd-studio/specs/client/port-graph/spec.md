@@ -14,6 +14,22 @@ The interface MUST declare asynchronous methods equivalent to the HTTP routes in
 
 `indexGraph({ force? })` MUST mirror `POST /v1/graph/index` and return the indexing summary DTO rather than a graph-status DTO.
 
+`searchGraph(query)` MUST expose the full graph-search query surface used by Studio:
+
+- `q`
+- `workspace`
+- `kinds`
+- `filePattern`
+- `excludePaths`
+- `excludeWorkspaces`
+- `symbols`
+- `specs`
+- `limit`
+
+`getImpact(query)` MUST forward `depth` as part of the graph impact selector.
+
+`getImpact(query)` MUST support `symbol`, `file`, or `spec` as the graph impact selector.
+
 ### Requirement: port signatures are identical for HTTP and IPC adapters
 
 Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types.

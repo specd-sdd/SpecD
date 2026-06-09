@@ -1,16 +1,16 @@
 import * as path from 'node:path'
 import { SearchSpecs } from '../../application/use-cases/search-specs.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
 import { NodeYamlSerializer } from '../../infrastructure/node/yaml-serializer.js'
+import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 
 /**
  * Options for creating SearchSpecs with pre-configured repositories.
  */
 export interface FsSearchSpecsOptions {
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
+  readonly listWorkspaces: ListWorkspaces
 }
 
 /**
@@ -49,11 +49,11 @@ export function createSearchSpecs(
         ),
       ]),
     )
-    const hasher = new NodeContentHasher()
-    const yaml = new NodeYamlSerializer()
-    return new SearchSpecs(specRepos, hasher, yaml)
+    return createSearchSpecs({
+      listWorkspaces: new ListWorkspaces(config, specRepos),
+    })
   }
   const hasher = new NodeContentHasher()
   const yaml = new NodeYamlSerializer()
-  return new SearchSpecs(configOrOptions.specRepositories, hasher, yaml)
+  return new SearchSpecs(configOrOptions.listWorkspaces, hasher, yaml)
 }

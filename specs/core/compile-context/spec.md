@@ -241,6 +241,19 @@ When `fingerprint` is provided to `execute()`:
 
 The fingerprint enables clients to skip re-fetching unchanged context without comparing the full output themselves.
 
+### Requirement: Prefer LLM-optimized context
+
+If `llmOptimizedContext: true` is active in the project configuration, the context compiler SHALL prefer `optimizedContext` for each spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`.
+
+### Requirement: Optimization warning signal
+
+When `llmOptimizedContext: true` is active, the compiler SHALL emit a warning if:
+
+- The project-level optimized context is missing or stale.
+- Any spec included in the context is missing its `optimizedContext` field.
+
+The warning SHALL include remediation instructions for the agent.
+
 ## Constraints
 
 - Project `context` entries always appear first in `projectContext`, before spec entries
@@ -308,3 +321,4 @@ const result = await compileContext.execute({
 - [`core:preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — shared schema-aware lifecycle interpretation for step availability and blocker diagnostics
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before context compilation; not invoked by `CompileContext` itself
+- [`core:core/project-metadata`](../project-metadata/spec.md) — for project-level optimization storage

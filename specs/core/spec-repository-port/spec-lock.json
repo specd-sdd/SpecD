@@ -12,6 +12,29 @@
     "core:spec-id-format",
     "core:spec-metadata",
     "core:search-specs",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:spec-lock"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/spec-repository.ts",
+      "symbols": ["SpecRepository", "specsPath"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/spec-repository.ts",
+      "symbols": ["FsSpecRepository", "count", "_countSpecs", "specsPath"]
+    },
+    {
+      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+      "symbols": ["GenerateSpecMetadata"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
+      "symbols": ["loadPersistedSpecDependsOn"]
+    },
+    {
+      "file": "core:src/application/use-cases/archive-change.ts",
+      "symbols": ["ArchiveChange"]
+    }
   ]
 }

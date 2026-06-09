@@ -14,16 +14,12 @@ The module MUST implement every method, path, query, and body declared in [`api:
 
 Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:
 
-- `SpecdConfig.workspaces`
+- `ListWorkspaces`
 - `ListSpecs`
 - `kernel.specs.get`
 - `kernel.specs.getOutline`
 - `kernel.specs.getContext`
 - `kernel.specs.search`
-
-### Requirement: artifact GET and PUT use dedicated core use cases
-
-For `/changes/{name}/artifacts/{filename}`, `GET` MUST call `GetChangeArtifact` and `PUT` MUST call `SaveChangeArtifact`. The handler MUST NOT call `ChangeRepository.artifact` or `saveArtifact` directly.
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 
@@ -33,9 +29,9 @@ Successful responses MUST be produced by the matching `api:presenter-*` module a
 
 Thrown kernel errors and validation failures MUST be converted through `api:problem-json` to `application/problem+json` responses with appropriate HTTP status codes.
 
-### Requirement: mutations pass the request-scoped actor into kernel
+### Requirement: workspace discovery preserves orchestrated ordering
 
-Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field.
+`GET /v1/workspaces` MUST preserve the declaration order produced by `ListWorkspaces`. Any optional descriptor enrichment from `SpecdConfig` MUST be joined onto those orchestrated rows without re-sorting or filtering them.
 
 ## Constraints
 

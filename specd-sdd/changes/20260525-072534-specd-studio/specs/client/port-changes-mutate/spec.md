@@ -15,6 +15,10 @@ The interface MUST declare asynchronous methods equivalent to the HTTP routes in
 - `validateChangeAll(name, { artifactId? })` — DAG batch (`POST .../validate-all`)
 - `transitionChange(...)`, lifecycle posts, `patchChange(...)`
 - `updateSpecDependencies(name, { specId, set | add | remove })` → `PATCH .../spec-dependencies`
+- `updateImplementationTracking(name, { action, file, specId?, symbols? })` → `PATCH .../implementation-tracking`
+
+`updateSpecDependencies(...)` MUST return `{ specId, dependsOn }`.
+`updateImplementationTracking(...)` MUST return `{ implementationTracking }`.
 
 Drafted and discarded are read-only storage classes; lifecycle mutations are still addressed by change name:
 

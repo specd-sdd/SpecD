@@ -1,8 +1,8 @@
-# Verification: Spec Tab Graph
+# Verification: Spec Tabs Coverage and Impact
 
 ## Requirements
 
-### Requirement: spec tab polls metadata while visible
+### Requirement: spec coverage and impact tabs poll graph data while visible
 
 #### Scenario: Visible spec tab refreshes metadata
 
@@ -25,11 +25,31 @@
 - **THEN** tree shows new node
 - **AND** spec tab poll does not scan filesystem directly
 
-#### Scenario: Graph tab loads spec graph view JSON
+#### Scenario: Coverage tab loads spec graph coverage
 
-- **WHEN** user selects Graph tab
+- **WHEN** user selects Coverage tab
 - **THEN** UI calls `getSpecGraphView`
-- **AND** renders JSON payload or error state
+- **AND** renders structured symbols/files sections or an empty state
+
+#### Scenario: Coverage files section does not trap scroll
+
+- **GIVEN** spec coverage includes many files
+- **WHEN** Coverage tab renders
+- **THEN** the file list grows in normal document flow
+- **AND** the files subsection does not add an inner scroll area for ordinary lists
+
+#### Scenario: Impact tab loads spec graph impact
+
+- **WHEN** user selects Impact tab
+- **THEN** UI calls `getImpact` with the selected spec id
+- **AND** renders ordered `Specs`, `Symbols`, and `Files` sections or an empty state
+- **AND** the summary header shows risk and aggregate affected counts aligned with CLI impact output
+
+#### Scenario: Tab labels are Coverage and Impact
+
+- **WHEN** spec tabs are rendered
+- **THEN** the graph-derived tab labels are `Coverage` and `Impact`
+- **AND** `Graph` is not shown as the visible tab title
 
 ### Requirement: view uses SpecdDataPort hooks only
 

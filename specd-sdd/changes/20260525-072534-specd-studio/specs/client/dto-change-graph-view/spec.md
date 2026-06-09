@@ -16,7 +16,14 @@ DTO types MUST be imported from a shared package or generated from the same sche
 
 ### Requirement: change graph view mirrors specs array wire shape
 
-`ChangeGraphViewDto` MUST declare `changeName`, `specIds`, and `specs` where each spec entry includes `specId`, `coveredFiles`, and `coveredSymbols`. The client MUST NOT declare or consume a `links` field for this endpoint.
+`ChangeGraphViewDto` MUST declare `changeName`, `specIds`, and `specs` where each spec entry
+includes `specId`, `coveredFiles`, and `coveredSymbols`.
+
+`coveredFiles[]` MUST reuse [`client:dto-graph-file-ref`](../dto-graph-file-ref/spec.md).
+
+`coveredSymbols[]` MUST reuse [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md).
+
+The client MUST NOT declare or consume a `links` field for this endpoint.
 
 ## Constraints
 
@@ -30,3 +37,5 @@ DTO types MUST be imported from a shared package or generated from the same sche
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — client boundaries
 - [`api:dto-change-graph-view`](../../api/dto-change-graph-view/spec.md) — mirror API DTO
+- [`client:dto-graph-file-ref`](../dto-graph-file-ref/spec.md) — reusable graph file reference
+- [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) — reusable graph symbol reference

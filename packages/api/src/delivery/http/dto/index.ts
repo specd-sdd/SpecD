@@ -12,10 +12,14 @@ export type { WorkspaceDto } from './workspace.js'
 export type { WorkspaceSpecTreeDto } from './workspace-spec-tree.js'
 export type { SpecSummaryDto } from './spec-summary.js'
 export type { SpecDetailDto } from './spec-detail.js'
+export type { SpecContextDto, SpecContextEntryDto, SpecContextWarningDto } from './spec-context.js'
 export type { GraphStatusDto } from './graph-status.js'
+export type { GraphFileRefDto } from './graph-file-ref.js'
+export type { GraphSymbolRefDto } from './graph-symbol-ref.js'
 export type { GraphSearchResultDto } from './graph-search.js'
 export type { GraphImpactDto } from './graph-impact.js'
 export type { ChangeGraphViewDto } from './change-graph-view.js'
+export type { GraphSpecCoverageDto } from './graph-spec-coverage.js'
 export type {
   ImplementationLinkDto,
   ImplementationReviewDto,

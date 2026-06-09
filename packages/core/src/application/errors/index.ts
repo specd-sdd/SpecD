@@ -18,3 +18,5 @@ export { ImplementationFileNotFoundError } from './implementation-file-not-found
 export { UiPluginNotConfiguredError } from './ui-plugin-not-configured-error.js'
 export { UiPluginTypeMismatchError } from './ui-plugin-type-mismatch-error.js'
 export { UiPluginBundleMissingError } from './ui-plugin-bundle-missing-error.js'
+export { ConfigNotFoundError } from './config-not-found-error.js'
+export { ProjectMetadataNotFoundError } from './project-metadata-not-found-error.js'

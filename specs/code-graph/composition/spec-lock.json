@@ -11,20 +11,13 @@
     "code-graph:language-adapter",
     "code-graph:indexer",
     "code-graph:traversal",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "code-graph:document-model"
   ],
   "implementation": [
     {
       "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": [
-        "CodeGraphProvider",
-        "CodeGraphProvider.getCoveredFiles",
-        "CodeGraphProvider.getCoveredSymbols",
-        "CodeGraphProvider.analyzeSpecImpact"
-      ]
-    },
-    {
-      "file": "code-graph:src/index.ts"
+      "symbols": ["CodeGraphProvider"]
     }
   ]
 }

@@ -8,22 +8,17 @@ Without an up-to-date code graph, all graph-based queries return stale or empty 
 
 ### Requirement: Command signature
 
-```
-specd graph index [--workspace <name>] [--exclude-path <pattern>]... [--force] [--config <path> | --path <path>] [--format text|json|toon]
+```text
+specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
-- `--workspace` — optional; index only the named workspace instead of all workspaces
-- `--exclude-path <pattern>` — optional, repeatable; gitignore-syntax pattern added on top of the workspace's `graph.excludePaths` config for this run only. Does not modify `specd.yaml`. Multiple patterns are accumulated: `--exclude-path "*.gen.ts" --exclude-path "fixtures/"`.
-- `--force` — optional flag; when present, all existing graph data is cleared before indexing
-- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
+- `--force` — optional; recreate the graph store from scratch
+- `--exclude-path <pattern>` — optional, repeatable; additional patterns to exclude during file discovery
+- `--config <path>` — optional; explicit path to `specd.yaml`
 - `--path <path>` — optional; repo-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 `--config` and `--path` are mutually exclusive.
-
-When neither flag is passed, the command SHALL first try config autodiscovery. If config is found, it SHALL use configured workspaces. If config is not found, it SHALL fall back to repo-root bootstrap mode.
-
-`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
 
 ### Requirement: Indexing behaviour
 
@@ -33,17 +28,22 @@ The command:
 
 1. Validates that `--config` and `--path` are not both present
 2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
-3. In configured mode, derives `WorkspaceIndexTarget[]` from `SpecdConfig.workspaces` and uses `kernel.specs.repos` to provide spec sources
+3. In configured mode, obtains the orchestrated project structure via `ListWorkspaces` and uses the rich `ProjectWorkspace[]` list to build `IndexOptions`
 4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root
 5. Acquires the shared graph indexing lock before opening the provider for mutation work
-6. If `--force` is passed, invokes the graph-store recreation capability before indexing so the backend starts from empty persisted state without the CLI knowing backend-specific files or directories
-7. If `--workspace` is specified, filters to only that workspace
-8. For each workspace target, populates `excludePaths` and `respectGitignore` from `SpecdWorkspaceConfig.graph`. If `--exclude-path` flags are present, those patterns are **appended** to the config's `excludePaths` (or to the built-in defaults when no config `excludePaths` is set). `--exclude-path` never replaces config values — it always adds on top.
-9. Calls `index({ workspaces, projectRoot })` to perform the indexing
-10. Outputs the `IndexResult` with per-workspace breakdown
-11. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths
-12. Closes the provider
-13. Exits with `process.exit(0)` — this explicit exit is required because the LadybugDB native threads keep the Node process alive
+6. If `--force` is passed, invokes the graph-store recreation capability before indexing
+7. In configured mode, builds the effective graph config from `SpecdConfig.graph`, including project-global `includePaths`, global `excludePaths`, workspace graph filters, and any synthetic spec-root exclusions. Patterns from `--exclude-path` flags are appended to the effective global exclusion set.
+8. Calls `index(options)` to perform the indexing. The indexer handles spec extraction and progress reporting using the injected repositories.
+9. Outputs the `IndexResult` with per-workspace breakdown
+10. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths
+11. Closes the provider
+12. Exits with `process.exit(0)`
+
+In configured mode, indexing SHALL always cover the full configured project graph surface. The command MUST NOT offer a workspace-scoped partial indexing mode.
+
+Project-global discovery MUST NOT emit `root:` entries for files already owned by a configured workspace `codeRoot`.
+
+Archived spec implementation coverage and spec resolution SHALL be derived inside `@specd/code-graph`. The CLI SHALL NOT read `spec-lock.json` sidecars or manually construct extraction callbacks.
 
 When output is a TTY and format is `text`, progress is displayed on stderr using `\r\x1b[K` for in-place updates (overwriting the current line).
 
@@ -53,9 +53,10 @@ The indexing lock is a CLI-level coordination mechanism that prevents overlappin
 
 In `text` mode (default), the output is a summary block:
 
-```
+```text
 Indexed 387 file(s) in 1234ms
   discovered: 459
+  documents:  18
   skipped:    72
   removed:    0
   specs:      122
@@ -63,9 +64,11 @@ Indexed 387 file(s) in 1234ms
     path/to/file.ts: error message
 ```
 
-The first line shows `filesIndexed` and `duration`. The indented lines show `filesDiscovered`, `filesSkipped`, `filesRemoved`, `specsIndexed`, and error count. When errors are present, each error is listed below with its file path and message, indented further.
+The first line shows `filesIndexed` and `duration`. The indented lines show `filesDiscovered`, `documentsIndexed`, `filesSkipped`, `filesRemoved`, `specsIndexed`, and error count. When errors are present, each error is listed below with its file path and message, indented further.
 
-In `json` or `toon` mode, the full `IndexResult` object is output as-is.
+When the result includes per-workspace breakdowns, text mode also lists each workspace with discovered, indexed, document, skipped, and removed counts.
+
+In `json` or `toon` mode, the full `IndexResult` object is output as-is, including `documentsIndexed` and the per-workspace `documentsIndexed` breakdown.
 
 ### Requirement: Error cases
 
@@ -105,32 +108,26 @@ For each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documen
 $ specd graph index
 Indexed 387 file(s) in 1234ms
   discovered: 459
+  documents:  18
   skipped:    72
   removed:    0
   specs:      122
   errors:     0
   workspaces:
-    core:    300 discovered, 250 indexed, 50 skipped, 0 removed
-    cli:     159 discovered, 137 indexed, 22 skipped, 0 removed
-
-$ specd graph index --workspace core
-Indexed 250 file(s) in 800ms
-  discovered: 300
-  skipped:    50
-  removed:    0
-  specs:      80
-  errors:     0
+    core:    300 discovered, 250 indexed, 12 documents, 50 skipped, 0 removed
+    cli:     159 discovered, 137 indexed, 6 documents, 22 skipped, 0 removed
 
 $ specd graph index --force
 Indexed 459 file(s) in 2100ms
   discovered: 459
+  documents:  18
   skipped:    0
   removed:    312
   specs:      122
   errors:     0
 
 $ specd graph index --format json
-{"filesDiscovered":459,"filesIndexed":387,...,"workspaces":[{"name":"core",...},{"name":"cli",...}]}
+{"filesDiscovered":459,"filesIndexed":387,"documentsIndexed":18,...,"workspaces":[{"name":"core",...},{"name":"cli",...}]}
 ```
 
 ## Spec Dependencies
@@ -139,3 +136,4 @@ $ specd graph index --format json
 - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
 - [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration

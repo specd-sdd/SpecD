@@ -44,7 +44,7 @@
 #### Scenario: Escaping archive pattern is rejected
 
 - **GIVEN** archive path derivation from pattern variables would resolve outside the configured archive root
-- **WHEN** `archive(change)` or `archivePath(archivedChange)` resolves that path
+- **WHEN** `archive(change)` or `archivePath(entry)` resolves that path
 - **THEN** the repository rejects the path
 
 #### Scenario: Recovered index path outside root is rejected
@@ -80,9 +80,11 @@
 
 #### Scenario: Multiple archived changes
 
-- **GIVEN** three changes archived at different times
-- **WHEN** `list()` is called
-- **THEN** all three are returned in chronological order (oldest first)
+- **GIVEN** the archive has 250 changes
+- **WHEN** `list({ limit: 100, page: 2 })` is called
+- **THEN** it returns 100 changes (entries 101 to 200)
+- **AND** `meta.total` is 250
+- **AND** `meta.page` is 2
 
 #### Scenario: Duplicate entries in index
 
@@ -95,24 +97,35 @@
 - **WHEN** `list()` is called and no changes have been archived
 - **THEN** an empty array is returned
 
+### Requirement: list returns index entries
+
+#### Scenario: List returns result object with items and meta
+
+- **GIVEN** the archive contains archived changes
+- **WHEN** `list()` is called
+- **THEN** the result is an object with `items` (array) and `meta` (object)
+- **AND** `meta.total` reflects the count from `.specd-index-meta.json`
+
 ### Requirement: get returns an archived change or null
 
 #### Scenario: Change found in index
 
 - **GIVEN** a change named `add-oauth-login` exists in `index.jsonl`
-- **WHEN** `get("add-oauth-login")` is called
+- **WHEN** `get(\"add-oauth-login\")` is called
 - **THEN** the `ArchivedChange` is returned
+- **AND** it is loaded from the archived directory `manifest.json`
 
 #### Scenario: Change not in index but exists on disk
 
 - **GIVEN** a change directory exists in the archive but its entry is missing from `index.jsonl`
-- **WHEN** `get("orphaned-change")` is called
+- **WHEN** `get(\"orphaned-change\")` is called
 - **THEN** the `ArchivedChange` is returned from the filesystem scan
+- **AND** it is loaded from the archived directory `manifest.json`
 - **AND** the recovered entry is appended to `index.jsonl`
 
 #### Scenario: Change does not exist
 
-- **WHEN** `get("nonexistent")` is called and no matching change exists anywhere
+- **WHEN** `get(\"nonexistent\")` is called and no matching change exists anywhere
 - **THEN** `null` is returned
 
 ### Requirement: fs implementation maintains archive runtime ignore rules
@@ -181,3 +194,12 @@
 - **WHEN** `ArchiveRepository` is declared
 - **THEN** it is an abstract class with abstract methods for `archive`, `list`, `get`, and `archivePath`
 - **AND** concrete implementations must implement all abstract methods
+
+### Requirement: Archive index metadata persistence
+
+#### Scenario: reindex rebuilds metadata file
+
+- **GIVEN** the archive has 150 directories with manifests
+- **AND** `.specd-index-meta.json` is missing or incorrect
+- **WHEN** `reindex()` is called
+- **THEN** `.specd-index-meta.json` is created/updated with `totalCount: 150`

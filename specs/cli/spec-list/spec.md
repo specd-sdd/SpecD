@@ -30,15 +30,11 @@ specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [-
 
 ### Requirement: Workspace filtering
 
-When `--workspace` is provided one or more times, the CLI MUST pass the collected workspace names to `ListSpecs.execute({ workspaces: [...] })` so that filtering is performed by the core use case, not by the CLI.
+The command SHALL use `ListWorkspaces` to obtain the official project structure.
 
-Workspace names that do not match any configured workspace MUST produce no output for that name (no error, no warning).
+When `--workspace` is provided one or more times, only the matching `ProjectWorkspace` entities SHALL be processed. If a requested workspace name does not exist in the orchestrated list, it SHALL be ignored.
 
-When `--workspace` is not provided, the CLI calls `ListSpecs.execute()` without `workspaces`, which includes all configured workspaces (existing behavior).
-
-In text mode, only workspace groups matching the filter are rendered. Empty filtered workspaces (no specs in the filtered set) are still shown with their heading and `(none)`.
-
-In JSON/toon mode, the `workspaces` array contains entries for all configured workspace names; filtered-out workspaces appear with an empty `specs` array, matching the existing empty-workspace behavior.
+In text mode, the command MUST group specs by workspace, displaying the workspace name and its directory root. Read-only and external workspaces SHOULD be visually flagged.
 
 ### Requirement: Title resolution
 
@@ -141,9 +137,9 @@ When `--metadata-status` is not passed, `metadataStatus` is omitted from JSON/to
 
 ### Requirement: Empty output
 
-If a workspace has no specs, its heading is still printed in text mode followed by `  (none)`. In JSON/toon mode it appears as `{"name": "...", "specs": []}`.
+If a workspace exists in the orchestrated list but has no specs, its heading MUST still be printed in text mode followed by `  (none)`. In JSON/toon mode, it MUST appear with an empty `specs` array.
 
-If there are no workspaces configured, the command prints `no workspaces configured` and exits with code 0.
+If no workspaces are configured, the command MUST print `no workspaces configured`.
 
 ### Requirement: Error cases
 
@@ -225,5 +221,6 @@ $ specd spec list --workspace default --format json
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:spec`](../../core/spec/spec.md) — spec metadata access and listing model
-- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
-- [`cli:spec-search`](../spec-search/spec.md) — dedicated spec search command; `specs list` does not perform text searches
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — project orchestration source
+- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming
+- [`cli:spec-search`](../spec-search/spec.md) — dedicated spec search

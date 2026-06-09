@@ -39,7 +39,11 @@ export function toSpecDetailDto(
     dependsOn: readonly string[]
     artifacts: readonly { filename: string; hash?: string }[]
   },
-  linkedChanges: readonly string[],
+  linkedChanges: readonly {
+    readonly name: string
+    readonly description?: string
+    readonly state: string
+  }[],
 ): SpecDetailDto {
   return {
     specId: spec.specId,
@@ -52,7 +56,11 @@ export function toSpecDetailDto(
       filename: a.filename,
       ...(a.hash !== undefined ? { hash: a.hash } : {}),
     })),
-    linkedChanges: [...linkedChanges],
+    linkedChanges: linkedChanges.map((change) => ({
+      name: change.name,
+      ...(change.description !== undefined ? { description: change.description } : {}),
+      state: change.state,
+    })),
   }
 }
 

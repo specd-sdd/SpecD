@@ -7,4 +7,9 @@ export interface SpecDetailDto {
   readonly description?: string
   readonly artifacts: readonly { readonly filename: string; readonly hash?: string }[]
   readonly dependsOn?: readonly string[]
+  readonly linkedChanges?: readonly {
+    readonly name: string
+    readonly description?: string
+    readonly state: string
+  }[]
 }

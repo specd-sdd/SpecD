@@ -96,11 +96,18 @@
 - **THEN** `updateSpecDeps` persists `specDependsOn` for that spec
 - **AND** response includes `{ specId, dependsOn }`
 
-#### Scenario: PATCH implementation tracking toggles flags
+#### Scenario: PATCH implementation tracking returns projection DTO
 
-- **WHEN** `PATCH` sets implementation tracking fields
+- **WHEN** `PATCH /v1/changes/{name}/implementation-tracking` submits a valid mutation body
 - **THEN** kernel persists tracking state
-- **AND** GetStatus reflects new values
+- **AND** response includes `{ implementationTracking }`
+
+#### Scenario: PATCH implementation tracking rejects add without specId
+
+- **WHEN** client PATCHes `{ "action": "add", "file": "packages/api/src/index.ts" }`
+- **THEN** HTTP 400 is returned
+- **AND** body is `application/problem+json`
+- **AND** code is `INVALID_REQUEST`
 
 ### Requirement: mutating routes pass request actor into kernel
 

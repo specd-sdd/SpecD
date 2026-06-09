@@ -9,6 +9,7 @@ import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { createSchemaRepository } from '../schema-repository.js'
+import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 
 /** Domain context for `createEditChange(context, options)`. */
 export interface EditChangeContext {
@@ -23,6 +24,8 @@ export interface FsEditChangeOptions {
   readonly changesPath: string
   readonly draftsPath: string
   readonly discardedPath: string
+  /** The project orchestrator. */
+  readonly listWorkspaces: ListWorkspaces
 }
 
 /**
@@ -118,7 +121,7 @@ export function createEditChange(
     })
     const resolveSchema = new ResolveSchema(schemas, config.schemaRef, [], undefined)
     const schemaProvider = new LazySchemaProvider(resolveSchema)
-    return new EditChange(changeRepo, specRepos, actor, schemaProvider)
+    return new EditChange(changeRepo, new ListWorkspaces(config, specRepos), actor, schemaProvider)
   }
   const opts = options!
   const changeRepo = createChangeRepository('fs', configOrContext, {
@@ -126,15 +129,6 @@ export function createEditChange(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
-  const specRepos = new Map([
-    [
-      configOrContext.workspace,
-      createSpecRepository('fs', configOrContext, {
-        specsPath: path.join(opts.changesPath, '..', '..', 'specs'),
-        metadataPath: path.join(opts.changesPath, '..', '.specd', 'metadata'),
-      }),
-    ],
-  ])
   const actor = createVcsActorResolver()
   const schemaProvider: import('../../application/ports/schema-provider.js').SchemaProvider = {
     get: () =>
@@ -142,5 +136,5 @@ export function createEditChange(
         new Error('EditChange context factory requires SpecdConfig for schema resolution'),
       ),
   }
-  return new EditChange(changeRepo, specRepos, actor, schemaProvider)
+  return new EditChange(changeRepo, opts.listWorkspaces, actor, schemaProvider)
 }

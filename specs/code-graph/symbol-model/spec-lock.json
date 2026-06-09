@@ -3,11 +3,15 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/conventions", "default:_global/error-handling-conventions"],
+  "dependsOn": [
+    "default:_global/conventions",
+    "default:_global/error-handling-conventions",
+    "code-graph:document-model"
+  ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/errors/specd-code-graph-error.ts",
-      "symbols": ["SpecdCodeGraphError"]
+      "file": "code-graph:src/domain/value-objects/file-node.ts",
+      "symbols": ["FileNode", "createFileNode"]
     }
   ]
 }

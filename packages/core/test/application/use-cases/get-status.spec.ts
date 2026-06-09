@@ -114,7 +114,7 @@ describe('GetStatus', () => {
     it('returns empty artifact statuses when change has no artifacts', async () => {
       const change = makeChange('add-oauth')
       const repo = makeChangeRepository([change])
-      const uc = makeGetStatus(repo)
+      const uc = makeGetStatus(repo, { schema: makeSchema({ artifacts: [] }) })
 
       const result = await uc.execute({ name: 'add-oauth' })
 
@@ -158,7 +158,17 @@ describe('GetStatus', () => {
         }),
       )
       const repo = makeChangeRepository([change])
-      const uc = makeGetStatus(repo)
+      const uc = makeGetStatus(
+        repo,
+        {
+          schema: makeSchema({
+            artifacts: [
+              makeArtifactType('proposal', { requires: [] }),
+              makeArtifactType('spec', { requires: ['proposal'] }),
+            ],
+          }),
+        },
+      )
 
       const result = await uc.execute({ name: 'add-oauth' })
 
@@ -201,7 +211,17 @@ describe('GetStatus', () => {
         }),
       )
       const repo = makeChangeRepository([change])
-      const uc = makeGetStatus(repo)
+      const uc = makeGetStatus(
+        repo,
+        {
+          schema: makeSchema({
+            artifacts: [
+              makeArtifactType('proposal', { requires: [] }),
+              makeArtifactType('spec', { requires: ['proposal'] }),
+            ],
+          }),
+        },
+      )
 
       const result = await uc.execute({ name: 'add-oauth' })
 
@@ -1036,6 +1056,54 @@ describe('GetStatus', () => {
         complete: 0,
         incomplete: 2,
         total: 2,
+      })
+    })
+  })
+
+  describe('spec dependencies', () => {
+    it('projects specDependsOn from an active change', async () => {
+      const change = makeChange('spec-deps-active', { specIds: ['core:a', 'core:b'] })
+      change.setSpecDependsOn('core:a', ['core:c', 'core:d'])
+      change.transition('designing', testActor)
+
+      const result = await makeGetStatus(makeChangeRepository([change])).execute({
+        name: 'spec-deps-active',
+      })
+
+      expect(result.specDependsOn).toEqual({
+        'core:a': ['core:c', 'core:d'],
+      })
+    })
+
+    it('keeps specDependsOn on unchanged status polls', async () => {
+      const change = makeChange('spec-deps-unchanged', { specIds: ['core:a'] })
+      change.setSpecDependsOn('core:a', ['core:b'])
+      change.transition('designing', testActor)
+
+      const result = await makeGetStatus(makeChangeRepository([change])).execute({
+        name: 'spec-deps-unchanged',
+        ifModifiedSince: change.updatedAt.toISOString(),
+      })
+
+      expect(result.unchanged).toBe(true)
+      expect(result.specDependsOn).toEqual({
+        'core:a': ['core:b'],
+      })
+    })
+
+    it('projects specDependsOn from a drafted change', async () => {
+      const change = makeChange('spec-deps-draft', { specIds: ['core:a'] })
+      change.setSpecDependsOn('core:a', ['core:b'])
+      change.transition('designing', testActor)
+      change.draft(testActor)
+
+      const repo = makeChangeRepository()
+      repo.store.set(change.name, change)
+
+      const result = await makeGetStatus(repo).execute({ name: 'spec-deps-draft' })
+
+      expect(result.specDependsOn).toEqual({
+        'core:a': ['core:b'],
       })
     })
   })

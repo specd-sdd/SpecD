@@ -10,10 +10,5 @@
     "core:composition",
     "default:_global/error-handling-conventions"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/update-spec-deps.ts",
-      "symbols": ["UpdateSpecDeps"]
-    }
-  ]
+  "implementation": []
 }

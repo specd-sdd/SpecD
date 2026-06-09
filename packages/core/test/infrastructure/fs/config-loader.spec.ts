@@ -1305,6 +1305,47 @@ storage:
       expect(defaultWs?.graph).toBeUndefined()
     })
 
+    it('parses graph.allowedPaths correctly', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      allowedPaths:
+        - src/**
+        - templates/**
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      const defaultWs = config.workspaces.find((w) => w.name === 'default')
+      expect(defaultWs?.graph?.allowedPaths).toEqual(['src/**', 'templates/**'])
+    })
+
     it('rejects graph.respectGitignore with a non-boolean value', async () => {
       const configPath = await writeConfig(
         `
@@ -1377,6 +1418,42 @@ storage:
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph\.excludePaths/)
     })
 
+    it('rejects graph.allowedPaths when given a bare string instead of array', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+    graph:
+      allowedPaths: "src/**"
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph\.allowedPaths/)
+    })
+
     it('rejects unknown fields inside the graph block', async () => {
       const configPath = await writeConfig(
         `
@@ -1411,6 +1488,81 @@ storage:
 
       const loader = new FsConfigLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph/)
+    })
+  })
+
+  describe('Requirement: Project graph config', () => {
+    it('reads graph.includePaths and graph.excludePaths into SpecdConfig', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  includePaths:
+    - docs/**
+    - package.json
+  excludePaths:
+    - specd-sdd/
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.graph?.includePaths).toEqual(['docs/**', 'package.json'])
+      expect(config.graph?.excludePaths).toEqual(['specd-sdd/'])
+    })
+
+    it('rejects graph.includePaths when given a bare string instead of array', async () => {
+      const configPath = await writeConfig(
+        minimalYaml(`
+graph:
+  includePaths: "docs/**"
+`),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/graph\.includePaths/)
+    })
+  })
+
+  describe('Requirement: Reserved root workspace namespace', () => {
+    it('rejects workspace name root', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+  root:
+    specs:
+      adapter: fs
+      fs:
+        path: root-specs
+    codeRoot: .
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      await expect(loader.load()).rejects.toThrow(/workspaces\.root.*reserved/)
     })
   })
 

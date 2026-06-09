@@ -80,8 +80,33 @@ export interface SpecdWorkspaceGraphConfig {
   readonly respectGitignore?: boolean
   /**
    * Gitignore-syntax exclusion patterns applied during file discovery.
-   * Supports `!` negation. When absent, built-in defaults apply.
-   * When present, replaces built-in defaults entirely.
+   * Supports `!` negation. These patterns are additive on top of the
+   * project-global graph exclusion set.
+   */
+  readonly excludePaths?: readonly string[]
+  /**
+   * Optional graph-visible include surface inside the workspace `codeRoot`.
+   *
+   * Paths are gitignore-syntax patterns relative to `codeRoot`. They affect
+   * graph indexing only and do not change workspace ownership semantics.
+   */
+  readonly allowedPaths?: readonly string[]
+}
+
+/** Project-level code graph configuration from `specd.yaml`. */
+export interface SpecdGraphConfig {
+  /**
+   * Optional project-global graph include paths rooted at `projectRoot`.
+   *
+   * Paths are gitignore-syntax patterns relative to the active config
+   * directory and are indexed under the reserved `root:` namespace.
+   */
+  readonly includePaths?: readonly string[]
+  /**
+   * Optional global exclusion patterns applied to file/document discovery.
+   *
+   * When omitted, the code-graph layer applies its built-in defaults.
+   * Workspace-local graph excludes are additive on top of this set.
    */
   readonly excludePaths?: readonly string[]
 }
@@ -201,6 +226,8 @@ export interface SpecdConfig {
   readonly storage: SpecdStorageConfig
   /** Approval gate settings (both default to `false`). */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  /** Project-level code graph configuration. */
+  readonly graph?: SpecdGraphConfig
   /** Project-level logging configuration. */
   readonly logging?: SpecdLoggingConfig
   /** Freeform context entries prepended to the compiled context. */
@@ -262,6 +289,12 @@ const specdConfigShape = z.object({
   workspaces: z.array(z.object({ name: z.string() })),
   storage: z.object({ changesPath: z.string() }),
   approvals: z.object({ spec: z.boolean(), signoff: z.boolean() }),
+  graph: z
+    .object({
+      includePaths: z.array(z.string()).optional(),
+      excludePaths: z.array(z.string()).optional(),
+    })
+    .optional(),
   logging: z
     .object({ level: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'silent']) })
     .optional(),

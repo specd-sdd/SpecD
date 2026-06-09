@@ -6,7 +6,9 @@
     "core:storage",
     "core:change",
     "core:kernel",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:archived-change-index-entry",
+    "core:read-only-change-view"
   ],
   "context": [
     "When inspecting the archive — for audit, diffing, or post-mortem — users need to retrieve a specific archived change by name rather than scanning the full list. `GetArchivedChange` is a read-only query that looks up a single archived change by name and throws `ChangeNotFoundError` when the requested change does not exist."
@@ -27,7 +29,7 @@
     {
       "requirement": "Output on success",
       "rules": [
-        "When the archive contains a change matching the given name, `GetArchivedChange.execute()` MUST return `Promise<ArchivedChange>` -- the matching archived change entity."
+        "When the archive contains a change matching the given name, `GetArchivedChange.execute()` MUST return `Promise<ArchivedChange>` — the matching archived change read model loaded from the archived directory `manifest.json`.\n\nThe returned `ArchivedChange` MUST extend `ReadOnlyChangeView` (shared read-only surface) and MUST include archive metadata (`archivedAt`, `archivedBy`, `archivedName`) so callers can inspect archived work without restoring it."
       ]
     },
     {
@@ -64,9 +66,21 @@
     {
       "requirement": "Output on success",
       "name": "Archived change exists",
-      "given": ["the archive repository contains an archived change named 'add-oauth-login'"],
+      "given": [
+        "the archive repository contains an archived change named 'add-oauth-login' loaded from manifest.json"
+      ],
       "when": ["getArchivedChange.execute({ name: 'add-oauth-login' }) is called"],
-      "then": ["the result is the ArchivedChange entity returned by ArchiveRepository.get()"]
+      "then": [
+        "the result is the ArchivedChange read model returned by ArchiveRepository.get()",
+        "AND the result extends ReadOnlyChangeView and includes archivedAt, archivedName, and archive metadata"
+      ]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "Detail includes manifest lifecycle state",
+      "given": ["the archived manifest records lifecycle state archivable for 'add-oauth-login'"],
+      "when": ["getArchivedChange.execute({ name: 'add-oauth-login' }) is called"],
+      "then": ["the result state equals archivable"]
     },
     {
       "requirement": "Delegation to ArchiveRepository",
@@ -121,9 +135,28 @@
       "then": ["it requires an ArchiveRepository in its constructor"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-archived-change",
+        "file": "core:src/domain/read-only-change-view.ts",
+        "symbol": "ArchivedChange"
+      },
+      {
+        "specId": "core:get-archived-change",
+        "file": "core:src/domain/read-only-change-view.ts",
+        "symbol": "toArchivedChangeView"
+      },
+      {
+        "specId": "core:get-archived-change",
+        "file": "core:src/application/use-cases/get-archived-change.ts",
+        "symbol": "GetArchivedChange"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:283edeff069fd927a222144bf4a5fa5c5d28dffa6d3649dac270aa4a2eb5fd29",
-    "verify.md": "sha256:33ca0b318a30c0cda940eb57756a2a61b4d6a88570996820e68e7382deb1bdfa"
+    "spec.md": "sha256:36573d7c1f7eeaec5a2165e8ceab7176e4b34303c2c0762f23ed586281d15311",
+    "verify.md": "sha256:745f875634fbf7f6128c1385ad8828f03a174a4102e490495d58db52c55ee3eb"
   },
   "generatedBy": "core"
 }

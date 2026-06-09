@@ -10,6 +10,8 @@ Client-side type for **Dto Change Summary**, kept in parity with the matching `a
 
 Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names.
 
+For change summary rows this includes `name`, optional `description`, `state`, `specIds`, and sidebar timing/count fields.
+
 ### Requirement: types are shared or generated from API schemas
 
 DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI.

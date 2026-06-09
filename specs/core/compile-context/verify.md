@@ -351,3 +351,29 @@
 - **GIVEN** `contextMode: "summary"` and a spec matched only via include pattern
 - **WHEN** `CompileContext.execute` is called
 - **THEN** `PreviewSpec` is NOT called for that spec — non-full specs have no merged content to render
+
+### Requirement: Prefer LLM-optimized context
+
+#### Scenario: Uses optimized context when available
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** a spec has `optimizedContext: "Optimized"` and `context: ["Original"]`
+- **WHEN** context is compiled
+- **THEN** the rendered output for that spec contains "Optimized"
+
+#### Scenario: Falls back to standard context when optimized is empty
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** a spec has `optimizedContext: ""` or missing
+- **WHEN** context is compiled
+- **THEN** the rendered output for that spec uses the standard `context`
+
+### Requirement: Optimization warning signal
+
+#### Scenario: Emits warning for missing spec optimization
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** a spec in the context is missing its `optimizedContext` field
+- **WHEN** context is compiled
+- **THEN** a warning is emitted for that spec
+- **AND** it includes remediation instructions

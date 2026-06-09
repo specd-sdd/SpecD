@@ -26,24 +26,91 @@ describe('createSkillRepository', () => {
     expect(skill).toBeUndefined()
   })
 
-  it('given variables, when getBundle is called, then unresolved placeholders are preserved', async () => {
+  it('given templates migrated to .md.tpl, when list is called, then metadata still loads', async () => {
     const repository = createSkillRepository()
-    const bundle = await repository.getBundle('specd', { change_name: 'demo' })
+    const skill = await repository.get('specd')
+
+    expect(skill?.templates.some((template) => template.filename === 'SKILL.md.tpl')).toBe(true)
+  })
+
+  it('given unresolved variables, when getBundle is called, then placeholders are preserved', async () => {
+    const repository = createSkillRepository()
+    const bundle = await repository.getBundle('specd', {
+      variables: { change_name: 'demo' },
+    })
 
     expect(bundle.files.length).toBeGreaterThan(0)
     expect(bundle.files[0]?.content.length).toBeGreaterThan(0)
     expect(bundle.files.some((file) => file.filename === 'shared.md')).toBe(true)
+    expect(bundle.files.some((file) => file.filename === 'SKILL.md')).toBe(true)
     expect(bundle.files.find((file) => file.filename === 'shared.md')?.shared).toBe(true)
     expect(bundle.files.find((file) => file.filename === 'SKILL.md')?.shared).not.toBe(true)
   })
 
-  it('given shared metadata, when listSharedFiles is called, then returns shared file entries', async () => {
+  it('given variables.frontmatter without frontmatter capability, when getBundle is called, then frontmatter is not emitted', async () => {
+    const repository = createSkillRepository()
+    const bundle = await repository.getBundle('specd', {
+      variables: {
+        frontmatter: {
+          name: 'specd',
+          description: 'specd',
+        },
+      },
+    })
+
+    const skillFile = bundle.files.find((file) => file.filename === 'SKILL.md')
+    expect(skillFile?.content.startsWith('---\n')).toBe(false)
+  })
+
+  it('given variables.frontmatter with frontmatter capability, when getBundle is called, then frontmatter is emitted only for non-shared files', async () => {
+    const repository = createSkillRepository()
+    const bundle = await repository.getBundle('specd', {
+      variables: {
+        frontmatter: {
+          name: 'specd',
+          description: 'specd',
+        },
+      },
+      capabilities: ['frontmatter'],
+    })
+
+    const skillFile = bundle.files.find((file) => file.filename === 'SKILL.md')
+    const sharedFile = bundle.files.find((file) => file.filename === 'shared.md')
+
+    expect(skillFile?.content.startsWith('---\n')).toBe(true)
+    expect(sharedFile?.content.startsWith('---\n')).toBe(false)
+  })
+
+  it('given capability-aware shared templates, when getBundle is called, then handlebars else blocks do not leak into output', async () => {
+    const repository = createSkillRepository()
+    const codexBundle = await repository.getBundle('specd', {
+      capabilities: ['mcp', 'agents'],
+    })
+    const standardBundle = await repository.getBundle('specd', {
+      capabilities: [],
+    })
+
+    const codexShared = codexBundle.files.find((file) => file.filename === 'shared.md')?.content
+    const standardShared = standardBundle.files.find(
+      (file) => file.filename === 'shared.md',
+    )?.content
+
+    expect(codexShared).toContain('This runtime supports MCP-oriented workflows.')
+    expect(codexShared).toContain('This runtime supports delegated agent workflows.')
+    expect(codexShared).not.toContain('{{else}}')
+    expect(codexShared).not.toContain('This runtime does not expose MCP-oriented workflows.')
+    expect(standardShared).toContain('This runtime does not expose MCP-oriented workflows.')
+    expect(standardShared).toContain('This runtime does not support delegated agent workflows.')
+    expect(standardShared).not.toContain('{{else}}')
+    expect(standardShared).not.toContain('This runtime supports MCP-oriented workflows.')
+  })
+
+  it('given shared templates, when listSharedFiles is called, then returns shared file entries', async () => {
     const repository = createSkillRepository()
     const sharedFiles = await repository.listSharedFiles()
     const shared = sharedFiles.find((file) => file.filename === 'shared.md')
 
     expect(shared).toBeDefined()
-    expect(shared?.skills.includes('specd')).toBe(true)
     expect(shared?.content.length).toBeGreaterThan(0)
   })
 

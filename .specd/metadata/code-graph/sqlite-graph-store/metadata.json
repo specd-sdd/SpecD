@@ -44,7 +44,7 @@
     {
       "requirement": "Persisted node storage",
       "rules": [
-        "The SQLite schema SHALL persist the logical node kinds required by the abstract graph\nmodel:\n\n- `File` nodes for indexed source files\n- `Symbol` nodes for extracted code symbols\n- `Spec` nodes for indexed specification documents\n- `Meta` records for store-level metadata such as `lastIndexedAt`, `lastIndexedRef`,\n  and backend schema version state\n\nThe adapter MAY represent those records as one table per logical node kind or another\nSQLite-appropriate layout, provided the observable `GraphStore` semantics remain\npreserved."
+        "The SQLite schema SHALL persist the logical node kinds required by the abstract graph model:\n\n- `File` nodes for indexed source files, including persisted source content used for symbol snippet extraction\n- `Symbol` nodes for extracted code symbols\n- `Spec` nodes for indexed specification documents\n- **`Document`** nodes for textual non-code resources\n- `Meta` records for store-level metadata\n\nThe `File` table SHALL include the source content needed to derive symbol snippets from file-backed context.\n\nThe `Document` table SHALL include columns for `path` (PK), `configRelativePath`, `contentHash`, `content`, and `workspace`."
       ]
     },
     {
@@ -56,7 +56,7 @@
     {
       "requirement": "SQLite full-text search",
       "rules": [
-        "`SQLiteGraphStore` SHALL implement symbol and spec search using SQLite full-text search\ncapabilities.\n\nThe adapter MUST:\n\n- provide full-text search over symbol search text and symbol comments for\n  `GraphStore.searchSymbols()`\n- provide full-text search over spec title, description, and searchable content for\n  `GraphStore.searchSpecs()`\n- sanitize the FTS query string before passing it to the FTS5 MATCH clause so that\n  user input is treated as literal text and not interpreted as FTS5 query syntax\n  (boolean operators, column filters, prefix wildcards, etc.)\n- join multiple search tokens using the `OR` operator in the sanitized FTS5 query\n  so that results matching any of the terms are returned (discovery mode)\n- return results ordered by descending relevance score, relying on the backend's\n  BM25 ranking to prioritize records matching more search terms (precision mode)\n- rebuild or refresh backend-specific FTS structures when required after bulk data\n  changes\n\nThe implementation MAY use SQLite FTS5 virtual tables or another SQLite-native full-text\nsearch mechanism, provided the abstract graph-store search contract remains satisfied."
+        "`SQLiteGraphStore` SHALL implement symbol, spec, and document search using SQLite full-text search (FTS5).\n\nThe adapter MUST:\n\n- provide full-text search over `Document` content and paths\n- prioritize **exact identity matches** (Spec ID, Symbol Name/ID, Document Path) by boosting results where the query matches the primary identity column exactly\n- use BM25 ranking for remaining textual matches across all searchable columns\n- sanitize and join multi-token queries using `OR` logic for broad discovery\n- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches\n\nThe SQLite FTS schema MUST include:\n\n- **`symbol_fts`** virtual table covering `Symbol.name` and `Symbol.comment`\n- **`spec_fts`** virtual table covering `Spec.title`, `Spec.description`, and `Spec.content`\n- **`document_fts`** virtual table covering `Document.path` and `Document.content`\n\nThe implementation MAY use stemming or other SQLite-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.\n\nPersisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change."
       ]
     },
     {
@@ -149,8 +149,17 @@
       "name": "Logical node kinds survive backend-specific layout choices",
       "when": ["files, symbols, specs, and metadata are persisted by SQLiteGraphStore"],
       "then": [
-        "the abstract graph-store queries can retrieve the expected logical node",
-        "AND callers do not need to know whether SQLite uses one table per kind or\nanother internal layout"
+        "the abstract graph-store queries can retrieve the expected logical node kinds",
+        "AND callers do not need to know whether SQLite uses one table per kind or another internal layout"
+      ]
+    },
+    {
+      "requirement": "Persisted node storage",
+      "name": "File node persistence includes source content for symbol snippets",
+      "when": ["a source file is persisted by SQLiteGraphStore"],
+      "then": [
+        "the persisted file record includes source content sufficient to derive symbol snippets from file-backed context",
+        "AND symbol preview extraction does not require a separate persisted snippet field per symbol"
       ]
     },
     {
@@ -171,7 +180,9 @@
       "name": "Symbol and spec search use SQLite full-text search",
       "given": ["symbols and specs have been indexed into SQLite"],
       "when": ["abstract search methods are called"],
-      "then": ["results come back in descending relevance order from SQLite-backed full-text"]
+      "then": [
+        "results come back in descending relevance order from SQLite-backed full-text search structures"
+      ]
     },
     {
       "requirement": "SQLite full-text search",
@@ -191,6 +202,15 @@
       "then": [
         "symbol B has a higher relevance score than symbol A",
         "AND symbol B appears first in the results"
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "Symbol result derives snippet from file content even for comment-driven hit",
+      "given": ["a symbol search hit is returned because of matched comment text"],
+      "when": ["searchSymbols(...) returns the symbol"],
+      "then": [
+        "the result snippet is derived from persisted file source content at the symbol location"
       ]
     },
     {
@@ -218,6 +238,22 @@
       "then": [
         "the query does not perform boolean logic",
         "AND results matching the literal terms are returned"
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "Exact identity matches boosted in SQLite FTS",
+      "given": ["a spec with ID core:change"],
+      "when": ["searching for core:change in the SQLite backend"],
+      "then": ["that spec is the first result returned"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "Persisted file content does not create SQLite file search category",
+      "given": ["SQLite persists file source content for snippet extraction"],
+      "when": ["search APIs are used through the current graph-store contract"],
+      "then": [
+        "there is still no separate file full-text result category introduced by this change"
       ]
     },
     {
@@ -264,13 +300,30 @@
     "files": [
       {
         "specId": "code-graph:sqlite-graph-store",
-        "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts"
+        "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "code-graph:sqlite-graph-store",
+        "file": "code-graph:src/infrastructure/sqlite/schema.ts",
+        "symbol": "SQLITE_SCHEMA_VERSION"
+      },
+      {
+        "specId": "code-graph:sqlite-graph-store",
+        "file": "code-graph:src/infrastructure/sqlite/schema.ts",
+        "symbol": "SQLITE_SCHEMA_DDL"
+      },
+      {
+        "specId": "code-graph:sqlite-graph-store",
+        "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+        "symbol": "SQLiteGraphStore"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:7da62ece8ffcd62dadf6d4211c717d0c05f8bf1413a8a4d6993548341f5a70df",
-    "verify.md": "sha256:68312a3a1c57624c0a84b64b5862ce11ee3d88f8393efc72699891fba81b0070"
+    "spec.md": "sha256:2da4f492a7f3d43cd25d8db531dbaf756ddc418ff29f775c0d9b2d26e33faa3d",
+    "verify.md": "sha256:0e09af711ef39247480cf262073c6a70b101c41c28b03b990638af803ab4ada1"
   },
   "generatedBy": "core"
 }

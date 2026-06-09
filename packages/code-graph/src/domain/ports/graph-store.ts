@@ -1,4 +1,5 @@
 import { type FileNode } from '../value-objects/file-node.js'
+import { type DocumentNode } from '../value-objects/document-node.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type SpecNode } from '../value-objects/spec-node.js'
 import { type Relation } from '../value-objects/relation.js'
@@ -57,6 +58,20 @@ export abstract class GraphStore {
   abstract removeFile(filePath: string): Promise<void>
 
   /**
+   * Inserts or updates a document node in the store.
+   * @param document - The document node to upsert.
+   * @returns A promise that resolves when the upsert is complete.
+   */
+  abstract upsertDocument(document: DocumentNode): Promise<void>
+
+  /**
+   * Removes a document from the store.
+   * @param documentPath - The canonical document path to remove.
+   * @returns A promise that resolves when the removal is complete.
+   */
+  abstract removeDocument(documentPath: string): Promise<void>
+
+  /**
    * Inserts or updates a spec node along with its relations.
    * @param spec - The spec node to upsert.
    * @param relations - The relations associated with the spec.
@@ -70,6 +85,14 @@ export abstract class GraphStore {
    * @returns A promise that resolves when the removal is complete.
    */
   abstract removeSpec(specId: string): Promise<void>
+
+  /**
+   * Removes multiple specs and their associated relations from the store.
+   * Implementations should batch internal cleanup and rebuild derived indexes once.
+   * @param specIds - The spec identifiers to remove.
+   * @returns A promise that resolves when the removal is complete.
+   */
+  abstract removeSpecs(specIds: readonly string[]): Promise<void>
 
   /**
    * Retrieves a file node by its path.
@@ -93,6 +116,7 @@ export abstract class GraphStore {
    */
   abstract bulkLoad(data: {
     files: FileNode[]
+    documents?: DocumentNode[]
     symbols: SymbolNode[]
     specs: SpecNode[]
     relations: Relation[]
@@ -104,11 +128,25 @@ export abstract class GraphStore {
   abstract getFile(path: string): Promise<FileNode | undefined>
 
   /**
+   * Retrieves a document node by its path.
+   * @param path - The document path to look up.
+   * @returns The matching document node, or undefined if not found.
+   */
+  abstract getDocument(path: string): Promise<DocumentNode | undefined>
+
+  /**
    * Retrieves all file nodes whose configRelativePath exactly matches the given path.
    * @param configRelativePath - The normalized config-relative path to search.
    * @returns An array of matching file nodes.
    */
   abstract findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
+
+  /**
+   * Retrieves all document nodes whose configRelativePath exactly matches the given path.
+   * @param configRelativePath - The normalized config-relative path to search.
+   * @returns An array of matching document nodes.
+   */
+  abstract findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]>
 
   /**
    * Retrieves a symbol node by its id.
@@ -263,6 +301,12 @@ export abstract class GraphStore {
   abstract getAllFiles(): Promise<FileNode[]>
 
   /**
+   * Returns all document nodes in the store.
+   * @returns An array of all document nodes.
+   */
+  abstract getAllDocuments(): Promise<DocumentNode[]>
+
+  /**
    * Returns all spec nodes in the store.
    * @returns An array of all spec nodes.
    */
@@ -273,20 +317,51 @@ export abstract class GraphStore {
    * Filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied
    * before LIMIT in the query — no post-query filtering needed.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching symbols with BM25 scores, ordered by relevance.
+   * @returns Matching symbols with BM25 scores and snippets, ordered by relevance.
    */
   abstract searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>>
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  >
 
   /**
    * Full-text search across specs (title, description, and content).
    * Filters (workspace, excludePaths, excludeWorkspaces) are applied
    * before LIMIT in the query — no post-query filtering needed.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching specs with BM25 scores, ordered by relevance.
+   * @returns Matching specs with BM25 scores and snippets, ordered by relevance.
    */
-  abstract searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>
+  abstract searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  >
+
+  /**
+   * Full-text search across documents (path and content).
+   * Filters (filePattern, workspace, excludePaths, excludeWorkspaces) are applied
+   * before LIMIT in the query — no post-query filtering needed.
+   * @param options - Search options including query, limit, and filters.
+   * @returns Matching documents with scores and snippets, ordered by relevance.
+   */
+  abstract searchDocuments(
+    options: SearchOptions,
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  >
 
   /**
    * Rebuilds full-text search indexes after data changes.

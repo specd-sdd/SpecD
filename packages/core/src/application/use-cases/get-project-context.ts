@@ -1,4 +1,5 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { checkProjectMetadataFreshness } from './_shared/project-metadata-freshness.js'
 import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
@@ -7,6 +8,7 @@ import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
+import { Schema } from '../../domain/value-objects/schema.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import {
   type CompileContextConfig,
@@ -23,6 +25,7 @@ import {
   extractMetadataFromSpecArtifacts,
   type MetadataArtifactInput,
 } from './_shared/extract-metadata-from-spec-artifacts.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
@@ -66,7 +69,7 @@ export interface GetProjectContextResult {
  * a change's `specIds` dependsOn metadata) is not performed — that requires a specific change.
  */
 export class GetProjectContext {
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _schemaProvider: SchemaProvider
   private readonly _files: FileReader
   private readonly _parsers: ArtifactParserRegistry
@@ -77,7 +80,7 @@ export class GetProjectContext {
   /**
    * Creates a new `GetProjectContext` use case instance.
    *
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
@@ -86,7 +89,7 @@ export class GetProjectContext {
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
   constructor(
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     files: FileReader,
     parsers: ArtifactParserRegistry,
@@ -94,7 +97,7 @@ export class GetProjectContext {
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
-    this._specs = specs
+    this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
     this._files = files
     this._parsers = parsers
@@ -116,6 +119,27 @@ export class GetProjectContext {
     const warnings: ContextWarning[] = []
     const contextEntries: string[] = []
 
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    // Step 0: Cache Verification for LLM-optimized context
+    const {
+      metadata: projectMeta,
+      isFresh,
+      warnings: optimizationWarnings,
+    } = await checkProjectMetadataFreshness(input.config, this._files, this._hasher, workspaceMap)
+
+    warnings.push(...optimizationWarnings)
+
+    if (isFresh && projectMeta) {
+      // ALL FRESH! Return optimized context.
+      return {
+        contextEntries: [projectMeta.optimized.context],
+        specs: [], // optimized context already includes them
+        warnings: [],
+      }
+    }
+
     // Collect project-level context entries (labelled with their source)
     for (const entry of input.config.context ?? []) {
       if ('instruction' in entry) {
@@ -135,13 +159,11 @@ export class GetProjectContext {
     }
 
     // Steps 1–2: collect included specs using project-level patterns only.
-    // Workspace-level patterns are not applied — those are conditional on a specific
-    // change having that workspace active and are handled by CompileContext.
     const includedSpecs = new Map<string, ResolvedSpec>()
 
-    // Step 1: Project-level include patterns (bare * = all workspaces)
+    // Step 1: Project-level include patterns (all workspaces, bare * = all)
     for (const pattern of input.config.contextIncludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
+      const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) {
         const key = `${spec.workspace}:${spec.capPath}`
         if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
@@ -151,10 +173,10 @@ export class GetProjectContext {
     // Step 2: Project-level exclude patterns
     const excludedKeys = new Set<string>()
     for (const pattern of input.config.contextExcludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, this._specs, warnings)
+      const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) excludedKeys.add(`${spec.workspace}:${spec.capPath}`)
     }
-    for (const key of excludedKeys) includedSpecs.delete(key)
+    for (const key of projectExcludedKeysFrom(excludedKeys)) includedSpecs.delete(key)
 
     // Step 3 (optional): dependsOn traversal from included specs (only when followDeps is true)
     if (input.followDeps === true) {
@@ -180,7 +202,7 @@ export class GetProjectContext {
           dependsOnAdded,
           depSeen,
           new Set<string>(),
-          this._specs,
+          workspaceMap,
           warnings,
           input.depth,
           0,
@@ -200,14 +222,14 @@ export class GetProjectContext {
           ? 'full'
           : input.config.contextMode
 
-    // Project context has no change-scoped tier, so hybrid behaves as full.
     const sectionsFilter = input.sections
 
     const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of includedSpecs.values()) {
-      const specRepo = this._specs.get(workspace)
-      if (specRepo === undefined) continue
+      const ws = workspaceMap.get(workspace)
+      if (ws === undefined) continue
 
+      const specRepo = ws.specRepo
       let specPathObj: SpecPath
       try {
         specPathObj = SpecPath.parse(capPath)
@@ -241,47 +263,11 @@ export class GetProjectContext {
       let content: string
 
       if (isFresh && metadata !== null) {
-        const metaParts: string[] = []
-
-        // Description is always included in full mode as part of the content string
-        // if it exists in metadata (header persistence).
-        if (metadata.description !== undefined) {
-          metaParts.push(`**Description:** ${metadata.description}`)
-        }
-
-        // If no sections are provided, default to Rules + Constraints.
-        const effectiveSections =
-          sectionsFilter === undefined || sectionsFilter.length === 0
-            ? (['rules', 'constraints'] as const)
-            : sectionsFilter
-
-        if (effectiveSections.includes('rules') && metadata.rules?.length) {
-          const rulesText = metadata.rules
-            .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
-            .join('\n\n')
-          metaParts.push(`#### Rules\n\n${rulesText}`)
-        }
-        if (effectiveSections.includes('constraints') && metadata.constraints?.length) {
-          metaParts.push(
-            `#### Constraints\n\n${metadata.constraints.map((c) => `- ${c}`).join('\n')}`,
-          )
-        }
-        if (effectiveSections.includes('scenarios') && metadata.scenarios?.length) {
-          const scenariosText = metadata.scenarios
-            .map((s) => {
-              const lines: string[] = [
-                `##### Scenario: ${s.name}`,
-                `*Requirement: ${s.requirement}*`,
-              ]
-              if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)
-              if (s.when?.length) lines.push(`**When:** ${s.when.join('; ')}`)
-              if (s.then?.length) lines.push(`**Then:** ${s.then.join('; ')}`)
-              return lines.join('\n')
-            })
-            .join('\n\n')
-          metaParts.push(`#### Scenarios\n\n${scenariosText}`)
-        }
-        content = metaParts.join('\n\n')
+        content = this._renderFromMetadata(
+          metadata,
+          sectionsFilter,
+          input.config.llmOptimizedContext,
+        )
       } else {
         if (metadata !== null) {
           warnings.push({
@@ -306,6 +292,7 @@ export class GetProjectContext {
             spec,
             schema,
             extraction,
+            workspaceMap,
             sectionsFilter,
           )
         }
@@ -326,15 +313,17 @@ export class GetProjectContext {
    * @param spec - The spec entity to extract metadata from
    * @param schema - The resolved schema with artifact definitions
    * @param extraction - The metadata extraction declarations from the schema
+   * @param workspaces - Orchestrated workspace map
    * @param sectionsFilter - Optional filter to include only specific sections
    * @returns Rendered context parts as strings
    */
   private async _extractionFallback(
     specRepo: SpecRepository,
     spec: Spec,
-    schema: import('../../domain/value-objects/schema.js').Schema,
+    schema: Schema,
     extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
-    sectionsFilter: ReadonlyArray<import('./compile-context.js').SpecSection> | undefined,
+    workspaces: Map<string, ProjectWorkspace>,
+    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
   ): Promise<string[]> {
     const artifacts: MetadataArtifactInput[] = []
 
@@ -356,6 +345,11 @@ export class GetProjectContext {
       })
     }
 
+    const repositories = new Map<string, SpecRepository>()
+    for (const ws of workspaces.values()) {
+      repositories.set(ws.name, ws.specRepo)
+    }
+
     const extracted = await extractMetadataFromSpecArtifacts({
       effectiveSpecSchema: schema,
       workspace: spec.workspace,
@@ -363,36 +357,74 @@ export class GetProjectContext {
       artifacts,
       parsers: this._parsers,
       extractorTransforms: this._extractorTransforms,
-      repositories: this._specs,
+      repositories,
       workspaceRoutes: this._workspaceRoutes,
     })
+
+    return this._metadataToParts(extracted.metadata, sectionsFilter, true) // fallback extraction can also use optimized fields if they came from extraction? actually no.
+  }
+
+  /**
+   * Renders spec content from fresh metadata into a single string.
+   *
+   * @param metadata - The fresh parsed metadata
+   * @param sectionsFilter - Optional filter to include only specific sections
+   * @param llmOptimizedContext - Whether to prefer optimized fields
+   * @returns Rendered content string
+   */
+  private _renderFromMetadata(
+    metadata: SpecMetadata,
+    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    llmOptimizedContext = false,
+  ): string {
+    if (
+      llmOptimizedContext &&
+      metadata.optimizedContext !== undefined &&
+      metadata.optimizedContext !== ''
+    ) {
+      return metadata.optimizedContext
+    }
+    return this._metadataToParts(metadata, sectionsFilter, llmOptimizedContext).join('\n\n')
+  }
+
+  /**
+   * Converts metadata sections into an array of rendered strings.
+   *
+   * @param metadata - Spec metadata to convert
+   * @param sectionsFilter - Optional section filter
+   * @param llmOptimizedContext - Whether to prefer optimized fields
+   * @returns Array of rendered markdown strings
+   */
+  private _metadataToParts(
+    metadata: SpecMetadata,
+    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    llmOptimizedContext = false,
+  ): string[] {
     const metaParts: string[] = []
 
-    // Description is always included in full mode as part of the content string
-    // if it exists (header persistence).
-    if (extracted.metadata.description !== undefined) {
-      metaParts.push(`**Description:** ${extracted.metadata.description}`)
+    // Preference for optimized description
+    const description =
+      (llmOptimizedContext && metadata.optimizedDescription) || metadata.description
+    if (description !== undefined && description !== '') {
+      metaParts.push(`**Description:** ${description}`)
     }
 
-    // If no sections are provided, default to Rules + Constraints.
     const effectiveSections =
       sectionsFilter === undefined || sectionsFilter.length === 0
         ? (['rules', 'constraints'] as const)
         : sectionsFilter
 
-    if (effectiveSections.includes('rules') && extracted.metadata.rules?.length) {
-      const rulesText = extracted.metadata.rules
+    if (effectiveSections.includes('rules') && metadata.rules?.length) {
+      const rulesText = metadata.rules
         .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
         .join('\n\n')
       metaParts.push(`#### Rules\n\n${rulesText}`)
     }
-    if (effectiveSections.includes('constraints') && extracted.metadata.constraints?.length) {
-      metaParts.push(
-        `#### Constraints\n\n${extracted.metadata.constraints.map((c) => `- ${c}`).join('\n')}`,
-      )
+    if (effectiveSections.includes('constraints') && metadata.constraints?.length) {
+      metaParts.push(`#### Constraints\n\n${metadata.constraints.map((c) => `- ${c}`).join('\n')}`)
     }
-    if (effectiveSections.includes('scenarios') && extracted.metadata.scenarios?.length) {
-      const scenariosText = extracted.metadata.scenarios
+    if (effectiveSections.includes('scenarios') && metadata.scenarios?.length) {
+      const scenariosText = metadata.scenarios
         .map((s) => {
           const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
           if (s.given?.length) lines.push(`**Given:** ${s.given.join('; ')}`)
@@ -403,7 +435,6 @@ export class GetProjectContext {
         .join('\n\n')
       metaParts.push(`#### Scenarios\n\n${scenariosText}`)
     }
-
     return metaParts
   }
 
@@ -430,4 +461,14 @@ export class GetProjectContext {
     )
     return result.allFresh
   }
+}
+
+/**
+ * Helper to convert a Set of project-level excluded keys to an array.
+ *
+ * @param keys - The set of keys to convert
+ * @returns Array of key strings
+ */
+function projectExcludedKeysFrom(keys: Set<string>): string[] {
+  return [...keys]
 }

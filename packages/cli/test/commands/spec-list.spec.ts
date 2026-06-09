@@ -46,6 +46,15 @@ import { registerSpecList } from '../../src/commands/spec/list.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
+  kernel.project.listWorkspaces.execute.mockResolvedValue([
+    {
+      name: 'default',
+      codeRoot: '/project',
+      isExternal: false,
+      ownership: 'owned',
+      specRepo: { count: vi.fn().mockResolvedValue(3) },
+    },
+  ])
   vi.mocked(loadConfig).mockResolvedValue(config)
   vi.mocked(createCliKernel).mockResolvedValue(kernel)
   const stdout = captureStdout()
@@ -205,6 +214,22 @@ describe('spec list --workspace', () => {
   it('passes workspace filter to use case', async () => {
     const config = makeMultiWorkspaceConfig()
     const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(0) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(0) },
+      },
+    ])
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockResolvedValue(kernel)
     kernel.specs.list.execute.mockResolvedValue([])
@@ -223,6 +248,22 @@ describe('spec list --workspace', () => {
   it('passes multiple workspace filters to use case', async () => {
     const config = makeMultiWorkspaceConfig()
     const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(0) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(0) },
+      },
+    ])
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockResolvedValue(kernel)
     kernel.specs.list.execute.mockResolvedValue([])
@@ -250,6 +291,22 @@ describe('spec list --workspace', () => {
   it('shows only filtered workspace in text output', async () => {
     const config = makeMultiWorkspaceConfig()
     const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+    ])
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockResolvedValue(kernel)
     kernel.specs.list.execute.mockResolvedValue([multiEntries[0]!])
@@ -268,6 +325,22 @@ describe('spec list --workspace', () => {
   it('includes only filtered workspaces in JSON output', async () => {
     const config = makeMultiWorkspaceConfig()
     const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+    ])
     vi.mocked(loadConfig).mockResolvedValue(config)
     vi.mocked(createCliKernel).mockResolvedValue(kernel)
     kernel.specs.list.execute.mockResolvedValue([multiEntries[0]!])

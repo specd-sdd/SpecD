@@ -284,6 +284,13 @@ The port's contract requires:
 
 The `FsArchiveRepository` implementation additionally moves the change directory from its current location (`changes/` or `drafts/`) to the archive directory using the configured pattern, then appends an entry to `index.jsonl`. The use case has no knowledge of these implementation details.
 
+### Requirement: Archive index metadata maintenance
+
+The `ArchiveChange` use case SHALL ensure that the archive index metadata (total count) is maintained during the archiving process.
+
+- The implementation MUST update the `.specd-index-meta.json` file to increment the `totalCount` after a successful archival.
+- This update MUST happen atomically or with appropriate concurrency controls to prevent corruption of the metadata.
+
 ### Requirement: Post-archive hooks
 
 After `archiveRepository.archive()` succeeds, when `'all'` and `'post'` are both absent from `skipHookPhases`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.

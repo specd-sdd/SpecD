@@ -193,4 +193,21 @@
 #### Scenario: Constructor accepts all required ports
 
 - **WHEN** `GetProjectContext` is instantiated
-- **THEN** it requires `specs` (ReadonlyMap<string, SpecRepository>), `schemaProvider` (SchemaProvider), `files` (FileReader), `parsers` (ArtifactParserRegistry), and `hasher` (ContentHasher) in its constructor
+- **THEN** it requires `specs` (ReadonlyMap\<string, SpecRepository>), `schemaProvider` (SchemaProvider), `files` (FileReader), `parsers` (ArtifactParserRegistry), and `hasher` (ContentHasher) in its constructor
+
+### Requirement: Project context optimization and invalidation
+
+#### Scenario: Uses optimized project context when fresh
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** `project-metadata.json` exists and all hashes match
+- **WHEN** project context is retrieved
+- **THEN** the result uses `optimized.context`
+
+#### Scenario: Falls back and warns when project context is stale
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** `specd.yaml` has changed (hash mismatch in `project-metadata.json`)
+- **WHEN** project context is retrieved
+- **THEN** it falls back to raw compilation
+- **AND** emits a warning signal

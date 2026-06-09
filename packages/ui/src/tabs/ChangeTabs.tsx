@@ -7,7 +7,7 @@ export const CHANGE_VIEWS = [
   'Tasks',
   'Events',
   'Context',
-  'Impact',
+  'Coverage',
 ] as const
 export type ChangeView = (typeof CHANGE_VIEWS)[number]
 

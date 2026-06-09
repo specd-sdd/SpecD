@@ -2,7 +2,7 @@
 
 ## Requirements
 
-### Requirement: change tab refetches status tasks + `tasks.md` content when needed when updatedAt advances
+### Requirement: change tab refetches task-capable artifacts when needed when updatedAt advances
 
 #### Scenario: Unchanged status skips tab refetch
 
@@ -26,19 +26,26 @@
 - **THEN** no tab-scoped status request is sent
 - **AND** cache is retained until visible again
 
-#### Scenario: Tasks tab loads tasks.md when visible
+#### Scenario: Tasks tab loads every task-capable file when visible
 
-- **GIVEN** active (non-archived) change with `tasks.md`
+- **GIVEN** active (non-archived) change with one or more task-capable artifacts
 - **WHEN** user selects Tasks tab
-- **THEN** UI loads artifact via `getChangeArtifact`
-- **AND** displays tasks artifact status from `getChangeStatus` when present
+- **THEN** UI loads every tracked file from artifacts marked `hasTasks`
+- **AND** displays aggregate `completedTasks/totalTasks` from `getChangeStatus` when present
 
-#### Scenario: Archived change shows read-only message
+#### Scenario: Markdown task files render as markdown with filename headers
+
+- **GIVEN** a task-capable artifact file named `tasks-plan.md`
+- **WHEN** the Tasks tab renders it
+- **THEN** the filename appears in the rendered section header
+- **AND** the body is rendered as Markdown rather than plain preformatted text
+
+#### Scenario: Archived change loads tasks from archived snapshot
 
 - **GIVEN** shell context is archived
 - **WHEN** user selects Tasks tab
-- **THEN** UI does not call `getChangeArtifact`
-- **AND** shows read-only archived messaging
+- **THEN** UI loads every tracked task-capable body through the archived read-only artifact route when present
+- **AND** falls back to the missing-tasks message only when the archived snapshot has no task-capable artifact files
 
 ### Requirement: view uses SpecdDataPort hooks only
 

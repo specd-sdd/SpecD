@@ -9,10 +9,15 @@ Teams need a way to review past work without digging through the archive directo
 ### Requirement: Command signature
 
 ```
-specd archive list [--format text|json|toon]
+specd archive list [--format text|json|toon] [--limit <n>] [--page <p>] [--start-at <name>]
 ```
 
-No positional arguments. The `--format` flag controls output encoding; defaults to `text`.
+- `--format` — controls output encoding; defaults to `text`
+- `--limit` — maximum number of entries to return; defaults to `100`
+- `--page` — 1-based page number (requires `--limit`)
+- `--start-at` — exclusive cursor for keyset pagination; name of the change to start after
+
+`--page` and `--start-at` are mutually exclusive.
 
 ### Requirement: Output format — text
 
@@ -20,24 +25,37 @@ The command prints a human-readable table to stdout. Changes are sorted by archi
 
 The output has an inverse-video column header row `NAME  DATE` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).
 
+At the end of the table, a summary line SHALL be printed:
+`Showing <count> archived changes of <total>. Increase limit or specify another page.`
+
 ### Requirement: Output format — JSON
 
-When `--format json` is passed, the command writes a JSON array to stdout:
+When `--format json` is passed, the command writes a JSON object to stdout containing the list and metadata:
 
 ```json
-[
-  {
-    "name": "...",
-    "archivedName": "...",
-    "workspace": "...",
-    "archivedAt": "...",
-    "archivedBy": { "name": "...", "email": "..." },
-    "artifacts": ["..."]
+{
+  "items": [
+    {
+      "name": "...",
+      "archivedName": "...",
+      "archivedAt": "...",
+      "archivedBy": { "name": "...", "email": "..." },
+      "artifacts": ["..."],
+      "specIds": ["..."]
+    }
+  ],
+  "meta": {
+    "total": 125,
+    "count": 100,
+    "limit": 100,
+    "page": 1
   }
-]
+}
 ```
 
 One object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.
+
+The command MUST NOT read every archived change `manifest.json` to produce this listing; it SHOULD rely on archive index entries.
 
 ### Requirement: Output format — toon
 
@@ -45,7 +63,7 @@ When `--format toon` is passed, the command writes the same data model as JSON e
 
 ### Requirement: Empty archive
 
-If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0.
+If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `{"items":[],"meta":{"total":0,"count":0,"limit":100}}` (or equivalent empty paginated envelope) in JSON/toon mode, and exits with code 0.
 
 ### Requirement: Error cases
 
@@ -72,4 +90,4 @@ $ specd archive list --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — archive semantics, archivable state
+- `core:archived-change-index-entry` — index row type surfaced in list outputs

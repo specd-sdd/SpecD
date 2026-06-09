@@ -23,6 +23,37 @@
 - **THEN** build or contract test fails
 - **AND** prevents silent UI breakage
 
+### Requirement: impact entries use reusable graph refs
+
+#### Scenario: Client deserializes impact symbol refs through reusable dto
+
+- **GIVEN** API JSON with impacted symbols
+- **WHEN** the client deserializes the response
+- **THEN** each symbol entry satisfies
+  [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md)
+- **AND** optional impact-specific fields such as `risk` remain additive
+
+#### Scenario: Client deserializes impact file refs through reusable dto
+
+- **GIVEN** API JSON with impacted files
+- **WHEN** the client deserializes the response
+- **THEN** each file entry satisfies [`client:dto-graph-file-ref`](../dto-graph-file-ref/spec.md)
+- **AND** optional impact-specific fields such as `risk` remain additive
+
+#### Scenario: Client preserves aggregate graph-impact metrics
+
+- **GIVEN** API JSON with top-level impact counts and `riskLevel`
+- **WHEN** the client deserializes the response
+- **THEN** those aggregate fields remain available without adapter rewriting
+- **AND** symbol entries preserve traversal `depth`
+
+#### Scenario: Client preserves affected spec ids and stable arrays
+
+- **GIVEN** API JSON with `specs` and `files`
+- **WHEN** the client deserializes the response
+- **THEN** `specs` remains a string array of canonical spec ids
+- **AND** `files` remains an array even when empty
+
 ### Requirement: types are shared or generated from API schemas
 
 #### Scenario: Types imported from shared package

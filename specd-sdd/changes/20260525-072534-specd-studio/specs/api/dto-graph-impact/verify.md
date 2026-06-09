@@ -43,23 +43,42 @@
 - **WHEN** presenter serializes twice
 - **THEN** both JSON bodies are byte-identical
 
-### Requirement: optional fields are omitted rather than null
+### Requirement: impact entries use reusable graph refs
 
-#### Scenario: Optional keys omitted when absent
+#### Scenario: Impact symbol entries match graph symbol ref shape
 
-- **WHEN** presenter serializes without optional values
-- **THEN** JSON omits those properties
-- **AND** keys are not `null` unless allowed
+- **WHEN** impact returns affected symbols
+- **THEN** each symbol entry satisfies [`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md)
+- **AND** optional `risk` MAY be added without replacing the reusable ref fields
 
-#### Scenario: Present optional values are included
+#### Scenario: Impact file entries match graph file ref shape
 
-- **GIVEN** kernel provides optional field
-- **WHEN** DTO is serialized
-- **THEN** property appears with correct type
-- **AND** OpenAPI documents optionality
+- **WHEN** impact returns affected files
+- **THEN** each file entry satisfies [`api:dto-graph-file-ref`](../dto-graph-file-ref/spec.md)
+- **AND** optional `risk` MAY be added without replacing the reusable ref fields
 
-#### Scenario: Client parser accepts omitted keys
+#### Scenario: Impact spec entries expose canonical spec ids
 
-- **WHEN** client reads JSON without optional field
-- **THEN** typed object treats field as undefined
-- **AND** UI guards optional access
+- **WHEN** impact returns affected specs
+- **THEN** each `specs[]` entry is a canonical `workspace:capability-path` id
+- **AND** the array is present even when no specs are affected
+
+#### Scenario: Impact symbol entries expose traversal depth
+
+- **WHEN** impact returns affected symbols
+- **THEN** each symbol entry includes `depth`
+- **AND** depth matches the underlying graph traversal distance
+
+### Requirement: impact response exposes aggregate blast-radius metrics
+
+#### Scenario: Impact response exposes aggregate analysis metrics
+
+- **WHEN** graph impact is serialized
+- **THEN** JSON includes `riskLevel`, dependency counts, affected file count, and `affectedProcesses`
+- **AND** clients can assess blast radius without recomputing aggregates
+
+#### Scenario: Impact response keeps stable arrays
+
+- **WHEN** presenter serializes graph impact without affected specs or files
+- **THEN** `specs` and `files` are still present as empty arrays
+- **AND** clients do not need optional guards for those collections

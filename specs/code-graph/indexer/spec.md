@@ -10,16 +10,17 @@ Source files change constantly and the code graph must be kept in sync without r
 
 `IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:
 
-1. **Discover** — walk the workspace to find source files
-2. **Diff** — compare content hashes with the store to identify new, changed, and deleted files
-3. **Extract** — run the appropriate language adapter on each new/changed file
-4. **Store** — upsert extracted data into the `GraphStore`
-5. **Clean** — remove deleted files from the store
-6. **Persist VCS ref** — if `IndexOptions.vcsRef` is provided, store it as the `lastIndexedRef` meta key after successful indexing
+1. **Discover** — walk the workspace roots AND project-global graph paths to find source files and documents
+2. **Diff** — compare content hashes (or spec hashes) with the store to identify new, changed, and deleted resources
+3. **Extract** — run the appropriate language adapter on code files, or index textual content as documents
+4. **Spec Indexing** — consume `SpecRepository` from each workspace to extract metadata, dependencies, and coverage links
+5. **Store** — upsert extracted data and relations into the `GraphStore`
+6. **Clean** — remove deleted resources from the store
+7. **Persist VCS ref** — store `lastIndexedRef` after success
 
 Extraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.
 
-The use case accepts a `GraphStore` (already opened) and an `AdapterRegistry` via constructor injection.
+The indexer SHALL directly consume `SpecRepository` methods (`list`, `metadata`, `artifact`, `readPersistedImplementation`, `specHash`) to build `SpecNode` and coverage relations. It MUST NOT parse raw sidecar files.
 
 ### Requirement: Incremental indexing
 
@@ -44,44 +45,63 @@ Changed files are removed from the store before bulk load, because CSV `COPY FRO
 
 To force a full re-index, callers MUST invoke the graph-store recreation path before `execute()`. This removes all stored data, causing every file to be treated as new.
 
+### Requirement: Discovery fingerprint uses effective config
+
+The graph fingerprint for an indexing run SHALL be computed from the effective discovery configuration actually used by the indexer, not only from the raw config declared in `specd.yaml`.
+
+The effective fingerprint inputs MUST include:
+
+- project-global `graph.includePaths`
+- global `graph.excludePaths`
+- each workspace's `allowedPaths`
+- each workspace's `excludePaths`
+- each workspace's `respectGitignore`
+- any synthetic exclusions derived from filesystem-backed repository `specsPath` roots
+
 ### Requirement: Multi-workspace file discovery
 
-The indexer SHALL discover files from each workspace's `codeRoot` independently. For each `WorkspaceIndexTarget`:
+The indexer SHALL discover files from two sources:
 
-1. Call `discoverFiles(codeRoot, hasAdapter, options)` to get paths relative to `codeRoot`
-2. Prefix each path with `{workspaceName}:` to form the globally unique `FileNode.path`
-3. Derive `FileNode.configRelativePath` from the directory containing the active `specd.yaml`
-4. Diff against the store (filtered by workspace prefix)
+**1. Workspace Discovery**
+For each `ProjectWorkspace` provided in options:
+
+- Resolve one effective exclusion set composed of global `graph.excludePaths`, repository-derived spec-root exclusions, and the workspace's `excludePaths`
+- Call `discoverFiles` on `codeRoot`, filtered by the workspace's `allowedPaths` (if configured)
+- Prefix each path with `{workspaceName}:`
+- Diff against the store filtered by workspace prefix
+
+**2. Project-Global Discovery**
+
+- Call `discoverFiles` on the project root using patterns from `graphConfig.includePaths`
+- Prefix each path with `root:` to form the globally unique identity
+- Resources discovered here are treated as project-global documents or scripts only when they are outside every configured workspace `codeRoot`
+
+Files matching a language adapter become `FileNode`. Files without an adapter but with textual content become `DocumentNode` under the same identity format.
+
+When a workspace repository exposes a filesystem-backed `specsPath`, the indexer SHALL derive a synthetic exclusion for that root and apply it to file/document discovery. Spec artifacts MUST be indexed through spec indexing only, not as files or documents.
+
+Textual fallback SHALL decode document content using this policy:
+
+- Detect and accept BOM-marked `utf-8`, `utf-16le`, and `utf-16be`
+- Otherwise try `utf-8`
+- Otherwise accept `utf-16le` or `utf-16be` when the byte pattern matches UTF-16 null-byte layout
+- Otherwise accept `windows-1252` only when the file does not contain NUL bytes
+- Otherwise skip the file as non-textual
 
 `discoverFiles` accepts a root directory plus optional exclusion options:
 
-- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically (git root → codeRoot → subdirectories during walk) and applied with absolute priority — no `excludePaths` pattern can re-include a file that `.gitignore` excludes. When `false`, `.gitignore` files are not loaded.
-- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer on top of `.gitignore` (or as the sole ruleset when `respectGitignore` is `false`). Supports `!` negation. When not provided, the following built-in defaults apply: When provided, the supplied list **replaces** the built-in defaults entirely — the built-in defaults are not merged.
-
-Evaluation order when `respectGitignore: true`:
-
-1. `.gitignore` rules (absolute priority — cannot be overridden)
-2. `excludePaths` rules (applied after; can negate each other but cannot un-ignore gitignored files)
-
-`discoverFiles` itself has no workspace knowledge — it accepts a root directory and:
-
-- Respects `.gitignore` rules hierarchically when `respectGitignore` is `true`
-- Applies `excludePaths` patterns (or built-in defaults) as an `ignore`-library instance
-- Skips symbolic links — only regular files are indexed
-- Skips files with no registered language adapter (determined by extension)
-- Returns root-relative file paths with forward-slash normalization
-
-`FileNode.configRelativePath` SHALL be forward-slash-normalized, omit a leading `./`, and remain relative to the active config directory even when the file lies outside that directory (using `..` segments when needed).
+- **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically and applied with absolute priority.
+- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer.
 
 ### Requirement: Two-pass extraction with in-memory index
 
 Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:
 
-- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, extract `ImportDeclaration` entries, and build `DEFINES` and `EXPORTS` relations. When an adapter provides `extractSymbolsWithNamespace()`, the indexer MAY use it to obtain symbols and namespace information from a single parse; otherwise it uses the adapter's separate extraction methods. Register symbols in the in-memory `SymbolIndex` (indexed by file path and by name). If the adapter provides namespace and qualified-name support, build the qualified name map for that language. No store queries are needed during extraction.
-- **Pass 2 (Resolve imports + scoped bindings + CALLS + CONSTRUCTS + USES_TYPE + hierarchy, all workspaces)** — For each file across all workspaces: resolve `ImportDeclaration` entries to symbol ids using the `SymbolIndex` (not the store). All import and package resolution is delegated to the adapter: relative imports via `adapter.resolveRelativeImportPath`, package imports via `adapter.resolvePackageFromSpecifier` (using the `packageName -> workspaceName` map built from `adapter.getPackageIdentity`), and qualified names via the namespace map (built using `adapter.buildQualifiedName`). For `ImportDeclaration` entries with `isRelative: false` whose specifier is not resolved via the qualified name map, and where the adapter implements `resolveQualifiedNameToPath`, the indexer SHALL call `adapter.resolveQualifiedNameToPath(specifier, codeRoot, repoRoot)` and, if a path is returned, emit a file-to-file `IMPORTS` relation. Build the import map, collect adapter binding facts and call facts, build the scoped binding environment, and then resolve `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for code-file analysis. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.
-- **Specs (per workspace)** — For each workspace: call the `specs()` callback to get discovered specs. Assign the workspace name to each spec.
-- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once with the files, symbols, specs, and relations accumulated for the run. Concrete backends MAY use native bulk import mechanisms internally, but the indexer remains coupled only to the abstract graph-store contract.
-- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()` so the active backend can bring its search indexes into a query-ready state when needed.
+- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, and build `DEFINES` and `EXPORTS` relations. No store queries are needed during extraction.
+- **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — Resolve cross-file and cross-workspace relations using the `SymbolIndex`. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.
+- **Specs (per workspace)** — For each workspace: iterate through specs provided by the `SpecRepository`.
+- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once.
+- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()`.
 
 This two-pass approach ensures all symbols exist in the index before import, binding, call, and hierarchy resolution, while avoiding store queries during analysis.
 
@@ -168,20 +188,22 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 
 ### Requirement: Spec dependency indexing
 
-The indexer SHALL build `SpecNode` entries with `DEPENDS_ON` relations. Specs are resolved via the workspace's `specs()` callback (backed by `SpecRepository`), NOT by reading the filesystem directly. For each spec provided by the repository:
+The indexer SHALL build `SpecNode` entries and relations by directly consuming the `SpecRepository` instance from each workspace:
 
-1. Load metadata via `SpecRepository.metadata()` — extract `title`, `description`, and `dependsOn`
-2. If metadata is absent (`null`), use defaults: `title` = specId, `description` = `''`, `dependsOn` = `[]`. There is no fallback parsing of `spec.md` — metadata should be regenerated via `spec generate-metadata` before indexing.
-3. Load `spec-lock.json` when present and treat it as the durable source for archived implementation traceability
-4. Compute a `contentHash` (SHA-256 of all artifacts in `spec.filenames`) — this includes `spec.md`, `verify.md`, and any other spec artifacts
-5. Create a `SpecNode` and upsert it into the store
-6. Create a `DEPENDS_ON` relation for each entry in `dependsOn`
-7. Create a `COVERS_FILE` relation for each archived file-level implementation entry from `spec-lock.json`
-8. Create a `COVERS_SYMBOL` relation for each archived symbol-level implementation entry from `spec-lock.json`, preserving any `stale` metadata required by the relation model
+1. Use `repo.count()` to discover the total spec volume upfront for accurate progress reporting
+2. Use `repo.list()` to enumerate spec identities
+3. For each spec, check `repo.specHash()` against the store to enable incremental skipping
+4. Load `title` and `description` via `repo.metadata()`
+5. Load `COVERS_FILE` and `COVERS_SYMBOL` relations via `repo.readPersistedImplementation()`
+6. Load `DEPENDS_ON` relations via `repo.readPersistedDependsOn()`
 
-Metadata changes alone do NOT trigger re-indexing — only changes to spec content artifacts (`spec.md`, `verify.md`, etc.) affect the `contentHash`. Metadata freshness is tracked independently by `@specd/core`.
+The indexer SHALL NOT rely on the CLI to pre-extract spec data. It owns the semantic mapping from repository data to graph nodes.
 
-Spec indexing runs as an additional phase after source file indexing (Phase 1 and Phase 2). It does not depend on source file data and could run in parallel, but sequencing after source indexing simplifies the implementation.
+Spec indexing runs as an additional phase after source file indexing.
+
+### Requirement: Prefer LLM-optimized description
+
+When indexing specs into the code graph, the indexer SHALL prefer `optimizedDescription` (if it exists and is not empty) over the standard `description` for BM25 full-text indexing and display metadata.
 
 ## Constraints
 
@@ -202,33 +224,18 @@ Spec indexing runs as an additional phase after source file indexing (Phase 1 an
 ## Examples
 
 ```typescript
-const store = new LadybugGraphStore({ storagePath: '/project' })
+const store = new SQLiteGraphStore({ storagePath: '/project' })
 await store.open()
 
 const registry = new AdapterRegistry()
 const indexer = new IndexCodeGraph(store, registry)
 
+// Workspaces are typically obtained via ListWorkspaces use case
 const result = await indexer.execute({
-  workspaces: [
-    { name: 'core', codeRoot: '/project/packages/core', specs: async () => [...] },
-    { name: 'cli', codeRoot: '/project/packages/cli', specs: async () => [...] },
-  ],
+  workspaces: orchestratedWorkspaces,
+  graphConfig: { includePaths: ['docs/**'] },
   projectRoot: '/project',
 })
-// result: {
-//   filesDiscovered: 150,
-//   filesIndexed: 12,
-//   filesRemoved: 2,
-//   filesSkipped: 136,
-//   specsDiscovered: 20,
-//   specsIndexed: 5,
-//   errors: [],
-//   duration: 340,
-//   workspaces: [
-//     { name: 'core', filesDiscovered: 100, filesIndexed: 8, filesSkipped: 90, filesRemoved: 2, specsDiscovered: 15, specsIndexed: 3 },
-//     { name: 'cli', filesDiscovered: 50, filesIndexed: 4, filesSkipped: 46, filesRemoved: 0, specsDiscovered: 5, specsIndexed: 2 },
-//   ],
-// }
 
 await store.close()
 ```
@@ -240,3 +247,6 @@ await store.close()
 - [`code-graph:symbol-model`](../symbol-model/spec.md) — files, symbols, specs, relations, and result types
 - [`code-graph:workspace-integration`](../workspace-integration/spec.md) — workspace-prefixed path and spec identity rules
 - [`core:config`](../../core/config/spec.md) — graph discovery config and config-derived graph/temp directories
+- [`core:spec-repository-port`](../../core/spec-repository-port/spec.md) — semantic spec repository contract consumed during spec indexing
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — orchestrated workspace and repository source for indexing
+- [`code-graph:document-model`](../document-model/spec.md) — document-node identity and textual fallback semantics

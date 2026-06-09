@@ -94,7 +94,12 @@ export interface OutlineSpecDraftInput {
 export interface GraphSearchInput {
   readonly q: string
   readonly workspace?: string
-  readonly kind?: string
+  readonly kinds?: readonly string[]
+  readonly filePattern?: string
+  readonly excludePaths?: readonly string[]
+  readonly excludeWorkspaces?: readonly string[]
+  readonly symbols?: boolean
+  readonly specs?: boolean
   readonly limit?: number
   readonly signal?: AbortSignal
 }
@@ -103,7 +108,9 @@ export interface GraphSearchInput {
 export interface GraphImpactInput {
   readonly symbol?: string
   readonly file?: string
-  readonly direction?: 'dependents' | 'dependencies'
+  readonly spec?: string
+  readonly direction?: 'dependents' | 'dependencies' | 'upstream' | 'downstream' | 'both'
+  readonly depth?: number
   readonly signal?: AbortSignal
 }
 

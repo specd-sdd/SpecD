@@ -10,6 +10,7 @@ import { apiHandler } from '../handler-utils.js'
 import { toChangeDetailDto } from '../presenters/presenter-change.js'
 import { toSaveArtifactContentDto } from '../presenters/presenter-artifact.js'
 import { type ValidateBatchResultDto } from '../dto/validate-batch-result.js'
+import { type UpdateImplementationTrackingResultDto } from '../dto/implementation-review.js'
 import {
   apiRouteSchema,
   NON_EMPTY_STRING_SCHEMA,
@@ -355,15 +356,15 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
     },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
-      const body = (req.body ?? {}) as {
-        specId?: string
+      const body = req.body as {
+        specId: string
         add?: string[]
         remove?: string[]
         set?: string[]
       }
       const result = await ctx.kernel.changes.updateSpecDeps.execute({
         name,
-        specId: body.specId!,
+        specId: body.specId,
         ...(body.add !== undefined ? { add: body.add } : {}),
         ...(body.remove !== undefined ? { remove: body.remove } : {}),
         ...(body.set !== undefined ? { set: body.set } : {}),
@@ -378,17 +379,25 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
       ...apiRouteSchema({
         params: PARAMS_CHANGE_NAME,
         body: 'UpdateImplementationTrackingBody',
-        response: { 200: 'JsonObjectDto' },
+        response: { 200: 'UpdateImplementationTrackingResultDto' },
       }),
     },
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
-      const body = req.body as Record<string, unknown>
+      const body = req.body as {
+        action: 'add' | 'remove' | 'ignore' | 'resolve'
+        file: string
+        specId?: string
+        symbols?: string[]
+      }
       const result = await ctx.kernel.changes.updateImplementationTracking.execute({
         name,
-        ...body,
-      } as Parameters<typeof ctx.kernel.changes.updateImplementationTracking.execute>[0])
-      return result
+        action: body.action,
+        file: body.file,
+        ...(body.specId !== undefined ? { specId: body.specId } : {}),
+        ...(body.symbols !== undefined ? { symbols: body.symbols } : {}),
+      })
+      return result satisfies UpdateImplementationTrackingResultDto
     }),
   )
 }

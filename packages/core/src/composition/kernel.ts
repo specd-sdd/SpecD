@@ -1,3 +1,5 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { CreateChange } from '../application/use-cases/create-change.js'
 import { GetStatus } from '../application/use-cases/get-status.js'
 import { TransitionChange } from '../application/use-cases/transition-change.js'
@@ -51,7 +53,10 @@ import { SaveChangeArtifact } from '../application/use-cases/save-change-artifac
 import { GetChangeArtifact } from '../application/use-cases/get-change-artifact.js'
 import { GetReadOnlyChangeArtifact } from '../application/use-cases/get-read-only-change-artifact.js'
 import { ReadLog } from '../application/use-cases/read-log.js'
-import { createArchiveWorkspaceImplementationConfig } from '../application/use-cases/archive-change.js'
+import { UpdateSpecMetadata } from '../application/use-cases/update-spec-metadata.js'
+import { UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
+import { GetProjectMetadata } from '../application/use-cases/get-project-metadata.js'
+import { ListWorkspaces } from '../application/use-cases/list-workspaces.js'
 import { buildSchema } from '../domain/services/build-schema.js'
 import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
@@ -186,6 +191,8 @@ export interface Kernel {
     validate: ValidateSpecs
     /** Generates deterministic metadata from schema-declared extraction rules. */
     generateMetadata: GenerateSpecMetadata
+    /** Updates metadata for a single spec. */
+    updateMetadata: UpdateSpecMetadata
     /** Builds structured context entries for a spec with optional dependency traversal. */
     getContext: GetSpecContext
   }
@@ -199,8 +206,14 @@ export interface Kernel {
     removePlugin: RemovePlugin
     /** Lists declared plugins from `specd.yaml`. */
     listPlugins: ListPlugins
+    /** Lists configured project workspaces. */
+    listWorkspaces: ListWorkspaces
     /** Compiles the project-level context block without a specific change or step. */
     getProjectContext: GetProjectContext
+    /** Reads deterministic project metadata, when present. */
+    getMetadata: GetProjectMetadata
+    /** Updates deterministic project metadata. */
+    updateMetadata: UpdateProjectMetadata
   }
   /** In-memory log readback when a {@link LogRingBuffer} was wired at bootstrap. */
   readonly logs?: {
@@ -298,9 +311,29 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
   const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
   const implementationDetector = new VcsImplementationDetector(config.projectRoot, i.vcs)
+  const listWorkspaces = new ListWorkspaces(config, i.specs)
+  const generateMetadata = new GenerateSpecMetadata(
+    listWorkspaces,
+    schemaProvider,
+    i.parsers,
+    i.hasher,
+    i.registry.extractorTransforms,
+    workspaceRoutes,
+  )
+  const saveMetadata = new SaveSpecMetadata(i.specs)
+  const updateSpecMetadata = new UpdateSpecMetadata(generateMetadata, saveMetadata)
+  const updateProjectMetadata = new UpdateProjectMetadata(
+    config,
+    listWorkspaces,
+    i.specs,
+    i.files,
+    i.fileWriter,
+    i.hasher,
+  )
+  const getProjectMetadata = new GetProjectMetadata(config, i.files)
   const validateArtifacts = new ValidateArtifacts(
     i.changes,
-    i.specs,
+    listWorkspaces,
     schemaProvider,
     i.parsers,
     i.actor,
@@ -315,7 +348,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     schemas: i.schemas,
     changes: {
       repo: i.changes,
-      create: new CreateChange(i.changes, i.specs, i.actor),
+      create: new CreateChange(i.changes, listWorkspaces, i.actor),
       status: new GetStatus(
         i.changes,
         schemaProvider,
@@ -326,7 +359,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         lifecycle,
       ),
       getArtifact: new GetChangeArtifact(i.changes),
-      getReadOnlyChangeArtifact: new GetReadOnlyChangeArtifact(i.changes),
+      getReadOnlyChangeArtifact: new GetReadOnlyChangeArtifact(i.changes, i.archive),
       saveArtifact: new SaveChangeArtifact(i.changes, schemaProvider, i.hasher),
       transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
       draft: new DraftChange(i.changes, i.actor),
@@ -334,31 +367,23 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       discard: new DiscardChange(i.changes, i.actor),
       archive: new ArchiveChange(
         i.changes,
-        i.specs,
+        listWorkspaces,
         i.archive,
         runStepHooks,
         i.actor,
         i.parsers,
         schemaProvider,
-        new GenerateSpecMetadata(
-          i.specs,
-          schemaProvider,
-          i.parsers,
-          i.hasher,
-          i.registry.extractorTransforms,
-          workspaceRoutes,
-        ),
-        new SaveSpecMetadata(i.specs),
+        generateMetadata,
+        saveMetadata,
         i.registry.extractorTransforms,
         workspaceRoutes,
         config.projectRoot,
-        createArchiveWorkspaceImplementationConfig(config.workspaces),
       ),
       validate: validateArtifacts,
       validateBatch: new ValidateChangeBatch(i.changes, schemaProvider, validateArtifacts),
       compile: new CompileContext(
         i.changes,
-        i.specs,
+        listWorkspaces,
         schemaProvider,
         i.files,
         i.parsers,
@@ -373,7 +398,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       getDraft: new GetDraft(i.changes),
       listDiscarded: new ListDiscarded(i.changes),
       getDiscarded: new GetDiscarded(i.changes),
-      edit: new EditChange(i.changes, i.specs, i.actor, schemaProvider),
+      edit: new EditChange(i.changes, listWorkspaces, i.actor, schemaProvider),
       invalidate: new InvalidateChange(i.changes, i.actor, schemaProvider),
       skipArtifact: new SkipArtifact(i.changes, i.actor),
       updateSpecDeps: new UpdateSpecDeps(i.changes),
@@ -408,32 +433,27 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       repos: i.specs,
       approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher),
       approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher),
-      list: new ListSpecs(i.specs, i.hasher, i.yaml),
-      search: new SearchSpecs(i.specs, i.hasher, i.yaml),
+      list: new ListSpecs(listWorkspaces, i.hasher, i.yaml),
+      search: new SearchSpecs(listWorkspaces, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
       getOutline: new GetSpecOutline(i.specs, schemaProvider, i.parsers),
-      saveMetadata: new SaveSpecMetadata(i.specs),
+      saveMetadata,
       invalidateMetadata: new InvalidateSpecMetadata(i.specs),
-      getActiveSchema: new GetActiveSchema(resolveSchema, i.schemas, buildSchema, i.schemaRef),
-      validateSchema: new ValidateSchema(i.schemas, i.schemaRef, buildSchema, resolveSchema),
+      getActiveSchema: new GetActiveSchema(resolveSchema, i.schemas, buildSchema, config.schemaRef),
+      validateSchema: new ValidateSchema(i.schemas, config.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
-      generateMetadata: new GenerateSpecMetadata(
-        i.specs,
-        schemaProvider,
-        i.parsers,
-        i.hasher,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-      ),
-      getContext: new GetSpecContext(i.specs, i.hasher),
+      generateMetadata,
+      updateMetadata: updateSpecMetadata,
+      getContext: new GetSpecContext(listWorkspaces, i.hasher),
     },
     project: {
       init: new InitProject(i.configWriter),
       addPlugin: new AddPlugin(i.configWriter),
       removePlugin: new RemovePlugin(i.configWriter),
       listPlugins: new ListPlugins(i.configWriter),
+      listWorkspaces,
       getProjectContext: new GetProjectContext(
-        i.specs,
+        listWorkspaces,
         schemaProvider,
         i.files,
         i.parsers,
@@ -441,11 +461,11 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.registry.extractorTransforms,
         workspaceRoutes,
       ),
+      getMetadata: getProjectMetadata,
+      updateMetadata: updateProjectMetadata,
     },
     ...(options?.logRing !== undefined
       ? { logs: { read: new ReadLog(options.logRing, logFormatter) } }
       : {}),
   }
 }
-import fs from 'node:fs/promises'
-import path from 'node:path'

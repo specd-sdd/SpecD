@@ -28,9 +28,9 @@ When `refreshImplementation=true`, the handler MUST run implementation refresh b
 
 ### Requirement: artifact list and body routes use dedicated core use cases
 
-`GET /changes/{name}/artifacts` lists tracked filenames and aggregate states from the active change. `GET /changes/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetChangeArtifact`, not direct repository access.
+`GET /changes/{name}/artifacts` lists tracked filenames and aggregate states from the active change. Each artifact row MUST preserve task-capability metadata (`hasTasks`) and MAY include `totalTasks` / `completedTasks` for that artifact type. `GET /changes/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetChangeArtifact`, not direct repository access.
 
-`GET /drafts/{name}/artifacts` and `GET /discarded/{name}/artifacts` MUST list metadata from `DraftedChangeView` / `DiscardedChangeView` without inline bodies. `GET /drafts/{name}/artifacts/{filename}` and `GET /discarded/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetReadOnlyChangeArtifact` with `readOnlyOrigin` `draft` or `discarded`, not `GetChangeArtifact` and not direct `ChangeRepository` calls.
+`GET /drafts/{name}/artifacts` and `GET /discarded/{name}/artifacts` MUST list metadata from `DraftedChangeView` / `DiscardedChangeView` without inline bodies. These read-only list routes MUST preserve the same task-capability metadata so Studio can resolve task tabs without assuming `tasks.md`. `GET /drafts/{name}/artifacts/{filename}` and `GET /discarded/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetReadOnlyChangeArtifact` with `readOnlyOrigin` `draft` or `discarded`, not `GetChangeArtifact` and not direct `ChangeRepository` calls.
 
 ### Requirement: context preview and instruction routes delegate to kernel
 

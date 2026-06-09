@@ -54,7 +54,7 @@ export class InvalidateSpecMetadata {
     }
 
     const existing = await repo.metadata(spec)
-    if (existing === null) {
+    if (existing === null || typeof existing !== 'object' || Array.isArray(existing)) {
       return null
     }
 

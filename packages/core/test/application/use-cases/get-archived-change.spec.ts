@@ -1,20 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { GetArchivedChange } from '../../../src/application/use-cases/get-archived-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
-import { ArchivedChange } from '../../../src/domain/entities/archived-change.js'
-import { type ArchiveRepository } from '../../../src/application/ports/archive-repository.js'
-
-function makeArchivedChange(name: string): ArchivedChange {
-  return new ArchivedChange({
-    name,
-    archivedName: name,
-    archivedAt: new Date('2024-01-01T00:00:00Z'),
-    artifacts: ['spec'],
-    specIds: ['auth/login'],
-    schemaName: 'test-schema',
-    schemaVersion: 1,
-  })
-}
+import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
+import {
+  type ArchivePathEntry,
+  type ArchiveRepository,
+} from '../../../src/application/ports/archive-repository.js'
+import { makeArchivedChange } from './helpers.js'
 
 function makeArchiveRepository(changes: ArchivedChange[] = []): ArchiveRepository {
   return {
@@ -22,7 +14,7 @@ function makeArchiveRepository(changes: ArchivedChange[] = []): ArchiveRepositor
     ownership: () => 'owned' as const,
     isExternal: () => false,
     async list() {
-      return changes
+      return []
     },
     async get(name: string) {
       return changes.find((c) => c.name === name) ?? null
@@ -32,6 +24,9 @@ function makeArchiveRepository(changes: ArchivedChange[] = []): ArchiveRepositor
     },
     async reindex() {
       throw new Error('not implemented')
+    },
+    archivePath(entry: ArchivePathEntry) {
+      return `/test/archive/${entry.archivedName}`
     },
   } as unknown as ArchiveRepository
 }
@@ -45,6 +40,7 @@ describe('GetArchivedChange', () => {
     const result = await uc.execute({ name: 'my-change' })
 
     expect(result.name).toBe('my-change')
+    expect(result.state).toBe('archivable')
   })
 
   it('throws ChangeNotFoundError when not found', async () => {

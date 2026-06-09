@@ -38,7 +38,7 @@ There is no restore from discarded; there MUST NOT be `POST /discarded/{name}/re
 
 `PATCH /changes/{name}/spec-dependencies` MUST accept `{ specId, add?, remove?, set? }`, delegate to `kernel.changes.updateSpecDeps`, and return `{ specId, dependsOn }` (Studio refetches detail after save).
 
-`PATCH /changes/{name}/implementation-tracking` MUST implement `updateImplementationTracking` per kernel.
+`PATCH /changes/{name}/implementation-tracking` MUST accept `{ action, file, specId?, symbols? }`, delegate to `kernel.changes.updateImplementationTracking`, and return `{ implementationTracking }` with tracked files and confirmed links.
 
 ### Requirement: mutating routes pass request actor into kernel
 

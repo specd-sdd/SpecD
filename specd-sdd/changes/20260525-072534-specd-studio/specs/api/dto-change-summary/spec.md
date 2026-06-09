@@ -14,7 +14,7 @@ The **Dto Change Summary** wire shape MUST use camelCase property names stable a
 
 The type MUST include at least:
 
-- `name`, description snippet, derived state, `updatedAt`, blocker count
+- `name`, `description`, `specIds`, derived state, `updatedAt`, blocker count
 
 ### Requirement: presenters map domain results without embedding rules
 

@@ -1,35 +1,21 @@
-# Verification: Spec Tab Metadata
+# Verification: Spec Metadata Presentation
 
 ## Requirements
 
-### Requirement: spec tab polls metadata while visible
+### Requirement: overview owns spec metadata presentation
 
-#### Scenario: Visible spec tab refreshes metadata
+#### Scenario: Metadata tab is not offered
 
-- **GIVEN** spec tab for `core:kernel` is active
-- **WHEN** light poll interval elapses
-- **THEN** spec metadata hook refetches
-- **AND** tree discovery still uses global poll
+- **WHEN** user opens a spec in Studio
+- **THEN** the center tab strip does not include a **Metadata** tab
+- **AND** metadata remains available through Overview presentation
 
-#### Scenario: Hidden spec tab stops metadata poll
+#### Scenario: Overview carries the metadata summary
 
-- **GIVEN** user switches away from spec tab
-- **WHEN** poll would have fired
-- **THEN** no metadata request is sent
-- **AND** last data remains rendered
-
-#### Scenario: New spec appears via workspace tree poll
-
-- **GIVEN** agent adds a spec file on disk
-- **WHEN** global workspace poll runs
-- **THEN** tree shows new node
-- **AND** spec tab poll does not scan filesystem directly
-
-#### Scenario: Metadata tab renders SpecDetailDto fields
-
-- **WHEN** user selects Metadata tab
-- **THEN** UI shows specId, workspace, path, title, and description
-- **AND** data came from `getSpec`
+- **GIVEN** a loaded spec with title and description
+- **WHEN** user views Overview
+- **THEN** the main spec metadata is visible there
+- **AND** Studio does not require a separate spec header bar for that summary
 
 ### Requirement: view uses SpecdDataPort hooks only
 

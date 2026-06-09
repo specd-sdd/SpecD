@@ -23,6 +23,12 @@
 - **THEN** `searchSpecs` includes workspace param
 - **AND** results limited to scope
 
+#### Scenario: Spec hook preserves structured context payload
+
+- **WHEN** spec detail hook requests context for the selected spec
+- **THEN** it calls `getSpecContext`
+- **AND** the returned `entries[]` and `warnings[]` remain available to the view without markdown flattening
+
 ### Requirement: workspace tree refreshes on global poll
 
 #### Scenario: Tree refetches on global poll tick

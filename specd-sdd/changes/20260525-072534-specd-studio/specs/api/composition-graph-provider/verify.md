@@ -24,6 +24,14 @@
 - **THEN** new provider instance uses updated paths
 - **AND** old in-memory graph is not reused
 
+### Requirement: indexing preparation follows the merged project-assembly model
+
+#### Scenario: API graph indexing assembles project-level input before provider call
+
+- **WHEN** API prepares a graph index request
+- **THEN** it combines `ListWorkspaces` output with effective graph config
+- **AND** the provider receives one project-level index input instead of legacy per-workspace targets
+
 ### Requirement: stale state is observable
 
 #### Scenario: Stale flag true when index older than sources

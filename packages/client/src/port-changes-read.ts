@@ -22,6 +22,9 @@ export type ReadOnlyChangeOrigin = 'draft' | 'discarded' | 'archived'
 export interface ChangeArtifactListItemDto {
   readonly filename: string
   readonly artifactType: string
+  readonly hasTasks: boolean
+  readonly totalTasks?: number
+  readonly completedTasks?: number
   readonly state?: string
 }
 

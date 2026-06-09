@@ -29,6 +29,10 @@ For `/changes/{name}/artifacts/{filename}`, `GET` MUST call `GetChangeArtifact` 
 
 Successful responses MUST be produced by the matching `api:presenter-*` module and conform to the corresponding `api:dto-*` spec.
 
+For canonical spec context reads, the handler MUST return the structured `GetSpecContext` result shape as JSON and MUST NOT pretend it is compiled markdown content.
+
+For the default Studio spec-context view, the handler MUST call `GetSpecContext` in full structured mode with section extraction enabled so the UI receives more than title/description when metadata includes richer sections.
+
 ### Requirement: failures map to RFC 7807 problem+json
 
 Thrown kernel errors and validation failures MUST be converted through `api:problem-json` to `application/problem+json` responses with appropriate HTTP status codes.

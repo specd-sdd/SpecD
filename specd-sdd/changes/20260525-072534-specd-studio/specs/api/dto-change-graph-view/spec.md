@@ -20,7 +20,9 @@ The **Dto Change Graph View** wire shape MUST use camelCase property names stabl
 
 - `changeName` — change name
 - `specIds` — spec IDs in change scope (ordered list)
-- `specs` — array of `{ specId, coveredFiles, coveredSymbols }` where file and symbol entries are graph target strings from the code graph provider
+- `specs` — array of `{ specId, coveredFiles, coveredSymbols }` where:
+  - `coveredFiles[]` use [`api:dto-graph-file-ref`](../dto-graph-file-ref/spec.md)
+  - `coveredSymbols[]` use [`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md)
 
 The response MUST NOT use a `links` property; clients and OpenAPI MUST use `specs` for per-spec coverage rows.
 
@@ -40,3 +42,5 @@ Optional properties MUST be omitted from JSON when absent unless the OpenAPI sch
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+- [`api:dto-graph-file-ref`](../dto-graph-file-ref/spec.md) — reusable graph file reference
+- [`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) — reusable graph symbol reference

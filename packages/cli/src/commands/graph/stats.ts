@@ -3,10 +3,10 @@ import { createVcsAdapter } from '@specd/core'
 import { parseFingerprintMap, detectFingerprintMismatch } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
+import { buildProjectGraphConfig } from './build-project-graph-config.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { assertGraphIndexUnlocked } from './graph-index-lock.js'
-import { buildWorkspaceTargets } from './build-workspace-targets.js'
 import { codeGraphVersion } from './code-graph-version.js'
 
 /**
@@ -27,6 +27,7 @@ export function registerGraphStats(parent: Command): void {
 JSON/TOON output schema:
   {
     fileCount: number
+    documentCount: number
     symbolCount: number
     specCount: number
     relationCounts: Record<RelationType, number>
@@ -71,9 +72,17 @@ JSON/TOON output schema:
         let fingerprintMismatch: boolean | null = null
         if (kernel !== null && stats.graphFingerprint !== null) {
           try {
-            const workspaces = await buildWorkspaceTargets(config, kernel)
+            const workspaces = await kernel.project.listWorkspaces.execute()
             const storedMap = parseFingerprintMap(stats.graphFingerprint)
-            fingerprintMismatch = detectFingerprintMismatch(storedMap, codeGraphVersion, workspaces)
+            const graphConfig = buildProjectGraphConfig(config)
+
+            fingerprintMismatch = detectFingerprintMismatch(
+              storedMap,
+              codeGraphVersion,
+              config.projectRoot,
+              workspaces,
+              graphConfig,
+            )
           } catch {
             fingerprintMismatch = null
           }
@@ -82,6 +91,7 @@ JSON/TOON output schema:
         if (fmt === 'text') {
           const lines = [
             `Files:     ${String(stats.fileCount)}`,
+            `Documents: ${String(stats.documentCount)}`,
             `Symbols:   ${String(stats.symbolCount)}`,
             `Specs:     ${String(stats.specCount)}`,
             `Languages: ${stats.languages.join(', ') || 'none'}`,

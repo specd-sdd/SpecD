@@ -18,12 +18,23 @@ describe('Specs API', () => {
 
   it('given a known spec, when GET /workspaces/:ws/specs/:path, then returns spec detail', async () => {
     const { workspace, specPath } = await loadProjectSamples()
-    const { res, data } = await apiJson<{ specId: string; path: string; title: string }>(
+    const { res, data } = await apiJson<{
+      specId: string
+      path: string
+      title: string
+      linkedChanges?: Array<{ name: string; state: string; description?: string }>
+    }>(
       `/workspaces/${workspace}/specs/${specPath}`,
     )
     expect(res.ok).toBe(true)
     expect(data.specId).toBe(`${workspace}:${specPath}`)
     expect(data.title.length).toBeGreaterThan(0)
+    expect(Array.isArray(data.linkedChanges ?? [])).toBe(true)
+    expect(
+      (data.linkedChanges ?? []).every(
+        (entry) => typeof entry.name === 'string' && typeof entry.state === 'string',
+      ),
+    ).toBe(true)
   })
 
   it('given a known spec, when GET .../outline, then returns outline', async () => {
@@ -35,13 +46,42 @@ describe('Specs API', () => {
     expect(data).toBeDefined()
   })
 
-  it('given a known spec, when GET .../context, then returns context entries', async () => {
+  it('given a known spec, when POST .../outline with draft body, then returns outline', async () => {
     const { workspace, specPath } = await loadProjectSamples()
-    const { res, data } = await apiJson<{ entries: unknown[]; warnings: string[] }>(
+    const { res, data } = await apiJson<Record<string, unknown> | Array<Record<string, unknown>>>(
+      `/workspaces/${workspace}/specs/${specPath}/outline`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ filename: 'spec.md', content: '# Draft\n' }),
+      },
+    )
+    expect(res.ok).toBe(true)
+    expect(data).toBeDefined()
+  })
+
+  it('given a known spec, when GET .../context, then returns structured context entries', async () => {
+    const { workspace, specPath } = await loadProjectSamples()
+    const { res, data } = await apiJson<{
+      entries: Array<{
+        spec: string
+        source: 'root' | 'dependency'
+        mode: 'list' | 'summary' | 'full'
+        description?: string
+        rules?: unknown[]
+        constraints?: string[]
+        scenarios?: unknown[]
+      }>
+      warnings: Array<{ type: string; message: string }>
+    }>(
       `/workspaces/${workspace}/specs/${specPath}/context`,
     )
     expect(res.ok).toBe(true)
     expect(Array.isArray(data.entries)).toBe(true)
+    expect(data.entries[0]?.spec).toBe(`${workspace}:${specPath}`)
+    expect(data.entries[0]?.source).toBe('root')
+    expect(data.entries[0]?.mode).toBe('full')
+    expect(data.entries[0]?.description ?? data.entries[0]?.rules ?? data.entries[0]?.constraints).toBeDefined()
     expect(Array.isArray(data.warnings)).toBe(true)
   })
 

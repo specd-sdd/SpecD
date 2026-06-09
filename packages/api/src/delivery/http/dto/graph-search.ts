@@ -1,18 +1,16 @@
+import type { GraphSymbolRefDto } from './graph-symbol-ref.js'
+
 /**
  *
  */
 export interface GraphSearchResultDto {
   readonly symbols: readonly {
     readonly workspace: string
-    readonly symbol: {
-      readonly id: string
-      readonly name: string
-      readonly kind: string
-      readonly filePath: string
-      readonly line: number
-      readonly column: number
-    }
+    readonly symbol: GraphSymbolRefDto
     readonly score: number
+    readonly snippet: string
+    readonly startLine: number
+    readonly endLine: number
   }[]
   readonly specs: readonly {
     readonly workspace: string
@@ -21,5 +19,8 @@ export interface GraphSearchResultDto {
     readonly title: string
     readonly description: string
     readonly score: number
+    readonly snippet: string
+    readonly startLine: number
+    readonly endLine: number
   }[]
 }

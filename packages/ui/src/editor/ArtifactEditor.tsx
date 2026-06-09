@@ -68,6 +68,8 @@ export function ArtifactEditor({
               scrollBeyondLastLine: false,
               padding: { top: 8 },
               find: { addExtraSpaceOnTop: false },
+              wordWrap: 'on',
+              wrappingStrategy: 'advanced',              
             }}
           />
         </React.Suspense>

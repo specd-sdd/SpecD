@@ -17,6 +17,8 @@ The type MUST include at least:
 - `updatedAt: string` (ISO 8601) — revision clock from manifest
 - `unchanged?: boolean` when conditional poll matches `ifModifiedSince`
 - artifact DAG, blockers, `nextAction`, task completion, implementation projection
+- `totalTasks?: number` and `completedTasks?: number` as change-level aggregate counters summed across all task-capable artifacts
+- per-artifact `hasTasks: boolean` plus optional `totalTasks` / `completedTasks` when that artifact type is task-capable
 
 ### Requirement: presenters map domain results without embedding rules
 

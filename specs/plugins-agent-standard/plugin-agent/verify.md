@@ -32,26 +32,26 @@
 
 ### Requirement: Frontmatter type contract
 
-#### Scenario: Frontmatter model enforces supported field set
+#### Scenario: Frontmatter value model enforces supported field set
 
-- **WHEN** frontmatter is generated for an installed `SKILL.md`
+- **WHEN** frontmatter values are generated for an installed `SKILL.md`
 - **THEN** required fields `name` and `description` are present
-- **AND** optional fields `license`, `compatibility`, `metadata`, and `allowed-tools` are emitted only when configured
-- **AND** unknown fields are not emitted
+- **AND** optional fields `license`, `compatibility`, `metadata`, and `allowed-tools` are represented only when configured
+- **AND** unknown fields are not represented
 
 #### Scenario: allowed-tools uses hyphen not underscore
 
-- **WHEN** frontmatter is generated with pre-approved tools configured
-- **THEN** the emitted key is `allowed-tools` (with hyphen)
+- **WHEN** frontmatter values are generated with pre-approved tools configured
+- **THEN** the represented key is `allowed-tools`
 - **AND** the value is a space-separated string per the agentskills.io specification
 
 ### Requirement: Frontmatter injection
 
-#### Scenario: Install prepends only Agent Skills standard fields
+#### Scenario: Install passes Agent Skills capability identifiers and frontmatter source values
 
 - **WHEN** skill markdown files are written during install
-- **THEN** YAML frontmatter is prepended before markdown content
-- **AND** emitted fields are limited to the Agent Skills standard-supported keys
+- **THEN** the plugin supplies Agent Skills capability identifiers and structured frontmatter values to `@specd/skills`
+- **AND** the rendered markdown includes only the Agent Skills standard-supported fields
 
 #### Scenario: Shared files do not receive skill frontmatter
 
@@ -61,17 +61,17 @@
 
 ### Requirement: Install location
 
-#### Scenario: Skills install into agents directory
+#### Scenario: Skills install into agents directory and sharedFolder default
 
 - **GIVEN** a `SpecdConfig` with `projectRoot`
 - **WHEN** install writes skill files
 - **THEN** non-shared files are created under `.agents/skills/<skill-name>/`
-- **AND** shared files are created under `.agents/skills/_specd-shared/`
+- **AND** shared files are created under the resolved `sharedFolder` location under the project root
 
 #### Scenario: Shared directory is not discovered as a skill
 
-- **WHEN** install creates `.agents/skills/_specd-shared/`
-- **THEN** the directory does not contain a `SKILL.md` file
+- **WHEN** install writes shared files to the resolved shared location
+- **THEN** that location does not contain a `SKILL.md` file
 
 ### Requirement: allowed-tools configuration
 
@@ -102,14 +102,14 @@
 - **GIVEN** a `SpecdConfig` and multiple skills installed under `.agents/skills/`
 - **WHEN** `uninstall(config, { skills: ['specd-design'] })` is executed
 - **THEN** only the selected specd-managed skill directories are removed
-- **AND** `.agents/skills/_specd-shared/` remains when other installed skills may still reference it
+- **AND** the resolved shared location remains when other installed skills may still reference it
 
 #### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
 
 - **GIVEN** a `SpecdConfig` with specd-managed skills and unrelated user skills installed under `.agents/skills/`
 - **WHEN** `uninstall(config, optionsWithoutSkills)` is executed
 - **THEN** all specd-managed skill directories are removed
-- **AND** `.agents/skills/_specd-shared/` is removed
+- **AND** the resolved sharedFolder location is removed
 - **AND** unrelated user skill directories remain
 
 ### Requirement: Application layer
@@ -118,5 +118,17 @@
 
 - **GIVEN** skills are available from `@specd/skills`
 - **WHEN** `InstallSkills` runs
-- **THEN** it reads skill templates, resolves per-skill frontmatter, prepends Agent Skills standard YAML frontmatter only to skill-local markdown files, and writes installed skill files
-- **AND** shared-marked files are written under the Agent Skills standard shared skills resource directory
+- **THEN** it reads skill templates, resolves capability identifiers and frontmatter source values, and passes them into `@specd/skills`
+- **AND** shared-marked files are written to the rendered sharedFolder location under the project root
+- **AND** it resolves install bundles through `ResolveBundle`
+
+#### Scenario: Agent Skills standard application layer does not prepend YAML after resolution
+
+- **WHEN** the Agent Skills standard install flow is reviewed
+- **THEN** the plugin does not assemble a final YAML frontmatter block after bundle resolution
+
+#### Scenario: Standard-agent install does not call repository bundle resolution directly
+
+- **WHEN** the Agent Skills standard install flow is reviewed
+- **THEN** bundle resolution goes through `ResolveBundle`
+- **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`

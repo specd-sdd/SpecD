@@ -39,6 +39,12 @@
 - **THEN** config discovery is ignored
 - **AND** the command searches a synthetic single workspace `default` rooted at `/tmp/repo`
 
+#### Scenario: Search supports document filter
+
+- **WHEN** `specd graph search "ADR" --documents` is run
+- **THEN** the command successfully executes
+- **AND** it passes the document category filter to the graph provider
+
 ### Requirement: Search behaviour
 
 #### Scenario: Results ranked by relevance
@@ -79,7 +85,7 @@
 
 #### Scenario: Invalid kind token fails before query execution
 
-- **WHEN** `specd graph search \"transition\" --kind method,unknownKind` is run
+- **WHEN** `specd graph search \"transition\" --kind method,unknownKind\"` is run
 - **THEN** the command exits with code 1
 - **AND** the search query is not executed
 
@@ -89,6 +95,39 @@
 - **WHEN** `specd graph search \"kernel\"` is run
 - **THEN** the command exits with code 3 before opening the provider
 - **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+
+#### Scenario: Search delegates document queries to the provider
+
+- **WHEN** `specd graph search \"Change\" --documents` is run
+- **THEN** the command delegates to `CodeGraphProvider.searchDocuments`
+- **AND** it does not implement document ranking or matching logic in the CLI
+
+#### Scenario: Symbol hit from comment still uses code snippet preview
+
+- **GIVEN** a symbol is returned because its attached comment matches the query
+- **WHEN** `specd graph search` renders the symbol result
+- **THEN** the preview is derived from source-file content around the symbol location
+- **AND** the preview is not limited to a truncated comment excerpt
+
+#### Scenario: Spec preview comes from body content when body content drives the hit
+
+- **GIVEN** a spec result matches because of text in spec body content rather than only in the description
+- **WHEN** `specd graph search` renders the spec result
+- **THEN** the preview is derived from matched spec body content
+- **AND** the preview is not forced to the description field
+
+#### Scenario: Document preview is centered on the best textual match
+
+- **GIVEN** a document contains the best match far from the start of the file
+- **WHEN** `specd graph search` renders the document result
+- **THEN** the preview is centered around the matched text
+- **AND** it is not rendered from the beginning of the file unless the beginning contains the best match
+
+#### Scenario: Search results include 1-based line range metadata
+
+- **WHEN** a search result is returned in `json` or `toon` mode
+- **THEN** the entry includes `startLine` and `endLine` fields
+- **AND** the values represent the 1-based line range of the snippet in the source content
 
 ### Requirement: Error cases
 
@@ -102,32 +141,76 @@
 #### Scenario: Text output groups by category
 
 - **WHEN** results include both symbols and specs in text mode
-- **THEN** symbols are listed under `Symbols (N):` header
-- **AND** specs are listed under `Specs (N):` header
-- **AND** each line shows score, identity, and preview
+- **THEN** symbols are listed under a category header
+- **AND** specs are listed under a category header
+- **AND** each result renders identity separately from snippet content
 
-#### Scenario: JSON output includes workspace and scores
+#### Scenario: Category headers show explicit limits in text mode
 
-- **WHEN** `specd graph search "hook" --format json` is run
-- **THEN** output is `{"symbols":[...],"specs":[...]}`
+- **WHEN** `specd graph search \"hook\" --limit 5` is run in text mode
+- **THEN** the `Symbols` header matches `Symbols (N shown, limit 5):`
+- **AND** the `Specs` header matches `Specs (M shown, limit 5):`
+
+#### Scenario: JSON output includes workspace and scores but excludes full content
+
+- **WHEN** `specd graph search \"hook\" --format json` is run
+- **THEN** output is `{\"symbols\":[...],\"specs\":[...],\"documents\":[...]}`
 - **AND** each entry includes a `workspace` field and a `score` field
+- **AND** each entry includes a `snippet` field
+- **AND** each entry includes `startLine` and `endLine` fields
 - **AND** spec entries include `specId`, `path`, `title`, `description` but NOT `content`
+- **AND** document entries include `path`, `configRelativePath` but NOT `content`
 
-#### Scenario: JSON with --spec-content includes full content
+#### Scenario: JSON with --spec-content includes full spec content
 
-- **WHEN** `specd graph search "hook" --format json --spec-content` is run
+- **WHEN** `specd graph search \"hook\" --format json --spec-content` is run
 - **THEN** spec entries include a `content` field with the full spec text
+- **AND** spec entries still include a `snippet` field
 
 #### Scenario: --spec-content with text format fails
 
-- **WHEN** `specd graph search "hook" --spec-content` is run (text format)
+- **WHEN** `specd graph search \"hook\" --spec-content` is run (text format)
 - **THEN** the command exits with code 1
 - **AND** an error message explains that `--spec-content` requires `--format json` or `--format toon`
 
 #### Scenario: Text output shows workspace in brackets
 
 - **WHEN** results are displayed in text mode
-- **THEN** each line shows `[workspace]` before the symbol or spec identity
+- **THEN** each result shows `[workspace]` before the identity
+
+#### Scenario: Text output groups document results separately
+
+- **GIVEN** document search returns one or more matching documents
+- **WHEN** `specd graph search \"Change\"` is run in text mode
+- **THEN** stdout contains a `Documents (` section
+- **AND** each document result shows the owning workspace, canonical path, and a fenced snippet block
+
+#### Scenario: Structured output includes documents array
+
+- **GIVEN** document search returns one or more matching documents
+- **WHEN** `specd graph search \"Change\" --format json` is run
+- **THEN** stdout is valid JSON containing `symbols`, `specs`, and `documents`
+
+#### Scenario: Text-mode symbol snippet uses normalized indentation
+
+- **GIVEN** a symbol preview is cut from indented source code
+- **WHEN** the result is rendered in text mode
+- **THEN** tabs in the snippet are expanded to spaces using tab width 2 before indentation normalization
+- **AND** the smallest common leading indentation across non-blank lines is removed
+- **AND** the rendered snippet preserves the relative indentation of the code
+
+#### Scenario: Text-mode snippet block uses line range header and custom markers
+
+- **WHEN** any symbol, spec, or document preview is rendered in text mode
+- **THEN** the snippet is preceded by a header matching `snippet @ L<start>-L<end>:`
+- **AND** the snippet is wrapped in `>>>` and `<<<` markers
+- **AND** no triple-backtick fences are used for the block
+
+#### Scenario: Exact identity hit does not require raw boosted score as primary cue
+
+- **GIVEN** a result is ranked first because of an exact identity boost
+- **WHEN** the result is rendered in text mode
+- **THEN** text rendering does not rely on the raw boosted score magnitude as the primary readability cue for that result
 
 ### Requirement: Command signature (filters)
 

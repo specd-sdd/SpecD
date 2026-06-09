@@ -2,7 +2,6 @@ import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
-import { type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as SpecRepositoryConfig }
@@ -25,8 +24,15 @@ export interface SpecSearchResult {
 export interface SpecPublication {
   /** Final artifact files that should become canonical for the spec. */
   readonly artifacts: readonly SpecArtifact[]
-  /** Optional final `spec-lock.json` content staged with the canonical spec publication. */
-  readonly specLock?: SpecLockData
+  /** Optional final persisted schema identity staged with the publication. */
+  readonly persistedSchema?: { name: string; version: number }
+  /** Optional final persisted dependencies staged with the publication. */
+  readonly persistedDependsOn?: readonly string[]
+  /** Optional final persisted implementation links staged with the publication. */
+  readonly persistedImplementation?: readonly {
+    readonly file: string
+    readonly symbols?: readonly string[]
+  }[]
 }
 
 /**
@@ -54,6 +60,17 @@ export abstract class SpecRepository extends Repository {
   }
 
   /**
+   * Returns the canonical specs root path for filesystem-backed repositories.
+   *
+   * Non-filesystem-backed repositories return `undefined`.
+   *
+   * @returns Absolute specs root path when available.
+   */
+  get specsPath(): string | undefined {
+    return undefined
+  }
+
+  /**
    * Returns the spec metadata for the given name, or `null` if not found.
    *
    * @param name - The spec identity path within this workspace (e.g. `auth/oauth`)
@@ -70,6 +87,16 @@ export abstract class SpecRepository extends Repository {
    * @returns All matching specs, in repository order
    */
   abstract list(prefix?: SpecPath): Promise<Spec[]>
+
+  /**
+   * Returns the total number of specs in this workspace.
+   *
+   * This provides an efficient way to discover workspace size without loading
+   * all lightweight metadata into memory.
+   *
+   * @returns The total spec count
+   */
+  abstract count(): Promise<number>
 
   /**
    * Loads the content of a single artifact file within a spec.
@@ -152,33 +179,81 @@ export abstract class SpecRepository extends Repository {
   ): Promise<void>
 
   /**
-   * Returns the parsed spec lock sidecar for the given spec, or `null` if no sidecar exists.
+   * Returns the persisted schema identity for the given spec, or `null` if absent.
    *
-   * The returned object includes an `originalHash` field (SHA-256 of the raw
-   * file content) for use in conflict detection when saving.
-   *
-   * @param spec - The spec whose sidecar to load
-   * @returns Parsed sidecar with `originalHash`, or `null` if absent
+   * @param spec - The spec whose persisted schema to load
    */
-  abstract readSpecLock(spec: Spec): Promise<SpecLockData | null>
+  abstract readPersistedSchema(spec: Spec): Promise<{ name: string; version: number } | null>
 
   /**
-   * Persists `spec-lock.json` content for a spec.
+   * Returns the persisted dependencies for the given spec, or `null` if absent.
    *
-   * When `content.originalHash` is provided and `force` is not `true`, the
-   * current file on disk is hashed and compared — a mismatch causes
-   * `ArtifactConflictError`.
+   * @param spec - The spec whose persisted dependencies to load
+   */
+  abstract readPersistedDependsOn(spec: Spec): Promise<readonly string[] | null>
+
+  /**
+   * Returns the persisted implementation links for the given spec, or `null` if absent.
    *
-   * @param spec - The spec to write sidecar for
-   * @param content - Parsed sidecar content to persist
-   * @param options - Save options
+   * @param spec - The spec whose persisted implementation links to load
+   */
+  abstract readPersistedImplementation(
+    spec: Spec,
+  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null>
+
+  /**
+   * Returns a stable hash representing the persisted spec state.
+   *
+   * @param spec - The spec whose stable hash to compute
+   */
+  abstract specHash(spec: Spec): Promise<string | null>
+
+  /**
+   * Updates the persisted schema identity for the given spec.
+   *
+   * @param spec - The spec whose persisted schema to update
+   * @param schema - The new schema identity
+   * @param options - Update options
    * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the persisted spec state
    * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
    */
-  abstract saveSpecLock(
+  abstract updatePersistedSchema(
     spec: Spec,
-    content: SpecLockData,
-    options?: { force?: boolean },
+    schema: { name: string; version: number },
+    options?: { force?: boolean; originalHash?: string },
+  ): Promise<void>
+
+  /**
+   * Updates the persisted dependencies for the given spec.
+   *
+   * @param spec - The spec whose persisted dependencies to update
+   * @param dependsOn - The new dependency list
+   * @param options - Update options
+   * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the persisted spec state
+   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
+   */
+  abstract updatePersistedDependsOn(
+    spec: Spec,
+    dependsOn: readonly string[],
+    options?: { force?: boolean; originalHash?: string },
+  ): Promise<void>
+
+  /**
+   * Updates the persisted implementation links for the given spec.
+   *
+   * @param spec - The spec whose persisted implementation links to update
+   * @param implementation - The new implementation link list
+   * @param options - Update options
+   * @param options.force - Skip conflict detection when `true`
+   * @param options.originalHash - Expected hash of the persisted spec state
+   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
+   */
+  abstract updatePersistedImplementation(
+    spec: Spec,
+    implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
+    options?: { force?: boolean; originalHash?: string },
   ): Promise<void>
 
   /**

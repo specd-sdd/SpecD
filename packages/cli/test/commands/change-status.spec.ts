@@ -82,6 +82,8 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
       ],
@@ -106,7 +108,8 @@ describe('Output format', () => {
     expect(out).toContain('add-login')
     expect(out).toContain('state:')
     expect(out).toContain('designing')
-    expect(out).toContain('specs:')
+    expect(out).not.toContain('specs:')
+    expect(out).toContain('specs and dependencies:')
     expect(out).toContain('auth/login')
     expect(out).toContain('proposal')
     expect(out).toContain('lifecycle:')
@@ -119,6 +122,8 @@ describe('Output format', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         { type: 'proposal', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
         { type: 'spec', state: 'in-progress', effectiveStatus: 'in-progress', files: [] },
@@ -144,6 +149,8 @@ describe('Output format', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, availableTransitions: ['ready', 'designing'] },
       blockers: [],
@@ -164,6 +171,8 @@ describe('Output format', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, availableTransitions: [] },
       blockers: [],
@@ -183,6 +192,8 @@ describe('Output format', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: {
         ...defaultLifecycle,
@@ -207,6 +218,8 @@ describe('Output format', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, nextArtifact: 'specs' },
       blockers: [],
@@ -226,6 +239,8 @@ describe('Output format', () => {
     const change = makeMockChange({ name: 'my-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: { ...defaultLifecycle, nextArtifact: null },
       blockers: [],
@@ -251,6 +266,8 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
       ],
@@ -286,6 +303,8 @@ describe('Output format', () => {
     const change = makeMockChange({ name: 'dag-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         {
           type: 'proposal',
@@ -357,6 +376,8 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         {
           type: 'proposal',
@@ -399,6 +420,7 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
       blockers: [],
@@ -457,6 +479,7 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
       blockers: [],
@@ -483,6 +506,7 @@ describe('Output format', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
       blockers: [],
@@ -521,6 +545,8 @@ describe('Schema version warning', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: {
         ...defaultLifecycle,
@@ -561,6 +587,8 @@ describe('Overlap conflict display', () => {
     const change = makeMockChange({ name: 'overlap-change', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
       blockers: [],
@@ -597,6 +625,8 @@ describe('Overlap conflict display', () => {
     })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
       blockers: [],
@@ -633,6 +663,8 @@ describe('Overlap conflict display', () => {
     const change = makeMockChange({ name: 'no-overlap', state: 'designing' })
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [],
       lifecycle: defaultLifecycle,
       blockers: [],
@@ -670,6 +702,8 @@ describe('Artifact DAG rendering', () => {
 
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         { type: 'proposal', state: 'complete', effectiveStatus: 'complete', files: [] },
         { type: 'design', state: 'complete', effectiveStatus: 'complete', files: [] },
@@ -720,6 +754,8 @@ describe('Artifact DAG rendering', () => {
 
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         {
           type: 'tasks',
@@ -748,6 +784,8 @@ describe('Artifact DAG rendering', () => {
 
     kernel.changes.status.execute.mockResolvedValue({
       change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
       artifactStatuses: [
         { type: 'A', state: 'complete', effectiveStatus: 'complete', files: [] },
         { type: 'B', state: 'complete', effectiveStatus: 'complete', files: [] },

@@ -1,4 +1,5 @@
 import { GraphStore } from '../../src/domain/ports/graph-store.js'
+import { type DocumentNode } from '../../src/domain/value-objects/document-node.js'
 import { type FileNode } from '../../src/domain/value-objects/file-node.js'
 import { type SymbolNode } from '../../src/domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../src/domain/value-objects/spec-node.js'
@@ -29,6 +30,7 @@ function isSymbolDependencyRelationType(relationType: RelationType): boolean {
 export class InMemoryGraphStore extends GraphStore {
   private _isOpen = false
   private files = new Map<string, FileNode>()
+  private documents = new Map<string, DocumentNode>()
   private symbols = new Map<string, SymbolNode>()
   private specs = new Map<string, SpecNode>()
   private relations: Relation[] = []
@@ -128,6 +130,17 @@ export class InMemoryGraphStore extends GraphStore {
     )
   }
 
+  async upsertDocument(document: DocumentNode): Promise<void> {
+    this.ensureOpen()
+    this.documents.set(document.path, document)
+    this._lastIndexedAt = new Date().toISOString()
+  }
+
+  async removeDocument(documentPath: string): Promise<void> {
+    this.ensureOpen()
+    this.documents.delete(documentPath)
+  }
+
   async addRelations(relations: Relation[]): Promise<void> {
     this.ensureOpen()
     this.relations.push(...relations)
@@ -135,6 +148,7 @@ export class InMemoryGraphStore extends GraphStore {
 
   async bulkLoad(data: {
     files: FileNode[]
+    documents?: DocumentNode[]
     symbols: SymbolNode[]
     specs: SpecNode[]
     relations: Relation[]
@@ -144,6 +158,7 @@ export class InMemoryGraphStore extends GraphStore {
   }): Promise<void> {
     this.ensureOpen()
     for (const f of data.files) this.files.set(f.path, f)
+    for (const d of data.documents ?? []) this.documents.set(d.path, d)
     for (const s of data.symbols) this.symbols.set(s.id, s)
     for (const sp of data.specs) this.specs.set(sp.specId, sp)
     this.relations.push(...data.relations)
@@ -176,9 +191,30 @@ export class InMemoryGraphStore extends GraphStore {
     )
   }
 
+  async removeSpecs(specIds: readonly string[]): Promise<void> {
+    this.ensureOpen()
+    const ids = new Set(specIds)
+    for (const specId of ids) {
+      this.specs.delete(specId)
+    }
+    this.relations = this.relations.filter(
+      (r) =>
+        !(
+          (r.type === RelationType.DependsOn && (ids.has(r.source) || ids.has(r.target))) ||
+          ((r.type === RelationType.CoversFile || r.type === RelationType.CoversSymbol) &&
+            ids.has(r.source))
+        ),
+    )
+  }
+
   async getFile(path: string): Promise<FileNode | undefined> {
     this.ensureOpen()
     return this.files.get(path)
+  }
+
+  async getDocument(path: string): Promise<DocumentNode | undefined> {
+    this.ensureOpen()
+    return this.documents.get(path)
   }
 
   async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
@@ -187,6 +223,17 @@ export class InMemoryGraphStore extends GraphStore {
     for (const file of this.files.values()) {
       if (file.configRelativePath === configRelativePath) {
         results.push(file)
+      }
+    }
+    return results
+  }
+
+  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
+    this.ensureOpen()
+    const results: DocumentNode[] = []
+    for (const document of this.documents.values()) {
+      if (document.configRelativePath === configRelativePath) {
+        results.push(document)
       }
     }
     return results
@@ -311,6 +358,15 @@ export class InMemoryGraphStore extends GraphStore {
       }
     }
 
+    if (query.filePaths !== undefined && query.filePaths.length > 0) {
+      const paths = new Set(query.filePaths)
+      results = results.filter((s) => paths.has(s.filePath))
+    }
+
+    if (query.parentSymbolId !== undefined) {
+      results = results.filter((s) => s.parentId === query.parentSymbolId)
+    }
+
     if (query.name !== undefined) {
       if (query.name.includes('*')) {
         const flags = ci ? 'i' : ''
@@ -354,6 +410,7 @@ export class InMemoryGraphStore extends GraphStore {
 
     return {
       fileCount: this.files.size,
+      documentCount: this.documents.size,
       symbolCount: this.symbols.size,
       specCount: this.specs.size,
       relationCounts: relationCounts as Record<
@@ -372,6 +429,11 @@ export class InMemoryGraphStore extends GraphStore {
     return [...this.files.values()]
   }
 
+  async getAllDocuments(): Promise<DocumentNode[]> {
+    this.ensureOpen()
+    return [...this.documents.values()]
+  }
+
   async getAllSpecs(): Promise<SpecNode[]> {
     this.ensureOpen()
     return [...this.specs.values()]
@@ -379,10 +441,25 @@ export class InMemoryGraphStore extends GraphStore {
 
   async searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     this.ensureOpen()
+    const rawQuery = options.query.trim().toLowerCase()
     const terms = options.query.toLowerCase().split(/\s+/)
-    const results: Array<{ symbol: SymbolNode; score: number }> = []
+    const results: Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
     for (const sym of this.symbols.values()) {
       const text = `${expandSymbolName(sym.name)} ${sym.comment ?? ''}`.toLowerCase()
       if (!terms.some((t) => text.includes(t))) continue
@@ -396,24 +473,79 @@ export class InMemoryGraphStore extends GraphStore {
       }
       if (options.workspace && !sym.filePath.startsWith(options.workspace + ':')) continue
       if (matchesExclude(sym.filePath, options.excludePaths, options.excludeWorkspaces)) continue
-      results.push({ symbol: sym, score: 1 })
+      const score =
+        1 +
+        (sym.id.toLowerCase() === rawQuery ? 1_000_000 : 0) +
+        (sym.name.toLowerCase() === rawQuery ? 1_000 : 0)
+      results.push({ symbol: sym, score, snippet: '', startLine: 1, endLine: 1 })
     }
-    return results.slice(0, options.limit ?? 20)
+    return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
   }
 
-  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  > {
     this.ensureOpen()
+    const rawQuery = options.query.trim().toLowerCase()
     const terms = options.query.toLowerCase().split(/\s+/)
-    const results: Array<{ spec: SpecNode; score: number }> = []
+    const results: Array<{
+      spec: SpecNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
     for (const spec of this.specs.values()) {
-      const text = `${spec.title} ${spec.description} ${spec.content}`.toLowerCase()
+      const text = `${spec.specId} ${spec.title} ${spec.description} ${spec.content}`.toLowerCase()
       if (!terms.some((t) => text.includes(t))) continue
       if (options.workspace && spec.workspace !== options.workspace) continue
       if (matchesExclude(spec.path, options.excludePaths, options.excludeWorkspaces)) continue
       if (options.excludeWorkspaces && options.excludeWorkspaces.includes(spec.workspace)) continue
-      results.push({ spec, score: 1 })
+      const score = 1 + (spec.specId.toLowerCase() === rawQuery ? 1_000_000 : 0)
+      results.push({ spec, score, snippet: '', startLine: 1, endLine: 1 })
     }
-    return results.slice(0, options.limit ?? 20)
+    return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
+  }
+
+  async searchDocuments(
+    options: SearchOptions,
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
+    this.ensureOpen()
+    const rawQuery = options.query.trim().toLowerCase()
+    const terms = options.query.toLowerCase().split(/\s+/)
+    const results: Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
+    for (const document of this.documents.values()) {
+      const text =
+        `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
+      if (!terms.some((t) => text.includes(t))) continue
+      if (options.workspace && document.workspace !== options.workspace) continue
+      if (matchesExclude(document.path, options.excludePaths, options.excludeWorkspaces)) continue
+      if (options.excludeWorkspaces && options.excludeWorkspaces.includes(document.workspace)) {
+        continue
+      }
+      const score =
+        1 +
+        (document.path.toLowerCase() === rawQuery ? 1_000_000 : 0) +
+        (document.configRelativePath.toLowerCase() === rawQuery ? 1_000 : 0)
+      results.push({ document, score, snippet: '', startLine: 1, endLine: 1 })
+    }
+    return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
   }
 
   async rebuildFtsIndexes(): Promise<void> {
@@ -450,6 +582,7 @@ export class InMemoryGraphStore extends GraphStore {
   async clear(): Promise<void> {
     this.ensureOpen()
     this.files.clear()
+    this.documents.clear()
     this.symbols.clear()
     this.specs.clear()
     this.relations = []
@@ -460,6 +593,7 @@ export class InMemoryGraphStore extends GraphStore {
 
   async recreate(): Promise<void> {
     this.files.clear()
+    this.documents.clear()
     this.symbols.clear()
     this.specs.clear()
     this.relations = []

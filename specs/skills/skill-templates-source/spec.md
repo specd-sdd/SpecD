@@ -2,22 +2,70 @@
 
 ## Purpose
 
-Defines how skill templates are sourced, stored, and how frontmatter is handled across supported agent runtimes. Templates live without frontmatter in the skills package, and each agent plugin injects frontmatter that is exact for its target runtime.
+Defines how skill templates are sourced, stored, rendered, and linked to shared template content across supported agent runtimes. Templates live without static frontmatter in the skills package, while each skill directory declares its own metadata contract and `@specd/skills` renders the final installed markdown for each runtime.
 
 ## Requirements
 
 ### Requirement: Template source location
 
-Template files MUST live in `packages/skills/templates/<skill-name>/` WITHOUT frontmatter YAML blocks.
+Template files MUST live in `packages/skills/templates/<skill-name>/` using the `.md.tpl` extension.
+
+Each skill template directory MUST also contain a `skill.meta.json` file.
+
+Installed skill files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix.
 
 ### Requirement: Template migration
 
 The template directory MUST contain:
 
 - `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories
-- `shared.md` as shared content across all skills; the file MAY live in the root of the template directory or within a `shared/` subdirectory
+- a `shared/` directory for shared template source files
 
-Each skill directory contains `.md` files (without frontmatter).
+Each skill directory contains template files ending in `.md.tpl` plus a `skill.meta.json` file that declares the skill's template contract.
+
+The current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates.
+
+### Requirement: Skill template metadata contract
+
+Each skill template directory MUST declare a `skill.meta.json` file with this shape:
+
+```json
+{
+  "supportedCapabilities": ["mcp", "agents", "frontmatter"],
+  "requiredCapabilities": [],
+  "requiredSharedTemplates": ["shared.md"]
+}
+```
+
+`supportedCapabilities` declares the capability identifiers that templates in that skill directory are allowed to reference.
+
+`requiredCapabilities` declares the capability identifiers that MUST be present for the skill's templates to be installable.
+
+`requiredSharedTemplates` declares the shared template filenames that the skill requires.
+
+The initial required capability identifiers that the system MUST recognize are:
+
+- `mcp`
+- `agents`
+- `frontmatter`
+
+### Requirement: Capability-aware install-time rendering
+
+Skill templates MUST support capability-aware install-time rendering.
+
+Templates MAY use `Handlebars` conditionals and iteration over structured render context provided at install time.
+
+The rendering model MUST remain deterministic and single-pass at install time. Templates MUST NOT execute arbitrary code or runtime-specific scripting.
+
+The initial required capability identifiers MUST behave as follows:
+
+- `mcp`: enables template branches and content intended for runtimes that support MCP tools or MCP-connected workflows
+- `agents`: enables template branches and content intended for runtimes that support delegated agent or subagent workflows
+- `frontmatter`: enables final frontmatter composition and insertion from `variables.frontmatter`
+
+Shared template references inside installed markdown MUST use the form `@{{sharedFolder}}/shared.md`.
+
+`sharedFolder` MUST be treated as a normal template variable and MUST remain relative to the project root in rendered output.
 
 ### Requirement: Graph impact terminology in workflow templates
 
@@ -32,13 +80,21 @@ Templates MUST NOT ask for "downstream dependents" or otherwise describe `downst
 
 ### Requirement: Frontmatter source
 
-Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and maps MUST reflect those documented contracts exactly.
+Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and value collections MUST reflect those documented contracts exactly.
+
+Agent plugins MUST provide structured frontmatter data under `variables.frontmatter`; they MUST NOT pass prebuilt YAML frontmatter documents for direct insertion.
 
 ### Requirement: Frontmatter injection
 
-Each agent plugin MUST inject its stored frontmatter when installing a skill.
+Agent plugins MUST provide their capability list when installing a skill.
 
-Injection MUST be runtime-specific: each plugin emits only fields recognized by its target runtime and excludes unsupported fields.
+`@specd/skills` MUST inject the final frontmatter block when rendering skill-local markdown templates, using `variables.frontmatter` as input.
+
+Frontmatter insertion MUST occur only when the `frontmatter` capability is present. If `variables.frontmatter` is present while the `frontmatter` capability is absent, the frontmatter block MUST NOT be emitted.
+
+Injection MUST remain runtime-specific: the rendered output for each plugin emits only fields recognized by its target runtime and excludes unsupported fields.
+
+Files marked as shared MUST NOT receive runtime skill frontmatter.
 
 ### Requirement: Agent frontmatter matrix
 
@@ -52,7 +108,7 @@ Runtime defaults MAY emit a smaller subset, but model/type coverage MUST include
 
 ### Requirement: Why no frontmatter in skills package
 
-The skills package does not include frontmatter because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and inject the appropriate metadata while preserving the base skill definition.
+The skills package does not include static frontmatter blocks because each agent environment has different metadata fields and compatibility rules. Agent plugins know their target environment and provide the runtime-specific values, while `@specd/skills` composes and injects the final frontmatter block during template rendering.
 
 ### Requirement: Implementation tracking instructions in templates
 
@@ -66,10 +122,15 @@ At minimum:
 
 ## Constraints
 
-- Templates in skills package MUST NOT contain frontmatter YAML.
-- Each agent plugin is responsible for storing and injecting its own frontmatter.
-- Agent plugins MUST model the full supported frontmatter field set for their target runtime.
+- Templates in the skills package MUST NOT contain static frontmatter YAML blocks.
+- Template source files in the skills package MUST use the `.md.tpl` extension.
+- Each skill directory MUST contain a `skill.meta.json` file.
+- `shared.meta.json` MUST NOT remain the canonical source for determining which skills require shared templates.
+- Templates MAY contain a frontmatter insertion point that is resolved by `@specd/skills` at install time.
+- Agent plugins are responsible for declaring supported runtime capabilities and providing structured `variables.frontmatter` data.
 - Agent plugins MUST NOT emit fields unsupported by their target runtime.
+- `@specd/skills` MUST perform the final frontmatter insertion for skill-local markdown files.
+- Installed markdown MUST NOT render absolute filesystem paths.
 - Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer `--direction dependents` / `--direction dependencies`; `upstream` / `downstream` may appear only as compatibility values.
 - Workflow templates MUST use `specd graph impact --file` for file-based blast-radius checks and MUST NOT reference `specd graph impact --changes`.
 

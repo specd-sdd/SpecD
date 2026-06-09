@@ -14,6 +14,18 @@ Field names, optional/required semantics, and nesting MUST match the paired `api
 
 DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI.
 
+### Requirement: symbol hits use reusable graph symbol refs
+
+The client DTO for graph search symbol hits MUST reuse
+[`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) for the nested `symbol` payload
+rather than declaring duplicate location fields inline.
+
+The client DTO MUST also preserve graph-search preview fields on both symbol and spec hits:
+
+- `snippet`
+- `startLine`
+- `endLine`
+
 ## Constraints
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
@@ -26,3 +38,5 @@ DTO types MUST be imported from a shared package or generated from the same sche
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — client boundaries
 - [`api:dto-graph-search`](../../api/dto-graph-search/spec.md) — mirror API DTO
+- [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) — reusable graph symbol
+  reference

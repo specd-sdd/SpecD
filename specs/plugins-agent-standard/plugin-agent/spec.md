@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's frontmatter format, complementing the existing vendor-specific plugins. This spec defines the Agent Skills standard plugin contract for skill install/uninstall, target install directory, frontmatter handling including `allowed-tools`, and integration requirements.
+The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's metadata contract while relying on `@specd/skills` to render the final installed markdown.
 
 ## Requirements
 
@@ -24,7 +24,7 @@ The plugin class constructor MUST accept `name` and `version` as parameters. The
 
 ### Requirement: Frontmatter type contract
 
-The Agent Skills standard frontmatter model MUST support this exact field set per the agentskills.io specification:
+The Agent Skills standard frontmatter value model MUST support this exact field set per the agentskills.io specification:
 
 - `name` (required)
 - `description` (required)
@@ -33,23 +33,28 @@ The Agent Skills standard frontmatter model MUST support this exact field set pe
 - `metadata` (optional `Record<string, string>`)
 - `allowed-tools` (optional, space-separated string of pre-approved tools)
 
-Unknown fields MUST NOT be emitted into generated `SKILL.md` files.
+Unknown fields MUST NOT be represented in the structured value collection for generated `SKILL.md` files.
 
 ### Requirement: Application layer
 
 The application layer MUST include an `InstallSkills` use case that:
 
-1. reads skills from `@specd/skills`, passing `SpecdConfig` for built-in variable resolution
-2. resolves the per-skill frontmatter map
-3. prepends Agent Skills standard YAML frontmatter only to markdown files not marked as shared
-4. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
-5. writes files marked as shared to the Agent Skills standard shared skills resource directory under the `projectRoot` provided in `SpecdConfig`
+1. reads skills from `@specd/skills`
+2. resolves the per-skill frontmatter source value collection
+3. declares only the Agent Skills standard-supported capability identifiers
+4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
+5. passes `variables.sharedFolder` only when overriding the default shared path contract
+6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
+7. writes files marked as shared to the rendered `sharedFolder` location under the project root
+
+The plugin MUST NOT prepend YAML frontmatter after bundle resolution.
+The plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.
 
 ### Requirement: Frontmatter injection
 
-During install, the plugin MUST prepend YAML frontmatter to each skill-local markdown file and include only configured fields supported by the Agent Skills standard.
+During install, the plugin MUST provide structured Agent Skills standard frontmatter values to `@specd/skills`, and the rendered skill-local markdown output MUST include only configured fields supported by the Agent Skills standard.
 
-The plugin MUST NOT prepend skill frontmatter to files marked as shared.
+Files marked as shared MUST continue to be written without Agent Skills standard frontmatter.
 
 ### Requirement: Install location
 
@@ -57,7 +62,9 @@ Project-level skill installation MUST target `.agents/skills/` under the `projec
 
 For each skill, files not marked as shared MUST be installed under `.agents/skills/<skill-name>/`.
 
-Files marked as shared MUST be installed under `.agents/skills/_specd-shared/`. This shared directory MUST NOT contain a `SKILL.md` file.
+Files marked as shared MUST be installed under the rendered `sharedFolder` location within the project root. When no override is provided, that location MUST default to a relative path derived from the runtime config directory.
+
+The resolved shared location MUST NOT contain a `SKILL.md` file.
 
 ### Requirement: allowed-tools configuration
 
@@ -79,9 +86,9 @@ The `@specd/specd` meta package MUST declare `@specd/plugin-agent-standard` as a
 
 `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.agents/skills/` relative to `config.projectRoot`.
 
-When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory MUST remain in place because other installed skills may still reference it.
+When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
 
-When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and `_specd-shared/`.
+When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.
 
 Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/` that are not part of the specd-managed skill set.
 
@@ -98,3 +105,4 @@ Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/`
 
 - [`plugin-agent-opencode:plugin-agent`](../../plugins-opencode/plugin-agent/spec.md) — reference implementation for the clone
 - [`default:_global/commits`](../../../_global/commits/spec.md) — commit scope registration
+- [`skills:resolve-bundle`](../../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults

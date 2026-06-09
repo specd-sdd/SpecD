@@ -199,15 +199,7 @@
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:update-spec-deps",
-        "file": "core:src/application/use-cases/update-spec-deps.ts",
-        "symbol": "UpdateSpecDeps"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:9dd1b9737b6f5f0b820b2f6b6d7b0eb86a4a5d6b5d42610d9758587d9fa57833",
     "verify.md": "sha256:56342d1cc2150660c20044f9be8f2b8988defe775c49e07200796e2967168f43"

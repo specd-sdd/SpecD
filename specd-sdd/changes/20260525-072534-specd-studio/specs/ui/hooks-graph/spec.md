@@ -8,7 +8,7 @@ React data hooks for **Hooks Graph**: loading state, error propagation, and poll
 
 ### Requirement: graph hooks expose port-graph operations to views
 
-Consumers MUST receive graph status, search, impact, and linkage data exclusively via `client:port-graph`.
+Consumers MUST receive graph status, search, impact, spec coverage, and linkage data exclusively via `client:port-graph`.
 
 ### Requirement: stale graph index shows warning affordances
 

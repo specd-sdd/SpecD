@@ -27,9 +27,13 @@ import type { ValidateResultDto } from './dto/validate-result.js'
 import type { CompiledContextDto } from './dto/compiled-context.js'
 import type { PreviewResultDto } from './dto/preview-result.js'
 import type { SpecDetailDto } from './dto/spec-detail.js'
+import type { SpecContextDto } from './dto/spec-context.js'
 import type { GraphSearchResultDto } from './dto/graph-search.js'
 import type { GraphImpactDto } from './dto/graph-impact.js'
 import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
+import type { GraphSpecCoverageDto } from './dto/graph-spec-coverage.js'
+import type { GraphFileRefDto } from './dto/graph-file-ref.js'
+import type { GraphSymbolRefDto } from './dto/graph-symbol-ref.js'
 import type {
   ImplementationReviewDto,
   UpdateImplementationTrackingResultDto,
@@ -473,6 +477,7 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
       path: specPath,
       title: 'Demo spec',
       artifacts: [{ filename: 'spec.md' }],
+      linkedChanges: [],
     })
   }
 
@@ -490,8 +495,20 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     ])
   }
 
-  getSpecContext(): Promise<CompiledContextDto> {
-    return this.getChangeContext()
+  getSpecContext(workspace: string, specPath: string): Promise<SpecContextDto> {
+    return Promise.resolve({
+      entries: [
+        {
+          spec: `${workspace}:${specPath}`,
+          source: 'root',
+          mode: 'summary',
+          title: 'Demo spec',
+          description: 'Fixture structured spec context',
+          stale: false,
+        },
+      ],
+      warnings: [],
+    })
   }
 
   getSpecArtifact(
@@ -507,7 +524,8 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
   }
 
   searchSpecs(query: { readonly q: string }): Promise<GraphSearchResultDto> {
-    return Promise.resolve({ query: query.q, hits: [] })
+    void query
+    return Promise.resolve({ symbols: [], specs: [] })
   }
 
   getGraphStatus(): Promise<GraphStatusDto> {
@@ -540,20 +558,33 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
   }
 
   searchGraph(query: GraphSearchInput): Promise<GraphSearchResultDto> {
-    return Promise.resolve({ query: query.q, hits: [] })
+    void query
+    return Promise.resolve({ symbols: [], specs: [] })
   }
 
   getImpact(query: GraphImpactInput): Promise<GraphImpactDto> {
     void query
-    return Promise.resolve({ direction: 'dependents', nodes: [] })
+    return Promise.resolve({
+      target: 'fixture',
+      direction: 'dependents',
+      riskLevel: 'LOW',
+      directDepsCount: 0,
+      indirectDepsCount: 0,
+      transitiveDepsCount: 0,
+      affectedFilesCount: 0,
+      affectedProcesses: [],
+      specs: [],
+      symbols: [],
+      files: [],
+    })
   }
 
   getHotspots(): Promise<readonly Record<string, unknown>[]> {
     return Promise.resolve([])
   }
 
-  getSpecGraphView(): Promise<Record<string, unknown>> {
-    return Promise.resolve({ links: [] })
+  getSpecGraphView(): Promise<GraphSpecCoverageDto> {
+    return Promise.resolve({ specId: 'default:demo/spec', files: [], symbols: [] })
   }
 
   getChangeGraphView(name: string): Promise<ChangeGraphViewDto> {
@@ -564,8 +595,8 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
       specIds,
       specs: specIds.map((specId) => ({
         specId,
-        coveredFiles: [],
-        coveredSymbols: [],
+        coveredFiles: [] as readonly GraphFileRefDto[],
+        coveredSymbols: [] as readonly GraphSymbolRefDto[],
       })),
     })
   }
@@ -603,6 +634,7 @@ function toSummary(change: ChangeDetailDto): ChangeSummaryDto {
   return {
     name: change.name,
     state: change.state,
+    specIds: [...change.specIds],
     blockerCount: 0,
     ...(change.description !== undefined ? { description: change.description } : {}),
     ...(change.updatedAt !== undefined ? { updatedAt: change.updatedAt } : {}),

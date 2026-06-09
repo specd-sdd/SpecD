@@ -9,7 +9,7 @@ When a spec depends on other specs for context, those relationships need to be d
 ### Requirement: Command signature
 
 ```
-specd change deps <name> <specId>
+specd change deps <name> [<specId>]
   [--add <id>...]
   [--remove <id>...]
   [--set <id>...]
@@ -18,24 +18,40 @@ specd change deps <name> <specId>
 ```
 
 - `<name>` — required positional; the change name
-- `<specId>` — required positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)
+- `[<specId>]` — optional positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)
 - `--add <id>` — repeatable; adds dependency spec IDs to this spec's `dependsOn`
 - `--remove <id>` — repeatable; removes dependency spec IDs
 - `--set <id>` — repeatable; replaces all dependencies (mutually exclusive with `--add`/`--remove`)
-- At least one of `--add`, `--remove`, or `--set` is required
 
 ### Requirement: Output
 
 **Text format (default):**
+
+When modifying a specific spec:
 
 ```
 updated deps for <specId> in change <name>
 dependsOn: dep1, dep2, dep3
 ```
 
-When no dependencies remain: `dependsOn: (none)`
+When displaying a specific spec (`change deps <name> <specId>` with no flags):
+
+```
+spec dependencies for <specId> in change <name>:
+dependsOn: dep1, dep2
+```
+
+When listing all dependencies (`change deps <name>` with no `<specId>` and no flags):
+
+```
+spec dependencies for change <name>:
+- workspace:spec-path-1: dep1, dep2
+- workspace:spec-path-2: (none)
+```
 
 **JSON/toon format:**
+
+When targeting a specific spec (modify or display):
 
 ```json
 {
@@ -43,6 +59,19 @@ When no dependencies remain: `dependsOn: (none)`
   "name": "<name>",
   "specId": "<specId>",
   "dependsOn": ["dep1", "dep2"]
+}
+```
+
+When listing all:
+
+```json
+{
+  "result": "ok",
+  "name": "<name>",
+  "specDependsOn": {
+    "spec1": ["dep1"],
+    "spec2": []
+  }
 }
 ```
 
@@ -54,13 +83,13 @@ All errors exit with code 1 and write to stderr:
 - `specId` not in `change.specIds`
 - `--set` used with `--add` or `--remove`
 - `--remove` value not in current deps
-- No flags provided
+- Modification flags (`--add`, `--remove`, `--set`) provided without a `<specId>`
 
 ## Constraints
 
 - `--set` is mutually exclusive with `--add` and `--remove`
-- At least one modification flag must be provided
-- The command delegates to the `UpdateSpecDeps` use case in `@specd/core`
+- The command delegates to the `UpdateSpecDeps` use case in `@specd/core` for modifications.
+- Listing and display modes use `GetStatus` or direct repository access to retrieve dependencies.
 
 ## Spec Dependencies
 

@@ -756,11 +756,17 @@ Use plugins when you have a set of schema customisations that is shared across m
 llmOptimizedContext: true # default: false
 ```
 
-When `true`, SpecD uses an LLM to generate richer metadata when building `metadata.json` files: more precise descriptions, better-structured scenarios, and more accurate `dependsOn` suggestions.
+When `true`, SpecD prefers LLM-optimized descriptions and context blocks when available. This improves agent performance and reduces token usage by providing a condensed, high-signal representation of specs and project background.
 
-When `false` or absent, metadata is extracted by parsing the structural conventions of `spec.md` and `verify.md` directly — deterministic, no LLM required.
+When enabled:
 
-Leave this `false` in offline CI, air-gapped environments, or any pipeline without LLM access. Set it to `true` if you want higher-quality metadata and your tooling has model access.
+- **Agents** populate `optimizedDescription` and `optimizedContext` fields in `metadata.json`.
+- **Compilers** prefer these fields over raw artifact content.
+- **Cache**: Project-level background context is cached in `project-metadata.json` and verified with hashes.
+
+When `false` or absent, SpecD uses standard deterministic extraction from Markdown artifacts.
+
+Set this to `true` to unblock advanced agent features and optimize token costs.
 
 ---
 

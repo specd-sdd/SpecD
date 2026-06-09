@@ -139,6 +139,12 @@
       ]
     },
     {
+      "requirement": "Archive index metadata maintenance",
+      "rules": [
+        "The `ArchiveChange` use case SHALL ensure that the archive index metadata (total count) is maintained during the archiving process.\n\n- The implementation MUST update the `.specd-index-meta.json` file to increment the `totalCount` after a successful archival.\n- This update MUST happen atomically or with appropriate concurrency controls to prevent corruption of the metadata."
+      ]
+    },
+    {
       "requirement": "Post-archive hooks",
       "rules": [
         "After `archiveRepository.archive()` succeeds, when `'all'` and `'post'` are both absent from `skipHookPhases`, `ArchiveChange` must execute post-archive hooks by delegating to `RunStepHooks.execute({ name, step: 'archiving', phase: 'post' })`.\n\nPost-archive hook failures do not roll back the archive. Every failed hook command must be appended to `postHookFailures` in declaration order.\n\nWhen `'all'` or `'post'` is in `skipHookPhases`, post-archive hook execution is skipped entirely."
@@ -534,6 +540,13 @@
         "the returned archivedChange is constructed by the repository",
         "AND the use case does not directly construct the ArchivedChange record"
       ]
+    },
+    {
+      "requirement": "Archive index metadata maintenance",
+      "name": "Metadata file updated after archive",
+      "given": [".specd-index-meta.json exists with totalCount: 10"],
+      "when": ["a new change is archived"],
+      "then": [".specd-index-meta.json is updated to totalCount: 11"]
     },
     {
       "requirement": "ArchivedChange construction",
@@ -1058,49 +1071,10 @@
       "then": ["ArchiveImplementationStateError is thrown"]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:archive-change",
-        "file": "core:test/application/use-cases/archive-change-batch-restore.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/application/use-cases/archive-change.ts",
-        "symbol": "ArchiveChange"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/application/use-cases/archive-change.ts",
-        "symbol": "_handleCommitFailure"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/infrastructure/fs/archive-batch-snapshot.ts",
-        "symbol": "FsArchiveBatchSnapshot"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/composition/use-cases/archive-change.ts",
-        "symbol": "resolveArchiveBatchSnapshotPort"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/composition/use-cases/archive-change.ts",
-        "symbol": "buildWorkspaceSpecLayouts"
-      },
-      {
-        "specId": "core:archive-change",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "specsPath"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:995913eabb7220ac7abf5568eb8ef730c66d071ddfb535cc5a3858169f17c287",
-    "verify.md": "sha256:8e413e761f81f366166b2d0fd99e5e67bc064dfb0c8ace9a098729f4d74d9ebe"
+    "spec.md": "sha256:df826a7856bf8d0464c76fb6383c93e7c8c8e58cb859a4328c057334fa95085c",
+    "verify.md": "sha256:7d2d468c9b9f76ace5dde1e7e1fb0a9e8e3ec338e82b60cc08a3d14a5b259c6a"
   },
   "generatedBy": "core"
 }

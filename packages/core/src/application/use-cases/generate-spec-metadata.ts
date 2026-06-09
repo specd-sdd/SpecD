@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
@@ -6,7 +7,6 @@ import { type ContentHasher } from '../ports/content-hasher.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
-import { type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -15,6 +15,7 @@ import {
   extractMetadataFromSpecArtifacts,
   type MetadataArtifactInput,
 } from './_shared/extract-metadata-from-spec-artifacts.js'
+import { type ListWorkspaces } from './list-workspaces.js'
 
 /** Input for the {@link GenerateSpecMetadata} use case. */
 export interface GenerateSpecMetadataInput {
@@ -36,14 +37,15 @@ export interface GenerateSpecMetadataResult {
  *
  * Algorithm:
  * 1. Resolve schema; bail if no `metadataExtraction`
- * 2. For each `scope: 'spec'` artifact, load content from `SpecRepository`
- * 3. Parse each into AST via `ArtifactParserRegistry`
- * 4. Call `extractMetadata()` with the shared extractor transform registry
- * 5. Compute `contentHashes` (SHA-256 per artifact file)
- * 6. Merge extracted + hashes + `generatedBy: 'core'`
+ * 2. Resolve orchestrated workspaces to find repositories
+ * 3. For each `scope: 'spec'` artifact, load content from `SpecRepository`
+ * 4. Parse each into AST via `ArtifactParserRegistry`
+ * 5. Call `extractMetadata()` with the shared extractor transform registry
+ * 6. Compute `contentHashes` (SHA-256 per artifact file)
+ * 7. Merge extracted + implementation + hashes + `generatedBy: 'core'`
  */
 export class GenerateSpecMetadata {
-  private readonly _specs: ReadonlyMap<string, SpecRepository>
+  private readonly _listWorkspaces: ListWorkspaces
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
   private readonly _hasher: ContentHasher
@@ -53,7 +55,7 @@ export class GenerateSpecMetadata {
   /**
    * Creates a new GenerateSpecMetadata use case instance.
    *
-   * @param specs - Spec repositories keyed by workspace name
+   * @param listWorkspaces - The project orchestrator
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hashing service
@@ -61,14 +63,14 @@ export class GenerateSpecMetadata {
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
   constructor(
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry,
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
-    this._specs = specs
+    this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._hasher = hasher
@@ -92,11 +94,15 @@ export class GenerateSpecMetadata {
     }
 
     const { workspace, capPath } = parseSpecId(input.specId)
-    const specRepo = this._specs.get(workspace)
-    if (specRepo === undefined) {
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+
+    const ws = workspaceMap.get(workspace)
+    if (ws === undefined) {
       throw new WorkspaceNotFoundError(workspace)
     }
 
+    const specRepo = ws.specRepo
     const specPath = SpecPath.parse(capPath)
     const spec = await specRepo.get(specPath)
     if (spec === null) {
@@ -108,7 +114,7 @@ export class GenerateSpecMetadata {
     for (const artifactType of schema.artifacts()) {
       if (artifactType.scope !== 'spec') continue
 
-      const filename = artifactType.output.split('/').pop()!
+      const filename = path.basename(artifactType.output)
       const format = artifactType.format ?? inferFormat(filename) ?? 'plaintext'
       const parser = this._parsers.get(format)
       if (parser === undefined) continue
@@ -124,6 +130,12 @@ export class GenerateSpecMetadata {
       })
     }
 
+    // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts
+    const repositories = new Map<string, SpecRepository>()
+    for (const w of workspaces) {
+      repositories.set(w.name, w.specRepo)
+    }
+
     const extracted = await extractMetadataFromSpecArtifacts({
       effectiveSpecSchema: schema,
       workspace,
@@ -131,17 +143,17 @@ export class GenerateSpecMetadata {
       artifacts,
       parsers: this._parsers,
       extractorTransforms: this._extractorTransforms,
-      repositories: this._specs,
+      repositories,
       workspaceRoutes: this._workspaceRoutes,
       hasher: this._hasher,
     })
 
     // Assemble final metadata
-    const specLock = await specRepo.readSpecLock(spec)
+    const implementation = await specRepo.readPersistedImplementation(spec)
     const metadata: SpecMetadata = {
       ...extracted.metadata,
-      ...(specLock !== null
-        ? { implementation: projectImplementationMetadata(input.specId, specLock) }
+      ...(implementation !== null
+        ? { implementation: projectImplementationMetadata(input.specId, implementation) }
         : {}),
       contentHashes: extracted.contentHashes,
       generatedBy: 'core',
@@ -152,21 +164,21 @@ export class GenerateSpecMetadata {
 }
 
 /**
- * Projects archived implementation data from `spec-lock.json` into metadata shape.
+ * Projects archived implementation data into metadata shape.
  *
  * @param specId - Owning spec identifier
- * @param specLock - Parsed sidecar payload
+ * @param implementation - Persisted implementation links
  * @returns Metadata implementation projection
  */
 function projectImplementationMetadata(
   specId: string,
-  specLock: SpecLockData,
+  implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
 ): NonNullable<SpecMetadata['implementation']> {
   const files: Array<{ specId: string; file: string }> = []
   const symbols: Array<{ specId: string; file: string; symbol: string }> = []
 
-  for (const entry of specLock.implementation) {
-    if (entry.symbols === undefined) {
+  for (const entry of implementation) {
+    if (entry.symbols === undefined || entry.symbols.length === 0) {
       files.push({ specId, file: entry.file })
       continue
     }

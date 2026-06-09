@@ -14,9 +14,32 @@ The **Dto Graph Impact** wire shape MUST use camelCase property names stable acr
 
 [`api:presenter-graph`](../presenter-graph/spec.md) MUST map kernel or graph results into this DTO and MUST NOT embed lifecycle, validation, or approval logic.
 
-### Requirement: optional fields are omitted rather than null
+### Requirement: impact entries use reusable graph refs
 
-Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`.
+`GraphImpactDto.symbols[]` MUST use the reusable shape defined by
+[`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) plus optional impact-specific fields
+such as `risk` and required traversal `depth`.
+
+`GraphImpactDto.files[]` MUST use the reusable shape defined by
+[`api:dto-graph-file-ref`](../dto-graph-file-ref/spec.md) plus optional impact-specific fields such
+as `risk`.
+
+`GraphImpactDto.specs[]` MUST expose affected spec ids as canonical `workspace:capability-path`
+strings. The array MUST always be present, even when empty.
+
+### Requirement: impact response exposes aggregate blast-radius metrics
+
+`GraphImpactDto` MUST expose the aggregate analysis fields returned by graph impact:
+
+- `riskLevel`
+- `directDepsCount`
+- `indirectDepsCount`
+- `transitiveDepsCount`
+- `affectedFilesCount`
+- `affectedProcesses`
+
+`GraphImpactDto.files[]` MUST be present as an array for all graph-impact responses, even when
+empty, so clients can render a stable `Specs` / `Symbols` / `Files` layout without shape-guards.
 
 ## Constraints
 
@@ -30,3 +53,5 @@ Optional properties MUST be omitted from JSON when absent unless the OpenAPI sch
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+- [`api:dto-graph-file-ref`](../dto-graph-file-ref/spec.md) — reusable graph file reference
+- [`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) — reusable graph symbol reference

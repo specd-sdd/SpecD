@@ -43,6 +43,12 @@
 - **WHEN** adapter receives `getReadOnlyChangeArtifact(name, filename, 'discarded')`
 - **THEN** HTTP `GET /v1/discarded/{name}/artifacts/{filename}` is called
 
+#### Scenario: artifact list preserves task metadata
+
+- **WHEN** adapter reads change artifact lists from API
+- **THEN** entries preserve `hasTasks`
+- **AND** optional task counters remain available to UI consumers
+
 ### Requirement: port failures surface as typed client errors
 
 #### Scenario: port failures surface as typed client errors — primary path

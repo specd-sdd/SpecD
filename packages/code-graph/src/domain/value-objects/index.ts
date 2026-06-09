@@ -1,4 +1,5 @@
 export { type FileNode, createFileNode } from './file-node.js'
+export { type DocumentNode, createDocumentNode } from './document-node.js'
 export { type SymbolNode, createSymbolNode } from './symbol-node.js'
 export { type SpecNode, createSpecNode } from './spec-node.js'
 export { type Relation, createRelation } from './relation.js'
@@ -14,8 +15,7 @@ export { type ChangeDetectionResult } from './change-detection-result.js'
 export {
   type IndexOptions,
   type IndexProgressCallback,
-  type WorkspaceIndexTarget,
-  type DiscoveredSpec,
+  type ProjectGraphConfig,
 } from './index-options.js'
 export { type IndexResult, type IndexError, type WorkspaceIndexBreakdown } from './index-result.js'
 export { type LanguageAdapter } from './language-adapter.js'

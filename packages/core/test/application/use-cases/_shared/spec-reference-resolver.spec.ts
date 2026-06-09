@@ -9,6 +9,7 @@ import {
   type SpecSearchResult,
   SpecRepository,
 } from '../../../../src/application/ports/spec-repository.js'
+import { type SpecMetadata } from '../../../../src/domain/services/parse-metadata.js'
 import {
   createSpecReferenceResolver,
   type SpecWorkspaceRoute,
@@ -38,6 +39,57 @@ class FakeSpecRepository extends SpecRepository {
     return []
   }
 
+  override async count(): Promise<number> {
+    return this._knownSpecs.size
+  }
+
+  override async specHash(_spec: Spec): Promise<string | null> {
+    return null
+  }
+
+  override async metadata(_spec: Spec): Promise<SpecMetadata | null> {
+    return null
+  }
+
+  override async saveMetadata(
+    _spec: Spec,
+    _content: string,
+    _options?: { force?: boolean; originalHash?: string },
+  ): Promise<void> {}
+
+  override async readPersistedSchema(
+    _spec: Spec,
+  ): Promise<{ name: string; version: number } | null> {
+    return null
+  }
+
+  override async readPersistedDependsOn(_spec: Spec): Promise<readonly string[] | null> {
+    return null
+  }
+
+  override async readPersistedImplementation(
+    _spec: Spec,
+  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
+    return null
+  }
+
+  override async updatePersistedSchema(
+    _spec: Spec,
+    _schema: { name: string; version: number },
+  ): Promise<void> {}
+  override async updatePersistedDependsOn(
+    _spec: Spec,
+    _dependsOn: readonly string[],
+  ): Promise<void> {}
+  override async updatePersistedImplementation(
+    _spec: Spec,
+    _implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
+  ): Promise<void> {}
+
+  override async search(_query: string): Promise<SpecSearchResult[]> {
+    return []
+  }
+
   override async artifact(_spec: Spec, _filename: string): Promise<SpecArtifact | null> {
     return null
   }
@@ -52,37 +104,11 @@ class FakeSpecRepository extends SpecRepository {
 
   override async delete(_spec: Spec): Promise<void> {}
 
-  override async metadata(
-    _spec: Spec,
-  ): Promise<import('../../../../src/domain/services/parse-metadata.js').SpecMetadata | null> {
-    return null
-  }
-
-  override async saveMetadata(
-    _spec: Spec,
-    _content: string,
-    _options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {}
-
-  override async readSpecLock(_spec: Spec): Promise<SpecLockData | null> {
-    return null
-  }
-
-  override async saveSpecLock(
-    _spec: Spec,
-    _content: SpecLockData,
-    _options?: { force?: boolean },
-  ): Promise<void> {}
-
   override async resolveFromPath(
     _inputPath: string,
     _from?: SpecPath,
   ): Promise<ResolveFromPathResult | null> {
     return this._resolveResult
-  }
-
-  override async search(): Promise<SpecSearchResult[]> {
-    return []
   }
 }
 

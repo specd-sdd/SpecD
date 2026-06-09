@@ -31,6 +31,7 @@
 
 - `<workspace>:<capability-path>`: <!-- what requirement is changing and why -->
   - Depends on (added): <!-- new dependencies introduced by this change, or "none" -->
+  - Depends on (removed): <!-- removed dependencies from this change, or "none" -->
 
 ## Impact
 

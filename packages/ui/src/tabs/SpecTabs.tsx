@@ -4,11 +4,11 @@ import { cn } from '../lib/cn.js'
 export const SPEC_VIEWS = [
   'Overview',
   'Artifacts',
-  'Metadata',
   'Dependencies',
   'Linked Changes',
   'Outline',
-  'Graph',
+  'Coverage',
+  'Impact',
   'Context',
 ] as const
 

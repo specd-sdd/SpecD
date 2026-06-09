@@ -74,11 +74,11 @@
 - **WHEN** user opens the Artifacts tab under Spec for `ui:foo`
 - **THEN** `spec.md` is listed before `verify.md`
 
-#### Scenario: Archived artifacts tab shows snapshot types
+#### Scenario: Archived artifacts tab shows snapshot artifact files
 
 - **GIVEN** archived change context
 - **WHEN** user selects Artifacts tab
-- **THEN** UI lists `archivedMeta.artifactTypes`
+- **THEN** UI lists archived snapshot artifact files grouped in the standard layout
 - **AND** does not call `listChangeArtifacts`
 
 ### Requirement: artifacts tab exposes validate all for active changes

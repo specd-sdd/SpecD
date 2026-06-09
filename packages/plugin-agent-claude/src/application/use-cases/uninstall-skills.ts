@@ -3,6 +3,7 @@ import { createSkillRepository } from '@specd/skills'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import type { AgentInstallOptions } from '@specd/plugin-manager'
+import { resolveSharedFolder } from './shared-folder.js'
 
 /**
  * Uninstalls selected or all specd skills from Claude's project-local skills directory.
@@ -17,6 +18,13 @@ export class UninstallSkills {
    */
   async execute(config: SpecdConfig, options?: AgentInstallOptions): Promise<void> {
     const targetDir = path.join(config.projectRoot, '.claude', 'skills')
+    const sharedDir = resolveSharedFolder(
+      config.projectRoot,
+      config.configPath,
+      typeof options?.variables?.['sharedFolder'] === 'string'
+        ? options.variables['sharedFolder']
+        : undefined,
+    ).absolutePath
     if (options?.skills !== undefined && options.skills.length > 0) {
       for (const skill of options.skills) {
         await rm(path.join(targetDir, skill), { recursive: true, force: true })
@@ -31,6 +39,6 @@ export class UninstallSkills {
       await rm(path.join(targetDir, skill), { recursive: true, force: true })
       await rm(path.join(targetDir, `${skill}.md`), { force: true })
     }
-    await rm(path.join(targetDir, '_specd-shared'), { recursive: true, force: true })
+    await rm(sharedDir, { recursive: true, force: true })
   }
 }

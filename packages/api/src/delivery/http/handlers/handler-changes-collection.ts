@@ -40,10 +40,21 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
     { ...apiRouteSchema({ response: { 200: 'ArchivedChangeList' } }) },
     apiHandler(async (ctx) => {
       const archived = await ctx.kernel.changes.listArchived.execute()
-      return archived.map((change) => ({
-        name: change.name,
-        archivedName: change.archivedName,
-      }))
+      return {
+        items: archived.items.map((change) => ({
+          name: change.name,
+          archivedName: change.archivedName,
+          archivedAt: change.archivedAt.toISOString(),
+          ...(change.description !== undefined ? { description: change.description } : {}),
+          ...(change.archivedBy !== undefined ? { archivedBy: change.archivedBy } : {}),
+          specIds: [...change.specIds],
+          schemaName: change.schemaName,
+          schemaVersion: change.schemaVersion,
+          workspaces: [...change.workspaces],
+          artifacts: [...change.artifacts],
+        })),
+        meta: archived.meta,
+      }
     }),
   )
 

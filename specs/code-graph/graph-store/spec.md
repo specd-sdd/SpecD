@@ -18,13 +18,20 @@ Every `GraphStore` implementation SHALL support the code-graph package's minimum
 
 At minimum, the abstract store contract MUST support:
 
-- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths
+- file nodes carrying the `FileNode` data needed by indexing, traversal, and CLI queries, including both canonical workspace-prefixed paths and config-relative file paths, and the full textual **content**
 - symbol nodes carrying the `SymbolNode` data needed by indexing, traversal, and CLI queries
 - spec nodes carrying the `SpecNode` data needed by spec indexing and search
+- **document nodes** carrying the `DocumentNode` data (textual non-code resources)
 - persisted relations for the relation families used by the package: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
 - store-level metadata sufficient to satisfy abstract statistics and derivation-freshness fields such as `lastIndexedAt`, `lastIndexedRef`, and the persisted graph fingerprint
 
 `COVERS_FILE` and `COVERS_SYMBOL` are the abstract relation families used for requirement-aware graph linkage. `COVERS_FILE` links a spec to a covered implementation file. `COVERS_SYMBOL` links a spec to a covered implementation symbol and MAY carry `metadata.stale` when the archived symbol-level link no longer resolves to a live indexed symbol.
+
+The `files` storage SHALL persist the full textual content of indexed source files to enable match-aware snippet extraction without re-reading from disk at query time.
+
+The store MUST provide operations for upserting and removing `DocumentNode` entries, as well as searching them via full-text search.
+
+The store SHALL support incremental indexing by matching `contentHash` values before updating node properties or relations.
 
 Backends MAY represent those concepts differently internally, but they MUST preserve the observable semantics exposed by the `GraphStore` API. Storage-agnostic consumers MUST rely on these abstract semantics rather than any backend-specific table, label, or index shape.
 
@@ -110,13 +117,22 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 
 These follow the same atomic pattern as `upsertFile()` and `removeFile()`.
 
-### Requirement: Full-text search
+### Requirement: Search with exact-match prioritization
 
 `GraphStore` SHALL provide:
 
-- **`searchSymbols(options: SearchOptions): Promise<Array<{ symbol: SymbolNode; score: number }>>`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order
-- **`searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>>`** — search spec title, description, and content, returning results ranked by relevance in descending order
+- **`searchSymbols(options: SearchOptions)`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order
+- **`searchSpecs(options: SearchOptions)`** — search spec title, description, and content, returning results ranked by relevance in descending order
+- **`searchDocuments(options: SearchOptions)`** — search document paths and textual content, returning results ranked by relevance in descending order
 - **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes
+
+Search results MUST return match-aware **snippets** and the corresponding 1-based **line range** (`startLine` to `endLine`) from the source content.
+
+When a query exactly matches a canonical identity (Spec ID, Symbol Name/ID, Document Path), the store MUST prioritize that exact match at the top of the results, regardless of generic relevance scores.
+
+- **Exact Spec ID match**: prioritized first in Spec search.
+- **Exact Symbol Name/ID match**: prioritized first in Symbol search.
+- **Exact Document Path match**: prioritized first in Document search.
 
 `SearchOptions` is a value object with:
 
@@ -129,6 +145,8 @@ These follow the same atomic pattern as `upsertFile()` and `removeFile()`.
 - **excludeWorkspaces** — array of workspace names to exclude
 
 All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns.
+
+Generic text matching (BM25 or equivalent) SHALL be used to rank the remaining hits.
 
 ### Requirement: Bulk operations
 
@@ -145,6 +163,7 @@ All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are 
 
 ## Spec Dependencies
 
-- [`code-graph:symbol-model`](../symbol-model/spec.md) — `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `RelationType`, and hierarchy relation semantics
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes and adapters in infrastructure
-- [`code-graph:staleness-detection`](../staleness-detection/spec.md) — `lastIndexedRef` field definition and staleness semantics
+- [`code-graph:symbol-model`](../symbol-model/spec.md) — shared graph vocabulary for files, symbols, specs, and documents
+- [`default:_global/architecture`](../../../_global/architecture/spec.md) — abstract-port and storage-boundary constraints
+- [`code-graph:staleness-detection`](../staleness-detection/spec.md) — persisted derivation metadata and freshness reporting
+- [`code-graph:document-model`](../document-model/spec.md) — document-node semantics and searchable textual resources

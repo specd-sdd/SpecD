@@ -1,7 +1,6 @@
 import * as path from 'node:path'
 import { CompileContext } from '../../application/use-cases/compile-context.js'
 import { PreviewSpec } from '../../application/use-cases/preview-spec.js'
-import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
@@ -19,6 +18,8 @@ import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.
 import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
  */
@@ -44,11 +45,9 @@ export interface FsCompileContextOptions {
   /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
   /**
-   * Pre-built spec repositories keyed by workspace name.
-   *
-   * Must include entries for every workspace declared in the project config.
+   * The project orchestrator.
    */
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
+  readonly listWorkspaces: ListWorkspaces
   /** Absolute path to the `node_modules` directory for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
@@ -144,7 +143,7 @@ export function createCompileContext(
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
-        specRepositories: specRepos,
+        listWorkspaces: new ListWorkspaces(config, specRepos),
         nodeModulesPaths: [
           path.join(config.projectRoot, 'node_modules'),
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
@@ -172,10 +171,15 @@ export function createCompileContext(
   const files = new FsFileReader()
   const parsers = createArtifactParserRegistry()
   const hasher = new NodeContentHasher()
-  const previewSpec = new PreviewSpec(changeRepo, opts.specRepositories, schemaProvider, parsers)
+  const previewSpec = new PreviewSpec(
+    changeRepo,
+    opts.listWorkspaces.repos,
+    schemaProvider,
+    parsers,
+  )
   return new CompileContext(
     changeRepo,
-    opts.specRepositories,
+    opts.listWorkspaces,
     schemaProvider,
     files,
     parsers,

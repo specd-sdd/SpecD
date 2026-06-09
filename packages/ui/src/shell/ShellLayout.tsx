@@ -120,6 +120,7 @@ export function ShellLayout({
   const [inspectorMode, setInspectorMode] = React.useState<
     'raw' | 'preview' | 'diff' | 'metadata' | 'outline'
   >('raw')
+  const [dismissedSpecInspectorKey, setDismissedSpecInspectorKey] = React.useState<string | undefined>()
   const [unsavedPrompt, setUnsavedPrompt] = React.useState<
     { readonly onProceed: () => void } | undefined
   >()
@@ -158,6 +159,7 @@ export function ShellLayout({
   )
   const specWorkspace = centerCtx.kind === 'spec' ? centerCtx.workspace : undefined
   const specPath = centerCtx.kind === 'spec' ? centerCtx.specPath : undefined
+  const openSpecKey = specWorkspace && specPath ? `${specWorkspace}:${specPath}` : undefined
 
   const workspaceSpecs = useWorkspaceSpecsCollection(project?.workspaces ?? [], refreshKey)
   const workspaceSpecIdSuggestions = React.useMemo(
@@ -183,13 +185,13 @@ export function ShellLayout({
     selectedArtifact?.kind === 'change' ? selectedArtifact.filename : undefined
   const changeArtifactName =
     selectedArtifact?.kind === 'change' ? selectedArtifact.changeName : undefined
+  const changeArtifactSection = isArchivedChange ? 'archived' : changeListSection
   const changeArtifact = useChangeArtifact(
-    isArchivedChange ? undefined : changeArtifactName,
-    isArchivedChange ? undefined : changeArtifactFile,
+    changeArtifactName,
+    changeArtifactFile,
     refreshKey,
-    { listSection: changeListSection, poll: isOpenActiveChange },
+    { listSection: changeArtifactSection, poll: isOpenActiveChange },
   )
-
   const specArtifactFilename =
     selectedArtifact?.kind === 'spec' ? selectedArtifact.filename : undefined
   const specArtifactWs =
@@ -199,6 +201,11 @@ export function ShellLayout({
   const specArtifactRead = useSpecRead(specArtifactWs, specArtifactPath, {
     artifactFilename: specArtifactFilename,
     refreshKey,
+  })
+  const openSpecRead = useSpecRead(specWorkspace, specPath, {
+    refreshKey,
+    pollArtifact: false,
+    pollContext: false,
   })
 
   const artifactContent =
@@ -232,10 +239,9 @@ export function ShellLayout({
         ? `change:${selectedArtifact.changeName}:${selectedArtifact.filename}`
         : `spec:${selectedArtifact.workspace}:${selectedArtifact.specPath}:${selectedArtifact.filename}`
 
-  // Reset editor buffer + mode when artifact selection changes.
+  // Reset only the buffer on selection changes; the selected handler owns the initial inspector mode.
   React.useEffect(() => {
     setEditorBuffer(undefined)
-    setInspectorMode('raw')
   }, [artifactSelectionKey])
 
   // Sync buffer only when loaded content matches the current selection (avoids stale races).
@@ -303,7 +309,7 @@ export function ShellLayout({
   }, [usesMergedPreview, previewHook.data?.merged, editorBuffer, artifactContent])
 
   const canShowDiff = usesMergedPreview && previewHook.data?.merged !== undefined
-  const showDiffTab = showsInspectorDiffTab(artifactFilename)
+  const showDiffTab = !isArchivedChange && showsInspectorDiffTab(artifactFilename)
 
   const inspectorModes = React.useMemo((): readonly (
     | 'raw'
@@ -312,17 +318,15 @@ export function ShellLayout({
     | 'metadata'
     | 'outline'
   )[] => {
-    const modes: ('raw' | 'preview' | 'diff' | 'metadata' | 'outline')[] = [
-      'raw',
-      'preview',
-      'metadata',
-      'outline',
-    ]
+    const modes: ('raw' | 'preview' | 'diff' | 'metadata' | 'outline')[] =
+      selectedArtifact?.kind === 'spec'
+        ? ['preview', 'raw', 'metadata', 'outline']
+        : ['raw', 'preview', 'metadata', 'outline']
     if (showDiffTab) {
       modes.splice(2, 0, 'diff')
     }
     return modes
-  }, [showDiffTab])
+  }, [showDiffTab, selectedArtifact])
 
   React.useEffect(() => {
     if (inspectorMode === 'diff' && !showDiffTab) {
@@ -368,12 +372,50 @@ export function ShellLayout({
   )
 
   const closeArtifactPanel = React.useCallback(() => {
+    if (openSpecKey) {
+      setDismissedSpecInspectorKey(openSpecKey)
+    }
     setSelectedArtifact(undefined)
     setEditorBuffer(undefined)
     setInspectorMode('raw')
-  }, [])
+  }, [openSpecKey])
 
   const showRightPanel = selectedArtifact !== undefined
+
+  React.useEffect(() => {
+    if (centerCtx.kind !== 'spec' || !specWorkspace || !specPath) {
+      return
+    }
+    if (dismissedSpecInspectorKey === openSpecKey) {
+      return
+    }
+    if (
+      selectedArtifact?.kind === 'spec' &&
+      selectedArtifact.workspace === specWorkspace &&
+      selectedArtifact.specPath === specPath
+    ) {
+      return
+    }
+    const specMd = (openSpecRead.detail.data?.artifacts ?? []).find((file) => file.filename === 'spec.md')
+    if (!specMd) {
+      return
+    }
+    setInspectorMode('preview')
+    setSelectedArtifact({
+      kind: 'spec',
+      workspace: specWorkspace,
+      specPath,
+      filename: specMd.filename,
+    })
+  }, [
+    centerCtx.kind,
+    dismissedSpecInspectorKey,
+    openSpecKey,
+    openSpecRead.detail.data?.artifacts,
+    selectedArtifact,
+    specPath,
+    specWorkspace,
+  ])
 
   const handleSelectChange = (name: string) => {
     runWithUnsavedGuard(() => {
@@ -395,6 +437,7 @@ export function ShellLayout({
 
   const handleSelectSpec = (workspace: string, path: string) => {
     runWithUnsavedGuard(() => {
+      setDismissedSpecInspectorKey(undefined)
       setCenterCtx({ kind: 'spec', workspace, specPath: path })
       setSelectedArtifact(undefined)
       void pushOutput(`Opened spec ${workspace}:${path}`, 'open-spec')
@@ -404,12 +447,15 @@ export function ShellLayout({
   const handleSelectChangeArtifact = (filename: string) => {
     if (!changeName) return
     runWithUnsavedGuard(() => {
+      setInspectorMode('raw')
       setSelectedArtifact({ kind: 'change', changeName, filename })
     })
   }
 
   const handleSelectSpecArtifact = (filename: string) => {
     if (!specWorkspace || !specPath) return
+    setDismissedSpecInspectorKey(undefined)
+    setInspectorMode('preview')
     setSelectedArtifact({ kind: 'spec', workspace: specWorkspace, specPath, filename })
   }
 
@@ -845,7 +891,9 @@ export function ShellLayout({
                               >
                                 {mode === 'raw'
                                   ? canEditChangeArtifact
-                                    ? 'Edit'
+                                    ? artifactFilename?.startsWith('deltas/')
+                                      ? 'Delta'
+                                      : 'Edit'
                                     : isOpenChangeArtifact
                                       ? 'View'
                                       : 'Raw'

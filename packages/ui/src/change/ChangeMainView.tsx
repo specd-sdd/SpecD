@@ -13,8 +13,12 @@ import {
   type ArtifactSpecGroup,
   type ArtifactTypeGroup,
 } from '../hooks/use-change-artifact-list.js'
-import { artifactScopeGroupFileCount } from '../lib/group-change-artifacts.js'
+import {
+  artifactScopeGroupFileCount,
+  groupChangeArtifactEntries,
+} from '../lib/group-change-artifacts.js'
 import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
+import type { ChangeReadSection } from '../lib/change-read-routes.js'
 import {
   ChangeContextTab,
   ChangeEventsTab,
@@ -93,7 +97,7 @@ export function ChangeMainView({
   }, [allowDeepReadTabs, changeName])
 
   React.useEffect(() => {
-    if (!allowDeepReadTabs && (changeView === 'Context' || changeView === 'Impact')) {
+    if (!allowDeepReadTabs && (changeView === 'Context' || changeView === 'Coverage')) {
       onChangeView('Overview')
     }
   }, [allowDeepReadTabs, changeView, onChangeView])
@@ -167,9 +171,15 @@ export function ChangeMainView({
 
       {changeView === 'Artifacts' ? (
         isArchived ? (
-          <ArchivedArtifactsList
-            artifactTypes={detail?.archivedMeta?.artifactTypes ?? []}
-            loading={detailLoading}
+          <ArtifactsTabPanel
+            changeName={changeName}
+            listSection="archived"
+            refreshKey={artifactsPollKey}
+            poll={false}
+            selected={selectedArtifactFile}
+            onSelect={onSelectArtifact}
+            artifactItems={detail?.artifacts ?? []}
+            loadingOverride={detailLoading}
           />
         ) : (
           <ArtifactsTabPanel
@@ -210,9 +220,13 @@ export function ChangeMainView({
       ) : null}
 
       {changeView === 'Tasks' && isArchived ? (
-        <div className="flex flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
-          Tasks are not available for archived changes.
-        </div>
+        <ChangeTasksTab
+          changeName={changeName}
+          listSection="archived"
+          artifactItems={detail?.artifacts}
+          refreshKey={refreshKey}
+          tabActive={false}
+        />
       ) : null}
 
       {changeView === 'Events' ? (
@@ -223,11 +237,11 @@ export function ChangeMainView({
         />
       ) : null}
 
-      {changeView === 'Impact' && !isArchived ? (
+      {changeView === 'Coverage' && !isArchived ? (
         <ChangeImpactTab changeName={changeName} refreshKey={refreshKey} tabActive />
       ) : null}
 
-      {changeView === 'Impact' && isArchived ? (
+      {changeView === 'Coverage' && isArchived ? (
         <div className="flex flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
           Graph impact is not available for archived changes.
         </div>
@@ -363,43 +377,6 @@ function SpecScopeFiles({
   )
 }
 
-function ArchivedArtifactsList({
-  artifactTypes,
-  loading,
-}: {
-  artifactTypes: readonly string[]
-  loading: boolean
-}): React.ReactElement {
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-        Loading archive snapshot…
-      </div>
-    )
-  }
-  if (artifactTypes.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-        No artifact types recorded in archive.
-      </div>
-    )
-  }
-  return (
-    <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
-      <p className="mb-2 text-[10px] text-muted-foreground">
-        Artifact files are stored in the archive directory (read-only).
-      </p>
-      <ul className="space-y-1">
-        {artifactTypes.map((type) => (
-          <li key={type} className="studio-card px-3 py-2 font-mono text-xs capitalize text-foreground">
-            {type}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 function ArtifactsTabPanel({
   changeName,
   listSection = null,
@@ -408,14 +385,23 @@ function ArtifactsTabPanel({
   selected,
   onSelect,
   onValidateAll,
+  artifactItems,
+  loadingOverride = false,
 }: {
   changeName: string
-  listSection?: ChangeListSection | null
+  listSection?: ChangeReadSection
   refreshKey?: number
   poll?: boolean
   selected?: string
   onSelect?: (filename: string) => void
   onValidateAll?: () => void
+  artifactItems?: readonly {
+    readonly filename: string
+    readonly type: string
+    readonly state: string
+    readonly displayStatus: string
+  }[]
+  loadingOverride?: boolean
 }): React.ReactElement {
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="studio-artifacts-tab">
@@ -440,6 +426,8 @@ function ArtifactsTabPanel({
         poll={poll}
         selected={selected}
         onSelect={onSelect}
+        artifactItems={artifactItems}
+        loadingOverride={loadingOverride}
       />
     </div>
   )
@@ -452,18 +440,35 @@ function ArtifactsAccordion({
   poll = true,
   selected,
   onSelect,
+  artifactItems,
+  loadingOverride = false,
 }: {
   changeName: string
-  listSection?: ChangeListSection | null
+  listSection?: ChangeReadSection
   refreshKey?: number
   poll?: boolean
   selected?: string
   onSelect?: (filename: string) => void
+  artifactItems?: readonly {
+    readonly filename: string
+    readonly type: string
+    readonly state: string
+    readonly displayStatus: string
+  }[]
+  loadingOverride?: boolean
 }): React.ReactElement {
-  const { scopeGroups, isLoading } = useChangeArtifactList(changeName, refreshKey, {
-    poll,
-    listSection,
-  })
+  const { scopeGroups, isLoading } = useChangeArtifactList(
+    artifactItems !== undefined ? undefined : changeName,
+    refreshKey,
+    {
+      poll,
+      listSection: artifactItems !== undefined ? null : listSection,
+    },
+  )
+  const groupedArtifactItems = React.useMemo(
+    () => (artifactItems !== undefined ? groupChangeArtifactEntries(artifactItems) : scopeGroups),
+    [artifactItems, scopeGroups],
+  )
 
   const [openTypeGroups, setOpenTypeGroups] = React.useState<Set<string>>(
     () => new Set(['proposal', 'design', 'tasks']),
@@ -478,7 +483,7 @@ function ArtifactsAccordion({
     })
   }
 
-  if (isLoading && scopeGroups.length === 0) {
+  if ((loadingOverride || isLoading) && groupedArtifactItems.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
         Loading artifacts…
@@ -486,7 +491,7 @@ function ArtifactsAccordion({
     )
   }
 
-  if (scopeGroups.length === 0) {
+  if (groupedArtifactItems.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
         No artifacts tracked for this change
@@ -497,7 +502,7 @@ function ArtifactsAccordion({
   return (
     <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
       <div className="space-y-4">
-        {scopeGroups.map((scopeGroup) => (
+        {groupedArtifactItems.map((scopeGroup) => (
           <ScopeArtifactsSection
             key={scopeGroup.scope}
             scopeGroup={scopeGroup}
@@ -586,4 +591,3 @@ function ScopeArtifactsSection({
     </section>
   )
 }
-

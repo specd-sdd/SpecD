@@ -72,6 +72,18 @@
 - **THEN** matching `api:presenter-*` mapped the result
 - **AND** JSON conforms to paired `api:dto-*`
 
+#### Scenario: Spec context keeps the structured core payload
+
+- **WHEN** handler serves `GET /v1/workspaces/{ws}/specs/{path}/context`
+- **THEN** response body keeps `entries[]` and structured `warnings[]`
+- **AND** entry sections such as `rules`, `constraints`, `scenarios`, and `optimizedContent` are not collapsed into a single text field
+
+#### Scenario: Handler requests full spec-context sections
+
+- **WHEN** Studio requests canonical spec context without custom shape overrides
+- **THEN** handler invokes `GetSpecContext` with full structured mode
+- **AND** rules, constraints, and scenarios are requested from metadata when available
+
 #### Scenario: Presenter output stays stable for fixed fixture
 
 - **GIVEN** a fixed kernel fixture for this route

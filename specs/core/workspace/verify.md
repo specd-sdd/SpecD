@@ -222,3 +222,9 @@
 - **WHEN** specd loads configuration
 - **THEN** `../billing-repo/specd.yaml` is never read
 - **AND** all workspace properties come from the local `specd.yaml`
+
+#### Scenario: root workspace name is rejected
+
+- **GIVEN** `specd.yaml` declares a workspace named `root`
+- **WHEN** the config is loaded
+- **THEN** a `ConfigValidationError` is thrown on startup

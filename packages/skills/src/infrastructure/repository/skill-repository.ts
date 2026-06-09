@@ -3,16 +3,20 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
-import type { SpecdConfig } from '@specd/core'
 import type { SharedFile, SkillRepository } from '../../application/ports/skill-repository.js'
 import type { Skill } from '../../domain/skill.js'
+import type { SkillTemplateMetadata } from '../../domain/skill-template-metadata.js'
 import type {
   ResolvedFile,
   SkillBundle,
   SkillBundleInstallTarget,
 } from '../../domain/skill-bundle.js'
+import type { SkillTemplateContext } from '../../domain/template-context.js'
+import { InvalidSkillTemplateMetadataError } from '../../domain/errors/invalid-skill-template-metadata-error.js'
 import { SkillNotFoundError } from '../../domain/errors/skill-not-found-error.js'
 import { TemplateReader } from './template-reader.js'
+import { SkillTemplateMetadataReader } from './skill-template-metadata-reader.js'
+import { TemplateRenderer } from './template-renderer.js'
 
 /**
  * Repository configuration for template resolution.
@@ -96,10 +100,14 @@ class FsSkillRepository implements SkillRepository {
    *
    * @param templatesRoot - Absolute templates root.
    * @param templateReader - Lazy template reader.
+   * @param metadataReader - Skill metadata reader.
+   * @param templateRenderer - Install-time template renderer.
    */
   constructor(
     private readonly templatesRoot: string,
     private readonly templateReader: TemplateReader,
+    private readonly metadataReader: SkillTemplateMetadataReader,
+    private readonly templateRenderer: TemplateRenderer,
   ) {}
 
   /**
@@ -142,60 +150,68 @@ class FsSkillRepository implements SkillRepository {
    * Resolves one skill to a concrete install bundle.
    *
    * @param name - Skill name.
-   * @param variables - Placeholder variables.
-   * @param config - Optional project configuration.
+   * @param context - Structured install-time render context.
    * @returns Resolved install bundle.
    * @throws SkillNotFoundError if skill is not found.
    */
-  getBundle(
-    name: string,
-    variables: Readonly<Record<string, string>> = {},
-    config?: SpecdConfig,
-  ): SkillBundle {
+  getBundle(name: string, context: SkillTemplateContext = {}): SkillBundle {
     const skill = this.get(name)
     if (skill === undefined) {
       throw new SkillNotFoundError(name)
     }
 
-    let finalVariables = { ...variables }
-    if (config !== undefined) {
-      finalVariables = {
-        projectRoot: config.projectRoot,
-        configPath: config.configPath,
-        schemaRef: config.schemaRef,
-        ...finalVariables,
-      }
-    }
+    const skillDir = path.join(this.templatesRoot, name)
+    const metadata = this.metadataReader.readSkillMetadata(skillDir)
+    this.validateCapabilities(name, metadata, context.capabilities ?? [])
 
     const files: ResolvedFile[] = []
     const included = new Set<string>()
     for (const template of skill.templates) {
-      included.add(template.filename)
-      const content = readFileSync(path.join(this.templatesRoot, name, template.filename), 'utf8')
+      const outputFilename = this.templateRenderer.normalizeOutputFilename(template.filename)
+      included.add(outputFilename)
+      const content = readFileSync(path.join(skillDir, template.filename), 'utf8')
       files.push({
-        filename: template.filename,
-        content: applyVariables(content, finalVariables),
+        filename: outputFilename,
+        content: this.templateRenderer.render({
+          templateSource: content,
+          context: this.filterContextForSkill(metadata, context),
+          includeFrontmatter: true,
+        }),
       })
     }
 
     const sharedFiles = this.listSharedFiles()
+    const requiredSharedTemplates = new Set(metadata.requiredSharedTemplates)
     for (const shared of sharedFiles) {
-      if (!shared.skills.includes(name) || included.has(shared.filename)) {
+      if (!requiredSharedTemplates.has(shared.filename) || included.has(shared.filename)) {
         continue
       }
       files.push({
         filename: shared.filename,
-        content: applyVariables(shared.content, finalVariables),
+        content: this.templateRenderer.render({
+          templateSource: shared.content,
+          context: this.filterContextForSkill(metadata, context),
+          includeFrontmatter: false,
+        }),
         shared: true,
       })
       included.add(shared.filename)
+    }
+
+    for (const filename of metadata.requiredSharedTemplates) {
+      if (!included.has(filename)) {
+        throw new InvalidSkillTemplateMetadataError(
+          path.join(skillDir, 'skill.meta.json'),
+          `required shared template '${filename}' does not exist`,
+        )
+      }
     }
 
     return new ResolvedSkillBundle(skill.name, skill.description, files)
   }
 
   /**
-   * Lists shared files declared by metadata files in `templates/shared`.
+   * Lists shared files available in `templates/shared`.
    *
    * @returns Shared-file records.
    */
@@ -208,29 +224,19 @@ class FsSkillRepository implements SkillRepository {
       return []
     }
 
-    const metadataFiles = entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.meta.json'))
+    const templateFiles = entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md.tpl'))
       .map((entry) => entry.name)
       .sort()
 
     const output: SharedFile[] = []
-    for (const metadataFile of metadataFiles) {
-      const metadataPath = path.join(sharedRoot, metadataFile)
-      const metadataRaw = readFileSync(metadataPath, 'utf8')
-      const metadata = JSON.parse(metadataRaw) as { filename?: unknown; skills?: unknown }
-
-      if (typeof metadata.filename !== 'string' || !Array.isArray(metadata.skills)) {
-        continue
-      }
-
-      const skills = metadata.skills.filter((value): value is string => typeof value === 'string')
-      const contentPath = path.join(sharedRoot, metadata.filename)
-      const content = readFileSync(contentPath, 'utf8')
+    for (const templateFile of templateFiles) {
+      const outputFilename = this.templateRenderer.normalizeOutputFilename(templateFile)
+      const content = readFileSync(path.join(sharedRoot, templateFile), 'utf8')
 
       output.push({
-        filename: metadata.filename,
+        filename: outputFilename,
         content,
-        skills,
       })
     }
 
@@ -247,13 +253,57 @@ class FsSkillRepository implements SkillRepository {
     const skillDir = path.join(this.templatesRoot, skillName)
     const entries = readdirSync(skillDir, { withFileTypes: true })
     const markdownFiles = entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md.tpl'))
       .map((entry) => entry.name)
       .sort()
 
     return markdownFiles.map((filename) =>
       this.templateReader.createTemplate(filename, path.join(skillDir, filename)),
     )
+  }
+
+  /**
+   * Filters the public render context down to metadata-supported capabilities.
+   *
+   * @param metadata - Skill metadata contract.
+   * @param context - Incoming render context.
+   * @returns Filtered render context.
+   */
+  private filterContextForSkill(
+    metadata: SkillTemplateMetadata,
+    context: SkillTemplateContext,
+  ): SkillTemplateContext {
+    const supported = new Set(metadata.supportedCapabilities)
+    const capabilities = (context.capabilities ?? []).filter((capability) =>
+      supported.has(capability),
+    )
+    return {
+      ...(context.variables !== undefined ? { variables: context.variables } : {}),
+      ...(capabilities.length > 0 ? { capabilities } : {}),
+    }
+  }
+
+  /**
+   * Validates that all required capabilities are present before rendering.
+   *
+   * @param skillName - Skill name used for diagnostics.
+   * @param metadata - Skill metadata contract.
+   * @param capabilities - Provided capability list.
+   * @throws {InvalidSkillTemplateMetadataError} When required capabilities are missing.
+   */
+  private validateCapabilities(
+    skillName: string,
+    metadata: SkillTemplateMetadata,
+    capabilities: readonly string[],
+  ): void {
+    const provided = new Set(capabilities)
+    const missing = metadata.requiredCapabilities.filter((capability) => !provided.has(capability))
+    if (missing.length > 0) {
+      throw new InvalidSkillTemplateMetadataError(
+        path.join(this.templatesRoot, skillName, 'skill.meta.json'),
+        `missing required capabilities: ${missing.join(', ')}`,
+      )
+    }
   }
 }
 
@@ -265,7 +315,12 @@ class FsSkillRepository implements SkillRepository {
  */
 export function createSkillRepository(options: SkillRepositoryOptions = {}): SkillRepository {
   const templatesRoot = options.templatesRoot ?? resolveDefaultTemplatesRoot()
-  return new FsSkillRepository(templatesRoot, new TemplateReader())
+  return new FsSkillRepository(
+    templatesRoot,
+    new TemplateReader(),
+    new SkillTemplateMetadataReader(),
+    new TemplateRenderer(),
+  )
 }
 
 /**
@@ -333,17 +388,4 @@ function derivePackageRoot(packageName: string, entryPath: string): string | nul
     }
     current = parent
   }
-}
-
-/**
- * Applies `{{key}}` substitution using invocation-time variables.
- *
- * @param content - Template content.
- * @param variables - Variable map.
- * @returns Content with placeholders replaced where possible.
- */
-function applyVariables(content: string, variables: Readonly<Record<string, string>>): string {
-  return content.replaceAll(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_match, key: string) => {
-    return variables[key] ?? `{{${key}}}`
-  })
 }

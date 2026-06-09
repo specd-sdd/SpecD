@@ -22,12 +22,12 @@
 
 ### Requirement: Frontmatter injection
 
-#### Scenario: Install adds frontmatter
+#### Scenario: Install emits Claude-compatible frontmatter through skills rendering
 
 - **WHEN** `install()` is called
-- **THEN** YAML frontmatter is prepended to each skill-local markdown file
+- **THEN** skill-local markdown files are written with Claude-compatible frontmatter already present in the rendered content
 
-#### Scenario: Install does not prepend skill frontmatter to shared files
+#### Scenario: Shared files do not receive Claude frontmatter
 
 - **GIVEN** a resolved bundle includes files marked as shared
 - **WHEN** `install()` writes those files
@@ -35,33 +35,33 @@
 
 ### Requirement: Install location
 
-#### Scenario: Installs to .claude/skills/
+#### Scenario: Installs to .claude/skills/ and sharedFolder default location
 
 - **GIVEN** a `SpecdConfig` with `projectRoot`
 - **WHEN** install is called with that configuration
 - **THEN** non-shared files are written to `{projectRoot}/.claude/skills/<skill-name>/`
-- **AND** shared files are written to `{projectRoot}/.claude/skills/_specd-shared/`
+- **AND** shared files are written to the resolved `sharedFolder` location under the project root
 
 #### Scenario: Shared directory is not discovered as a skill
 
-- **WHEN** install creates `.claude/skills/_specd-shared/`
-- **THEN** the directory does not contain a `SKILL.md` file
+- **WHEN** install writes shared files to the resolved shared location
+- **THEN** that location does not contain a `SKILL.md` file
 
 ### Requirement: Uninstall behavior
 
 #### Scenario: Uninstall removes selected skill directories and keeps shared resources
 
-- **GIVEN** multiple skills are installed and share `.claude/skills/_specd-shared/`
+- **GIVEN** multiple skills are installed and share the resolved `sharedFolder` location
 - **WHEN** `uninstall(config, { skills: ['specd'] })` is executed
 - **THEN** only `.claude/skills/specd/` is removed
-- **AND** `.claude/skills/_specd-shared/` remains
+- **AND** the resolved shared location remains
 
 #### Scenario: Uninstall without filter removes only specd-managed skills and shared resources
 
 - **GIVEN** specd-managed skills and unrelated user skills are installed under `.claude/skills/`
 - **WHEN** `uninstall(config)` is executed without `skills`
 - **THEN** all specd-managed skill directories are removed
-- **AND** `.claude/skills/_specd-shared/` is removed
+- **AND** the resolved sharedFolder location is removed
 - **AND** unrelated user skill directories remain
 
 ### Requirement: Domain layer
@@ -78,14 +78,35 @@
 
 ### Requirement: Frontmatter type
 
-#### Scenario: Frontmatter defines required and optional fields
+#### Scenario: Frontmatter values cover Claude-supported metadata
 
-- **WHEN** Frontmatter is used
-- **THEN** it includes `description` (required), and optional fields like `name`, `when_to_use`, `argument_hint`, etc.
+- **WHEN** Claude frontmatter values are prepared for install
+- **THEN** they can represent the Claude-supported metadata fields
+- **AND** they are stored as structured values rather than a prebuilt YAML document
+
+#### Scenario: Unsupported Claude metadata stays out of the value collection
+
+- **WHEN** a non-Claude metadata key is proposed
+- **THEN** it is excluded from the Claude frontmatter value collection
 
 ### Requirement: Application layer
 
-#### Scenario: Application layer contains InstallSkills use case
+#### Scenario: InstallSkills passes Claude values into skills rendering
 
-- **WHEN** the application layer is inspected
-- **THEN** `InstallSkills` use case exists that orchestrates skill installation
+- **GIVEN** skills are available from `@specd/skills`
+- **WHEN** `InstallSkills` runs
+- **THEN** it resolves Claude frontmatter source values per skill
+- **AND** it passes only Claude capability identifiers into `@specd/skills`
+- **AND** it resolves install bundles through `ResolveBundle`
+
+#### Scenario: Shared files are written to the rendered sharedFolder location
+
+- **GIVEN** a resolved bundle contains files marked as shared
+- **WHEN** `InstallSkills` writes those files
+- **THEN** they are written to the resolved sharedFolder location under the project root
+
+#### Scenario: Claude install does not call repository bundle resolution directly
+
+- **WHEN** the Claude install flow is reviewed
+- **THEN** bundle resolution goes through `ResolveBundle`
+- **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`

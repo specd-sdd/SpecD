@@ -26,6 +26,16 @@ export function useChangeArtifactList(
   refreshKey = 0,
   options: { poll?: boolean; listSection?: ChangeListSection | null } = {},
 ): {
+  items: ReadonlyArray<{
+    filename: string
+    type?: string
+    artifactType?: string
+    hasTasks?: boolean
+    totalTasks?: number
+    completedTasks?: number
+    state?: string
+    displayStatus?: string
+  }>
   scopeGroups: readonly ArtifactScopeGroup[]
   isLoading: boolean
   error: Error | undefined
@@ -40,23 +50,42 @@ export function useChangeArtifactList(
       filename: string
       type?: string
       artifactType?: string
+      hasTasks?: boolean
+      totalTasks?: number
+      completedTasks?: number
       state?: string
       displayStatus?: string
     }> = Array.isArray(raw)
       ? (raw as unknown[] as typeof items)
       : (((raw as unknown as { artifacts?: unknown[] }).artifacts ?? []) as typeof items)
 
-    return groupChangeArtifactEntries(items)
+    return {
+      items,
+      grouped: groupChangeArtifactEntries(items),
+    }
   }, [port, changeName, listSection])
 
-  const resource = useAsyncResource<readonly ArtifactScopeGroup[]>(
+  const resource = useAsyncResource<{
+    readonly items: ReadonlyArray<{
+      filename: string
+      type?: string
+      artifactType?: string
+      hasTasks?: boolean
+      totalTasks?: number
+      completedTasks?: number
+      state?: string
+      displayStatus?: string
+    }>
+    readonly grouped: readonly ArtifactScopeGroup[]
+  }>(
     changeReadCacheKey(listSection, `change-artifact-list:${changeName ?? ''}`),
     load,
     { enabled: Boolean(changeName), refreshKey: poll ? refreshKey : undefined },
   )
 
   return {
-    scopeGroups: resource.data ?? [],
+    items: resource.data?.items ?? [],
+    scopeGroups: resource.data?.grouped ?? [],
     isLoading: resource.isLoading,
     error: resource.error,
   }

@@ -14,6 +14,31 @@ The **Dto Graph Search** wire shape MUST use camelCase property names stable acr
 
 [`api:presenter-graph`](../presenter-graph/spec.md) MUST map kernel or graph results into this DTO and MUST NOT embed lifecycle, validation, or approval logic.
 
+### Requirement: symbol hits use reusable graph symbol refs
+
+`GraphSearchResultDto.symbols[]` MUST include:
+
+- `workspace`
+- `symbol`
+- `score`
+- `snippet`
+- `startLine`
+- `endLine`
+
+The nested `symbol` object MUST use the reusable shape defined by
+[`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) rather than repeating ad hoc symbol
+location fields inline.
+
+### Requirement: spec hits expose preview context
+
+`GraphSearchResultDto.specs[]` MUST include preview context from graph search:
+
+- `snippet`
+- `startLine`
+- `endLine`
+
+Those fields MUST reflect the persisted graph-search preview contract rather than being recomputed by the API.
+
 ### Requirement: optional fields are omitted rather than null
 
 Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`.
@@ -30,3 +55,4 @@ Optional properties MUST be omitted from JSON when absent unless the OpenAPI sch
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+- [`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) — reusable graph symbol reference

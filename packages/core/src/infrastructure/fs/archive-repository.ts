@@ -1,9 +1,18 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { ArchivedChange } from '../../domain/entities/archived-change.js'
+import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type Change } from '../../domain/entities/change.js'
 import {
+  type ArchivedChangeIndexEntry,
+  workspacesFromSpecIds,
+} from '../../domain/archived-change-index-entry.js'
+import { toArchivedChangeView } from '../../domain/read-only-change-view.js'
+import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
+import {
   ArchiveRepository,
+  type ArchiveListOptions,
+  type ArchiveListResult,
+  type ArchivePathEntry,
   type ArchiveRepositoryConfig,
 } from '../../application/ports/archive-repository.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
@@ -14,13 +23,20 @@ import { changeDirName } from './dir-name.js'
 import { isEnoent } from './is-enoent.js'
 import { moveDir } from './move-dir.js'
 import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
+import { sha256 } from './hash.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { type ChangeManifest, changeManifestSchema } from './manifest.js'
+import { loadChangeFromManifest } from './manifest-change-loader.js'
 
 /** Filename of the append-only archive index at the archive root. */
 const INDEX_FILE = '.specd-index.jsonl'
+const INDEX_META_FILE = '.specd-index-meta.json'
 const ARCHIVE_GITIGNORE_FILE = '.gitignore'
-const ARCHIVE_RUNTIME_GITIGNORE_ENTRIES = ['.specd-index.jsonl', '.staging'] as const
+const ARCHIVE_RUNTIME_GITIGNORE_ENTRIES = [
+  '.specd-index.jsonl',
+  '.staging',
+  INDEX_META_FILE,
+] as const
 
 /** Default archive pattern when none is configured. */
 const DEFAULT_PATTERN = '{{change.archivedName}}'
@@ -128,6 +144,62 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 
   /**
+   * Reads the current total archived change count from the metadata file.
+   *
+   * Falls back to a full index scan if the file is missing or corrupted.
+   *
+   * @returns The total number of archived changes
+   */
+  private async _readMetaCount(): Promise<number> {
+    const metaPath = path.join(this._archivePath, INDEX_META_FILE)
+    try {
+      const content = await fs.readFile(metaPath, 'utf8')
+      const data = JSON.parse(content) as Record<string, unknown> | null
+      if (data !== null && typeof data === 'object' && typeof data.totalCount === 'number') {
+        return data.totalCount
+      }
+    } catch (err) {
+      if (!isEnoent(err)) {
+        Logger.debug(
+          'FsArchiveRepository failed to read metadata file; falling back to index scan',
+          {
+            error: err,
+          },
+        )
+      }
+    }
+
+    // Fallback: full index scan
+    try {
+      const lines = await this._readIndexLines()
+      const names = new Set<string>()
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line) as IndexEntry
+          names.add(entry.name)
+        } catch {
+          continue
+        }
+      }
+      return names.size
+    } catch (err) {
+      if (!isEnoent(err)) throw err
+      return 0
+    }
+  }
+
+  /**
+   * Writes the total archived change count to the metadata file atomically.
+   *
+   * @param count - The new total count
+   */
+  private async _writeMetaCount(count: number): Promise<void> {
+    const metaPath = path.join(this._archivePath, INDEX_META_FILE)
+    await fs.mkdir(this._archivePath, { recursive: true })
+    await writeFileAtomic(metaPath, JSON.stringify({ totalCount: count }, null, 2) + '\n')
+  }
+
+  /**
    * Moves the change directory to the archive, records an `archivedAt`
    * timestamp in the manifest, and appends an entry to `index.jsonl`.
    *
@@ -186,12 +258,19 @@ export class FsArchiveRepository extends ArchiveRepository {
       }
       await this._writeManifestAtomic(stageDir, archivedManifest)
 
-      const archivedChange = this._buildArchivedChange(archivedManifest, archivedName, archivedAt)
+      const previousCount = await this._readMetaCount()
 
       await fs.mkdir(path.dirname(archiveDir), { recursive: true })
       await moveDir(stageDir, archiveDir)
       await this._ensureArchiveRuntimeGitignore()
       await this._appendIndex(this._buildIndexEntry(archivedManifest, relPath))
+      await this._writeMetaCount(previousCount + 1)
+
+      const archivedChange = toArchivedChangeView(change, {
+        archivedName,
+        archivedAt,
+        ...(options?.actor !== undefined ? { archivedBy: options.actor } : {}),
+      })
 
       Logger.debug('FsArchiveRepository completed staged archive commit', {
         change: change.name,
@@ -210,57 +289,66 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 
   /**
-   * Lists all archived changes in chronological order (oldest first).
+   * Lists archived changes in this workspace in chronological order (oldest first).
    *
-   * Reads `index.jsonl` from the start. Deduplicates by name so that the last
-   * index entry wins in case of duplicates introduced by manual recovery.
+   * Streams `index.jsonl` from the start, deduplicating by name so that the
+   * last entry wins in case of duplicates introduced by manual recovery.
    *
-   * @returns All archived changes in chronological order
+   * @param options - Pagination and filtering options
+   * @returns Paginated index-backed archive result, oldest first
    */
-  override async list(): Promise<ArchivedChange[]> {
+  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
     await this._ensureIndex()
     const lines = await this._readIndexLines()
-    const map = new Map<string, ArchivedChange>()
+    const map = new Map<string, ArchivedChangeIndexEntry>()
 
     for (const line of lines) {
       try {
         const entry = JSON.parse(line) as IndexEntry
-
-        if (entry.createdAt !== undefined) {
-          // Enriched index entry — build ArchivedChange without reading manifest
-          const createdAt = new Date(entry.createdAt)
-          const archivedAt = new Date(entry.archivedAt ?? entry.createdAt)
-          const archivedName = changeDirName(entry.name, createdAt)
-          map.set(
-            entry.name,
-            new ArchivedChange({
-              name: entry.name,
-              archivedName,
-              archivedAt,
-              ...(entry.archivedBy !== undefined ? { archivedBy: entry.archivedBy } : {}),
-              artifacts: entry.artifacts ?? [],
-              specIds: entry.specIds ?? [],
-              schemaName: entry.schemaName ?? 'unknown',
-              schemaVersion: entry.schemaVersion ?? 0,
-            }),
-          )
-        } else {
-          // Legacy index entry — fall back to reading manifest
-          const archiveDir = this._resolveArchiveDirPath(entry.path)
-          const manifest = await this._loadManifest(archiveDir)
-          const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
-          const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
-          map.set(entry.name, this._buildArchivedChange(manifest, archivedName, archivedAt))
+        const row = await this._indexEntryToRow(entry)
+        if (row !== null) {
+          map.set(entry.name, row)
         }
       } catch (err) {
-        // Skip malformed JSON lines, missing manifest directories (ENOENT), or
-        // invalid manifest structure (SyntaxError). Re-throw unexpected I/O errors.
         if (err instanceof SyntaxError || isEnoent(err)) continue
         throw err
       }
     }
 
-    return Array.from(map.values())
+    const allItems = Array.from(map.values())
+    const limit = options?.limit ?? 100
+    const total = await this._readMetaCount()
+
+    let items = allItems
+    let page: number | undefined
+    let startAt: string | undefined
+
+    if (options?.startAt !== undefined) {
+      startAt = options.startAt
+      const startIdx = items.findIndex((i) => i.name === options.startAt)
+      if (startIdx >= 0) {
+        items = items.slice(startIdx + 1)
+      }
+    } else {
+      const p = options?.page ?? 1
+      page = p
+      const offset = (p - 1) * limit
+      items = items.slice(offset)
+    }
+
+    const count = Math.min(items.length, limit)
+    items = items.slice(0, limit)
+
+    return {
+      items,
+      meta: {
+        total,
+        count,
+        limit,
+        ...(page !== undefined ? { page } : {}),
+        ...(startAt !== undefined ? { startAt } : {}),
+      },
+    }
   }
 
   /**
@@ -277,10 +365,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     const entry = await this._findInIndexReverse(name)
     if (entry !== null) {
       const archiveDir = this._resolveArchiveDirPath(entry.path)
-      const manifest = await this._loadManifest(archiveDir)
-      const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
-      const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
-      return this._buildArchivedChange(manifest, archivedName, archivedAt)
+      return this._loadArchivedDetail(archiveDir)
     }
 
     // Fallback: scan directory tree
@@ -288,9 +373,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     if (found === null) return null
 
     const manifest = await this._loadManifest(found.dir)
-    const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
-    const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
-    const archivedChange = this._buildArchivedChange(manifest, archivedName, archivedAt)
+    const archivedChange = this._loadArchivedDetailFromManifest(manifest)
 
     // Recover: append enriched entry to index so future lookups are O(1)
     await this._appendIndex(this._buildIndexEntry(manifest, found.relPath))
@@ -314,6 +397,7 @@ export class FsArchiveRepository extends ArchiveRepository {
     await this._ensureArchiveRuntimeGitignore()
     await fs.mkdir(this._archivePath, { recursive: true })
     await writeFileAtomic(indexPath, content)
+    await this._writeMetaCount(entries.length)
   }
 
   /**
@@ -322,17 +406,38 @@ export class FsArchiveRepository extends ArchiveRepository {
    * Reconstructs the path deterministically from the archived change's
    * properties and the configured archive pattern.
    *
-   * @param archivedChange - The archived change to resolve the path for
+   * @param entry - Index row or full archived detail with path resolution fields
    * @returns The absolute path to the archived change's directory
    */
-  override archivePath(archivedChange: ArchivedChange): string {
+  override archivePath(entry: ArchivePathEntry): string {
     const relPath = this._expandPattern(
-      archivedChange.name,
-      archivedChange.archivedName,
-      archivedChange.archivedAt,
-      archivedChange.workspaces[0] ?? 'default',
+      entry.name,
+      entry.archivedName,
+      entry.archivedAt,
+      entry.workspaces[0] ?? 'default',
     )
     return resolveArchiveDirPathSync(this._archivePath, relPath)
+  }
+
+  /** @inheritdoc */
+  override async artifact(change: ArchivedChange, filename: string): Promise<SpecArtifact | null> {
+    const dir = this.archivePath(change)
+    const allowed = new Set<string>()
+    for (const artifact of change.artifacts.values()) {
+      for (const file of artifact.files.values()) {
+        allowed.add(normalizeRelativePath(file.filename))
+      }
+    }
+    const filePath = resolveConfinedPath(dir, filename, allowed.size > 0 ? allowed : undefined)
+    let content: string
+    try {
+      content = await fs.readFile(filePath, 'utf8')
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    return new SpecArtifact(filename, content, sha256(content))
   }
 
   // ---- Private helpers ----
@@ -393,19 +498,52 @@ export class FsArchiveRepository extends ArchiveRepository {
   }
 
   /**
-   * Constructs an `ArchivedChange` domain entity from a manifest and archive metadata.
+   * Maps an index line to an {@link ArchivedChangeIndexEntry}.
    *
-   * @param manifest - The parsed archive manifest
-   * @param archivedName - The timestamped directory name
-   * @param archivedAt - The timestamp when the change was archived
-   * @returns A new `ArchivedChange` instance
+   * Enriched entries are converted without manifest I/O. Legacy entries fall
+   * back to reading the archived manifest once.
+   *
+   * @param entry - Parsed index entry
+   * @returns Index row, or `null` when the entry cannot be resolved
    */
-  private _buildArchivedChange(
-    manifest: ChangeManifest,
-    archivedName: string,
-    archivedAt: Date,
-  ): ArchivedChange {
-    return new ArchivedChange({
+  private async _indexEntryToRow(entry: IndexEntry): Promise<ArchivedChangeIndexEntry | null> {
+    if (entry.createdAt !== undefined) {
+      const createdAt = new Date(entry.createdAt)
+      const archivedAt = new Date(entry.archivedAt ?? entry.createdAt)
+      const specIds = entry.specIds ?? []
+      return {
+        name: entry.name,
+        archivedName: changeDirName(entry.name, createdAt),
+        archivedAt,
+        ...(entry.archivedBy !== undefined ? { archivedBy: entry.archivedBy } : {}),
+        artifacts: entry.artifacts ?? [],
+        specIds,
+        schemaName: entry.schemaName ?? 'unknown',
+        schemaVersion: entry.schemaVersion ?? 0,
+        workspaces: workspacesFromSpecIds(specIds),
+      }
+    }
+
+    try {
+      const archiveDir = this._resolveArchiveDirPath(entry.path)
+      const manifest = await this._loadManifest(archiveDir)
+      return this._manifestToIndexEntry(manifest)
+    } catch (err) {
+      if (err instanceof SyntaxError || isEnoent(err)) return null
+      throw err
+    }
+  }
+
+  /**
+   * Builds an index row from manifest summary fields.
+   *
+   * @param manifest - Parsed archive manifest
+   * @returns Index-backed archive row
+   */
+  private _manifestToIndexEntry(manifest: ChangeManifest): ArchivedChangeIndexEntry {
+    const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
+    const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
+    return {
       name: manifest.name,
       archivedName,
       archivedAt,
@@ -414,6 +552,35 @@ export class FsArchiveRepository extends ArchiveRepository {
       specIds: manifest.specIds,
       schemaName: manifest.schema.name,
       schemaVersion: manifest.schema.version,
+      workspaces: workspacesFromSpecIds(manifest.specIds),
+    }
+  }
+
+  /**
+   * Loads full archived detail from an archive directory.
+   *
+   * @param archiveDir - Absolute path to the archived change directory
+   * @returns Manifest-backed archived read model
+   */
+  private async _loadArchivedDetail(archiveDir: string): Promise<ArchivedChange> {
+    const manifest = await this._loadManifest(archiveDir)
+    return this._loadArchivedDetailFromManifest(manifest)
+  }
+
+  /**
+   * Constructs full archived detail from a parsed manifest.
+   *
+   * @param manifest - Parsed archive manifest
+   * @returns Manifest-backed archived read model
+   */
+  private _loadArchivedDetailFromManifest(manifest: ChangeManifest): ArchivedChange {
+    const archivedName = changeDirName(manifest.name, new Date(manifest.createdAt))
+    const archivedAt = new Date(manifest.archivedAt ?? manifest.createdAt)
+    const change = loadChangeFromManifest(manifest)
+    return toArchivedChangeView(change, {
+      archivedName,
+      archivedAt,
+      ...(manifest.archivedBy !== undefined ? { archivedBy: manifest.archivedBy } : {}),
     })
   }
 

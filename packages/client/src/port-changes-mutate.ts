@@ -1,11 +1,17 @@
 import type { ArtifactContentDto } from './dto/artifact-content.js'
 import type { ChangeDetailDto } from './dto/change-detail.js'
+import type {
+  UpdateImplementationTrackingResultDto,
+  UpdateSpecDependenciesResultDto,
+} from './dto/implementation-tracking.js'
 import type { ValidateBatchResultDto } from './dto/validate-batch-result.js'
 import type { ValidateResultDto } from './dto/validate-result.js'
 import type {
   PatchChangeInput,
   SaveChangeArtifactInput,
   TransitionChangeInput,
+  UpdateImplementationTrackingInput,
+  UpdateSpecDependenciesInput,
   ValidateChangeBatchInput,
   ValidateChangeInput,
 } from './inputs.js'
@@ -52,12 +58,12 @@ export interface PortChangesMutate {
   ): Promise<ChangeDetailDto>
   updateSpecDependencies(
     name: string,
-    body: Record<string, unknown>,
+    body: UpdateSpecDependenciesInput,
     signal?: AbortSignal,
-  ): Promise<ChangeDetailDto>
+  ): Promise<UpdateSpecDependenciesResultDto>
   updateImplementationTracking(
     name: string,
-    body: Record<string, unknown>,
+    body: UpdateImplementationTrackingInput,
     signal?: AbortSignal,
-  ): Promise<ChangeDetailDto>
+  ): Promise<UpdateImplementationTrackingResultDto>
 }

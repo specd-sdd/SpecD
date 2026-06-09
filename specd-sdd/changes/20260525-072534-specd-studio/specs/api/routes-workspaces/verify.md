@@ -2,14 +2,14 @@
 
 ## Requirements
 
-### Requirement: GET workspaces lists configured workspaces
+### Requirement: GET workspaces lists orchestrated project workspaces
 
-#### Scenario: Workspaces endpoint returns yaml workspaces
+#### Scenario: Workspaces endpoint returns orchestrated workspaces in declaration order
 
 - **GIVEN** `specd.yaml` lists `core` and `cli`
 - **WHEN** `GET /v1/workspaces`
 - **THEN** JSON array includes both ids
-- **AND** paths are relative to project root
+- **AND** rows preserve the same workspace ordering
 
 #### Scenario: Empty workspace config yields empty list
 
@@ -17,6 +17,12 @@
 - **WHEN** workspaces endpoint is called
 - **THEN** HTTP 200 with `[]`
 - **AND** UI shows empty state
+
+#### Scenario: Response may enrich orchestrated rows with descriptor fields
+
+- **WHEN** `GET /v1/workspaces` is serialized
+- **THEN** each row may include config-derived `prefix` or `specsPath`
+- **AND** the underlying workspace membership still comes from `ListWorkspaces`
 
 #### Scenario: Workspace ids are stable keys for tree route
 

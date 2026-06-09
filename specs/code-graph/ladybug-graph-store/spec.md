@@ -60,12 +60,13 @@ The Ladybug schema SHALL define the following node tables:
 
 **File** — source files indexed from workspace code roots.
 
-| Column      | Type   | Notes                                      |
-| ----------- | ------ | ------------------------------------------ |
-| path        | STRING | Primary key. `{workspace}:{relativePath}`. |
-| language    | STRING | Language identifier (e.g. `typescript`).   |
-| contentHash | STRING | SHA-256 hash of file content.              |
-| workspace   | STRING | Workspace name (e.g. `core`, `cli`).       |
+| Column      | Type   | Notes                                                         |
+| ----------- | ------ | ------------------------------------------------------------- |
+| path        | STRING | Primary key. `{workspace}:{relativePath}`.                    |
+| language    | STRING | Language identifier (e.g. `typescript`).                      |
+| contentHash | STRING | SHA-256 hash of file content.                                 |
+| content     | STRING | Persisted file source content used to derive symbol snippets. |
+| workspace   | STRING | Workspace name (e.g. `core`, `cli`).                          |
 
 **Symbol** — code symbols extracted from files.
 
@@ -91,6 +92,16 @@ The Ladybug schema SHALL define the following node tables:
 | contentHash | STRING | SHA-256 hash of concatenated artifacts (excluding metadata artifact content when that is not part of searchable spec content). |
 | content     | STRING | Concatenated artifact text for full-text search.                                                                               |
 | workspace   | STRING | Workspace name.                                                                                                                |
+
+**Document** — textual non-code resources.
+
+| Column             | Type   | Notes                                      |
+| ------------------ | ------ | ------------------------------------------ |
+| path               | STRING | Primary key. `{workspace}:{relativePath}`. |
+| configRelativePath | STRING | Path relative to specd.yaml.               |
+| contentHash        | STRING | SHA-256 hash of content.                   |
+| content            | STRING | Raw textual content.                       |
+| workspace          | STRING | Workspace name (or `root`).                |
 
 **Meta** — key-value metadata for the database itself.
 
@@ -124,23 +135,29 @@ Relationship tables have no persisted edge properties unless a requirement expli
 
 ### Requirement: Full-text search implementation
 
-`LadybugGraphStore` SHALL implement symbol and spec search using Ladybug's full-text search facilities.
+`LadybugGraphStore` SHALL implement symbol, spec, and document search using Ladybug's full-text search facilities.
 
 The adapter MUST:
 
-- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()` and `GraphStore.searchSpecs()` contract
+- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()`, `GraphStore.searchSpecs()`, and `GraphStore.searchDocuments()` contract
 - index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching
 - index spec title, description, and full content for spec search
+- index document paths and full textual content
+- prioritize **exact identity matches** during search by applying a score boost to nodes where the query exactly matches the `path` or `name` column
 - join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)
 - return results ordered from highest to lowest relevance, relying on the backend's ranking to prioritize records matching more search terms (precision mode)
 - rebuild or recreate FTS indexes when required by the backend after bulk data changes
+- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches
 
 The Ladybug FTS schema MUST include:
 
 - **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`
 - **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`
+- **`document_fts`** — covering `Document.content` and `Document.path`
 
 The implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.
+
+Persisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change.
 
 ### Requirement: Schema versioning
 

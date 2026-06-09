@@ -14,8 +14,13 @@ export interface ChangeStatusDto {
     readonly reason: string
     readonly command: string | null
   }
+  readonly totalTasks?: number
+  readonly completedTasks?: number
   readonly artifacts?: readonly {
     readonly type: string
+    readonly hasTasks: boolean
+    readonly totalTasks?: number
+    readonly completedTasks?: number
     readonly state: string
     readonly effectiveStatus: string
     readonly displayStatus: string

@@ -10,6 +10,8 @@ React data hooks for **Hooks Workspaces Specs**: loading state, error propagatio
 
 The hooks MUST call `listWorkspaces` and spec tree/list methods on `client:port-workspaces-specs`.
 
+When a spec detail view is active, the spec hooks MUST also load structured spec context through `getSpecContext()` and preserve that structure for the consuming component.
+
 ### Requirement: workspace tree refreshes on global poll
 
 Tree metadata MUST refresh on the global poll interval; per-spec detail loads when a spec tab becomes visible.

@@ -4,6 +4,7 @@ import { type IndexOptions } from '../domain/value-objects/index-options.js'
 import { type IndexResult } from '../domain/value-objects/index-result.js'
 import { type SymbolNode } from '../domain/value-objects/symbol-node.js'
 import { type FileNode } from '../domain/value-objects/file-node.js'
+import { type DocumentNode } from '../domain/value-objects/document-node.js'
 import { type SpecNode } from '../domain/value-objects/spec-node.js'
 import { type SymbolQuery } from '../domain/value-objects/symbol-query.js'
 import { type GraphStatistics } from '../domain/value-objects/graph-statistics.js'
@@ -18,6 +19,12 @@ import { type ChangeDetectionResult } from '../domain/value-objects/change-detec
 import { type HotspotOptions, type HotspotResult } from '../domain/value-objects/hotspot-result.js'
 import { type Relation } from '../domain/value-objects/relation.js'
 import { type SearchOptions } from '../domain/value-objects/search-options.js'
+import {
+  resolveFileSelector,
+  resolveSymbolSelector,
+  type ResolvedFileSelector,
+  type ResolvedSymbolSelector,
+} from '../application/services/resolve-graph-selector.js'
 import { getUpstream } from '../domain/services/get-upstream.js'
 import { getDownstream } from '../domain/services/get-downstream.js'
 import { analyzeImpact } from '../domain/services/analyze-impact.js'
@@ -35,10 +42,12 @@ export class CodeGraphProvider {
    * Creates a new CodeGraphProvider.
    * @param store - The underlying graph store.
    * @param indexer - The indexing use case.
+   * @param projectRoot - Optional project root path to make configuration paths relative.
    */
   constructor(
     private readonly store: GraphStore,
     private readonly indexer: IndexCodeGraph,
+    private readonly projectRoot?: string,
   ) {}
 
   /**
@@ -92,12 +101,54 @@ export class CodeGraphProvider {
   }
 
   /**
+   * Retrieves a document node by its path.
+   * @param path - The document path.
+   * @returns The document node, or undefined if not found.
+   */
+  async getDocument(path: string): Promise<DocumentNode | undefined> {
+    return this.store.getDocument(path)
+  }
+
+  /**
    * Finds files by their config-relative path.
    * @param configRelativePath - The config-relative path to search for.
    * @returns Matching file nodes.
    */
   async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
     return this.store.findFilesByConfigRelativePath(configRelativePath)
+  }
+
+  /**
+   * Finds documents by their config-relative path.
+   * @param configRelativePath - The config-relative path to search for.
+   * @returns Matching document nodes.
+   */
+  async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
+    return this.store.findDocumentsByConfigRelativePath(configRelativePath)
+  }
+
+  /**
+   * Resolves a file-bearing selector into canonical graph identities.
+   * @param input - The raw selector string.
+   * @returns Matching canonical file or document entries.
+   */
+  async resolveFileSelector(input: string): Promise<ResolvedFileSelector[]> {
+    return resolveFileSelector(input, {
+      store: this.store,
+      ...(this.projectRoot !== undefined ? { projectRoot: this.projectRoot } : {}),
+    })
+  }
+
+  /**
+   * Resolves a symbol selector into canonical graph identities.
+   * @param input - The raw selector string.
+   * @returns Matching canonical symbol entries.
+   */
+  async resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelector[]> {
+    return resolveSymbolSelector(input, {
+      store: this.store,
+      ...(this.projectRoot !== undefined ? { projectRoot: this.projectRoot } : {}),
+    })
   }
 
   /**
@@ -280,7 +331,15 @@ export class CodeGraphProvider {
    */
   async searchSymbols(
     options: SearchOptions,
-  ): Promise<Array<{ symbol: SymbolNode; score: number }>> {
+  ): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
     return this.store.searchSymbols(options)
   }
 
@@ -288,9 +347,33 @@ export class CodeGraphProvider {
    * Full-text search across specs (title, description, and content).
    * Filters are applied at the store level before LIMIT.
    * @param options - Search options including query, limit, and filters.
-   * @returns Matching specs with BM25 scores, ordered by relevance.
+   * @returns Matching specs with BM25 scores and snippets, ordered by relevance.
    */
-  async searchSpecs(options: SearchOptions): Promise<Array<{ spec: SpecNode; score: number }>> {
+  async searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  > {
     return this.store.searchSpecs(options)
+  }
+
+  /**
+   * Full-text search across documents (path and content).
+   * Filters are applied at the store level before LIMIT.
+   * @param options - Search options including query, limit, and filters.
+   * @returns Matching documents with scores and snippets, ordered by relevance.
+   */
+  async searchDocuments(
+    options: SearchOptions,
+  ): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  > {
+    return this.store.searchDocuments(options)
   }
 }

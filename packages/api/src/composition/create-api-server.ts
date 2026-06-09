@@ -168,16 +168,10 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
     { prefix: '/v1' },
   )
 
-  app.setNotFoundHandler(async (request, reply) => {
-    if (request.url.startsWith('/v1')) {
-      return sendApiNotFound(reply)
-    }
-    return reply.status(404).send({ error: 'Not Found' })
-  })
-
+  let spaIndexPath: string | null = null
   if (options.uiDistPath !== undefined) {
-    const indexPath = path.join(options.uiDistPath, 'index.html')
-    if (!fs.existsSync(indexPath)) {
+    spaIndexPath = path.join(options.uiDistPath, 'index.html')
+    if (!fs.existsSync(spaIndexPath)) {
       throw new Error(
         `Studio UI dist is missing index.html at ${options.uiDistPath}. Run: pnpm --filter @specd/studio-web build`,
       )
@@ -186,24 +180,26 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
       root: options.uiDistPath,
       prefix: '/',
     })
-    app.setNotFoundHandler(async (request, reply) => {
-      if (request.url.startsWith('/v1')) {
-        return sendApiNotFound(reply)
-      }
-      const pathname = request.url.split('?')[0] ?? request.url
-      const hasFileExtension = /\.[a-z0-9]+$/i.test(pathname)
-      const acceptsHtml = (request.headers.accept ?? '').includes('text/html')
-      if (
-        request.method === 'GET' &&
-        !hasFileExtension &&
-        acceptsHtml &&
-        fs.existsSync(indexPath)
-      ) {
-        return reply.type('text/html').send(fs.readFileSync(indexPath, 'utf8'))
-      }
-      return reply.status(404).send({ error: 'Not Found' })
-    })
   }
+
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.url.startsWith('/v1')) {
+      return sendApiNotFound(reply)
+    }
+    const pathname = request.url.split('?')[0] ?? request.url
+    const hasFileExtension = /\.[a-z0-9]+$/i.test(pathname)
+    const acceptsHtml = (request.headers.accept ?? '').includes('text/html')
+    if (
+      spaIndexPath !== null &&
+      request.method === 'GET' &&
+      !hasFileExtension &&
+      acceptsHtml &&
+      fs.existsSync(spaIndexPath)
+    ) {
+      return reply.type('text/html').send(fs.readFileSync(spaIndexPath, 'utf8'))
+    }
+    return reply.status(404).send({ error: 'Not Found' })
+  })
 
   const host = options.host ?? '127.0.0.1'
   const port = options.port ?? 3847

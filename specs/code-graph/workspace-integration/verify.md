@@ -89,38 +89,19 @@
 
 ### Requirement: Spec resolution via SpecRepository
 
-#### Scenario: Specs callback delegates to SpecRepository
+#### Scenario: Spec resolution pulls from repository
 
-- **WHEN** a workspace provides a `specs` callback backed by SpecRepository
-- **THEN** the indexer SHALL call it to get specs instead of walking the filesystem
-- **AND** the returned specs SHALL be stored with the workspace name
+- **WHEN** indexing specs
+- **THEN** the indexer SHALL directly call `SpecRepository` methods to extract semantics
+- **AND** it SHALL NOT rely on precomputed extraction callbacks
 
-#### Scenario: Content hash excludes metadata
+#### Scenario: Workspace-owned file is not duplicated under root namespace
 
-- **WHEN** a spec has artifacts `spec.md` and `verify.md`
-- **THEN** the contentHash SHALL be computed from all artifacts in `spec.filenames` concatenated
-- **AND** `spec.md` SHALL be ordered first, then the rest alphabetically
-- **AND** metadata SHALL NOT be included in the content hash
-
-#### Scenario: Metadata loaded via repository metadata port
-
-- **WHEN** a spec has metadata available via `repo.metadata(spec)`
-- **THEN** `title` SHALL be taken from `metadata.title`
-- **AND** `description` SHALL be taken from `metadata.description`
-- **AND** `dependsOn` SHALL be taken from `metadata.dependsOn`
-
-#### Scenario: Missing metadata uses defaults
-
-- **WHEN** `repo.metadata(spec)` returns `null`
-- **THEN** `title` SHALL default to the specId
-- **AND** `description` SHALL default to an empty string
-- **AND** `dependsOn` SHALL default to an empty array
-
-#### Scenario: Unique specIds across workspaces
-
-- **WHEN** `core` and `cli` both have a spec named `spec-metadata`
-- **THEN** specIds SHALL be `core:spec-metadata` and `cli:spec-metadata` respectively
-- **AND** no primary key collision SHALL occur
+- **GIVEN** a file under a configured workspace `codeRoot`
+- **AND** it also matches a project-global `graph.includePaths` pattern
+- **WHEN** the graph identity is computed
+- **THEN** the file receives only the workspace-prefixed identity
+- **AND** no `root:` identity is persisted for the same physical file
 
 ### Requirement: Cross-workspace import resolution
 

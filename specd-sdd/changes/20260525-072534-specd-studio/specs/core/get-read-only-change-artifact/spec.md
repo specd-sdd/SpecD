@@ -10,11 +10,11 @@ Studio and HTTP read routes for **drafted**, **discarded**, and (future) **archi
 
 For `readOnlyOrigin` `draft` or `discarded`, the use case MUST load the view via `getDraft` or `getDiscarded`, verify the filename is tracked on that view, then call `artifactReadOnly(readOnlyOrigin, name, filename)` and return `{ content, originalHash }` or a typed not-found error.
 
-For `readOnlyOrigin` `archived`, the use case MUST remain unimplemented until archived changes adopt `ReadOnlyChangeView`; callers MUST receive an explicit error rather than falling through to active-change APIs.
+For `readOnlyOrigin` `archived`, the use case MUST load the archived snapshot via `ArchiveRepository.get(name)`, verify the filename is tracked on that archived read-only view, then load bytes through the archive repository artifact reader and return `{ content, originalHash }`.
 
 ### Requirement: GetReadOnlyChangeArtifact does not expose Change
 
-The use case MUST NOT return a `Change` entity and MUST NOT call `mutate`, `mutateDraft`, or `get(name)` for active storage. HTTP handlers and Studio MUST invoke this use case (or the client port equivalent) for `/drafts/*` and `/discarded/*` artifact body routes — not `GetChangeArtifact`.
+The use case MUST NOT return a `Change` entity and MUST NOT call `mutate`, `mutateDraft`, or `get(name)` for active storage. HTTP handlers and Studio MUST invoke this use case (or the client port equivalent) for `/drafts/*`, `/discarded/*`, and archived artifact body routes — not `GetChangeArtifact`.
 
 ### Requirement: GetReadOnlyChangeArtifact enforces tracked-file confinement
 

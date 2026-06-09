@@ -10,10 +10,6 @@
 - **WHEN** `specd change deps add-auth auth/login --add auth/shared --add auth/jwt`
 - **THEN** the command exits with code 0
 - **AND** the output is:
-  ```
-  updated deps for auth/login in change add-auth
-  dependsOn: auth/shared, auth/jwt
-  ```
 
 #### Scenario: Remove deps from a spec in the change
 
@@ -29,6 +25,20 @@
 - **THEN** the command exits with code 0
 - **AND** the output includes `dependsOn: auth/session`
 - **AND** previous deps are fully replaced
+
+#### Scenario: List all dependencies in the change
+
+- **GIVEN** a change with multiple specs and some dependencies
+- **WHEN** `specd change deps <name>` is run without `<specId>` or flags
+- **THEN** the command exits with code 0
+- **AND** the output lists all specs in the change and their dependencies
+
+#### Scenario: Display dependencies for a specific spec
+
+- **GIVEN** a change with `specIds: ['core:a']` and some dependencies for it
+- **WHEN** `specd change deps <name> core:a` is run without flags
+- **THEN** the command exits with code 0
+- **AND** the output shows the dependencies for `core:a`
 
 ### Requirement: Output
 
@@ -65,15 +75,15 @@
 - **THEN** the command exits with code 1
 - **AND** stderr indicates --set is mutually exclusive with --add/--remove
 
-#### Scenario: Error when no flags provided
-
-- **WHEN** `specd change deps add-auth auth/login`
-- **THEN** the command exits with code 1
-- **AND** stderr indicates at least one of --add, --remove, or --set is required
-
 #### Scenario: Error when removing non-existent dep
 
 - **GIVEN** a change `add-auth` with no deps for `auth/login`
 - **WHEN** `specd change deps add-auth auth/login --remove auth/shared`
 - **THEN** the command exits with code 1
 - **AND** stderr indicates the dep was not found
+
+#### Scenario: Error when modification flags provided without specId
+
+- **WHEN** `specd change deps <name> --add core:other`
+- **THEN** the command exits with code 1
+- **AND** stderr indicates modification flags require a specId

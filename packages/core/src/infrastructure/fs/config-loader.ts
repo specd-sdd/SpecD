@@ -172,6 +172,14 @@ const WorkspaceGraphZodSchema = z
   .object({
     respectGitignore: z.boolean().optional(),
     excludePaths: z.array(z.string()).optional(),
+    allowedPaths: z.array(z.string()).optional(),
+  })
+  .strict()
+
+const ProjectGraphZodSchema = z
+  .object({
+    includePaths: z.array(z.string()).optional(),
+    excludePaths: z.array(z.string()).optional(),
   })
   .strict()
 
@@ -266,6 +274,7 @@ const SpecdYamlZodSchema = z
         signoff: z.boolean().optional(),
       })
       .optional(),
+    graph: ProjectGraphZodSchema.optional(),
     logging: LoggingZodSchema.optional(),
     context: z.array(ContextEntryRawZodSchema).optional(),
     contextIncludeSpecs: z.array(z.string()).optional(),
@@ -1108,6 +1117,12 @@ export class FsConfigLoader implements ConfigLoader {
     if (!data.workspaces.default) {
       throw new ConfigValidationError(rootConfigPath, "'workspaces.default' is required")
     }
+    if (data.workspaces.root) {
+      throw new ConfigValidationError(
+        rootConfigPath,
+        "'workspaces.root' is invalid because 'root' is reserved for project-global graph identities",
+      )
+    }
 
     const gitRoot = await findVcsRoot(configDir)
 
@@ -1176,6 +1191,9 @@ export class FsConfigLoader implements ConfigLoader {
                   : {}),
                 ...(ws.graph.excludePaths !== undefined
                   ? { excludePaths: ws.graph.excludePaths }
+                  : {}),
+                ...(ws.graph.allowedPaths !== undefined
+                  ? { allowedPaths: ws.graph.allowedPaths }
                   : {}),
               },
             }
@@ -1255,6 +1273,18 @@ export class FsConfigLoader implements ConfigLoader {
       workspaces,
       storage,
       approvals: { spec: data.approvals?.spec ?? false, signoff: data.approvals?.signoff ?? false },
+      ...(data.graph !== undefined
+        ? {
+            graph: {
+              ...(data.graph.includePaths !== undefined
+                ? { includePaths: data.graph.includePaths }
+                : {}),
+              ...(data.graph.excludePaths !== undefined
+                ? { excludePaths: data.graph.excludePaths }
+                : {}),
+            },
+          }
+        : {}),
       logging: { level: data.logging?.level ?? 'info' },
       ...(data.actorProvider !== undefined ? { actorProvider: data.actorProvider } : {}),
       ...(data.privacy !== undefined ? { privacy: data.privacy } : {}),

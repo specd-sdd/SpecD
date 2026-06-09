@@ -4,27 +4,20 @@
 
 ### Requirement: Input
 
-#### Scenario: With variables
+#### Scenario: With structured render context
 
-- **WHEN** `ResolveBundle` use case is executed with `{ name: 'skill', variables: { key: 'value' } }`
-- **THEN** it replaces `{{key}}` with 'value'
+- **WHEN** `ResolveBundle` use case is executed with `{ name: 'skill', context }`
+- **THEN** recursive variables and capability identifiers from `context` are available to template rendering
 
-#### Scenario: Without variables
+#### Scenario: Nested variables are accepted in context.variables
+
+- **WHEN** `ResolveBundle` receives nested data under `context.variables`
+- **THEN** that nested structure is preserved when passed to repository rendering
+
+#### Scenario: Without context
 
 - **WHEN** `ResolveBundle` use case is executed with `{ name: 'skill' }`
-- **THEN** placeholders remain as-is
-
-#### Scenario: With SpecdConfig for built-in variables
-
-- **GIVEN** a `SpecdConfig` with `projectRoot: '/path/to/project'`
-- **WHEN** `ResolveBundle` is executed with that config
-- **THEN** it automatically replaces `{{projectRoot}}` with '/path/to/project'
-
-#### Scenario: Shared marker is preserved in resolved output
-
-- **GIVEN** `SkillRepository.getBundle` returns files including a shared-marked file
-- **WHEN** `ResolveBundle` applies variable substitution
-- **THEN** the shared marker remains unchanged on that file in the output bundle
+- **THEN** templates render with an empty install-time context except for any built-in safe values provided through `config`
 
 ### Requirement: Output
 
@@ -35,22 +28,49 @@
 
 ### Requirement: Behavior
 
-#### Scenario: Built-in variables merged with user variables
+#### Scenario: Built-in safe values merge with install-time context
 
-- **GIVEN** a `SpecdConfig` with `projectRoot: '/path/to/project'`
-- **AND** user-provided variables `{ customKey: 'customValue' }`
+- **GIVEN** a `SpecdConfig`
+- **AND** install-time context with custom variables and capabilities
 - **WHEN** `ResolveBundle` is executed
-- **THEN** built-in variables (`{{projectRoot}}`, `{{configPath}}`, `{{schemaRef}}`) are available
-- **AND** user-provided variables override built-ins
+- **THEN** built-in safe values remain available in the merged render context
+- **AND** install-time context values are available to template rendering
 
-#### Scenario: Variable substitution replaces placeholders
+#### Scenario: sharedFolder is injected when absent
 
-- **GIVEN** a resolved file with content containing `{{outputPath}}`
-- **WHEN** `ResolveBundle` is called with `variables: { outputPath: '/tmp/output' }`
-- **THEN** all instances of `{{outputPath}}` are replaced with `/tmp/output`
+- **GIVEN** `variables.sharedFolder` is absent
+- **WHEN** `ResolveBundle` is executed with `SpecdConfig`
+- **THEN** a default relative shared folder value is injected into template rendering
 
-#### Scenario: Resolved file metadata preserved
+#### Scenario: sharedFolder trailing slash is normalized away
 
-- **GIVEN** a resolved file with `shared: true` metadata
-- **WHEN** `ResolveBundle` applies variable substitution
-- **THEN** the `shared` metadata is preserved in the output
+- **GIVEN** `variables.sharedFolder` ends with `/`
+- **WHEN** `ResolveBundle` is executed
+- **THEN** the rendered `sharedFolder` value omits the trailing `/`
+
+#### Scenario: sharedFolder escaping the project root is rejected
+
+- **GIVEN** `variables.sharedFolder` resolves outside `projectRoot`
+- **WHEN** `ResolveBundle` is executed
+- **THEN** bundle resolution fails
+
+#### Scenario: projectRoot is not exposed as a template variable
+
+- **GIVEN** `SpecdConfig` includes `projectRoot`
+- **WHEN** `ResolveBundle` executes
+- **THEN** `projectRoot` is used only for internal validation
+- **AND** it is not available as a public template variable
+
+#### Scenario: Structured context drives frontmatter composition
+
+- **GIVEN** a render context with `variables.frontmatter`
+- **AND** the `frontmatter` capability is present
+- **WHEN** `ResolveBundle` resolves a skill-local markdown template with a frontmatter insertion point
+- **THEN** the resulting bundle content includes the composed frontmatter block
+
+#### Scenario: Agent-plugin installs route bundle resolution through ResolveBundle
+
+- **GIVEN** an agent plugin needs built-in render defaults from `SpecdConfig`
+- **WHEN** it resolves a skill bundle for installation
+- **THEN** the install flow uses `ResolveBundle`
+- **AND** bundle resolution does not depend on a direct `SkillRepository.getBundle(...)` call from the plugin adapter

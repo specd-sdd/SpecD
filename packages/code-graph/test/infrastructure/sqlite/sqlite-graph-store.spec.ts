@@ -206,10 +206,79 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(2)
+    expect(SQLITE_SCHEMA_VERSION).toBe(5)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
+    expect(SQLITE_SCHEMA_DDL).toContain('content TEXT')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS documents')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS document_fts')
+  })
+
+  it('extracts symbol snippets using a line-budget windowing algorithm', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const content = [
+      '// header',
+      '',
+      'function top() {}',
+      '',
+      '/**',
+      ' * Target function',
+      ' */',
+      'export function target() {',
+      '  // line 1',
+      '',
+      '  // line 2',
+      '  return true',
+      '}',
+      '',
+      'function bottom() {}',
+    ].join('\n')
+
+    const file = createFileNode({
+      path: 'src/snippet.ts',
+      configRelativePath: '',
+      language: 'typescript',
+      contentHash: 'sha256:snippet',
+      workspace: 'core',
+      content,
+    })
+    const symbol = createSymbolNode({
+      name: 'target',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 8, // 'export function target() {'
+      column: 0,
+    })
+
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.upsertFile(file, [symbol], [])
+    await store.rebuildFtsIndexes()
+
+    const results = await store.searchSymbols({ query: 'target' })
+    expect(results).toHaveLength(1)
+
+    // Algorithm budget: 2 non-blank lines up, 2 non-blank lines down
+    // Up: line 7 (/**), line 6 (Target function) -> non-blank 2 reached. Line 5 (/**) is blank-ish? No, but let's check exact match.
+    // Up from 8:
+    // 7: /** (non-blank 1)
+    // 6:  * Target function (non-blank 2) -> STOP
+    // Down from 8:
+    // 9:   // line 1 (non-blank 1)
+    // 10: (blank)
+    // 11:   // line 2 (non-blank 2) -> STOP
+
+    const snippet = results[0]!.snippet
+    const lines = snippet.split('\n')
+
+    expect(lines).toContain('export function target() {')
+    expect(lines).toContain(' * Target function')
+    expect(lines).toContain('  // line 2')
+    expect(lines[0]).toBe(' * Target function')
+    expect(lines[lines.length - 1]).toBe('  // line 2')
+
+    await store.close()
   })
 
   it('pushes exact findSymbols filters into SQL while preserving wildcard semantics', async () => {
@@ -345,6 +414,7 @@ describe('SQLiteGraphStore', () => {
       const store = new SQLiteGraphStore(tempDir)
       await store.open()
       await store.upsertFile(file, [symbol], [])
+      await store.rebuildFtsIndexes()
       const results = await store.searchSymbols({ query: 'pending-parent-artifact-review' })
       expect(results).toHaveLength(1)
       expect(results[0]!.symbol.name).toBe('pending-parent-artifact-review')
@@ -379,6 +449,7 @@ describe('SQLiteGraphStore', () => {
       const store = new SQLiteGraphStore(tempDir)
       await store.open()
       await store.upsertFile(file, [symNot, symUnrelated], [])
+      await store.rebuildFtsIndexes()
       const results = await store.searchSymbols({ query: 'NOT' })
       const names = results.map((r) => r.symbol.name)
       expect(names).toContain('assertNot')
@@ -421,6 +492,7 @@ describe('SQLiteGraphStore', () => {
       await store.open()
       await store.upsertFile(file1, [sym1], [])
       await store.upsertFile(file2, [sym2], [])
+      await store.rebuildFtsIndexes()
 
       // Combined search for terms in different files
       const results = await store.searchSymbols({ query: 'effectiveStatus findBlockingParent' })
@@ -460,6 +532,7 @@ describe('SQLiteGraphStore', () => {
       const store = new SQLiteGraphStore(tempDir)
       await store.open()
       await store.upsertFile(file, [partialMatch, fullMatch], [])
+      await store.rebuildFtsIndexes()
 
       const results = await store.searchSymbols({ query: 'effective status' })
 

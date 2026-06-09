@@ -1,4 +1,4 @@
-export const SQLITE_SCHEMA_VERSION = 2
+export const SQLITE_SCHEMA_VERSION = 5
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
@@ -9,7 +9,16 @@ CREATE TABLE IF NOT EXISTS files (
   language TEXT NOT NULL,
   content_hash TEXT NOT NULL,
   workspace TEXT NOT NULL,
-  embedding BLOB
+  embedding BLOB,
+  content TEXT
+);
+
+CREATE TABLE IF NOT EXISTS documents (
+  path TEXT PRIMARY KEY,
+  config_relative_path TEXT NOT NULL DEFAULT '',
+  content_hash TEXT NOT NULL,
+  content TEXT NOT NULL,
+  workspace TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS symbols (
@@ -17,6 +26,7 @@ CREATE TABLE IF NOT EXISTS symbols (
   name TEXT NOT NULL,
   kind TEXT NOT NULL,
   file_path TEXT NOT NULL,
+  parent_id TEXT,
   line INTEGER NOT NULL,
   column_number INTEGER NOT NULL,
   comment TEXT,
@@ -49,6 +59,7 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 
 CREATE INDEX IF NOT EXISTS idx_files_config_relative_path ON files(config_relative_path);
+CREATE INDEX IF NOT EXISTS idx_documents_config_relative_path ON documents(config_relative_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_file_path ON symbols(file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
 CREATE INDEX IF NOT EXISTS idx_specs_workspace ON specs(workspace);
@@ -64,9 +75,16 @@ CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts USING fts5(
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts USING fts5(
-  spec_id UNINDEXED,
+  spec_id,
   title,
   description,
+  content,
+  tokenize = 'porter'
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(
+  path,
+  config_relative_path,
   content,
   tokenize = 'porter'
 );

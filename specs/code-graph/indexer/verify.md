@@ -85,6 +85,14 @@
 - **THEN** `FileNode.configRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it has forward slashes and no leading `./`
 
+### Requirement: Discovery fingerprint uses effective config
+
+#### Scenario: Synthetic spec-root exclusions affect fingerprint
+
+- **GIVEN** a filesystem-backed repository exposes a `specsPath`
+- **WHEN** the indexer computes the current graph fingerprint
+- **THEN** the synthetic exclusion derived from that spec root contributes to the fingerprint payload
+
 ### Requirement: Two-pass extraction with in-memory index
 
 #### Scenario: Symbols from all workspaces available before relation resolution
@@ -248,43 +256,49 @@
 
 ### Requirement: Spec dependency indexing
 
-#### Scenario: Specs resolved via callback
+#### Scenario: Total spec count improves progress UX
 
-- **GIVEN** a workspace with a `specs()` callback that returns `DiscoveredSpec[]`
-- **WHEN** spec indexing runs
-- **THEN** the indexer calls the callback instead of walking the filesystem
-- **AND** the returned specs are stored with the workspace name
+- **GIVEN** a workspace with 100 specs
+- **WHEN** the indexer starts spec discovery
+- **THEN** it calls `repo.count()` to determine the total volume
+- **AND** it emits progress events using the total spec count as the denominator
+
+#### Scenario: Indexer pulls spec data from repository
+
+- **WHEN** indexing specs
+- **THEN** the indexer SHALL directly call `repo.list()`, `repo.metadata()`, and `repo.readPersistedDependsOn()`
+- **AND** it SHALL NOT rely on the CLI to provide pre-resolved spec objects
 
 #### Scenario: Spec contentHash from content artifacts only
 
 - **GIVEN** a spec with artifacts `spec.md`, `verify.md`, and `.specd-metadata.yaml`
-- **WHEN** the `specs()` callback builds the `DiscoveredSpec`
+- **WHEN** the indexer builds the `SpecNode`
 - **THEN** `contentHash` is computed from all artifacts EXCEPT `.specd-metadata.yaml`
 - **AND** `spec.md` is ordered first, then the remaining artifacts in alphabetical order
 
-#### Scenario: Spec with .specd-metadata.yaml indexed
+#### Scenario: Spec with metadata indexed
 
-- **GIVEN** a spec in workspace `core` with `.specd-metadata.yaml` containing `dependsOn: [core:config, core:storage]`
+- **GIVEN** a spec in workspace `core` with metadata containing `dependsOn: [core:config, core:storage]`
 - **WHEN** spec indexing runs
 - **THEN** a `SpecNode` with `specId: 'core:change'` and `workspace: 'core'` is upserted
 - **AND** two `DEPENDS_ON` relations are created to `core:config` and `core:storage`
 
 #### Scenario: Spec without metadata uses defaults
 
-- **GIVEN** a spec in workspace `code-graph` with no `.specd-metadata.yaml`
+- **GIVEN** a spec in workspace `code-graph` with no metadata
 - **WHEN** spec indexing runs
 - **THEN** `title` defaults to the `specId`, `description` defaults to `''`, and `dependsOn` defaults to `[]`
 - **AND** no fallback parsing of `spec.md` is performed
 
 #### Scenario: Spec title defaults to specId when metadata is absent
 
-- **GIVEN** a spec with `specId: 'code-graph:change'` and no `.specd-metadata.yaml`
+- **GIVEN** a spec with `specId: 'code-graph:change'` and no metadata
 - **WHEN** spec indexing runs
 - **THEN** the `SpecNode` has `title: 'code-graph:change'`
 
 #### Scenario: Incremental spec indexing skips unchanged specs
 
-- **GIVEN** a spec was indexed with `contentHash` `abc` computed from all its artifacts
+- **GIVEN** a spec was indexed with `contentHash` `abc`
 - **AND** no artifact has changed
 - **WHEN** spec indexing runs again
 - **THEN** the spec is skipped because its `contentHash` matches the stored hash
@@ -298,20 +312,20 @@
 
 #### Scenario: Archived file-level implementation becomes COVERS_FILE
 
-- **GIVEN** a spec sidecar contains a file-level implementation entry for `core:src/change.ts`
-- **WHEN** `IndexCodeGraph.execute()` indexes spec metadata
+- **GIVEN** a spec has a file-level implementation link to `core:src/change.ts`
+- **WHEN** spec indexing runs
 - **THEN** it emits a `COVERS_FILE` relation from that spec to that file
 
 #### Scenario: Archived symbol-level implementation becomes COVERS_SYMBOL
 
-- **GIVEN** a spec sidecar contains a symbol-level implementation entry for `core:Change.transition`
-- **WHEN** `IndexCodeGraph.execute()` indexes spec metadata
+- **GIVEN** a spec has a symbol-level implementation link to `core:Change.transition`
+- **WHEN** spec indexing runs
 - **THEN** it emits a `COVERS_SYMBOL` relation from that spec to that symbol
 
 #### Scenario: Archived stale symbol coverage preserves metadata
 
-- **GIVEN** a spec sidecar marks a symbol-level implementation entry as stale
-- **WHEN** `IndexCodeGraph.execute()` indexes spec metadata
+- **GIVEN** a spec has a symbol-level implementation entry marked as stale
+- **WHEN** spec indexing runs
 - **THEN** the emitted `COVERS_SYMBOL` relation preserves `stale: true` in metadata
 
 ### Requirement: Error isolation
@@ -345,3 +359,47 @@
 - **WHEN** indexing completes successfully after escalating to a full rebuild
 - **THEN** `IndexResult.graphFingerprint` equals the new persisted fingerprint
 - **AND** `IndexResult.fullRebuildReason` is a human-readable explanation of the mismatch
+
+#### Scenario: Filesystem-backed spec roots are excluded from document discovery
+
+- **GIVEN** a workspace repository exposes a filesystem-backed `specsPath`
+- **WHEN** the indexer discovers files and documents
+- **THEN** files under that spec root are excluded from file/document discovery
+- **AND** they are indexed only through spec indexing
+
+#### Scenario: Workspace-owned file is not duplicated under root namespace
+
+- **GIVEN** a file under a configured workspace `codeRoot`
+- **AND** it also matches a project-global `graph.includePaths` pattern
+- **WHEN** the indexer runs
+- **THEN** the file is indexed under the workspace-prefixed identity
+- **AND** no duplicate `root:` identity is created
+
+#### Scenario: Windows-1252 document becomes a DocumentNode
+
+- **GIVEN** a `.txt` file with no language adapter registered
+- **AND** its content decodes as `windows-1252` and does not contain NUL bytes
+- **WHEN** it is indexed
+- **THEN** it produces a `DocumentNode` in the graph
+
+#### Scenario: UTF-16 document becomes a DocumentNode
+
+- **GIVEN** a `.txt` file with no language adapter registered
+- **AND** its content is valid `utf-16le` or `utf-16be`
+- **WHEN** it is indexed
+- **THEN** it produces a `DocumentNode` in the graph
+
+#### Scenario: NUL-bearing non-UTF16 file is skipped
+
+- **GIVEN** a file with no language adapter registered
+- **AND** its content contains NUL bytes but does not match the accepted UTF-16 layouts
+- **WHEN** it is indexed
+- **THEN** no node is created in the graph
+
+### Requirement: Prefer LLM-optimized description
+
+#### Scenario: Indexer uses optimized description
+
+- **GIVEN** a spec with `optimizedDescription: "AI Summary"` and `description: "Manual"`
+- **WHEN** indexing the spec
+- **THEN** the resulting `SpecNode` in the graph has `description: "AI Summary"`

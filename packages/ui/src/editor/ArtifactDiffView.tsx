@@ -58,6 +58,8 @@ function ArtifactDiffViewInner({
             fontSize: 12,
             fontFamily: 'var(--font-mono)',
             scrollBeyondLastLine: false,
+            wordWrap: 'on',
+            wrappingStrategy: 'advanced',
           }}
         />
       </React.Suspense>

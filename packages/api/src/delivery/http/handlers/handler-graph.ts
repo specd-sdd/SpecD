@@ -1,11 +1,13 @@
-import { ChangeNotFoundError } from '@specd/core'
+import { createVcsAdapter, ChangeNotFoundError, SpecNotFoundError, SpecPath } from '@specd/core'
 import { type FastifyInstance } from 'fastify'
-import { buildWorkspaceIndexTargets } from '../../../composition/build-graph-index-targets.js'
+import { buildProjectGraphConfig } from '../../../composition/build-project-graph-config.js'
 import { apiHandler } from '../handler-utils.js'
 import {
   toChangeGraphViewDto,
+  toGraphFileRefDto,
   toGraphImpactDto,
   toGraphSearchResultDto,
+  toGraphSymbolRefDto,
   toGraphStatusDto,
 } from '../presenters/presenter-graph.js'
 import {
@@ -56,10 +58,17 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       }
       await provider.open()
       try {
-        const targets = await buildWorkspaceIndexTargets(ctx.config, ctx.kernel)
+        const workspaces = await ctx.kernel.project.listWorkspaces.execute()
+        const graphConfig = buildProjectGraphConfig(ctx.config)
+        const vcs = await Promise.resolve(createVcsAdapter(ctx.config.projectRoot)).catch(
+          () => null,
+        )
+        const vcsRef = (await vcs?.ref()) ?? undefined
         const result = await provider.index({
-          workspaces: targets,
           projectRoot: ctx.config.projectRoot,
+          workspaces,
+          graphConfig,
+          ...(vcsRef !== undefined ? { vcsRef } : {}),
         })
         return result
       } finally {
@@ -81,6 +90,10 @@ export function registerGraphRoutes(app: FastifyInstance): void {
               specs: BOOLEAN_QUERY_SCHEMA,
               limit: POSITIVE_INTEGER_QUERY_SCHEMA,
               workspace: NON_EMPTY_STRING_SCHEMA,
+              kinds: NON_EMPTY_STRING_SCHEMA,
+              filePattern: NON_EMPTY_STRING_SCHEMA,
+              excludePaths: NON_EMPTY_STRING_SCHEMA,
+              excludeWorkspaces: NON_EMPTY_STRING_SCHEMA,
             },
           }),
         },
@@ -94,6 +107,10 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         specs?: string
         limit?: string
         workspace?: string
+        kinds?: string
+        filePattern?: string
+        excludePaths?: string
+        excludeWorkspaces?: string
       }
       const provider = ctx.createGraphProvider()
       await provider.open()
@@ -103,12 +120,37 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           query: query.q,
           limit,
           ...(query.workspace !== undefined ? { workspace: query.workspace } : {}),
+          ...(query.kinds !== undefined
+            ? {
+                kinds: query.kinds
+                  .split(',')
+                  .map((kind) => kind.trim())
+                  .filter((kind) => kind.length > 0),
+              }
+            : {}),
+          ...(query.filePattern !== undefined ? { filePattern: query.filePattern } : {}),
+          ...(query.excludePaths !== undefined
+            ? {
+                excludePaths: query.excludePaths
+                  .split(',')
+                  .map((path) => path.trim())
+                  .filter((path) => path.length > 0),
+              }
+            : {}),
+          ...(query.excludeWorkspaces !== undefined
+            ? {
+                excludeWorkspaces: query.excludeWorkspaces
+                  .split(',')
+                  .map((workspace) => workspace.trim())
+                  .filter((workspace) => workspace.length > 0),
+              }
+            : {}),
         }
         const symbolsOnly = query.symbols === 'true'
         const specsOnly = query.specs === 'true'
         const symbols = symbolsOnly || !specsOnly ? await provider.searchSymbols(searchOpts) : []
         const specs = specsOnly || !symbolsOnly ? await provider.searchSpecs(searchOpts) : []
-        return toGraphSearchResultDto(symbols, specs)
+        return toGraphSearchResultDto(ctx.config, symbols, specs)
       } finally {
         await provider.close()
       }
@@ -124,10 +166,11 @@ export function registerGraphRoutes(app: FastifyInstance): void {
             properties: {
               symbol: NON_EMPTY_STRING_SCHEMA,
               file: NON_EMPTY_STRING_SCHEMA,
+              spec: NON_EMPTY_STRING_SCHEMA,
               direction: IMPACT_DIRECTION_QUERY_SCHEMA,
               depth: POSITIVE_INTEGER_QUERY_SCHEMA,
             },
-            oneOf: [{ required: ['symbol'] }, { required: ['file'] }],
+            oneOf: [{ required: ['symbol'] }, { required: ['file'] }, { required: ['spec'] }],
           }),
         },
         response: { 200: 'GraphImpactDto' },
@@ -137,6 +180,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       const query = req.query as {
         symbol?: string
         file?: string
+        spec?: string
         direction?: string
         depth?: string
       }
@@ -153,13 +197,16 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         if (query.symbol !== undefined) {
           const impact = await provider.analyzeImpact(query.symbol, direction, maxDepth)
           return toGraphImpactDto(
+            ctx.config,
             query.symbol,
             direction,
+            impact,
             impact.affectedSymbols.map((s) => ({
               id: s.id,
               name: s.name,
-              kind: 'symbol',
               filePath: s.filePath,
+              line: s.line,
+              depth: s.depth,
               risk: impact.riskLevel,
             })),
           )
@@ -167,10 +214,36 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         if (query.file !== undefined) {
           const impact = await provider.analyzeFileImpact(query.file, direction, maxDepth)
           return toGraphImpactDto(
+            ctx.config,
             query.file,
             direction,
-            [],
-            impact.affectedFiles.map((p) => ({ path: p, risk: impact.riskLevel })),
+            impact,
+            impact.affectedSymbols.map((s) => ({
+              id: s.id,
+              name: s.name,
+              filePath: s.filePath,
+              line: s.line,
+              depth: s.depth,
+              risk: impact.riskLevel,
+            })),
+          )
+        }
+        if (query.spec !== undefined) {
+          const impact = await provider.analyzeSpecImpact(query.spec, direction, maxDepth)
+          return toGraphImpactDto(
+            ctx.config,
+            query.spec,
+            direction,
+            impact,
+            impact.affectedSymbols.map((s) => ({
+              id: s.id,
+              name: s.name,
+              filePath: s.filePath,
+              line: s.line,
+              depth: s.depth,
+              risk: impact.riskLevel,
+            })),
+            impact.affectedSpecs,
           )
         }
         throw new Error('Invalid graph impact request')
@@ -225,6 +298,13 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       const { workspace } = req.params as { workspace: string }
       const path = (req.params as { '*': string })['*']
       const specId = `${workspace}:${path}`
+      const spec = await ctx.kernel.specs.get.execute({
+        workspace,
+        specPath: SpecPath.parse(path),
+      })
+      if (spec === null) {
+        throw new SpecNotFoundError(specId)
+      }
       const provider = ctx.createGraphProvider()
       await provider.open()
       try {
@@ -232,8 +312,15 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         const coveredSymbols = await provider.getCoveredSymbols(specId)
         return {
           specId,
-          files: coveredFiles.map((r) => r.target),
-          symbols: coveredSymbols.map((r) => r.target),
+          files: coveredFiles.map((r) => toGraphFileRefDto(ctx.config, r.target)),
+          symbols: (
+            await Promise.all(
+              coveredSymbols.map(async (relation) => {
+                const symbol = await provider.getSymbol(relation.target)
+                return symbol === undefined ? null : toGraphSymbolRefDto(ctx.config, symbol)
+              }),
+            )
+          ).filter((entry) => entry !== null),
         }
       } finally {
         await provider.close()
@@ -260,12 +347,21 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       try {
         const specs = await Promise.all(
           [...change.specIds].map(async (specId) => {
-            const coveredFiles = (await provider.getCoveredFiles(specId)).map((r) => r.target)
-            const coveredSymbols = (await provider.getCoveredSymbols(specId)).map((r) => r.target)
+            const coveredFiles = (await provider.getCoveredFiles(specId)).map((r) =>
+              toGraphFileRefDto(ctx.config, r.target),
+            )
+            const coveredSymbols = (
+              await Promise.all(
+                (await provider.getCoveredSymbols(specId)).map(async (relation) => {
+                  const symbol = await provider.getSymbol(relation.target)
+                  return symbol === undefined ? null : toGraphSymbolRefDto(ctx.config, symbol)
+                }),
+              )
+            ).filter((entry) => entry !== null)
             return { specId, coveredFiles, coveredSymbols }
           }),
         )
-        return toChangeGraphViewDto(name, [...change.specIds], specs)
+        return toChangeGraphViewDto(ctx.config, name, [...change.specIds], specs)
       } finally {
         await provider.close()
       }
