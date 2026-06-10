@@ -8,7 +8,7 @@ Before structural validation runs, Studio MUST warn that re-validation can **inv
 
 ### Requirement: validate actions require explicit confirmation
 
-**Validate** (inspector, current artifact) and **Validate All** (Artifacts tab toolbar on active changes) MUST open a confirmation modal with **Continue** and **Cancel** before calling `validateChange`. Modal chrome MUST follow [`ui:design-system`](../design-system/spec.md) (`StudioDialog`).
+**Validate** (inspector, current artifact) and **Validate All** (Artifacts tab toolbar on active changes) MUST open a confirmation modal with **Continue** and **Cancel** before calling `validateChange`. Modal chrome MUST follow [`ui:design-system`](../design-system/spec.md) (`StudioDialog` using shadcn `Button` components for actions).
 
 **Cancel** MUST close the modal without invoking validation. **Continue** MUST run validation, append each result line to the studio **Output** stream (with `error` / `warn` / `info` levels), and select the **Problems** tab when any line is a warning or error.
 

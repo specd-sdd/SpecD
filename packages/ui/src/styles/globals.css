@@ -77,6 +77,25 @@
     @apply border-b border-border bg-panel-header px-2 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground;
   }
 
+  .studio-dialog-panel {
+    @apply border-border bg-panel text-foreground shadow-2xl;
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(88, 166, 255, 0.06);
+  }
+
+  .studio-dialog-header {
+    @apply border-b border-border/70 bg-panel-header px-4 py-3;
+  }
+
+  .studio-dialog-body {
+    @apply px-4 py-3 text-xs leading-relaxed text-muted-foreground;
+  }
+
+  .studio-dialog-footer {
+    @apply border-t border-border/70 bg-panel-header/60 px-4 py-3;
+  }
+
   .studio-tab-bar {
     @apply flex flex-wrap items-center gap-1 border-b border-border bg-panel-header px-2 py-1.5;
   }
@@ -114,6 +133,22 @@
     @apply inline-flex items-center rounded-sm border border-border bg-background/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground;
   }
 
+  .studio-command {
+    @apply rounded-md border border-border bg-panel text-foreground;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 18px 48px rgba(0, 0, 0, 0.35);
+  }
+
+  .studio-command-search {
+    @apply border-b border-border bg-panel-header/90;
+  }
+
+  .studio-command-item {
+    @apply rounded-md border border-transparent px-2.5 py-2 text-xs text-muted-foreground transition-colors duration-150;
+    @apply data-[selected=true]:border-border data-[selected=true]:bg-accent/85 data-[selected=true]:text-accent-foreground;
+  }
+
   .studio-bottom-tab {
     @apply studio-tab;
   }
@@ -149,6 +184,14 @@
 
   .studio-scrollbar::-webkit-scrollbar-corner {
     background: transparent;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
   .studio-markdown-preview h1 {

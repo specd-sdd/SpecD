@@ -6,6 +6,10 @@ Studio UI for **Connect Panel**: user-visible layout and actions driven exclusiv
 
 ## Requirements
 
+### Requirement: view is composed using shadcn primitives
+
+The Connect Panel MUST be composed using shadcn `Card`, `Input`, `Button`, and `Alert` components to ensure consistency with the Studio design system.
+
 ### Requirement: connect panel collects API URL and optional token
 
 The form MUST require API base URL and MAY collect an optional bearer token. “Test connection” MUST call `GET /v1/project` or health before saving the profile.

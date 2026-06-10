@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { cn } from '../lib/cn.js'
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js'
 
 export const CHANGE_VIEWS = [
   'Overview',
@@ -31,18 +31,25 @@ export function ChangeTabs({
   }
 
   return (
-    <div className="studio-tab-bar">
-      {views.map((view) => (
-        <button
-          key={view}
-          type="button"
-          className={cn('studio-tab', active === view && 'studio-tab-active')}
-          onClick={() => onActiveChange(view)}
-        >
-          {view}
-        </button>
-      ))}
-      <span className="ml-auto pr-2 font-mono text-xs text-muted-foreground">{changeName}</span>
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1 bg-panel-header px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+        <span>changes</span>
+        <span className="opacity-40">/</span>
+        <span className="font-mono text-muted-foreground/80">{changeName}</span>
+      </div>
+      <Tabs value={active} onValueChange={(v) => onActiveChange(v as ChangeView)}>
+        <TabsList className="w-full justify-start border-t border-border/40">
+          {views.map((view) => (
+            <TabsTrigger
+              key={view}
+              value={view}
+              className="studio-tab data-[state=active]:studio-tab-active h-auto bg-transparent shadow-none"
+            >
+              {view}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </div>
   )
 }

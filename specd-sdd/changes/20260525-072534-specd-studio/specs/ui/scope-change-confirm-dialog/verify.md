@@ -10,6 +10,7 @@
 - **WHEN** user clicks **Save changes**
 - **THEN** dialog title becomes confirm scope change
 - **AND** body lists specs to add and remove
+- **AND** action buttons (Back, Apply scope change) use shadcn `Button` components
 - **AND** no PATCH runs until **Apply scope change**
 
 #### Scenario: Back returns to editor

@@ -1,6 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import * as React from 'react'
-import { cn } from '../lib/cn.js'
+import { cn } from '../lib/utils.js'
 
 export type StudioLoadingBandProps = {
   active: boolean
@@ -19,7 +19,7 @@ export function StudioLoadingBand({
   return (
     <div
       className={cn(
-        'flex h-5 shrink-0 items-center gap-2 border-t border-border/80 bg-panel px-2 text-xs',
+        'flex h-6 shrink-0 items-center gap-2 border-t border-border/80 bg-panel-header/80 px-3 font-mono text-[10px] uppercase tracking-[0.14em]',
         className,
       )}
       aria-live="polite"

@@ -1,6 +1,14 @@
 import { FileText, FolderTree, GitBranchPlus, ShieldCheck } from 'lucide-react'
 import * as React from 'react'
-import { cn } from '../lib/cn.js'
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from '../components/ui/command.js'
 
 export type CommandPaletteAction = {
   id: string
@@ -24,108 +32,29 @@ export function CommandPalette({
   onClose,
   actions,
 }: CommandPaletteProps): React.ReactElement | null {
-  const [query, setQuery] = React.useState('')
-  const [highlight, setHighlight] = React.useState(0)
-
-  const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return actions
-    return actions.filter(
-      (a) =>
-        a.label.toLowerCase().includes(q) ||
-        (a.hint?.toLowerCase().includes(q) ?? false),
-    )
-  }, [actions, query])
-
-  React.useEffect(() => {
-    if (!open) {
-      setQuery('')
-      setHighlight(0)
-    }
-  }, [open])
-
-  React.useEffect(() => {
-    setHighlight(0)
-  }, [query])
-
-  React.useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-      }
-      if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        setHighlight((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)))
-      }
-      if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        setHighlight((i) => Math.max(i - 1, 0))
-      }
-      if (event.key === 'Enter' && filtered[highlight]) {
-        event.preventDefault()
-        filtered[highlight].onSelect()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, filtered, highlight, onClose])
-
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[12vh] p-4"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div
-        className="flex w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-panel shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Command palette"
-      >
-        <input
-          autoFocus
-          className="border-b border-border bg-input px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          placeholder="Type a command or search…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <ul className="max-h-64 overflow-auto py-1 text-xs">
-          {filtered.length === 0 ? (
-            <li className="px-3 py-2 text-muted-foreground">No matches</li>
-          ) : (
-            filtered.map((action, index) => (
-              <li key={action.id}>
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/60',
-                    index === highlight && 'bg-accent text-foreground',
-                  )}
-                  onMouseEnter={() => setHighlight(index)}
-                  onClick={() => {
-                    action.onSelect()
-                    onClose()
-                  }}
-                >
-                  <span className="text-muted-foreground">{action.icon}</span>
-                  <span className="flex-1 font-medium">{action.label}</span>
-                  {action.hint ? (
-                    <span className="text-muted-foreground">{action.hint}</span>
-                  ) : null}
-                </button>
-              </li>
-            ))
-          )}
-        </ul>
-      </div>
-    </div>
+    <CommandDialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <CommandInput placeholder="Type a command or search…" />
+      <CommandList>
+        <CommandEmpty>No matches found.</CommandEmpty>
+        <CommandGroup heading="Suggestions">
+          {actions.map((action) => (
+            <CommandItem
+              key={action.id}
+              value={action.label + (action.hint ? ` ${action.hint}` : '')}
+              onSelect={() => {
+                action.onSelect()
+                onClose()
+              }}
+            >
+              {action.icon}
+              <span>{action.label}</span>
+              {action.hint && <CommandShortcut>{action.hint}</CommandShortcut>}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
   )
 }
 

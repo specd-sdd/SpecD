@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { buildValidateConfirmMessage, type ValidateConfirmScope } from '../hooks/use-change-validate.js'
 import { StudioDialog } from './StudioDialog.js'
+import { Button } from './ui/button.js'
 
 export function ValidateConfirmDialog({
   open,
@@ -27,24 +28,26 @@ export function ValidateConfirmDialog({
       title={title}
       titleId="validate-confirm-dialog-title"
       testId="studio-validate-confirm-dialog"
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !validating) onCancel()
+      }}
       actions={
         <>
-          <button
-            type="button"
-            className="rounded px-3 py-1.5 text-muted-foreground hover:bg-muted"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onCancel}
             disabled={validating}
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            className="rounded bg-primary px-3 py-1.5 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+          </Button>
+          <Button
+            size="sm"
             onClick={onContinue}
             disabled={validating}
           >
             {validating ? 'Validating…' : 'Continue'}
-          </button>
+          </Button>
         </>
       }
     >

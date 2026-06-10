@@ -2,9 +2,25 @@ import type { ChangeDetailDto, ChangeStatusDto } from '@specd/client'
 import { isShelvedReadOnlySection, type ChangeListSection } from './change-list-section.js'
 import { ChevronDown, ChevronRight, FileText, Info, ShieldCheck } from 'lucide-react'
 import * as React from 'react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '../components/ui/accordion.js'
+import {
+  Alert,
+  AlertDescription,
+} from '../components/ui/alert.js'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card.js'
 import { CHANGE_VIEWS, ChangeTabs, type ChangeView } from '../tabs/ChangeTabs.js'
 import { Button } from '../components/ui/button.js'
-import { cn } from '../lib/cn.js'
+import { cn } from '../lib/utils.js'
 import { ChangeOverview } from './ChangeOverview.js'
 import {
   useChangeArtifactList,
@@ -120,26 +136,32 @@ export function ChangeMainView({
       />
 
       {isArchived ? (
-        <div className="flex items-center gap-1.5 border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+        <Alert className="rounded-none border-x-0 border-b bg-muted/30 px-3 py-1.5 shadow-none">
           <Info className="h-3 w-3 shrink-0 text-studio-info" />
-          Read-only archived snapshot
-          {detail?.archivedMeta
-            ? ` · ${detail.archivedMeta.archivedName} · ${detail.archivedMeta.archivedAt}`
-            : null}
-        </div>
+          <AlertDescription className="text-xs text-muted-foreground">
+            Read-only archived snapshot
+            {detail?.archivedMeta
+              ? ` · ${detail.archivedMeta.archivedName} · ${detail.archivedMeta.archivedAt}`
+              : null}
+          </AlertDescription>
+        </Alert>
       ) : shelvedReadOnly ? (
-        <div className="flex items-center gap-1.5 border-b border-border bg-muted/50 px-3 py-1.5 text-xs text-muted-foreground">
+        <Alert className="rounded-none border-x-0 border-b bg-muted/50 px-3 py-1.5 shadow-none">
           <Info className="h-3 w-3 shrink-0 text-studio-info" />
-          {changeListSection === 'draft'
-            ? 'Read-only drafted change — restore to active to edit artifacts and metadata.'
-            : 'Read-only discarded change — permanently abandoned.'}
-        </div>
+          <AlertDescription className="text-xs text-muted-foreground">
+            {changeListSection === 'draft'
+              ? 'Read-only drafted change — restore to active to edit artifacts and metadata.'
+              : 'Read-only discarded change — permanently abandoned.'}
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       {detailError ? (
-        <div className="border-b border-destructive/40 bg-destructive/10 px-2 py-1 text-xs text-destructive">
-          {detailError.message}
-        </div>
+        <Alert variant="destructive" className="rounded-none border-x-0 border-b p-2 shadow-none">
+          <AlertDescription className="text-xs">
+            {detailError.message}
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       {changeView === 'Overview' ? (
@@ -284,15 +306,16 @@ function ArtifactFileRow({
 
   return (
     <li key={file.filename}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         disabled={isMissing}
         title={isMissing ? 'File not on disk yet — scaffold or create it in the change directory' : undefined}
         className={cn(
-          'flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs transition-colors duration-150',
+          'h-auto w-full justify-start gap-2 px-4 py-1.5 text-left text-xs transition-colors duration-150',
           isMissing
-            ? 'cursor-not-allowed opacity-60'
-            : 'hover:bg-background/60',
+            ? 'opacity-60'
+            : '',
           selected === file.filename && !isMissing && 'bg-background/80 text-foreground',
         )}
         onClick={() => {
@@ -309,7 +332,7 @@ function ArtifactFileRow({
             {file.displayStatus}
           </span>
         ) : null}
-      </button>
+      </Button>
     </li>
   )
 }
@@ -356,22 +379,26 @@ function SpecScopeFiles({
   return (
     <div className="space-y-1.5 pt-1">
       {specGroups.map((specGroup) => (
-        <div key={specGroup.specId} className="studio-card overflow-hidden">
-          <div className="bg-background/40 px-3 py-1.5 font-mono text-[10px] text-foreground">
-            {specGroup.specId}
-          </div>
-          <ul className="py-0.5">
-            {specGroup.files.map((file) => (
-              <ArtifactFileRow
-                key={file.filename}
-                file={file}
-                label={artifactFileLabel(file.filename, true)}
-                selected={selected}
-                onSelect={onSelect}
-              />
-            ))}
-          </ul>
-        </div>
+        <Card key={specGroup.specId} className="overflow-hidden">
+          <CardHeader className="px-3 py-2">
+            <CardTitle className="font-mono text-[10px] normal-case tracking-normal">
+              {specGroup.specId}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-0 py-0.5">
+            <ul>
+              {specGroup.files.map((file) => (
+                <ArtifactFileRow
+                  key={file.filename}
+                  file={file}
+                  label={artifactFileLabel(file.filename, true)}
+                  selected={selected}
+                  onSelect={onSelect}
+                />
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       ))}
     </div>
   )
@@ -470,18 +497,9 @@ function ArtifactsAccordion({
     [artifactItems, scopeGroups],
   )
 
-  const [openTypeGroups, setOpenTypeGroups] = React.useState<Set<string>>(
-    () => new Set(['proposal', 'design', 'tasks']),
+  const [openTypeGroups, setOpenTypeGroups] = React.useState<string[]>(
+    () => ['proposal', 'design', 'tasks'],
   )
-
-  const toggleTypeGroup = (type: string) => {
-    setOpenTypeGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(type)) next.delete(type)
-      else next.add(type)
-      return next
-    })
-  }
 
   if ((loadingOverride || isLoading) && groupedArtifactItems.length === 0) {
     return (
@@ -507,7 +525,7 @@ function ArtifactsAccordion({
             key={scopeGroup.scope}
             scopeGroup={scopeGroup}
             openTypeGroups={openTypeGroups}
-            onToggleTypeGroup={toggleTypeGroup}
+            onOpenTypeGroupsChange={setOpenTypeGroups}
             selected={selected}
             onSelect={onSelect}
           />
@@ -520,13 +538,13 @@ function ArtifactsAccordion({
 function ScopeArtifactsSection({
   scopeGroup,
   openTypeGroups,
-  onToggleTypeGroup,
+  onOpenTypeGroupsChange,
   selected,
   onSelect,
 }: {
   scopeGroup: ArtifactScopeGroup
-  openTypeGroups: Set<string>
-  onToggleTypeGroup: (type: string) => void
+  openTypeGroups: string[]
+  onOpenTypeGroupsChange: (types: string[]) => void
   selected?: string
   onSelect?: (filename: string) => void
 }): React.ReactElement {
@@ -545,40 +563,37 @@ function ScopeArtifactsSection({
       </div>
 
       {scopeGroup.scope === 'change' && scopeGroup.typeGroups ? (
-        <div className="space-y-1.5">
-          {scopeGroup.typeGroups.map((typeGroup) => {
-            const isOpen = openTypeGroups.has(typeGroup.type)
-            return (
-              <div key={typeGroup.type} className="studio-card overflow-hidden">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors duration-150 hover:bg-background/60"
-                  onClick={() => onToggleTypeGroup(typeGroup.type)}
-                >
-                  {isOpen ? (
-                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="flex-1 font-medium capitalize text-foreground">
-                    {typeGroup.type}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {artifactTypeGroupFileCount(typeGroup)}{' '}
-                    {artifactTypeGroupFileCount(typeGroup) === 1 ? 'file' : 'files'}
-                  </span>
-                </button>
-                {isOpen ? (
-                  <ChangeTypeGroupFiles
-                    group={typeGroup}
-                    selected={selected}
-                    onSelect={onSelect}
-                  />
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
+        <Accordion
+          type="multiple"
+          value={openTypeGroups}
+          onValueChange={onOpenTypeGroupsChange}
+          className="space-y-1.5"
+        >
+          {scopeGroup.typeGroups.map((typeGroup) => (
+            <AccordionItem
+              key={typeGroup.type}
+              value={typeGroup.type}
+              className="bg-background/25"
+            >
+              <AccordionTrigger className="bg-background/20 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground">
+                <span className="flex-1 font-medium capitalize text-foreground">
+                  {typeGroup.type}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {artifactTypeGroupFileCount(typeGroup)}{' '}
+                  {artifactTypeGroupFileCount(typeGroup) === 1 ? 'file' : 'files'}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pb-0">
+                <ChangeTypeGroupFiles
+                  group={typeGroup}
+                  selected={selected}
+                  onSelect={onSelect}
+                />
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       ) : null}
 
       {scopeGroup.scope === 'spec' && scopeGroup.specGroups ? (

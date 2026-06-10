@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { cn } from '../lib/cn.js'
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js'
 
 export const SPEC_VIEWS = [
   'Overview',
@@ -26,20 +26,27 @@ export function SpecTabs({
   onActiveChange: (view: SpecView) => void
 }): React.ReactElement {
   return (
-    <div className="studio-tab-bar">
-      {SPEC_VIEWS.map((view) => (
-        <button
-          key={view}
-          type="button"
-          className={cn('studio-tab', active === view && 'studio-tab-active')}
-          onClick={() => onActiveChange(view)}
-        >
-          {view}
-        </button>
-      ))}
-      <span className="ml-auto truncate pr-2 font-mono text-xs text-muted-foreground">
-        {specPath ? `${workspace}:${specPath}` : (workspace ?? 'workspace')}
-      </span>
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1 bg-panel-header px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+        <span>specs</span>
+        <span className="opacity-40">/</span>
+        <span className="font-mono text-muted-foreground/80">
+          {specPath ? `${workspace}:${specPath}` : (workspace ?? 'workspace')}
+        </span>
+      </div>
+      <Tabs value={active} onValueChange={(v) => onActiveChange(v as SpecView)}>
+        <TabsList className="w-full justify-start border-t border-border/40">
+          {SPEC_VIEWS.map((view) => (
+            <TabsTrigger
+              key={view}
+              value={view}
+              className="studio-tab data-[state=active]:studio-tab-active h-auto bg-transparent shadow-none"
+            >
+              {view}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </div>
   )
 }

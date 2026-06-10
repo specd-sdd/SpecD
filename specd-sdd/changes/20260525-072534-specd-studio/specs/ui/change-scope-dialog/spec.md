@@ -12,7 +12,7 @@ The dialog MUST open with a visible warning (`role="alert"`) stating that **remo
 
 ### Requirement: each spec is one card with scope remove and dependencies
 
-The dialog MUST list each spec in scope as a **card** (ascending order per [`ui:design-system`](../design-system/spec.md)): header shows `specId` and ✕ to **remove the spec from scope**; body shows `dependsOn` as add/remove chips with the same ordering rule. **Add spec** MUST appear **first** (before cards). **Add spec** and **Add dep** MUST share one workspace spec picker implemented in `packages/ui/src/change/scope-spec-suggestions.tsx` (`ScopeSpecSuggestionsDatalist` + `ScopeSpecIdInput`, single `datalist` id `studio-scope-dialog-spec-suggestions`). Suggestion ids MUST come from the `specSuggestions` prop (shell supplies flattened workspace spec trees). The dialog MUST NOT add a spec as its own dependency. There MUST NOT be a separate chip row duplicating the card list.
+The dialog MUST list each spec in scope as a shadcn **`Card`** (ascending order per [`ui:design-system`](../design-system/spec.md)): header shows `specId` and ✕ to **remove the spec from scope** (using a shadcn **`Button`**); body shows `dependsOn` as add/remove chips implemented with shadcn **`Badge`** components following the same ordering rule. **Add spec** MUST appear **first** (before cards). **Add spec** and **Add dep** MUST share one workspace spec picker implemented in `packages/ui/src/change/scope-spec-suggestions.tsx` (`ScopeSpecSuggestionsDatalist` + `ScopeSpecIdInput`, single `datalist` id `studio-scope-dialog-spec-suggestions`). Suggestion ids MUST come from the `specSuggestions` prop (shell supplies flattened workspace spec trees). The dialog MUST NOT add a spec as its own dependency. There MUST NOT be a separate chip row duplicating the card list.
 
 ### Requirement: dialog persists scope and dependsOn on save
 
@@ -24,7 +24,7 @@ When draft scope differs from persisted `specIds`, **Save changes** MUST show th
 
 ### Requirement: dialog uses StudioDialog chrome
 
-`data-testid="studio-change-scope-dialog"`. Large layout (`max-w-2xl`) with scrollable body. Actions: **Cancel**, **Save changes**; confirm sub-step: **Back**, **Apply scope change**.
+`data-testid="studio-change-scope-dialog"`. Large layout (`max-w-2xl`) with scrollable body using shadcn `ScrollArea`. Actions: **Cancel**, **Save changes**; confirm sub-step: **Back**, **Apply scope change**. Actions MUST use shadcn `Button` components.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

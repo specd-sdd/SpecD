@@ -10,7 +10,7 @@ Studio UI for **Spec Tab Overview**: user-visible layout and actions driven excl
 
 While the Overview tab is visible, the view MUST refresh spec detail via `getSpec` on tab-scoped poll ticks. New specs in the tree are already discovered by the global workspace poll.
 
-The Overview presentation MUST also serve as the primary place for spec metadata summary; Studio MUST NOT require a separate **Metadata** tab to read the current spec's identity and description.
+The Overview presentation MUST also serve as the primary place for spec metadata summary; Studio MUST NOT require a separate **Metadata** tab to read the current spec's identity and description. Metadata MUST be presented using shadcn **`Card`** components and **`Badge`** status indicators.
 
 ### Requirement: linked changes tab lists active changes referencing the current spec
 

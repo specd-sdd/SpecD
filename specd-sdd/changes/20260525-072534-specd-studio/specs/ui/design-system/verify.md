@@ -204,10 +204,10 @@
 
 ### Requirement: sidebar follows VS Code Cursor tree patterns
 
-#### Scenario: Tree nodes collapse and expand via react-arborist
+#### Scenario: Tree nodes collapse and expand via shared Studio tree composition
 
 - **WHEN** workspace tree has nested specs
-- **THEN** tree renders with `react-arborist`
+- **THEN** tree renders through the shared Studio tree wrapper
 - **AND** chevron toggles collapse state and children hide when collapsed
 
 #### Scenario: Selected row is clearly highlighted
@@ -308,7 +308,8 @@
 #### Scenario: package.json declares the v1 UI stack
 
 - **WHEN** `@specd/ui` dependencies are inspected
-- **THEN** `tailwindcss`, `class-variance-authority`, `tailwind-merge`, `lucide-react`, `react-resizable-panels`, `react-arborist`, and `@monaco-editor/react` are present
+- **THEN** `tailwindcss`, `class-variance-authority`, `tailwind-merge`, `lucide-react`, `react-resizable-panels`, and `@monaco-editor/react` are present
+- **AND** tree composition is implemented either with `react-arborist` or shared shadcn/Radix-backed wrappers
 - **AND** Radix packages required by shadcn components are present
 
 #### Scenario: shadcn components live under components ui

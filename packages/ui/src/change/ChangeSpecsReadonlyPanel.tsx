@@ -1,5 +1,10 @@
 import type { ChangeDetailDto } from '@specd/client'
 import * as React from 'react'
+import { Badge } from '../components/ui/badge.js'
+import {
+  Card,
+  CardContent,
+} from '../components/ui/card.js'
 import { sortSpecIds } from '../lib/sort-spec-ids.js'
 
 /**
@@ -23,22 +28,23 @@ export function ChangeSpecsReadonlyPanel({
       {specIds.map((specId) => {
         const deps = sortSpecIds(depends[specId] ?? [])
         return (
-          <li
-            key={specId}
-            className="rounded border border-border/80 bg-background/40 px-2 py-1.5"
-          >
-            <div className="font-mono text-foreground">{specId}</div>
-            {deps.length > 0 ? (
-              <ul className="mt-1 space-y-0.5 pl-2 text-[10px] text-muted-foreground">
-                {deps.map((dep) => (
-                  <li key={dep} className="font-mono">
-                    → {dep}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-0.5 text-[10px] text-muted-foreground">No declared dependencies</p>
-            )}
+          <li key={specId}>
+            <Card>
+              <CardContent className="flex flex-col gap-2">
+                <div className="font-mono text-foreground">{specId}</div>
+                {deps.length > 0 ? (
+                  <ul className="flex flex-wrap gap-1">
+                    {deps.map((dep) => (
+                      <li key={dep}>
+                        <Badge>depends-on: {dep}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">No declared dependencies</p>
+                )}
+              </CardContent>
+            </Card>
           </li>
         )
       })}

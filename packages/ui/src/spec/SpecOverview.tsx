@@ -1,5 +1,12 @@
 import type { SpecDetailDto } from '@specd/client'
 import * as React from 'react'
+import { Badge } from '../components/ui/badge.js'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card.js'
 
 export function SpecOverview({ spec }: { spec: SpecDetailDto }): React.ReactElement {
   return (
@@ -16,62 +23,69 @@ export function SpecOverview({ spec }: { spec: SpecDetailDto }): React.ReactElem
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[1.3fr_0.9fr]">
-        <section className="studio-card p-3">
-          <h2 className="mb-2 font-medium uppercase tracking-wide text-muted-foreground">
-            Summary
-          </h2>
-          <dl className="space-y-1">
-            <MetaRow label="Workspace" value={spec.workspace} />
-            <MetaRow label="Path" value={spec.path} />
-            <MetaRow label="Artifacts" value={String(spec.artifacts.length)} />
-            <MetaRow label="Dependencies" value={String(spec.dependsOn?.length ?? 0)} />
-          </dl>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-1">
+              <MetaRow label="Workspace" value={spec.workspace} />
+              <MetaRow label="Path" value={spec.path} />
+              <MetaRow label="Artifacts" value={String(spec.artifacts.length)} />
+              <MetaRow label="Dependencies" value={String(spec.dependsOn?.length ?? 0)} />
+            </dl>
+          </CardContent>
+        </Card>
 
-        <section className="studio-card p-3">
-          <h2 className="mb-2 font-medium uppercase tracking-wide text-muted-foreground">
-            Metadata
-          </h2>
-          <dl className="space-y-1">
-            <MetaRow label="Spec ID" value={spec.specId} mono />
-            <MetaRow label="Title" value={spec.title ?? 'Untitled'} />
-          </dl>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Metadata</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-1">
+              <MetaRow label="Spec ID" value={spec.specId} mono />
+              <MetaRow label="Title" value={spec.title ?? 'Untitled'} />
+            </dl>
+          </CardContent>
+        </Card>
 
-        <section className="studio-card p-3">
-        <h2 className="mb-2 font-medium uppercase tracking-wide text-muted-foreground">
-          Artifacts
-        </h2>
-        {spec.artifacts.length === 0 ? (
-          <p className="text-muted-foreground">No artifacts listed.</p>
-        ) : (
-          <ul className="space-y-1 font-mono">
-            {spec.artifacts.map((a) => (
-              <li key={a.filename}>
-                {a.filename}
-                {a.hash ? <span className="ml-2 text-muted-foreground">{a.hash.slice(0, 12)}…</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Artifacts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {spec.artifacts.length === 0 ? (
+              <p className="text-muted-foreground">No artifacts listed.</p>
+            ) : (
+              <ul className="space-y-1 font-mono">
+                {spec.artifacts.map((a) => (
+                  <li key={a.filename}>
+                    {a.filename}
+                    {a.hash ? (
+                      <span className="ml-2 text-muted-foreground">{a.hash.slice(0, 12)}…</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
         {spec.dependsOn && spec.dependsOn.length > 0 ? (
-          <section className="studio-card p-3">
-          <h2 className="mb-2 font-medium uppercase tracking-wide text-muted-foreground">
-            Depends on
-          </h2>
-          <ul className="flex flex-wrap gap-1">
-            {spec.dependsOn.map((dep) => (
-              <li
-                key={dep}
-                className="rounded border border-border bg-background/60 px-1.5 py-0.5 font-mono"
-              >
-                {dep}
-              </li>
-            ))}
-          </ul>
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle>Depends on</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="flex flex-wrap gap-1">
+                {spec.dependsOn.map((dep) => (
+                  <li key={dep}>
+                    <Badge>{dep}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         ) : null}
       </div>
     </div>

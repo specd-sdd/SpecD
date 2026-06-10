@@ -11,12 +11,31 @@ import { FileText } from 'lucide-react'
 import * as React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '../components/ui/alert.js'
 import { useSpecRead } from '../hooks/use-spec-read.js'
 import { useSpecOutline } from '../hooks/use-spec-outline.js'
 import { useSpecImpact } from '../hooks/use-spec-impact.js'
 import { useSpecGraphView } from '../hooks/use-spec-graph-view.js'
 import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
-import { cn } from '../lib/cn.js'
+import { cn } from '../lib/utils.js'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '../components/ui/accordion.js'
+import { Badge } from '../components/ui/badge.js'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card.js'
+import { Button } from '../components/ui/button.js'
 import { SpecTabs, type SpecView } from '../tabs/SpecTabs.js'
 import { SpecOverview } from './SpecOverview.js'
 
@@ -85,8 +104,10 @@ export function SpecMainView({
       <SpecTabs workspace={workspace} specPath={specPath} active={view} onActiveChange={setView} />
 
       {specRead.detail.error ? (
-        <div className="border-b border-destructive/40 bg-destructive/10 px-2 py-1 text-xs text-destructive">
-          {specRead.detail.error.message}
+        <div className="border-b border-border px-2 py-2">
+          <Alert variant="destructive" className="px-3 py-2 text-xs">
+            <AlertDescription>{specRead.detail.error.message}</AlertDescription>
+          </Alert>
         </div>
       ) : null}
 
@@ -188,10 +209,11 @@ function SpecContextPanel({
   return (
     <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-3 text-xs">
       {warnings.length > 0 ? (
-        <section className="mb-3 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-amber-100">
-          <h2 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200/80">
+        <Alert className="mb-3 border-amber-500/30 bg-amber-500/10 text-amber-100 [&>svg]:hidden">
+          <AlertTitle className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200/80">
             Warnings
-          </h2>
+          </AlertTitle>
+          <AlertDescription>
           <ul className="space-y-2">
             {warnings.map((warning) => (
               <li key={`${warning.type}:${warning.path ?? warning.message}`}>
@@ -202,7 +224,8 @@ function SpecContextPanel({
               </li>
             ))}
           </ul>
-        </section>
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       <div className="space-y-3">
@@ -228,114 +251,116 @@ function SpecContextEntryCard({
   const headerTone = entry.source === 'root' ? 'text-sky-300' : 'text-muted-foreground'
 
   return (
-    <section className="studio-card p-3">
-      <div className="mb-2 flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className={`font-mono text-[11px] ${headerTone}`}>{entry.spec}</div>
-          <div className="mt-1 flex flex-wrap gap-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            <span>{entry.source}</span>
-            <span>{entry.mode}</span>
-            {entry.stale ? <span className="text-amber-400">stale metadata</span> : null}
+    <Card>
+      <CardContent>
+        <div className="mb-2 flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className={`font-mono text-[11px] ${headerTone}`}>{entry.spec}</div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              <Badge>{entry.source}</Badge>
+              <Badge>{entry.mode}</Badge>
+              {entry.stale ? <Badge variant="destructive">stale metadata</Badge> : null}
+            </div>
           </div>
         </div>
-      </div>
 
-      {entry.title ? <h2 className="text-sm font-semibold text-foreground">{entry.title}</h2> : null}
+        {entry.title ? <h2 className="text-sm font-semibold text-foreground">{entry.title}</h2> : null}
 
-      <div className="mt-3 space-y-2">
-        <ContextAccordion title="Optimized Content" defaultOpen>
-          {entry.optimizedContent ? (
-            <MarkdownSection content={entry.optimizedContent} compact />
-          ) : (
-            <EmptyContextField label="Optimized content" />
-          )}
-        </ContextAccordion>
+        <div className="mt-3 space-y-2">
+          <ContextAccordion title="Optimized Content" defaultOpen>
+            {entry.optimizedContent ? (
+              <MarkdownSection content={entry.optimizedContent} compact />
+            ) : (
+              <EmptyContextField label="Optimized content" />
+            )}
+          </ContextAccordion>
 
-        <ContextAccordion title="Description" defaultOpen>
-          {entry.description ? (
-            <MarkdownSection content={entry.description} />
-          ) : (
-            <EmptyContextField label="Description" />
-          )}
-        </ContextAccordion>
+          <ContextAccordion title="Description" defaultOpen>
+            {entry.description ? (
+              <MarkdownSection content={entry.description} />
+            ) : (
+              <EmptyContextField label="Description" />
+            )}
+          </ContextAccordion>
 
-        <ContextAccordion title={`Rules${entry.rules ? ` (${entry.rules.length})` : ''}`} defaultOpen>
-          {entry.rules && entry.rules.length > 0 ? (
-            <div className="space-y-2">
-              {entry.rules.map((group) => (
-                <div key={group.requirement}>
-                  <div className="mb-1 text-base font-bold text-foreground">
-                    <MarkdownSection content={group.requirement} />
+          <ContextAccordion title={`Rules${entry.rules ? ` (${entry.rules.length})` : ''}`} defaultOpen>
+            {entry.rules && entry.rules.length > 0 ? (
+              <div className="space-y-2">
+                {entry.rules.map((group) => (
+                  <div key={group.requirement}>
+                    <div className="mb-1 text-base font-bold text-foreground">
+                      <MarkdownSection content={group.requirement} />
+                    </div>
+                    <div className="space-y-2">
+                      {group.rules.map((rule) => (
+                        <div key={rule}>
+                          <MarkdownSection content={rule} />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    {group.rules.map((rule) => (
-                      <div key={rule}>
-                        <MarkdownSection content={rule} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyContextField label="Rules" />
-          )}
-        </ContextAccordion>
+                ))}
+              </div>
+            ) : (
+              <EmptyContextField label="Rules" />
+            )}
+          </ContextAccordion>
 
-        <ContextAccordion
-          title={`Constraints${entry.constraints ? ` (${entry.constraints.length})` : ''}`}
-          defaultOpen
-        >
-          {entry.constraints && entry.constraints.length > 0 ? (
-            <ul className="list-disc space-y-1 pl-5">
-              {entry.constraints.map((constraint) => (
-                <li key={constraint}>
-                  <MarkdownSection content={constraint} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyContextField label="Constraints" />
-          )}
-        </ContextAccordion>
+          <ContextAccordion
+            title={`Constraints${entry.constraints ? ` (${entry.constraints.length})` : ''}`}
+            defaultOpen
+          >
+            {entry.constraints && entry.constraints.length > 0 ? (
+              <ul className="list-disc space-y-1 pl-5">
+                {entry.constraints.map((constraint) => (
+                  <li key={constraint}>
+                    <MarkdownSection content={constraint} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyContextField label="Constraints" />
+            )}
+          </ContextAccordion>
 
-        <ContextAccordion
-          title={`Scenarios${entry.scenarios ? ` (${entry.scenarios.length})` : ''}`}
-          defaultOpen
-        >
-          {entry.scenarios && entry.scenarios.length > 0 ? (
-            <div className="space-y-4">
-              {entry.scenarios.map((scenario) => (
-                <div key={`${scenario.requirement}:${scenario.name}`}>
-                  <div className="text-base font-bold text-foreground">
-                    <MarkdownSection content={scenario.name} />
+          <ContextAccordion
+            title={`Scenarios${entry.scenarios ? ` (${entry.scenarios.length})` : ''}`}
+            defaultOpen
+          >
+            {entry.scenarios && entry.scenarios.length > 0 ? (
+              <div className="space-y-4">
+                {entry.scenarios.map((scenario) => (
+                  <div key={`${scenario.requirement}:${scenario.name}`}>
+                    <div className="text-base font-bold text-foreground">
+                      <MarkdownSection content={scenario.name} />
+                    </div>
+                    <div className="mb-2 text-muted-foreground">
+                      <MarkdownSection content={scenario.requirement} compact />
+                    </div>
+                    {scenario.given && scenario.given.length > 0 ? (
+                      <ScenarioList label="Given" items={scenario.given} />
+                    ) : null}
+                    {scenario.when && scenario.when.length > 0 ? (
+                      <ScenarioList label="When" items={scenario.when} />
+                    ) : null}
+                    {scenario.then && scenario.then.length > 0 ? (
+                      <ScenarioList label="Then" items={scenario.then} />
+                    ) : null}
                   </div>
-                  <div className="mb-2 text-muted-foreground">
-                    <MarkdownSection content={scenario.requirement} compact />
-                  </div>
-                  {scenario.given && scenario.given.length > 0 ? (
-                    <ScenarioList label="Given" items={scenario.given} />
-                  ) : null}
-                  {scenario.when && scenario.when.length > 0 ? (
-                    <ScenarioList label="When" items={scenario.when} />
-                  ) : null}
-                  {scenario.then && scenario.then.length > 0 ? (
-                    <ScenarioList label="Then" items={scenario.then} />
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyContextField label="Scenarios" />
-          )}
-        </ContextAccordion>
-      </div>
-    </section>
+                ))}
+              </div>
+            ) : (
+              <EmptyContextField label="Scenarios" />
+            )}
+          </ContextAccordion>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 /**
- * Small native accordion used by the spec context panel.
+ * Studio accordion wrapper used by the spec context panel.
  *
  * @param title - Section heading
  * @param children - Section body
@@ -352,15 +377,14 @@ function ContextAccordion({
   defaultOpen?: boolean
 }): React.ReactElement {
   return (
-    <details
-      open={defaultOpen}
-      className="overflow-hidden rounded border border-border bg-background/20"
-    >
-      <summary className="cursor-pointer list-none px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        {title}
-      </summary>
-      <div className="border-t border-border px-3 py-3">{children}</div>
-    </details>
+    <Accordion type="single" collapsible defaultValue={defaultOpen ? 'section' : undefined}>
+      <AccordionItem value="section">
+        <AccordionTrigger className="bg-background/20 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          {title}
+        </AccordionTrigger>
+        <AccordionContent>{children}</AccordionContent>
+      </AccordionItem>
+    </Accordion>
   )
 }
 
@@ -461,17 +485,19 @@ function SpecArtifactsList({
 
   return (
     <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto p-3">
-      <div className="studio-card overflow-hidden">
-        <div className="border-b border-border px-3 py-2 text-xs font-medium capitalize text-foreground">
-          Canonical artifacts
-        </div>
-        <ul className="py-1">
+      <Card>
+        <CardHeader>
+          <CardTitle>Canonical artifacts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-1">
           {artifacts.map((a) => (
             <li key={a.filename}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 className={cn(
-                  'flex w-full items-center gap-2 px-4 py-1.5 text-left text-xs transition-colors duration-150 hover:bg-background/60',
+                  'h-auto w-full justify-start gap-2 px-4 py-1.5 text-left text-xs transition-colors duration-150 hover:bg-background/60',
                   selected === a.filename && 'bg-background/80 text-foreground',
                 )}
                 onClick={() => onSelect?.(a.filename)}
@@ -485,11 +511,12 @@ function SpecArtifactsList({
                     {a.hash.slice(0, 8)}
                   </span>
                 ) : null}
-              </button>
+              </Button>
             </li>
           ))}
-        </ul>
-      </div>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -526,10 +553,9 @@ function LinkedChangesPanel({
       ) : (
         <ul className="space-y-2">
           {linkedChanges.map((c) => (
-            <li
-              key={c.name}
-              className="studio-card flex items-start gap-3 p-3"
-            >
+            <li key={c.name}>
+              <Card>
+                <CardContent className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-foreground">{c.name}</div>
                 <div className="mt-1 text-muted-foreground">
@@ -538,14 +564,11 @@ function LinkedChangesPanel({
                     : 'No description.'}
                 </div>
               </div>
-              <span
-                className={cn(
-                  'shrink-0 capitalize',
-                  STATE_COLOR[c.state] ?? 'text-muted-foreground',
-                )}
-              >
+              <span className={cn('shrink-0 capitalize', STATE_COLOR[c.state] ?? 'text-muted-foreground')}>
                 {c.state}
               </span>
+                </CardContent>
+              </Card>
             </li>
           ))}
         </ul>
@@ -576,8 +599,10 @@ function SpecDependenciesPanel({
       ) : (
         <ul className="space-y-1 font-mono">
           {deps.map((id) => (
-            <li key={id} className="studio-card px-3 py-2 text-foreground">
-              {id}
+            <li key={id}>
+              <Card>
+                <CardContent className="text-foreground">{id}</CardContent>
+              </Card>
             </li>
           ))}
         </ul>
@@ -640,11 +665,11 @@ function SpecGraphPanel({
   }
   return (
     <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-4 text-xs">
-      <section className="studio-card overflow-hidden">
-        <div className="border-b border-border bg-muted/30 px-3 py-2 font-mono text-sm text-foreground">
-          {data.specId}
-        </div>
-        <div className="space-y-3 p-3">
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-mono normal-case tracking-normal">{data.specId}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
           <ImpactSection
             title="Symbols"
             count={data.symbols.length}
@@ -678,8 +703,8 @@ function SpecGraphPanel({
               ))}
             </ul>
           </ImpactSection>
-        </div>
-      </section>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -719,11 +744,12 @@ function SpecImpactPanel({
 
   return (
     <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-4 text-xs">
-      <section className="studio-card overflow-hidden">
-        <div className="border-b border-border bg-muted/30 px-3 py-2 font-mono text-sm text-foreground">
-          {data.target}
-        </div>
-        <div className="grid gap-2 border-b border-border/60 px-3 py-2 text-[10px] text-muted-foreground md:grid-cols-3 xl:grid-cols-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-mono normal-case tracking-normal">{data.target}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+        <div className="grid gap-2 border-b border-border/60 pb-2 text-[10px] text-muted-foreground md:grid-cols-3 xl:grid-cols-6">
           <div>
             <span className="text-foreground/80">Risk: </span>
             {data.riskLevel}
@@ -749,7 +775,7 @@ function SpecImpactPanel({
             {data.specs.length}
           </div>
         </div>
-        <div className="space-y-3 p-3">
+        <div className="space-y-3">
           <ImpactSection
             title="Specs"
             count={data.specs.length}
@@ -818,7 +844,8 @@ function SpecImpactPanel({
             </ImpactSection>
           ) : null}
         </div>
-      </section>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -846,7 +873,7 @@ function ImpactSection({
     <section>
       <h2 className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {title}
-        <span className="ml-2 studio-badge">{count}</span>
+        <span className="ml-2 inline-flex align-middle"><Badge>{count}</Badge></span>
       </h2>
       {count > 0 ? children : <p className="text-[10px] text-muted-foreground">{empty}</p>}
     </section>

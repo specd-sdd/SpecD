@@ -68,7 +68,7 @@ Editor area tabs MUST be compact horizontal IDE tabs (closable when appropriate)
 
 ### Requirement: sidebar follows VS Code Cursor tree patterns
 
-Sidebars MUST implement workspace and change trees with **`react-arborist`** (or a thin wrapper in `@specd/ui`). Trees MUST support collapsible nodes, optional status badges, selected-row highlight, and hover-revealed row actions consistent with VS Code / Cursor file-tree behaviour.
+Sidebars MUST implement workspace and change trees using a shared Studio tree composition in `@specd/ui`. The implementation MAY be backed by **`react-arborist`** or by shadcn/Radix-backed collapsible tree rows when a lighter hierarchy is sufficient. In both cases, trees MUST support collapsible nodes, optional status badges, selected-row highlight, and hover/active row chrome consistent with VS Code / Cursor file-tree behaviour.
 
 ### Requirement: artifact and inspector surfaces feel like code tooling
 
@@ -98,24 +98,24 @@ Lifecycle and validation states MUST use the semantic palette: success green, wa
 | Variants           | **class-variance-authority** (`cva`)                             | Variant props on shared components                                                                     |
 | Class merging      | **tailwind-merge** (+ `clsx` or equivalent)                      | `cn()` helper in `lib/utils.ts`                                                                        |
 | Split layout       | **react-resizable-panels**                                       | Sidebar / editor / inspector / bottom splits                                                           |
-| Trees              | **react-arborist**                                               | Changes and workspace sidebars                                                                         |
+| Trees              | **`react-arborist`** or shadcn/Radix-backed tree wrappers        | Changes and workspace sidebars                                                                         |
 | Code editor        | **@monaco-editor/react** + **monaco-editor**                     | `ui:artifact-editor` and read-only inspectors                                                          |
 | Icons              | **lucide-react**                                                 | Navigation and toolbars                                                                                |
 | Terminal (desktop) | **xterm** (+ fit addon as needed) + **node-pty** in main process | `studio-desktop:bottom-panel-terminal` only                                                            |
 
-shadcn components MUST be customized (Tailwind theme + `cva`) to match this spec’s palette, radius, and density. Default shadcn “card dashboard” layouts MUST NOT be used for the shell.
+shadcn components MUST be customized (Tailwind theme + `cva`) to match this spec’s palette, radius, and density. Local names such as `StudioDialog` or sidebar/tree wrappers MUST be thin shadcn/Radix-backed adapters, not reimplemented primitives. Default shadcn “card dashboard” layouts MUST NOT be used for the shell.
 
 Hosts (`studio-web`, `studio-desktop`) MUST configure Tailwind to scan `@specd/ui` sources (or consume a prebuilt UI stylesheet) so utilities compile correctly.
 
 ### Requirement: confirmation modals use StudioDialog chrome
 
-Blocking confirmations (unsaved edits, validate drift, save conflicts, and similar Studio modals) MUST use the shared **`StudioDialog`** shell in `@specd/ui` (`packages/ui/src/components/StudioDialog.tsx`), not ad hoc card overlays.
+Blocking confirmations (unsaved edits, validate drift, save conflicts, and similar Studio modals) MUST use the shared **`StudioDialog`** shell in `@specd/ui` (`packages/ui/src/components/StudioDialog.tsx`), not ad hoc card overlays. `StudioDialog` MUST be implemented as a thin shadcn-backed wrapper around the `Dialog` primitive.
 
-- The viewport **backdrop** MUST **dim** the shell underneath with a semi-transparent scrim (e.g. `bg-black/50`), same family as the command palette overlay. The scrim MUST NOT be a solid opaque layer that hides the workspace entirely.
-- The **dialog panel** MUST be **fully opaque**: solid `bg-background` (or `background.elevated` token) with `border.default`. The panel MUST NOT use `bg-background/40`, `studio-card` translucency, or glassmorphism—only the panel is solid; the mask stays dimmed.
+- The viewport **backdrop** MUST **dim** the shell underneath with a semi-transparent scrim (e.g. `bg-black/50` or the shadcn `DialogOverlay` default). The scrim MUST NOT be a solid opaque layer that hides the workspace entirely.
+- The **dialog panel** MUST be **fully opaque**: solid `bg-background` (or `background.elevated` token) with `border.default`. The panel MUST NOT use `bg-background/40`, legacy `studio-card` translucency, or glassmorphism—only the panel is solid; the mask stays dimmed.
 - Feature specs (e.g. `ui:validate-confirm-dialog`, `ui:inspector-unsaved-draft`) define copy, buttons, and workflow; **presentation** MUST conform to this split.
 
-Radix/shadcn `Dialog` primitives MAY be used elsewhere, but Studio confirmation flows that block navigation or mutation MUST go through `StudioDialog` unless a future change explicitly exempts a surface.
+Radix/shadcn `Dialog` and `AlertDialog` primitives MUST be the underlying implementation for Studio confirmation flows, with `StudioDialog` enforcing consistent composition and density across the application.
 
 ## Constraints
 

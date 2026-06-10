@@ -1,6 +1,12 @@
 import type { ChangeDetailDto, ChangeHistoryEventDto, ChangeStatusDto } from '@specd/client'
 import * as React from 'react'
 import { Button } from '../components/ui/button.js'
+import {
+  Card as StudioCard,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card.js'
 import { ChangeDescriptionEditor } from './ChangeDescriptionEditor.js'
 import { ChangeInvalidationPolicyEditor } from './ChangeInvalidationPolicyEditor.js'
 import { ChangeScopeDialog } from './ChangeScopeDialog.js'
@@ -202,12 +208,12 @@ function Card({
   className?: string
 }): React.ReactElement {
   return (
-    <section className={`studio-card p-3 ${className}`}>
-      <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h2>
-      {children}
-    </section>
+    <StudioCard className={className}>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </StudioCard>
   )
 }
 

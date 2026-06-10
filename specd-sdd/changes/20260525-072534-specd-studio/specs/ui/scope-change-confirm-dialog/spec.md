@@ -8,7 +8,7 @@ Second step inside [`ui:change-metadata-editor`](../change-metadata-editor/spec.
 
 ### Requirement: scope confirm is a step inside ChangeScopeDialog
 
-When **Save changes** includes `addSpecIds` or `removeSpecIds`, the dialog MUST switch to a confirm view with copy from `buildScopeChangeConfirmMessage` and **Back** / **Apply scope change** actions — not a separate top-level modal on Overview.
+When **Save changes** includes `addSpecIds` or `removeSpecIds`, the dialog MUST switch to a confirm view with copy from `buildScopeChangeConfirmMessage` and **Back** / **Apply scope change** actions (using shadcn `Button` components) — not a separate top-level modal on Overview.
 
 ### Requirement: dependency-only saves skip scope confirm
 

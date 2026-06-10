@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { StudioDialog } from './StudioDialog.js'
+import { Button } from './ui/button.js'
 
 export function UnsavedChangesDialog({
   open,
@@ -20,32 +21,34 @@ export function UnsavedChangesDialog({
       title="Unsaved changes"
       titleId="unsaved-dialog-title"
       testId="studio-unsaved-dialog"
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !saving) onCancel()
+      }}
       actions={
         <>
-          <button
-            type="button"
-            className="rounded px-3 py-1.5 text-muted-foreground hover:bg-muted"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onCancel}
             disabled={saving}
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            className="rounded px-3 py-1.5 text-destructive hover:bg-destructive/10"
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={onDiscard}
             disabled={saving}
           >
             Discard
-          </button>
-          <button
-            type="button"
-            className="rounded bg-primary px-3 py-1.5 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+          </Button>
+          <Button
+            size="sm"
             onClick={onSave}
             disabled={saving}
           >
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </>
       }
     >

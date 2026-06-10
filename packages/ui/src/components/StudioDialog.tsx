@@ -1,5 +1,12 @@
 import * as React from 'react'
-import { cn } from '../lib/cn.js'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from './ui/dialog.js'
+import { cn } from '../lib/utils.js'
 
 export type StudioDialogProps = {
   open: boolean
@@ -10,10 +17,12 @@ export type StudioDialogProps = {
   /** Optional test id on the panel (not the backdrop). */
   testId?: string
   className?: string
+  /** Optional callback when the dialog's open state changes (e.g., clicking outside). */
+  onOpenChange?: (open: boolean) => void
 }
 
 /**
- * Studio confirmation modal: dimmed scrim + opaque dialog panel.
+ * Studio confirmation modal: thin shadcn-backed wrapper.
  */
 export function StudioDialog({
   open,
@@ -23,30 +32,30 @@ export function StudioDialog({
   actions,
   testId,
   className,
+  onOpenChange,
 }: StudioDialogProps): React.ReactElement | null {
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="presentation"
-    >
-      <div
-        className={cn(
-          'w-full max-w-sm rounded-md border border-border bg-background p-4 text-xs text-foreground shadow-2xl',
-          className,
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={cn('text-xs', className)}
         data-testid={testId}
+        onPointerDownOutside={(e) => {
+          // If no onOpenChange is provided, prevent closing on outside click to match legacy behavior
+          if (!onOpenChange) {
+            e.preventDefault()
+          }
+        }}
       >
-        <h2 id={titleId} className="mb-2 text-sm font-medium text-foreground">
-          {title}
-        </h2>
-        <div className="mb-4 min-h-0 flex-1 overflow-hidden text-muted-foreground">{children}</div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">{actions}</div>
-      </div>
-    </div>
+        <DialogHeader>
+          <DialogTitle id={titleId} className="text-sm font-medium">
+            {title}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="studio-dialog-body flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+        <DialogFooter className="flex shrink-0 flex-wrap justify-end">
+          {actions}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

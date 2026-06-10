@@ -1,6 +1,20 @@
 import type { ChangeDetailDto } from '@specd/client'
 import * as React from 'react'
 import { Button } from '../components/ui/button.js'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card.js'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js'
 import { usePatchChange } from '../hooks/use-patch-change.js'
 
 const POLICY_OPTIONS = [
@@ -31,15 +45,10 @@ export function ChangeInvalidationPolicyEditor({
   const dirty = draft !== saved
 
   return (
-    <section
-      className="studio-card p-3"
-      data-testid="studio-change-invalidation-policy-editor"
-    >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <Card data-testid="studio-change-invalidation-policy-editor">
+      <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0">
         <div>
-          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Invalidation policy
-          </h2>
+          <CardTitle>Invalidation policy</CardTitle>
           <p className="mt-0.5 text-[10px] text-muted-foreground">
             Affects future drift invalidation only — does not invalidate approvals by itself.
           </p>
@@ -53,23 +62,31 @@ export function ChangeInvalidationPolicyEditor({
         >
           {isPatching ? 'Saving…' : 'Save'}
         </Button>
-      </div>
-      <select
-        className="h-8 w-full max-w-md rounded-md border border-input bg-background px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-        value={draft}
-        disabled={isPatching}
-        onChange={(e) => {
-          clearError()
-          setDraft(e.target.value as InvalidationPolicyValue)
-        }}
-      >
-        {POLICY_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {error ? <p className="mt-2 text-[10px] text-destructive">{error.message}</p> : null}
-    </section>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        <Select
+          value={draft}
+          disabled={isPatching}
+          onValueChange={(value) => {
+            clearError()
+            setDraft(value as InvalidationPolicyValue)
+          }}
+        >
+          <SelectTrigger className="max-w-md">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {POLICY_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        {error ? <p className="text-[10px] text-destructive">{error.message}</p> : null}
+      </CardContent>
+    </Card>
   )
 }

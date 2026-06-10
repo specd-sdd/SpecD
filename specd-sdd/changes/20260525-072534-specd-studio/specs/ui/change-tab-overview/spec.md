@@ -20,7 +20,7 @@ While requests are in flight or fail, the UI MUST show loading indicators and hu
 
 ### Requirement: overview includes workflow and validation status
 
-Overview MUST embed `getChangeStatus` results for the open **active** or **drafted** change: next action, blockers, and lifecycle transitions. Overview MUST NOT duplicate the Artifacts tab (no per-artifact file list on Overview).
+Overview MUST embed `getChangeStatus` results for the open **active** or **drafted** change: next action, blockers, and lifecycle transitions. Overview MUST NOT duplicate the Artifacts tab (no per-artifact file list on Overview). Next actions and blockers MUST be displayed using shadcn **`Card`** or **`Alert`** components as appropriate for their severity.
 
 For **archived** and **discarded** changes, the shell MUST NOT poll workflow status. The **Workflow & validation** card MUST show the embedded message **Workflow status unavailable.** (same copy as archived), not an API error from `getChangeStatus`.
 

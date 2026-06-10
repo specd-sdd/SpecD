@@ -8,7 +8,7 @@
 
 - **GIVEN** user is on the Artifacts tab for an active change
 - **WHEN** user clicks **Validate All**
-- **THEN** confirm modal is shown per `ui:design-system` (`StudioDialog`)
+- **THEN** confirm modal is shown per `ui:design-system` (`StudioDialog` with shadcn `Button` components)
 - **AND** neither `validateChange` nor `validateChangeAll` is called until user clicks **Continue**
 
 #### Scenario: Cancel dismisses confirm without validating

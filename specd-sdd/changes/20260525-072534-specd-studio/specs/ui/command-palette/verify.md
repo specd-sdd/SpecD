@@ -22,6 +22,30 @@
 - **THEN** lint or build fails
 - **AND** data must flow through the port surface
 
+### Requirement: view is composed using shadcn Command and Dialog primitives
+
+#### Scenario: CommandPalette renders CommandDialog
+
+- **WHEN** CommandPalette is open
+- **THEN** it renders shadcn `CommandDialog`
+- **AND** standard shadcn structure (`CommandInput`, `CommandList`, `CommandGroup`, `CommandItem`) is present
+
+#### Scenario: Keyboard navigation is preserved
+
+- **GIVEN** CommandPalette is open
+- **WHEN** user presses ArrowDown or ArrowUp
+- **THEN** highlight moves through the list
+- **WHEN** user presses Enter
+- **THEN** the highlighted action is executed
+- **WHEN** user presses Escape
+- **THEN** the CommandPalette closes
+
+#### Scenario: Empty state shows when no actions match
+
+- **GIVEN** CommandPalette is open with actions
+- **WHEN** user types a query that matches no actions
+- **THEN** `CommandEmpty` renders "No matches found."
+
 ### Requirement: view surfaces loading and error states
 
 #### Scenario: Hook exposes loading while port call is in flight

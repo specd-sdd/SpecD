@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { StudioDialog } from '../components/StudioDialog.js'
+import { Button } from '../components/ui/button.js'
 
 export type LifecycleConfirmKind = 'draft' | 'restore' | 'discard' | 'archive'
 
@@ -91,29 +92,23 @@ export function ChangeLifecycleConfirmDialog({
       titleId="change-lifecycle-confirm-title"
       testId="studio-change-lifecycle-confirm-dialog"
       className={copy.destructive ? 'max-w-md border-destructive/40' : undefined}
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !busy) onCancel()
+      }}
       actions={
         <>
-          <button
-            type="button"
-            className="rounded px-3 py-1.5 text-muted-foreground hover:bg-muted"
-            onClick={onCancel}
-            disabled={busy}
-          >
+          <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
             Cancel
-          </button>
-          <button
-            type="button"
-            className={
-              copy.destructive
-                ? 'rounded bg-destructive px-3 py-1.5 font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40'
-                : 'rounded bg-primary px-3 py-1.5 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40'
-            }
+          </Button>
+          <Button
+            variant={copy.destructive ? 'destructive' : 'default'}
+            size="sm"
             onClick={onConfirm}
             disabled={busy}
             data-testid="studio-lifecycle-confirm"
           >
             {busy ? 'Working…' : copy.confirmLabel}
-          </button>
+          </Button>
         </>
       }
     >

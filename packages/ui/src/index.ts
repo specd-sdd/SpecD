@@ -8,7 +8,7 @@ export { useGraphStatus } from './hooks/use-graph-status.js'
 export { useWorkspacesSpecsStub, useGraphStatusStub, useCommandPaletteStub } from './hooks/stubs.js'
 export { ShellLayout, type ShellLayoutProps } from './shell/ShellLayout.js'
 export { ArtifactEditor } from './editor/ArtifactEditor.js'
-export { cn } from './lib/cn.js'
+export { cn } from './lib/utils.js'
 
 export type {
   SpecdConnectionProfile,

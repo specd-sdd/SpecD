@@ -81,17 +81,12 @@
 
 ### Requirement: dialog uses StudioDialog chrome
 
-#### Scenario: dialog uses StudioDialog chrome — primary path
+#### Scenario: Dialog uses ScrollArea and Button components
 
-- **WHEN** data-testid=studio-change-scope-dialog. Large layout (max-w-2xl) with scrollable body. Actions:
-- **THEN** behaviour matches the spec requirement
-- **AND** no forbidden side effects occur
-
-#### Scenario: dialog uses StudioDialog chrome — guard path
-
-- **GIVEN** inputs that stress the requirement boundary
-- **WHEN** the same capability runs
-- **THEN** errors or skips are explicit and documented
+- **WHEN** the dialog is opened
+- **THEN** it renders with a `max-w-2xl` layout
+- **AND** the scrollable body uses shadcn `ScrollArea`
+- **AND** the action buttons (Cancel, Save changes, Back, Apply scope change) render as shadcn `Button` components
 
 ### Requirement: view uses SpecdDataPort hooks only
 

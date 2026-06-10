@@ -8,7 +8,7 @@
 2. **`specs/**`and`deltas/**` in this change** — one spec per hexagonal slice; each `spec.md` + `verify.md` is the contract. **Do not implement from memory or from the reference draft alone.**
 3. **`tasks.md`** — ordered checklist derived from this design; each task points at files and spec IDs.
 
-**Non-binding narrative:** `specd-studio-api-and-ui.md` (route tables §5, UI tab copy, desktop menus). Use it for orientation; if it disagrees with a spec in this change, **the spec wins**.
+**Non-binding narrative:** `.specd-exploration.md` preserves the earlier route tables, UI tab copy, and desktop-menu decisions captured during discovery. Use it for orientation; if it disagrees with a spec in this change, **the spec wins**.
 
 This `design.md` is an **implementer's map**: where code lives, how layers connect, which spec IDs cover which slice, and which core use cases handlers must call. It does **not** restate requirements (see specs).
 
@@ -29,7 +29,7 @@ From proposal and cross-cutting specs (v1):
 
 ---
 
-## Spec catalog (148 spec IDs)
+## Spec catalog (188 spec IDs)
 
 Implement and test against these IDs. Counts match proposal §Spec count summary.
 
@@ -108,7 +108,7 @@ Each `client:dto-*` mirrors `api:dto-*` (16 specs).
 | Sidebars                        | `ui:sidebar-changes-in-progress`, `ui:sidebar-changes-drafts`, `ui:sidebar-changes-archive`, `ui:sidebar-changes-discarded`, `ui:sidebar-workspaces-tree`, `ui:sidebar-graph-entry`               |
 | Change tabs                     | `ui:change-tab-overview`, `ui:change-tab-artifacts`, `ui:change-tab-validation`, `ui:change-tab-tasks`, `ui:change-tab-events`, `ui:change-tab-context`, `ui:change-tab-impact`                   |
 | Change metadata (Overview)      | `ui:change-metadata-editor`, `ui:change-description-editor`, `ui:change-invalidation-policy-editor`, `ui:change-specs-readonly-panel`, `ui:change-scope-dialog`, `ui:scope-change-confirm-dialog` |
-| Spec tabs                       | `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-schema`, `ui:spec-tab-graph`, `ui:spec-tab-context`                             |
+| Spec tabs                       | `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-outline`, `ui:spec-tab-graph`, `ui:spec-tab-context`                            |
 | Inspector / editor              | `ui:artifact-editor`, `ui:hooks-inspector-save`, `ui:inspector-*` (metadata, delta, preview, canonical readonly)                                                                                  |
 | Bottom (Output, Problems, Logs) | `ui:bottom-panel-output`, `ui:bottom-panel-problems`, `ui:bottom-panel-logs`                                                                                                                      |
 | Per-tab read hook               | `ui:hooks-changes-read`                                                                                                                                                                           | Tab-visible poll + `ifModifiedSince` |
@@ -165,7 +165,7 @@ Everything below is already registered in root `specd.yaml` (except where noted)
 
 **Explicitly out of scope (unchanged by this change):** `apps/public-web`, `@specd/mcp`, `@specd/skills`, `plugin-*`, `plugin-manager`.
 
-**`@specd/ui` v1 stack (binding: `ui:design-system`):** Tailwind CSS, Radix (via **shadcn/ui** in `src/components/ui/`), **class-variance-authority**, **tailwind-merge** + `cn()`, **lucide-react**, **react-resizable-panels**, **react-arborist**, **@monaco-editor/react**. Desktop terminal: **xterm** + **node-pty** (main process). Markdown preview / unified diff may add `react-markdown` / `diff` per `ui:artifact-editor` (not shell kit).
+**`@specd/ui` v1 stack (binding: `ui:design-system`):** Tailwind CSS, Radix (via **shadcn/ui** in `src/components/ui/`), **class-variance-authority**, **tailwind-merge** + `cn()`, **lucide-react**, **react-resizable-panels**, shared Studio tree wrappers (optionally `react-arborist` where the hierarchy justifies it), **@monaco-editor/react**. Desktop terminal: **xterm** + **node-pty** (main process). Markdown preview / unified diff may add `react-markdown` / `diff` per `ui:artifact-editor` (not shell kit). **Note on shadcn adoption:** Migration from custom primitives to shadcn-backed Studio wrappers is complete. All major surfaces (Dialogs, Command Palettes, Tabs, Accordions, Cards, Badges, Alerts, ScrollAreas) now use shadcn primitives customized to maintain Studio density and styling conventions.
 
 **Hosts:** React 18 + Vite (`studio-web`), Electron (`studio-desktop`); Tailwind must scan `@specd/ui`. HTTP server lib for `@specd/api` — implementation choice unless a spec names it.
 
@@ -224,7 +224,7 @@ packages/ui/src/
   shell/                 # react-resizable-panels; status bar (ui:shell-layout)
   connect-panel/
   hooks/
-  sidebars/              # react-arborist trees
+  sidebars/              # Studio tree wrappers / sidebar chrome
   change-tabs/
   spec-tabs/
   artifact-editor/       # @monaco-editor/react
@@ -417,7 +417,7 @@ export type SpecdAppProps = {
 | Auth registry with one built-in           | Extension point without shipping JWT                                   | Implement bearer adapter in v1 (deferred in proposal)    |
 | Polling not WebSocket                     | Agents coexist via manifest `updatedAt`                                | Push notifications                                       |
 | Desktop local via IPC                     | No loopback token on kernel                                            | HTTP to localhost for local (extra auth surface)         |
-| `specd-studio-api-and-ui.md` non-binding  | Specs are normative for this change                                    | Treat draft as source of truth                           |
+| `.specd-exploration.md` non-binding       | Specs are normative for this change                                    | Treat exploration snapshot as historical context only    |
 
 ---
 
@@ -531,5 +531,5 @@ Every `verify.md` scenario should map to at least one test (per `default:_global
 - `proposal.md` — full spec tables, save steps, polling tables, handler→kernel matrix.
 - `specd-sdd/changes/20260525-072534-specd-studio/specs/**` — normative requirements + verify scenarios.
 - `specd-sdd/changes/20260525-072534-specd-studio/deltas/**` — core/global amendments.
-- `specd-studio-api-and-ui.md` — narrative route catalog §5 and UI §7–8 (non-binding).
+- `.specd-exploration.md` — preserved discovery snapshot for route catalog and UI framing (non-binding).
 - `tasks.md` — implementation checklist.

@@ -1,7 +1,11 @@
 import type { ChangeSummaryDto } from '@specd/client'
 import { AlertCircle, Circle } from 'lucide-react'
 import * as React from 'react'
-import { cn } from '../lib/cn.js'
+import { Badge } from '../components/ui/badge.js'
+import { Button } from '../components/ui/button.js'
+import { Card } from '../components/ui/card.js'
+import { ScrollArea } from '../components/ui/scroll-area.js'
+import { cn } from '../lib/utils.js'
 
 const STATE_BADGE: Record<string, string> = {
   exploring: 'text-sky-400',
@@ -33,7 +37,7 @@ export function ChangesSidebar({
   onSelectArchived?: (name: string) => void
 }): React.ReactElement {
   return (
-    <div className="flex flex-col text-xs">
+    <div className="flex w-full min-w-0 flex-col text-xs pr-2">
       {error ? (
         <div className="flex items-center gap-1 px-2 py-2 text-destructive">
           <AlertCircle className="h-3 w-3 shrink-0" />
@@ -98,52 +102,59 @@ function Section({
 }): React.ReactElement {
   if (items.length === 0) {
     return (
-      <div className="px-2 py-1">
-        <div className="px-1 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {title}
-        </div>
-        <p className="py-1 text-muted-foreground">None</p>
+      <div className="px-2 py-2">
+        <Card className="overflow-hidden bg-background/35 shadow-none">
+          <div className="studio-panel-header flex items-center justify-between">
+            <span className="truncate whitespace-nowrap text-[10px] tracking-[0.14em]">{title}</span>
+            <Badge variant="secondary" className="h-4 px-1 text-[9px]">0</Badge>
+          </div>
+          <p className="px-3 py-3 text-xs text-muted-foreground">None</p>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="px-2 py-2">
-      <div className="mb-1 flex items-center justify-between px-1 py-0.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-        <span>{title}</span>
-        <span className="studio-badge">{items.length}</span>
-      </div>
-      <ul>
-        {items.map((item) => {
-          const stateColor = STATE_BADGE[item.state ?? ''] ?? 'text-muted-foreground'
-          const circleColor = fixedCircleColor ?? stateColor
+    <div className="flex w-full min-w-0 flex-col px-2 py-2">
+      <Card className="flex w-full min-w-0 flex-col overflow-hidden bg-background/35 shadow-none">
+        <div className="studio-panel-header flex w-full shrink-0 items-center justify-between gap-2">
+          <span className="truncate whitespace-nowrap text-[10px] tracking-[0.14em]">{title}</span>
+          <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[9px]">{items.length}</Badge>
+        </div>
+        <ul className="flex w-full min-w-0 flex-col gap-0.5 p-1.5">
+          {items.map((item) => {
+            const stateColor = STATE_BADGE[item.state ?? ''] ?? 'text-muted-foreground'
+            const circleColor = fixedCircleColor ?? stateColor
 
-          return (
-            <li key={item.name}>
-              <button
-                type="button"
-                data-testid={
-                  rowTestIdPrefix !== undefined ? `${rowTestIdPrefix}-${item.name}` : undefined
-                }
-                className={cn(
-                  'studio-sidebar-row w-full',
-                  selected === item.name && 'studio-sidebar-row-active',
-                )}                onClick={() => onSelect(item.name)}
-              >
-                <Circle className={cn('h-2 w-2 shrink-0 fill-current stroke-none', circleColor)} />
-                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-                  {item.name}
-                </span>
-                {showState ? (
-                  <span className={cn('capitalize', stateColor)}>
-                    {item.state ?? '—'}
+            return (
+              <li key={item.name} className="flex w-full min-w-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid={
+                    rowTestIdPrefix !== undefined ? `${rowTestIdPrefix}-${item.name}` : undefined
+                  }
+                  className={cn(
+                    'studio-sidebar-row flex h-auto w-0 flex-1 min-w-0 max-w-full justify-start overflow-hidden px-2 py-1.5',
+                    selected === item.name && 'studio-sidebar-row-active',
+                  )}
+                  onClick={() => onSelect(item.name)}
+                >
+                  <Circle className={cn('!size-2 shrink-0 fill-current stroke-none', circleColor)} />
+                  <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground">
+                    {item.name}
                   </span>
-                ) : null}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+                  {showState ? (
+                    <span className={cn('shrink-0 font-mono text-[10px] uppercase tracking-[0.12em]', stateColor)}>
+                      {item.state ?? '—'}
+                    </span>
+                  ) : null}
+                </Button>
+              </li>
+            )
+          })}
+        </ul>
+      </Card>
     </div>
   )
 }

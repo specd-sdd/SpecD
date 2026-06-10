@@ -49,8 +49,11 @@ import {
 } from '../hooks/use-studio-panel.js'
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog.js'
 import { ValidateConfirmDialog } from '../components/ValidateConfirmDialog.js'
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.js'
+import { Button } from '../components/ui/button.js'
+import { Card, CardContent } from '../components/ui/card.js'
 import type { ValidateConfirmScope } from '../hooks/use-change-validate.js'
-import { Circle, GitPullRequest, Layers, Network } from 'lucide-react'
+import { AlertTriangle, Circle, GitPullRequest, Layers, Network, X } from 'lucide-react'
 import { ChangesSidebar } from '../sidebar/ChangesSidebar.js'
 import { GraphSidebarEntry, WorkspacesSidebar } from '../sidebar/WorkspacesSidebar.js'
 import {
@@ -63,7 +66,8 @@ import { StatusBar } from './StatusBar.js'
 import { ArtifactEditor } from '../editor/ArtifactEditor.js'
 import { ArtifactDiffView } from '../editor/ArtifactDiffView.js'
 import { ArtifactMarkdownPreview } from '../editor/ArtifactMarkdownPreview.js'
-import { cn } from '../lib/cn.js'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs.js'
+import { cn } from '../lib/utils.js'
 
 export type ShellLayoutProps = {
   project: ProjectDto | undefined
@@ -687,14 +691,14 @@ export function ShellLayout({
 
       <PanelGroup direction="horizontal" className="min-h-0 flex-1">
         {/* ── Sidebar ── */}
-        <Panel defaultSize={15} minSize={14} maxSize={28} className="studio-panel border-r border-border">
-          <div className="studio-sidebar-stack">
-            <section className="studio-sidebar-pane min-h-0 flex-[0.95]">
+        <Panel defaultSize={18} minSize={16} maxSize={30} className="studio-panel border-r border-border">
+          <div className="studio-sidebar-stack min-w-0">
+            <section className="studio-sidebar-pane min-h-0 min-w-0 flex-[0.9]">
               <div className="studio-panel-header flex items-center gap-2">
                 <GitPullRequest className="h-3 w-3 text-studio-success" />
                 <span>Changes</span>
               </div>
-              <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto">
+              <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
                 <ChangesSidebar
                   active={changes.active}
                   drafts={changes.drafts}
@@ -708,12 +712,12 @@ export function ShellLayout({
               </div>
             </section>
 
-            <section className="studio-sidebar-pane min-h-0 flex-[1.4]">
+            <section className="studio-sidebar-pane min-h-0 min-w-0 flex-[1.45]">
               <div className="studio-panel-header flex items-center gap-2">
                 <Layers className="h-3 w-3 text-studio-info" />
                 <span>Workspaces - Specs</span>
               </div>
-              <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto">
+              <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
                 <WorkspacesSidebar
                   entries={workspaceSpecs.data ?? []}
                   loading={workspaceSpecs.isLoading}
@@ -748,7 +752,7 @@ export function ShellLayout({
         <Panel minSize={40} className="flex min-w-0 flex-col">
           <PanelGroup direction="vertical" className="min-h-0 flex-1">
             {/* main content row */}
-            <Panel defaultSize={75} minSize={30} className="flex min-h-0 flex-col">
+            <Panel defaultSize={78} minSize={30} className="flex min-h-0 flex-col">
               <PanelGroup direction="horizontal" className="min-h-0 flex-1">
                 {/* center content */}
                 <Panel minSize={20} className="studio-scrollbar flex min-w-0 flex-col">
@@ -864,30 +868,32 @@ export function ShellLayout({
                         <span className="min-w-0 truncate font-mono text-xs">
                           {selectedArtifact?.filename}
                         </span>
-                        <button
-                          type="button"
-                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
                           aria-label="Close artifact"
                           onClick={() => runWithUnsavedGuard(closeArtifactPanel)}
                         >
-                          ✕
-                        </button>
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
 
-                      {/* mode tabs */}
-                      <div className="studio-tab-bar shrink-0">
-                        {inspectorModes.map((mode) => {
+                      <Tabs
+                        value={inspectorMode}
+                        onValueChange={(v) => setInspectorMode(v as any)}
+                        className="flex min-h-0 flex-1 flex-col"
+                      >
+                        {/* mode tabs */}
+                        <TabsList className="shrink-0">
+                          {inspectorModes.map((mode) => {
                             const disabled = mode === 'outline' && !canOutline
                             return (
-                              <button
+                              <TabsTrigger
                                 key={mode}
-                                type="button"
+                                value={mode}
                                 disabled={disabled}
-                                className={cn(
-                                  'studio-bottom-tab',
-                                  inspectorMode === mode && 'studio-bottom-tab-active',
-                                )}
-                                onClick={() => !disabled && setInspectorMode(mode)}
+                                className="h-auto bg-transparent shadow-none"
                               >
                                 {mode === 'raw'
                                   ? canEditChangeArtifact
@@ -904,154 +910,163 @@ export function ShellLayout({
                                       : mode === 'metadata'
                                         ? 'Metadata'
                                         : 'Outline'}
-                              </button>
+                              </TabsTrigger>
                             )
                           })}
 
-                        {/* Save + Validate — only for change artifacts */}
-                        {canEditChangeArtifact ? (
-                          <div className="ml-auto flex items-center gap-[5px]">
-                            {isDirty ? (
-                              <span title="Unsaved changes">
-                                <Circle
-                                  className="h-2 w-2 fill-amber-400 text-amber-400"
-                                  aria-label="Unsaved changes"
-                                />
-                              </span>
-                            ) : null}
-                            {saveHook.conflict ? (
-                              <span className="text-[10px] text-destructive">conflict</span>
-                            ) : null}
-                            <button
-                              type="button"
-                              disabled={saveHook.isSaving || !artifactOriginalHash}
-                              className="m-[5px] rounded px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:opacity-40"
-                              onClick={() => {
-                                if (!editorBuffer || !artifactOriginalHash) return
-                                void saveHook.save(editorBuffer, artifactOriginalHash)
-                              }}
-                            >
-                              {saveHook.isSaving ? 'Saving…' : 'Save'}
-                            </button>
-                            <button
-                              type="button"
-                              data-testid="studio-validate-artifact"
-                              disabled={validating}
-                              className="m-[5px] rounded px-2 py-0.5 text-[10px] font-medium bg-muted/40 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-                              onClick={() => requestValidate('artifact')}
-                            >
-                              Validate
-                            </button>
-                          </div>
+                          {/* Save + Validate — only for change artifacts */}
+                          {canEditChangeArtifact ? (
+                            <div className="ml-auto flex items-center gap-[5px]">
+                              {isDirty ? (
+                                <span title="Unsaved changes">
+                                  <Circle
+                                    className="!size-2 fill-amber-400 text-amber-400"
+                                    aria-label="Unsaved changes"
+                                  />
+                                </span>
+                              ) : null}
+                              {saveHook.conflict ? (
+                                <span className="text-[10px] text-destructive">conflict</span>
+                              ) : null}
+                              <button
+                                type="button"
+                                disabled={saveHook.isSaving || !artifactOriginalHash}
+                                className="m-[5px] rounded px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary transition-colors hover:bg-primary/20 disabled:opacity-40"
+                                onClick={() => {
+                                  if (!editorBuffer || !artifactOriginalHash) return
+                                  void saveHook.save(editorBuffer, artifactOriginalHash)
+                                }}
+                              >
+                                {saveHook.isSaving ? 'Saving…' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                data-testid="studio-validate-artifact"
+                                disabled={validating}
+                                className="m-[5px] rounded px-2 py-0.5 text-[10px] font-medium bg-muted/40 text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+                                onClick={() => requestValidate('artifact')}
+                              >
+                                Validate
+                              </button>
+                            </div>
+                          ) : null}
+                        </TabsList>
+
+                        {/* 409 conflict banner */}
+                        {saveHook.conflict ? (
+                          <Alert variant="destructive" className="rounded-none border-x-0 border-b p-2 shadow-none">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle className="text-[11px] font-bold uppercase tracking-wider">Save Conflict</AlertTitle>
+                            <AlertDescription className="text-xs">
+                              Another process modified this file.{' '}
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0 text-xs text-destructive underline"
+                                onClick={() => {
+                                  if (!editorBuffer || !artifactOriginalHash) return
+                                  void saveHook.forceOverwrite(editorBuffer, artifactOriginalHash)
+                                }}
+                              >
+                                Force overwrite
+                              </Button>{' '}
+                              or{' '}
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0 text-xs text-destructive underline"
+                                onClick={saveHook.clearConflict}
+                              >
+                                discard
+                              </Button>
+                              .
+                            </AlertDescription>
+                          </Alert>
                         ) : null}
-                      </div>
 
-                      {/* 409 conflict banner */}
-                      {saveHook.conflict ? (
-                        <div className="shrink-0 border-b border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
-                          <span className="font-medium">Save conflict.</span> Another process
-                          modified this file.{' '}
-                          <button
-                            type="button"
-                            className="underline hover:no-underline"
-                            onClick={() => {
-                              if (!editorBuffer || !artifactOriginalHash) return
-                              void saveHook.forceOverwrite(editorBuffer, artifactOriginalHash)
-                            }}
-                          >
-                            Force overwrite
-                          </button>{' '}
-                          or{' '}
-                          <button
-                            type="button"
-                            className="underline hover:no-underline"
-                            onClick={saveHook.clearConflict}
-                          >
-                            discard
-                          </button>
-                          .
-                        </div>
-                      ) : null}
-
-                      {/* inspector body */}
-                      <div className="min-h-0 flex-1">
-                        {inspectorMode === 'metadata' ? (
-                          <ArtifactMetadataPanel
-                            filename={selectedArtifact?.filename}
-                            kind={selectedArtifact?.kind ?? 'spec'}
-                            originalHash={artifactOriginalHash}
-                            content={editorBuffer ?? artifactContent ?? ''}
-                          />
-                        ) : inspectorMode === 'outline' ? (
-                          artifactOutline.isLoading && !artifactOutline.data?.length ? (
-                            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                              Loading outline…
-                            </div>
-                          ) : artifactOutline.error ? (
-                            <div className="flex h-full items-center justify-center p-4 text-xs text-destructive">
-                              {artifactOutline.error.message}
-                            </div>
-                          ) : (
-                            <pre className="studio-scrollbar h-full overflow-auto p-3 font-mono text-xs text-foreground/90">
-                              {artifactOutline.data?.length
-                                ? JSON.stringify(artifactOutline.data, null, 2)
-                                : 'No outline for this artifact.'}
-                            </pre>
-                          )
-                        ) : inspectorMode === 'diff' ? (
-                          usesMergedPreview && previewHook.isLoading && !previewHook.data ? (
-                            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                              Loading spec-preview…
-                            </div>
-                          ) : previewHook.error && !previewHook.data ? (
-                            <div className="flex h-full items-center justify-center p-4 text-xs text-destructive">
-                              {previewHook.error.message}
-                            </div>
-                          ) : canShowDiff ? (
-                            <ArtifactDiffView
+                        {/* inspector body */}
+                        <TabsContent
+                          value={inspectorMode}
+                          className="m-0 min-h-0 flex-1 focus-visible:ring-0"
+                        >
+                          {inspectorMode === 'metadata' ? (
+                            <ArtifactMetadataPanel
                               filename={selectedArtifact?.filename}
-                              original={previewHook.data!.base ?? ''}
-                              modified={previewHook.data!.merged}
+                              kind={selectedArtifact?.kind ?? 'spec'}
+                              originalHash={artifactOriginalHash}
+                              content={editorBuffer ?? artifactContent ?? ''}
                             />
-                          ) : (
-                            <div className="flex h-full items-center justify-center p-4 text-center text-xs text-muted-foreground">
-                              Diff is available for spec deltas in a change (base vs merged).
+                          ) : inspectorMode === 'outline' ? (
+                            artifactOutline.isLoading && !artifactOutline.data?.length ? (
+                              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                Loading outline…
+                              </div>
+                            ) : artifactOutline.error ? (
+                              <div className="flex h-full items-center justify-center p-4 text-xs text-destructive">
+                                {artifactOutline.error.message}
+                              </div>
+                            ) : (
+                              <pre className="studio-scrollbar h-full overflow-auto p-3 font-mono text-xs text-foreground/90">
+                                {artifactOutline.data?.length
+                                  ? JSON.stringify(artifactOutline.data, null, 2)
+                                  : 'No outline for this artifact.'}
+                              </pre>
+                            )
+                          ) : inspectorMode === 'diff' ? (
+                            usesMergedPreview && previewHook.isLoading && !previewHook.data ? (
+                              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                Loading spec-preview…
+                              </div>
+                            ) : previewHook.error && !previewHook.data ? (
+                              <div className="flex h-full items-center justify-center p-4 text-xs text-destructive">
+                                {previewHook.error.message}
+                              </div>
+                            ) : canShowDiff ? (
+                              <ArtifactDiffView
+                                filename={selectedArtifact?.filename}
+                                original={previewHook.data!.base ?? ''}
+                                modified={previewHook.data!.merged}
+                              />
+                            ) : (
+                              <div className="flex h-full items-center justify-center p-4 text-center text-xs text-muted-foreground">
+                                Diff is available for spec deltas in a change (base vs merged).
+                              </div>
+                            )
+                          ) : inspectorMode === 'preview' ? (
+                            usesMergedPreview && previewHook.isLoading && !previewHook.data ? (
+                              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                Loading spec-preview…
+                              </div>
+                            ) : previewHook.error && usesMergedPreview && !previewHook.data ? (
+                              <div className="flex h-full items-center justify-center p-4 text-xs text-destructive">
+                                {previewHook.error.message}
+                              </div>
+                            ) : usesMergedPreview && !previewHook.data?.merged ? (
+                              <div className="flex h-full items-center justify-center p-4 text-xs text-muted-foreground">
+                                No merged preview for this artifact.
+                              </div>
+                            ) : (
+                              <ArtifactMarkdownPreview content={previewMarkdown} />
+                            )
+                          ) : artifactError ? (
+                            <div className="flex h-full items-center justify-center p-4 text-center text-xs text-destructive">
+                              {artifactError.message}
                             </div>
-                          )
-                        ) : inspectorMode === 'preview' ? (
-                          usesMergedPreview && previewHook.isLoading && !previewHook.data ? (
+                          ) : artifactLoading ? (
                             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                              Loading spec-preview…
-                            </div>
-                          ) : previewHook.error && usesMergedPreview && !previewHook.data ? (
-                            <div className="flex h-full items-center justify-center p-4 text-xs text-destructive">
-                              {previewHook.error.message}
-                            </div>
-                          ) : usesMergedPreview && !previewHook.data?.merged ? (
-                            <div className="flex h-full items-center justify-center p-4 text-xs text-muted-foreground">
-                              No merged preview for this artifact.
+                              Loading…
                             </div>
                           ) : (
-                            <ArtifactMarkdownPreview content={previewMarkdown} />
-                          )
-                        ) : artifactError ? (
-                          <div className="flex h-full items-center justify-center p-4 text-center text-xs text-destructive">
-                            {artifactError.message}
-                          </div>
-                        ) : artifactLoading ? (
-                          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                            Loading…
-                          </div>
-                        ) : (
-                          <ArtifactEditor
-                            key={artifactSelectionKey}
-                            filename={selectedArtifact?.filename}
-                            value={editorBuffer ?? ''}
-                            readOnly={!canEditChangeArtifact}
-                            onChange={canEditChangeArtifact ? setEditorBuffer : undefined}
-                          />
-                        )}
-                      </div>
+                            <ArtifactEditor
+                              key={artifactSelectionKey}
+                              filename={selectedArtifact?.filename}
+                              value={editorBuffer ?? ''}
+                              readOnly={!canEditChangeArtifact}
+                              onChange={canEditChangeArtifact ? setEditorBuffer : undefined}
+                            />
+                          )}
+                        </TabsContent>
+                      </Tabs>
                     </Panel>
                   </>
                 ) : null}
@@ -1061,41 +1076,53 @@ export function ShellLayout({
             <PanelResizeHandle className="studio-resize-handle h-px" />
 
             {/* bottom panel */}
-            <Panel defaultSize={25} minSize={12} className="studio-panel">
-              <div className="studio-tab-bar">
-                {(['Output', 'Problems', 'Logs'] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    className={cn('studio-bottom-tab', bottomTab === tab && 'studio-bottom-tab-active')}
-                    onClick={() => setBottomTab(tab)}
-                  >
-                    {tab}
-                  </button>
-                ))}
-                {validating ? (
-                  <span className="px-2 text-xs text-muted-foreground"> · validating…</span>
-                ) : null}
-              </div>
-              <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-2 font-mono text-xs">
-                <BottomLines
-                  entries={
-                    bottomTab === 'Problems'
-                      ? problems
-                      : bottomTab === 'Output'
-                        ? outputEntries
-                        : undefined
-                  }
-                  lines={bottomTab === 'Logs' ? projectLogs.lines : undefined}
-                  emptyLabel={
-                    bottomTab === 'Problems'
-                      ? 'Warnings and errors from studio actions appear here.'
-                      : bottomTab === 'Output'
-                        ? 'Results of saves, validation, and other studio actions appear here.'
-                        : 'Recent specd log entries appear here.'
-                  }
-                />
-              </div>
+            <Panel defaultSize={22} minSize={12} className="studio-panel">
+              <Tabs
+                value={bottomTab}
+                onValueChange={(v) => setBottomTab(v as any)}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <TabsList className="shrink-0">
+                  {(['Output', 'Problems', 'Logs'] as const).map((tab) => (
+                    <TabsTrigger
+                      key={tab}
+                      value={tab}
+                      className="h-auto bg-transparent shadow-none"
+                    >
+                      {tab}
+                    </TabsTrigger>
+                  ))}
+                  {validating ? (
+                    <span className="px-2 text-xs text-muted-foreground"> · validating…</span>
+                  ) : null}
+                </TabsList>
+                <TabsContent
+                  value={bottomTab}
+                  className="m-0 min-h-0 flex-1 overflow-hidden focus-visible:ring-0"
+                >
+                  <div className="studio-scrollbar h-full overflow-y-auto">
+                    <div className="p-2 font-mono text-xs">
+                      <BottomLines
+                        entries={
+                          bottomTab === 'Problems'
+                            ? problems
+                            : bottomTab === 'Output'
+                              ? outputEntries
+                              : undefined
+                        }
+                        lines={bottomTab === 'Logs' ? projectLogs.lines : undefined}
+                        emptyLabel={
+                          bottomTab === 'Problems'
+                            ? 'Warnings and errors from studio actions appear here.'
+                            : bottomTab === 'Output'
+                              ? 'Results of saves, validation, and other studio actions appear here.'
+                              : 'Recent specd log entries appear here.'
+                        }
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </Panel>
           </PanelGroup>
         </Panel>
@@ -1168,8 +1195,21 @@ export function ShellLayout({
 
 function EmptyCenter(): React.ReactElement {
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center text-xs text-muted-foreground">
-      Select a change or spec from the sidebar
+    <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+      <Card className="w-full max-w-xl">
+        <CardContent className="px-6 py-8 text-center">
+          <div className="mb-3 inline-flex rounded-md border border-border bg-panel-header px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Workspace Ready
+          </div>
+          <h2 className="text-lg font-semibold uppercase tracking-[0.12em] text-foreground">
+            Select a change or spec
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Use the left sidebar to open an active change, inspect archived work, or browse workspace
+            specs and their artifacts.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -1240,7 +1280,11 @@ function BottomLines({
 }): React.ReactElement {
   const rowCount = entries?.length ?? lines?.length ?? 0
   if (rowCount === 0) {
-    return <p className="text-muted-foreground">{emptyLabel}</p>
+    return (
+      <div className="rounded-md border border-border/60 bg-background/30 px-3 py-2 text-muted-foreground">
+        {emptyLabel}
+      </div>
+    )
   }
 
   if (entries !== undefined && entries.length > 0) {

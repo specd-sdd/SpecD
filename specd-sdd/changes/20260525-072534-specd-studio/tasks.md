@@ -8,7 +8,7 @@ For **every** task below you MUST read, before coding:
 
 1. **`proposal.md`** — save pipeline (§`SaveChangeArtifact`), polling model, handler→kernel matrix, granularity rules.
 2. **The matching `spec.md` + `verify.md`** under `specd-sdd/changes/20260525-072534-specd-studio/specs/<workspace>/<capability>/` (or `deltas/` for core/global). Implement to satisfy **all** requirements and implement tests from **verify scenarios**.
-3. **`specd-studio-api-and-ui.md`** — optional narrative (routes §5, UI §7–8). If it conflicts with a change spec, **the spec wins**.
+3. **`.specd-exploration.md`** — preserved discovery snapshot. Use it only as orientation; if it conflicts with current change specs or artifacts, **the current change wins**.
 
 Use `node packages/cli/dist/index.js changes spec-preview specd-studio <specId> --artifact specs|verify` for merged deltas. Do not implement from `design.md` or the reference draft alone.
 
@@ -293,7 +293,7 @@ Read first: `ui:design-system` (full palette and IDE chrome rules). Then: `ui:sh
 
 - [x] 10.0b Layout and tree libraries
       `packages/ui/src/shell/`, `packages/ui/src/sidebars/`
-      Approach: `react-resizable-panels` for shell splits; `react-arborist` for workspace/change trees; `@monaco-editor/react` wired in artifact-editor package path
+      Approach: `react-resizable-panels` for shell splits; shared Studio tree wrappers for workspace/change trees (with `react-arborist` optional, not mandatory); `@monaco-editor/react` wired in artifact-editor package path
       (Req: `ui:design-system` — layout panels, sidebar trees, artifact surfaces)
 
 - [x] 10.1 `SpecdApp` + shell layout + global poll orchestration
@@ -357,7 +357,7 @@ Read each `ui:spec-tab-*` spec.
 - [x] 13.1 Spec tabs (overview, artifacts, metadata, dependencies, schema, graph, context)
       `packages/ui/src/spec-tabs/`
       Approach: metadata poll while tab visible; no direct filesystem access
-      (Req: `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-schema`, `ui:spec-tab-graph`, `ui:spec-tab-context`)
+      (Req: `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-outline`, `ui:spec-tab-graph`, `ui:spec-tab-context`)
 
 ---
 
@@ -462,20 +462,76 @@ Read **each** `studio-desktop:*` spec before implementing that slice.
 
 Read `design.md` §Testing and proposal polling table.
 
-- [x] 18.1 Integrated smoke: `specd ui serve`
+- [ ] 18.1 Integrated smoke: `specd ui serve`
       Manual: loopback project with active change
       Approach: open Studio embedded; global poll updates sidebar; open change tab; verify `ifModifiedSince` after external manifest touch
       (Req: `ui:shell-layout`, `api:routes-changes-read`, polling model)
 
-- [x] 18.2 Save and conflict smoke
+- [ ] 18.2 Save and conflict smoke
       Manual: edit `proposal.md` in Studio, Save, provoke 409, exercise force/reload UI
       Approach: covers `SaveChangeArtifact` + `hooks-inspector-save` + `handler-changes-mutate`
       (Req: `core:save-change-artifact`, `ui:hooks-inspector-save`)
 
-- [x] 18.3 Desktop dual profile smoke
+- [ ] 18.3 Desktop dual profile smoke
       Manual: open local folder via IPC; connect remote URL; recents menu
       (Req: `studio-desktop:welcome-and-file-menu`, `studio-desktop:desktop-local-data-adapter`, `studio-desktop:desktop-remote-profile`)
 
-- [x] 18.4 Standalone web smoke
+- [ ] 18.4 Standalone web smoke
       Manual: `studio-web` dev against `specd serve` on another port with CORS configured
       (Req: `studio-web:remote-bootstrap`, `api:middleware-cors`)
+
+---
+
+## 19. shadcn/ui Migration
+
+- [x] 19.0 Phase 0 & 1: Baseline and Primitives
+      `packages/ui/components.json`, `tsconfig.json`, `src/components/ui/`
+      Approach: Install all required shadcn primitives (`Dialog`, `Tabs`, `Accordion`, `Command`, `Card`, etc.) and set up path aliases.
+
+- [x] 19.2 Phase 2: Dialog Migration
+      `packages/ui/src/components/StudioDialog.tsx` and all dialog consumers
+      Approach: Replace custom modal shell with thin shadcn `Dialog` wrapper; use `Button` components for all actions.
+
+- [x] 19.3 Phase 3: Command Palette Migration
+      `packages/ui/src/shell/CommandPalette.tsx`
+      Approach: Replace custom command palette with shadcn `Command` + `Dialog` primitives.
+
+- [x] 19.4 Phase 4: Tabs Migration
+      `packages/ui/src/tabs/` (ChangeTabs, SpecTabs)
+      Approach: Replace custom tab bar with shadcn `Tabs` while keeping Studio tab chrome through shared classes and theme tokens.
+
+- [x] 19.5 Phase 5: Accordion Migration
+      `packages/ui/src/change/ChangeMainView.tsx`, `packages/ui/src/spec/SpecMainView.tsx`
+      Approach: Replace custom accordions with shadcn `Accordion`.
+
+- [ ] 19.6 Phase 6: Card / Badge / Alert / Separator Migration
+      Overview and Spec panels
+      Approach: Continue replacing remaining ad hoc warning/error/divider blocks with shadcn `Card`, `Badge`, `Alert`, and `Separator`; `studio-card`/`studio-badge` now remain as wrapper skin classes behind shared primitives rather than feature-level widgets.
+
+- [x] 19.6.1 Replace local card helpers and main panel surfaces
+      `ChangeOverview`, `SpecOverview`, `ChangeStatusPanel`, `ChangeSpecsReadonlyPanel`, `ChangeDescriptionEditor`, `ChangeInvalidationPolicyEditor`, `ChangeScopeDialog`, `ChangeMainView`, `SpecMainView`, `ShellLayout`
+      Approach: Recompose major overview/scope/spec surfaces with shadcn-backed `Card` and `Badge`.
+
+- [x] 19.6.2 Normalize remaining alerts and separators
+      Remaining warning, validation, and divider-heavy blocks
+      Approach: Finish migrating residual ad hoc bordered status blocks to shadcn `Alert` / `Separator` where the custom markup still carries presentation weight.
+
+- [x] 19.7 Phase 7: Sidebar and Tree Chrome Migration
+      `packages/ui/src/sidebar/`
+      Approach: Finish normalizing sidebar rows and sections with shadcn-backed Button, Badge, Card, and Collapsible; current workspace tree already uses shared wrappers but does not yet use a dedicated tree primitive.
+
+- [x] 19.7.1 Recompose primary sidebar sections
+      `ChangesSidebar`, `WorkspacesSidebar`, graph entry
+      Approach: Move section chrome and badges onto shared shadcn-backed primitives while preserving Studio tree density.
+
+- [x] 19.8 Phase 8: Form Composition Migration
+      `ConnectPanel`, `ChangeDescriptionEditor`, `ChangeInvalidationPolicyEditor`
+      Approach: Rework forms using shadcn `Input`, `Select`, `Textarea`.
+
+- [x] 19.9 Phase 9: Top Bar and Shell Cleanup
+      `StudioTopBar`, `ShellLayout`
+      Approach: Replace raw buttons with shadcn `Button`, add `Tooltip` where appropriate, use `ScrollArea` for main containers, and normalize shell empty-state/status chrome.
+
+- [x] 19.10 Phase 10: Final Cleanup and Artifact Closure
+      All change artifacts
+      Approach: Finish remaining spec/verify wording, close residual accessibility polish, and update all project artifacts to reflect the final shadcn-backed implementation.

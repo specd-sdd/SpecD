@@ -19,6 +19,14 @@ While the Studio window has focus, a **global poll** every **2–3 seconds** ref
 - `ui:hooks-workspaces-specs` + workspace tree → spec tree metadata
 - Graph entry → cheap `graph/status`
 
+### Requirement: editor area tabs support horizontal scrolling and navigation arrows
+
+When the central tab workspace or right-hand inspector host contains more tabs than the available width, the tab bar MUST support fluid horizontal scrolling (e.g. via trackpad or mouse wheel). Navigation arrows (← and →) MUST appear at the right end of the tab bar when desbordamiento exists, allowing the user to scroll programmatically. Arrows MUST be disabled visually when the scroll limit is reached in their respective direction.
+
+### Requirement: tab views display context via breadcrumbs
+
+To stabilize tab bar height and provide persistent context, change and spec tab views MUST display their qualified name or path (e.g. `CHANGES / <name>` or `SPECS / <path>`) in a thin breadcrumb header immediately above the horizontal tab bar. The tab bar itself MUST remain single-line and MUST NOT contain trailing name/path metadata that could cause height jumps on narrow viewports.
+
 ### Requirement: global polling pauses when the window is unfocused
 
 The global poll interval MUST NOT run while the browser window or Electron app lacks focus.

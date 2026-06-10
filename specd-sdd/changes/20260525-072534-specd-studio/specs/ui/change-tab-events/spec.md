@@ -16,11 +16,11 @@ The UI MUST display events in reverse chronological order (most recent at the to
 
 ### Requirement: events render as expandable accordions
 
-Each history row MUST be a collapsible accordion using the same interaction pattern as change **Artifacts** type groups (`ui:change-tab-artifacts`): chevron, clickable header, `aria-expanded`, and `studio-card` container.
+Each history row MUST be a collapsible accordion item using the shadcn **`Accordion`** component (with `type="multiple"`). The interaction pattern MUST be consistent with change **Artifacts** type groups (`ui:change-tab-artifacts`): chevron, clickable header, `aria-expanded`.
 
 - **Collapsed:** summary shows `type`, `at`, and a single-line actor when `by` is present.
 - **Expanded:** panel shows `by` when present, then **all other fields** on `ChangeHistoryEventDto` except `type` and `at` (e.g. `from`/`to`, `cause`, `specIds`, `artifactHashes`, sync deltas) as labeled rows. Object or array values MAY render in a scrollable monospace block (`max-height` capped). When no extra fields exist, the panel MUST show a short empty-state message.
-- **Toggle:** clicking the header expands or collapses that row only; multiple rows MAY stay open at once.
+- **Toggle:** clicking the header expands or collapses that row only; multiple rows MUST stay open at once.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

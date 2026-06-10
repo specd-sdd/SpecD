@@ -1,50 +1,85 @@
 import * as React from 'react'
-import { Input } from '../components/ui/input.js'
-
-/** Shared HTML `datalist` id for spec-id autocomplete in scope dialog. */
-export const SCOPE_SPEC_SUGGESTIONS_LIST_ID = 'studio-scope-dialog-spec-suggestions'
-
-/**
- * Renders once per dialog; multiple inputs use `list={SCOPE_SPEC_SUGGESTIONS_LIST_ID}`.
- */
-export function ScopeSpecSuggestionsDatalist({
-  specIds,
-}: {
-  specIds: readonly string[]
-}): React.ReactElement {
-  return (
-    <datalist id={SCOPE_SPEC_SUGGESTIONS_LIST_ID}>
-      {specIds.map((id) => (
-        <option key={id} value={id} />
-      ))}
-    </datalist>
-  )
-}
+import { Check, ChevronsUpDown } from 'lucide-react'
+import { cn } from '../lib/utils.js'
+import { Button } from '../components/ui/button.js'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '../components/ui/command.js'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '../components/ui/popover.js'
 
 export function ScopeSpecIdInput({
   value,
   onChange,
   placeholder,
   disabled,
-  onFocus,
+  specIds = [],
   className,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder: string
   disabled?: boolean
-  onFocus?: () => void
+  specIds?: readonly string[]
   className?: string
 }): React.ReactElement {
+  const [open, setOpen] = React.useState(false)
+
   return (
-    <Input
-      className={className ? `font-mono ${className}` : 'font-mono'}
-      list={SCOPE_SPEC_SUGGESTIONS_LIST_ID}
-      placeholder={placeholder}
-      value={value}
-      disabled={disabled}
-      onFocus={onFocus}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            "w-full justify-between font-mono text-xs shadow-none border-border/60 bg-background/50 hover:bg-background/80 hover:border-primary/30",
+            !value && "text-muted-foreground",
+            className
+          )}
+        >
+          <span className="truncate">{value || placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder}...`} className="h-8 text-xs" />
+          <CommandList className="max-h-[300px] studio-scrollbar">
+            <CommandEmpty className="py-2 text-center text-xs">No spec found.</CommandEmpty>
+            <CommandGroup>
+              {specIds.map((id) => (
+                <CommandItem
+                  key={id}
+                  value={id}
+                  onSelect={(currentValue) => {
+                    onChange(currentValue)
+                    setOpen(false)
+                  }}
+                  className="font-mono text-[10px]"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-3.5 w-3.5",
+                      value === id ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {id}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }

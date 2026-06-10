@@ -13,7 +13,7 @@ SpecD today is driven effectively through the CLI and agent skills, but there is
 
 ## Proposed solution
 
-Deliver **SpecD Studio** as a layered product on top of existing **core** use cases (see `specd-studio-api-and-ui.md` for HTTP paths and UI tabs).
+Deliver **SpecD Studio** as a layered product on top of existing **core** use cases (see `.specd-exploration.md` for the preserved discovery snapshot of HTTP paths, UI tabs, and product framing).
 
 | Layer                  | Role                                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------------------ |
@@ -259,7 +259,7 @@ Each `presenter-*` depends on its `dto-*` specs. Handlers depend on matching `pr
 
 ### Workspace `ui` — shell, hooks, views
 
-**Visual foundation:** `ui:design-system` — premium dark IDE aesthetic (GitHub-dark palette, Cursor/VS Code/JetBrains density). **Stack:** Tailwind + Radix/shadcn + `class-variance-authority` + `tailwind-merge`, `react-resizable-panels`, `react-arborist`, `@monaco-editor/react`, `lucide-react`; desktop terminal uses xterm. Panel-based chrome, 4–8px radius, 150–200ms motion, no SaaS dashboard / glass / neumorphism.
+**Visual foundation:** `ui:design-system` — premium dark IDE aesthetic (GitHub-dark palette, Cursor/VS Code/JetBrains density). **Stack:** Tailwind + Radix/shadcn + `class-variance-authority` + `tailwind-merge`, `react-resizable-panels`, shared Studio tree wrappers (optionally `react-arborist` where justified), `@monaco-editor/react`, `lucide-react`; desktop terminal uses xterm. Panel-based chrome, 4–8px radius, 150–200ms motion, no SaaS dashboard / glass / neumorphism.
 
 **Shell / navigation:** `ui:shell-layout`, `ui:command-palette`, `ui:connect-panel`, sidebar `ui:sidebar-*`.
 
@@ -300,7 +300,7 @@ Each `presenter-*` depends on its `dto-*` specs. Handlers depend on matching `pr
 
 **Spec view tabs** (`ui:spec-tab-*`): poll on tab visible for that spec’s metadata/artifacts/context (global tree already caught new spec nodes; tabs load detail). No change `updatedAt` — use refetch on interval or future spec revision field if needed (v1: light poll of spec metadata).
 
-**Spec main tabs:** `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-schema`, `ui:spec-tab-graph`, `ui:spec-tab-context`.
+**Spec main tabs:** `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-outline`, `ui:spec-tab-graph`, `ui:spec-tab-context`.
 
 **Inspector / editor:** `ui:artifact-editor` (**Save**, **Validate**, find-in-file), `ui:inspector-metadata-schema`, `ui:inspector-edit-preview`, `ui:inspector-delta-edit`, `ui:inspector-delta-preview`, `ui:inspector-delta-full-diff`, `ui:inspector-canonical-readonly`.
 
@@ -344,17 +344,17 @@ Each `presenter-*` depends on its `dto-*` specs. Handlers depend on matching `pr
 
 ### Spec count summary
 
-| Workspace           | Specs                                   |
-| ------------------- | --------------------------------------- |
-| `api`               | 54                                      |
-| `client`            | 30                                      |
-| `ui`                | 35                                      |
-| `studio-web`        | 2                                       |
-| `studio-desktop`    | 9                                       |
-| `cli`               | 2                                       |
-| `core`              | 2 new + 4 modified                      |
-| `default`           | 1 modified                              |
-| **Total in change** | **142 new + 6 modified (148 spec IDs)** |
+| Workspace           | Specs                                             |
+| ------------------- | ------------------------------------------------- |
+| `api`               | 54                                                |
+| `client`            | 30                                                |
+| `ui`                | 35                                                |
+| `studio-web`        | 2                                                 |
+| `studio-desktop`    | 9                                                 |
+| `cli`               | 2                                                 |
+| `core`              | 2 new + 4 modified                                |
+| `default`           | 1 modified                                        |
+| **Total in change** | **188 spec IDs currently attached to the change** |
 
 ---
 
@@ -383,7 +383,7 @@ Each `presenter-*` depends on its `dto-*` specs. Handlers depend on matching `pr
 
 ### Reference draft
 
-`specd-studio-api-and-ui.md` supplies HTTP route tables and UI tab inventory. Where it disagrees with this proposal (e.g. mandatory Bearer, `repo.saveArtifact` in handlers, JWT adapters), **proposal wins**.
+`.specd-exploration.md` preserves the earlier HTTP route tables and UI tab inventory snapshot. Where that snapshot disagrees with this proposal or with the change specs, **proposal and change specs win**.
 
 ## Open questions
 
@@ -391,3 +391,5 @@ Each `presenter-*` depends on its `dto-*` specs. Handlers depend on matching `pr
 - Token storage: `recent-connections` vs `connect-panel` localStorage scope.
 
 **Deferred (out of scope):** workspace spec **`updatedAt` / spec-lock**; validation history events. Change-manifest `updatedAt` covers conditional poll for open changes in v1.
+
+**Note on shadcn adoption:** The migration to shadcn-backed composition is complete. All previous custom React primitives (Dialogs, Command Palettes, Tabs, Accordions, Cards, Badges, Alerts, ScrollAreas) have been replaced by thin wrappers over shadcn primitives, ensuring accessibility and consistency while maintaining the Studio's premium dark IDE aesthetic.

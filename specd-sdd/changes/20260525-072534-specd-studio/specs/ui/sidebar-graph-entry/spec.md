@@ -8,7 +8,7 @@ Studio UI for **Sidebar Graph Entry**: user-visible layout and actions driven ex
 
 ### Requirement: sidebar renders global poll data and wires actions
 
-The sidebar MUST render lists from global poll hooks (`hooks-changes-collection`, `hooks-workspaces-specs`, etc.). Row actions (open, restore, discard) MUST call the appropriate mutate port methods.
+The sidebar MUST render lists from global poll hooks (`hooks-changes-collection`, `hooks-workspaces-specs`, etc.). The Graph entry MUST be implemented using a shadcn **`Button`** (variant ghost) and a shadcn **`Badge`** to indicate status (ready, stale, etc.). Row actions (open, restore, discard) MUST call the appropriate mutate port methods.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

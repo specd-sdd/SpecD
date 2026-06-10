@@ -7,7 +7,22 @@ import type {
 } from '@specd/client'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import * as React from 'react'
-import { cn } from '../lib/cn.js'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '../components/ui/accordion.js'
+import { Badge } from '../components/ui/badge.js'
+import { Button } from '../components/ui/button.js'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card.js'
+import { Separator } from '../components/ui/separator.js'
+import { cn } from '../lib/utils.js'
 import type { ChangeReadSection } from '../lib/change-read-routes.js'
 import { useChangeArtifacts } from '../hooks/use-change-artifact.js'
 import { formatChangeArtifactError } from '../lib/change-read-routes.js'
@@ -48,41 +63,34 @@ function formatHistoryDetailValue(value: unknown): string {
 function ChangeHistoryEventRow({
   event,
   index,
-  expanded,
-  onToggle,
 }: {
   event: ChangeHistoryEventDto
   index: number
-  expanded: boolean
-  onToggle: () => void
 }): React.ReactElement {
   const details = historyEventDetailEntries(event)
   const actor = formatHistoryActor(event.by)
+  const rowKey = `${event.type}-${event.at}-${index}`
 
   return (
-    <li className="studio-card overflow-hidden" data-testid={`studio-event-row-${index}`}>
-      <button
-        type="button"
-        className="flex w-full items-start gap-2 px-3 py-2 text-left transition-colors duration-150 hover:bg-muted/30"
-        onClick={onToggle}
-        aria-expanded={expanded}
-      >
-        {expanded ? (
-          <ChevronDown className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-        )}
-        <span className="min-w-0 flex-1">
-          <span className="font-mono text-foreground">{event.type}</span>
-          <span className="text-muted-foreground"> · {event.at}</span>
+    <AccordionItem
+      value={rowKey}
+      data-testid={`studio-event-row-${index}`}
+      className="overflow-hidden rounded-md border border-border bg-background/25"
+    >
+      <AccordionTrigger className="px-3 py-2 hover:bg-muted/30 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground">
+        <div className="flex flex-1 flex-col items-start gap-0.5 text-left">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-foreground">{event.type}</span>
+            <span className="text-muted-foreground"> · {event.at}</span>
+          </div>
           {actor ? (
-            <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{actor}</span>
+            <span className="truncate text-[10px] text-muted-foreground">{actor}</span>
           ) : null}
-        </span>
-      </button>
+        </div>
+      </AccordionTrigger>
 
-      {expanded ? (
-        <div className="border-t border-border/60 bg-muted/15 px-3 py-2">
+      <AccordionContent className="bg-muted/15 p-0">
+        <div className="border-t border-border/60 px-3 py-2">
           {event.by !== undefined ? (
             <dl className="mb-2 grid gap-1 sm:grid-cols-[7rem_1fr]">
               <dt className="text-muted-foreground">by</dt>
@@ -116,8 +124,8 @@ function ChangeHistoryEventRow({
             </dl>
           )}
         </div>
-      ) : null}
-    </li>
+      </AccordionContent>
+    </AccordionItem>
   )
 }
 
@@ -228,32 +236,34 @@ export function ChangeTasksTab({
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4 text-xs">
       {tasksEntry ? (
-        <section className="mb-4 studio-card p-3">
-          <h2 className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Tasks artifact
-          </h2>
-          <p>
-            Status: <span className="text-foreground">{tasksEntry.displayStatus}</span>
-            {' · '}
-            {tasksEntry.files.length} file(s)
-            {taskSummary !== undefined ? (
-              <>
-                {' · '}
-                <span className="text-foreground">
-                  {taskSummary.completedTasks}/{taskSummary.totalTasks} tasks complete
-                </span>
-              </>
-            ) : null}
-          </p>
-          <ul className="mt-2 space-y-0.5 font-mono text-muted-foreground">
-            {tasksEntry.files.map((f) => (
-              <li key={f.key}>
-                {f.filename}
-                {f.hasDrift ? ' · drift' : ''}
-              </li>
-            ))}
-          </ul>
-        </section>
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Tasks artifact</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>
+              Status: <span className="text-foreground">{tasksEntry.displayStatus}</span>
+              {' · '}
+              {tasksEntry.files.length} file(s)
+              {taskSummary !== undefined ? (
+                <>
+                  {' · '}
+                  <span className="text-foreground">
+                    {taskSummary.completedTasks}/{taskSummary.totalTasks} tasks complete
+                  </span>
+                </>
+              ) : null}
+            </p>
+            <ul className="mt-2 space-y-0.5 font-mono text-muted-foreground">
+              {tasksEntry.files.map((f) => (
+                <li key={f.key}>
+                  {f.filename}
+                  {f.hasDrift ? ' · drift' : ''}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       ) : null}
 
       {tasksArtifacts.isLoading && !tasksArtifacts.data ? (
@@ -270,20 +280,24 @@ export function ChangeTasksTab({
       ) : tasksArtifacts.data && tasksArtifacts.data.length > 0 ? (
         <div className="space-y-3">
           {tasksArtifacts.data.map((artifact) => (
-            <section key={artifact.filename} className="studio-card overflow-hidden">
-              <header className="border-b border-border/60 bg-background/40 px-3 py-2 font-mono text-[11px] text-foreground">
-                {artifact.filename}
-              </header>
-              {artifact.filename.endsWith('.md') ? (
-                <div className="studio-markdown-preview max-w-none px-3 py-3 text-sm text-foreground">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content}</ReactMarkdown>
-                </div>
-              ) : (
-                <pre className="overflow-auto whitespace-pre-wrap p-3 font-mono text-xs text-foreground/90">
-                  {artifact.content}
-                </pre>
-              )}
-            </section>
+            <Card key={artifact.filename}>
+              <CardHeader>
+                <CardTitle className="font-mono normal-case tracking-normal">
+                  {artifact.filename}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {artifact.filename.endsWith('.md') ? (
+                  <div className="studio-markdown-preview max-w-none text-sm text-foreground">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <pre className="overflow-auto whitespace-pre-wrap font-mono text-xs text-foreground/90">
+                    {artifact.content}
+                  </pre>
+                )}
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : (
@@ -303,16 +317,7 @@ export function ChangeEventsTab({
   error?: Error
 }): React.ReactElement {
   const events = detail !== undefined ? [...detail.history].reverse() : []
-  const [expandedKeys, setExpandedKeys] = React.useState<ReadonlySet<string>>(() => new Set())
-
-  const toggleEvent = (key: string) => {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
+  const [expandedKeys, setExpandedKeys] = React.useState<string[]>([])
 
   if (error) {
     return <div className="p-3 text-xs text-destructive">{error.message}</div>
@@ -340,20 +345,20 @@ export function ChangeEventsTab({
       <div className="mb-3 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
         Lifecycle events ({events.length})
       </div>
-      <ul className="space-y-1.5">
-        {events.map((event, i) => {
-          const rowKey = `${event.type}-${event.at}-${i}`
-          return (
-            <ChangeHistoryEventRow
-              key={rowKey}
-              event={event}
-              index={i}
-              expanded={expandedKeys.has(rowKey)}
-              onToggle={() => toggleEvent(rowKey)}
-            />
-          )
-        })}
-      </ul>
+      <Accordion
+        type="multiple"
+        value={expandedKeys}
+        onValueChange={setExpandedKeys}
+        className="space-y-1.5"
+      >
+        {events.map((event, i) => (
+          <ChangeHistoryEventRow
+            key={`${event.type}-${event.at}-${i}`}
+            event={event}
+            index={i}
+          />
+        ))}
+      </Accordion>
     </div>
   )
 }
@@ -366,8 +371,8 @@ function TrackedFileList({
   return (
     <ul className="space-y-1 font-mono text-[10px] text-foreground/90">
       {files.map((entry) => (
-        <li key={entry.file} className="truncate rounded border border-border/60 bg-muted/20 px-2 py-1">
-          {entry.file}
+        <li key={entry.file}>
+          <Badge className="truncate normal-case tracking-normal">{entry.file}</Badge>
         </li>
       ))}
     </ul>
@@ -440,15 +445,12 @@ export function ChangeImpactTab({
     >
       <ul className="space-y-3">
         {model.bySpec.map((group) => (
-          <li
-            key={group.specId}
-            className="studio-card overflow-hidden"
-            data-testid={`studio-impact-spec-${group.specId.replace(/:/g, '-')}`}
-          >
-            <div className="border-b border-border bg-muted/30 px-3 py-2 font-mono text-sm text-foreground">
-              {group.specId}
-            </div>
-            <div className="space-y-3 p-3">
+          <li key={group.specId} data-testid={`studio-impact-spec-${group.specId.replace(/:/g, '-')}`}>
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-mono normal-case tracking-normal">{group.specId}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
               <ImpactSubsection
                 title="Accepted links"
                 count={group.accepted.length}
@@ -519,7 +521,8 @@ export function ChangeImpactTab({
               ) : null}
 
               <ImpactTrackedSubsections tracked={group.tracked} />
-            </div>
+              </CardContent>
+            </Card>
           </li>
         ))}
       </ul>
@@ -528,7 +531,7 @@ export function ChangeImpactTab({
         <section className="mt-4" data-testid="studio-impact-tracked-unassigned">
           <h2 className="mb-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             Tracked files (unassigned)
-            <span className="ml-2 studio-badge">{unassignedCount}</span>
+            <span className="ml-2 inline-flex align-middle"><Badge>{unassignedCount}</Badge></span>
           </h2>
           <p className="mb-2 text-[10px] text-muted-foreground">
             Files not uniquely tied to one spec via links or graph paths.
@@ -555,7 +558,7 @@ function ImpactSubsection({
     <div>
       <h3 className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {title}
-        {count > 0 ? <span className="ml-1 studio-badge">{count}</span> : null}
+        {count > 0 ? <span className="ml-1 inline-flex align-middle"><Badge>{count}</Badge></span> : null}
       </h3>
       {count === 0 && empty ? (
         <p className="text-[10px] text-muted-foreground">{empty}</p>

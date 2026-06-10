@@ -29,9 +29,10 @@ It MUST show:
 - grouped rules, constraints, scenarios, and optimized content when present
 - advisory warnings separately from the entry bodies
 
-Structured entry fields beyond the identity header MUST be rendered in separate collapsible sections so the user can inspect one field at a time instead of reading a single long body.
+Structured entry fields beyond the identity header MUST be rendered in separate collapsible sections using shadcn **`Accordion`** (type multiple) so the user can inspect one field at a time instead of reading a single long body.
 
 For the Studio default presentation:
+...
 
 - the optimized-content section appears before description, rules, constraints, and scenarios
 - all field sections start expanded
