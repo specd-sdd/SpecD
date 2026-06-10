@@ -293,7 +293,7 @@ Read first: `ui:design-system` (full palette and IDE chrome rules). Then: `ui:sh
 
 - [x] 10.0b Layout and tree libraries
       `packages/ui/src/shell/`, `packages/ui/src/sidebars/`
-      Approach: `react-resizable-panels` for shell splits; shared Studio tree wrappers for workspace/change trees (with `react-arborist` optional, not mandatory); `@monaco-editor/react` wired in artifact-editor package path
+      Approach: `react-resizable-panels` (via shadcn `Resizable`) for shell splits; shared Studio tree wrappers for workspace/change trees (with `react-arborist` optional, not mandatory); `@monaco-editor/react` wired in artifact-editor package path
       (Req: `ui:design-system` — layout panels, sidebar trees, artifact surfaces)
 
 - [x] 10.1 `SpecdApp` + shell layout + global poll orchestration

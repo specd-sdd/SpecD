@@ -27,7 +27,7 @@
 #### Scenario: Resizable split regions use react-resizable-panels
 
 - **WHEN** user adjusts sidebar or inspector width
-- **THEN** `PanelGroup` / `PanelResizeHandle` from `react-resizable-panels` drives the split
+- **THEN** `PanelGroup` / `PanelResizeHandle` from `react-resizable-panels` (via shadcn `Resizable`) drives the split
 - **AND** layout remains panel-based
 
 #### Scenario: Bottom panel is a tool window host
@@ -308,7 +308,7 @@
 #### Scenario: package.json declares the v1 UI stack
 
 - **WHEN** `@specd/ui` dependencies are inspected
-- **THEN** `tailwindcss`, `class-variance-authority`, `tailwind-merge`, `lucide-react`, `react-resizable-panels`, and `@monaco-editor/react` are present
+- **THEN** `tailwindcss`, `class-variance-authority`, `tailwind-merge`, `lucide-react`, `react-resizable-panels` (via shadcn `Resizable`), and `@monaco-editor/react` are present
 - **AND** tree composition is implemented either with `react-arborist` or shared shadcn/Radix-backed wrappers
 - **AND** Radix packages required by shadcn components are present
 

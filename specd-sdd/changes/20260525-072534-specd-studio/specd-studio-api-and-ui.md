@@ -855,7 +855,7 @@ No **Delta** / **Full diff** without an active change context.
 | ------------------------------ | ------------------------------------------------------------------- |
 | Styling                        | `tailwindcss`, `tailwind-merge`, `class-variance-authority`, `clsx` |
 | Components                     | **shadcn/ui** (Radix primitives), `lucide-react`                    |
-| Layout                         | `react-resizable-panels`                                            |
+| Layout                         | `react-resizable-panels` (via shadcn `Resizable`)                   |
 | Trees                          | `react-arborist`                                                    |
 | Editor                         | `@monaco-editor/react`, `monaco-editor`                             |
 | Preview / diff (artifact only) | `react-markdown` (or unified), `diff`                               |

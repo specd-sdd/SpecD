@@ -12,7 +12,7 @@ The product mood MUST be serious, technical, focused, dense, and professional. T
 
 ### Requirement: layout is panel-based IDE chrome not card dashboards
 
-Structure MUST use editor chrome: split panes, resizable panels, dense side navigation, tool windows, inspectors, compact tabs, and a thin status bar. Shell splits (sidebar, editor, inspector, bottom panel) MUST use **`react-resizable-panels`**. The UI MUST NOT rely on big rounded SaaS widgets, marketing tiles, or card-dashboard composition as the primary layout model.
+Structure MUST use editor chrome: split panes, resizable panels, dense side navigation, tool windows, inspectors, compact tabs, and a thin status bar. Shell splits (sidebar, editor, inspector, bottom panel) MUST use **`react-resizable-panels` (via shadcn `Resizable`)**. The UI MUST NOT rely on big rounded SaaS widgets, marketing tiles, or card-dashboard composition as the primary layout model.
 
 ### Requirement: color tokens use the Studio dark palette
 
@@ -125,7 +125,7 @@ Radix/shadcn `Dialog` and `AlertDialog` primitives MUST be the underlying implem
 
 ## Examples
 
-**`packages/ui/package.json` dependencies (illustrative):** `tailwindcss`, `class-variance-authority`, `tailwind-merge`, `clsx`, `lucide-react`, `react-resizable-panels`, `react-arborist`, `@monaco-editor/react`, `monaco-editor`, and Radix packages as required by installed shadcn components.
+**`packages/ui/package.json` dependencies (illustrative):** `tailwindcss`, `class-variance-authority`, `tailwind-merge`, `clsx`, `lucide-react`, `react-resizable-panels` (via shadcn `Resizable`), `react-arborist`, `@monaco-editor/react`, `monaco-editor`, and Radix packages as required by installed shadcn components.
 
 **Theme + `cn()`:**
 

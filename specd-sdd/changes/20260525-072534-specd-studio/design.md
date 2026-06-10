@@ -165,7 +165,7 @@ Everything below is already registered in root `specd.yaml` (except where noted)
 
 **Explicitly out of scope (unchanged by this change):** `apps/public-web`, `@specd/mcp`, `@specd/skills`, `plugin-*`, `plugin-manager`.
 
-**`@specd/ui` v1 stack (binding: `ui:design-system`):** Tailwind CSS, Radix (via **shadcn/ui** in `src/components/ui/`), **class-variance-authority**, **tailwind-merge** + `cn()`, **lucide-react**, **react-resizable-panels**, shared Studio tree wrappers (optionally `react-arborist` where the hierarchy justifies it), **@monaco-editor/react**. Desktop terminal: **xterm** + **node-pty** (main process). Markdown preview / unified diff may add `react-markdown` / `diff` per `ui:artifact-editor` (not shell kit). **Note on shadcn adoption:** Migration from custom primitives to shadcn-backed Studio wrappers is complete. All major surfaces (Dialogs, Command Palettes, Tabs, Accordions, Cards, Badges, Alerts, ScrollAreas) now use shadcn primitives customized to maintain Studio density and styling conventions.
+**`@specd/ui` v1 stack (binding: `ui:design-system`):** Tailwind CSS, Radix (via **shadcn/ui** in `src/components/ui/`), **class-variance-authority**, **tailwind-merge** + `cn()`, **lucide-react**, **react-resizable-panels** (via shadcn `Resizable`), shared Studio tree wrappers (optionally `react-arborist` where the hierarchy justifies it), **@monaco-editor/react**. Desktop terminal: **xterm** + **node-pty** (main process). Markdown preview / unified diff may add `react-markdown` / `diff` per `ui:artifact-editor` (not shell kit). **Note on shadcn adoption:** Migration from custom primitives to shadcn-backed Studio wrappers is complete. All major surfaces (Dialogs, Command Palettes, Tabs, Accordions, Cards, Badges, Alerts, ScrollAreas) now use shadcn primitives customized to maintain Studio density and styling conventions.
 
 **Hosts:** React 18 + Vite (`studio-web`), Electron (`studio-desktop`); Tailwind must scan `@specd/ui`. HTTP server lib for `@specd/api` — implementation choice unless a spec names it.
 
@@ -221,7 +221,7 @@ packages/ui/src/
   styles/globals.css     # Tailwind + Studio CSS variables
   theme/                 # token map / tailwind.config extension
   SpecdApp.tsx
-  shell/                 # react-resizable-panels; status bar (ui:shell-layout)
+  shell/                 # react-resizable-panels (via shadcn Resizable); status bar (ui:shell-layout)
   connect-panel/
   hooks/
   sidebars/              # Studio tree wrappers / sidebar chrome

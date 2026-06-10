@@ -259,7 +259,7 @@ Each `presenter-*` depends on its `dto-*` specs. Handlers depend on matching `pr
 
 ### Workspace `ui` — shell, hooks, views
 
-**Visual foundation:** `ui:design-system` — premium dark IDE aesthetic (GitHub-dark palette, Cursor/VS Code/JetBrains density). **Stack:** Tailwind + Radix/shadcn + `class-variance-authority` + `tailwind-merge`, `react-resizable-panels`, shared Studio tree wrappers (optionally `react-arborist` where justified), `@monaco-editor/react`, `lucide-react`; desktop terminal uses xterm. Panel-based chrome, 4–8px radius, 150–200ms motion, no SaaS dashboard / glass / neumorphism.
+**Visual foundation:** `ui:design-system` — premium dark IDE aesthetic (GitHub-dark palette, Cursor/VS Code/JetBrains density). **Stack:** Tailwind + Radix/shadcn + `class-variance-authority` + `tailwind-merge`, `react-resizable-panels` (via shadcn `Resizable`), shared Studio tree wrappers (optionally `react-arborist` where justified), `@monaco-editor/react`, `lucide-react`; desktop terminal uses xterm. Panel-based chrome, 4–8px radius, 150–200ms motion, no SaaS dashboard / glass / neumorphism.
 
 **Shell / navigation:** `ui:shell-layout`, `ui:command-palette`, `ui:connect-panel`, sidebar `ui:sidebar-*`.
 

@@ -7,10 +7,10 @@ import type {
 } from '@specd/client'
 import * as React from 'react'
 import {
-  Panel,
-  PanelGroup,
-  PanelResizeHandle,
-} from 'react-resizable-panels'
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '../components/ui/resizable.js'
 import {
   ChangeLifecycleConfirmDialog,
   type LifecycleConfirmKind,
@@ -689,9 +689,9 @@ export function ShellLayout({
         actions={paletteActions}
       />
 
-      <PanelGroup direction="horizontal" className="min-h-0 flex-1">
+      <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">
         {/* ── Sidebar ── */}
-        <Panel defaultSize={18} minSize={16} maxSize={30} className="studio-panel border-r border-border">
+        <ResizablePanel defaultSize={18} minSize={16} maxSize={30} className="studio-panel border-r border-border">
           <div className="studio-sidebar-stack min-w-0">
             <section className="studio-sidebar-pane min-h-0 min-w-0 flex-[0.9]">
               <div className="studio-panel-header flex items-center gap-2">
@@ -744,18 +744,18 @@ export function ShellLayout({
               </div>
             </section>
           </div>
-        </Panel>
+        </ResizablePanel>
 
-        <PanelResizeHandle className="studio-resize-handle w-px" />
+        <ResizableHandle className="studio-resize-handle w-px" />
 
         {/* ── Center + right ── */}
-        <Panel minSize={40} className="flex min-w-0 flex-col">
-          <PanelGroup direction="vertical" className="min-h-0 flex-1">
+        <ResizablePanel minSize={40} className="flex min-w-0 flex-col">
+          <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
             {/* main content row */}
-            <Panel defaultSize={78} minSize={30} className="flex min-h-0 flex-col">
-              <PanelGroup direction="horizontal" className="min-h-0 flex-1">
+            <ResizablePanel defaultSize={78} minSize={30} className="flex min-h-0 flex-col">
+              <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">
                 {/* center content */}
-                <Panel minSize={20} className="studio-scrollbar flex min-w-0 flex-col">
+                <ResizablePanel minSize={20} className="studio-scrollbar flex min-w-0 flex-col">
                   {centerCtx.kind === 'change' ? (
                     <ChangeMainView
                       changeName={changeName}
@@ -851,13 +851,13 @@ export function ShellLayout({
                   ) : (
                     <EmptyCenter />
                   )}
-                </Panel>
+                </ResizablePanel>
 
                 {/* right artifact inspector panel */}
                 {showRightPanel ? (
                   <>
-                    <PanelResizeHandle className="studio-resize-handle w-px" />
-                    <Panel
+                    <ResizableHandle className="studio-resize-handle w-px" />
+                    <ResizablePanel
                       defaultSize={50}
                       minSize={20}
                       maxSize={80}
@@ -1067,16 +1067,16 @@ export function ShellLayout({
                           )}
                         </TabsContent>
                       </Tabs>
-                    </Panel>
+                    </ResizablePanel>
                   </>
                 ) : null}
-              </PanelGroup>
-            </Panel>
+              </ResizablePanelGroup>
+            </ResizablePanel>
 
-            <PanelResizeHandle className="studio-resize-handle h-px" />
+            <ResizableHandle className="studio-resize-handle h-px" />
 
             {/* bottom panel */}
-            <Panel defaultSize={22} minSize={12} className="studio-panel">
+            <ResizablePanel defaultSize={22} minSize={12} className="studio-panel">
               <Tabs
                 value={bottomTab}
                 onValueChange={(v) => setBottomTab(v as any)}
@@ -1123,10 +1123,10 @@ export function ShellLayout({
                   </div>
                 </TabsContent>
               </Tabs>
-            </Panel>
-          </PanelGroup>
-        </Panel>
-      </PanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <StudioLoadingBand
         active={loading.active || Boolean(centerLoading) || validating}
