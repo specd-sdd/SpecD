@@ -693,40 +693,44 @@ export function ShellLayout({
         {/* ── Sidebar ── */}
         <ResizablePanel defaultSize={18} minSize={16} maxSize={30} className="studio-panel border-r border-border">
           <div className="studio-sidebar-stack min-w-0">
-            <section className="studio-sidebar-pane min-h-0 min-w-0 flex-[0.9]">
-              <div className="studio-panel-header flex items-center gap-2">
-                <GitPullRequest className="h-3 w-3 text-studio-success" />
-                <span>Changes</span>
-              </div>
-              <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
-                <ChangesSidebar
-                  active={changes.active}
-                  drafts={changes.drafts}
-                  archived={changes.archived}
-                  discarded={changes.discarded}
-                  error={changes.error}
-                  selected={changeName}
-                  onSelect={handleSelectChange}
-                  onSelectArchived={handleSelectArchivedChange}
-                />
-              </div>
-            </section>
+            <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
+              <ResizablePanel defaultSize={40} minSize={20} className="studio-sidebar-pane min-h-0 min-w-0">
+                <div className="studio-panel-header flex items-center gap-2">
+                  <GitPullRequest className="h-3 w-3 text-studio-success" />
+                  <span>Changes</span>
+                </div>
+                <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
+                  <ChangesSidebar
+                    active={changes.active}
+                    drafts={changes.drafts}
+                    archived={changes.archived}
+                    discarded={changes.discarded}
+                    error={changes.error}
+                    selected={changeName}
+                    onSelect={handleSelectChange}
+                    onSelectArchived={handleSelectArchivedChange}
+                  />
+                </div>
+              </ResizablePanel>
 
-            <section className="studio-sidebar-pane min-h-0 min-w-0 flex-[1.45]">
-              <div className="studio-panel-header flex items-center gap-2">
-                <Layers className="h-3 w-3 text-studio-info" />
-                <span>Workspaces - Specs</span>
-              </div>
-              <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
-                <WorkspacesSidebar
-                  entries={workspaceSpecs.data ?? []}
-                  loading={workspaceSpecs.isLoading}
-                  selectedWorkspace={specWorkspace}
-                  selectedSpecPath={specPath}
-                  onSelectSpec={handleSelectSpec}
-                />
-              </div>
-            </section>
+              <ResizableHandle className="h-2 w-full bg-transparent after:h-2 data-[panel-group-direction=vertical]:h-2 data-[panel-group-direction=vertical]:bg-transparent" />
+
+              <ResizablePanel defaultSize={60} minSize={20} className="studio-sidebar-pane min-h-0 min-w-0">
+                <div className="studio-panel-header flex items-center gap-2">
+                  <Layers className="h-3 w-3 text-studio-info" />
+                  <span>Workspaces - Specs</span>
+                </div>
+                <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
+                  <WorkspacesSidebar
+                    entries={workspaceSpecs.data ?? []}
+                    loading={workspaceSpecs.isLoading}
+                    selectedWorkspace={specWorkspace}
+                    selectedSpecPath={specPath}
+                    onSelectSpec={handleSelectSpec}
+                  />
+                </div>
+              </ResizablePanel>
+            </ResizablePanelGroup>
 
             <section className="studio-sidebar-pane">
               <div className="studio-panel-header flex items-center gap-2">

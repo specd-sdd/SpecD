@@ -10,6 +10,8 @@ SpecD Studio is a spec-work IDE: sidebars for changes and workspaces, a tabbed e
 
 The layout MUST render a left sidebar (changes, workspaces, graph entry), a central tab workspace, a right-hand inspector host, and a bottom panel host with three tabs in order **Output**, **Problems**, **Logs** (full studio output stream; warn/error filter; specd in-memory log readback). The default selected bottom tab MUST be **Output**.
 
+The left sidebar sections for **Changes** and **Workspaces - Specs** MUST be vertically resizable. The shell MUST implement this using shadcn **`Resizable`** panel group components, allowing the user to adjust the proportion of the sidebar allocated to each section.
+
 ### Requirement: shell orchestrates global polling while focused
 
 While the Studio window has focus, a **global poll** every **2–3 seconds** refreshes project scope without requiring an open change tab:
