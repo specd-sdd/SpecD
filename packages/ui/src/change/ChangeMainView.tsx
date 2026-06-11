@@ -63,7 +63,6 @@ export type ChangeMainViewProps = {
   onScopeSaved?: (detail: ChangeDetailDto) => void
   onScopeInvalidated?: () => void
   onInvalidationPolicySaved?: (detail: ChangeDetailDto) => void
-  specSuggestions?: readonly string[]
   changeListSection?: ChangeListSection | null
   lifecycleBusy?: boolean
   onShelfToDrafts?: () => void
@@ -91,7 +90,6 @@ export function ChangeMainView({
   onScopeSaved,
   onScopeInvalidated,
   onInvalidationPolicySaved,
-  specSuggestions = [],
   changeListSection = null,
   lifecycleBusy = false,
   onShelfToDrafts,
@@ -176,7 +174,6 @@ export function ChangeMainView({
             statusLoading={statusLoading}
             statusError={statusError}
             editable={contentEditable}
-            specSuggestions={specSuggestions}
             onDescriptionSaved={onDescriptionSaved}
             onScopeSaved={onScopeSaved}
             onScopeInvalidated={onScopeInvalidated}

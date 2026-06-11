@@ -5,8 +5,8 @@ import { StudioDialog } from '../components/StudioDialog.js'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.js'
 import { Button } from '../components/ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.js'
+import { RemoteMultiCombobox } from '../components/RemoteMultiCombobox.js'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
-import { ScopeSpecIdInput } from './scope-spec-suggestions.js'
 import {
   buildScopeChangeConfirmMessage,
   computeSpecScopeDelta,
@@ -14,6 +14,14 @@ import {
 } from '../hooks/use-change-scope-patch.js'
 import { usePatchChange } from '../hooks/use-patch-change.js'
 import { sortSpecIds } from '../lib/sort-spec-ids.js'
+
+type SpecSearchResult = {
+  specId: string
+  title: string
+  workspace: string
+  path: string
+  description: string
+}
 
 function cloneDependsOn(
   source: Record<string, readonly string[]> | undefined,
@@ -42,7 +50,6 @@ function dependsOnChanged(
 export function ChangeScopeDialog({
   open,
   change,
-  specSuggestions = [],
   onClose,
   onSaved,
   onScopeInvalidated,
@@ -64,9 +71,10 @@ export function ChangeScopeDialog({
   const [draftDepends, setDraftDepends] = React.useState<Record<string, string[]>>(() =>
     cloneDependsOn(savedDepends, savedSpecIds),
   )
-  const [addSpecInput, setAddSpecInput] = React.useState('')
-  const [addDepSpecId, setAddDepSpecId] = React.useState<string | null>(null)
-  const [addDepInput, setAddDepInput] = React.useState('')
+  
+  const [selectedSpecsToAdd, setSelectedSpecsToAdd] = React.useState<SpecSearchResult[]>([])
+  const [pendingDeps, setPendingDeps] = React.useState<Record<string, SpecSearchResult[]>>({})
+
   const [confirmScope, setConfirmScope] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | undefined>()
@@ -77,9 +85,8 @@ export function ChangeScopeDialog({
     if (!open) return
     setDraftSpecIds(sortSpecIds(savedSpecIds))
     setDraftDepends(cloneDependsOn(savedDepends, savedSpecIds))
-    setAddSpecInput('')
-    setAddDepSpecId(null)
-    setAddDepInput('')
+    setSelectedSpecsToAdd([])
+    setPendingDeps({})
     setConfirmScope(false)
     setError(undefined)
     clearPatchError()
@@ -103,34 +110,39 @@ export function ChangeScopeDialog({
   const depsDirty = dependsOnChanged(savedDepends, draftDepends, draftSpecIds)
   const dirty = scopeDirty || depsDirty
 
-  const suggestionSet = React.useMemo(() => {
-    const set = new Set(specSuggestions)
-    for (const id of savedSpecIds) set.add(id)
-    return sortSpecIds([...set])
-  }, [specSuggestions, savedSpecIds])
-
   const sortedDraftSpecIds = React.useMemo(() => sortSpecIds(draftSpecIds), [draftSpecIds])
 
-  const addSpec = (raw: string) => {
-    const id = raw.trim()
-    if (!id || draftSpecIds.includes(id)) return
-    setDraftSpecIds((prev) => sortSpecIds([...prev, id]))
-    setAddSpecInput('')
+  const addSpecs = (specs: SpecSearchResult[]) => {
+    const newIds = specs.map((s) => s.specId).filter((id) => !draftSpecIds.includes(id))
+    if (newIds.length === 0) return
+    setDraftSpecIds((prev) => sortSpecIds([...prev, ...newIds]))
+    setSelectedSpecsToAdd([])
   }
 
   const removeSpec = (id: string) => {
     setDraftSpecIds((prev) => prev.filter((x) => x !== id))
   }
 
-  const addDep = (specId: string, raw: string) => {
-    const dep = raw.trim()
-    if (!dep || dep === specId) return
+  const addDeps = (specId: string, specs: SpecSearchResult[]) => {
+    const newDeps = specs.map((s) => s.specId).filter((id) => id !== specId)
+    if (newDeps.length === 0) return
     setDraftDepends((prev) => {
       const list = prev[specId] ?? []
-      if (list.includes(dep)) return prev
-      return { ...prev, [specId]: sortSpecIds([...list, dep]) }
+      const combined = new Set([...list, ...newDeps])
+      return { ...prev, [specId]: sortSpecIds([...combined]) }
     })
-    setAddDepInput('')
+    setPendingDeps((prev) => ({ ...prev, [specId]: [] }))
+  }
+
+  const searchSpecs = async (q: string): Promise<SpecSearchResult[]> => {
+    if (!q.trim()) return []
+    try {
+      const data = await port.searchGraph({ q: q.trim(), specs: true, limit: 50 })
+      return data.specs as unknown as SpecSearchResult[]
+    } catch (err) {
+      console.error('Spec search failed:', err)
+      return []
+    }
   }
 
   const removeDep = (specId: string, dep: string) => {
@@ -224,22 +236,13 @@ export function ChangeScopeDialog({
             >
               Back
             </Button>
-            <Button
-              size="sm"
-              disabled={saving}
-              onClick={() => void runSave()}
-            >
+            <Button size="sm" disabled={saving} onClick={() => void runSave()}>
               {saving ? 'Applying…' : 'Apply scope change'}
             </Button>
           </>
         ) : (
           <>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={saving}
-              onClick={onClose}
-            >
+            <Button variant="secondary" size="sm" disabled={saving} onClick={onClose}>
               Cancel
             </Button>
             <Button
@@ -269,8 +272,9 @@ export function ChangeScopeDialog({
             </AlertTitle>
             <AlertDescription className="space-y-1 text-[11px] leading-relaxed">
               <p>
-                <strong>Removing</strong> a spec from scope drops its scaffolded artifact directories
-                and <strong>invalidates</strong> prior spec approval and sign-off on this change.
+                <strong>Removing</strong> a spec from scope drops its scaffolded artifact
+                directories and <strong>invalidates</strong> prior spec approval and sign-off on
+                this change.
               </p>
               <p>
                 <strong>Adding</strong> specs may require new artifact work. Dependency edits affect
@@ -283,29 +287,47 @@ export function ChangeScopeDialog({
             <h3 className="mb-2 shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Specs in scope
             </h3>
-            <form
-              className="mb-3 flex shrink-0 gap-2"
-              onSubmit={(e) => {
-                e.preventDefault()
-                addSpec(addSpecInput)
-              }}
-            >
+            <div className="mb-3 flex shrink-0 items-center gap-2">
+              <span className="shrink-0 text-[11px] text-muted-foreground whitespace-nowrap">
+                Add specs to scope:
+              </span>
               <div className="min-w-0 flex-1">
-                <ScopeSpecIdInput
-                  value={addSpecInput}
-                  specIds={suggestionSet}
-                  placeholder="Add spec to scope (workspace:capability-path)"
-                  disabled={saving}
-                  onChange={setAddSpecInput}
+                <RemoteMultiCombobox<SpecSearchResult>
+                  value={selectedSpecsToAdd}
+                  onValueChange={setSelectedSpecsToAdd}
+                  search={searchSpecs}
+                  getItemValue={(s) => s.specId}
+                  getItemLabel={(s) => s.specId}
+                  placeholder="Search specs to add..."
+                  renderItem={(s) => (
+                    <div className="flex flex-col gap-0.5 text-left">
+                      <span className="font-mono text-[11px] font-medium text-foreground">
+                        {s.specId}
+                      </span>
+                      {s.title && (
+                        <span className="truncate text-[10px] text-muted-foreground italic">
+                          {s.title}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 />
               </div>
-              <Button type="submit" size="sm" variant="secondary" disabled={saving}>
-                Add spec
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="shrink-0 h-8"
+                disabled={saving || selectedSpecsToAdd.length === 0}
+                onClick={() => addSpecs(selectedSpecsToAdd)}
+              >
+                Add Spec
               </Button>
-            </form>
+            </div>
+
             <p className="mb-2 shrink-0 text-[10px] text-muted-foreground">
               Each card is one spec: remove the spec with ✕ on the card, or add/remove dependencies
-              below its id (same project spec picker).
+              below its id.
             </p>
 
             <div className="flex min-h-0 flex-1">
@@ -314,7 +336,7 @@ export function ChangeScopeDialog({
                   No specs in scope yet — add one above.
                 </p>
               ) : (
-                <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto pr-3">
+                <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto pr-3">
                   <div className="pb-4">
                     <ul
                       className="flex flex-col gap-3"
@@ -339,7 +361,9 @@ export function ChangeScopeDialog({
                               </Button>
                             </CardHeader>
                             <CardContent>
-                              <div className="mb-1.5 text-[10px] text-muted-foreground">Depends on</div>
+                              <div className="mb-1.5 text-[10px] text-muted-foreground">
+                                Depends on
+                              </div>
                               <ul className="mb-2 flex flex-wrap gap-1">
                                 {(draftDepends[specId] ?? []).length === 0 ? (
                                   <li className="text-[10px] text-muted-foreground">
@@ -365,32 +389,45 @@ export function ChangeScopeDialog({
                                   ))
                                 )}
                               </ul>
-                              <form
-                                className="flex gap-2"
-                                onSubmit={(e) => {
-                                  e.preventDefault()
-                                  addDep(specId, addDepSpecId === specId ? addDepInput : '')
-                                  setAddDepSpecId(null)
-                                  setAddDepInput('')
-                                }}
-                              >
+                              <div className="flex items-center gap-2">
+                                <span className="shrink-0 text-[11px] text-muted-foreground whitespace-nowrap">
+                                  Add deps to spec:
+                                </span>
                                 <div className="min-w-0 flex-1">
-                                  <ScopeSpecIdInput
-                                    className="text-[10px]"
-                                    value={addDepSpecId === specId ? addDepInput : ''}
-                                    specIds={suggestionSet.filter((id) => id !== specId)}
+                                  <RemoteMultiCombobox<SpecSearchResult>
+                                    value={pendingDeps[specId] ?? []}
+                                    onValueChange={(val) =>
+                                      setPendingDeps((prev) => ({ ...prev, [specId]: val }))
+                                    }
+                                    search={searchSpecs}
+                                    getItemValue={(s) => s.specId}
+                                    getItemLabel={(s) => s.specId}
                                     placeholder="depends-on spec id"
-                                    disabled={saving}
-                                    onChange={(value) => {
-                                      setAddDepSpecId(specId)
-                                      setAddDepInput(value)
-                                    }}
+                                    className="w-full"
+                                    renderItem={(s) => (
+                                      <div className="flex flex-col gap-0.5 text-left">
+                                        <span className="font-mono text-[10px] font-medium text-foreground">
+                                          {s.specId}
+                                        </span>
+                                        {s.title && (
+                                          <span className="truncate text-[9px] text-muted-foreground italic">
+                                            {s.title}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   />
                                 </div>
-                                <Button type="submit" size="sm" variant="ghost" disabled={saving}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 shrink-0 text-[10px]"
+                                  disabled={saving || (pendingDeps[specId]?.length ?? 0) === 0}
+                                  onClick={() => addDeps(specId, pendingDeps[specId] ?? [])}
+                                >
                                   Add dep
                                 </Button>
-                              </form>
+                              </div>
                             </CardContent>
                           </Card>
                         </li>
@@ -404,7 +441,7 @@ export function ChangeScopeDialog({
 
           {error ? <p className="shrink-0 px-1 text-destructive">{error}</p> : null}
         </div>
-    )}
+      )}
     </StudioDialog>
   )
 }

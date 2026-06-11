@@ -17,7 +17,6 @@ import {
 } from '../change/ChangeLifecycleConfirmDialog.js'
 import { ChangeMainView } from '../change/ChangeMainView.js'
 import { isShelvedReadOnlySection } from '../change/change-list-section.js'
-import { flattenWorkspaceSpecIds } from '../change/flatten-spec-ids.js'
 import { SpecMainView } from '../spec/SpecMainView.js'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
 import type { ChangeView } from '../tabs/ChangeTabs.js'
@@ -166,10 +165,6 @@ export function ShellLayout({
   const openSpecKey = specWorkspace && specPath ? `${specWorkspace}:${specPath}` : undefined
 
   const workspaceSpecs = useWorkspaceSpecsCollection(project?.workspaces ?? [], refreshKey)
-  const workspaceSpecIdSuggestions = React.useMemo(
-    () => flattenWorkspaceSpecIds(workspaceSpecs.data ?? []),
-    [workspaceSpecs.data],
-  )
   const isOpenActiveChange =
     !isArchivedChange && centerCtx.kind === 'change' && changeListSection === 'active'
   const pollChangeDetail = isOpenActiveChange && (changeView === 'Overview' || changeView === 'Events')
@@ -788,7 +783,6 @@ export function ShellLayout({
                           ? undefined
                           : () => requestValidate('all')
                       }
-                      specSuggestions={workspaceSpecIdSuggestions}
                       onDescriptionSaved={(detail) => {
                         if (!isArchivedChange) {
                           changeRead.detail.refetch()

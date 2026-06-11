@@ -1,7 +1,7 @@
 {
   "name": "dummy-draft",
   "createdAt": "2026-05-26T17:51:40.942Z",
-  "updatedAt": "2026-06-09T10:50:14.375Z",
+  "updatedAt": "2026-06-10T06:22:56.074Z",
   "description": "Dummy change for testing drafts endpoints",
   "schema": {
     "name": "schema-std",

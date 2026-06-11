@@ -30,7 +30,6 @@ export function ChangeOverview({
   statusLoading = false,
   statusError,
   editable = false,
-  specSuggestions = [],
   onDescriptionSaved,
   onScopeSaved,
   onScopeInvalidated,
@@ -47,7 +46,6 @@ export function ChangeOverview({
   statusLoading?: boolean
   statusError?: Error
   editable?: boolean
-  specSuggestions?: readonly string[]
   listSection?: ChangeListSection | null
   lifecycleBusy?: boolean
   onDescriptionSaved?: (detail: ChangeDetailDto) => void
@@ -185,7 +183,6 @@ export function ChangeOverview({
         <ChangeScopeDialog
           open={scopeDialogOpen}
           change={change}
-          specSuggestions={specSuggestions}
           onClose={() => setScopeDialogOpen(false)}
           onSaved={(detail, meta) => {
             onScopeSaved?.(detail)

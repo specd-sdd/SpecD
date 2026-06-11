@@ -22,6 +22,7 @@ import type { ProjectDto } from './dto/project.js'
 import type { ProjectStatusDto } from './dto/project-status.js'
 import type { SpecDetailDto } from './dto/spec-detail.js'
 import type { SpecContextDto } from './dto/spec-context.js'
+import type { SpecSummaryDto } from './dto/spec-summary.js'
 import type { ValidateBatchResultDto } from './dto/validate-batch-result.js'
 import type { ValidateResultDto } from './dto/validate-result.js'
 import type { WorkspaceSpecTreeDto } from './dto/workspace-spec-tree.js'
@@ -247,10 +248,10 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
   ): Promise<ArtifactContentDto> {
     return this._transport
       .request<Omit<ArtifactContentDto, 'filename'>>({
-      method: 'GET',
-      path: `/changes/${enc(name)}/artifacts/${enc(filename)}`,
-      signal,
-    })
+        method: 'GET',
+        path: `/changes/${enc(name)}/artifacts/${enc(filename)}`,
+        signal,
+      })
       .then((dto) => withArtifactFilename(filename, dto))
   }
 
@@ -268,10 +269,10 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
           : 'archived-changes'
     return this._transport
       .request<Omit<ArtifactContentDto, 'filename'>>({
-      method: 'GET',
-      path: `/${base}/${enc(name)}/artifacts/${enc(filename)}`,
-      signal,
-    })
+        method: 'GET',
+        path: `/${base}/${enc(name)}/artifacts/${enc(filename)}`,
+        signal,
+      })
       .then((dto) => withArtifactFilename(filename, dto))
   }
 
@@ -613,7 +614,7 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     readonly q: string
     readonly workspace?: string
     readonly signal?: AbortSignal
-  }): Promise<GraphSearchResultDto> {
+  }): Promise<readonly SpecSummaryDto[]> {
     return this._transport.request({
       method: 'GET',
       path: '/specs/search',

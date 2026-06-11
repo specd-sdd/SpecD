@@ -93,11 +93,12 @@ Lifecycle and validation states MUST use the semantic palette: success green, wa
 | Concern            | Library                                                          | Usage                                                                                                  |
 | ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Utility CSS        | **Tailwind CSS**                                                 | Layout, spacing, colors mapped to Studio tokens                                                        |
-| Primitives         | **Radix UI**                                                     | Accessible primitives via shadcn components (Dialog, DropdownMenu, Tooltip, Tabs, etc.)                |
+| Primitives         | **Radix UI** / **Base UI**                                       | Accessible primitives via shadcn components (Dialog, Popover, Combobox, Tabs, etc.)                    |
 | Component kit      | **shadcn/ui**                                                    | Copied into `packages/ui/src/components/ui/`; re-themed to IDE density (not default marketing spacing) |
 | Variants           | **class-variance-authority** (`cva`)                             | Variant props on shared components                                                                     |
 | Class merging      | **tailwind-merge** (+ `clsx` or equivalent)                      | `cn()` helper in `lib/utils.ts`                                                                        |
 | Split layout       | **react-resizable-panels**                                       | Sidebar / editor / inspector / bottom splits                                                           |
+| Selection & Lists  | **cmdk** / **Base UI**                                           | Command palettes and advanced Combobox implementations                                                 |
 | Trees              | **`react-arborist`** or shadcn/Radix-backed tree wrappers        | Changes and workspace sidebars                                                                         |
 | Code editor        | **@monaco-editor/react** + **monaco-editor**                     | `ui:artifact-editor` and read-only inspectors                                                          |
 | Icons              | **lucide-react**                                                 | Navigation and toolbars                                                                                |
@@ -168,7 +169,7 @@ All consumers MUST call `sortSpecIds` (or an API that delegates to it) before re
 | Surface                                                          | Location                                             |
 | ---------------------------------------------------------------- | ---------------------------------------------------- |
 | Overview read-only scope + deps                                  | `ui:change-specs-readonly-panel`                     |
-| Scope dialog cards, dep chips, datalist suggestions              | `ui:change-scope-dialog`, `flattenWorkspaceSpecIds`  |
+| Scope dialog cards, dep chips, centralized picker                | `ui:change-scope-dialog`, `ui:spec-picker-dialog`    |
 | Scope confirm Add/Remove lines                                   | `ui:hooks-change-scope-patch`                        |
 | Artifacts accordion — scope (change/spec), DAG types, spec cards | `ui:change-tab-artifacts` / `group-change-artifacts` |
 | Impact tab spec cards                                            | `ui:change-tab-impact` / `merge-impact-view`         |

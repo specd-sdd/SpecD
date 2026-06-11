@@ -12,7 +12,16 @@ The dialog MUST open with a visible warning (`role="alert"`) stating that **remo
 
 ### Requirement: each spec is one card with scope remove and dependencies
 
-The dialog MUST list each spec in scope as a shadcn **`Card`** (ascending order per [`ui:design-system`](../design-system/spec.md)): header shows `specId` and ✕ to **remove the spec from scope** (using a shadcn **`Button`**); body shows `dependsOn` as add/remove chips implemented with shadcn **`Badge`** components following the same ordering rule. **Add spec** MUST appear **first** (before cards). **Add spec** and **Add dep** MUST share one workspace spec picker implemented in `packages/ui/src/change/scope-spec-suggestions.tsx` (`ScopeSpecSuggestionsDatalist` + `ScopeSpecIdInput`, single `datalist` id `studio-scope-dialog-spec-suggestions`). Suggestion ids MUST come from the `specSuggestions` prop (shell supplies flattened workspace spec trees). The dialog MUST NOT add a spec as its own dependency. There MUST NOT be a separate chip row duplicating the card list.
+The dialog MUST list each spec in scope as a shadcn **`Card`** (ascending order per [`ui:design-system`](../design-system/spec.md)): header shows `specId` and ✕ to **remove the spec from scope** (using a shadcn **`Button`**); body shows `dependsOn` as add/remove chips implemented with shadcn **`Badge`** components following the same ordering rule.
+
+**Add spec** and **Add dep** MUST be implemented using a high-performance **`RemoteMultiCombobox`** component:
+
+- The component MUST be built using **Base UI** primitives (`Combobox`, `ComboboxChips`, etc.) integrated into Studio's shadcn theme.
+- It MUST support **remote fetching** (debounced 300-500ms) using the `searchGraph` API.
+- Selected items MUST appear as **visual chips** within or immediately below the combobox trigger.
+- The trigger MUST include a **Search** icon and a **Clear** button (when items are selected).
+- Selection MUST NOT be final until the user clicks the adjacent **"Add Spec"** or **"Add dep"** button, which performs the batch update.
+- The dialog MUST NOT add a spec as its own dependency. There MUST NOT be a separate chip row duplicating the card list.
 
 ### Requirement: dialog persists scope and dependsOn on save
 

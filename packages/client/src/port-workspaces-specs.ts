@@ -1,9 +1,10 @@
 import type { ArtifactContentDto } from './dto/artifact-content.js'
 import type { SpecDetailDto } from './dto/spec-detail.js'
 import type { SpecContextDto } from './dto/spec-context.js'
+import type { SpecSummaryDto } from './dto/spec-summary.js'
 import type { WorkspaceSpecTreeDto } from './dto/workspace-spec-tree.js'
 import type { WorkspaceSummaryDto } from './dto/project.js'
-import type { GraphSearchResultDto } from './dto/graph-search.js'
+import type { OutlineSpecDraftInput } from './inputs.js'
 
 /** Workspace and canonical spec operations (`api:routes-workspaces`). */
 export interface PortWorkspacesSpecs {
@@ -18,7 +19,7 @@ export interface PortWorkspacesSpecs {
   outlineSpecDraft(
     workspace: string,
     specPath: string,
-    input: import('./inputs.js').OutlineSpecDraftInput,
+    input: OutlineSpecDraftInput,
   ): Promise<readonly Record<string, unknown>[]>
   getSpecContext(
     workspace: string,
@@ -31,7 +32,9 @@ export interface PortWorkspacesSpecs {
     filename: string,
     signal?: AbortSignal,
   ): Promise<ArtifactContentDto>
-  searchSpecs(
-    query: { readonly q: string; readonly workspace?: string; readonly signal?: AbortSignal },
-  ): Promise<GraphSearchResultDto>
+  searchSpecs(query: {
+    readonly q: string
+    readonly workspace?: string
+    readonly signal?: AbortSignal
+  }): Promise<readonly SpecSummaryDto[]>
 }

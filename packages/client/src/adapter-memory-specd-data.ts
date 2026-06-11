@@ -28,6 +28,7 @@ import type { CompiledContextDto } from './dto/compiled-context.js'
 import type { PreviewResultDto } from './dto/preview-result.js'
 import type { SpecDetailDto } from './dto/spec-detail.js'
 import type { SpecContextDto } from './dto/spec-context.js'
+import type { SpecSummaryDto } from './dto/spec-summary.js'
 import type { GraphSearchResultDto } from './dto/graph-search.js'
 import type { GraphImpactDto } from './dto/graph-impact.js'
 import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
@@ -523,9 +524,13 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     })
   }
 
-  searchSpecs(query: { readonly q: string }): Promise<GraphSearchResultDto> {
+  searchSpecs(query: {
+    readonly q: string
+    readonly workspace?: string
+    readonly signal?: AbortSignal
+  }): Promise<readonly SpecSummaryDto[]> {
     void query
-    return Promise.resolve({ symbols: [], specs: [] })
+    return Promise.resolve([])
   }
 
   getGraphStatus(): Promise<GraphStatusDto> {
