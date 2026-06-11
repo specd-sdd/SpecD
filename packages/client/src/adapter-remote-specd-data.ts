@@ -652,6 +652,7 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
           : {}),
         ...(query.symbols !== undefined ? { symbols: query.symbols } : {}),
         ...(query.specs !== undefined ? { specs: query.specs } : {}),
+        ...(query.documents !== undefined ? { documents: query.documents } : {}),
       },
       signal: query.signal,
     })

@@ -89,6 +89,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
               q: NON_EMPTY_STRING_SCHEMA,
               symbols: BOOLEAN_QUERY_SCHEMA,
               specs: BOOLEAN_QUERY_SCHEMA,
+              documents: BOOLEAN_QUERY_SCHEMA,
               limit: POSITIVE_INTEGER_QUERY_SCHEMA,
               workspace: NON_EMPTY_STRING_SCHEMA,
               kinds: NON_EMPTY_STRING_SCHEMA,
@@ -106,6 +107,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         q: string
         symbols?: string
         specs?: string
+        documents?: string
         limit?: string
         workspace?: string
         kinds?: string
@@ -149,9 +151,20 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         }
         const symbolsOnly = query.symbols === 'true'
         const specsOnly = query.specs === 'true'
-        const symbols = symbolsOnly || !specsOnly ? await provider.searchSymbols(searchOpts) : []
-        const specs = specsOnly || !symbolsOnly ? await provider.searchSpecs(searchOpts) : []
-        return toGraphSearchResultDto(ctx.config, symbols, specs)
+        const documentsOnly = query.documents === 'true'
+        const symbols =
+          symbolsOnly || (!specsOnly && !documentsOnly)
+            ? await provider.searchSymbols(searchOpts)
+            : []
+        const specs =
+          specsOnly || (!symbolsOnly && !documentsOnly)
+            ? await provider.searchSpecs(searchOpts)
+            : []
+        const documents =
+          documentsOnly || (!symbolsOnly && !specsOnly)
+            ? await provider.searchDocuments(searchOpts)
+            : []
+        return toGraphSearchResultDto(ctx.config, symbols, specs, documents)
       } finally {
         await provider.close()
       }

@@ -540,10 +540,9 @@ export function ShellLayout({
 
   const requestValidate = React.useCallback(
     (scope: ValidateConfirmScope) => {
-      const target = changeName ?? changes.active[0]?.name
-      if (!target) {
+      if (!changeName) {
         void appendOutput({
-          message: 'Select a change or create one before validating.',
+          message: 'Select a change before validating.',
           level: 'error',
           action: 'validate',
         }).then(() => {
@@ -573,28 +572,21 @@ export function ShellLayout({
       }
       setValidatePrompt(scope)
     },
-    [changeName, changes.active, isArchivedChange, isShelvedReadOnly, appendOutput],
+    [changeName, isArchivedChange, isShelvedReadOnly, appendOutput],
   )
 
   const paletteActions = React.useMemo(
     () =>
       defaultCommandPaletteActions({
-        onFocusChanges: () => {
-          if (centerCtx.kind !== 'change') {
-            setCenterCtx({ kind: 'empty' })
-          }
-        },
-        onFocusWorkspaces: () => {
-          if (centerCtx.kind !== 'spec') {
-            setCenterCtx({ kind: 'empty' })
-          }
-        },
-        onValidateAll: () => requestValidate('all'),
+        onValidateAll:
+          changeName && !isArchivedChange && !isShelvedReadOnly
+            ? () => requestValidate('all')
+            : undefined,
         onNewChange: () => {
           void pushOutput('New change — wire create dialog (coming soon)', 'new-change')
         },
       }),
-    [requestValidate, centerCtx.kind, pushOutput],
+    [requestValidate, changeName, isArchivedChange, isShelvedReadOnly, pushOutput],
   )
 
   const activeDetail = isArchivedChange ? archivedRead : changeRead.detail
@@ -682,6 +674,15 @@ export function ShellLayout({
         open={commandOpen}
         onClose={() => setCommandOpen(false)}
         actions={paletteActions}
+        onSelectSpec={handleSelectSpec}
+        onSelectSymbol={(workspace, file, line) => {
+          void pushOutput(`Selected symbol in ${workspace}:${file} at line ${line}`, 'select-symbol')
+          // Redirection logic for source files can be added here
+        }}
+        onSelectDocument={(workspace, path) => {
+          void pushOutput(`Selected document ${workspace}:${path}`, 'select-document')
+          // Redirection logic for generic docs can be added here
+        }}
       />
 
       <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">

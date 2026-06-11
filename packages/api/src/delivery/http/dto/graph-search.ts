@@ -23,4 +23,13 @@ export interface GraphSearchResultDto {
     readonly startLine: number
     readonly endLine: number
   }[]
+  readonly documents: readonly {
+    readonly workspace: string
+    readonly path: string
+    readonly projectRelativePath: string
+    readonly score: number
+    readonly snippet: string
+    readonly startLine: number
+    readonly endLine: number
+  }[]
 }

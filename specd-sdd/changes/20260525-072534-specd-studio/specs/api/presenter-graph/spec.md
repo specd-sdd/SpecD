@@ -8,7 +8,7 @@ Maps kernel or graph results into the matching `dto-*` response for **Presenter 
 
 ### Requirement: presenter maps entities to DTO fields deterministically
 
-Given the same kernel or graph result, the presenter MUST produce the same DTO JSON shape, omitting optional properties when values are absent.
+Given the same kernel or graph result, the presenter MUST produce the same DTO JSON shape, omitting optional properties when values are absent. **`toGraphSearchResultDto`** MUST support mapping `SymbolNode`, `SpecNode`, and `DocumentNode` search results into the consolidated search DTO.
 
 ### Requirement: presenter does not encode business rules
 

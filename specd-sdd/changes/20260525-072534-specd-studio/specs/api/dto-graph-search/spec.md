@@ -39,6 +39,18 @@ location fields inline.
 
 Those fields MUST reflect the persisted graph-search preview contract rather than being recomputed by the API.
 
+### Requirement: document hits expose file context
+
+`GraphSearchResultDto.documents[]` MUST include hits for non-specification documents from the graph search:
+
+- `workspace`
+- `path`
+- `projectRelativePath`
+- `score`
+- `snippet`
+- `startLine`
+- `endLine`
+
 ### Requirement: optional fields are omitted rather than null
 
 Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`.

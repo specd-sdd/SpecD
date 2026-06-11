@@ -100,6 +100,7 @@ export interface GraphSearchInput {
   readonly excludeWorkspaces?: readonly string[]
   readonly symbols?: boolean
   readonly specs?: boolean
+  readonly documents?: boolean
   readonly limit?: number
   readonly signal?: AbortSignal
 }

@@ -55,7 +55,9 @@ Global sidebar polling continues to refresh the lists, but the open drafted/disc
 
 ### Requirement: validate requires drift confirmation
 
-**Validate** and **Validate All** MUST show [`ui:validate-confirm-dialog`](../validate-confirm-dialog/spec.md) before calling `validateChange`. Scoped validate MUST pass `specId` and `artifactId` derived from the open change artifact; **Validate All** MUST validate each spec in `change.specIds` and MUST be offered from the change **Artifacts** tab (not the global top bar). Change tabs that require live change APIs (Tasks, Coverage, Context) MUST show read-only messaging for archived context. Workflow and validation status from `getChangeStatus` MUST appear on the Overview tab only (not a separate Validation tab).
+**Validate** and **Validate All** MUST show [`ui:validate-confirm-dialog`](../validate-confirm-dialog/spec.md) before calling `validateChange`. Scoped validate MUST pass `specId` and `artifactId` derived from the open change artifact; **Validate All** MUST validate each spec in `change.specIds`.
+
+The **Validate All** action MUST be offered from the change **Artifacts** tab and the **Command Palette** (as "Validate change artifacts"), but only when a valid, editable change is currently selected. Change tabs that require live change APIs (Tasks, Coverage, Context) MUST show read-only messaging for archived context. Workflow and validation status from `getChangeStatus` MUST appear on the Overview tab only (not a separate Validation tab).
 
 ### Requirement: shell delegates tab-scoped polling to visible center tabs
 
@@ -76,6 +78,14 @@ Artifact save ([`ui:hooks-inspector-save`](../hooks-inspector-save/spec.md)), de
 ### Requirement: graph sidebar does not append output lines
 
 Opening the graph entry from the sidebar MUST switch to the **Logs** tab and refresh log readback only; it MUST NOT append a graph status line to the local output buffer.
+
+### Requirement: shell orchestrates global command and search navigation
+
+The shell MUST host a global **Command Palette** (⌘K) and orchestrate navigation from search results:
+
+- Selection of a **Specification** in the palette MUST open that spec in the central workspace.
+- Selection of a **Code Symbol** MUST (in v1) log the selection to Output; subsequent versions MAY implement direct source file navigation.
+- Selection of a **Document** MUST (in v1) log the selection to Output.
 
 ## Spec Dependencies
 

@@ -631,7 +631,7 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
   GraphSearchResultDto: {
     type: 'object',
     additionalProperties: false,
-    required: ['symbols', 'specs'],
+    required: ['symbols', 'specs', 'documents'],
     properties: {
       symbols: {
         type: 'array',
@@ -671,6 +671,31 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
             path: { type: 'string' },
             title: { type: 'string' },
             description: { type: 'string' },
+            score: { type: 'number' },
+            snippet: { type: 'string' },
+            startLine: { type: 'integer' },
+            endLine: { type: 'integer' },
+          },
+        },
+      },
+      documents: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'workspace',
+            'path',
+            'projectRelativePath',
+            'score',
+            'snippet',
+            'startLine',
+            'endLine',
+          ],
+          properties: {
+            workspace: { type: 'string' },
+            path: { type: 'string' },
+            projectRelativePath: { type: 'string' },
             score: { type: 'number' },
             snippet: { type: 'string' },
             startLine: { type: 'integer' },

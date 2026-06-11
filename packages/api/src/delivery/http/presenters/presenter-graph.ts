@@ -1,5 +1,10 @@
 import path from 'node:path'
-import { type GraphStatistics, type SymbolNode, type SpecNode } from '@specd/code-graph'
+import {
+  type GraphStatistics,
+  type SymbolNode,
+  type SpecNode,
+  type DocumentNode,
+} from '@specd/code-graph'
 import type { SpecdConfig } from '@specd/core'
 import { type GraphStatusDto } from '../dto/graph-status.js'
 import { type GraphFileRefDto } from '../dto/graph-file-ref.js'
@@ -13,10 +18,7 @@ import { type ChangeGraphViewDto } from '../dto/change-graph-view.js'
  * @param stats
  * @param stale
  */
-export function toGraphStatusDto(
-  stats: GraphStatistics,
-  stale: boolean | null,
-): GraphStatusDto {
+export function toGraphStatusDto(stats: GraphStatistics, stale: boolean | null): GraphStatusDto {
   return {
     lastIndexedAt: stats.lastIndexedAt ?? null,
     lastIndexedRef: stats.lastIndexedRef ?? null,
@@ -29,9 +31,11 @@ export function toGraphStatusDto(
 }
 
 /**
- * Maps symbol and spec search hits to DTO.
+ * Maps symbol, spec, and document search hits to DTO.
+ * @param config
  * @param symbols
  * @param specs
+ * @param documents
  */
 export function toGraphSearchResultDto(
   config: SpecdConfig,
@@ -49,6 +53,13 @@ export function toGraphSearchResultDto(
     startLine: number
     endLine: number
   }>,
+  documents: Array<{
+    document: DocumentNode
+    score: number
+    snippet: string
+    startLine: number
+    endLine: number
+  }> = [],
 ): GraphSearchResultDto {
   return {
     symbols: symbols.map(({ symbol, score, snippet, startLine, endLine }) => ({
@@ -70,6 +81,19 @@ export function toGraphSearchResultDto(
       startLine,
       endLine,
     })),
+    documents: documents.map(({ document, score, snippet, startLine, endLine }) => {
+      const workspace = document.workspace ?? getWorkspaceFromGraphPath(document.path)
+      const workspaceRelativePath = getRelativePathFromGraphPath(document.path)
+      return {
+        workspace,
+        path: workspaceRelativePath,
+        projectRelativePath: toProjectRelativePath(config, workspace, workspaceRelativePath),
+        score,
+        snippet,
+        startLine,
+        endLine,
+      }
+    }),
   }
 }
 

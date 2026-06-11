@@ -564,7 +564,7 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
 
   searchGraph(query: GraphSearchInput): Promise<GraphSearchResultDto> {
     void query
-    return Promise.resolve({ symbols: [], specs: [] })
+    return Promise.resolve({ symbols: [], specs: [], documents: [] })
   }
 
   getImpact(query: GraphImpactInput): Promise<GraphImpactDto> {

@@ -44,6 +44,7 @@ For graph search, the API MUST support at least:
 - `excludeWorkspaces`
 - `symbols`
 - `specs`
+- `documents`
 - `limit`
 
 For graph impact, the API MUST support `symbol`, `file`, and `spec` selectors, matching the CLI capability surface.

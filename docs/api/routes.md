@@ -105,15 +105,15 @@ All paths are under the `/v1` prefix. Query and body fields mirror CLI/kernel in
 
 ## Code graph
 
-| Method | Path                        | Description                                                      |
-| ------ | --------------------------- | ---------------------------------------------------------------- |
-| `GET`  | `/graph/status`             | Index statistics                                                 |
-| `POST` | `/graph/index`              | Reindex the full project graph (`force?: boolean` body)          |
-| `GET`  | `/graph/search`             | BM25 search (`q`, `symbols`, `specs`, `limit`, `workspace`)      |
-| `GET`  | `/graph/impact`             | Symbol or file impact (`symbol` or `file`, `direction`, `depth`) |
-| `GET`  | `/graph/hotspots`           | Hotspot report (`minRisk`, `limit`)                              |
-| `GET`  | `/graph/specs/:workspace/*` | Coverage for spec id `workspace:path`                            |
-| `GET`  | `/graph/changes/:name`      | Graph view for change specs                                      |
+| Method | Path                        | Description                                                              |
+| ------ | --------------------------- | ------------------------------------------------------------------------ |
+| `GET`  | `/graph/status`             | Index statistics                                                         |
+| `POST` | `/graph/index`              | Reindex the full project graph (`force?: boolean` body)                  |
+| `GET`  | `/graph/search`             | BM25 search (`q`, `symbols`, `specs`, `documents`, `limit`, `workspace`) |
+| `GET`  | `/graph/impact`             | Symbol or file impact (`symbol` or `file`, `direction`, `depth`)         |
+| `GET`  | `/graph/hotspots`           | Hotspot report (`minRisk`, `limit`)                                      |
+| `GET`  | `/graph/specs/:workspace/*` | Coverage for spec id `workspace:path`                                    |
+| `GET`  | `/graph/changes/:name`      | Graph view for change specs                                              |
 
 ## Response DTOs
 

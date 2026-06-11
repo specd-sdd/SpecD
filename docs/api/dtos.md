@@ -251,7 +251,13 @@ Spec context: `{ entries[], warnings[] }`. Outline routes return an array of out
 
 ### `GraphSearchResultDto`
 
-`GET /graph/search` — `symbols[]` (workspace, symbol id/name/kind/location, score), `specs[]` (workspace, specId, path, title, description, score).
+`GET /graph/search`
+
+| Field         | Type    | Description                                                                           |
+| ------------- | ------- | ------------------------------------------------------------------------------------- |
+| `symbols[]`   | `array` | `{ workspace, symbol, score, snippet, startLine, endLine }`                           |
+| `specs[]`     | `array` | `{ workspace, specId, path, title, description, score, snippet, startLine, endLine }` |
+| `documents[]` | `array` | `{ workspace, path, projectRelativePath, score, snippet, startLine, endLine }`        |
 
 ### `GraphIndexResultDto`
 
