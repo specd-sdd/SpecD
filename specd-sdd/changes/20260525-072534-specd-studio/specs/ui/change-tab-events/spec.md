@@ -30,6 +30,10 @@ Each history row MUST be a collapsible accordion item using the shadcn **`Accord
 
 While detail is loading or fails, the tab MUST show `Loading history…`, a human-readable error, or `No change detail` — matching other change tabs.
 
+### Requirement: component SHALL avoid infinite render loops from unstable dependencies
+
+The Events tab component SHALL stabilize all array and object references passed as dependencies to downstream components or hooks. It MUST use `useMemo` for derived mappings (including reversed history lists) and use static constants for default empty values to ensure stable prop references.
+
 ## Spec Dependencies
 
 - [`client:specd-data-port`](../../client/specd-data-port/spec.md) — data access

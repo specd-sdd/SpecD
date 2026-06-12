@@ -35,6 +35,12 @@ Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `
 
 While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable).
 
+### Requirement: hooks MUST prevent infinite render loops through stable results
+
+Hooks that return arrays or complex objects from async resources (e.g. `useChangeArtifactList`, `useChangeArtifacts`) SHALL ensure the returned references are stable when data is unchanged. They MUST avoid returning new array/object literals on every render when data sources or dependencies have not logically changed.
+
+Multi-artifact readers MUST memoize their normalized parameter sets (e.g. filenames) using stringified representations (e.g. `join('|')`) to prevent re-triggering loads when a parent component passes a new array reference containing identical content.
+
 ## Spec Dependencies
 
 - [`client:specd-data-port`](../../client/specd-data-port/spec.md) — data access

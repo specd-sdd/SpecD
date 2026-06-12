@@ -348,6 +348,11 @@ Read `ui:hooks-changes-read` plus **each** `ui:change-tab-*` and `ui:change-meta
       Approach: one component module per spec; each documents which API calls refetch on `updatedAt` bump (see proposal polling table)
       (Req: `ui:change-tab-overview`, `ui:change-tab-artifacts`, `ui:change-tab-validation`, `ui:change-tab-tasks`, `ui:change-tab-events`, `ui:change-tab-context`, `ui:change-tab-impact`, `ui:change-metadata-editor`)
 
+- [x] 12.3 Fix infinite render loops in change tabs
+      `packages/ui/src/hooks/use-change-artifact.ts`, `use-change-artifact-list.ts`, `ChangeTabPanels.tsx`
+      Approach: Stabilize hook results and memoize component-derived array dependencies to prevent continuous effect re-triggering.
+      (Req: `ui:hooks-changes-read`, `ui:change-tab-tasks`, `ui:change-tab-events`)
+
 ---
 
 ## 13. `@specd/ui` — spec tabs

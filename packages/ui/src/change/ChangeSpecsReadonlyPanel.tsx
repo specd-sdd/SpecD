@@ -32,11 +32,12 @@ export function ChangeSpecsReadonlyPanel({
             <Card>
               <CardContent className="flex flex-col gap-2">
                 <div className="font-mono text-foreground">{specId}</div>
+                <div className="text-muted-foreground">Spec dependencies:</div>
                 {deps.length > 0 ? (
                   <ul className="flex flex-wrap gap-1">
                     {deps.map((dep) => (
                       <li key={dep}>
-                        <Badge>depends-on: {dep}</Badge>
+                        <Badge>{dep}</Badge>
                       </li>
                     ))}
                   </ul>

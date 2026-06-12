@@ -224,16 +224,27 @@
 - **THEN** the oldest entry is discarded
 - **AND** total retained entries remain 400
 
-### Requirement: graph sidebar does not append output lines
+### Requirement: graph sidebar opens central overview
 
-#### Scenario: graph sidebar does not append output lines — primary path
+#### Scenario: Opening graph sidebar entry switches center workspace
 
 - **WHEN** the user opens the graph entry from the sidebar
-- **THEN** the shell switches to **Logs** and refreshes remote log readback
+- **THEN** the shell switches to the central **Graph Main View**
 - **AND** local output entry count is unchanged
 
-#### Scenario: graph sidebar does not append output lines — guard path
+### Requirement: shell orchestrates global command and search navigation
 
-- **GIVEN** inputs that stress the requirement boundary
-- **WHEN** the same capability runs
-- **THEN** errors or skips are explicit and documented
+#### Scenario: Navigating to a spec from palette
+
+- **WHEN** user selects a Specification from the Command Palette
+- **THEN** the central workspace switches to the selected spec
+
+#### Scenario: Navigating to a symbol logs to output
+
+- **WHEN** user selects a Code Symbol from the Command Palette
+- **THEN** the shell appends a navigation log to the Output panel
+
+#### Scenario: Navigating to a document logs to output
+
+- **WHEN** user selects a Document from the Command Palette
+- **THEN** the shell appends a navigation log to the Output panel

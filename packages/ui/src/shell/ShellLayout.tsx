@@ -55,6 +55,7 @@ import type { ValidateConfirmScope } from '../hooks/use-change-validate.js'
 import { AlertTriangle, Circle, GitPullRequest, Layers, Network, X } from 'lucide-react'
 import { ChangesSidebar } from '../sidebar/ChangesSidebar.js'
 import { GraphSidebarEntry, WorkspacesSidebar } from '../sidebar/WorkspacesSidebar.js'
+import { GraphMainView } from './GraphMainView.js'
 import {
   CommandPalette,
   defaultCommandPaletteActions,
@@ -90,6 +91,7 @@ export type ShellLayoutProps = {
 type CenterContext =
   | { kind: 'change'; name: string; archived?: boolean }
   | { kind: 'spec'; workspace: string; specPath: string }
+  | { kind: 'graph' }
   | { kind: 'empty' }
 
 type SelectedArtifact =
@@ -737,8 +739,8 @@ export function ShellLayout({
                 <GraphSidebarEntry
                   graphStatus={graphStatus.data}
                   onOpenGraph={() => {
-                    setBottomTab('Logs')
-                    projectLogs.refetch()
+                    setCenterCtx({ kind: 'graph' })
+                    setSelectedArtifact(undefined)
                   }}
                 />
               </div>
@@ -847,6 +849,8 @@ export function ShellLayout({
                           : undefined
                       }
                     />
+                  ) : centerCtx.kind === 'graph' ? (
+                    <GraphMainView refreshKey={refreshKey} />
                   ) : (
                     <EmptyCenter />
                   )}

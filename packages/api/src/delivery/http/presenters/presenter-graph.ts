@@ -23,6 +23,7 @@ export function toGraphStatusDto(stats: GraphStatistics, stale: boolean | null):
     lastIndexedAt: stats.lastIndexedAt ?? null,
     lastIndexedRef: stats.lastIndexedRef ?? null,
     fileCount: stats.fileCount,
+    documentCount: stats.documentCount,
     symbolCount: stats.symbolCount,
     specCount: stats.specCount,
     graphFingerprint: stats.graphFingerprint ?? null,

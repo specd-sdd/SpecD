@@ -113,6 +113,7 @@ Each `client:dto-*` mirrors `api:dto-*` (16 specs).
 | Bottom (Output, Problems, Logs) | `ui:bottom-panel-output`, `ui:bottom-panel-problems`, `ui:bottom-panel-logs`                                                                                                                      |
 | Per-tab read hook               | `ui:hooks-changes-read`                                                                                                                                                                           | Tab-visible poll + `ifModifiedSince` |
 | Mutate hook                     | `ui:hooks-changes-mutate`                                                                                                                                                                         | Surfaces 409 to inspector            |
+| Stability & Render loops        | `ui:hooks-changes-read`, `ui:change-tab-*`                                                                                                                                                        | Result stability & memoization       |
 
 **Boundary:** every `ui:*` view spec includes “uses `SpecdDataPort` hooks only” / loading+error — no `@specd/core` import (`ui:shell-layout`, architecture delta).
 
@@ -138,6 +139,8 @@ Each `client:dto-*` mirrors `api:dto-*` (16 specs).
 | `FsChangeRepository.get` + save path | Shared drift reconciliation                        | `core:change-repository-port`                                                                  | HIGH                         |
 | `Kernel` wiring                      | Register `SaveChangeArtifact`, `GetChangeArtifact` | `core:save-change-artifact`, `core:get-change-artifact`                                        | MEDIUM                       |
 | Config schema                        | `api.auth` in `specd.yaml`                         | `core:config` delta + `schema-std` (task 2.1); consumed by `api:composition-create-api-server` | MEDIUM                       |
+| `useChangeArtifacts` & list          | Memoize normalized filenames & stabilize results   | `ui:hooks-changes-read`                                                                        | LOW                          |
+| `ChangeTasksTab` & `ChangeEventsTab` | Stabilize array references with `useMemo`          | `ui:change-tab-tasks`, `ui:change-tab-events`                                                  | LOW                          |
 
 ### `packages/cli`
 

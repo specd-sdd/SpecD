@@ -66,10 +66,9 @@ export function useChangeArtifacts(
   const listSection: ChangeReadSection = options.listSection ?? null
   const normalizedFilenames = React.useMemo(
     () => [...new Set(filenames)].filter((filename) => filename.length > 0),
-    [filenames],
+    [filenames.join('|')],
   )
-  const enabled =
-    (options.enabled ?? true) && Boolean(changeName) && normalizedFilenames.length > 0
+  const enabled = (options.enabled ?? true) && Boolean(changeName) && normalizedFilenames.length > 0
   const load = React.useCallback(
     () =>
       Promise.all(

@@ -534,7 +534,16 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
   }
 
   getGraphStatus(): Promise<GraphStatusDto> {
-    return Promise.resolve({ indexed: false, stale: true })
+    return Promise.resolve({
+      lastIndexedAt: null,
+      lastIndexedRef: null,
+      fileCount: 0,
+      documentCount: 0,
+      symbolCount: 0,
+      specCount: 0,
+      graphFingerprint: null,
+      stale: true,
+    })
   }
 
   indexGraph(input: GraphIndexInput = {}): Promise<GraphIndexResultDto> {

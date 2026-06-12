@@ -110,3 +110,19 @@
 - **WHEN** inspector save hook completes with error
 - **THEN** UI shows the conflict message
 - **AND** editor buffer is not silently replaced
+
+### Requirement: hooks MUST prevent infinite render loops through stable results
+
+#### Scenario: Hook returns stable array reference when data is unchanged
+
+- **GIVEN** `useChangeArtifactList` has loaded data
+- **WHEN** component re-renders without a port refresh
+- **THEN** the returned `items` and `scopeGroups` arrays are referentially equal to previous result
+- **AND** no downstream effect is re-triggered
+
+#### Scenario: Multi-artifact reader memoizes normalized filenames
+
+- **GIVEN** `useChangeArtifacts` called with `['a.md']`
+- **WHEN** parent re-renders and passes a new array `['a.md']` (different reference, same content)
+- **THEN** `normalizedFilenames` reference remains stable
+- **AND** `useAsyncResource` does not re-trigger a load

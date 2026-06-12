@@ -26,6 +26,10 @@ Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `
 
 While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable).
 
+### Requirement: component SHALL avoid infinite render loops from unstable dependencies
+
+The Tasks tab component SHALL stabilize all array and object references passed as dependencies to downstream hooks (e.g. `useChangeArtifacts`). It MUST use `useMemo` for derived mappings and use static constants for default empty values to prevent continuous re-triggering of effect-based resource loading.
+
 ## Spec Dependencies
 
 - [`client:specd-data-port`](../../client/specd-data-port/spec.md) — data access

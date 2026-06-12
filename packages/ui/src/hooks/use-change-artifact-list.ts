@@ -17,6 +17,8 @@ import {
 
 export type { ArtifactFileItem, ArtifactScopeGroup, ArtifactSpecGroup, ArtifactTypeGroup }
 
+const EMPTY_ARRAY = [] as const
+
 /**
  * Fetches the flat artifact list for a change and groups by scope (change, spec).
  * Uses the dedicated `/artifacts` endpoint — not the status short-circuit.
@@ -77,15 +79,14 @@ export function useChangeArtifactList(
       displayStatus?: string
     }>
     readonly grouped: readonly ArtifactScopeGroup[]
-  }>(
-    changeReadCacheKey(listSection, `change-artifact-list:${changeName ?? ''}`),
-    load,
-    { enabled: Boolean(changeName), refreshKey: poll ? refreshKey : undefined },
-  )
+  }>(changeReadCacheKey(listSection, `change-artifact-list:${changeName ?? ''}`), load, {
+    enabled: Boolean(changeName),
+    refreshKey: poll ? refreshKey : undefined,
+  })
 
   return {
-    items: resource.data?.items ?? [],
-    scopeGroups: resource.data?.grouped ?? [],
+    items: resource.data?.items ?? EMPTY_ARRAY,
+    scopeGroups: resource.data?.grouped ?? EMPTY_ARRAY,
     isLoading: resource.isLoading,
     error: resource.error,
   }

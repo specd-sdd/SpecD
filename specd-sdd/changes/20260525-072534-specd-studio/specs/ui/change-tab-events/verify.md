@@ -119,3 +119,12 @@
 - **GIVEN** no detail object after load settled
 - **WHEN** Events tab is shown
 - **THEN** UI shows `No change detail`
+
+### Requirement: component SHALL avoid infinite render loops from unstable dependencies
+
+#### Scenario: Events tab memoizes reversed history
+
+- **GIVEN** Events tab receives `detail` prop
+- **WHEN** tab re-renders without `detail.history` changing
+- **THEN** `events` array reference remains stable
+- **AND** downstream `Accordion` does not perform unnecessary reconciliation

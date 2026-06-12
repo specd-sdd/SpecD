@@ -87,3 +87,12 @@
 - **WHEN** inspector save hook completes with error
 - **THEN** UI shows the conflict message
 - **AND** editor buffer is not silently replaced
+
+### Requirement: component SHALL avoid infinite render loops from unstable dependencies
+
+#### Scenario: Tasks tab passes stable references to hooks
+
+- **GIVEN** Tasks tab is visible
+- **WHEN** parent component (e.g. `ChangeTabPanels`) re-renders
+- **THEN** `tasksEntry` and `selectedTaskFiles` maintain stable references
+- **AND** `useChangeArtifacts` does not cycle through infinite reloads

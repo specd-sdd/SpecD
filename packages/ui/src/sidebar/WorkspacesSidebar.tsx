@@ -62,7 +62,7 @@ export function GraphSidebarEntry({
         <GitBranch className="h-3.5 w-3.5 shrink-0 text-studio-warning" />
         <span className="min-w-0 flex-1 truncate text-left font-medium text-foreground">Code Graph</span>
         <Badge variant="secondary" className="h-4 px-1 text-[9px]">
-          {graphStatus?.indexed ? (graphStatus.stale ? 'stale' : 'ready') : 'off'}
+          {graphStatus?.lastIndexedAt !== null ? (graphStatus?.stale ? 'stale' : 'ready') : 'off'}
         </Badge>
       </Button>
     </div>

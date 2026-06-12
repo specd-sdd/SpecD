@@ -129,6 +129,8 @@ function ChangeHistoryEventRow({
   )
 }
 
+const EMPTY_ARRAY = [] as const
+
 export function ChangeTasksTab({
   changeName,
   listSection = null,
@@ -188,46 +190,52 @@ export function ChangeTasksTab({
       { totalTasks: 0, completedTasks: 0 },
     )
   }, [readOnlyTaskItems, status?.completedTasks, status?.totalTasks])
-  const statusTaskArtifacts = status?.artifacts?.filter((a) => a.hasTasks) ?? []
-  const tasksEntry =
-    statusTaskArtifacts.length > 0
-      ? {
-          type: statusTaskArtifacts[0]?.type ?? 'tasks',
-          hasTasks: true,
-          state: statusTaskArtifacts.some((a) => a.state !== 'missing') ? 'complete' : 'missing',
-          displayStatus: statusTaskArtifacts.some((a) => a.displayStatus !== 'missing')
-            ? 'complete'
-            : 'missing',
-          files: statusTaskArtifacts.flatMap((artifact) => artifact.files),
-        }
-      :
-    (readOnlyTaskItems.length > 0
-      ? {
-          type: readOnlyTaskItems.find((a) => a.hasTasks)?.type ?? 'tasks',
-          hasTasks: readOnlyTaskItems.some((a) => a.hasTasks),
-          state: readOnlyTaskItems.some((a) => a.hasTasks) ? 'complete' : 'missing',
-          displayStatus: readOnlyTaskItems.some((a) => a.hasTasks) ? 'complete' : 'missing',
-          files: readOnlyTaskItems
-            .filter((a) => a.hasTasks)
-            .map((a) => ({
-              key: a.filename,
-              filename: a.filename,
-              state: a.state ?? 'missing',
-              hasDrift: false,
-              displayStatus: a.displayStatus ?? (a.state ?? 'missing'),
-            })),
-        }
-      : undefined)
-  const selectedTaskFiles = tasksEntry?.files
-    .filter((f) => f.state !== 'missing')
-    .map((f) => f.filename) ?? []
+
+  const tasksEntry = React.useMemo(() => {
+    const statusTaskArtifacts = status?.artifacts?.filter((a) => a.hasTasks) ?? EMPTY_ARRAY
+    if (statusTaskArtifacts.length > 0) {
+      return {
+        type: statusTaskArtifacts[0]?.type ?? 'tasks',
+        hasTasks: true,
+        state: statusTaskArtifacts.some((a) => a.state !== 'missing') ? 'complete' : 'missing',
+        displayStatus: statusTaskArtifacts.some((a) => a.displayStatus !== 'missing')
+          ? 'complete'
+          : 'missing',
+        files: statusTaskArtifacts.flatMap((artifact) => artifact.files),
+      }
+    }
+    if (readOnlyTaskItems.length > 0) {
+      return {
+        type: readOnlyTaskItems.find((a) => a.hasTasks)?.type ?? 'tasks',
+        hasTasks: readOnlyTaskItems.some((a) => a.hasTasks),
+        state: readOnlyTaskItems.some((a) => a.hasTasks) ? 'complete' : 'missing',
+        displayStatus: readOnlyTaskItems.some((a) => a.hasTasks) ? 'complete' : 'missing',
+        files: readOnlyTaskItems
+          .filter((a) => a.hasTasks)
+          .map((a) => ({
+            key: a.filename,
+            filename: a.filename,
+            state: a.state ?? 'missing',
+            hasDrift: false,
+            displayStatus: a.displayStatus ?? (a.state ?? 'missing'),
+          })),
+      }
+    }
+    return undefined
+  }, [status?.artifacts, readOnlyTaskItems])
+
+  const selectedTaskFiles = React.useMemo(
+    () =>
+      tasksEntry?.files.filter((f) => f.state !== 'missing').map((f) => f.filename) ?? EMPTY_ARRAY,
+    [tasksEntry],
+  )
   const tasksFileReady =
     tasksEntry !== undefined &&
     tasksEntry.state !== 'missing' &&
     tasksEntry.displayStatus !== 'missing' &&
     tasksEntry.files.some((f) => f.state !== 'missing')
 
-  const tasksArtifacts = useChangeArtifacts(changeName, selectedTaskFiles, pollKey, {
+  const tasksArtifacts = useChangeArtifacts(changeName, selectedTaskFiles as string[], pollKey, {
     poll: tabActive,
     listSection,
     enabled: tasksFileReady,
@@ -316,7 +324,7 @@ export function ChangeEventsTab({
   loading: boolean
   error?: Error
 }): React.ReactElement {
-  const events = detail !== undefined ? [...detail.history].reverse() : []
+  const events = React.useMemo(() => (detail !== undefined ? [...detail.history].reverse() : EMPTY_ARRAY), [detail?.history])
   const [expandedKeys, setExpandedKeys] = React.useState<string[]>([])
 
   if (error) {

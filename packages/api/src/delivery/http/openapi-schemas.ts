@@ -587,6 +587,7 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
       lastIndexedAt: { type: 'string', nullable: true },
       lastIndexedRef: { type: 'string', nullable: true },
       fileCount: { type: 'integer' },
+      documentCount: { type: 'integer' },
       symbolCount: { type: 'integer' },
       specCount: { type: 'integer' },
       graphFingerprint: { type: 'string', nullable: true },
