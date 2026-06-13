@@ -41,7 +41,7 @@ When draft scope differs from persisted `specIds`, **Save changes** MUST show th
 
 ### Requirement: dialog uses StudioDialog chrome
 
-`data-testid="studio-change-scope-dialog"`. Large layout (`max-w-2xl`) with scrollable body using shadcn `ScrollArea`. Actions: **Cancel**, **Save changes**; confirm sub-step: **Back**, **Apply scope change**. Actions MUST use shadcn `Button` components.
+`data-testid="studio-change-scope-dialog"`. Large layout (`max-w-2xl`) with scrollable body using shadcn `ScrollArea`. The dialog title MUST indicate the active mode (e.g., "Create new change") and, in edit mode, MUST explicitly include the name of the change being edited (e.g., "Edit change: feat-user-auth"). Actions: **Cancel**, **Save changes**; confirm sub-step: **Back**, **Apply scope change**. Actions MUST use shadcn `Button` components.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

@@ -274,7 +274,7 @@ export function EditChangeDialog({
   return (
     <StudioDialog
       open={open}
-      title={isCreate ? 'Create new change' : confirmScope ? 'Confirm scope change' : 'Edit change & scope'}
+      title={isCreate ? 'Create new change' : confirmScope ? 'Confirm scope change' : `Edit change: ${change!.name}`}
       titleId="change-scope-dialog-title"
       testId="studio-change-scope-dialog"
       className="flex max-h-[90vh] !w-[70vw] max-w-none flex-col"
