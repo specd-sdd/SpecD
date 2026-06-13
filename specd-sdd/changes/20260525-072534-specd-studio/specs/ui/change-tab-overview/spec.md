@@ -26,7 +26,7 @@ For **archived** and **discarded** changes, the shell MUST NOT poll workflow sta
 
 ### Requirement: overview hosts change metadata editor
 
-Overview MUST delegate description, invalidation policy, read-only specs/deps, and scope dialog to [`ui:change-metadata-editor`](../change-metadata-editor/spec.md). Layout order: title → lifecycle actions → metadata block → summary cards → workflow → specs & dependencies → recent events.
+Overview MUST delegate description, invalidation policy, read-only specs/deps, and scope dialog to [`ui:change-metadata-editor`](../change-metadata-editor/spec.md). Layout order: title → lifecycle actions → metadata block → workflow & validation → summary cards → specs & dependencies → recent events.
 
 ### Requirement: overview surfaces lifecycle actions
 

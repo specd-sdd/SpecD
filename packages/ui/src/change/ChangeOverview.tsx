@@ -88,6 +88,15 @@ export function ChangeOverview({
       </div>
 
       <div className="grid w-full grid-cols-1 gap-3 @[640px]:grid-cols-2 @[960px]:grid-cols-3">
+        <Card title="Workflow & validation" className="col-span-full">
+          <ChangeStatusPanel
+            embedded
+            status={status}
+            loading={statusLoading}
+            error={statusError}
+          />
+        </Card>
+
         <Card title="Details">
           <dl className="space-y-1">
             <Row label="State" value={change.state} />
@@ -121,15 +130,6 @@ export function ChangeOverview({
             <p>Latest state: {change.state}</p>
             <p>Last revision: {change.updatedAt ?? 'n/a'}</p>
           </div>
-        </Card>
-
-        <Card title="Workflow & validation" className="col-span-full">
-          <ChangeStatusPanel
-            embedded
-            status={status}
-            loading={statusLoading}
-            error={statusError}
-          />
         </Card>
 
         <Card title="Specs & dependencies" className="col-span-full">
