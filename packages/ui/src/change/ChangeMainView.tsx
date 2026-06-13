@@ -174,10 +174,8 @@ export function ChangeMainView({
             statusLoading={statusLoading}
             statusError={statusError}
             editable={contentEditable}
-            onDescriptionSaved={onDescriptionSaved}
             onScopeSaved={onScopeSaved}
             onScopeInvalidated={onScopeInvalidated}
-            onInvalidationPolicySaved={onInvalidationPolicySaved}
             listSection={changeListSection}
             lifecycleBusy={lifecycleBusy}
             onShelfToDrafts={onShelfToDrafts}

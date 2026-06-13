@@ -5,6 +5,15 @@ import { StudioDialog } from '../components/StudioDialog.js'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.js'
 import { Button } from '../components/ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.js'
+import { Input } from '../components/ui/input.js'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js'
+import { Textarea } from '../components/ui/textarea.js'
 import { RemoteMultiCombobox } from '../components/RemoteMultiCombobox.js'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
 import {
@@ -47,7 +56,7 @@ function dependsOnChanged(
   return false
 }
 
-export function ChangeScopeDialog({
+export function EditChangeDialog({
   open,
   change,
   onClose,
@@ -55,15 +64,19 @@ export function ChangeScopeDialog({
   onScopeInvalidated,
 }: {
   open: boolean
-  change: ChangeDetailDto
-  specSuggestions?: readonly string[]
+  change?: ChangeDetailDto
   onClose: () => void
-  onSaved?: (detail: ChangeDetailDto, meta: { readonly scopeInvalidated: boolean }) => void
+  onSaved?: (detail: ChangeDetailDto, meta: { readonly scopeInvalidated: boolean; readonly isNew: boolean }) => void
   onScopeInvalidated?: () => void
 }): React.ReactElement | null {
   const port = useSpecdDataPort()
-  const savedSpecIds = change.specIds
-  const savedDepends = change.specDependsOn ?? {}
+  const isCreate = !change
+  const savedSpecIds = change?.specIds ?? []
+  const savedDepends = change?.specDependsOn ?? {}
+
+  const [draftName, setDraftName] = React.useState(change?.name ?? '')
+  const [draftDescription, setDraftDescription] = React.useState(change?.description ?? '')
+  const [draftPolicy, setDraftPolicy] = React.useState(change?.invalidationPolicy ?? 'downstream')
 
   const [draftSpecIds, setDraftSpecIds] = React.useState<readonly string[]>(() =>
     sortSpecIds(savedSpecIds),
@@ -83,6 +96,9 @@ export function ChangeScopeDialog({
 
   React.useEffect(() => {
     if (!open) return
+    setDraftName(change?.name ?? '')
+    setDraftDescription(change?.description ?? '')
+    setDraftPolicy(change?.invalidationPolicy ?? 'downstream')
     setDraftSpecIds(sortSpecIds(savedSpecIds))
     setDraftDepends(cloneDependsOn(savedDepends, savedSpecIds))
     setSelectedSpecsToAdd([])
@@ -90,7 +106,7 @@ export function ChangeScopeDialog({
     setConfirmScope(false)
     setError(undefined)
     clearPatchError()
-  }, [open, change.name, savedSpecIds.join('|'), clearPatchError])
+  }, [open, change?.name, savedSpecIds.join('|'), clearPatchError])
 
   React.useEffect(() => {
     setDraftDepends((prev) => {
@@ -108,7 +124,12 @@ export function ChangeScopeDialog({
   const scopeDelta = computeSpecScopeDelta(savedSpecIds, draftSpecIds)
   const scopeDirty = hasSpecScopeDelta(savedSpecIds, draftSpecIds)
   const depsDirty = dependsOnChanged(savedDepends, draftDepends, draftSpecIds)
-  const dirty = scopeDirty || depsDirty
+  const metaDirty =
+    draftName !== (change?.name ?? '') ||
+    draftDescription !== (change?.description ?? '') ||
+    draftPolicy !== (change?.invalidationPolicy ?? 'downstream')
+    
+  const dirty = scopeDirty || depsDirty || metaDirty
 
   const sortedDraftSpecIds = React.useMemo(() => sortSpecIds(draftSpecIds), [draftSpecIds])
 
@@ -156,14 +177,49 @@ export function ChangeScopeDialog({
     setBusy(true)
     setError(undefined)
     try {
-      let detail: ChangeDetailDto = change
+      let detail: ChangeDetailDto
       let scopeInvalidated = false
 
-      if (scopeDirty) {
-        const patched = await patch(change.name, {
+      if (isCreate) {
+        if (!draftName.trim()) {
+          throw new Error('Change name is required')
+        }
+        detail = await port.createChange({
+          name: draftName.trim(),
+          description: draftDescription.trim() || undefined,
+          invalidationPolicy: draftPolicy,
+          specIds: draftSpecIds,
+        })
+        
+        // Apply dependencies if any were added during creation
+        for (const specId of draftSpecIds) {
+          if ((draftDepends[specId] ?? []).length > 0) {
+            await port.updateSpecDependencies(detail.name, {
+              specId,
+              set: draftDepends[specId] ?? [],
+            })
+          }
+        }
+        detail = await port.getChange(detail.name)
+        onSaved?.(detail, { scopeInvalidated: false, isNew: true })
+        onClose()
+        return
+      }
+      
+      const changeName = change!.name
+      detail = change!
+
+      if (scopeDirty || metaDirty) {
+        const patched = await patch(changeName, {
           ...(scopeDelta.addSpecIds.length > 0 ? { addSpecIds: scopeDelta.addSpecIds } : {}),
           ...(scopeDelta.removeSpecIds.length > 0
             ? { removeSpecIds: scopeDelta.removeSpecIds }
+            : {}),
+          ...(draftDescription !== (change?.description ?? '')
+            ? { description: draftDescription }
+            : {}),
+          ...(draftPolicy !== (change?.invalidationPolicy ?? 'downstream')
+            ? { invalidationPolicy: draftPolicy }
             : {}),
         })
         if (!patched) {
@@ -182,17 +238,17 @@ export function ChangeScopeDialog({
       })
 
       for (const specId of depUpdates) {
-        await port.updateSpecDependencies(change.name, {
+        await port.updateSpecDependencies(changeName, {
           specId,
           set: draftDepends[specId] ?? [],
         })
       }
 
-      if (depUpdates.length > 0 || scopeDirty) {
-        detail = await port.getChange(change.name)
+      if (depUpdates.length > 0 || scopeDirty || metaDirty) {
+        detail = await port.getChange(changeName)
       }
 
-      onSaved?.(detail, { scopeInvalidated })
+      onSaved?.(detail, { scopeInvalidated, isNew: false })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -203,8 +259,8 @@ export function ChangeScopeDialog({
   }
 
   const handleSaveClick = () => {
-    if (!dirty) return
-    if (scopeDirty) {
+    if (!dirty && !isCreate) return
+    if (!isCreate && scopeDirty) {
       setConfirmScope(true)
       return
     }
@@ -218,7 +274,7 @@ export function ChangeScopeDialog({
   return (
     <StudioDialog
       open={open}
-      title={confirmScope ? 'Confirm scope change' : 'Edit spec scope & dependencies'}
+      title={isCreate ? 'Create new change' : confirmScope ? 'Confirm scope change' : 'Edit change & scope'}
       titleId="change-scope-dialog-title"
       testId="studio-change-scope-dialog"
       className="flex max-h-[90vh] !w-[70vw] max-w-none flex-col"
@@ -237,7 +293,7 @@ export function ChangeScopeDialog({
               Back
             </Button>
             <Button size="sm" disabled={saving} onClick={() => void runSave()}>
-              {saving ? 'Applying…' : 'Apply scope change'}
+              {saving ? 'Applying…' : 'Apply changes'}
             </Button>
           </>
         ) : (
@@ -247,11 +303,11 @@ export function ChangeScopeDialog({
             </Button>
             <Button
               size="sm"
-              disabled={!dirty || saving}
+              disabled={(!dirty && !isCreate) || saving}
               data-testid="studio-change-scope-dialog-save"
               onClick={handleSaveClick}
             >
-              {saving ? 'Saving…' : 'Save changes'}
+              {saving ? 'Saving…' : isCreate ? 'Create change' : 'Save changes'}
             </Button>
           </>
         )
@@ -260,28 +316,87 @@ export function ChangeScopeDialog({
       {confirmScope ? (
         <div className="px-1">
           <p className="whitespace-pre-wrap text-foreground">
-            {buildScopeChangeConfirmMessage(change.name, scopeDelta)}
+            {buildScopeChangeConfirmMessage(change!.name, scopeDelta)}
           </p>
         </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col gap-4 px-1">
-          <Alert className="shrink-0 border-amber-500/40 bg-amber-500/10 text-foreground [&>svg]:text-amber-500">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            <AlertTitle className="text-[11px] font-medium text-amber-200/90">
-              High-impact edits
-            </AlertTitle>
-            <AlertDescription className="space-y-1 text-[11px] leading-relaxed">
-              <p>
-                <strong>Removing</strong> a spec from scope drops its scaffolded artifact
-                directories and <strong>invalidates</strong> prior spec approval and sign-off on
-                this change.
-              </p>
-              <p>
-                <strong>Adding</strong> specs may require new artifact work. Dependency edits affect
-                compiled context only — they do not invalidate approvals.
-              </p>
-            </AlertDescription>
-          </Alert>
+          {!isCreate && (
+            <Alert className="shrink-0 border-amber-500/40 bg-amber-500/10 text-foreground [&>svg]:text-amber-500">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <AlertTitle className="text-[11px] font-medium text-amber-200/90">
+                High-impact edits
+              </AlertTitle>
+              <AlertDescription className="space-y-1 text-[11px] leading-relaxed">
+                <p>
+                  <strong>Removing</strong> a spec from scope drops its scaffolded artifact
+                  directories and <strong>invalidates</strong> prior spec approval and sign-off on
+                  this change.
+                </p>
+                <p>
+                  <strong>Adding</strong> specs may require new artifact work. Dependency edits affect
+                  compiled context only — they do not invalidate approvals.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <section className="flex min-h-0 flex-col shrink-0 gap-4 mb-2">
+            {isCreate && (
+              <div>
+                <label htmlFor="change-name" className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Change Name <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  id="change-name"
+                  placeholder="e.g. feat-user-auth"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  disabled={saving}
+                  autoFocus
+                  className="font-mono text-xs"
+                />
+              </div>
+            )}
+            
+            <div className="grid gap-4 md:grid-cols-1">
+              <div>
+                <label htmlFor="change-desc" className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Description
+                </label>
+                <Textarea
+                  id="change-desc"
+                  placeholder="Brief description of the change's goal..."
+                  value={draftDescription}
+                  onChange={(e) => setDraftDescription(e.target.value)}
+                  disabled={saving}
+                  className="h-20 resize-none text-xs"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Invalidation Policy
+                </label>
+                <Select
+                  value={draftPolicy}
+                  onValueChange={setDraftPolicy}
+                  disabled={saving}
+                >
+                  <SelectTrigger className="w-full text-xs">
+                    <SelectValue placeholder="Select a policy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="downstream">downstream (default: safe invalidation)</SelectItem>
+                    <SelectItem value="isolated">isolated (no cascade)</SelectItem>
+                    <SelectItem value="strict">strict (invalidate all)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[10px] text-muted-foreground leading-relaxed">
+                  Controls how scope modifications (adding/removing specs) affect downstream artifacts.
+                </p>
+              </div>
+            </div>
+          </section>
 
           <section className="flex min-h-0 flex-1 flex-col">
             <h3 className="mb-2 shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">

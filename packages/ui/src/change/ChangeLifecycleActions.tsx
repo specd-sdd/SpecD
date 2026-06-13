@@ -1,12 +1,13 @@
 import * as React from 'react'
 import type { ChangeListSection } from './change-list-section.js'
 import { Button } from '../components/ui/button.js'
-import { Trash2, ArchiveRestore, Archive } from 'lucide-react'
+import { Trash2, ArchiveRestore, Archive, Edit3 } from 'lucide-react'
 
 export function ChangeLifecycleActions({
   listSection,
   state,
   busy = false,
+  onEdit,
   onDraft,
   onRestore,
   onDiscard,
@@ -15,6 +16,7 @@ export function ChangeLifecycleActions({
   listSection: ChangeListSection | null
   state: string
   busy?: boolean
+  onEdit?: () => void
   onDraft?: () => void
   onRestore?: () => void
   onDiscard?: () => void
@@ -41,7 +43,7 @@ export function ChangeLifecycleActions({
           <Button
             type="button"
             size="sm"
-            variant="default"
+            variant="secondary"
             disabled={busy}
             data-testid="studio-shelf-change"
             onClick={onDraft}
@@ -54,7 +56,7 @@ export function ChangeLifecycleActions({
           <Button
             type="button"
             size="sm"
-            variant="default"
+            variant="secondary"
             disabled={busy}
             data-testid="studio-archive-change"
             onClick={onArchive}
@@ -68,7 +70,7 @@ export function ChangeLifecycleActions({
         <Button
           type="button"
           size="sm"
-          variant="default"
+          variant="secondary"
           disabled={busy}
           data-testid="studio-restore-change"
           onClick={onRestore}
@@ -87,7 +89,19 @@ export function ChangeLifecycleActions({
       data-testid="studio-change-lifecycle-actions"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {/* Placeholder for future buttons on the left */}
+        {onEdit ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="default"
+            disabled={busy}
+            onClick={onEdit}
+            className="gap-1"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit Change
+          </Button>
+        ) : null}
       </div>
 
       <div className="ml-auto flex items-center gap-4">
@@ -103,15 +117,16 @@ export function ChangeLifecycleActions({
           >
             <Button
               type="button"
-              size="icon"
-              variant="ghost"
+              size="sm"
+              variant="outline"
               disabled={busy}
               title="Discard permanently"
-              className="h-8 w-8 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
               data-testid="studio-discard-change"
               onClick={onDiscard}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Discard
             </Button>
           </div>
         ) : null}

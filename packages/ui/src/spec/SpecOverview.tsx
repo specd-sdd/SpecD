@@ -29,10 +29,10 @@ export function SpecOverview({ spec }: { spec: SpecDetailDto }): React.ReactElem
           </CardHeader>
           <CardContent>
             <dl className="space-y-1">
-              <MetaRow label="Workspace" value={spec.workspace} />
-              <MetaRow label="Path" value={spec.path} />
-              <MetaRow label="Artifacts" value={String(spec.artifacts.length)} />
-              <MetaRow label="Dependencies" value={String(spec.dependsOn?.length ?? 0)} />
+              <MetaRow label="Workspace" value={spec.workspace} badge badgeVariant="outline" mono />
+              <MetaRow label="Path" value={spec.path} mono />
+              <MetaRow label="Artifacts" value={spec.artifacts.length} badge />
+              <MetaRow label="Dependencies" value={spec.dependsOn?.length ?? 0} badge />
             </dl>
           </CardContent>
         </Card>
@@ -43,7 +43,7 @@ export function SpecOverview({ spec }: { spec: SpecDetailDto }): React.ReactElem
           </CardHeader>
           <CardContent>
             <dl className="space-y-1">
-              <MetaRow label="Spec ID" value={spec.specId} mono />
+              <MetaRow label="Spec ID" value={spec.specId} badge badgeVariant="default" mono />
               <MetaRow label="Title" value={spec.title ?? 'Untitled'} />
             </dl>
           </CardContent>
@@ -96,15 +96,27 @@ function MetaRow({
   label,
   value,
   mono = false,
+  badge = false,
+  badgeVariant = 'secondary',
 }: {
   label: string
-  value: string
+  value: string | number
   mono?: boolean
+  badge?: boolean
+  badgeVariant?: 'default' | 'secondary' | 'destructive' | 'outline'
 }): React.ReactElement {
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 py-0.5">
       <dt className="w-24 shrink-0 text-muted-foreground">{label}</dt>
-      <dd className={mono ? 'font-mono' : ''}>{value}</dd>
+      <dd className={mono ? 'font-mono' : ''}>
+        {badge ? (
+          <Badge variant={badgeVariant} className={mono ? 'font-mono text-[10px]' : ''}>
+            {value}
+          </Badge>
+        ) : (
+          value
+        )}
+      </dd>
     </div>
   )
 }

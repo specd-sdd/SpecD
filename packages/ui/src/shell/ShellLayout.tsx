@@ -46,6 +46,7 @@ import {
   useStudioOutput,
   useStudioPanelActions,
 } from '../hooks/use-studio-panel.js'
+import { EditChangeDialog } from '../change/EditChangeDialog.js'
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog.js'
 import { ValidateConfirmDialog } from '../components/ValidateConfirmDialog.js'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.js'
@@ -110,6 +111,7 @@ export function ShellLayout({
   const [centerCtx, setCenterCtx] = React.useState<CenterContext>({ kind: 'empty' })
   const [changeView, setChangeView] = React.useState<ChangeView>('Overview')
   const [commandOpen, setCommandOpen] = React.useState(false)
+  const [createChangeOpen, setCreateChangeOpen] = React.useState(false)
   const [bottomTab, setBottomTab] = React.useState<'Output' | 'Problems' | 'Logs'>('Output')
   const pollProjectLogs = bottomTab === 'Logs'
   const studioOutput = useStudioOutput()
@@ -667,9 +669,7 @@ export function ShellLayout({
     <div className="flex h-full min-h-0 flex-col bg-background" data-testid="studio-shell">
       <StudioTopBar
         onOpenCommandPalette={() => setCommandOpen(true)}
-        onNewChange={() => {
-          void pushOutput('New change — coming soon', 'new-change')
-        }}
+        onNewChange={() => setCreateChangeOpen(true)}
       />
 
       <CommandPalette
@@ -1192,6 +1192,17 @@ export function ShellLayout({
         onCancel={() => setLifecycleConfirm(null)}
         onConfirm={executeLifecycleConfirm}
       />
+
+      {createChangeOpen ? (
+        <EditChangeDialog
+          open={createChangeOpen}
+          onClose={() => setCreateChangeOpen(false)}
+          onSaved={(detail) => {
+            handleSelectChange(detail.name)
+            // The polling hooks will automatically pick up the new change
+          }}
+        />
+      ) : null}
     </div>
   )
 }

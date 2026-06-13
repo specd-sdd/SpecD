@@ -7,9 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../components/ui/card.js'
-import { ChangeDescriptionEditor } from './ChangeDescriptionEditor.js'
-import { ChangeInvalidationPolicyEditor } from './ChangeInvalidationPolicyEditor.js'
-import { ChangeScopeDialog } from './ChangeScopeDialog.js'
+import { EditChangeDialog } from './EditChangeDialog.js'
 import { ChangeSpecsReadonlyPanel } from './ChangeSpecsReadonlyPanel.js'
 import type { ChangeListSection } from './change-list-section.js'
 import { ChangeLifecycleActions } from './ChangeLifecycleActions.js'
@@ -30,10 +28,8 @@ export function ChangeOverview({
   statusLoading = false,
   statusError,
   editable = false,
-  onDescriptionSaved,
   onScopeSaved,
   onScopeInvalidated,
-  onInvalidationPolicySaved,
   listSection = null,
   lifecycleBusy = false,
   onShelfToDrafts,
@@ -48,16 +44,14 @@ export function ChangeOverview({
   editable?: boolean
   listSection?: ChangeListSection | null
   lifecycleBusy?: boolean
-  onDescriptionSaved?: (detail: ChangeDetailDto) => void
   onScopeSaved?: (detail: ChangeDetailDto) => void
   onScopeInvalidated?: () => void
-  onInvalidationPolicySaved?: (detail: ChangeDetailDto) => void
   onShelfToDrafts?: () => void
   onRestoreToActive?: () => void
   onDiscardChange?: () => void
   onArchiveChange?: () => void
 }): React.ReactElement {
-  const [scopeDialogOpen, setScopeDialogOpen] = React.useState(false)
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false)
 
   const specApproved =
     change.approvals?.specApproved ??
@@ -66,11 +60,13 @@ export function ChangeOverview({
   return (
     <div className="@container min-h-0 flex-1 overflow-auto p-4 text-xs">
       <div className="mb-4">
-        <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Change Overview
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Change Overview
+          </div>
         </div>
         <h1 className="text-2xl font-semibold tracking-tight">{change.name}</h1>
-        {!editable && change.description ? (
+        {change.description ? (
           <p className="mt-2 max-w-3xl text-muted-foreground">{change.description}</p>
         ) : null}
         {listSection !== null ? (
@@ -79,6 +75,7 @@ export function ChangeOverview({
               listSection={listSection}
               state={change.state}
               busy={lifecycleBusy}
+              onEdit={editable ? () => setEditDialogOpen(true) : undefined}
               onDraft={listSection === 'active' ? onShelfToDrafts : undefined}
               onRestore={listSection === 'draft' ? onRestoreToActive : undefined}
               onDiscard={
@@ -89,16 +86,6 @@ export function ChangeOverview({
           </div>
         ) : null}
       </div>
-
-      {editable ? (
-        <div className="mb-4 space-y-3">
-          <ChangeDescriptionEditor change={change} onSaved={onDescriptionSaved} />
-          <ChangeInvalidationPolicyEditor
-            change={change}
-            onSaved={onInvalidationPolicySaved}
-          />
-        </div>
-      ) : null}
 
       <div className="grid w-full grid-cols-1 gap-3 @[640px]:grid-cols-2 @[960px]:grid-cols-3">
         <Card title="Details">
@@ -146,22 +133,6 @@ export function ChangeOverview({
         </Card>
 
         <Card title="Specs & dependencies" className="col-span-full">
-          {editable ? (
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[10px] text-muted-foreground">
-                Read-only on Overview — use the dialog to edit scope safely.
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                data-testid="studio-edit-spec-scope"
-                onClick={() => setScopeDialogOpen(true)}
-              >
-                Edit spec scope…
-              </Button>
-            </div>
-          ) : null}
           <ChangeSpecsReadonlyPanel change={change} />
         </Card>
 
@@ -180,10 +151,10 @@ export function ChangeOverview({
       </div>
 
       {editable ? (
-        <ChangeScopeDialog
-          open={scopeDialogOpen}
+        <EditChangeDialog
+          open={editDialogOpen}
           change={change}
-          onClose={() => setScopeDialogOpen(false)}
+          onClose={() => setEditDialogOpen(false)}
           onSaved={(detail, meta) => {
             onScopeSaved?.(detail)
             if (meta.scopeInvalidated) onScopeInvalidated?.()
