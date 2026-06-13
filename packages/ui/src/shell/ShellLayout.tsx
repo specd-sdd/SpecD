@@ -587,10 +587,10 @@ export function ShellLayout({
             ? () => requestValidate('all')
             : undefined,
         onNewChange: () => {
-          void pushOutput('New change — wire create dialog (coming soon)', 'new-change')
+          setCreateChangeOpen(true)
         },
       }),
-    [requestValidate, changeName, isArchivedChange, isShelvedReadOnly, pushOutput],
+    [requestValidate, changeName, isArchivedChange, isShelvedReadOnly],
   )
 
   const activeDetail = isArchivedChange ? archivedRead : changeRead.detail
