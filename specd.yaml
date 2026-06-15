@@ -86,6 +86,14 @@ workspaces:
     codeRoot: packages/code-graph
     ownership: owned
 
+  code-graph-electron:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/code-graph-electron
+    codeRoot: packages/code-graph-electron
+    ownership: owned
+
   skills:
     specs:
       adapter: fs

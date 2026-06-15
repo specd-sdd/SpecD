@@ -9,9 +9,12 @@ const ROOT = path.resolve(__dirname, '..', '..', '..')
 const ARCHIVE_DIR_CANDIDATES = ['specd-sdd/archive', '.specd/archive']
 
 const WORKSPACE_PACKAGE_MAP = {
+  'api': '@specd/api',
   'core': '@specd/core',
   'cli': '@specd/cli',
+  'client': '@specd/client',
   'code-graph': '@specd/code-graph',
+  'code-graph-electron': '@specd/code-graph-electron',
   'skills': '@specd/skills',
   'schema-std': '@specd/schema-std',
   'mcp': '@specd/mcp',
@@ -19,7 +22,14 @@ const WORKSPACE_PACKAGE_MAP = {
   'plugin-agent-claude': '@specd/plugin-agent-claude',
   'plugin-agent-copilot': '@specd/plugin-agent-copilot',
   'plugin-agent-codex': '@specd/plugin-agent-codex',
+  'plugin-agent-opencode': '@specd/plugin-agent-opencode',
   'plugin-agent-standard': '@specd/plugin-agent-standard',
+  'plugin-ui-studio': '@specd/plugin-ui-studio',
+  'specd-metapackage': '@specd/specd',
+  'ui': '@specd/ui',
+  'public-web': '@specd/public-web',
+  'studio-web': '@specd/studio-web',
+  'studio-desktop': '@specd/studio-desktop',
 }
 
 async function findIndexFile(archiveDir) {

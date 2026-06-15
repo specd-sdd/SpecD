@@ -1,0 +1,43 @@
+{
+  "name": "@specd/code-graph-electron",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist/",
+    "vendor/"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "sync:vendor-sqlite": "node ./scripts/sync-vendored-sqlite.mjs",
+    "build": "pnpm sync:vendor-sqlite && tsup --config tsup.config.ts",
+    "dev": "tsup --config tsup.config.ts --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm build && vitest run --passWithNoTests",
+    "lint": "eslint .",
+    "rebuild:vendored-sqlite-electron": "node ./scripts/rebuild-vendored-sqlite-electron.mjs",
+    "rebuild:electron": "pnpm rebuild:vendored-sqlite-electron"
+  },
+  "dependencies": {
+    "@ast-grep/lang-go": "^0.0.5",
+    "@ast-grep/lang-php": "^0.0.6",
+    "@ast-grep/lang-python": "^0.0.5",
+    "@ast-grep/napi": "^0.41.1",
+    "@specd/core": "workspace:*",
+    "better-sqlite3": "^12.8.0",
+    "ignore": "^7.0.0",
+    "lbug": "^0.14.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,1159 @@
+{
+  "name": "code-graph-electron",
+  "createdAt": "2026-06-14T11:10:07.850Z",
+  "updatedAt": "2026-06-15T07:17:42.808Z",
+  "description": "Add an internal @specd/code-graph-electron workspace that keeps studio-desktop on the shared code-graph behavior while isolating Electron’s native SQLite runtime path from the standard CLI/API Node path. The change vendors and rebuilds better-sqlite3 specifically for Electron, rewires desktop local graph composition to consume the new package, and ensures desktop builds prepare the Electron-targeted sqlite runtime automatically.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph-electron:composition"
+  ],
+  "specDependsOn": {
+    "code-graph-electron:composition": [
+      "code-graph:composition",
+      "code-graph:sqlite-graph-store",
+      "default:_global/architecture"
+    ]
+  },
+  "invalidationPolicy": "none",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/conventions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/error-handling-conventions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/eslint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/logging/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/spec-layout/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/testing/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/preload/bridge.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/renderer/main.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/renderer/specd-window.d.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-web/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-web/playwright.config.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-web/tests/e2e/studio.ui.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/dto/artifact-content.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-archived-changes.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-changes-mutate.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-changes-read.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-specs-read.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/openapi-schemas.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/presenters/presenter-artifact.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/change/ChangeTabPanels.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/change/EditChangeDialog.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/components/RemoteMultiCombobox.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/CommandPalette.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/GraphMainView.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/StudioTopBar.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "REMAINING_WORK.md",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/connection-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/renderer/desktop-local-data-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/desktop-local-data-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/tsup.main.config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/tsup.preload.config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/check-studio-e2e-ready.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/run-studio-ui-e2e.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/test/presenter-artifact.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/lib/artifact-filename.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/test/artifact-filename.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/specs/code-graph-electron/composition/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/specs/code-graph-electron/composition/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph-electron/.gitkeep",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/electron-graph-smoke.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/test/composition/code-graph-electron.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/client/connection-profiles.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/studio/packages.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/desktop-graph-runtime.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/ipc-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/rebuild-electron.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/tsconfig.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/tsup.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store-migration.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/sync-vendored-sqlite.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/src/runtime/vendored-better-sqlite3.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/test/runtime/vendored-sqlite.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/LICENSE",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/binding.gyp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/better_sqlite3.node",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/common.gypi",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/copy.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/defines.gypi",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/download.sh",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/patches/1208.patch",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/sqlite3.gyp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/sqlite3/sqlite3.c",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/sqlite3/sqlite3.h",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/sqlite3/sqlite3ext.h",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/deps/test_extension.c",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/database.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/index.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/aggregate.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/backup.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/function.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/inspect.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/pragma.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/serialize.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/table.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/transaction.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/methods/wrappers.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/sqlite-error.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/lib/util.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/addon.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/better_sqlite3.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/backup.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/backup.hpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/database.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/database.hpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/statement-iterator.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/statement-iterator.hpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/statement.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/objects/statement.hpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/bind-map.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/binder.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/constants.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/custom-aggregate.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/custom-function.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/custom-table.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/data-converter.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/data.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/helpers.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/macros.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/query-macros.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/src/util/row-builder.cpp",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/sqlite-graph-store/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "eslint.config.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/rebuild-vendored-sqlite-electron.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/.electron-build.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/studio-desktop/ipc-handler-registry/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/studio-desktop/ipc-handler-registry/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/studio-desktop/main-kernel-lifecycle/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260525-072534-specd-studio/specs/studio-desktop/main-kernel-lifecycle/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260614-111007-code-graph-electron/reports/20260615-084037/specs-compliance-change-code-graph-electron-20260615-084037.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/test/composition/code-graph-electron.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/scripts/sync-vendored-sqlite.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/tsup.config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/test/runtime/vendored-sqlite.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/src/runtime/vendored-better-sqlite3.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/README.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/scripts/rebuild-vendored-sqlite-electron.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/tsconfig.json",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:52d4ddd0aa2cf459b822de6215b3279f1074460bdc728d9be7c2034bfcdab7c8"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": [
+        "proposal"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph-electron:composition",
+          "filename": "specs/code-graph-electron/composition/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:b2721587f91d26e466348d30cd8db0e25d78c9d39d67e227bc4556fc105102a0"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": [
+        "specs"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph-electron:composition",
+          "filename": "specs/code-graph-electron/composition/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:b611e408a22d5de8a9f54733bc7b0ce8d24f4eb4c8b7fac150e45ed367703c2d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": [
+        "proposal",
+        "specs",
+        "verify"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:8bc02ef0b2d4d6510d64bdcdacdea567779e57acf82be8acab46ed6e826c2634"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": [
+        "specs",
+        "design"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:457ecdb92c1f2c200172928370d4bc19de237cffee3fd5d222cb7a20bb1352f8"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-14T11:10:07.850Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "default:_global/architecture"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-14T11:10:07.863Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [
+        "proposal",
+        "specs",
+        "verify",
+        "design",
+        "tasks"
+      ],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T11:12:20.900Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": [
+            "proposal"
+          ]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "default:_global/architecture"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/architecture"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T11:12:20.900Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-14T11:12:20.901Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph-electron:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph-electron:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T11:12:37.037Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": [
+            "proposal"
+          ]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "default:_global/architecture",
+            "code-graph-electron:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/architecture",
+            "code-graph-electron:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-14T11:12:37.038Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/architecture"
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T11:13:38.420Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T12:44:23.015Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": [
+            "proposal"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T13:24:57.330Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T13:26:03.718Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T13:47:12.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": [
+            "proposal"
+          ]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph-electron:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph-electron:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T13:47:12.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T13:50:24.889Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T13:53:05.811Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T13:56:08.752Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T13:58:06.862Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T14:27:13.323Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T14:29:31.402Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T06:35:00.982Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T06:46:41.072Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T06:47:26.661Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-06-15T07:10:26.113Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Add an internal @specd/code-graph-electron workspace that keeps studio-desktop on the shared code-graph behavior while isolating Electron’s native SQLite runtime path from the standard CLI/API Node path. The change vendors and rebuilds better-sqlite3 specifically for Electron, rewires desktop local graph composition to consume the new package, and ensures desktop builds prepare the Electron-targeted sqlite runtime automatically."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-15T07:14:40.539Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph-electron:composition\" points outside workspace \"code-graph-electron\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-15T07:15:57.395Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph-electron:composition\" points outside workspace \"code-graph-electron\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T07:17:42.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-15T07:17:42.813Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

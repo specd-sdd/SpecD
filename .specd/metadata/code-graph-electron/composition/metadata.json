@@ -1,0 +1,213 @@
+{
+  "title": "Composition",
+  "description": "`studio-desktop` needs local code-graph access without sharing the same native SQLite runtime path used by CLI and API. This spec defines the Electron-specific composition contract for `@specd/code-graph-electron`: what surface it must provide, how it relates to `@specd/code-graph`, and what boundaries it must preserve for desktop-only usage.",
+  "dependsOn": [
+    "code-graph:composition",
+    "code-graph:sqlite-graph-store",
+    "default:_global/architecture"
+  ],
+  "context": [
+    "`studio-desktop` needs local code-graph access without sharing the same native SQLite runtime path used by CLI and API. This spec defines the Electron-specific composition contract for `@specd/code-graph-electron`: what surface it must provide, how it relates to `@specd/code-graph`, and what boundaries it must preserve for desktop-only usage."
+  ],
+  "rules": [
+    {
+      "requirement": "Electron-specific graph package",
+      "rules": [
+        "The system SHALL provide a dedicated workspace package named `@specd/code-graph-electron` for Electron desktop usage.\n\nThis package MUST exist as a separate workspace from `@specd/code-graph`, and `studio-desktop` MUST consume it for local graph operations instead of importing the standard `@specd/code-graph` build output directly.\n\nCLI and API consumers MUST remain on `@specd/code-graph` unless they explicitly opt into a different runtime-specific package."
+      ]
+    },
+    {
+      "requirement": "Shared provider contract",
+      "rules": [
+        "`@specd/code-graph-electron` SHALL expose the same top-level provider contract expected by desktop graph consumers.\n\nAt minimum, the package MUST provide:\n\n- a `createCodeGraphProvider(...)` factory compatible with desktop local composition\n- the provider and option types required by desktop graph wiring\n- the graph constants and types that desktop imports from the current code-graph composition surface\n\nDesktop local graph callers MUST NOT need a desktop-only API fork to use the package."
+      ]
+    },
+    {
+      "requirement": "Isolated native runtime path",
+      "rules": [
+        "`@specd/code-graph-electron` SHALL isolate the native SQLite runtime path used by Electron from the runtime path used by `@specd/code-graph` in CLI and API.\n\nThe desktop package MUST ensure that when Electron loads the local graph provider, the effective native-module resolution path for SQLite-backed graph storage is owned by the Electron-specific package rather than by the standard `@specd/code-graph` package.\n\nThis isolation MUST allow desktop packaging and rebuild workflows to target Electron's supported runtime line without changing the native runtime expectations of CLI or API."
+      ]
+    },
+    {
+      "requirement": "Shared source model without behavioural fork",
+      "rules": [
+        "`@specd/code-graph-electron` SHALL reuse the shared code-graph source model instead of introducing an independent behavioural fork.\n\nThe package MUST preserve the same graph semantics as `@specd/code-graph` for:\n\n- backend selection and provider lifecycle\n- graph indexing and search behaviour\n- graph traversal, impact, hotspots, and stats operations\n- SQLite-backed graph-store behaviour as observed by desktop consumers\n\nDesktop-specific composition MAY differ in packaging, dependency resolution, or runtime-targeted native rebuilds, but it MUST NOT intentionally diverge from the functional graph behaviour defined by the shared code-graph specs."
+      ]
+    },
+    {
+      "requirement": "Internal-only distribution role",
+      "rules": [
+        "`@specd/code-graph-electron` SHALL be treated as an internal workspace package for desktop application packaging.\n\nThe package MUST NOT be designed as a separately published public npm package by default. Its primary distribution role is to support the packaged `studio-desktop` application and desktop development workflows inside the monorepo."
+      ]
+    },
+    {
+      "requirement": "Desktop runtime compatibility track",
+      "rules": [
+        "The desktop graph composition SHALL support alignment with a newer supported Electron runtime line when required for native module compatibility.\n\nIf `studio-desktop` upgrades its Electron major line as part of adopting `@specd/code-graph-electron`, the package contract MUST continue to keep that compatibility decision scoped to desktop runtime packaging and MUST NOT impose the same runtime target on CLI or API."
+      ]
+    }
+  ],
+  "constraints": [
+    "@specd/code-graph-electron is a desktop-facing composition package, not a second public graph product",
+    "The package must preserve the shared graph API shape used by desktop consumers",
+    "Native-runtime isolation is mandatory; cosmetic package renaming without effective runtime-path separation does not satisfy this spec",
+    "Behavioural drift from @specd/code-graph is not allowed unless a future spec explicitly permits it"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Electron-specific graph package",
+      "name": "Desktop local graph imports the Electron package",
+      "given": [
+        "studio-desktop provides local graph operations from Electron main"
+      ],
+      "when": [
+        "the desktop graph composition is inspected"
+      ],
+      "then": [
+        "local graph wiring resolves through @specd/code-graph-electron",
+        "AND it does not import the standard @specd/code-graph build output directly for desktop local graph operations"
+      ]
+    },
+    {
+      "requirement": "Electron-specific graph package",
+      "name": "CLI and API remain on the standard package",
+      "when": [
+        "CLI and API graph consumers are inspected"
+      ],
+      "then": [
+        "they continue to resolve graph composition through @specd/code-graph",
+        "AND they do not require the Electron-specific package to run"
+      ]
+    },
+    {
+      "requirement": "Shared provider contract",
+      "name": "Desktop local graph wiring uses the same provider shape",
+      "given": [
+        "desktop local graph callers already expect createCodeGraphProvider(...) and the shared graph types"
+      ],
+      "when": [
+        "studio-desktop is switched to @specd/code-graph-electron"
+      ],
+      "then": [
+        "desktop graph wiring still compiles against the expected provider contract",
+        "AND no desktop-only graph API fork is required"
+      ]
+    },
+    {
+      "requirement": "Isolated native runtime path",
+      "name": "Electron resolves its own native SQLite path",
+      "given": [
+        "Electron main opens the desktop-local graph provider"
+      ],
+      "when": [
+        "the provider initializes SQLite-backed graph storage"
+      ],
+      "then": [
+        "the effective native module path used for SQLite belongs to @specd/code-graph-electron",
+        "AND it is not satisfied by the standard @specd/code-graph native runtime path"
+      ]
+    },
+    {
+      "requirement": "Isolated native runtime path",
+      "name": "Desktop compatibility changes do not retarget CLI or API",
+      "given": [
+        "the Electron package requires a runtime-specific native rebuild or compatibility adjustment"
+      ],
+      "when": [
+        "desktop packaging or development rebuilds the graph package for Electron"
+      ],
+      "then": [
+        "CLI and API continue using their existing standard-package runtime path",
+        "AND they are not forced onto the Electron-targeted native build"
+      ]
+    },
+    {
+      "requirement": "Shared source model without behavioural fork",
+      "name": "Desktop and standard packages expose the same graph behaviour",
+      "given": [
+        "equivalent graph operations are invoked through @specd/code-graph and @specd/code-graph-electron"
+      ],
+      "when": [
+        "both packages run against the same compatible graph inputs"
+      ],
+      "then": [
+        "indexing, search, traversal, impact, hotspots, and stats follow the same observable graph semantics",
+        "AND any differences are limited to packaging or runtime-specific native resolution"
+      ]
+    },
+    {
+      "requirement": "Internal-only distribution role",
+      "name": "Electron package remains an internal workspace package",
+      "when": [
+        "the Electron package metadata and distribution role are reviewed"
+      ],
+      "then": [
+        "it is marked for internal workspace usage rather than public standalone npm publication",
+        "AND its primary consumer is the packaged or locally developed studio-desktop application"
+      ]
+    },
+    {
+      "requirement": "Desktop runtime compatibility track",
+      "name": "Desktop may upgrade Electron without retargeting Node consumers",
+      "given": [
+        "studio-desktop moves from Electron 36.x to a newer supported Electron line"
+      ],
+      "when": [
+        "the Electron-specific graph package is rebuilt or repackaged for that line"
+      ],
+      "then": [
+        "the compatibility adjustment remains scoped to desktop runtime packaging",
+        "AND CLI and API do not inherit the same Electron runtime target"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:test/composition/code-graph-electron.spec.ts"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:package.json"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:scripts/sync-vendored-sqlite.mjs"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:tsup.config.ts"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:src/index.ts"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:test/runtime/vendored-sqlite.spec.ts"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:src/runtime/vendored-better-sqlite3.ts"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:README.md"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:scripts/rebuild-vendored-sqlite-electron.mjs"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:tsconfig.json"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:b2721587f91d26e466348d30cd8db0e25d78c9d39d67e227bc4556fc105102a0",
+    "verify.md": "sha256:b611e408a22d5de8a9f54733bc7b0ce8d24f4eb4c8b7fac150e45ed367703c2d"
+  },
+  "generatedBy": "core"
+}

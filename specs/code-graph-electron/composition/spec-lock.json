@@ -1,0 +1,43 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:composition",
+    "code-graph:sqlite-graph-store",
+    "default:_global/architecture"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph-electron:test/composition/code-graph-electron.spec.ts"
+    },
+    {
+      "file": "code-graph-electron:package.json"
+    },
+    {
+      "file": "code-graph-electron:scripts/sync-vendored-sqlite.mjs"
+    },
+    {
+      "file": "code-graph-electron:tsup.config.ts"
+    },
+    {
+      "file": "code-graph-electron:src/index.ts"
+    },
+    {
+      "file": "code-graph-electron:test/runtime/vendored-sqlite.spec.ts"
+    },
+    {
+      "file": "code-graph-electron:src/runtime/vendored-better-sqlite3.ts"
+    },
+    {
+      "file": "code-graph-electron:README.md"
+    },
+    {
+      "file": "code-graph-electron:scripts/rebuild-vendored-sqlite-electron.mjs"
+    },
+    {
+      "file": "code-graph-electron:tsconfig.json"
+    }
+  ]
+}
