@@ -44,3 +44,23 @@
 - **WHEN** switch to B starts
 - **THEN** A requests rejected or aborted
 - **AND** B calls do not read A paths
+
+### Requirement: desktop startup prepares the Electron SQLite graph runtime
+
+#### Scenario: Desktop package exposes Electron graph rebuild wiring
+
+- **WHEN** the desktop package scripts are inspected
+- **THEN** `rebuild:graph-sqlite-electron` rebuilds the vendored Electron SQLite addon
+- **AND** `rebuild:graph-electron` aliases that rebuild
+- **AND** `prestart` executes the Electron SQLite rebuild before app startup
+
+#### Scenario: Desktop local host depends on the Electron graph package
+
+- **WHEN** the desktop package dependencies are inspected
+- **THEN** `@specd/code-graph-electron` is present for desktop-local graph execution
+
+#### Scenario: CLI and API keep the standard graph package
+
+- **WHEN** CLI and API package dependencies are inspected
+- **THEN** they depend on `@specd/code-graph`
+- **AND** they do not depend on `@specd/code-graph-electron`

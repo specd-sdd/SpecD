@@ -41,3 +41,17 @@
 - **WHEN** kernel throws `SpecdError`
 - **THEN** failure envelope returned to renderer
 - **AND** stack not leaked raw
+
+### Requirement: graph IPC methods use the Electron graph runtime
+
+#### Scenario: Local graph IPC uses the Electron graph provider package
+
+- **WHEN** the desktop main process serves graph status, search, impact, hotspot, or index IPC requests
+- **THEN** it creates the provider through `@specd/code-graph-electron`
+- **AND** graph execution stays inside the Electron local host runtime
+
+#### Scenario: Renderer graph calls stay on the shared data port
+
+- **WHEN** the renderer requests graph data in desktop-local mode
+- **THEN** it invokes the shared `SpecdDataPort` methods through IPC
+- **AND** the renderer does not import graph runtime packages directly

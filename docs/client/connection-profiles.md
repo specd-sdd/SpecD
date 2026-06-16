@@ -42,6 +42,8 @@ Used when the SPA and API share one origin (bundle plugin via `specd ui serve` +
 
 Reserved for `apps/specd-studio-desktop` where the main process runs kernel use cases and the renderer speaks IPC (`createIpcRequest` / `createIpcSuccess` in `ipc/envelope.ts`).
 
+For graph features, the desktop main process composes against `@specd/code-graph-electron`, an internal-only workspace package that keeps Electron's native sqlite rebuild flow separate from the standard `@specd/code-graph` package used by CLI and API.
+
 ## Connect panel
 
 When no profile is injected, `@specd/ui` shows `ConnectPanel` to collect `apiBaseUrl` and optional token, then probes with `testRemoteConnection`.

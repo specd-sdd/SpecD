@@ -62,3 +62,7 @@ export {
   isDraftAwareIpcMethod,
   type DraftAwareIpcMethod,
 } from './ipc/draft-port-methods.js'
+
+export type { IUserStorage } from './storage/user-storage-port.js'
+export { LocalStorageUserStorage } from './storage/local-storage-user-storage.js'
+export { FileUserStorage } from './storage/file-user-storage.js'

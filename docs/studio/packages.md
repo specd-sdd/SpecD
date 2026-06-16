@@ -85,6 +85,10 @@ To rebuild only the loader after sync: `pnpm --filter @specd/plugin-ui-studio bu
 
 Electron application: main process can host core locally; renderer reuses `@specd/ui` with an IPC-backed data adapter (see design doc for desktop auth and process model).
 
+- Local graph operations import `@specd/code-graph-electron`, not `@specd/code-graph`.
+- `@specd/code-graph-electron` is an internal workspace package used only to isolate the Electron-native `better-sqlite3` runtime path from the Node runtime used by CLI and API.
+- Rebuild the Electron-targeted sqlite addon with `pnpm --filter @specd/studio-desktop rebuild:graph-electron`.
+
 ## `@specd/cli` commands
 
 | Command                   | Purpose                                  |

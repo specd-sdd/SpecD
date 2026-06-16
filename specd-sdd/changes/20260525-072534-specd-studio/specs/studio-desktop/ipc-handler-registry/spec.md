@@ -16,6 +16,16 @@ v1 local desktop MUST implement draft-aware port methods `previewChangeDraft`, `
 
 Request/response serialization MUST follow `client:ipc-message-envelope`.
 
+### Requirement: graph IPC methods use the Electron graph runtime
+
+Desktop-local graph IPC methods MUST create and use their graph provider from
+`@specd/code-graph-electron`.
+
+The Electron main process MUST keep graph execution inside the desktop-local host
+runtime, including the SQLite-backed local graph operations exposed through IPC.
+Renderer code MUST continue to call the shared `SpecdDataPort` surface and MUST
+NOT import graph runtime packages directly.
+
 ## Spec Dependencies
 
 _none_

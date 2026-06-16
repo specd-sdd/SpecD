@@ -12,6 +12,23 @@
 
 This `design.md` is an **implementer's map**: where code lives, how layers connect, which spec IDs cover which slice, and which core use cases handlers must call. It does **not** restate requirements (see specs).
 
+## Implementation snapshot
+
+The codebase has already moved beyond the original greenfield plan in a few areas. Treat these as current implementation facts for follow-up work in this change:
+
+- Desktop local mode now boots through dedicated `tsup` main/preload builds, with the preload bridge decoupled from runtime ESM imports so Electron can render the shell instead of stalling on startup.
+- Desktop renderer bootstrap now keeps React hooks in a stable order while IPC readiness changes, avoiding the blank-window failure mode that previously appeared during initial startup.
+- Desktop local IPC already covers project, change, archived change, workspace/spec, and graph methods used by the current UI, via `studio-desktop:ipc-handler-registry` and `studio-desktop:desktop-local-data-adapter`.
+- Desktop-local graph execution now uses `@specd/code-graph-electron` from `apps/specd-studio-desktop/src/main/ipc-handlers.ts`, with package-level rebuild wiring for the vendored Electron SQLite addon before startup.
+- Desktop build/start now rebuilds `@specd/ui` before bundling `@specd/studio-desktop`, so the Electron host consumes current `ui/dist` output instead of stale published artifacts.
+- `@specd/ui` and `studio-web` already include automated UI verification for command palette categories, remote spec/dependency search in the create-change dialog, and opening the edit-change dialog.
+- The Studio welcome surface now follows the shared dark IDE tokens, uses English copy, and keeps both recents and connection setup within the viewport instead of spilling past the desktop host bounds.
+- Desktop session selection now reuses the shared `@specd/ui` project-entry component as a modal overlay above the Studio shell, with a compact chooser first, a second remote-connect dialog for endpoint details, and deferred session replacement so the current project remains visible until the new one is confirmed.
+- Artifact DTO plumbing now normalizes `filename` across HTTP and desktop-local reads/saves so inspector surfaces such as the Tasks tab can render safely in every host mode.
+- Core repository coverage already includes `updatedAt` persistence and drift-reconciliation scenarios for `core:save-change-artifact` and related repository behavior.
+
+Current remaining work is therefore concentrated on graph/index behavior and residual UI navigation defects rather than on initial package scaffolding or the desktop-local SQLite runtime split.
+
 ---
 
 ## Non-goals
@@ -29,20 +46,20 @@ From proposal and cross-cutting specs (v1):
 
 ---
 
-## Spec catalog (188 spec IDs)
+## Spec catalog (190 spec IDs)
 
 Implement and test against these IDs. Counts match proposal §Spec count summary.
 
-| Workspace        |                     Count | Role                                                                                                |
-| ---------------- | ------------------------: | --------------------------------------------------------------------------------------------------- |
-| `api`            |                        54 | HTTP delivery: domain, ports, adapters, middleware, composition, routes, handlers, presenters, DTOs |
-| `client`         |                        30 | `SpecdDataPort`, `port-*`, transports, adapters, mirrored `dto-*`                                   |
-| `ui`             |                        35 | Design system, shell, hooks, sidebars, change/spec tabs, inspector, editor, bottom panel            |
-| `studio-web`     |                         2 | Vite host + remote-only bootstrap                                                                   |
-| `studio-desktop` |                         9 | Electron main, IPC, local/remote profiles, terminal                                                 |
-| `cli`            |                         2 | `specd serve`, `specd ui serve`                                                                     |
-| `core`           | 2 new + 4 modified deltas | `updatedAt`, artifact load/save, drift hook, `api.auth` in config                                   |
-| `default`        |          1 modified delta | Studio package graph in architecture                                                                |
+| Workspace        |                     Count | Role                                                                                                         |
+| ---------------- | ------------------------: | ------------------------------------------------------------------------------------------------------------ |
+| `api`            |                        54 | HTTP delivery: domain, ports, adapters, middleware, composition, routes, handlers, presenters, DTOs          |
+| `client`         |                        31 | `SpecdDataPort`, `port-*`, transports, adapters, mirrored `dto-*`, **`IUserStorage` port**                   |
+| `ui`             |                        36 | Design system, shell, hooks, sidebars, change/spec tabs, inspector, editor, bottom panel, **welcome screen** |
+| `studio-web`     |                         2 | Vite host + remote-only bootstrap                                                                            |
+| `studio-desktop` |                         9 | Electron main, IPC, local/remote profiles, terminal                                                          |
+| `cli`            |                         2 | `specd serve`, `specd ui serve`                                                                              |
+| `core`           | 2 new + 4 modified deltas | `updatedAt`, artifact load/save, drift hook, `api.auth` in config                                            |
+| `default`        |          1 modified delta | Studio package graph in architecture                                                                         |
 
 ### Modified / new core & global (deltas)
 
@@ -79,41 +96,43 @@ Implement and test against these IDs. Counts match proposal §Spec count summary
 
 ### Client — port groups → HTTP or IPC
 
-| Port spec                            | Maps to routes / IPC                       | Notes                                         |
-| ------------------------------------ | ------------------------------------------ | --------------------------------------------- |
-| `client:specd-data-port`             | Composes all `client:port-*`               | UI imports only this aggregate                |
-| `client:port-project`                | `api:routes-project`                       | Global poll                                   |
-| `client:port-changes-collection`     | `api:routes-changes-collection`            | Sidebar lists                                 |
-| `client:port-changes-read`           | `api:routes-changes-read`                  | **`ifModifiedSince`** on status               |
-| `client:port-changes-mutate`         | `api:routes-changes-mutate`                | PUT artifact, validate, transition            |
-| `client:port-archived-changes`       | `api:routes-archived-changes`              |                                               |
-| `client:port-workspaces-specs`       | `api:routes-workspaces`, specs read/mutate |                                               |
-| `client:port-graph`                  | `api:routes-graph`                         |                                               |
-| `client:port-http-transport`         | Low-level fetch                            | `/v1` prefix, Accept JSON, AbortSignal        |
-| `client:adapter-remote-specd-data`   | Full HTTP stack                            | Remote + embedded same-origin                 |
-| `client:adapter-memory-specd-data`   | Tests / Storybook                          |                                               |
-| `client:adapter-bearer-auth`         | Header injection only                      | Remote profile; **not** local IPC / embedded  |
-| `client:adapter-problem-json-errors` | Problem body → `SpecdClientError`          |                                               |
-| `client:ipc-message-envelope`        | Desktop IPC shape                          | Used by `studio-desktop:ipc-handler-registry` |
+| Port spec                            | Maps to routes / IPC                       | Notes                                                                                                                                                                             |
+| ------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client:specd-data-port`             | Composes all `client:port-*`               | UI imports only this aggregate                                                                                                                                                    |
+| `client:port-project`                | `api:routes-project`                       | Global poll                                                                                                                                                                       |
+| `client:port-changes-collection`     | `api:routes-changes-collection`            | Sidebar lists                                                                                                                                                                     |
+| `client:port-changes-read`           | `api:routes-changes-read`                  | **`ifModifiedSince`** on status                                                                                                                                                   |
+| `client:port-changes-mutate`         | `api:routes-changes-mutate`                | PUT artifact, validate, transition                                                                                                                                                |
+| `client:port-archived-changes`       | `api:routes-archived-changes`              |                                                                                                                                                                                   |
+| `client:port-workspaces-specs`       | `api:routes-workspaces`, specs read/mutate |                                                                                                                                                                                   |
+| `client:port-graph`                  | `api:routes-graph`                         |                                                                                                                                                                                   |
+| `client:port-http-transport`         | Low-level fetch                            | `/v1` prefix, Accept JSON, AbortSignal                                                                                                                                            |
+| `client:adapter-remote-specd-data`   | Full HTTP stack                            | Remote + embedded same-origin                                                                                                                                                     |
+| `client:adapter-memory-specd-data`   | Tests / Storybook                          |                                                                                                                                                                                   |
+| `client:adapter-bearer-auth`         | Header injection only                      | Remote profile; **not** local IPC / embedded                                                                                                                                      |
+| `client:adapter-problem-json-errors` | Problem body → `SpecdClientError`          |                                                                                                                                                                                   |
+| `client:ipc-message-envelope`        | Desktop IPC shape                          | Used by `studio-desktop:ipc-handler-registry`                                                                                                                                     |
+| `client:user-storage-port`           | `IUserStorage` port + two adapters         | Platform-agnostic KV persistence: `localStorage` (web/embedded) and Electron `userData` JSON (desktop). Used by `ui:welcome-screen` and `ui:connect-panel` for profile + recents. |
 
 Each `client:dto-*` mirrors `api:dto-*` (16 specs).
 
 ### UI — structure driven by spec IDs
 
-| Area                            | Spec IDs                                                                                                                                                                                          |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| Visual foundation               | `ui:design-system` — dark IDE tokens, density, anti-SaaS rules (see spec for full palette)                                                                                                        |
-| Shell / chrome                  | `ui:shell-layout`, `ui:command-palette`, `ui:connect-panel`                                                                                                                                       |
-| Global poll hooks               | `ui:hooks-project`, `ui:hooks-changes-collection`, `ui:hooks-workspaces-specs`, `ui:hooks-graph`                                                                                                  |
-| Sidebars                        | `ui:sidebar-changes-in-progress`, `ui:sidebar-changes-drafts`, `ui:sidebar-changes-archive`, `ui:sidebar-changes-discarded`, `ui:sidebar-workspaces-tree`, `ui:sidebar-graph-entry`               |
-| Change tabs                     | `ui:change-tab-overview`, `ui:change-tab-artifacts`, `ui:change-tab-validation`, `ui:change-tab-tasks`, `ui:change-tab-events`, `ui:change-tab-context`, `ui:change-tab-impact`                   |
-| Change metadata (Overview)      | `ui:change-metadata-editor`, `ui:change-description-editor`, `ui:change-invalidation-policy-editor`, `ui:change-specs-readonly-panel`, `ui:change-scope-dialog`, `ui:scope-change-confirm-dialog` |
-| Spec tabs                       | `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-outline`, `ui:spec-tab-graph`, `ui:spec-tab-context`                            |
-| Inspector / editor              | `ui:artifact-editor`, `ui:hooks-inspector-save`, `ui:inspector-*` (metadata, delta, preview, canonical readonly)                                                                                  |
-| Bottom (Output, Problems, Logs) | `ui:bottom-panel-output`, `ui:bottom-panel-problems`, `ui:bottom-panel-logs`                                                                                                                      |
-| Per-tab read hook               | `ui:hooks-changes-read`                                                                                                                                                                           | Tab-visible poll + `ifModifiedSince` |
-| Mutate hook                     | `ui:hooks-changes-mutate`                                                                                                                                                                         | Surfaces 409 to inspector            |
-| Stability & Render loops        | `ui:hooks-changes-read`, `ui:change-tab-*`                                                                                                                                                        | Result stability & memoization       |
+| Area                            | Spec IDs                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Visual foundation               | `ui:design-system` — dark IDE tokens, density, anti-SaaS rules (see spec for full palette)                                                                                                                                                                                                                                                                                                                            |
+| Shell / chrome                  | `ui:shell-layout`, `ui:command-palette`, `ui:connect-panel`                                                                                                                                                                                                                                                                                                                                                           |
+| **Welcome screen**              | `ui:welcome-screen` — rendered by `SpecdApp` when no active connection and reused by the desktop host as the modal `Open SpecD Project` chooser above the shell, with separate local/remote entry buttons, scrollable recents, and a second `ConnectPanel` dialog for remote details; styled with Studio design tokens, English product copy, and viewport-safe shell proportions so it feels continuous with the IDE |
+| Global poll hooks               | `ui:hooks-project`, `ui:hooks-changes-collection`, `ui:hooks-workspaces-specs`, `ui:hooks-graph`                                                                                                                                                                                                                                                                                                                      |
+| Sidebars                        | `ui:sidebar-changes-in-progress`, `ui:sidebar-changes-drafts`, `ui:sidebar-changes-archive`, `ui:sidebar-changes-discarded`, `ui:sidebar-workspaces-tree`, `ui:sidebar-graph-entry`                                                                                                                                                                                                                                   |
+| Change tabs                     | `ui:change-tab-overview`, `ui:change-tab-artifacts`, `ui:change-tab-validation`, `ui:change-tab-tasks`, `ui:change-tab-events`, `ui:change-tab-context`, `ui:change-tab-impact`                                                                                                                                                                                                                                       |
+| Change metadata (Overview)      | `ui:change-metadata-editor`, `ui:change-description-editor`, `ui:change-invalidation-policy-editor`, `ui:change-specs-readonly-panel`, `ui:change-scope-dialog`, `ui:scope-change-confirm-dialog`                                                                                                                                                                                                                     |
+| Spec tabs                       | `ui:spec-tab-overview`, `ui:spec-tab-artifacts`, `ui:spec-tab-metadata`, `ui:spec-tab-dependencies`, `ui:spec-tab-outline`, `ui:spec-tab-graph`, `ui:spec-tab-context`                                                                                                                                                                                                                                                |
+| Inspector / editor              | `ui:artifact-editor`, `ui:hooks-inspector-save`, `ui:inspector-*` (metadata, delta, preview, canonical readonly)                                                                                                                                                                                                                                                                                                      |
+| Bottom (Output, Problems, Logs) | `ui:bottom-panel-output`, `ui:bottom-panel-problems`, `ui:bottom-panel-logs`                                                                                                                                                                                                                                                                                                                                          |
+| Per-tab read hook               | `ui:hooks-changes-read`                                                                                                                                                                                                                                                                                                                                                                                               | Tab-visible poll + `ifModifiedSince` |
+| Mutate hook                     | `ui:hooks-changes-mutate`                                                                                                                                                                                                                                                                                                                                                                                             | Surfaces 409 to inspector            |
+| Stability & Render loops        | `ui:hooks-changes-read`, `ui:change-tab-*`                                                                                                                                                                                                                                                                                                                                                                            | Result stability & memoization       |
 
 **Boundary:** every `ui:*` view spec includes “uses `SpecdDataPort` hooks only” / loading+error — no `@specd/core` import (`ui:shell-layout`, architecture delta).
 
@@ -211,7 +230,11 @@ packages/client/src/
   dto/*.ts
   transport/http-transport.ts
   adapters/{remote,memory,bearer-auth,problem-json-errors}.ts
-  ipc/envelope.ts          # types shared with desktop
+  ipc/envelope.ts                      # types shared with desktop
+  storage/
+    user-storage-port.ts               # IUserStorage interface (client:user-storage-port)
+    local-storage-user-storage.ts      # browser localStorage adapter (web/embedded)
+    file-user-storage.ts               # Electron userData JSON adapter (desktop)
   index.ts
 ```
 
@@ -225,7 +248,8 @@ packages/ui/src/
   theme/                 # token map / tailwind.config extension
   SpecdApp.tsx
   shell/                 # react-resizable-panels (via shadcn Resizable); status bar (ui:shell-layout)
-  connect-panel/
+  welcome/               # WelcomeScreen component (ui:welcome-screen) — shown pre-connect
+  connect-panel/         # ConnectPanel reused by WelcomeScreen and standalone hosts (ui:connect-panel)
   hooks/
   sidebars/              # Studio tree wrappers / sidebar chrome
   change-tabs/
@@ -252,18 +276,20 @@ Depends: `@specd/ui`, `@specd/client` (remote adapter). **No** `@specd/core` in 
 ### Desktop (`apps/specd-studio-desktop`)
 
 ```text
-main/
-  connection/{open-local,open-remote,recent-connections-store}.ts
-  kernel/session-manager.ts
-  ipc/specd-data-handlers.ts   # satisfies port-* via kernel
-  window/
-preload/
-  bridge.ts                    # studio-desktop:ipc-preload-bridge
-renderer/
-  welcome / hosts SpecdApp     # studio-desktop:welcome-and-file-menu
+src/main/
+  connection-store.ts
+  index.ts
+  ipc-handlers.ts              # satisfies port-* and graph IPC via kernel / code-graph-electron
+src/preload/
+  index.ts                     # studio-desktop:ipc-preload-bridge
+src/renderer/
+  desktop-app.tsx
+  desktop-local-data-adapter.ts
+  desktop-remote-profile.ts
 ```
 
 Local profile: `studio-desktop:desktop-local-data-adapter` → IPC. Remote: `studio-desktop:desktop-remote-profile` → `client:adapter-remote-specd-data`.
+Local graph runtime: `src/main/ipc-handlers.ts` → `@specd/code-graph-electron`, with `package.json` scripts `rebuild:graph-sqlite-electron`, `rebuild:graph-electron`, `build:ui`, and `prestart` preparing both the vendored Electron SQLite addon and current `@specd/ui` dist output before startup.
 
 ---
 
@@ -320,12 +346,36 @@ Implement exactly `core:save-change-artifact` (proposal table). API: `api:routes
 
 ### Delivery modes
 
-| Mode           | Launcher spec                           | Data path                                                  |
-| -------------- | --------------------------------------- | ---------------------------------------------------------- |
-| Integrated     | `cli:serve-ui`                          | Same-origin `/v1`; `ui:connect-panel` skipped (`embedded`) |
-| Remote web     | `studio-web:remote-bootstrap`           | `adapter-remote-specd-data` + Connect                      |
-| Desktop local  | `studio-desktop:main-kernel-lifecycle`  | IPC → main kernel                                          |
-| Desktop remote | `studio-desktop:desktop-remote-profile` | Same as web                                                |
+| Mode           | Launcher spec                           | Data path                                                  | Storage Adapter             |
+| -------------- | --------------------------------------- | ---------------------------------------------------------- | --------------------------- |
+| Integrated     | `cli:serve-ui`                          | Same-origin `/v1`; `ui:connect-panel` skipped (`embedded`) | `LocalStorageUserStorage`   |
+| Remote web     | `studio-web:remote-bootstrap`           | `adapter-remote-specd-data` + Connect                      | `LocalStorageUserStorage`   |
+| Desktop local  | `studio-desktop:main-kernel-lifecycle`  | IPC → main kernel                                          | `FileUserStorage` (via IPC) |
+| Desktop remote | `studio-desktop:desktop-remote-profile` | Same as web                                                | `FileUserStorage` (via IPC) |
+
+---
+
+### Welcome screen and user storage
+
+We introduce a unified mechanism to store platform-agnostic client configurations, such as connection profiles and recently opened projects.
+
+- **`IUserStorage` Port**: Defined in `@specd/client` under `src/storage/user-storage-port.ts`. It enforces a platform-agnostic key-value interface:
+  ```typescript
+  export interface IUserStorage {
+    get<T>(key: string): T | null
+    set<T>(key: string, value: T): void
+    remove(key: string): void
+  }
+  ```
+- **Storage Adapters**:
+  - **`LocalStorageUserStorage`**: Persists in the browser's `localStorage`. Used for web/embedded deployments.
+  - **`FileUserStorage`**: Persists in a local JSON file under the Electron user data directory (`app.getPath('userData')`). Used for desktop deployments. On the renderer side, calls are bridged via IPC (using the `window.specd` preload bridge).
+- **Welcome Screen Component**: `@specd/ui` exports `WelcomeScreen` (under `src/welcome/`).
+  - Rendered by `SpecdApp` when there is no active connection profile, and reused directly by desktop as the shared modal project chooser.
+  - Desktop startup and the single `Open SpecD Project...` File menu entry now open the same chooser rather than maintaining desktop-specific alternate entry surfaces.
+  - Remote connection details are deferred into a dedicated `ConnectPanel` dialog so the initial chooser remains fixed-size across desktop viewports.
+  - Detects if running within Electron (via `window.specd` bridge). If present, desktop mode exposes local project selection plus bounded, scrollable recent files/connections.
+  - Uses `IUserStorage` to load and display recent connections/projects.
 
 ---
 
@@ -506,6 +556,14 @@ Every `verify.md` scenario should map to at least one test (per `default:_global
 4. Edit artifact → Save → 409 on stale hash → force or reload per UI.
 5. Desktop: open local folder → IPC list changes; connect remote → Bearer optional.
 
+### Implemented automated coverage snapshot
+
+- Core: repository/use-case coverage for `updatedAt`, save conflict handling, and drift reconciliation has been added alongside the desktop/API/client work.
+- Web host: Playwright coverage exists for command palette remote categories, create-change remote searches, and edit-change dialog opening, with dedicated helper scripts in `dev/scripts/`.
+- Desktop: runtime verification includes the live Electron smoke for preload/window startup and `apps/specd-studio-desktop/test/desktop-graph-runtime.spec.ts` for Electron graph runtime isolation.
+
+These checks do not replace the remaining graph/dashboard/task-tab fixes; they define the current regression baseline while that follow-up work is in progress.
+
 ---
 
 ## Trade-offs and risks
@@ -523,7 +581,7 @@ Every `verify.md` scenario should map to at least one test (per `default:_global
 ## Open questions
 
 - **`handler-graph` `POST /graph/index`:** sync response vs job id (v2).
-- **Token storage:** `recent-connections` vs `connect-panel` localStorage scope.
+- ~~**Token storage:** `recent-connections` vs `connect-panel` localStorage scope.~~ **Resolved:** Both connection profiles and recent connections are persisted using the platform-appropriate `IUserStorage` adapter, eliminating scope disparity between web and desktop modes.
 
 **Deferred (out of scope):** workspace spec **`updatedAt` / spec-lock** — not in this change; spec tabs poll metadata lightly in v1.
 

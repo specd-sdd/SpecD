@@ -1,17 +1,20 @@
 import {
   createRemoteSpecdDataAdapter,
   testRemoteConnection,
+  LocalStorageUserStorage,
+  FileUserStorage,
   type ProjectDto,
   type RemoteConnectionProfile,
   type SpecdDataPort,
+  type IUserStorage,
 } from '@specd/client'
 import * as React from 'react'
-import { ConnectPanel } from './connect/ConnectPanel.js'
 import { SpecdDataProvider } from './context/specd-data-context.js'
 import { useChangesCollection } from './hooks/use-changes-collection.js'
 import { useProjectPoll } from './hooks/use-project-poll.js'
 import { StudioErrorBoundary } from './components/StudioErrorBoundary.js'
 import { ShellLayout } from './shell/ShellLayout.js'
+import { WelcomeScreen } from './welcome/WelcomeScreen.js'
 
 export type SpecdAppMode = 'embedded' | 'standalone' | 'desktop'
 
@@ -22,6 +25,8 @@ export type SpecdAppProps = {
   /** Saved remote profile for standalone / desktop remote. */
   connectionProfile?: RemoteConnectionProfile
   className?: string
+  storage?: IUserStorage
+  onOpenLocalProject?: (path: string) => void
 }
 
 function StudioShell({ mode }: { mode: SpecdAppMode }): React.ReactElement {
@@ -60,9 +65,13 @@ function StudioShell({ mode }: { mode: SpecdAppMode }): React.ReactElement {
 
 function RemoteStudioGate({
   initialProfile,
+  storage,
+  onOpenLocalProject,
   children,
 }: {
   initialProfile?: RemoteConnectionProfile
+  storage: IUserStorage
+  onOpenLocalProject?: (path: string) => void
   children: (port: SpecdDataPort, project: ProjectDto) => React.ReactNode
 }): React.ReactElement {
   const [profile, setProfile] = React.useState<RemoteConnectionProfile | undefined>(
@@ -123,18 +132,16 @@ function RemoteStudioGate({
 
   if (!profile || !project || !port) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <ConnectPanel
-          defaultApiBaseUrl={initialProfile?.apiBaseUrl}
-          onConnected={(nextProfile, nextProject) => {
-            setProfile(nextProfile)
-            setProject(nextProject)
-          }}
-        />
-        {autoFailed ? (
-          <p className="sr-only">Auto-connect to same-origin API failed; use the form above.</p>
-        ) : null}
-      </div>
+      <WelcomeScreen
+        storage={storage}
+        defaultApiBaseUrl={initialProfile?.apiBaseUrl}
+        autoFailed={autoFailed}
+        onConnected={(nextProfile, nextProject) => {
+          setProfile(nextProfile)
+          setProject(nextProject)
+        }}
+        onOpenLocalProject={onOpenLocalProject}
+      />
     )
   }
 
@@ -146,18 +153,27 @@ export function SpecdApp({
   port: portProp,
   connectionProfile,
   className,
+  storage: storageProp,
+  onOpenLocalProject,
 }: SpecdAppProps): React.ReactElement {
   const skipConnect = mode === 'embedded' && portProp !== undefined
+
+  const storage = React.useMemo(() => {
+    if (storageProp) return storageProp
+    return typeof window !== 'undefined' && (window as any).specd
+      ? new FileUserStorage()
+      : new LocalStorageUserStorage()
+  }, [storageProp])
 
   if (skipConnect && portProp) {
     return (
       <div className={className ?? 'h-screen w-screen overflow-hidden'}>
-          <SpecdDataProvider port={portProp}>
-            <StudioErrorBoundary>
-              <StudioShell mode={mode} />
-            </StudioErrorBoundary>
-          </SpecdDataProvider>
-        </div>
+        <SpecdDataProvider port={portProp}>
+          <StudioErrorBoundary>
+            <StudioShell mode={mode} />
+          </StudioErrorBoundary>
+        </SpecdDataProvider>
+      </div>
     )
   }
 
@@ -171,7 +187,11 @@ export function SpecdApp({
 
   return (
     <div className={className ?? 'h-screen w-screen overflow-hidden'}>
-      <RemoteStudioGate initialProfile={connectionProfile}>
+      <RemoteStudioGate
+        initialProfile={connectionProfile}
+        storage={storage}
+        onOpenLocalProject={onOpenLocalProject}
+      >
         {(port) => (
           <SpecdDataProvider port={port}>
             <StudioErrorBoundary>
@@ -183,3 +203,4 @@ export function SpecdApp({
     </div>
   )
 }
+

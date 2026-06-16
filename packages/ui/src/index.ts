@@ -1,5 +1,12 @@
 export { SpecdApp, type SpecdAppMode, type SpecdAppProps } from './SpecdApp.js'
 export { ConnectPanel, type ConnectPanelProps } from './connect/ConnectPanel.js'
+export {
+  OpenProjectDialog,
+  WelcomeScreen,
+  type OpenProjectDialogProps,
+  type WelcomeScreenProps,
+  type RecentConnection,
+} from './welcome/WelcomeScreen.js'
 export { SpecdDataProvider, useSpecdDataPort } from './context/specd-data-context.js'
 export { useProjectPoll } from './hooks/use-project-poll.js'
 export { useChangesCollection } from './hooks/use-changes-collection.js'

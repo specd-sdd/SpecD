@@ -264,6 +264,11 @@ Read `client:specd-data-port` first, then ports, adapters, DTOs, transport.
       `packages/client/src/ipc/envelope.ts` (or shared types package path)
       (Req: `client:ipc-message-envelope`)
 
+- [x] 8.7 Implement IUserStorage port and adapters
+      `packages/client/src/storage/` — user-storage-port.ts, local-storage-user-storage.ts, file-user-storage.ts
+      Approach: implement client storage adapters; local storage uses window.localStorage; file storage uses window.specd.storage IPC bridge
+      (Req: `client:user-storage-port` — all requirements)
+
 ---
 
 ## 9. CLI serve commands
@@ -316,6 +321,16 @@ Read first: `ui:design-system` (full palette and IDE chrome rules). Then: `ui:sh
       Approach: actions call `SpecdDataPort` methods (validate, open change, etc.)
       (Req: `ui:command-palette`)
 
+- [x] 10.4.1 Fallback spec search when graph data is unavailable
+      `packages/ui/src/shell/CommandPalette.tsx`
+      Approach: keep graph-backed symbol/document search, but merge `searchSpecs` results so the palette still finds specs while the graph is empty, stale, or rebuilding.
+      (Req: `ui:command-palette`, `client:port-graph`, `client:port-workspaces-specs`)
+
+- [x] 10.5 Welcome Screen component
+      `packages/ui/src/welcome/` — WelcomeScreen.tsx, SpecdApp welcome gate
+      Approach: implement the shared `@specd/ui` project-entry component; render when activeProfile is null; reuse the same component from desktop as a modal chooser with separate local/remote buttons, push remote details into a second ConnectPanel dialog, keep recents scrollable within a fixed-height viewport-safe chooser, and align copy/design tokens/layout with the Studio shell
+      (Req: `ui:welcome-screen` — all requirements)
+
 ---
 
 ## 11. `@specd/ui` — sidebars
@@ -352,6 +367,11 @@ Read `ui:hooks-changes-read` plus **each** `ui:change-tab-*` and `ui:change-meta
       `packages/ui/src/hooks/use-change-artifact.ts`, `use-change-artifact-list.ts`, `ChangeTabPanels.tsx`
       Approach: Stabilize hook results and memoize component-derived array dependencies to prevent continuous effect re-triggering.
       (Req: `ui:hooks-changes-read`, `ui:change-tab-tasks`, `ui:change-tab-events`)
+
+- [x] 12.4 Harden Tasks tab artifact rendering
+      `packages/ui/src/change/ChangeTabPanels.tsx`, artifact DTO adapters/presenters
+      Approach: guarantee artifact reads include `filename` in local and HTTP paths, and guard markdown rendering so the Tasks tab cannot crash on incomplete payloads.
+      (Req: `ui:change-tab-tasks`, `client:dto-artifact-content`, `api:dto-artifact-content`, `studio-desktop:desktop-local-data-adapter`)
 
 ---
 
@@ -416,13 +436,13 @@ Read: `studio-web:vite-host`, `studio-web:remote-bootstrap`.
 Read **each** `studio-desktop:*` spec before implementing that slice.
 
 - [x] 16.1 Main kernel lifecycle and session manager
-      `apps/specd-studio-desktop/main/kernel/`
-      Approach: one kernel per local project; tear down on switch; validate `specd.yaml` on open
+      `apps/specd-studio-desktop/src/main/`
+      Approach: one kernel per local project; tear down on switch; validate `specd.yaml` on open; keep Electron-local graph runtime isolated from CLI/API package wiring
       (Req: `studio-desktop:main-kernel-lifecycle`)
 
 - [x] 16.2 Window manager + welcome / file menu
       `apps/specd-studio-desktop/main/window/`, renderer welcome
-      Approach: title reflects project or remote host; dirty editor close prompt
+      Approach: title reflects project or remote host; dirty editor close prompt; desktop welcome shell stays consistent with shared Studio UI language and token usage; File menu now exposes a single `Open SpecD Project...` entry that opens the shared UI chooser over the existing shell and only replaces the current session after the new one is confirmed
       (Req: `studio-desktop:main-window-manager`, `studio-desktop:welcome-and-file-menu`)
 
 - [x] 16.3 Recent connections store
@@ -430,13 +450,28 @@ Read **each** `studio-desktop:*` spec before implementing that slice.
       (Req: `studio-desktop:recent-connections`)
 
 - [x] 16.4 IPC preload bridge
-      `apps/specd-studio-desktop/preload/`
+      `apps/specd-studio-desktop/src/preload/`
       (Req: `studio-desktop:ipc-preload-bridge`)
 
 - [x] 16.5 IPC handler registry (local profile)
-      `apps/specd-studio-desktop/main/ipc/specd-data-handlers.ts`
-      Approach: handlers satisfy `client:port-*` contracts via kernel; use `client:ipc-message-envelope`
+      `apps/specd-studio-desktop/src/main/ipc-handlers.ts`
+      Approach: handlers satisfy `client:port-*` contracts via kernel; use `client:ipc-message-envelope`; graph IPC uses `@specd/code-graph-electron`
       (Req: `studio-desktop:ipc-handler-registry`)
+
+- [x] 16.5.1 Fix desktop startup/runtime packaging regressions
+      `apps/specd-studio-desktop/src/main/`, `src/preload/`, `tsup.*.config.ts`
+      Approach: split Electron main/preload builds so preload is CJS-safe, remove runtime ESM dependency from preload bridge, keep renderer hook order stable during IPC bootstrap, and ensure startup exits the loading state when IPC is unavailable.
+      (Req: `studio-desktop:ipc-preload-bridge`, `studio-desktop:main-window-manager`, `studio-desktop:welcome-and-file-menu`)
+
+- [x] 16.5.2 Expand local IPC coverage to match active UI surfaces
+      `apps/specd-studio-desktop/src/main/ipc-handlers.ts`
+      Approach: implement workspace/spec/archive/graph IPC methods consumed by the renderer so local desktop mode does not fall back to `IPC method not implemented` for current tabs and sidebars.
+      (Req: `studio-desktop:ipc-handler-registry`, `studio-desktop:desktop-local-data-adapter`, `client:port-workspaces-specs`, `client:port-graph`)
+
+- [x] 16.5.3 Isolate the Electron SQLite graph runtime to the desktop host
+      `apps/specd-studio-desktop/src/main/ipc-handlers.ts`, `apps/specd-studio-desktop/package.json`, `apps/specd-studio-desktop/test/desktop-graph-runtime.spec.ts`
+      Approach: use `@specd/code-graph-electron` for desktop-local graph execution, rebuild the vendored Electron SQLite addon before start, and keep CLI/API on `@specd/code-graph`.
+      (Req: `studio-desktop:main-kernel-lifecycle`, `studio-desktop:ipc-handler-registry`)
 
 - [x] 16.6 Local and remote data adapters in renderer
       `apps/specd-studio-desktop/renderer/`
@@ -447,13 +482,18 @@ Read **each** `studio-desktop:*` spec before implementing that slice.
       `apps/specd-studio-desktop/` xterm + node-pty
       (Req: `studio-desktop:bottom-panel-terminal`)
 
+- [ ] 16.8 Expose storage IPC bridge in preload and main
+      `apps/specd-studio-desktop/src/main/ipc-handlers.ts`, `apps/specd-studio-desktop/src/preload/index.ts`
+      Approach: implement IPC bridge for window.specd.storage; save/read JSON connection/recent settings under Electron's userData directory
+      (Req: `client:user-storage-port` — FileUserStorage IPC bridge requirement)
+
 ---
 
 ## 17. Integration, workspace wiring, release
 
 - [x] 17.1 Monorepo workspace build graph
       Root `pnpm-workspace.yaml`, `specd.yaml`, package `package.json` files
-      Approach: `api`, `client`, `ui`, studio apps compile; `@specd/specd` bundles ui dist for `ui serve`
+      Approach: `api`, `client`, `ui`, studio apps compile; `@specd/specd` bundles ui dist for `ui serve`; desktop `build/start` rebuild `@specd/ui` before bundling the Electron renderer so hosts do not consume stale `ui/dist`
       (Req: `default:_global/architecture`, `default:_global/conventions`)
 
 - [x] 17.2 Architecture boundary lint or test
@@ -467,6 +507,11 @@ Read **each** `studio-desktop:*` spec before implementing that slice.
 
 Read `design.md` §Testing and proposal polling table.
 
+- [x] 18.0 Add automated Studio web verification harness
+      `apps/specd-studio-web/tests/e2e/`, `dev/scripts/run-studio-ui-e2e.mjs`, `dev/scripts/check-studio-e2e-ready.mjs`
+      Approach: wire repeatable Playwright entrypoints for studio-web, separate API health from UI base URL, and cover remote command palette / create-change / edit-change flows.
+      (Req: `studio-web:remote-bootstrap`, `ui:command-palette`, `ui:change-scope-dialog`)
+
 - [ ] 18.1 Integrated smoke: `specd ui serve`
       Manual: loopback project with active change
       Approach: open Studio embedded; global poll updates sidebar; open change tab; verify `ifModifiedSince` after external manifest touch
@@ -477,13 +522,18 @@ Read `design.md` §Testing and proposal polling table.
       Approach: covers `SaveChangeArtifact` + `hooks-inspector-save` + `handler-changes-mutate`
       (Req: `core:save-change-artifact`, `ui:hooks-inspector-save`)
 
-- [ ] 18.3 Desktop dual profile smoke
+- [x] 18.3 Desktop dual profile smoke
       Manual: open local folder via IPC; connect remote URL; recents menu
       (Req: `studio-desktop:welcome-and-file-menu`, `studio-desktop:desktop-local-data-adapter`, `studio-desktop:desktop-remote-profile`)
 
 - [ ] 18.4 Standalone web smoke
       Manual: `studio-web` dev against `specd serve` on another port with CORS configured
       (Req: `studio-web:remote-bootstrap`, `api:middleware-cors`)
+
+- [x] 18.5 Core regression coverage for save/drift behavior
+      `packages/core/test/infrastructure/fs/change-repository.spec.ts`
+      Approach: add explicit cases for manifest `updatedAt` persistence and drift reconciliation around `save-change-artifact` semantics so later UI/API fixes keep the repository contract stable.
+      (Req: `core:change-manifest`, `core:save-change-artifact`, `core:change-repository-port`)
 
 ---
 

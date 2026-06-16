@@ -1,14 +1,34 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
 /**
  *
  */
 import type { IpcRequestEnvelope, IpcResponseEnvelope } from '@specd/client'
-import { DRAFT_AWARE_IPC_METHODS } from '@specd/client'
+
+const DRAFT_AWARE_IPC_METHODS = [
+  'previewChangeDraft',
+  'outlineChangeArtifact',
+  'outlineSpecDraft',
+] as const
 
 export type SpecdIpcEnvelope = IpcRequestEnvelope
 
 export type SpecdIpcResult = IpcResponseEnvelope
+
+export type DesktopRecentConnection = {
+  readonly kind: 'local' | 'remote'
+  readonly path?: string
+  readonly apiBaseUrl?: string
+  readonly token?: string
+}
+
+export type DesktopSession = { readonly kind: 'local'; readonly path: string } | null
+
+type RendererStorageBridge = {
+  get: <T>(key: string) => T | null
+  set: <T>(key: string, value: T) => void
+  remove: (key: string) => void
+}
 
 let seq = 0
 
@@ -30,13 +50,46 @@ async function invoke(method: string, payload?: unknown): Promise<unknown> {
   return response.result
 }
 
+function subscribeToChannel<TPayload>(
+  channel: string,
+  callback: (payload: TPayload) => void,
+): () => void {
+  const listener = (_event: IpcRendererEvent, payload: TPayload) => callback(payload)
+  ipcRenderer.on(channel, listener)
+  return () => {
+    ipcRenderer.off(channel, listener)
+  }
+}
+
+function subscribeToSignal(channel: string, callback: () => void): () => void {
+  const listener = () => callback()
+  ipcRenderer.on(channel, listener)
+  return () => {
+    ipcRenderer.off(channel, listener)
+  }
+}
+
 contextBridge.exposeInMainWorld('specd', {
   invoke,
   ping: () => invoke('ping'),
-  previewChangeDraft: (name: string, input: unknown) => invoke('previewChangeDraft', [name, input]),
-  outlineChangeArtifact: (name: string, filename: string, input?: unknown) =>
-    invoke('outlineChangeArtifact', [name, filename, input]),
-  outlineSpecDraft: (workspace: string, specPath: string, input: unknown) =>
-    invoke('outlineSpecDraft', [workspace, specPath, input]),
   draftAwareMethods: DRAFT_AWARE_IPC_METHODS,
+  storage: {
+    get: <T>(key: string): T | null =>
+      ipcRenderer.sendSync('storage:get-sync', { key }) as T | null,
+    set: <T>(key: string, value: T): void => {
+      ipcRenderer.sendSync('storage:set-sync', { key, value })
+    },
+    remove: (key: string): void => {
+      ipcRenderer.sendSync('storage:remove-sync', { key })
+    },
+  } satisfies RendererStorageBridge,
+  onSessionChange: (callback: (session: DesktopSession) => void) =>
+    subscribeToChannel('session:change', callback),
+  onSelectRecent: (callback: (recent: DesktopRecentConnection) => void) =>
+    subscribeToChannel('session:select-recent', callback),
+  onTriggerOpenProject: (callback: () => void) =>
+    subscribeToSignal('session:trigger-open-project', callback),
+  onTriggerClearRecents: (callback: () => void) =>
+    subscribeToSignal('session:trigger-clear-recents', callback),
+  onTriggerClose: (callback: () => void) => subscribeToSignal('session:trigger-close', callback),
 })
