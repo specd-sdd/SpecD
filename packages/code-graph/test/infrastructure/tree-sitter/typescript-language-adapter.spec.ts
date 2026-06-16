@@ -6,10 +6,154 @@ import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitt
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
-import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
-import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
+import {
+  BindingSourceKind,
+  type BindingFact,
+} from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
+import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
+import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 
-const adapter = new TypeScriptLanguageAdapter()
+interface TestAdapter {
+  languages(): string[]
+  extensions(): Record<string, string>
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
+  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
+  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[]
+  extractSymbols(filePath: string, content: string): SymbolNode[]
+  extractImportedNames(filePath: string, content: string): ImportDeclaration[]
+  extractBindingFacts(
+    filePath: string,
+    content: string,
+    symbols: readonly SymbolNode[],
+    imports: readonly ImportDeclaration[],
+  ): BindingFact[]
+  extractCallFacts(filePath: string, content: string, symbols: readonly SymbolNode[]): CallFact[]
+  extractRelations(
+    filePath: string,
+    content: string,
+    relationSymbols: readonly SymbolNode[],
+    importMap?: ReadonlyMap<string, string>,
+    filePaths?: ReadonlySet<string>,
+  ): Relation[]
+}
+
+const baseAdapter = new TypeScriptLanguageAdapter()
+const adapter = baseAdapter as unknown as TestAdapter
+
+adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'typescript',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.symbols as SymbolNode[]
+}
+
+adapter.extractImportedNames = (filePath: string, content: string): ImportDeclaration[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'typescript',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.imports as ImportDeclaration[]
+}
+
+adapter.extractBindingFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+  imports: readonly ImportDeclaration[],
+): BindingFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'typescript',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.bindingFacts as BindingFact[]
+}
+
+adapter.extractCallFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+): CallFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'typescript',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.callFacts as CallFact[]
+}
+
+adapter.extractRelations = (
+  filePath: string,
+  content: string,
+  relationSymbols: readonly SymbolNode[],
+  importMap: ReadonlyMap<string, string> = new Map(),
+  filePaths: ReadonlySet<string> = new Set(),
+): Relation[] => {
+  const session = new InMemoryIndexSession()
+  for (const fp of filePaths) {
+    session.registerFile({
+      filePath: fp,
+      configRelativePath: fp,
+      language: 'typescript',
+      contentHash: 'abc',
+      workspace: 'ws',
+    })
+  }
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'typescript',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  const analysis = session.registerAnalysis({
+    filePath,
+    analysis: draft,
+  })
+  const resolvedImports = { importMap, fileImports: [] }
+  return baseAdapter.buildRelations(analysis, {
+    session,
+    resolvedImports,
+  })
+}
 
 describe('TypeScriptLanguageAdapter', () => {
   it('reports supported languages', () => {
@@ -36,7 +180,7 @@ describe('TypeScriptLanguageAdapter', () => {
     it('extracts arrow functions assigned to const', () => {
       const code = `const add = (a: number, b: number) => a + b`
       const symbols = adapter.extractSymbols('main.ts', code)
-      const fn = symbols.find((s) => s.name === 'add')
+      const fn = symbols.find((s: SymbolNode) => s.name === 'add')
       expect(fn).toBeDefined()
       expect(fn!.kind).toBe(SymbolKind.Function)
     })
@@ -44,15 +188,17 @@ describe('TypeScriptLanguageAdapter', () => {
     it('extracts class declarations', () => {
       const code = `class UserService { }`
       const symbols = adapter.extractSymbols('main.ts', code)
-      expect(symbols.some((s) => s.name === 'UserService' && s.kind === SymbolKind.Class)).toBe(
-        true,
-      )
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'UserService' && s.kind === SymbolKind.Class),
+      ).toBe(true)
     })
 
     it('extracts class with extends', () => {
       const code = `class Admin extends User { }`
       const symbols = adapter.extractSymbols('main.ts', code)
-      expect(symbols.some((s) => s.name === 'Admin' && s.kind === SymbolKind.Class)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Admin' && s.kind === SymbolKind.Class),
+      ).toBe(true)
     })
 
     it('extracts method definitions', () => {
@@ -61,34 +207,40 @@ describe('TypeScriptLanguageAdapter', () => {
         baz() { }
       }`
       const symbols = adapter.extractSymbols('main.ts', code)
-      const methods = symbols.filter((s) => s.kind === SymbolKind.Method)
+      const methods = symbols.filter((s: SymbolNode) => s.kind === SymbolKind.Method)
       expect(methods.length).toBeGreaterThanOrEqual(2)
     })
 
     it('extracts exported variables (non-arrow)', () => {
       const code = `export const MAX_RETRIES = 3`
       const symbols = adapter.extractSymbols('main.ts', code)
-      expect(symbols.some((s) => s.name === 'MAX_RETRIES' && s.kind === SymbolKind.Variable)).toBe(
-        true,
-      )
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'MAX_RETRIES' && s.kind === SymbolKind.Variable),
+      ).toBe(true)
     })
 
     it('extracts type aliases', () => {
       const code = `type UserId = string`
       const symbols = adapter.extractSymbols('main.ts', code)
-      expect(symbols.some((s) => s.name === 'UserId' && s.kind === SymbolKind.Type)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'UserId' && s.kind === SymbolKind.Type),
+      ).toBe(true)
     })
 
     it('extracts interface declarations', () => {
       const code = `interface Config { port: number }`
       const symbols = adapter.extractSymbols('main.ts', code)
-      expect(symbols.some((s) => s.name === 'Config' && s.kind === SymbolKind.Interface)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Config' && s.kind === SymbolKind.Interface),
+      ).toBe(true)
     })
 
     it('extracts enum declarations', () => {
       const code = `enum Status { Active, Inactive }`
       const symbols = adapter.extractSymbols('main.ts', code)
-      expect(symbols.some((s) => s.name === 'Status' && s.kind === SymbolKind.Enum)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Status' && s.kind === SymbolKind.Enum),
+      ).toBe(true)
     })
 
     it('extracts JSDoc comment for function declaration', () => {
@@ -118,7 +270,7 @@ describe('TypeScriptLanguageAdapter', () => {
       const code = `function foo() { }\nfunction bar() { }`
       const symbols = adapter.extractSymbols('main.ts', code)
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
-      const defines = relations.filter((r) => r.type === RelationType.Defines)
+      const defines = relations.filter((r: Relation) => r.type === RelationType.Defines)
       expect(defines.length).toBe(symbols.length)
     })
 
@@ -126,7 +278,7 @@ describe('TypeScriptLanguageAdapter', () => {
       const code = `export function foo() { }\nfunction bar() { }`
       const symbols = adapter.extractSymbols('main.ts', code)
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
-      const exports = relations.filter((r) => r.type === RelationType.Exports)
+      const exports = relations.filter((r: Relation) => r.type === RelationType.Exports)
       expect(exports).toHaveLength(1)
     })
 
@@ -134,7 +286,7 @@ describe('TypeScriptLanguageAdapter', () => {
       const code = `import { foo } from './utils.js'`
       const symbols = adapter.extractSymbols('src/main.ts', code)
       const relations = adapter.extractRelations('src/main.ts', code, symbols, new Map())
-      const imports = relations.filter((r) => r.type === RelationType.Imports)
+      const imports = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(imports).toHaveLength(1)
       expect(imports[0]!.target).toBe('src/utils.ts')
     })
@@ -143,7 +295,7 @@ describe('TypeScriptLanguageAdapter', () => {
       const code = `import { describe } from 'vitest'`
       const symbols = adapter.extractSymbols('main.ts', code)
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
-      const imports = relations.filter((r) => r.type === RelationType.Imports)
+      const imports = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(imports).toHaveLength(0)
     })
 
@@ -162,10 +314,10 @@ describe('TypeScriptLanguageAdapter', () => {
       const symbols = adapter.extractSymbols('main.ts', code)
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
 
-      expect(relations.some((r) => r.type === RelationType.Extends)).toBe(true)
-      expect(relations.some((r) => r.type === RelationType.Implements)).toBe(true)
+      expect(relations.some((r: Relation) => r.type === RelationType.Extends)).toBe(true)
+      expect(relations.some((r: Relation) => r.type === RelationType.Implements)).toBe(true)
 
-      const overrides = relations.filter((r) => r.type === RelationType.Overrides)
+      const overrides = relations.filter((r: Relation) => r.type === RelationType.Overrides)
       expect(overrides).toHaveLength(1)
     })
 
@@ -179,7 +331,9 @@ describe('TypeScriptLanguageAdapter', () => {
         new Map([['BaseService', 'src/base.ts:class:BaseService:1:0']]),
       )
 
-      const extendsRelation = relations.find((relation) => relation.type === RelationType.Extends)
+      const extendsRelation = relations.find(
+        (relation: Relation) => relation.type === RelationType.Extends,
+      )
       expect(extendsRelation?.target).toBe('src/base.ts:class:BaseService:1:0')
     })
   })
@@ -215,8 +369,8 @@ describe('TypeScriptLanguageAdapter', () => {
       const code = `import { createUser, type Config } from '@specd/core'`
       const imports = adapter.extractImportedNames('main.ts', code)
       expect(imports).toHaveLength(2)
-      expect(imports.map((i) => i.originalName)).toContain('createUser')
-      expect(imports.map((i) => i.originalName)).toContain('Config')
+      expect(imports.map((i: ImportDeclaration) => i.originalName)).toContain('createUser')
+      expect(imports.map((i: ImportDeclaration) => i.originalName)).toContain('Config')
     })
 
     it('parses side-effect imports as file-only declarations', () => {
@@ -236,7 +390,7 @@ describe('TypeScriptLanguageAdapter', () => {
         require.resolve('./not-runtime.js')
       `
       const imports = adapter.extractImportedNames('main.ts', code)
-      expect(imports.map((item) => item.kind)).toEqual([
+      expect(imports.map((item: ImportDeclaration) => item.kind)).toEqual([
         ImportDeclarationKind.Dynamic,
         ImportDeclarationKind.Require,
       ])
@@ -261,14 +415,15 @@ describe('TypeScriptLanguageAdapter', () => {
 
       expect(
         bindingFacts.some(
-          (fact) =>
+          (fact: BindingFact) =>
             fact.sourceKind === BindingSourceKind.Parameter &&
             fact.targetName === 'TemplateExpander',
         ),
       ).toBe(true)
       expect(
         callFacts.some(
-          (fact) => fact.form === CallForm.Constructor && fact.targetName === 'TemplateExpander',
+          (fact: CallFact) =>
+            fact.form === CallForm.Constructor && fact.targetName === 'TemplateExpander',
         ),
       ).toBe(true)
     })
@@ -283,15 +438,17 @@ describe('TypeScriptLanguageAdapter', () => {
       const facts = adapter.extractBindingFacts('main.ts', code, symbols, imports)
 
       const registryFacts = facts.filter(
-        (f) => f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
+        (f: BindingFact) =>
+          f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
       )
-      expect(registryFacts.some((f) => f.targetName === 'ArtifactParser')).toBe(true)
+      expect(registryFacts.some((f: BindingFact) => f.targetName === 'ArtifactParser')).toBe(true)
 
       const handlerFacts = facts.filter(
-        (f) => f.name === 'HandlerFn' && f.sourceKind === BindingSourceKind.ImportedType,
+        (f: BindingFact) =>
+          f.name === 'HandlerFn' && f.sourceKind === BindingSourceKind.ImportedType,
       )
-      expect(handlerFacts.some((f) => f.targetName === 'Event')).toBe(true)
-      expect(handlerFacts.some((f) => f.targetName === 'Result')).toBe(true)
+      expect(handlerFacts.some((f: BindingFact) => f.targetName === 'Event')).toBe(true)
+      expect(handlerFacts.some((f: BindingFact) => f.targetName === 'Result')).toBe(true)
     })
   })
 
@@ -300,7 +457,7 @@ describe('TypeScriptLanguageAdapter', () => {
       const code = `function caller() { callee() }\nfunction callee() { }`
       const symbols = adapter.extractSymbols('main.ts', code)
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
-      const calls = relations.filter((r) => r.type === RelationType.Calls)
+      const calls = relations.filter((r: Relation) => r.type === RelationType.Calls)
       expect(calls).toHaveLength(1)
       expect(calls[0]!.source).toContain('caller')
       expect(calls[0]!.target).toContain('callee')
@@ -311,7 +468,7 @@ describe('TypeScriptLanguageAdapter', () => {
       const symbols = adapter.extractSymbols('main.ts', code)
       const importMap = new Map([['helper', 'utils.ts:function:helper:1']])
       const relations = adapter.extractRelations('main.ts', code, symbols, importMap)
-      const calls = relations.filter((r) => r.type === RelationType.Calls)
+      const calls = relations.filter((r: Relation) => r.type === RelationType.Calls)
       expect(calls).toHaveLength(1)
       expect(calls[0]!.target).toBe('utils.ts:function:helper:1')
     })
@@ -320,7 +477,7 @@ describe('TypeScriptLanguageAdapter', () => {
       const code = `function main() { console.log('hi') }`
       const symbols = adapter.extractSymbols('main.ts', code)
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
-      const calls = relations.filter((r) => r.type === RelationType.Calls)
+      const calls = relations.filter((r: Relation) => r.type === RelationType.Calls)
       expect(calls).toHaveLength(0)
     })
   })

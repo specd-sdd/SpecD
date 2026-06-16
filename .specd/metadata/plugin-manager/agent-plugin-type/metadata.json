@@ -135,5 +135,7 @@
     "spec.md": "sha256:fe1d85c237ee0bd7f81257a778987c74ea9cffdad6c62c9aeee214cb04477887",
     "verify.md": "sha256:e00ad11eece5e0e376156b03029a4ac9bba2bb609efb0d4f69208f6efc16914e"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Defines the agent plugin interface that extends SpecdPlugin for agent integrations (Claude, Copilot, Codex, etc.).",
+  "optimizedContext": "# plugin-manager:agent-plugin-type\n\n## Rules\n- AgentPlugin extends SpecdPlugin: AgentPlugin MUST extend SpecdPlugin with type: 'agent' and add: - install(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult - uninstall(config:…\n- AgentInstallOptions: capabilities MUST be supplied as a simple collection of capability identifiers by the agent plugin at install time.\n- AgentInstallResult: See source artifacts.\n- isAgentPlugin type guard: The spec MUST export a pure function isAgentPlugin(value: SpecdPlugin): value is AgentPlugin that validates: 1.\n- Dependencies: core:config, plugin-manager:specd-plugin-type\n\n## Constraints\n- Agent plugins specialize the base plugin type for agent integrations.\n- Install-time capability data MUST be passed separately from template variables.\n- The initial required capability identifiers are mcp, agents, and frontmatter.\n- Agent plugins MUST NOT pass pre-normalized capability objects into @specd/skills.\n- Install-time frontmatter data MUST be passed through variables.frontmatter, not as a prebuilt YAML document.\n- Agent plugins MAY pass variables.sharedFolder, but @specd/skills owns its normalization and safety validation.\n"
 }

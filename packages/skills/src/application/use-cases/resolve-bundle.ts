@@ -77,7 +77,7 @@ export class ResolveBundle {
       capabilities: input.context?.capabilities ?? [],
     }
 
-    const bundle = this.repository.getBundle(input.name, mergedContext)
+    const bundle = await this.repository.getBundle(input.name, mergedContext)
     return { bundle }
   }
 }

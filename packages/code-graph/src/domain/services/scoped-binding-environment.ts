@@ -1,12 +1,13 @@
 import {
   type BindingFact,
   type BindingScope,
+  BindingScopeKind,
   BindingSourceKind,
 } from '../value-objects/binding-fact.js'
 import { CallForm, type CallFact, type ResolvedDependency } from '../value-objects/call-fact.js'
-import { type ImportDeclaration } from '../value-objects/import-declaration.js'
 import { RelationType } from '../value-objects/relation-type.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
+import { type FileAnalysis } from '../value-objects/file-analysis.js'
 
 /**
  * Read-only symbol lookup backed by the indexer's in-memory symbol index.
@@ -32,12 +33,8 @@ export interface SymbolLookup {
  * Input for building a per-file scoped binding environment.
  */
 export interface BuildScopedBindingEnvironmentInput {
-  readonly filePath: string
-  readonly symbols: readonly SymbolNode[]
-  readonly imports: readonly ImportDeclaration[]
+  readonly analysis: FileAnalysis
   readonly importMap: ReadonlyMap<string, string>
-  readonly scopes: readonly BindingScope[]
-  readonly facts: readonly BindingFact[]
   readonly symbolLookup: SymbolLookup
 }
 
@@ -73,9 +70,7 @@ export interface ScopedBindingEnvironment {
  */
 export interface ResolveDependencyFactsInput {
   readonly environment: ScopedBindingEnvironment
-  readonly bindingFacts: readonly BindingFact[]
-  readonly callFacts: readonly CallFact[]
-  readonly symbols: readonly SymbolNode[]
+  readonly analysis: FileAnalysis
   readonly symbolLookup: SymbolLookup
 }
 
@@ -87,13 +82,31 @@ export interface ResolveDependencyFactsInput {
 export function buildScopedBindingEnvironment(
   input: BuildScopedBindingEnvironmentInput,
 ): ScopedBindingEnvironment {
-  const rootScopeId = findRootScopeId(input)
-  const scopesById = new Map(input.scopes.map((scope) => [scope.id, scope]))
+  const filePath = input.analysis.filePath
+  const rootScopeId = filePath
+
+  const defaultFileScope: BindingScope = {
+    id: filePath,
+    kind: BindingScopeKind.File,
+    filePath,
+    parentId: undefined,
+    ownerSymbolId: undefined,
+    start: {
+      filePath,
+      line: 1,
+      column: 0,
+      endLine: undefined,
+      endColumn: undefined,
+    },
+    end: undefined,
+  }
+
+  const scopesById = new Map<string, BindingScope>([[defaultFileScope.id, defaultFileScope]])
   const factsByScopeAndName = groupFactsByScopeAndName([
-    ...input.facts,
-    ...buildImportBindingFacts(input, rootScopeId),
+    ...input.analysis.bindingFacts,
+    ...buildImportBindingFacts(input.analysis, input.importMap, rootScopeId),
   ])
-  const symbolsById = new Map(input.symbols.map((symbol) => [symbol.id, symbol]))
+  const symbolsById = new Map(input.analysis.symbols.map((symbol) => [symbol.id, symbol]))
 
   return {
     lookup: (name, scopeId) =>
@@ -122,9 +135,13 @@ export function resolveDependencyFacts(
   const dependencies: ResolvedDependency[] = []
   const seen = new Set<string>()
 
-  for (const fact of input.bindingFacts) {
+  for (const fact of input.analysis.bindingFacts) {
     if (!isTypeUseSource(fact.sourceKind)) continue
-    const sourceSymbol = findEnclosingSymbol(fact.filePath, fact.location.line, input.symbols)
+    const sourceSymbol = findEnclosingSymbol(
+      fact.filePath,
+      fact.location.line,
+      input.analysis.symbols,
+    )
     const targetSymbol = input.environment.resolveTargetSymbol(fact)
     if (sourceSymbol === undefined || targetSymbol === undefined) continue
     addDependency(dependencies, seen, {
@@ -136,10 +153,10 @@ export function resolveDependencyFacts(
     })
   }
 
-  for (const call of input.callFacts) {
+  for (const call of input.analysis.callFacts) {
     const sourceSymbol =
-      findSymbolById(call.callerSymbolId, input.symbols) ??
-      findEnclosingSymbol(call.filePath, call.location.line, input.symbols)
+      findSymbolById(call.callerSymbolId, input.analysis.symbols) ??
+      findEnclosingSymbol(call.filePath, call.location.line, input.analysis.symbols)
     const targetSymbol = resolveCallTarget(call, input.environment, input.symbolLookup)
     if (sourceSymbol === undefined || targetSymbol === undefined) continue
     const relationType =
@@ -157,37 +174,30 @@ export function resolveDependencyFacts(
 }
 
 /**
- * Resolves the root scope id for a file, using an explicit file scope when present.
- * @param input - Build input containing scopes and file path.
- * @returns Root scope identifier.
- */
-function findRootScopeId(input: BuildScopedBindingEnvironmentInput): string {
-  return input.scopes.find((scope) => scope.parentId === undefined)?.id ?? input.filePath
-}
-
-/**
  * Builds binding facts from resolved imports so shared lookup can see them.
- * @param input - Build input containing import declarations and import map.
+ * @param analysis - File analysis.
+ * @param importMap - Import map resolving imported local names to symbol IDs.
  * @param rootScopeId - File root scope id.
  * @returns Import-derived binding facts.
  */
 function buildImportBindingFacts(
-  input: BuildScopedBindingEnvironmentInput,
+  analysis: FileAnalysis,
+  importMap: ReadonlyMap<string, string>,
   rootScopeId: string,
 ): BindingFact[] {
   const facts: BindingFact[] = []
 
-  for (const declaration of input.imports) {
+  for (const declaration of analysis.imports) {
     if (declaration.localName.length === 0) continue
-    const targetSymbolId = input.importMap.get(declaration.localName)
+    const targetSymbolId = importMap.get(declaration.localName)
     if (targetSymbolId === undefined) continue
     facts.push({
       name: declaration.localName,
-      filePath: input.filePath,
+      filePath: analysis.filePath,
       scopeId: rootScopeId,
       sourceKind: BindingSourceKind.ImportedType,
       location: {
-        filePath: input.filePath,
+        filePath: analysis.filePath,
         line: 1,
         column: 0,
         endLine: undefined,
@@ -260,8 +270,14 @@ function lookupBindingFacts(
   factsByScopeAndName: ReadonlyMap<string, ReadonlyMap<string, readonly BindingFact[]>>,
 ): readonly BindingFact[] {
   let currentScopeId: string | undefined = scopeId
+  const visited = new Set<string>()
 
   while (currentScopeId !== undefined) {
+    if (visited.has(currentScopeId)) {
+      break
+    }
+    visited.add(currentScopeId)
+
     const candidates = factsByScopeAndName.get(currentScopeId)?.get(name) ?? []
     const deterministic = selectDeterministicFacts(candidates)
     if (deterministic !== undefined) return deterministic

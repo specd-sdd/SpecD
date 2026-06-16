@@ -96,6 +96,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: makeMockRepo([spec1]),
           ownership: 'owned',
@@ -103,6 +104,7 @@ describe('Workspace indexing', () => {
         },
         {
           name: 'ws2',
+          prefix: null,
           codeRoot: ws2Dir,
           specRepo: makeMockRepo([spec2]),
           ownership: 'owned',
@@ -140,6 +142,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: makeMockRepo([spec1]),
           ownership: 'owned',
@@ -168,6 +171,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: makeMockRepo(),
           ownership: 'owned',
@@ -199,6 +203,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: makeMockRepo(),
           ownership: 'owned',
@@ -227,6 +232,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: makeMockRepo(),
           ownership: 'owned',
@@ -257,6 +263,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: makeMockRepo([spec1]),
           ownership: 'owned',
@@ -264,6 +271,7 @@ describe('Workspace indexing', () => {
         },
         {
           name: 'ws2',
+          prefix: null,
           codeRoot: ws2Dir,
           specRepo: makeMockRepo([spec2]),
           ownership: 'owned',
@@ -291,6 +299,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: wsDir,
           specRepo: makeMockRepo(),
           ownership: 'owned',
@@ -334,6 +343,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: wsDir,
           specRepo: repo,
           ownership: 'owned',
@@ -366,6 +376,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: makeMockRepo([spec1], metadata),
           ownership: 'owned',
@@ -423,6 +434,7 @@ describe('Workspace indexing', () => {
       workspaces: [
         {
           name: 'ws1',
+          prefix: null,
           codeRoot: ws1Dir,
           specRepo: repo,
           ownership: 'owned',

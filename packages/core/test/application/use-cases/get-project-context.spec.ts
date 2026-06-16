@@ -599,5 +599,56 @@ describe('GetProjectContext', () => {
       expect(result.warnings.some((w) => w.type === 'stale-optimization')).toBe(true)
       expect(result.specs).toHaveLength(1) // processed normally
     })
+
+    it('warns when individual spec is missing optimizedContext field', async () => {
+      const specType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema([specType])
+      const hasher = makeContentHasher()
+
+      const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const repo = makeSpecRepository({
+        specs: [spec],
+        artifacts: {
+          'auth/login/.specd-metadata.yaml': JSON.stringify({
+            title: 'Title',
+            description: 'Desc',
+            contentHashes: { 'spec.md': hasher.hash('# Content\n') },
+          }),
+          'auth/login/spec.md': '# Content\n',
+        },
+      })
+      const specRepos = makeListWorkspaces(new Map([['default', repo]]))
+
+      const fileReader = makeFileReader({
+        [configYamlPath]: 'config',
+      })
+
+      const uc = new GetProjectContext(
+        specRepos,
+        makeSchemaProvider(schema),
+        fileReader,
+        makeParsers(),
+        hasher,
+      )
+
+      const result = await uc.execute({
+        config: {
+          projectRoot: '/project',
+          configPath,
+          llmOptimizedContext: true,
+          contextIncludeSpecs: ['*'],
+        },
+      })
+
+      expect(
+        result.warnings.some(
+          (w) => w.type === 'stale-optimization' && w.path === 'default:auth/login',
+        ),
+      ).toBe(true)
+    })
   })
 })

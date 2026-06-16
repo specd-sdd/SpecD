@@ -58,3 +58,19 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     argument_hint: '<change-name>',
   },
 }
+
+/**
+ * Frontmatter map keyed by agent id.
+ */
+export const agentFrontmatter: Readonly<Record<string, Frontmatter>> = {
+  'specd-project-context-optimizer': {
+    name: 'specd-project-context-optimizer',
+    description: 'Generates a high-density, token-efficient version of project-level context.',
+    allowed_tools: 'Bash(node *), Bash(specd *), Bash(cat *), Bash(rm *), Read, Write',
+  },
+  'specd-spec-context-optimizer': {
+    name: 'specd-spec-context-optimizer',
+    description: 'Generates a high-density, token-efficient version of spec-level metadata.',
+    allowed_tools: 'Bash(node *), Bash(specd *), Bash(cat *), Bash(rm *), Read, Write',
+  },
+}

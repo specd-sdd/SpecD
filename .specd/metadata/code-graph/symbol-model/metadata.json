@@ -29,6 +29,24 @@
       ]
     },
     {
+      "requirement": "File analysis model",
+      "rules": [
+        "The code graph SHALL define immutable runtime analysis value objects that capture the complete compact result of analyzing a source file before relation resolution.\n\nThe shared runtime model MUST include:\n\n- **`FileAnalysisDraft`** — adapter-emitted file analysis before the indexer assigns run-local file identity\n- **`FileAnalysis`** — registered file analysis that includes the file's run-local ID, workspace-prefixed path, language, content hash, compact facts, and optional per-file parser state\n- **`ParserState`** — optional compact parser-specific state retained only when it avoids repeated deterministic work later in the same indexing run\n- **`AdapterSessionState`** — optional compact run-scoped adapter state retained only when it provides deterministic shared caches across multiple files in the same indexing run\n\n`FileAnalysisDraft` and `FileAnalysis` MUST represent, at minimum:\n\n- symbols emitted for the file\n- import declarations emitted for the file\n- deterministic binding facts emitted for the file\n- deterministic call facts emitted for the file\n- namespace or equivalent qualified-name context when the language supports it\n- optional file/document node metadata already normalized for indexing\n\nThese runtime analysis value objects SHALL remain distinct from persisted graph-store entities. They exist to support in-memory indexing passes and MUST NOT require changes to persisted symbol IDs, relation IDs, or graph-store schemas."
+      ]
+    },
+    {
+      "requirement": "Shared indexing lookups",
+      "rules": [
+        "The symbol model SHALL support run-scoped lookup structures that make deterministic relation resolution bounded by relevant matches rather than full symbol scans.\n\nThe shared runtime lookup model MUST support:\n\n- file lookup by workspace-prefixed path and run-local file ID\n- symbol lookup by file, simple name, and qualified name\n- traversal from file to symbols and symbol back to file\n- lookup of specs and documents that participate in cross-entity relations during the same indexing run\n- traversal between specs and covered symbols when that relationship is needed by later phases\n- relation deduplication keys before final persistence\n\nThese lookups MAY be implemented by `IndexSession` and `SymbolIndex` collaborating internally, but the externally visible runtime model MUST preserve a common lookup contract across all built-in adapters and indexer phases."
+      ]
+    },
+    {
+      "requirement": "Compact retained analysis state",
+      "rules": [
+        "The retained runtime analysis model MUST prioritize compact, immutable data over heavyweight parser artifacts to reduce garbage-collection pressure during large indexing runs.\n\nRetained `ParserState`, `AdapterSessionState`, binding facts, call facts, imports, and lookup indexes MUST use plain data structures and MUST NOT retain AST nodes, parser trees, parser cursors, or equivalent heavyweight objects once per-file analysis completes."
+      ]
+    },
+    {
       "requirement": "Document category",
       "rules": [
         "The graph SHALL support a `document` category for textual non-code nodes.\n\n- **`DocumentNode`** represents a file that does not map to symbol semantics but is searchable via full-text content and identifiable by path.\n- Identities for documents follow the same format as `FileNode` (`workspace:path`), including the reserved `root:` namespace."
@@ -73,7 +91,7 @@
     {
       "requirement": "Scoped binding model",
       "rules": [
-        "The symbol model SHALL define immutable, language-agnostic value objects for deterministic scoped binding and call resolution. These value objects are analysis inputs and intermediate results that normalize source-language facts before they are converted into persisted graph relations.\n\nThe shared model SHALL represent:\n\n- **Scope ownership**: file, class/type, method, function, and block scopes when the adapter can identify them deterministically.\n- **Binding facts**: source-location-aware facts that bind a visible name or receiver to a declared, constructed, imported, inherited, framework-managed, or otherwise deterministic target type or symbol candidate.\n- **Binding source kind**: local, parameter, property/field, class-managed, inherited, file/global, imported type, framework-managed, constructor call, and alias-from-known-binding.\n- **Call facts**: source-location-aware facts for free calls, member calls, static calls, and constructor calls, including the enclosing caller symbol when known.\n- **Resolution metadata**: deterministic reason strings and optional confidence or diagnostic metadata that explain why a binding or call candidate was accepted or dropped.\n\nBinding facts and call facts MUST be immutable value objects with `readonly` properties. They MUST use workspace-prefixed file paths and symbol IDs when they reference graph entities.\n\nThe first iteration SHALL remain conservative. It MUST NOT model arbitrary runtime state, reflection, runtime container identifiers, interprocedural propagation, or whole-program data flow."
+        "The symbol model SHALL define immutable, language-agnostic value objects for deterministic scoped binding and call resolution. These value objects are analysis inputs and intermediate results that normalize source-language facts before they are converted into persisted graph relations.\n\nThe shared model SHALL represent:\n\n- **Scope ownership**: file, class/type, method, function, and block scopes when the adapter can identify them deterministically.\n- **Binding facts**: source-location-aware facts that bind a visible name or receiver to a declared, constructed, imported, inherited, framework-managed, or otherwise deterministic target type or symbol candidate.\n- **Binding source kind**: local, parameter, property/field, class-managed, inherited, file/global, imported type, framework-managed, constructor call, and alias-from-known-binding.\n- **Call facts**: source-location-aware facts for free calls, member calls, static calls, and constructor calls, including the enclosing caller symbol when known.\n- **Resolution metadata**: deterministic reason strings and optional confidence or diagnostic metadata that explain why a binding or call candidate was accepted or dropped.\n\nBinding facts and call facts MUST be immutable value objects with `readonly` properties. They MUST use workspace-prefixed file paths and symbol IDs when they reference graph entities.\n\n**Cycle Detection**: The scoped binding environment resolution SHALL implement cycle detection when traversing the scope hierarchy (e.g., following `parentId` links). If a circular reference is detected, the traversal MUST be aborted to prevent infinite loops, and no resolution result SHALL be returned for that lookup.\n\nThe first iteration SHALL remain conservative. It MUST NOT model arbitrary runtime state, reflection, runtime container identifiers, interprocedural propagation, or whole-program data flow."
       ]
     },
     {
@@ -225,6 +243,79 @@
       "given": ["a function declaration with no preceding comment"],
       "when": ["the symbol is extracted"],
       "then": ["comment is undefined"]
+    },
+    {
+      "requirement": "File analysis model",
+      "name": "Registered file analysis retains compact normalized facts",
+      "given": [
+        "an adapter has analyzed a file containing symbols, imports, binding facts, and call facts"
+      ],
+      "when": ["the indexer registers the result as FileAnalysis"],
+      "then": [
+        "the runtime model records the file ID, workspace-prefixed path, language, content hash, and those compact facts together",
+        "AND optional namespace or parser state is retained only when present"
+      ]
+    },
+    {
+      "requirement": "File analysis model",
+      "name": "File analysis remains separate from persisted graph entities",
+      "given": ["a FileAnalysis has been registered in memory"],
+      "when": ["the graph store is bulk-loaded"],
+      "then": [
+        "persisted graph symbols and relations are derived from that analysis",
+        "AND the runtime analysis object itself is not persisted as a graph-store entity"
+      ]
+    },
+    {
+      "requirement": "Shared indexing lookups",
+      "name": "Relation resolution uses bounded common lookups",
+      "given": ["the session has registered files and symbols from multiple workspaces"],
+      "when": ["Pass 2 resolves a name, qualified name, or file target"],
+      "then": [
+        "it uses the common lookup structures for file, symbol, and qualified-name access",
+        "AND it does not require a full scan of all registered symbols for every lookup"
+      ]
+    },
+    {
+      "requirement": "Shared indexing lookups",
+      "name": "Cross-entity lookups include specs and covered symbols",
+      "given": [
+        "the session has registered specs and their covered symbols during the same indexing run"
+      ],
+      "when": ["a later phase asks for symbols covered by a spec or specs covering a symbol"],
+      "then": [
+        "the runtime lookup model answers through the shared cross-entity indexes",
+        "AND it does not recompute the mapping from persisted relations on demand"
+      ]
+    },
+    {
+      "requirement": "Shared indexing lookups",
+      "name": "Relation deduplication happens before persistence",
+      "given": ["multiple deterministic resolution paths derive the same relation"],
+      "when": ["those relations are added to the run-scoped lookup model"],
+      "then": ["they collapse to one deduplicated relation before bulk loading"]
+    },
+    {
+      "requirement": "Compact retained analysis state",
+      "name": "Parser-specific retained state excludes heavyweight parser objects",
+      "given": [
+        "an adapter stores optional parser-specific state for later deterministic resolution"
+      ],
+      "when": ["retained runtime analysis state is inspected after Pass 1"],
+      "then": [
+        "that state uses plain compact data structures",
+        "AND it excludes AST nodes, parser trees, parser cursors, and equivalent heavyweight parser artifacts"
+      ]
+    },
+    {
+      "requirement": "Compact retained analysis state",
+      "name": "Run-scoped adapter cache state also excludes heavyweight parser objects",
+      "given": ["an adapter stores optional run-scoped cache state shared across multiple files"],
+      "when": ["that retained state is inspected after Pass 1"],
+      "then": [
+        "it uses plain compact data structures",
+        "AND it excludes AST nodes, parser trees, parser cursors, and equivalent heavyweight parser artifacts"
+      ]
     },
     {
       "requirement": "SymbolKind enum",
@@ -402,6 +493,19 @@
       "then": ["no deterministic binding fact is created for that runtime-only lookup"]
     },
     {
+      "requirement": "Scoped binding model",
+      "name": "Cycle detection breaks infinite parent traversal",
+      "given": [
+        "a malformed scope structure where scope A's parent is B and scope B's parent is A"
+      ],
+      "when": ["shared binding lookup traverses parent links from scope A"],
+      "then": [
+        "the traversal detects the cycle",
+        "AND it terminates without entering an infinite loop",
+        "AND it returns no resolution result for that lookup"
+      ]
+    },
+    {
       "requirement": "Scoped binding relation output",
       "name": "Constructor call uses CONSTRUCTS relation",
       "given": [
@@ -473,31 +577,17 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "code-graph:symbol-model",
-        "file": "code-graph:src/domain/value-objects/index.ts"
-      },
-      {
-        "specId": "code-graph:symbol-model",
-        "file": "code-graph:test/domain/value-objects/file-node.spec.ts"
-      },
-      {
-        "specId": "code-graph:symbol-model",
-        "file": "code-graph:test/domain/value-objects/symbol-node.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "code-graph:symbol-model",
-        "file": "code-graph:src/domain/value-objects/spec-node.ts",
-        "symbol": "createSpecNode"
+        "file": "code-graph:src/domain/services/scoped-binding-environment.ts",
+        "symbol": "lookupBindingFacts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4f11351f1c9d7556fb8e0324b64d022fbf9291536d236dc4bdb3b9fd745e230c",
-    "verify.md": "sha256:353c439084f8a7b6271e94c74d0d95f8ee55024c8220fbdaf03a57a15696c5fa"
+    "spec.md": "sha256:50781010b48e2c620c569f99b9984a71853c57ca1c5b080d05b1471085251fcb",
+    "verify.md": "sha256:c9d20aee5b975655e1ce20e011a51ef1fad4104e08e81af02939b1251a83f85f"
   },
   "generatedBy": "core"
 }

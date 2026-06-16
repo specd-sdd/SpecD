@@ -524,8 +524,11 @@ export class CompileContext {
 
     // --- Part 2: Spec entries ---
     const specArtifactDescriptors = this._listSpecArtifactDescriptors(schema)
-    const sectionsFilter = input.sections
-    const showAllSections = sectionsFilter === undefined
+    const sectionsFilter =
+      input.sections ??
+      (input.step === 'verifying' || input.step === 'done'
+        ? (['rules', 'constraints', 'scenarios'] as const)
+        : (['rules', 'constraints'] as const))
     const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of allSpecs) {
       const ws = workspaceMap.get(workspace)
@@ -550,7 +553,7 @@ export class CompileContext {
           warnings.push({
             type: 'stale-optimization',
             path: specId,
-            message: `Spec '${specId}' is missing LLM-optimized context. Run specd-spec-metadata skill to refresh.`,
+            message: `Spec '${specId}' is missing LLM-optimized context. Launch specd-spec-context-optimizer agent to refresh.`,
           })
         }
       }
@@ -643,11 +646,7 @@ export class CompileContext {
 
       // Fall back to metadata or extraction if preview didn't produce content
       if (content === undefined) {
-        if (showAllSections && mode !== 'full') {
-          // Keep raw markdown ONLY for non-full modes that explicitly requested everything
-          // (Internal fallback, standard modes are structured).
-          content = this._renderSpecFiles(displayFiles)
-        } else if (mergedFiles !== undefined) {
+        if (mergedFiles !== undefined) {
           const extraction = schema.metadataExtraction()
           if (extraction !== undefined) {
             content = await this._renderExtractedSectionsFromFiles(
@@ -779,17 +778,9 @@ export class CompileContext {
    */
   private _renderFromMetadata(
     metadata: SpecMetadata,
-    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    sectionsFilter: ReadonlyArray<SpecSection>,
     llmOptimizedContext = false,
   ): string {
-    if (
-      llmOptimizedContext &&
-      metadata.optimizedContext !== undefined &&
-      metadata.optimizedContext !== ''
-    ) {
-      return metadata.optimizedContext
-    }
-
     const metaParts: string[] = []
 
     // Description is always included in full mode as part of the content string
@@ -800,23 +791,33 @@ export class CompileContext {
       metaParts.push(`**Description:** ${description}`)
     }
 
-    // If no sections are provided, default to Rules + Constraints.
-    const effectiveSections =
-      sectionsFilter === undefined || sectionsFilter.length === 0
-        ? (['rules', 'constraints'] as const)
-        : sectionsFilter
+    const hasRules = sectionsFilter.includes('rules')
+    const hasConstraints = sectionsFilter.includes('constraints')
+    const hasScenarios = sectionsFilter.includes('scenarios')
 
-    if (effectiveSections.includes('rules') && metadata.rules?.length) {
-      const rulesText = metadata.rules
-        .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
-        .join('\n\n')
-      metaParts.push(`#### Rules\n\n${rulesText}`)
+    const useOptimized =
+      llmOptimizedContext &&
+      metadata.optimizedContext !== undefined &&
+      metadata.optimizedContext !== '' &&
+      hasRules &&
+      hasConstraints
+
+    if (useOptimized) {
+      metaParts.push(metadata.optimizedContext)
+    } else {
+      if (hasRules && metadata.rules?.length) {
+        const rulesText = metadata.rules
+          .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
+          .join('\n\n')
+        metaParts.push(`#### Rules\n\n${rulesText}`)
+      }
+      if (hasConstraints && metadata.constraints?.length) {
+        const constraintsText = metadata.constraints.map((c) => `- ${c}`).join('\n')
+        metaParts.push(`#### Constraints\n\n${constraintsText}`)
+      }
     }
-    if (effectiveSections.includes('constraints') && metadata.constraints?.length) {
-      const constraintsText = metadata.constraints.map((c) => `- ${c}`).join('\n')
-      metaParts.push(`#### Constraints\n\n${constraintsText}`)
-    }
-    if (effectiveSections.includes('scenarios') && metadata.scenarios?.length) {
+
+    if (hasScenarios && metadata.scenarios?.length) {
       const scenariosText = metadata.scenarios
         .map((s) => {
           const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
@@ -828,6 +829,7 @@ export class CompileContext {
         .join('\n\n')
       metaParts.push(`#### Scenarios\n\n${scenariosText}`)
     }
+
     return metaParts.join('\n\n')
   }
 
@@ -971,7 +973,7 @@ export class CompileContext {
     workspace: string,
     specPath: string,
     workspaces: Map<string, ProjectWorkspace>,
-    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    sectionsFilter: ReadonlyArray<SpecSection>,
     llmOptimizedContext = false,
   ): Promise<string> {
     // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts

@@ -8,7 +8,7 @@ import type {
   TemplateVariable,
 } from '@specd/plugin-manager'
 import type { Frontmatter } from '../../domain/types/frontmatter.js'
-import { skillFrontmatter } from '../../domain/frontmatter/index.js'
+import { skillFrontmatter, agentFrontmatter } from '../../domain/frontmatter/index.js'
 import { resolveSharedFolder } from './shared-folder.js'
 
 /**
@@ -24,13 +24,22 @@ export class InstallSkills {
    */
   async execute(config: SpecdConfig, options?: AgentInstallOptions): Promise<AgentInstallResult> {
     const repository = createSkillRepository()
-    const availableSkills = repository.list()
+    const availableItems = await repository.list()
+
     const requestedSkills =
       options?.skills !== undefined && options.skills.length > 0
         ? options.skills
-        : availableSkills.map((skill) => skill.name)
+        : availableItems.filter((s) => s.kind === 'skill').map((skill) => skill.name)
 
-    const targetDir = path.join(config.projectRoot, '.github', 'skills')
+    const requestedAgents =
+      options?.agents !== undefined && options.agents.length > 0
+        ? options.agents
+        : availableItems.filter((s) => s.kind === 'agent').map((agent) => agent.name)
+
+    const requestedNames = [...requestedSkills, ...requestedAgents]
+
+    const skillsTargetDir = path.join(config.projectRoot, '.github', 'skills')
+    const agentsTargetDir = path.join(config.projectRoot, '.github', 'agents')
     const resolvedSharedFolder = resolveSharedFolder(
       config.projectRoot,
       config.configPath,
@@ -39,71 +48,111 @@ export class InstallSkills {
         : undefined,
     )
     const sharedDir = resolvedSharedFolder.absolutePath
-    await mkdir(targetDir, { recursive: true })
+
+    await mkdir(skillsTargetDir, { recursive: true })
+    await mkdir(agentsTargetDir, { recursive: true })
 
     const installed: Array<{ skill: string; path: string }> = []
     const skipped: Array<{ skill: string; reason: string }> = []
 
-    for (const skillName of requestedSkills) {
-      const skill = repository.get(skillName)
-      if (skill === undefined) {
-        skipped.push({ skill: skillName, reason: 'skill not found' })
+    // Copilot capabilities
+    const capabilities = ['frontmatter', 'agents']
+
+    for (const name of requestedNames) {
+      const item = await repository.get(name)
+      if (item === undefined) {
+        skipped.push({ skill: name, reason: 'item not found' })
         continue
       }
 
-      const frontmatter =
-        skillFrontmatter[skillName] ??
-        ({ name: skillName, description: skill.description } satisfies Frontmatter)
+      let agentFrontmatterVars: Record<string, unknown> | undefined = undefined
+      if (item.kind === 'agent') {
+        const metadata =
+          agentFrontmatter[name] ?? ({ name, description: item.description } satisfies Frontmatter)
+        let tools: string[] | undefined = undefined
+        if (metadata['allowed-tools']) {
+          const rawTools = metadata['allowed-tools']
+          tools = Array.isArray(rawTools)
+            ? rawTools.map((t: string) => t.trim())
+            : rawTools.split(',').map((t: string) => t.trim())
+        }
+        agentFrontmatterVars = {
+          name: metadata.name ?? name,
+          description: metadata.description ?? item.description,
+          ...(tools ? { tools } : {}),
+        }
+      }
+
       const resolveBundle = new ResolveBundle(repository)
       const { bundle } = await resolveBundle.execute({
-        name: skillName,
+        name,
         config,
         context: {
           variables: {
             ...(options?.variables ?? {}),
-            frontmatter: toTemplateVariables(frontmatter),
+            ...(item.kind === 'skill'
+              ? {
+                  frontmatter: toTemplateVariables(
+                    skillFrontmatter[name] ??
+                      ({ name, description: item.description } satisfies Frontmatter),
+                  ),
+                }
+              : {
+                  ...(agentFrontmatterVars
+                    ? {
+                        frontmatter: toTemplateVariables(
+                          agentFrontmatterVars as unknown as Frontmatter,
+                        ),
+                      }
+                    : {}),
+                }),
           },
-          capabilities: buildCapabilities(false, false, true),
+          capabilities,
         },
       })
       if (bundle.files.length === 0) {
-        skipped.push({ skill: skillName, reason: 'bundle has no files' })
+        skipped.push({ skill: name, reason: 'bundle has no files' })
         continue
       }
 
-      const skillDir = path.join(targetDir, skillName)
-      const legacyFile = path.join(targetDir, `${skillName}.md`)
-      await mkdir(skillDir, { recursive: true })
-      await rm(legacyFile, { force: true })
-
-      for (const file of bundle.files) {
-        const baseDir = file.shared === true ? sharedDir : skillDir
-        const outputPath = path.join(baseDir, file.filename)
-        await mkdir(path.dirname(outputPath), { recursive: true })
-        await writeFile(outputPath, file.content, 'utf8')
+      let itemTargetDir: string
+      if (item.kind === 'skill') {
+        itemTargetDir = path.join(skillsTargetDir, name)
+        const legacyFile = path.join(skillsTargetDir, `${name}.md`)
+        await mkdir(itemTargetDir, { recursive: true })
+        await rm(legacyFile, { force: true })
+      } else {
+        itemTargetDir = agentsTargetDir
       }
 
-      installed.push({ skill: skillName, path: skillDir })
+      for (const file of bundle.files) {
+        const isAgentFile = item.kind === 'agent' && !file.shared
+        const baseDir = file.shared === true ? sharedDir : itemTargetDir
+
+        let finalFilename = file.filename
+        const content = file.content
+
+        if (isAgentFile) {
+          // Copilot convention for agents: .agent.md suffix
+          finalFilename = `${name}.agent.md`
+        }
+
+        const outputPath = path.join(baseDir, finalFilename)
+        await mkdir(path.dirname(outputPath), { recursive: true })
+        await writeFile(outputPath, content, 'utf8')
+      }
+
+      installed.push({
+        skill: name,
+        path:
+          item.kind === 'skill'
+            ? path.join(skillsTargetDir, name)
+            : path.join(agentsTargetDir, `${name}.agent.md`),
+      })
     }
 
     return { installed, skipped }
   }
-}
-
-/**
- * Converts runtime capability flags into install-time capability entries.
- *
- * @param mcp - Whether the runtime supports MCP-backed skills.
- * @param agents - Whether the runtime supports agent or subagent flows.
- * @param frontmatter - Whether the runtime expects generated skill frontmatter.
- * @returns Structured capability entries.
- */
-function buildCapabilities(mcp: boolean, agents: boolean, frontmatter: boolean): readonly string[] {
-  return [
-    ...(mcp ? ['mcp'] : []),
-    ...(agents ? ['agents'] : []),
-    ...(frontmatter ? ['frontmatter'] : []),
-  ]
 }
 
 /**

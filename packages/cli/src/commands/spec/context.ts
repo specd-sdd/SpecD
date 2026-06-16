@@ -18,19 +18,24 @@ function renderEntryText(entry: SpecContextEntry): string {
     `Source: ${entry.source}`,
   ]
 
-  if (entry.description !== undefined) {
-    parts.push(`**Description:** ${entry.description}`)
+  if (entry.optimizedContent !== undefined) {
+    parts.push(`**LLM-Optimized Representation:**\n\n${entry.optimizedContent}`)
+  } else {
+    if (entry.description !== undefined) {
+      parts.push(`**Description:** ${entry.description}`)
+    }
+    if (entry.rules !== undefined) {
+      const rulesText = entry.rules
+        .map((r) => `#### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
+        .join('\n\n')
+      parts.push(`### Rules\n\n${rulesText}`)
+    }
+    if (entry.constraints !== undefined) {
+      const constraintsText = entry.constraints.map((c) => `- ${c}`).join('\n')
+      parts.push(`### Constraints\n\n${constraintsText}`)
+    }
   }
-  if (entry.rules !== undefined) {
-    const rulesText = entry.rules
-      .map((r) => `#### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
-      .join('\n\n')
-    parts.push(`### Rules\n\n${rulesText}`)
-  }
-  if (entry.constraints !== undefined) {
-    const constraintsText = entry.constraints.map((c) => `- ${c}`).join('\n')
-    parts.push(`### Constraints\n\n${constraintsText}`)
-  }
+
   if (entry.scenarios !== undefined) {
     const scenariosText = entry.scenarios
       .map((s) => {
@@ -65,6 +70,8 @@ export function registerSpecContext(parent: Command): void {
     .option('--scenarios', 'include only scenarios sections')
     .option('--follow-deps', 'follow dependsOn links transitively')
     .option('--depth <n>', 'limit dependency traversal depth (requires --follow-deps)')
+    .option('--optimized', 'force prefer optimized content')
+    .option('--no-optimized', 'suppress preference for optimized content')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -79,6 +86,7 @@ JSON/TOON output schema:
       rules?: Array<{ requirement: string, rules: string[] }>
       constraints?: string[]
       scenarios?: Array<{ name: string, requirement: string, given?: string[], when?: string[], then?: string[] }>
+      optimizedContent?: string
       stale: boolean
     }>
     warnings: string[]
@@ -95,6 +103,7 @@ JSON/TOON output schema:
           scenarios?: boolean
           followDeps?: boolean
           depth?: string
+          optimized?: boolean
           format: string
           config?: string
         },
@@ -114,6 +123,12 @@ JSON/TOON output schema:
           if (opts.constraints) sectionFlags.push('constraints')
           if (opts.scenarios) sectionFlags.push('scenarios')
 
+          const llmOptimizedContext = (() => {
+            if (opts.optimized === false) return false
+            if (opts.optimized === true) return true
+            return config.llmOptimizedContext ?? false
+          })()
+
           const result = await kernel.specs.getContext.execute({
             workspace: parsed.workspace,
             specPath: SpecPath.parse(parsed.capabilityPath),
@@ -121,12 +136,21 @@ JSON/TOON output schema:
             ...(opts.depth !== undefined ? { depth: parseInt(opts.depth, 10) } : {}),
             contextMode: opts.mode,
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),
+            llmOptimizedContext,
           })
 
           const fmt = parseFormat(opts.format)
+          const isOptimizedRequested =
+            llmOptimizedContext &&
+            (sectionFlags.length === 0 ||
+              (sectionFlags.includes('rules') && sectionFlags.includes('constraints')))
 
           // Emit warnings to stderr
           for (const w of result.warnings) {
+            // Suppress stale-optimization warnings if user did not ask for optimized or if the sections requested don't support it
+            if (w.type === 'stale-optimization' && !isOptimizedRequested) {
+              continue
+            }
             process.stderr.write(`warning: ${w.message}\n`)
           }
 
@@ -150,6 +174,7 @@ JSON/TOON output schema:
               if (e.rules !== undefined) obj.rules = e.rules
               if (e.constraints !== undefined) obj.constraints = e.constraints
               if (e.scenarios !== undefined) obj.scenarios = e.scenarios
+              if (e.optimizedContent !== undefined) obj.optimizedContent = e.optimizedContent
               obj.stale = e.stale
               return obj
             })

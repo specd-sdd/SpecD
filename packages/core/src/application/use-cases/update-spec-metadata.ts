@@ -67,7 +67,7 @@ export class UpdateSpecMetadata {
     const result = await this._saveMetadata.execute({
       workspace: input.workspace,
       specPath: SpecPath.parse(input.capabilityPath),
-      content: JSON.stringify(merged),
+      content: JSON.stringify(merged, null, 2) + '\n',
       force: true, // we want to overwrite with our fresh merge
     })
 

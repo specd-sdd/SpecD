@@ -228,6 +228,7 @@ export function createArchiveChange(
         workspaceSpecLayouts: buildWorkspaceSpecLayouts(
           Array.from(config.workspaces).map((w) => ({
             name: w.name,
+            prefix: w.prefix ?? null,
             codeRoot: w.codeRoot,
             isExternal: w.isExternal,
             ownership: w.ownership,

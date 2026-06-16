@@ -109,5 +109,7 @@
     "spec.md": "sha256:c7b1a94cc5160e767b4949bfb8835d9a1c6fc7496248c3636d096150beb23c93",
     "verify.md": "sha256:9a3ad66c1acef4b963ac8cd6ffc7cc150acfdfdb9e37ed8a267c4e24b027693b"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Defines the SkillBundle and ResolvedFile types for representing a skill with all its templates resolved and ready for installation.",
+  "optimizedContext": "# skills:skill-bundle\n\n## Rules\n- ResolvedFile interface: ResolvedFile MUST be an interface with: - filename: string — resolved file name - content: string — file content with variables substituted - shared?: boolean — optional marker…\n- SkillBundle interface: SkillBundle MUST be an interface with: - name: string — skill name - description: string — skill description - files: ResolvedFile[] — array of resolved files - install(target:…\n- Install behavior: The install() method MUST: - Resolve the normal target directory from either the string argument or target.targetDir - Resolve the shared target directory from…\n- Uninstall behavior: The uninstall() method MUST: - Resolve the normal and shared target directories using the same rules as install() - Remove each file with shared: true from the shared target…\n- Dependencies: skills:skill\n\n## Constraints\n- All file operations happen in the domain layer for SkillBundle (unlike Skill which has lazy loading).\n"
 }

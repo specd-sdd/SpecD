@@ -9,7 +9,19 @@
     {
       "requirement": "LanguageAdapter interface",
       "rules": [
-        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found\n- **`extractSymbolsWithNamespace?(filePath: string, content: string): { symbols: SymbolNode[]; namespace: string | undefined }`** — optional fast path for languages that can derive symbols and namespace from the same parse tree\n- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution\n- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, CONSTRUCTS, USES\\_TYPE, DEFINES, EXPORTS, DEPENDS\\_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs, built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.\n- **`extractBindingFacts?(filePath: string, content: string, symbols: SymbolNode[], imports: ImportDeclaration[]): BindingFact[]`** — optional pure extension point for extracting deterministic binding facts used by the shared scoped binding environment.\n- **`extractCallFacts?(filePath: string, content: string, symbols: SymbolNode[]): CallFact[]`** — optional pure extension point for extracting normalized call-form facts used by shared call resolution.\n\nAll extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects."
+        "`LanguageAdapter` SHALL be an interface (not an abstract class, since adapters are stateless and have no shared state to inherit) with the following methods:\n\n- **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)\n- **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.\n- **`analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft`** — parses the file content once and returns the complete compact analysis required by indexing for that file, including symbols, imports, deterministic binding facts, deterministic call facts, namespace data when relevant, and optional compact parser-specific state.\n- **`resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports`** — resolves the file's previously extracted import declarations, qualified names, aliases, and deterministic file targets using the shared session lookups instead of re-reading or re-parsing file content.\n- **`buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]`** — builds deterministic graph relations for the file from the stored analysis facts and resolved import information. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` remains reserved for spec-level dependency edges.\n- **`getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined`** — optionally derives a package identity for the workspace.\n- **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — optionally maps an import specifier to a package identity.\n- **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — optionally maps a qualified name to a source file path for languages that support deterministic namespace resolution.\n\nAll adapter methods MUST be synchronous and deterministic with respect to the provided arguments and shared session context. They receive content as a string during analysis, not a file path to read, and they MUST NOT perform side effects outside the indexing session. Adapters MAY read and update compact run-scoped adapter cache state only through the `IndexSession` API exposed by the provided contexts."
+      ]
+    },
+    {
+      "requirement": "Full-file analysis contract",
+      "rules": [
+        "Each built-in language adapter SHALL emit a complete compact `FileAnalysisDraft` for every indexed file in a single `analyzeFile` call.\n\nThe draft MUST include every deterministic analysis fact the adapter needs later in the run for import resolution and relation building. Adapters MUST NOT require the indexer to call separate symbol, import, binding, or call extraction entry points for the same file.\n\nThe draft MAY include compact per-file parser-specific state when that state avoids repeated deterministic work in Pass 2, but it MUST remain serializable in memory-friendly plain data structures and MUST NOT retain AST nodes, parser trees, or other heavyweight parser-runtime objects."
+      ]
+    },
+    {
+      "requirement": "Unified built-in adapter migration",
+      "rules": [
+        "The built-in TypeScript/JavaScript, PHP, Python, and Go adapters SHALL all implement the unified `analyzeFile` / `resolveImports` / `buildRelations` contract within the same change.\n\nThe code graph MUST NOT retain a parallel legacy adapter-extraction path once this contract is introduced. The indexer, adapter registry, provider wiring, and tests SHALL treat the unified contract as the only supported built-in adapter interface."
       ]
     },
     {
@@ -21,25 +33,25 @@
     {
       "requirement": "TypeScript adapter",
       "rules": [
-        "A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. It MUST extract:\n\n- **Symbols**: functions (named + arrow assigned to const), classes, methods, exported variables, type aliases, interfaces, enums\n- **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.\n- **Relations**: `DEFINES` (file → symbol), `EXPORTS` (file → exported symbol), `IMPORTS` (file → file via import specifier resolution), `CALLS` (symbol → symbol via call expressions)\n\nThe adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:\n\n| Construct                          | SymbolKind  |\n| ---------------------------------- | ----------- |\n| Function declaration               | `function`  |\n| Arrow function assigned to `const` | `function`  |\n| Class declaration                  | `class`     |\n| Method definition                  | `method`    |\n| Exported `const`/`let`/`var`       | `variable`  |\n| Type alias                         | `type`      |\n| Interface declaration              | `interface` |\n| Enum declaration                   | `enum`      |"
+        "A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. Through the unified `analyzeFile` / `resolveImports` / `buildRelations` contract it MUST support:\n\n- **Symbols**: functions (named + arrow assigned to const), classes, methods, exported variables, type aliases, interfaces, enums\n- **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.\n- **Relations**: `DEFINES` (file → symbol), `EXPORTS` (file → exported symbol), `IMPORTS` (file → file via import specifier resolution), `CALLS` (symbol → symbol via call expressions)\n\nThe adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:\n\n| Construct                          | SymbolKind  |\n| ---------------------------------- | ----------- |\n| Function declaration               | `function`  |\n| Arrow function assigned to `const` | `function`  |\n| Class declaration                  | `class`     |\n| Method definition                  | `method`    |\n| Exported `const`/`let`/`var`       | `variable`  |\n| Type alias                         | `type`      |\n| Interface declaration              | `interface` |\n| Enum declaration                   | `enum`      |"
       ]
     },
     {
       "requirement": "Import declaration extraction",
       "rules": [
-        "`LanguageAdapter` SHALL provide `extractImportedNames(filePath: string, content: string): ImportDeclaration[]` — a synchronous, pure method that parses the file's import statements and returns structured declarations without any resolution.\n\n`ImportDeclaration` is a value object with:\n\n- **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)\n- **`originalName`** (`string`) — the name as declared in the source module\n- **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)\n- **`isRelative`** (`boolean`) — true if the specifier is relative to the importing file (starts with `.` for all built-in adapters)\n\nEach adapter parses imports using its language's syntax:\n\n| Language   | Import syntax                           | isRelative      |\n| ---------- | --------------------------------------- | --------------- |\n| TypeScript | `import { X } from 'specifier'`         | starts with `.` |\n| Python     | `from module import X`, `import module` | starts with `.` |\n| Go         | `import \"pkg\"`, `import alias \"pkg\"`    | always `false`  |\n| PHP        | `use Namespace\\Class`                   | always `false`  |\n\nThe adapter only parses syntax — specifier resolution is handled by the adapter's optional `resolveRelativeImportPath` and `resolvePackageFromSpecifier` methods, called by the indexer during Pass 2."
+        "`LanguageAdapter.analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft` SHALL include structured import declarations for the analyzed file as part of the returned draft.\n\n`ImportDeclaration` is a value object with:\n\n- **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)\n- **`originalName`** (`string`) — the name as declared in the source module\n- **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)\n- **`isRelative`** (`boolean`) — true if the specifier is relative to the importing file (starts with `.` for all built-in adapters that use relative imports)\n\nEach adapter parses imports using its language's syntax:\n\n| Language   | Import syntax                           | isRelative      |\n| ---------- | --------------------------------------- | --------------- |\n| TypeScript | `import { X } from 'specifier'`         | starts with `.` |\n| Python     | `from module import X`, `import module` | starts with `.` |\n| Go         | `import \"pkg\"`, `import alias \"pkg\"`    | always `false`  |\n| PHP        | `use Namespace\\Class`                   | always `false`  |\n\nThe adapter only parses syntax during `analyzeFile` — specifier resolution is handled later by `resolveImports()` during Pass 2."
       ]
     },
     {
       "requirement": "Call resolution",
       "rules": [
-        "For `CALLS` relations, the adapter MUST extract call expressions from the AST and resolve them:\n\n- **Caller**: the innermost enclosing function, method, or arrow function containing the call expression. Calls at module top level are silently dropped.\n- **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.\n\nCalls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown."
+        "For `CALLS` relations, the adapter MUST extract deterministic call facts during `analyzeFile()` and convert them into persisted `CALLS` relations during `buildRelations()` using the resolved import information and shared session lookups.\n\n- **Caller**: the innermost enclosing function, method, or arrow function containing the call expression. Calls at module top level are silently dropped.\n- **Callee**: resolved through deterministic local symbols, resolved imports, receiver bindings, or other statically known candidates available through the shared session and adapter facts.\n\nCalls to identifiers that cannot be resolved deterministically (e.g. unresolved global built-ins, ambiguous member expressions, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown."
       ]
     },
     {
       "requirement": "Scoped binding fact extraction",
       "rules": [
-        "`LanguageAdapter` SHALL expose optional synchronous, pure extension points for extracting scoped binding facts and call facts from source content. Built-in adapters for TypeScript/TSX/JavaScript/JSX, Python, Go, and PHP MUST implement these extension points for the deterministic cases defined by this spec.\n\nAdapter-owned fact extraction SHALL include language-specific syntax and semantics only. Shared scope lookup, shadowing, receiver binding, and cross-language candidate filtering belong to the common code-graph pipeline, not to adapter-local full environment implementations.\n\nAdapters SHALL extract deterministic facts for:\n\n- lexical ownership of file, class/type, method, function, and block scopes where the language exposes them clearly\n- typed parameters, including constructor parameters and constructor parameter properties where applicable\n- typed properties and fields\n- explicit construction expressions such as `new X()` or language-equivalent constructor calls that can produce `CONSTRUCTS`\n- receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when deterministic\n- local aliases whose source binding is already deterministic\n- imported or referenced type names that can produce `USES_TYPE` or affect receiver resolution\n- framework-managed bindings that the adapter can identify through deterministic, registry-based rules\n\nAdapters MUST silently drop binding facts whose target depends on runtime-only values, reflection, container identifiers, monkey patching, non-literal dynamic expressions, or whole-program data flow."
+        "`LanguageAdapter.analyzeFile()` SHALL expose deterministic scoped binding facts and call facts through the returned `FileAnalysisDraft`. Built-in adapters for TypeScript/TSX/JavaScript/JSX, Python, Go, and PHP MUST emit these facts for the deterministic cases defined by this spec.\n\nAdapter-owned fact extraction SHALL include language-specific syntax and semantics only. Shared scope lookup, shadowing, receiver binding, and cross-language candidate filtering belong to the common code-graph pipeline, not to adapter-local full environment implementations.\n\nAdapters SHALL extract deterministic facts for:\n\n- lexical ownership of file, class/type, method, function, and block scopes where the language exposes them clearly\n- typed parameters, including constructor parameters and constructor parameter properties where applicable\n- typed properties and fields\n- explicit construction expressions such as `new X()` or language-equivalent constructor calls that can produce `CONSTRUCTS`\n- receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when deterministic\n- local aliases whose source binding is already deterministic\n- imported or referenced type names that can produce `USES_TYPE` or affect receiver resolution\n- framework-managed bindings that the adapter can identify through deterministic, registry-based rules\n\nAdapters MUST silently drop binding facts whose target depends on runtime-only values, reflection, container identifiers, monkey patching, non-literal dynamic expressions, or whole-program data flow."
       ]
     },
     {
@@ -69,7 +81,7 @@
     {
       "requirement": "Import specifier resolution",
       "rules": [
-        "`LanguageAdapter` MAY provide optional methods for resolving import specifiers to file paths. This moves all language-specific resolution logic out of the indexer:\n\n- **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:\n\n| Language   | Specifier example                | Package extraction rule                               |\n| ---------- | -------------------------------- | ----------------------------------------------------- |\n| TypeScript | `@specd/core`                    | Scoped: first two segments. Bare: first segment.      |\n| Go         | `github.com/acme/auth/models`    | Longest matching prefix from known packages.          |\n| Python     | `acme_auth.models`               | First segment, normalized (hyphens ↔ underscores).    |\n| PHP        | (uses qualified names, not this) | Not applicable — PHP resolves via `extractNamespace`. |\n\n- **`resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]`** — given the importing file path and a relative specifier, returns one or more candidate file paths. Returns multiple candidates when the specifier is ambiguous (e.g. could be a file or a directory with an index file). The indexer tries each candidate in order against the symbol index. Each language has its own rules for extension mapping and path resolution:\n\n| Language   | Resolution rules                                                                               |\n| ---------- | ---------------------------------------------------------------------------------------------- |\n| TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal            |\n| Python     | `.` = current package, `..` = parent, module → `[.py, /__init__.py]`, bare dot → `__init__.py` |\n| Go         | Not applicable — Go imports are never relative                                                 |\n| PHP        | Not applicable — PHP imports are never relative                                                |\n\n- **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.\n\n| Language | Example                                   |\n| -------- | ----------------------------------------- |\n| PHP      | `App\\Models` + `User` → `App\\Models\\User` |\n\n- **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — given a fully qualified class/type name and the workspace's `codeRoot`, resolves it to an absolute file path by reading the language's autoloader configuration. This complements the in-memory qualified name map built from indexed symbols: it handles classes not present in the indexed codebase (e.g. library code excluded from indexing). Performs I/O (reads the autoloader manifest); the PSR-4 map SHOULD be cached per `codeRoot` to avoid repeated reads. Returns `undefined` if the qualified name cannot be resolved.\n\n| Language | Autoloader config                                       | Resolution rule                                                                              |\n| -------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |\n| PHP      | `composer.json` `autoload.psr-4` + `autoload-dev.psr-4` | Longest-prefix match on namespace → directory; appends remaining segments as `ClassName.php` |\n\nWhen these methods are not implemented, the indexer skips the corresponding resolution step for that language. The indexer MUST NOT contain any language-specific resolution logic — all specifier parsing, path resolution, and qualified name construction is delegated to adapters."
+        "Import and qualified-name resolution methods often need project-wide file and symbol existence checks.\n\nAdapters SHALL resolve imports and dynamic file targets through the shared `IndexSession` indexes exposed by `ImportResolutionContext` rather than by scanning all symbols or re-reading the filesystem during Pass 2.\n\n- `resolvePackageFromSpecifier` resolves package identity from a specifier.\n- `resolveQualifiedNameToPath` resolves qualified names (like PHP namespaces) to source file paths when the language supports deterministic mapping.\n- `resolveImports` combines raw import declarations, package identity, qualified-name lookup, and parser-specific deterministic rules into resolved import targets.\n\nAny metadata needed by `resolveQualifiedNameToPath` during Pass 2 (for example PSR-4 maps) MUST come from compact state already prepared during analysis or from deterministic run-scoped adapter cache state held in the session. Pass 2 MUST NOT probe the filesystem for per-import existence checks.\n\nThe PHP adapter in particular MUST use the shared session's common file and symbol lookups for CakePHP, CodeIgniter, and namespace-driven resolution so dynamic path resolution does not regress into O(N) scans of all workspace symbols."
       ]
     },
     {
@@ -111,12 +123,12 @@
   ],
   "constraints": [
     "LanguageAdapter is an interface, not an abstract class — adapters are stateless",
-    "Extraction methods are synchronous and pure — they receive content, not file handles",
-    "extractSymbolsWithNamespace() is optional and, when implemented, follows the same synchronous and pure extraction rules",
-    "extractBindingFacts?() and extractCallFacts?() are optional for custom adapters, required for built-in adapters, and follow the same synchronous and pure extraction rules",
-    "getPackageIdentity and resolveQualifiedNameToPath? are the only methods that perform I/O — both are optional and search for a manifest file on disk",
-    "Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure",
-    "resolveQualifiedNameToPath? SHOULD cache the parsed autoloader map per codeRoot to avoid repeated disk reads during a single indexing run",
+    "analyzeFile, resolveImports, and buildRelations are synchronous and deterministic",
+    "analyzeFile receives content, not file handles, and emits a complete FileAnalysisDraft",
+    "Per-file parser state and run-scoped adapter cache state MUST remain compact plain data",
+    "getPackageIdentity and resolveQualifiedNameToPath? are the only methods that may perform I/O, and Pass 2 import resolution must not probe the filesystem per candidate",
+    "Resolution methods (resolvePackageFromSpecifier, resolveQualifiedNameToPath, resolveImports) are synchronous and deterministic",
+    "resolveQualifiedNameToPath? SHOULD cache parsed autoloader/manifest metadata per codeRoot or session to avoid repeated disk reads during a single indexing run",
     "The indexer MUST NOT contain language-specific resolution logic — all of it is delegated to adapters",
     "Unrecognized file extensions are silently skipped",
     "Unresolvable call targets are silently dropped",
@@ -145,45 +157,78 @@
     },
     {
       "requirement": "LanguageAdapter interface",
-      "name": "extractSymbolsWithNamespace is an optional pure fast path",
-      "given": ["a language adapter implements extractSymbolsWithNamespace()"],
-      "when": ["it is called twice with the same filePath and content"],
-      "then": [
-        "it returns the same symbols and namespace information both times",
-        "AND it performs no side effects beyond parsing the provided input"
-      ]
-    },
-    {
-      "requirement": "LanguageAdapter interface",
-      "name": "extractRelations may emit dependency and hierarchy relations",
-      "given": ["a file containing resolvable inheritance or implementation declarations"],
-      "when": ["extractRelations() is called"],
-      "then": [
-        "the result may include USES_TYPE, CONSTRUCTS, EXTENDS, IMPLEMENTS, and OVERRIDES relations alongside the existing relation types"
-      ]
-    },
-    {
-      "requirement": "LanguageAdapter interface",
-      "name": "Binding and call fact extraction are pure",
-      "given": ["a built-in adapter implements extractBindingFacts() and extractCallFacts()"],
-      "when": [
-        "each method is called twice with the same file path, content, symbols, and imports"
-      ],
-      "then": [
-        "each method returns equivalent facts both times",
-        "AND neither method reads from disk or mutates adapter state"
-      ]
-    },
-    {
-      "requirement": "LanguageAdapter interface",
-      "name": "Custom adapter may omit scoped binding extensions",
+      "name": "File analysis is complete and pure",
       "given": [
-        "a custom adapter implements the existing required methods but not extractBindingFacts() or extractCallFacts()"
+        "a built-in adapter is called twice with the same filePath, content, and analyze context"
       ],
-      "when": ["the adapter is registered"],
+      "when": ["analyzeFile() is executed"],
       "then": [
-        "registration succeeds",
-        "AND shared scoped binding resolution skips fact extraction for that adapter"
+        "it returns equivalent symbols, imports, deterministic facts, and namespace data both times",
+        "AND it performs no side effects outside the provided session context"
+      ]
+    },
+    {
+      "requirement": "LanguageAdapter interface",
+      "name": "Import resolution uses stored analysis rather than raw content",
+      "given": ["a registered FileAnalysis already exists for a file"],
+      "when": ["resolveImports() is called"],
+      "then": [
+        "the adapter resolves targets from the stored analysis facts and shared session lookups",
+        "AND it does not require the original file content to be parsed again"
+      ]
+    },
+    {
+      "requirement": "LanguageAdapter interface",
+      "name": "Relation building consumes stored facts",
+      "given": ["a file analysis contains deterministic imports, binding facts, and call facts"],
+      "when": ["buildRelations() is called"],
+      "then": [
+        "the result may include IMPORTS, CALLS, CONSTRUCTS, USES_TYPE, EXTENDS, IMPLEMENTS, and OVERRIDES relations",
+        "AND those relations are derived from the stored analysis facts and resolved imports"
+      ]
+    },
+    {
+      "requirement": "LanguageAdapter interface",
+      "name": "Adapter may update only compact run-scoped cache state",
+      "given": ["an adapter needs a shared run-scoped cache such as parsed package metadata"],
+      "when": ["it updates that cache during analysis or resolution"],
+      "then": [
+        "the update happens only through the IndexSession API provided in context",
+        "AND no side effect escapes the indexing session"
+      ]
+    },
+    {
+      "requirement": "Full-file analysis contract",
+      "name": "Adapter emits all deterministic facts in one pass",
+      "given": [
+        "a file contains symbols, import declarations, typed bindings, and deterministic call sites"
+      ],
+      "when": ["analyzeFile() runs"],
+      "then": [
+        "the returned FileAnalysisDraft contains all of those facts together",
+        "AND the indexer does not need separate adapter entry points to gather them later"
+      ]
+    },
+    {
+      "requirement": "Full-file analysis contract",
+      "name": "Parser-specific state remains compact",
+      "given": [
+        "an adapter wants to retain parser-specific state for later deterministic resolution"
+      ],
+      "when": ["it returns that state in FileAnalysisDraft"],
+      "then": [
+        "the retained state uses plain compact data structures",
+        "AND it does not retain AST nodes or parser-runtime objects"
+      ]
+    },
+    {
+      "requirement": "Unified built-in adapter migration",
+      "name": "All built-in adapters implement the unified contract",
+      "given": ["the built-in TypeScript/JavaScript, PHP, Python, and Go adapters are registered"],
+      "when": ["the indexer executes Pass 1 and Pass 2"],
+      "then": [
+        "each built-in adapter participates through analyzeFile(), resolveImports(), and buildRelations()",
+        "AND no legacy built-in extraction path is required"
       ]
     },
     {
@@ -207,147 +252,125 @@
     },
     {
       "requirement": "TypeScript adapter",
-      "name": "Function declaration extracted",
+      "name": "Function declaration is present in file analysis",
       "given": ["content containing function createUser(name: string) { ... }"],
-      "when": ["extractSymbols() is called"],
-      "then": ["a SymbolNode with name: 'createUser', kind: 'function' is returned"]
+      "when": ["analyzeFile() is called"],
+      "then": [
+        "the returned FileAnalysisDraft.symbols include a SymbolNode with name: 'createUser', kind: 'function'"
+      ]
     },
     {
       "requirement": "TypeScript adapter",
-      "name": "Arrow function assigned to const extracted",
+      "name": "Arrow function assigned to const is present in file analysis",
       "given": ["content containing export const validate = (input: string) => { ... }"],
-      "when": ["extractSymbols() is called"],
-      "then": ["a SymbolNode with name: 'validate', kind: 'function' is returned"]
+      "when": ["analyzeFile() is called"],
+      "then": [
+        "the returned FileAnalysisDraft.symbols include a SymbolNode with name: 'validate', kind: 'function'"
+      ]
     },
     {
       "requirement": "TypeScript adapter",
-      "name": "Class and method extracted separately",
+      "name": "Class and method are captured separately",
       "given": ["content containing class AuthService { login() { ... } }"],
-      "when": ["extractSymbols() is called"],
-      "then": ["two symbols are returned: one class named AuthService and one method named login"]
+      "when": ["analyzeFile() is called"],
+      "then": [
+        "the returned symbols include one class named AuthService and one method named login"
+      ]
     },
     {
       "requirement": "TypeScript adapter",
-      "name": "Interface extracted",
-      "given": ["content containing export interface UserRepository { ... }"],
-      "when": ["extractSymbols() is called"],
-      "then": ["a SymbolNode with name: 'UserRepository', kind: 'interface' is returned"]
+      "name": "JSDoc comment is retained with the symbol",
+      "given": ["content containing a JSDoc block immediately before a declaration"],
+      "when": ["analyzeFile() is called"],
+      "then": ["the corresponding symbol contains the raw comment text in comment"]
     },
     {
       "requirement": "TypeScript adapter",
-      "name": "JSDoc comment extracted with symbol",
-      "given": ["content containing:"],
-      "when": ["extractSymbols() is called"],
-      "then": ["the createUser symbol has comment: '/** Creates a user in the system. */'"]
-    },
-    {
-      "requirement": "TypeScript adapter",
-      "name": "Multi-line JSDoc extracted",
-      "given": ["content with a multi-line JSDoc block before a class declaration"],
-      "when": ["extractSymbols() is called"],
-      "then": ["comment contains the full JSDoc text including newlines"]
-    },
-    {
-      "requirement": "TypeScript adapter",
-      "name": "No comment yields undefined",
-      "given": ["content containing a function with no preceding comment"],
-      "when": ["extractSymbols() is called"],
-      "then": ["the symbol's comment is undefined"]
-    },
-    {
-      "requirement": "TypeScript adapter",
-      "name": "EXPORTS relation created for exported symbol",
-      "given": ["content containing export function createUser() { ... }"],
-      "when": ["extractRelations() is called"],
+      "name": "Exported symbol yields an EXPORTS relation during relation building",
+      "given": ["a file analysis from content containing export function createUser() { ... }"],
+      "when": ["buildRelations() is called for that analysis"],
       "then": ["an EXPORTS relation from the file to the createUser symbol is returned"]
     },
     {
-      "requirement": "TypeScript adapter",
-      "name": "IMPORTS relation created for import statement",
-      "given": ["content containing import { createUser } from './user.ts'"],
-      "when": ["extractRelations() is called with the appropriate import map"],
-      "then": ["an IMPORTS relation from the current file to the resolved target file is returned"]
-    },
-    {
       "requirement": "Import declaration extraction",
-      "name": "TypeScript named imports parsed",
+      "name": "TypeScript named imports appear in file analysis",
       "given": ["content containing import { createUser, type Config } from '@specd/core'"],
-      "when": ["extractImportedNames() is called"],
+      "when": ["analyzeFile() is called"],
       "then": [
-        "two declarations are returned: createUser and Config, both with specifier '@specd/core' and isRelative: false"
+        "the returned draft includes two import declarations: createUser and Config, both with specifier '@specd/core' and isRelative: false"
       ]
     },
     {
       "requirement": "Import declaration extraction",
-      "name": "Relative import detected",
+      "name": "Relative import is marked relative",
       "given": ["content containing import { helper } from './utils.js'"],
-      "when": ["extractImportedNames() is called"],
-      "then": ["one declaration is returned with isRelative: true and specifier './utils.js'"]
+      "when": ["analyzeFile() is called"],
+      "then": [
+        "the returned draft includes one import declaration with isRelative: true and specifier './utils.js'"
+      ]
     },
     {
       "requirement": "Import declaration extraction",
       "name": "Aliased import preserves both names",
       "given": ["content containing import { foo as bar } from './mod.js'"],
-      "when": ["extractImportedNames() is called"],
-      "then": ["the declaration has originalName: 'foo' and localName: 'bar'"]
+      "when": ["analyzeFile() is called"],
+      "then": ["the import declaration has originalName: 'foo' and localName: 'bar'"]
     },
     {
       "requirement": "Import declaration extraction",
-      "name": "Python relative import",
+      "name": "Python relative import is represented in the draft",
       "given": ["content containing from .utils import helper"],
-      "when": ["extractImportedNames() is called on a Python adapter"],
-      "then": ["one declaration is returned with isRelative: true"]
+      "when": ["analyzeFile() is called on a Python adapter"],
+      "then": ["the returned import declaration has isRelative: true"]
     },
     {
       "requirement": "Import declaration extraction",
       "name": "Go imports are never relative",
       "given": ["content containing import \"fmt\""],
-      "when": ["extractImportedNames() is called on a Go adapter"],
-      "then": ["the declaration has isRelative: false"]
+      "when": ["analyzeFile() is called on a Go adapter"],
+      "then": ["the returned import declaration has isRelative: false"]
     },
     {
       "requirement": "Call resolution",
-      "name": "Call resolved via import map",
+      "name": "Call is resolved via stored imports and facts",
       "given": [
         "a function processOrder that calls validateUser()",
         "AND validateUser was imported from ./auth.ts"
       ],
-      "when": [
-        "extractRelations() is called with the import map containing validateUser → auth.ts:validateUser"
-      ],
+      "when": ["buildRelations() is called with resolved imports for the file analysis"],
       "then": ["a CALLS relation from processOrder to validateUser is returned"]
     },
     {
       "requirement": "Call resolution",
-      "name": "Unresolvable call silently dropped",
+      "name": "Unresolvable call is silently dropped",
       "given": ["a function that calls console.log() (a global built-in)"],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["no CALLS relation is created for that call and no error is thrown"]
     },
     {
       "requirement": "Call resolution",
-      "name": "Top-level call silently dropped",
+      "name": "Top-level call is silently dropped",
       "given": ["a call expression init() at module top level (not inside any function or class)"],
-      "when": ["extractRelations() is called"],
+      "when": ["analyzeFile() extracts call facts and buildRelations() runs"],
       "then": ["no CALLS relation is created for that call"]
     },
     {
       "requirement": "Scoped binding fact extraction",
       "name": "TypeScript constructor parameter type becomes binding fact",
       "given": ["TypeScript content containing constructor(expander: TemplateExpander) {}"],
-      "when": ["extractBindingFacts() is called"],
+      "when": ["analyzeFile() is called"],
       "then": [
-        "a parameter binding fact associates expander with target type TemplateExpander",
-        "AND no graph relation is emitted directly by the binding fact extraction step"
+        "the returned binding facts associate expander with target type TemplateExpander",
+        "AND no graph relation is emitted directly during fact extraction"
       ]
     },
     {
       "requirement": "Scoped binding fact extraction",
       "name": "Receiver binding fact is extracted",
       "given": ["a class method containing this.repository.save()"],
-      "when": ["extractBindingFacts() and extractCallFacts() are called"],
+      "when": ["analyzeFile() is called"],
       "then": [
-        "the adapter emits facts that identify this as the enclosing class receiver",
+        "the returned facts identify this as the enclosing class receiver",
         "AND the member call is represented as a call fact for shared resolution"
       ]
     },
@@ -355,16 +378,16 @@
       "requirement": "Scoped binding fact extraction",
       "name": "Runtime-only binding is dropped",
       "given": ["source content fetches a service by a non-literal runtime identifier"],
-      "when": ["extractBindingFacts() is called"],
+      "when": ["analyzeFile() is called"],
       "then": ["no binding fact is emitted for that service target"]
     },
     {
       "requirement": "Built-in multi-language dependency coverage",
-      "name": "TypeScript dynamic and CommonJS imports are parsed",
+      "name": "TypeScript dynamic and CommonJS imports are represented in file analysis",
       "given": [
         "TypeScript content containing import('./plugin.js'), require('./legacy.js'), and import './polyfill.js'"
       ],
-      "when": ["extractImportedNames() is called"],
+      "when": ["analyzeFile() is called"],
       "then": ["import declarations are returned for all three deterministic specifiers"]
     },
     {
@@ -373,7 +396,7 @@
       "given": [
         "TypeScript content containing constructor(expander: TemplateExpander) and new TemplateExpander(builtins)"
       ],
-      "when": ["binding and call facts are extracted"],
+      "when": ["analyzeFile() is called"],
       "then": [
         "facts identify the constructor-injected TemplateExpander dependency as a USES_TYPE candidate",
         "AND facts identify the constructor call as a CONSTRUCTS candidate"
@@ -381,9 +404,9 @@
     },
     {
       "requirement": "Built-in multi-language dependency coverage",
-      "name": "Python literal dynamic import is parsed",
+      "name": "Python literal dynamic import is represented in file analysis",
       "given": ["Python content containing importlib.import_module(\"acme.plugins.mailer\")"],
-      "when": ["import declarations are extracted"],
+      "when": ["analyzeFile() is called"],
       "then": ["a deterministic import declaration is returned for acme.plugins.mailer"]
     },
     {
@@ -392,7 +415,7 @@
       "given": [
         "Go content importing models \"github.com/acme/auth/models\" and calling models.NewUser()"
       ],
-      "when": ["import, binding, and call facts are extracted"],
+      "when": ["analyzeFile() is called"],
       "then": [
         "the import alias and selector call facts are available to shared resolution",
         "AND constructor-like/composite literal facts identify CONSTRUCTS candidates when present"
@@ -404,7 +427,7 @@
       "given": [
         "PHP content declaring var $uses = array('Article') and calling $this->Article->save()"
       ],
-      "when": ["binding and call facts are extracted"],
+      "when": ["analyzeFile() is called"],
       "then": [
         "the framework-managed Article receiver and member call are represented as shared facts"
       ]
@@ -431,7 +454,7 @@
       "given": [
         "a supported language file declaring a type that inherits from a resolvable base type"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["an EXTENDS relation is emitted"]
     },
     {
@@ -440,7 +463,7 @@
       "given": [
         "a supported language file declaring a type that fulfills a resolvable contract-like type"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["an IMPLEMENTS relation is emitted"]
     },
     {
@@ -449,7 +472,7 @@
       "given": [
         "a supported language file declaring a method that can be matched deterministically to an inherited or contract method"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["an OVERRIDES relation is emitted"]
     },
     {
@@ -458,14 +481,14 @@
       "given": [
         "a supported language construct that is not classical inheritance but preserves useful semantics when normalized"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["the emitted relation uses one of EXTENDS, IMPLEMENTS, or OVERRIDES"]
     },
     {
       "requirement": "Hierarchy extraction",
       "name": "Unresolvable hierarchy target is silently dropped",
       "given": ["a hierarchy declaration whose target cannot be resolved deterministically"],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["no hierarchy relation is emitted", "AND no error is thrown"]
     },
     {
@@ -572,7 +595,7 @@
       "name": "TypeScript scoped package specifier",
       "given": ["known packages ['@specd/core', '@specd/cli']"],
       "when": [
-        "resolvePackageFromSpecifier('@specd/core', knownPackages) is called on the TS adapter"
+        "resolvePackageFromSpecifier('@specd/core', knownPackages) is called on the TypeScript adapter"
       ],
       "then": ["it returns '@specd/core'"]
     },
@@ -581,7 +604,7 @@
       "name": "TypeScript bare package specifier",
       "given": ["known packages ['lodash']"],
       "when": [
-        "resolvePackageFromSpecifier('lodash/fp', knownPackages) is called on the TS adapter"
+        "resolvePackageFromSpecifier('lodash/fp', knownPackages) is called on the TypeScript adapter"
       ],
       "then": ["it returns 'lodash'"]
     },
@@ -612,19 +635,6 @@
     },
     {
       "requirement": "Import specifier resolution",
-      "name": "TypeScript relative import path resolution",
-      "given": ["a file at core/src/commands/create.ts"],
-      "when": ["resolveRelativeImportPath('core/src/commands/create.ts', '../utils.js') is called"],
-      "then": ["it returns 'core/src/utils.ts' (.js → .ts, path traversal applied)"]
-    },
-    {
-      "requirement": "Import specifier resolution",
-      "name": "PHP qualified name construction",
-      "when": ["buildQualifiedName('App\\\\Models', 'User') is called on the PHP adapter"],
-      "then": ["it returns 'App\\\\Models\\\\User'"]
-    },
-    {
-      "requirement": "Import specifier resolution",
       "name": "PSR-4 resolves qualified name to file path",
       "given": [
         "a codeRoot containing composer.json with autoload.psr-4: { \"App\\\\\": \"src/\" }"
@@ -636,15 +646,6 @@
     },
     {
       "requirement": "Import specifier resolution",
-      "name": "PSR-4 uses longest prefix match",
-      "given": [
-        "composer.json with autoload.psr-4: { \"App\\\\\": \"src/\", \"App\\\\Models\\\\\": \"src/models/\" }"
-      ],
-      "when": ["resolveQualifiedNameToPath('App\\\\Models\\\\User', codeRoot) is called"],
-      "then": ["it returns {codeRoot}/src/models/User.php (longer prefix wins)"]
-    },
-    {
-      "requirement": "Import specifier resolution",
       "name": "Qualified name with no matching prefix returns undefined",
       "given": ["composer.json with autoload.psr-4: { \"App\\\\\": \"src/\" }"],
       "when": ["resolveQualifiedNameToPath('Vendor\\\\Lib\\\\Foo', codeRoot) is called"],
@@ -652,17 +653,29 @@
     },
     {
       "requirement": "Import specifier resolution",
-      "name": "No composer.json returns undefined",
-      "given": ["a codeRoot with no composer.json at or above it (bounded by repoRoot)"],
-      "when": ["resolveQualifiedNameToPath('App\\\\Models\\\\User', codeRoot) is called"],
-      "then": ["it returns undefined and no error is thrown"]
+      "name": "Session lookups drive PHP import resolution",
+      "given": [
+        "the PHP adapter is resolving imports for a file that uses CakePHP, CodeIgniter, or namespace-based conventions",
+        "AND the shared session already knows the discovered files and registered symbols"
+      ],
+      "when": ["resolveImports() is called"],
+      "then": [
+        "the adapter uses those shared lookups to test candidates",
+        "AND it does not scan every workspace symbol or hit the filesystem for each candidate"
+      ]
     },
     {
       "requirement": "Import specifier resolution",
-      "name": "PSR-4 map cached across calls",
-      "given": ["a codeRoot with a valid composer.json"],
-      "when": ["resolveQualifiedNameToPath is called twice with different qualified names"],
-      "then": ["composer.json is read from disk only once"]
+      "name": "Pass 2 uses precomputed package metadata instead of filesystem probes",
+      "given": [
+        "the PHP adapter needs PSR-4 metadata to resolve a qualified import during Pass 2",
+        "AND that metadata was already prepared as compact per-file or run-scoped adapter state"
+      ],
+      "when": ["resolveImports() runs"],
+      "then": [
+        "the adapter resolves the import from that retained metadata and shared session lookups",
+        "AND it does not probe the filesystem for each import candidate"
+      ]
     },
     {
       "requirement": "PHP require/include dependencies",
@@ -670,7 +683,7 @@
       "given": [
         "a PHP file at app/controllers/PostsController.php containing require_once '../models/Post.php'"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called from the stored file analysis"],
       "then": [
         "an IMPORTS relation is returned from app/controllers/PostsController.php to app/models/Post.php"
       ]
@@ -679,65 +692,43 @@
       "requirement": "PHP require/include dependencies",
       "name": "include with relative path emits IMPORTS",
       "given": ["a PHP file containing include 'helpers/url_helper.php'"],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called from the stored file analysis"],
       "then": [
         "an IMPORTS relation is returned pointing to helpers/url_helper.php relative to the file's directory"
       ]
     },
     {
       "requirement": "PHP require/include dependencies",
-      "name": "require with PHP constant expression silently dropped",
+      "name": "require with PHP constant expression is silently dropped",
       "given": ["a PHP file containing require_once APPPATH . 'models/Post.php'"],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["no IMPORTS relation is created for that expression and no error is thrown"]
     },
     {
       "requirement": "PHP require/include dependencies",
-      "name": "require with variable silently dropped",
+      "name": "require with variable is silently dropped",
       "given": ["a PHP file containing require_once $path"],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["no relation is created for that expression and no error is thrown"]
-    },
-    {
-      "requirement": "PHP require/include dependencies",
-      "name": "require_once alongside use statements both processed",
-      "given": [
-        "a PHP file containing both use App\\Models\\User; and require_once 'bootstrap.php'"
-      ],
-      "when": ["extractRelations() is called with a populated importMap"],
-      "then": [
-        "an IMPORTS relation for bootstrap.php is returned",
-        "AND an IMPORTS relation for the resolved User class is also returned (via importMap)"
-      ]
     },
     {
       "requirement": "PHP dynamic loader dependencies",
       "name": "loadModel emits IMPORTS when target resolves",
       "given": [
-        "a PHP file containing $this->loadModel('User')",
+        "a PHP file analysis containing $this->loadModel('User')",
         "AND resolver rules can map User to a concrete file"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["an IMPORTS relation is returned to that target file"]
     },
     {
       "requirement": "PHP dynamic loader dependencies",
       "name": "CodeIgniter load->model emits IMPORTS when target resolves",
       "given": [
-        "a PHP file containing $this->load->model('User_model')",
+        "a PHP file analysis containing $this->load->model('User_model')",
         "AND resolver rules can map User_model to a concrete file"
       ],
-      "when": ["extractRelations() is called"],
-      "then": ["an IMPORTS relation is returned"]
-    },
-    {
-      "requirement": "PHP dynamic loader dependencies",
-      "name": "App::uses emits IMPORTS when target resolves",
-      "given": [
-        "a PHP file containing App::uses('Controller', 'Controller')",
-        "AND resolver rules can map the class to a concrete file"
-      ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["an IMPORTS relation is returned"]
     },
     {
@@ -747,58 +738,31 @@
         "a controller class declaring var $uses = array('Article', 'Category')",
         "AND resolver rules can map both entries to concrete files"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["IMPORTS relations are returned for both resolved targets"]
     },
     {
       "requirement": "PHP dynamic loader dependencies",
-      "name": "Bare Cake loaders are supported",
-      "given": ["a PHP file containing loadController('Admin') and loadComponent('Auth')"],
-      "when": ["extractRelations() is called"],
-      "then": ["loader resolver rules are applied to both calls"]
-    },
-    {
-      "requirement": "PHP dynamic loader dependencies",
-      "name": "Class-literal framework acquisition emits IMPORTS when target resolves",
-      "given": [
-        "a PHP file containing a framework acquisition call with an explicit class target",
-        "AND resolver rules can map that class target to a concrete file"
-      ],
-      "when": ["extractRelations() is called"],
-      "then": ["an IMPORTS relation is returned to that target file"]
-    },
-    {
-      "requirement": "PHP dynamic loader dependencies",
-      "name": "Dynamic argument silently dropped",
+      "name": "Dynamic argument is silently dropped",
       "given": ["a PHP file containing $this->loadModel($modelName)"],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["no relation is created for that call and no error is thrown"]
     },
     {
       "requirement": "PHP dynamic loader dependencies",
-      "name": "Unresolvable target silently dropped",
+      "name": "Unresolvable target is silently dropped",
       "given": [
         "a PHP file containing a known loader call with literal argument",
         "AND resolver rules cannot map it to a target file"
       ],
-      "when": ["extractRelations() is called"],
+      "when": ["buildRelations() is called"],
       "then": ["no relation is created for that call and no error is thrown"]
-    },
-    {
-      "requirement": "PHP dynamic loader dependencies",
-      "name": "Runtime-only service identifier is not treated as a deterministic dependency",
-      "given": [
-        "a PHP file containing a framework service lookup identified only by a string service ID",
-        "AND resolver rules do not define a deterministic file target for that service ID"
-      ],
-      "when": ["extractRelations() is called"],
-      "then": ["no IMPORTS relation is created from that lookup"]
     },
     {
       "requirement": "PHP loaded-instance call extraction",
       "name": "Member call on loaded alias emits CALLS",
       "given": ["a method containing loadModel('Article') and later $this->Article->save()"],
-      "when": ["extractRelations() runs with resolvable caller and callee symbols"],
+      "when": ["buildRelations() runs with resolvable caller and callee symbols"],
       "then": ["a CALLS relation is emitted from caller symbol to callee symbol"]
     },
     {
@@ -820,36 +784,6 @@
     },
     {
       "requirement": "PHP loaded-instance call extraction",
-      "name": "Bare loader form feeds the same alias resolution as receiver-based form",
-      "given": [
-        "a method containing loadComponent('Auth')",
-        "AND the same method later calls $this->Auth->login()"
-      ],
-      "when": ["caller and callee symbols are resolvable"],
-      "then": ["a CALLS relation is emitted"]
-    },
-    {
-      "requirement": "PHP loaded-instance call extraction",
-      "name": "Explicit instance construction after framework loading emits CALLS",
-      "given": [
-        "a method containing loadModel('Article')",
-        "AND the same method later assigns $article = new Article() and calls $article->save()"
-      ],
-      "when": ["caller and callee symbols are resolvable"],
-      "then": ["a CALLS relation is emitted"]
-    },
-    {
-      "requirement": "PHP loaded-instance call extraction",
-      "name": "Class-literal service acquisition emits CALLS when target is statically known",
-      "given": [
-        "a method assigns a framework-managed service acquisition with an explicit class target to a local variable",
-        "AND the same method later calls a method on that variable"
-      ],
-      "when": ["the service class and callee method symbols are resolvable"],
-      "then": ["a CALLS relation is emitted"]
-    },
-    {
-      "requirement": "PHP loaded-instance call extraction",
       "name": "Runtime-only service identifier is not promoted to CALLS",
       "given": [
         "a method fetches a service using only a runtime string identifier",
@@ -857,13 +791,6 @@
       ],
       "when": ["a method call is later made on the fetched value"],
       "then": ["no CALLS relation is emitted from that dynamic lookup"]
-    },
-    {
-      "requirement": "PHP loaded-instance call extraction",
-      "name": "Cross-method alias propagation is not performed",
-      "given": ["alias assignment in one method and method call in another"],
-      "when": ["extractRelations() runs"],
-      "then": ["no CALLS relation is emitted from cross-method alias propagation"]
     },
     {
       "requirement": "PHP loader resolver extensibility",
@@ -887,9 +814,68 @@
       "then": ["query patterns are not exposed through the public API"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+        "symbol": "PhpLanguageAdapter"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+        "symbol": "selectCandidatePath"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+        "symbol": "resolveCakeTarget"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+        "symbol": "resolveCodeIgniterTarget"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+        "symbol": "resolveYiiImportTarget"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+        "symbol": "resolveGenericPhpTarget"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+        "symbol": "resolveFrameworkClassLiteralTarget"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/domain/value-objects/language-adapter.ts",
+        "symbol": "LanguageAdapter"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+        "symbol": "TypeScriptLanguageAdapter"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
+        "symbol": "PythonLanguageAdapter"
+      },
+      {
+        "specId": "code-graph:language-adapter",
+        "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
+        "symbol": "GoLanguageAdapter"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:d7d80f0edc953d1ad050c9c8c9fd064a88181379bfbf13a7917d660599ac738e",
-    "verify.md": "sha256:a49256735fcb8cb3f04775f288cb5bd98b00d18d8436eae5074164e351330ff7"
+    "spec.md": "sha256:eb705db0498d6123c21518ad349ec8db7fe0e807d5e8f689bc63a8c0f6eff801",
+    "verify.md": "sha256:e6847a051226f51e3cec418cc1863eccd2acf894ecac395e6da5c16d7e6445ba"
   },
   "generatedBy": "core"
 }

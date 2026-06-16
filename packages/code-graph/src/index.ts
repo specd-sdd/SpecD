@@ -45,6 +45,12 @@ export {
   type IndexError,
   type WorkspaceIndexBreakdown,
 } from './domain/value-objects/index-result.js'
+export {
+  type IndexSession,
+  type RegisterFileInput,
+  type RegisterAnalysisInput,
+} from './domain/value-objects/index-session.js'
+export { InMemoryIndexSession } from './application/use-cases/in-memory-index-session.js'
 
 // Traversal types
 export { type TraversalOptions } from './domain/value-objects/traversal-options.js'

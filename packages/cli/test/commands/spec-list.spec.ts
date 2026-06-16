@@ -208,6 +208,24 @@ describe('spec list --metadata-status', () => {
     const out = stdout()
     expect(out).not.toContain('METADATA STATUS')
   })
+
+  it('uses optimizedDescription when available in summary mode', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.list.execute.mockResolvedValue([
+      {
+        workspace: 'default',
+        path: 'auth/login',
+        title: 'Login',
+        summary: 'Terse login summary',
+      },
+    ])
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--summary'])
+
+    expect(stdout()).toContain('Terse login summary')
+  })
 })
 
 describe('spec list --workspace', () => {

@@ -26,7 +26,7 @@ export interface SkillRepository {
    *
    * @returns Skill metadata collection.
    */
-  list(): readonly Skill[]
+  list(): Promise<readonly Skill[]>
 
   /**
    * Gets a skill by name.
@@ -34,7 +34,7 @@ export interface SkillRepository {
    * @param name - Skill name.
    * @returns Matching skill, or `undefined`.
    */
-  get(name: string): Skill | undefined
+  get(name: string): Promise<Skill | undefined>
 
   /**
    * Resolves a concrete bundle for installation.
@@ -46,12 +46,17 @@ export interface SkillRepository {
    * Shared files included from `templates/shared` MUST preserve their shared
    * origin metadata in the resolved bundle output.
    */
-  getBundle(name: string, context?: SkillTemplateContext): SkillBundle
+  getBundle(name: string, context?: SkillTemplateContext): Promise<SkillBundle>
 
   /**
    * Lists shared files declared under `templates/shared`.
    *
    * @returns Shared-file entries.
    */
-  listSharedFiles(): readonly SharedFile[]
+  listSharedFiles(): Promise<readonly SharedFile[]>
 }
+
+/**
+ * Alias for the SkillRepository interface port.
+ */
+export type SkillRepositoryPort = SkillRepository

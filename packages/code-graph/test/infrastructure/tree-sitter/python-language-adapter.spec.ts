@@ -6,10 +6,154 @@ import { PythonLanguageAdapter } from '../../../src/infrastructure/tree-sitter/p
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
-import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
-import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
+import {
+  BindingSourceKind,
+  type BindingFact,
+} from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
+import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
+import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 
-const adapter = new PythonLanguageAdapter()
+interface TestAdapter {
+  languages(): string[]
+  extensions(): Record<string, string>
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
+  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
+  resolveRelativeImportPath(fromFile: string, specifier: string): string | string[]
+  extractSymbols(filePath: string, content: string): SymbolNode[]
+  extractImportedNames(filePath: string, content: string): ImportDeclaration[]
+  extractBindingFacts(
+    filePath: string,
+    content: string,
+    symbols: readonly SymbolNode[],
+    imports: readonly ImportDeclaration[],
+  ): BindingFact[]
+  extractCallFacts(filePath: string, content: string, symbols: readonly SymbolNode[]): CallFact[]
+  extractRelations(
+    filePath: string,
+    content: string,
+    relationSymbols: readonly SymbolNode[],
+    importMap?: ReadonlyMap<string, string>,
+    filePaths?: ReadonlySet<string>,
+  ): Relation[]
+}
+
+const baseAdapter = new PythonLanguageAdapter()
+const adapter = baseAdapter as unknown as TestAdapter
+
+adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'python',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.symbols as SymbolNode[]
+}
+
+adapter.extractImportedNames = (filePath: string, content: string): ImportDeclaration[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'python',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.imports as ImportDeclaration[]
+}
+
+adapter.extractBindingFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+  imports: readonly ImportDeclaration[],
+): BindingFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'python',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.bindingFacts as BindingFact[]
+}
+
+adapter.extractCallFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+): CallFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'python',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.callFacts as CallFact[]
+}
+
+adapter.extractRelations = (
+  filePath: string,
+  content: string,
+  relationSymbols: readonly SymbolNode[],
+  importMap: ReadonlyMap<string, string> = new Map(),
+  filePaths: ReadonlySet<string> = new Set(),
+): Relation[] => {
+  const session = new InMemoryIndexSession()
+  for (const fp of filePaths) {
+    session.registerFile({
+      filePath: fp,
+      configRelativePath: fp,
+      language: 'python',
+      contentHash: 'abc',
+      workspace: 'ws',
+    })
+  }
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'python',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  const analysis = session.registerAnalysis({
+    filePath,
+    analysis: draft,
+  })
+  const resolvedImports = { importMap, fileImports: [] }
+  return baseAdapter.buildRelations(analysis, {
+    session,
+    resolvedImports,
+  })
+}
 
 describe('PythonLanguageAdapter', () => {
   it('reports supported languages', () => {
@@ -26,24 +170,26 @@ describe('PythonLanguageAdapter', () => {
 
     it('extracts class definitions', () => {
       const symbols = adapter.extractSymbols('main.py', 'class User:\n    pass')
-      expect(symbols.some((s) => s.name === 'User' && s.kind === SymbolKind.Class)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'User' && s.kind === SymbolKind.Class),
+      ).toBe(true)
     })
 
     it('extracts methods inside classes', () => {
       const code =
         'class User:\n    def login(self):\n        pass\n    def logout(self):\n        pass'
       const symbols = adapter.extractSymbols('main.py', code)
-      const methods = symbols.filter((s) => s.kind === SymbolKind.Method)
+      const methods = symbols.filter((s: SymbolNode) => s.kind === SymbolKind.Method)
       expect(methods).toHaveLength(2)
-      expect(methods.map((m) => m.name)).toContain('login')
-      expect(methods.map((m) => m.name)).toContain('logout')
+      expect(methods.map((m: SymbolNode) => m.name)).toContain('login')
+      expect(methods.map((m: SymbolNode) => m.name)).toContain('logout')
     })
 
     it('extracts module-level assignments as variables', () => {
       const symbols = adapter.extractSymbols('main.py', 'MAX_RETRIES = 3')
-      expect(symbols.some((s) => s.name === 'MAX_RETRIES' && s.kind === SymbolKind.Variable)).toBe(
-        true,
-      )
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'MAX_RETRIES' && s.kind === SymbolKind.Variable),
+      ).toBe(true)
     })
 
     it('extracts comment from preceding line', () => {
@@ -63,7 +209,7 @@ describe('PythonLanguageAdapter', () => {
       const code = 'def foo():\n    pass\ndef bar():\n    pass'
       const symbols = adapter.extractSymbols('main.py', code)
       const relations = adapter.extractRelations('main.py', code, symbols, new Map())
-      const defines = relations.filter((r) => r.type === RelationType.Defines)
+      const defines = relations.filter((r: Relation) => r.type === RelationType.Defines)
       expect(defines).toHaveLength(symbols.length)
     })
 
@@ -71,7 +217,7 @@ describe('PythonLanguageAdapter', () => {
       const code = 'from .utils import helper'
       const symbols = adapter.extractSymbols('src/main.py', code)
       const relations = adapter.extractRelations('src/main.py', code, symbols, new Map())
-      const imports = relations.filter((r) => r.type === RelationType.Imports)
+      const imports = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(imports).toHaveLength(1)
     })
 
@@ -79,7 +225,7 @@ describe('PythonLanguageAdapter', () => {
       const code = 'import os\nfrom pathlib import Path'
       const symbols = adapter.extractSymbols('main.py', code)
       const relations = adapter.extractRelations('main.py', code, symbols, new Map())
-      const imports = relations.filter((r) => r.type === RelationType.Imports)
+      const imports = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(imports).toHaveLength(0)
     })
 
@@ -96,8 +242,12 @@ class User(Base):
       const symbols = adapter.extractSymbols('main.py', code)
       const relations = adapter.extractRelations('main.py', code, symbols, new Map())
 
-      expect(relations.some((relation) => relation.type === RelationType.Extends)).toBe(true)
-      expect(relations.some((relation) => relation.type === RelationType.Overrides)).toBe(true)
+      expect(relations.some((relation: Relation) => relation.type === RelationType.Extends)).toBe(
+        true,
+      )
+      expect(relations.some((relation: Relation) => relation.type === RelationType.Overrides)).toBe(
+        true,
+      )
     })
 
     it('creates IMPLEMENTS for imported protocol-like bases', () => {
@@ -115,7 +265,7 @@ class User(Persistable):
       )
 
       const implementsRelation = relations.find(
-        (relation) => relation.type === RelationType.Implements,
+        (relation: Relation) => relation.type === RelationType.Implements,
       )
       expect(implementsRelation?.target).toBe('contracts.py:interface:Persistable:1:0')
     })
@@ -130,7 +280,9 @@ importlib.import_module(name)
 __import__("pkg.other")
 `
       const imports = adapter.extractImportedNames('main.py', code)
-      expect(imports.filter((item) => item.kind === ImportDeclarationKind.Dynamic)).toHaveLength(2)
+      expect(
+        imports.filter((item: ImportDeclaration) => item.kind === ImportDeclarationKind.Dynamic),
+      ).toHaveLength(2)
     })
 
     it('emits annotation and constructor facts', () => {
@@ -148,12 +300,14 @@ class Service:
 
       expect(
         bindingFacts.some(
-          (fact) =>
+          (fact: BindingFact) =>
             fact.sourceKind === BindingSourceKind.Parameter && fact.targetName === 'UserRepo',
         ),
       ).toBe(true)
       expect(
-        callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo'),
+        callFacts.some(
+          (fact: CallFact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo',
+        ),
       ).toBe(true)
     })
 
@@ -168,9 +322,10 @@ HandlerFn: TypeAlias = Callable[[Event], Result]
       const facts = adapter.extractBindingFacts('main.py', code, symbols, imports)
 
       const registryFacts = facts.filter(
-        (f) => f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
+        (f: BindingFact) =>
+          f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
       )
-      expect(registryFacts.some((f) => f.targetName === 'ArtifactParser')).toBe(true)
+      expect(registryFacts.some((f: BindingFact) => f.targetName === 'ArtifactParser')).toBe(true)
     })
   })
 

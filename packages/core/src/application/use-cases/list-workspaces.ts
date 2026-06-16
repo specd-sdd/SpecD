@@ -11,6 +11,8 @@ import { type SpecRepository } from '../ports/spec-repository.js'
 export interface ProjectWorkspace {
   /** The workspace name (e.g. `'default'`, `'core'`). */
   readonly name: string
+  /** Logical path prefix for all specs in this workspace, or null if none. */
+  readonly prefix: string | null
   /** Absolute path to the implementation code root for this workspace. */
   readonly codeRoot: string
   /** `true` when the workspace specs are outside the project VCS root. */
@@ -66,6 +68,7 @@ export class ListWorkspaces {
 
       return {
         name: workspace.name,
+        prefix: workspace.prefix ?? null,
         codeRoot: workspace.codeRoot,
         isExternal: workspace.isExternal,
         ownership: workspace.ownership,

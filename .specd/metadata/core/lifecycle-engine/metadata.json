@@ -4,8 +4,8 @@
   "dependsOn": [
     "core:change",
     "core:workflow-model",
-    "default:_global/architecture",
-    "core:schema-format"
+    "core:schema-format",
+    "default:_global/architecture"
   ],
   "context": [
     "Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing \"liar context\" and ensuring consistent system behavior. The `LifecycleEngine` is a centralized domain service that combines the change's persisted state with schema-defined workflow rules to derive the authoritative effective state, available transitions, and machine-readable blockers."
@@ -211,5 +211,7 @@
     "spec.md": "sha256:55f5980387125a4f5647c5d3f534404d8068c2ff4dce35ac5605cbdd7e3071c9",
     "verify.md": "sha256:5cd035c7607622ac483c5cf53c50f70eb37369d2c4a3681ab486ef6b4f3c9658"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing \"liar context\"…",
+  "optimizedContext": "# Lifecycle Engine\n\n## Rules\n- Centralized validation logic: The LifecycleEngine SHALL be the sole authority for interpreting a change's state within a project's workflow.\n- Effective artifact status computation: Artifacts may contain multiple files (e.g., one per spec ID).\n- Canonical-state-only lifecycle interpretation: LifecycleEngine SHALL interpret only canonical artifact/file workflow states when deriving effective status, blockers, review routing, and transition eligibility.\n- Machine-readable blockers: For every condition that prevents a transition or marks an artifact as incomplete, the engine MUST provide a structured Blocker object containing: - code: A unique…\n- Available steps and next action: The engine MUST derive the set of AvailableStep entries and the authoritative EffectiveTarget based on the current change state, project configuration (approval gates), and…\n- Archiving escape transitions in lifecycle verdict: When evaluating a change in archiving state, LifecycleEngine MUST expose archivable and designing in both validTransitions and availableTransitions unless a non-skippable blocker…\n- Review summary integration: The engine MUST detect and report Drift (physical content changes since last validation) and Overlap (conflicts with specs targeted by other archived changes) as part of the…\n- Shared lifecycle interpretation for consumers: Use cases that need DAG-aware lifecycle answers MUST consume LifecycleEngine rather than reimplementing schema interpretation locally.\n- Next artifact topological order: When deriving the recommended next artifact for a change, LifecycleEngine MUST scan artifacts in schema.artifactDag().topologicalOrder() and return the first artifact id whose…\n- Dependencies: core:change, core:workflow-model, default:_global/architecture, core:schema-format\n\n## Constraints\n- None explicit.\n"
 }

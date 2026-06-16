@@ -323,6 +323,7 @@ describe('graph stats — staleness detection', () => {
           config.projectRoot,
           {
             name: workspace.name,
+            prefix: null,
             codeRoot: workspace.codeRoot,
             ownership: workspace.ownership,
             isExternal: workspace.isExternal,
@@ -330,6 +331,7 @@ describe('graph stats — staleness detection', () => {
           },
           config.workspaces.map((candidate) => ({
             name: candidate.name,
+            prefix: null,
             codeRoot: candidate.codeRoot,
             ownership: candidate.ownership,
             isExternal: candidate.isExternal,
@@ -345,6 +347,7 @@ describe('graph stats — staleness detection', () => {
           config.projectRoot,
           config.workspaces.map((workspace) => ({
             name: workspace.name,
+            prefix: null,
             codeRoot: workspace.codeRoot,
             ownership: workspace.ownership,
             isExternal: workspace.isExternal,

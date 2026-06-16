@@ -129,5 +129,7 @@
     "spec.md": "sha256:40b77a1d0fe2f715ab0733e116141da3734028175c0d83f605651eeaed7c6c53",
     "verify.md": "sha256:c401e34e489be2ca3736d24ba3cabb2d4f14a8c166574db7a56070bcbe1dbd6e"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Standardized error handling across specd: every user-facing error must be machine-readable, actionable, and consistent.",
+  "optimizedContext": "# Error Handling Conventions\n\n## Rules\n\n- All user-facing errors SHALL follow Specd Error Contract: (1) inherit from `Error`, (2) have `readonly specd = true` discriminator, (3) have `readonly code: string`, (4) have descriptive human-readable `message`.\n- `@specd/core` SHALL define canonical `SpecdError` base class. Every domain/application error MUST extend `SpecdError`.\n- Every package depending on `@specd/core` MUST extend `SpecdError` for its errors. SHOULD define package-level base (e.g. `SpecdCodeGraphError`, `SpecdCliError`) for namespace.\n- Error codes SHALL be `UPPER_SNAKE_CASE` (e.g. `CHANGE_NOT_FOUND`). Unique within package, stable across versions.\n- Error messages MUST be descriptive, tell user how to fix. Avoid jargon/internal details.\n- Errors MAY include additional metadata properties (`specId`, `filePath`, `expected`). SHOULD be documented in JSDoc.\n- All error classes MUST include JSDoc: what error represents, machine-readable `code`, any metadata properties. Use cases MUST document thrown errors with `@throws`.\n\n## Constraints\n\n- System errors (OOM, network failure) and unexpected bugs MAY remain generic `Error` — handled as system errors with stack trace\n- Domain logic MUST NOT use generic `Error` for expected failure modes or validation errors"
 }

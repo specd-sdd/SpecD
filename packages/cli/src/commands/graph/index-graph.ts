@@ -93,9 +93,21 @@ export function registerGraphIndex(parent: Command): void {
               env: workerEnv,
             })
 
-            worker.on('exit', (code) => {
+            const forwardSignal = (sig: NodeJS.Signals): void => {
+              worker.kill(sig)
+            }
+            process.on('SIGINT', forwardSignal)
+            process.on('SIGTERM', forwardSignal)
+
+            worker.on('exit', (code, signal) => {
+              process.removeListener('SIGINT', forwardSignal)
+              process.removeListener('SIGTERM', forwardSignal)
               if (lockRelease) lockRelease()
-              process.exit(code ?? 0)
+              if (code !== 0 || signal) {
+                process.stderr.write(`Worker exited with code ${code} and signal ${signal}\n`)
+                process.exit(code ?? 1)
+              }
+              process.exit(0)
             })
           } else {
             if (kernel === null) {
@@ -124,6 +136,7 @@ export function registerGraphIndex(parent: Command): void {
                   projectRoot,
                   workspaces: workspaces.map((ws) => ({
                     name: ws.name,
+                    prefix: ws.prefix,
                     codeRoot: ws.codeRoot,
                     specRepo: ws.specRepo,
                     ownership: ws.ownership,

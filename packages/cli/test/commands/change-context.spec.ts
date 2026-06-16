@@ -441,4 +441,45 @@ describe('change context', () => {
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
   })
+
+  it('passes llmOptimizedContext as true by default when config says true, even with multiple flags', async () => {
+    const { kernel, config } = setup()
+    ;(config as any).llmOptimizedContext = true
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--rules',
+      '--constraints',
+    ])
+
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
+    expect(call.config.llmOptimizedContext).toBe(true)
+  })
+
+  it('passes llmOptimizedContext as false when --no-optimized is provided', async () => {
+    const { kernel, config } = setup()
+    ;(config as any).llmOptimizedContext = true
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--no-optimized',
+    ])
+
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
+    expect(call.config.llmOptimizedContext).toBe(false)
+  })
 })

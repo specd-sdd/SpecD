@@ -40,15 +40,33 @@
       ]
     },
     {
+      "requirement": "Binary file filtering",
+      "rules": [
+        "The indexer's discovery process SHALL filter out known binary and non-source file extensions by default (e.g., `.gif`, `.png`, `.jpg`, `.jpeg`, `.pdf`, `.sql`, `.zip`, `.tiff`, `.pack`). This prevents the engine from attempting to parse large binary payloads as text or document nodes, which causes CPU saturation and out-of-memory errors during hashing and extraction. This global binary filter runs before any document decoding heuristics are applied."
+      ]
+    },
+    {
+      "requirement": "Bounded analysis memory",
+      "rules": [
+        "The indexer SHALL reduce repeated allocation pressure by reusing shared session lookups across passes and by storing compact per-file analysis results instead of re-deriving imports, bindings, and relations from raw content multiple times.\n\nThe indexer MUST NOT retain parser ASTs, parse trees, or equivalent heavyweight parser objects across the full run. Pass 1 MAY allocate such structures transiently while analyzing an individual file, but the retained run-scoped state MUST be limited to compact normalized facts and common indexes that Pass 2 requires."
+      ]
+    },
+    {
       "requirement": "Two-pass extraction with in-memory index",
       "rules": [
-        "Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:\n\n- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, and build `DEFINES` and `EXPORTS` relations. No store queries are needed during extraction.\n- **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — Resolve cross-file and cross-workspace relations using the `SymbolIndex`. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.\n- **Specs (per workspace)** — For each workspace: iterate through specs provided by the `SpecRepository`.\n- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once.\n- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()`.\n\nThis two-pass approach ensures all symbols exist in the index before import, binding, call, and hierarchy resolution, while avoiding store queries during analysis."
+        "Extraction proceeds in two passes over the discovered files, using a shared in-memory `IndexSession` rather than repeated adapter extraction or graph-store lookups during analysis:\n\n- **Pass 1 (Analyze files, per workspace)** — For each workspace, for each file in chunks: read content, derive a complete `FileAnalysis` through the language adapter, register the file analysis in the shared `IndexSession`, and emit `DEFINES` and `EXPORTS` relations from the registered symbols. The session owns common in-memory lookups for files, symbols, qualified names, and parser-emitted facts. No store queries are needed during extraction.\n- **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — For each analyzed file, resolve imports and cross-file targets from the facts stored in the `IndexSession`, then derive `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy, and other deterministic relations from the stored facts without re-parsing the file. Shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup against the session indexes.\n- **Specs (per workspace)** — For each workspace: iterate through specs provided by the `SpecRepository`.\n- **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once.\n- **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()`.\n\nThis two-pass approach ensures all symbols exist in the shared session before import, binding, call, and hierarchy resolution, while avoiding store queries and repeated file analysis during indexing."
+      ]
+    },
+    {
+      "requirement": "Shared indexing session",
+      "rules": [
+        "The indexer SHALL maintain a run-scoped in-memory `IndexSession` for the full indexing operation.\n\nThe `IndexSession` MUST provide shared lookup and deduplication facilities for:\n\n- registered files and their stable run-local numeric IDs\n- registered file analyses keyed by file ID and workspace-prefixed file path\n- registered symbols keyed by file, name, and qualified name\n- registered documents, specs, and deterministic cross-entity lookups such as file-to-symbol and spec-to-symbol\n- deterministic parser-emitted facts required by Pass 2 relation building\n- deduplicated relations accumulated before the final store commit\n\nThe `IndexSession` MUST expose a common API for all built-in adapters and indexer phases. Adapters MAY store compact run-scoped adapter cache state through that API, but they MUST NOT bypass the session with direct access to raw internal maps.\n\nThe `IndexSession` SHALL remain an in-memory indexing primitive only. It MUST NOT change persisted graph-store schemas, persisted graph IDs, or final graph relation semantics."
       ]
     },
     {
       "requirement": "Scoped binding environment resolution",
       "rules": [
-        "During Pass 2, the indexer SHALL build a per-file scoped binding environment from adapter-provided binding facts, call facts, symbols, import declarations, resolved import maps, namespace maps, and the in-memory `SymbolIndex`.\n\nThe scoped binding environment builder SHALL be shared code-graph logic, not adapter-local full environment logic. It SHALL provide deterministic lookup for:\n\n- source location to enclosing scope\n- lexical shadowing\n- local, parameter, property/field, class-managed, inherited, file/global, framework-managed, and imported type bindings\n- receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when represented by adapter facts\n- free call, member call, static call, and constructor call candidates\n\nThe indexer SHALL use the environment to resolve `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` only when the target can be selected deterministically. It MUST NOT query the store during analysis and MUST NOT add language-specific resolution rules to `IndexCodeGraph`.\n\nThe indexer SHALL drop any resolved symbol-to-symbol dependency relation whose source symbol id equals its target symbol id before staging relations for persistence.\n\nUnresolved or ambiguous binding facts SHALL NOT create persisted relations. The indexer MAY retain non-persisted diagnostics for tests, debugging, or result reporting if doing so does not change the graph-store contract."
+        "During Pass 2, the indexer SHALL build a per-file scoped binding environment from adapter-provided binding facts, call facts, symbols, import declarations, resolved import maps, namespace maps, and the shared `IndexSession` lookups.\n\nThe scoped binding environment builder SHALL be shared code-graph logic, not adapter-local full environment logic. It SHALL provide deterministic lookup for:\n\n- source location to enclosing scope\n- lexical shadowing\n- local, parameter, property/field, class-managed, inherited, file/global, framework-managed, and imported type bindings\n- receiver identities such as `this`, `self`, `cls`, `parent`, `super`, and language equivalents when represented by adapter facts\n- free call, member call, static call, and constructor call candidates\n\nThe indexer SHALL use the environment to resolve `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` only when the target can be selected deterministically. It MUST NOT query the store during analysis and MUST NOT add language-specific resolution rules to `IndexCodeGraph`.\n\nThe indexer SHALL drop any resolved symbol-to-symbol dependency relation whose source symbol id equals its target symbol id before staging relations for persistence.\n\nUnresolved or ambiguous binding facts SHALL NOT create persisted relations. The indexer MAY retain non-persisted diagnostics for tests, debugging, or result reporting if doing so does not change the graph-store contract."
       ]
     },
     {
@@ -60,13 +78,19 @@
     {
       "requirement": "Progress reporting",
       "rules": [
-        "`IndexOptions` accepts an optional `onProgress` callback `(percent: number, phase: string) => void`. The indexer reports granular progress:\n\n- 0-5%: File discovery and content hashing\n- 5-7%: Diff computation and cleanup of deleted/changed files\n- 7-50%: Pass 1 — symbol extraction (updates per file)\n- 50-80%: Pass 2 — import resolution and CALLS extraction (updates per file)\n- 80-83%: Spec discovery\n- 83-95%: Bulk loading (updates per table and relation batch)\n- 100%: Done\n\nProgress updates include a detail string (e.g. `\"150/460 files\"`) for phases that process individual items."
+        "`IndexOptions` accepts an optional `onProgress` callback `(percent: number, phase: string) => void`. The indexer reports granular progress:\n\n- 0-5%: File discovery and content hashing\n- 5-7%: Diff computation and cleanup of deleted/changed files\n- 7-50%: Pass 1 — file analysis and symbol registration (updates per file)\n- 50-80%: Pass 2 — import resolution and relation building from stored facts (updates per file)\n- 80-83%: Spec discovery\n- 83-95%: Bulk loading (updates per table and relation batch)\n- 100%: Done\n\nProgress updates include a detail string (e.g. `\"150/460 files\"`) for phases that process individual items.\n\nThe indexer SHALL ensure progress callbacks are fired immediately when a phase finishes, before starting the next synchronous or heavy CPU-bound internal processing (such as session index finalization or relation aggregation), so the user interface does not display stale phase labels."
+      ]
+    },
+    {
+      "requirement": "Phase execution timing logging",
+      "rules": [
+        "The indexer SHALL log the execution time of each major internal phase (e.g., File Discovery, Pass 1, Pass 2, Spec Indexing, Bulk Load) at the `debug` level to facilitate performance diagnostics and bottleneck detection without blocking or polluting standard output."
       ]
     },
     {
       "requirement": "Cross-workspace package resolution",
       "rules": [
-        "Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).\n\nFor non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + ':'`).\n\nThis works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling."
+        "Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).\n\nFor non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the shared `IndexSession` lookups for symbols with the imported name within the matching workspace scope.\n\nThis works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling."
       ]
     },
     {
@@ -224,6 +248,26 @@
       ]
     },
     {
+      "requirement": "Binary file filtering",
+      "name": "Known binary extensions are skipped before decoding",
+      "given": ["a workspace contains image.png, document.pdf, and archive.zip"],
+      "when": ["file discovery runs"],
+      "then": [
+        "those files are excluded before any text decoding heuristics are applied",
+        "AND they do not appear in the discovered source-file set"
+      ]
+    },
+    {
+      "requirement": "Bounded analysis memory",
+      "name": "Retained analysis state excludes parser runtime objects",
+      "given": ["Pass 1 has completed for a large project"],
+      "when": ["retained run-scoped analysis state is inspected"],
+      "then": [
+        "it contains compact facts and shared lookup indexes needed for Pass 2",
+        "AND it does not retain AST nodes, parser trees, or equivalent heavyweight parser-runtime objects"
+      ]
+    },
+    {
       "requirement": "Discovery fingerprint uses effective config",
       "name": "Synthetic spec-root exclusions affect fingerprint",
       "given": ["a filesystem-backed repository exposes a specsPath"],
@@ -234,87 +278,88 @@
     },
     {
       "requirement": "Two-pass extraction with in-memory index",
-      "name": "Symbols from all workspaces available before relation resolution",
-      "given": ["two workspaces contain symbols that import/call each other"],
+      "name": "Symbols from all workspaces are available before relation resolution",
+      "given": ["two workspaces contain symbols that import or call each other"],
       "when": ["Pass 2 runs"],
       "then": [
-        "cross-workspace relations can be resolved from the in-memory SymbolIndex",
-        "AND no store query is needed during extraction"
+        "cross-workspace relations are resolved from the previously registered in-memory analysis data",
+        "AND no graph-store query is needed during extraction or relation building"
       ]
     },
     {
       "requirement": "Two-pass extraction with in-memory index",
-      "name": "Combined namespace and symbol extraction uses one adapter fast path",
-      "given": ["a language adapter implements extractSymbolsWithNamespace()"],
-      "when": ["Pass 1 processes a file from that language"],
-      "then": [
-        "the indexer may obtain symbols and namespace information from that single adapter call",
-        "AND it does not need a separate namespace-only extraction step for that file"
-      ]
-    },
-    {
-      "requirement": "Two-pass extraction with in-memory index",
-      "name": "PHP unresolved qualified name falls back to path resolution",
+      "name": "Each file is analyzed once before later relation work",
       "given": [
-        "a PHP file importing App\\Services\\Mailer",
-        "AND App\\Services\\Mailer is NOT present in the in-memory symbol index",
-        "AND the PHP adapter's resolveQualifiedNameToPath resolves it to {codeRoot}/src/Services/Mailer.php"
+        "a built-in adapter returns imports, symbols, binding facts, and call facts from analyzeFile()"
+      ],
+      "when": ["the same file reaches Pass 2"],
+      "then": [
+        "the indexer reuses the stored FileAnalysis",
+        "AND it does not call back into the adapter to re-parse the same file content"
+      ]
+    },
+    {
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "Unresolved qualified names may still become file imports",
+      "given": [
+        "a PHP file imports App\\Services\\Mailer",
+        "AND no registered symbol has that qualified name",
+        "AND the adapter can deterministically map the qualified name to a source file path"
+      ],
+      "when": ["Pass 2 resolves imports from the stored analysis"],
+      "then": ["a file-to-file IMPORTS relation is emitted to that resolved file target"]
+    },
+    {
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "Unresolvable imports are dropped without aborting the run",
+      "given": [
+        "an analyzed file contains an import that cannot be resolved through shared session lookups or deterministic adapter rules"
+      ],
+      "when": ["Pass 2 runs"],
+      "then": ["no relation is emitted for that import", "AND indexing continues without throwing"]
+    },
+    {
+      "requirement": "Two-pass extraction with in-memory index",
+      "name": "Shared scoped resolution runs after import resolution",
+      "given": [
+        "a file analysis contains imported type names and deterministic binding facts that reference those names"
       ],
       "when": ["Pass 2 runs"],
       "then": [
-        "a file-to-file IMPORTS relation is emitted from the importing file to src/Services/Mailer.php"
+        "import resolution completes before shared scoped binding resolution consumes those candidates",
+        "AND derived USES_TYPE, CONSTRUCTS, or CALLS relations are emitted from the stored facts"
       ]
     },
     {
-      "requirement": "Two-pass extraction with in-memory index",
-      "name": "PHP import unresolvable via both mechanisms produces no relation",
-      "given": [
-        "a PHP file containing use Vendor\\\\External\\\\Class",
-        "AND the qualified name is not in the symbol index",
-        "AND resolveQualifiedNameToPath returns undefined for that name"
-      ],
-      "when": ["Pass 2 runs"],
-      "then": ["no IMPORTS relation is created for that import and no error is thrown"]
-    },
-    {
-      "requirement": "Two-pass extraction with in-memory index",
-      "name": "DEPENDS_ON relations from dynamic loaders accumulated in Pass 2",
-      "given": [
-        "a PHP file from which extractRelations returns DEPENDS_ON relations for dynamic loader calls"
-      ],
-      "when": ["Pass 2 runs"],
-      "then": ["those DEPENDS_ON relations are accumulated and passed to bulk load"]
-    },
-    {
-      "requirement": "Two-pass extraction with in-memory index",
-      "name": "Hierarchy relations are accumulated in Pass 2",
-      "given": ["an adapter returns EXTENDS, IMPLEMENTS, and OVERRIDES relations for a file"],
-      "when": ["Pass 2 runs"],
+      "requirement": "Shared indexing session",
+      "name": "Adapters and pass logic share the same run-scoped session",
+      "given": ["Pass 1 has registered files, symbols, and per-file analyses in the IndexSession"],
+      "when": ["Pass 2 resolves imports and builds relations"],
       "then": [
-        "those hierarchy relations are accumulated with the other extracted relations",
-        "AND they are included in the single bulk load"
+        "it reads those registrations from the same session instance",
+        "AND it does not rebuild equivalent per-file lookup structures from scratch"
       ]
     },
     {
-      "requirement": "Two-pass extraction with in-memory index",
-      "name": "Binding facts are resolved after import maps",
+      "requirement": "Shared indexing session",
+      "name": "Run-scoped adapter cache state stays behind the common session API",
       "given": [
-        "a file has imported type names and adapter binding facts that reference those names"
+        "a built-in adapter stores compact run-scoped cache state for later deterministic resolution"
       ],
-      "when": ["Pass 2 runs"],
+      "when": ["the state is consumed in Pass 2"],
       "then": [
-        "import declarations are resolved before scoped binding lookup uses those imported type candidates",
-        "AND no store query is performed during binding resolution"
+        "access goes through the IndexSession API",
+        "AND the adapter does not mutate raw internal lookup maps owned by the session"
       ]
     },
     {
-      "requirement": "Two-pass extraction with in-memory index",
-      "name": "USES_TYPE and CONSTRUCTS relations are accumulated in Pass 2",
-      "given": ["scoped binding resolution returns USES_TYPE and CONSTRUCTS relations for a file"],
-      "when": ["Pass 2 runs"],
+      "requirement": "Shared indexing session",
+      "name": "Shared session also serves later spec and document lookups",
+      "given": ["the indexing run has already registered documents, specs, and covered symbols"],
+      "when": ["a later indexing phase needs a spec-to-symbol or symbol-to-spec lookup"],
       "then": [
-        "those relations are accumulated with imports, calls, and hierarchy relations",
-        "AND they are included in the single bulk load"
+        "it reads that relationship from the same run-scoped session",
+        "AND it does not rebuild a parallel cross-entity cache outside the session"
       ]
     },
     {
@@ -408,14 +453,28 @@
     },
     {
       "requirement": "Progress reporting",
-      "name": "Progress callback receives granular updates",
+      "name": "Progress callback receives pass labels aligned to the new pipeline",
       "given": ["an onProgress callback is provided in IndexOptions"],
       "when": ["indexing runs"],
       "then": [
-        "the callback is called with increasing percent values from 0 to 100",
-        "AND phase strings describe the current activity (e.g. \"Parsing symbols\", \"Resolving imports\", \"Bulk loading\")",
-        "AND detail strings are included for per-file phases (e.g. \"150/460\")"
+        "the callback reports progress across discovery, pass 1 file analysis, pass 2 relation building, and bulk loading",
+        "AND per-file phases include detail strings such as \"150/460 files\""
       ]
+    },
+    {
+      "requirement": "Progress reporting",
+      "name": "Progress callback fires before blocking processing",
+      "when": ["a phase like discovery or pass 1 finishes"],
+      "then": [
+        "the progress callback is fired immediately with the next phase label",
+        "AND this happens before synchronous heavy work begins, such as session index finalization or relation aggregation"
+      ]
+    },
+    {
+      "requirement": "Phase execution timing logging",
+      "name": "Debug logs record phase duration",
+      "when": ["indexing completes"],
+      "then": ["debug logs contain execution times for discovery, pass 1, pass 2, and bulk loading"]
     },
     {
       "requirement": "Cross-workspace package resolution",
@@ -657,13 +716,13 @@
     "symbols": [
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/domain/value-objects/spec-node.ts",
-        "symbol": "SpecNode"
+        "file": "code-graph:src/application/use-cases/discover-files.ts",
+        "symbol": "DEFAULT_BINARY_EXTENSIONS"
       },
       {
         "specId": "code-graph:indexer",
-        "file": "code-graph:src/domain/value-objects/spec-node.ts",
-        "symbol": "createSpecNode"
+        "file": "code-graph:src/application/use-cases/discover-files.ts",
+        "symbol": "discoverFiles"
       },
       {
         "specId": "code-graph:indexer",
@@ -673,8 +732,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1318ae503c01fd5ef0c6c53c93ed4504e0236eb4165a307499d95b0b866cab60",
-    "verify.md": "sha256:090de860ec9bbf14544fd588d3042338537f9edcf0ba81a0c8f1d0e043c29f13"
+    "spec.md": "sha256:75ca0526c46a77f15ffcf4b301f39353689c929a6f58501366593e83f6af621a",
+    "verify.md": "sha256:dfb27640baff9c11df37d655ddb086974f9739966db45ad75950284a5ac4ba84"
   },
   "generatedBy": "core"
 }

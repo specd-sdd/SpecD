@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SkillTemplateMetadata } from '../../domain/skill-template-metadata.js'
 import { InvalidSkillTemplateMetadataError } from '../../domain/errors/invalid-skill-template-metadata-error.js'
@@ -11,14 +11,19 @@ export class SkillTemplateMetadataReader {
    * Reads one skill metadata file from a template directory.
    *
    * @param directory - Absolute skill template directory.
+   * @param kind - Template kind to determine filename.
    * @returns Validated metadata contract.
    * @throws {InvalidSkillTemplateMetadataError} When the metadata file is missing or malformed.
    */
-  readSkillMetadata(directory: string): SkillTemplateMetadata {
-    const filename = path.join(directory, 'skill.meta.json')
+  async readSkillMetadata(
+    directory: string,
+    kind: 'skill' | 'agent' = 'skill',
+  ): Promise<SkillTemplateMetadata> {
+    const metaFilename = kind === 'skill' ? 'skill.meta.json' : 'specd-agent.meta.json'
+    const filename = path.join(directory, metaFilename)
     let raw: string
     try {
-      raw = readFileSync(filename, 'utf8')
+      raw = await readFile(filename, 'utf8')
     } catch (error) {
       throw new InvalidSkillTemplateMetadataError(
         filename,
@@ -36,7 +41,7 @@ export class SkillTemplateMetadataReader {
       )
     }
 
-    return this.validateMetadata(filename, parsed)
+    return this.validateMetadata(filename, parsed, kind)
   }
 
   /**
@@ -44,15 +49,21 @@ export class SkillTemplateMetadataReader {
    *
    * @param filename - Source metadata filename.
    * @param value - Parsed JSON value.
+   * @param kind - Template kind.
    * @returns Validated metadata object.
    * @throws {InvalidSkillTemplateMetadataError} When validation fails.
    */
-  private validateMetadata(filename: string, value: unknown): SkillTemplateMetadata {
+  private validateMetadata(
+    filename: string,
+    value: unknown,
+    kind: 'skill' | 'agent',
+  ): SkillTemplateMetadata {
     if (!this.isRecord(value)) {
       throw new InvalidSkillTemplateMetadataError(filename, 'root value must be an object')
     }
 
     return {
+      kind,
       supportedCapabilities: this.readStringArray(
         value['supportedCapabilities'],
         filename,
@@ -68,6 +79,13 @@ export class SkillTemplateMetadataReader {
         filename,
         'requiredSharedTemplates',
       ),
+      name: typeof value['name'] === 'string' ? value['name'] : undefined,
+      description: typeof value['description'] === 'string' ? value['description'] : undefined,
+      allowedTools:
+        value['allowedTools'] !== undefined
+          ? this.readStringArray(value['allowedTools'], filename, 'allowedTools')
+          : undefined,
+      model: typeof value['model'] === 'string' ? value['model'] : undefined,
     }
   }
 

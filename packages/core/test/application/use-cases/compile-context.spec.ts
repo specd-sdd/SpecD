@@ -3241,4 +3241,67 @@ describe('CompileContext', () => {
       expect(listBase.contextFingerprint).toBe(listWithSections.contextFingerprint)
     })
   })
+
+  describe('LLM-optimized context', () => {
+    it('prefers optimizedContext when llmOptimizedContext is true', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const metadataObj = {
+        title: 'Login',
+        description: 'Standard description',
+        optimizedDescription: 'Optimized description',
+        optimizedContext: 'Optimized context rules and constraints',
+        contentHashes: { 'spec.md': sha256Hex(loginContent) },
+        rules: [{ requirement: 'Auth', rules: ['Standard rule'] }],
+      }
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': JSON.stringify(metadataObj),
+        'auth/login/spec.md': loginContent,
+      })
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'implementing',
+        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+      })
+
+      expect(result.specs[0]!.content).toContain('Optimized context rules and constraints')
+      expect(result.specs[0]!.content).toContain('Optimized description')
+      expect(result.specs[0]!.content).not.toContain('Standard rule')
+      expect(result.warnings).toHaveLength(0)
+    })
+
+    it('emits stale-optimization warning when optimizedContext is missing and llmOptimizedContext is true', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n'
+      const metadataObj = {
+        title: 'Login',
+        description: 'Standard description',
+        contentHashes: { 'spec.md': sha256Hex(loginContent) },
+        rules: [{ requirement: 'Auth', rules: ['Standard rule'] }],
+      }
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': JSON.stringify(metadataObj),
+        'auth/login/spec.md': loginContent,
+      })
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'implementing',
+        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+      })
+
+      expect(result.warnings.some((w) => w.type === 'stale-optimization')).toBe(true)
+    })
+  })
 })

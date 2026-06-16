@@ -18,9 +18,9 @@ export interface Frontmatter {
   readonly license?: string
 
   /**
-   * Optional allowed tools declaration.
+   * Optional allowed tools declaration (space-separated string or YAML list of strings).
    */
-  readonly 'allowed-tools'?: string
+  readonly 'allowed-tools'?: string | string[]
 
   /**
    * Optional flag to mark user invocability.

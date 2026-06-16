@@ -191,7 +191,7 @@ contextIncludeSpecs:
 contextExcludeSpecs:
   - 'default:_global/commits'
 
-llmOptimizedContext: true
+llmOptimizedContext: false
 
 schemaOverrides:
   append:

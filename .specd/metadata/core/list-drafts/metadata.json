@@ -117,5 +117,7 @@
     "spec.md": "sha256:7b5627d8b6d5af2089948cef5e09029a54834030e9de58f7e92105c4db14bd24",
     "verify.md": "sha256:8a12ffbf30962286b1e1eb1ef7af277d23c767a78ae57b8a7b6201cb88523578"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Users who draft changes need visibility into what is parked so they can decide what to resume.",
+  "optimizedContext": "# ListDrafts\n\n## Rules\n- Returns all drafted changes: ListDrafts.execute() MUST return all changes that are in the drafted lifecycle state.\n- Returns DraftedChangeView without content: ListDrafts.execute() MUST return DraftedChangeView[].\n- Constructor accepts a ChangeRepository: ListDrafts MUST accept a ChangeRepository as its sole constructor argument.\n- Returns an empty array when no drafted changes exist: When the repository contains no drafted changes, execute() MUST return an empty array.\n- Dependencies: core:change, core:kernel\n\n## Constraints\n- None explicit.\n"
 }

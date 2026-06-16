@@ -5,15 +5,14 @@ import {
   type SymbolLookup,
 } from '../../../src/domain/services/scoped-binding-environment.js'
 import {
-  BindingScopeKind,
   BindingSourceKind,
   type BindingFact,
-  type BindingScope,
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { createSymbolNode, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type FileAnalysis } from '../../../src/domain/value-objects/file-analysis.js'
 
 const filePath = 'code-graph:src/service.ts'
 
@@ -47,50 +46,45 @@ function lookup(symbols: readonly SymbolNode[]): SymbolLookup {
   }
 }
 
+function mockAnalysis(params: {
+  symbols?: readonly SymbolNode[]
+  facts?: readonly BindingFact[]
+  callFacts?: readonly CallFact[]
+}): FileAnalysis {
+  return {
+    language: 'ts',
+    fileId: 1,
+    filePath,
+    contentHash: 'hash',
+    workspace: 'default',
+    configRelativePath: 'service.ts',
+    symbols: params.symbols ?? [],
+    imports: [],
+    bindingFacts: params.facts ?? [],
+    callFacts: params.callFacts ?? [],
+  }
+}
+
 describe('scoped binding environment', () => {
-  it('uses nearest lexical scope and drops ambiguous equal-confidence bindings', () => {
-    const scopes: BindingScope[] = [
-      {
-        id: filePath,
-        kind: BindingScopeKind.File,
-        filePath,
-        parentId: undefined,
-        ownerSymbolId: undefined,
-        start: location(1),
-        end: undefined,
-      },
-      {
-        id: 'method',
-        kind: BindingScopeKind.Method,
-        filePath,
-        parentId: filePath,
-        ownerSymbolId: 'method-id',
-        start: location(2),
-        end: undefined,
-      },
-    ]
+  it('drops ambiguous equal-confidence bindings', () => {
     const environment = buildScopedBindingEnvironment({
-      filePath,
-      symbols: [],
-      imports: [],
+      analysis: mockAnalysis({
+        facts: [fact('repo', 'OuterRepo', filePath)],
+      }),
       importMap: new Map(),
-      scopes,
-      facts: [fact('repo', 'OuterRepo', filePath), fact('repo', 'InnerRepo', 'method')],
       symbolLookup: lookup([]),
     })
 
-    expect(environment.lookup('repo', 'method')[0]?.targetName).toBe('InnerRepo')
+    expect(environment.lookup('repo', filePath)[0]?.targetName).toBe('OuterRepo')
 
     const ambiguous = buildScopedBindingEnvironment({
-      filePath,
-      symbols: [],
-      imports: [],
+      analysis: mockAnalysis({
+        facts: [fact('service', 'A', filePath), fact('service', 'B', filePath)],
+      }),
       importMap: new Map(),
-      scopes,
-      facts: [fact('service', 'A', 'method'), fact('service', 'B', 'method')],
       symbolLookup: lookup([]),
     })
-    expect(ambiguous.lookup('service', 'method')).toHaveLength(0)
+    expect(ambiguous.lookup('service', filePath)).toHaveLength(0)
   })
 
   it('resolves constructor and type facts into distinct dependency relations', () => {
@@ -123,21 +117,20 @@ describe('scoped binding environment', () => {
     }
     const symbols = [source, target]
     const symbolLookup = lookup(symbols)
-    const environment = buildScopedBindingEnvironment({
-      filePath,
+    const analysis = mockAnalysis({
       symbols,
-      imports: [],
-      importMap: new Map(),
-      scopes: [],
       facts: [typeFact],
+      callFacts: [callFact],
+    })
+    const environment = buildScopedBindingEnvironment({
+      analysis,
+      importMap: new Map(),
       symbolLookup,
     })
 
     const resolved = resolveDependencyFacts({
       environment,
-      bindingFacts: [typeFact],
-      callFacts: [callFact],
-      symbols,
+      analysis,
       symbolLookup,
     })
 
@@ -170,21 +163,20 @@ describe('scoped binding environment', () => {
     }
     const symbols = [selfSymbol]
     const symbolLookup = lookup(symbols)
-    const environment = buildScopedBindingEnvironment({
-      filePath,
+    const analysis = mockAnalysis({
       symbols,
-      imports: [],
-      importMap: new Map(),
-      scopes: [],
       facts: [typeFact],
+      callFacts: [callFact],
+    })
+    const environment = buildScopedBindingEnvironment({
+      analysis,
+      importMap: new Map(),
       symbolLookup,
     })
 
     const resolved = resolveDependencyFacts({
       environment,
-      bindingFacts: [typeFact],
-      callFacts: [callFact],
-      symbols,
+      analysis,
       symbolLookup,
     })
 

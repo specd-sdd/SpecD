@@ -786,6 +786,8 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 | `--scenarios`               | Include scenarios extracted from spec metadata (full-mode only).   |
 | `--follow-deps`             | Follow `dependsOn` links and include transitive specs.             |
 | `--depth <n>`               | Maximum depth for dependency traversal. Used with `--follow-deps`. |
+| `--optimized`               | Force prefer optimized content (when available and fresh).         |
+| `--no-optimized`            | Suppress preference for optimized content; show raw sections.      |
 | `--format text\|json\|toon` | Output format.                                                     |
 | `--config <path>`           | Config file path.                                                  |
 
@@ -947,6 +949,8 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 | `--scenarios`               | Include scenarios from project-level specs (full-mode only).   |
 | `--follow-deps`             | Follow `dependsOn` links and include transitive specs.         |
 | `--depth <n>`               | Maximum depth for dependency traversal.                        |
+| `--optimized`               | Force prefer optimized context (when available and fresh).     |
+| `--no-optimized`            | Suppress preference for optimized context; show raw contents.  |
 | `--format text\|json\|toon` | Output format.                                                 |
 | `--config <path>`           | Config file path.                                              |
 

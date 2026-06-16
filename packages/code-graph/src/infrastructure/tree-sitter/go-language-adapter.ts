@@ -1,6 +1,12 @@
 import { parse } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
-import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import {
+  type LanguageAdapter,
+  type AdapterAnalyzeContext,
+  type ImportResolutionContext,
+  type ResolvedImports,
+  type RelationBuildContext,
+} from '../../domain/value-objects/language-adapter.js'
 import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -12,6 +18,24 @@ import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/
 import { CallForm, type CallFact } from '../../domain/value-objects/call-fact.js'
 import { type SourceLocation } from '../../domain/value-objects/source-location.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
+import {
+  type FileAnalysisDraft,
+  type FileAnalysis,
+} from '../../domain/value-objects/file-analysis.js'
+
+/**
+ * Determines whether an import declaration is file-only/side-effect only.
+ * @param declaration - The import declaration to test.
+ * @returns True if the import has no bound local name/is side-effect only.
+ */
+function isFileOnlyImport(declaration: ImportDeclaration): boolean {
+  return (
+    declaration.kind === ImportDeclarationKind.SideEffect ||
+    declaration.kind === ImportDeclarationKind.Dynamic ||
+    declaration.kind === ImportDeclarationKind.Require ||
+    declaration.kind === ImportDeclarationKind.Blank
+  )
+}
 
 /**
  * Returns the string kind of an AST node.
@@ -84,6 +108,16 @@ interface GoTypeInfo {
 }
 
 /**
+ * Internal parser state for Go.
+ */
+interface GoParserState {
+  readonly kind: 'go'
+  readonly typeInfos: readonly GoTypeInfo[]
+  readonly methodReceivers: Record<string, Record<string, string>>
+  readonly interfaceMethods: Record<string, string[]>
+}
+
+/**
  * Language adapter for Go files using tree-sitter via ast-grep.
  * Extracts functions, methods, structs, interfaces, type aliases, vars, and consts.
  */
@@ -105,16 +139,33 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts symbol nodes from Go source code.
-   * @param filePath - The file path.
-   * @param content - The source content.
-   * @returns An array of extracted symbol nodes.
+   * Analyzes a single file and extracts its symbols, imports, binding/call facts,
+   * namespace, and any optional parser-specific state.
+   * @param filePath - The path of the file to analyze.
+   * @param content - The content of the file.
+   * @param context - The adapter analyze context.
+   * @returns The extracted file analysis draft.
    */
-  extractSymbols(filePath: string, content: string): SymbolNode[] {
+  analyzeFile(
+    filePath: string,
+    content: string,
+    context: AdapterAnalyzeContext,
+  ): FileAnalysisDraft {
     ensureLanguagesRegistered()
-    const root = parse('go', content).root()
+    const sgRoot = parse('go', content)
+    // Keep the parsed SgRoot instance alive in the session state to prevent
+    // V8 garbage collection from running its native Rust finalizer during
+    // event loop yields. This avoids a SIGSEGV segmentation fault caused
+    // by a native concurrency/double-free bug in @ast-grep/napi.
+    let keepAlive = context.session.getAdapterState<unknown[]>('napi-keepalive')
+    if (!keepAlive) {
+      keepAlive = []
+      context.session.setAdapterState('napi-keepalive', keepAlive)
+    }
+    keepAlive.push(sgRoot)
+    const root = sgRoot.root()
     const symbols: SymbolNode[] = []
-    const seen = new Set<string>()
+    const seenSymbol = new Set<string>()
 
     const addSymbol = (
       name: string,
@@ -125,8 +176,8 @@ export class GoLanguageAdapter implements LanguageAdapter {
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
-      if (seen.has(key)) return
-      seen.add(key)
+      if (seenSymbol.has(key)) return
+      seenSymbol.add(key)
       symbols.push(
         createSymbolNode({
           name,
@@ -168,57 +219,110 @@ export class GoLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    return symbols
+    const imports = this.extractImportedNamesFromData(content, root)
+    const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports)
+    const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
+
+    const typeInfos = this.collectTypeInfo(content, filePath, symbols)
+    const methodReceivers = this.collectMethodReceivers(content, filePath, symbols)
+    const serializedMethodReceivers: Record<string, Record<string, string>> = {}
+    for (const [receiver, methods] of methodReceivers.entries()) {
+      serializedMethodReceivers[receiver] = {}
+      for (const [mName, mId] of methods.entries()) {
+        serializedMethodReceivers[receiver][mName] = mId
+      }
+    }
+    const interfaceMethods: Record<string, string[]> = {}
+    for (const info of typeInfos) {
+      if (info.kind === SymbolKind.Interface) {
+        interfaceMethods[info.name] = this.collectInterfaceMethodNames(content, info.line)
+      }
+    }
+
+    return {
+      language: 'go',
+      symbols,
+      imports,
+      bindingFacts,
+      callFacts,
+      parserState: {
+        kind: 'go',
+        typeInfos,
+        methodReceivers: serializedMethodReceivers,
+        interfaceMethods,
+      },
+    }
   }
 
   /**
-   * Extracts relations from Go source code.
-   * @param filePath - The file path.
-   * @param content - The source content.
-   * @param symbols - Previously extracted symbols.
-   * @param _importMap - Reserved for future use.
-   * @returns An array of extracted relations.
+   * Resolves raw imports extracted in Pass 1 into symbol mappings and file dependencies.
+   * @param analysis - The file analysis.
+   * @param context - The import resolution context.
+   * @returns The resolved imports.
    */
-  extractRelations(
-    filePath: string,
-    content: string,
-    symbols: SymbolNode[],
+  resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
+    const importMap = new Map<string, string>()
+    const fileImports: string[] = []
+    const knownPackages = [...context.packageToWorkspace.keys()]
+    const { session, qualifiedNames, packageToWorkspace } = context
+
+    for (const imp of analysis.imports) {
+      if (isFileOnlyImport(imp)) {
+        continue
+      }
+
+      const qualifiedId = qualifiedNames.get(imp.specifier)
+      if (qualifiedId) {
+        importMap.set(imp.localName, qualifiedId)
+        continue
+      }
+
+      const pkgName = this.resolvePackageFromSpecifier(imp.specifier, knownPackages)
+      if (pkgName) {
+        const wsPrefix = packageToWorkspace.get(pkgName)
+        if (wsPrefix !== undefined) {
+          const candidates = session.findSymbolsByName(imp.originalName, wsPrefix + ':')
+          if (candidates.length > 0) {
+            importMap.set(imp.localName, candidates[0]!.id)
+          }
+        }
+      }
+    }
+
+    return { importMap, fileImports }
+  }
+
+  /**
+   * Builds relations between symbols or files from the analyzed facts and resolved imports.
+   * @param analysis - The file analysis.
+   * @param _context - The relation build context.
+   * @returns The build relations.
+   */
+  buildRelations(
+    analysis: FileAnalysis,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _importMap: Map<string, string>,
+    _context: RelationBuildContext,
   ): Relation[] {
     const relations: Relation[] = []
 
-    for (const symbol of symbols) {
+    for (const symbol of analysis.symbols) {
       relations.push(
-        createRelation({ source: filePath, target: symbol.id, type: RelationType.Defines }),
+        createRelation({
+          source: analysis.filePath,
+          target: symbol.id,
+          type: RelationType.Defines,
+        }),
       )
     }
 
-    this.extractHierarchyRelations(content, filePath, symbols, relations)
+    const hierarchy = analysis.parserState as GoParserState | undefined
+    if (!hierarchy) return relations
 
-    // Go imports are package-level (e.g. "fmt"), not file-level relative imports.
-    // Resolving them requires knowledge of the module path and GOPATH,
-    // which is deferred to a future version.
+    const typeInfos = hierarchy.typeInfos ?? []
+    const typeByName = new Map<string, GoTypeInfo>(typeInfos.map((info) => [info.name, info]))
+    const methodReceivers = hierarchy.methodReceivers ?? {}
+    const interfaceMethods = hierarchy.interfaceMethods ?? {}
 
-    return relations
-  }
-
-  /**
-   * Extracts deterministic hierarchy relations from local Go declarations.
-   * @param content - The source content.
-   * @param filePath - The current file path.
-   * @param symbols - Previously extracted symbols.
-   * @param relations - Array to push relations into.
-   */
-  private extractHierarchyRelations(
-    content: string,
-    filePath: string,
-    symbols: SymbolNode[],
-    relations: Relation[],
-  ): void {
-    const typeInfos = this.collectTypeInfo(content, filePath, symbols)
-    const typeByName = new Map(typeInfos.map((info) => [info.name, info]))
-    const methodReceivers = this.collectMethodReceivers(content, filePath, symbols)
     const seen = new Set<string>()
 
     for (const info of typeInfos) {
@@ -243,11 +347,11 @@ export class GoLanguageAdapter implements LanguageAdapter {
     const interfaces = typeInfos.filter((info) => info.kind === SymbolKind.Interface)
     const structs = typeInfos.filter((info) => info.kind === SymbolKind.Class)
     for (const structInfo of structs) {
-      const receiverMethods = methodReceivers.get(structInfo.name) ?? new Map<string, string>()
+      const receiverMethods = methodReceivers[structInfo.name] ?? {}
       for (const iface of interfaces) {
-        const ifaceMethods = this.collectInterfaceMethodNames(content, iface.line)
+        const ifaceMethods = interfaceMethods[iface.name] ?? []
         if (ifaceMethods.length === 0) continue
-        const implementsAll = ifaceMethods.every((methodName) => receiverMethods.has(methodName))
+        const implementsAll = ifaceMethods.every((methodName) => methodName in receiverMethods)
         if (!implementsAll) continue
 
         const implementsKey = `${structInfo.symbolId}:${RelationType.Implements}:${iface.symbolId}`
@@ -263,14 +367,16 @@ export class GoLanguageAdapter implements LanguageAdapter {
         }
       }
     }
+
+    return relations
   }
 
   /**
-   * Collects local Go types and embedded interface references.
-   * @param content - The source content.
-   * @param filePath - The current file path.
-   * @param symbols - Previously extracted symbols.
-   * @returns Local type declarations.
+   * Collects Go type declarations from content.
+   * @param content - Source file content.
+   * @param filePath - The path of the Go file.
+   * @param symbols - Extracted symbol nodes.
+   * @returns Array of type info objects.
    */
   private collectTypeInfo(content: string, filePath: string, symbols: SymbolNode[]): GoTypeInfo[] {
     const infos: GoTypeInfo[] = []
@@ -319,11 +425,11 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Collects method symbols by receiver type name.
-   * @param content - The source content.
-   * @param filePath - The current file path.
-   * @param symbols - Previously extracted symbols.
-   * @returns Receiver-name to method-name map.
+   * Collects method receiver mappings from content.
+   * @param content - Source file content.
+   * @param filePath - The path of the Go file.
+   * @param symbols - Extracted symbol nodes.
+   * @returns Map of receiver to method name to symbol ID.
    */
   private collectMethodReceivers(
     content: string,
@@ -356,10 +462,10 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Collects named methods declared directly inside an interface block.
-   * @param content - The source content.
-   * @param line - The 1-based line where the interface begins.
-   * @returns Method names declared by the interface.
+   * Collects interface method names declared in an interface block.
+   * @param content - Source file content.
+   * @param line - Starting line number.
+   * @returns Array of method name strings.
    */
   private collectInterfaceMethodNames(content: string, line: number): string[] {
     const lines = content.split('\n')
@@ -383,14 +489,12 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Parses Go import declarations from source code.
-   * @param filePath - Path to the source file.
-   * @param content - The source file content.
-   * @returns An array of parsed import declarations.
+   * Extracts imported package names from AST.
+   * @param content - Source file content.
+   * @param root - AST grep root node.
+   * @returns Array of import declarations.
    */
-  extractImportedNames(filePath: string, content: string): ImportDeclaration[] {
-    ensureLanguagesRegistered()
-    const root = parse('go', content).root()
+  private extractImportedNamesFromData(content: string, root: SgNode): ImportDeclaration[] {
     const results: ImportDeclaration[] = []
 
     for (const child of root.children()) {
@@ -404,7 +508,6 @@ export class GoLanguageAdapter implements LanguageAdapter {
             }
           }
         } else if (nodeKind(specListChild) === 'import_spec') {
-          // Single import without parentheses: import "fmt"
           this.extractGoImportSpec(specListChild, results)
         }
       }
@@ -415,9 +518,9 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts Go import declarations from source text to preserve alias, dot, and blank forms.
+   * Extracts Go imports directly from text via regexp matching.
    * @param content - Source file content.
-   * @returns Parsed import declarations.
+   * @returns Array of import declarations.
    */
   private extractGoImportsFromText(content: string): ImportDeclaration[] {
     const declarations: ImportDeclaration[] = []
@@ -459,9 +562,9 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts a single Go import spec into an ImportDeclaration.
-   * @param spec - The import_spec AST node.
-   * @param results - Array to push declarations into.
+   * Extracts details from a single Go import spec node.
+   * @param spec - The import spec AST node.
+   * @param results - Array to accumulate import declarations.
    */
   private extractGoImportSpec(spec: SgNode, results: ImportDeclaration[]): void {
     let alias: string | undefined
@@ -495,14 +598,14 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts deterministic Go binding facts for shared scoped resolution.
-   * @param filePath - Path to the source file.
+   * Extracts binding facts from Go content.
+   * @param filePath - The path of the Go file.
    * @param content - Source file content.
-   * @param _symbols - Symbols extracted from the file.
-   * @param imports - Import declarations extracted from the file.
-   * @returns Binding facts for imports and type references.
+   * @param _symbols - Extracted symbol nodes.
+   * @param imports - Extracted import declarations.
+   * @returns Array of binding facts.
    */
-  extractBindingFacts(
+  private extractBindingFactsFromData(
     filePath: string,
     content: string,
     _symbols: SymbolNode[],
@@ -571,13 +674,17 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts normalized Go call facts for shared scoped resolution.
-   * @param filePath - Path to the source file.
+   * Extracts call facts from Go content.
+   * @param filePath - The path of the Go file.
    * @param content - Source file content.
-   * @param symbols - Symbols extracted from the file.
-   * @returns Call facts for package selectors, receiver calls, and composite literals.
+   * @param symbols - Extracted symbol nodes.
+   * @returns Array of call facts.
    */
-  extractCallFacts(filePath: string, content: string, symbols: SymbolNode[]): CallFact[] {
+  private extractCallFactsFromData(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+  ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
 
@@ -624,10 +731,10 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts type declarations (struct, interface, type alias).
-   * @param node - The type_declaration AST node.
-   * @param filePath - The file path.
-   * @param addSymbol - Callback to register a discovered symbol.
+   * Extracts type declarations from Go AST node.
+   * @param node - The AST node to extract from.
+   * @param filePath - The path of the Go file.
+   * @param addSymbol - Callback to register a symbol.
    */
   private extractTypeDeclaration(
     node: SgNode,
@@ -659,11 +766,11 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts var or const declarations.
-   * @param node - The var_declaration or const_declaration AST node.
-   * @param filePath - The file path.
-   * @param kind - The symbol kind to assign.
-   * @param addSymbol - Callback to register a discovered symbol.
+   * Extracts variables or constants from Go AST node.
+   * @param node - The AST node to extract from.
+   * @param filePath - The path of the Go file.
+   * @param kind - The symbol kind (Variable or Constant).
+   * @param addSymbol - Callback to register a symbol.
    */
   private extractVarOrConst(
     node: SgNode,

@@ -4,21 +4,25 @@ Read this file at the start of every specd skill invocation.
 
 ## Runtime capabilities
 
-{{#if capabilities.mcp}}
-This runtime supports MCP-oriented workflows. Prefer MCP-backed tools and connectors
+If this runtime supports MCP-oriented workflows. Prefer MCP-backed tools and connectors
 when the workflow or installed tooling exposes them.
-{{else}}
-This runtime does not expose MCP-oriented workflows. Prefer local CLI and filesystem
-tools when a workflow would otherwise rely on MCP access.
-{{/if}}
 
-{{#if capabilities.agents}}
-This runtime supports delegated agent workflows. Use them when a skill explicitly
+If this runtime supports delegated agent workflows. You MUST use them when a skill explicitly
 calls for parallel or isolated sub-work.
-{{else}}
-This runtime does not support delegated agent workflows. Execute the workflow in the
-main thread unless the user switches to a runtime with agent support.
-{{/if}}
+
+## Context Optimization Policy
+
+When `llmOptimizedContext` is enabled, context should be high-density and terse.
+If a specd command returns a warning that the context is stale or missing, you MUST optimize it before proceeding
+Don't ask users to optimize the context, you MUST optimize it yourself now.
+If you need to optimize project or spec context:
+- If you support subagents: you MUST use the Agent tool and launch the `specd-project-context-optimizer` or
+  `specd-spec-context-optimizer` agent respectively.
+- If you do NOT support subagents: Read the prompt from the corresponding agent
+  file:
+    - `{{sharedFolder}}/specd-project-context-optimizer.agent.md` for project context
+    - `{{sharedFolder}}/specd-spec-context-optimizer.agent.md` for spec context
+  execute the optimization logic inline following the "Smart Caveman" style.
 
 ## Mental model
 

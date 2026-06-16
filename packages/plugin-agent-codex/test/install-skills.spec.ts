@@ -3,26 +3,58 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { SpecdConfig } from '@specd/core'
+import type { Skill, SkillBundle } from '@specd/skills'
 
 const repositoryMock = {
-  list: vi.fn(() => [{ name: 'specd', description: 'specd', templates: [] }]),
-  get: vi.fn((name: string) =>
-    name === 'specd' ? { name, description: name, templates: [] } : undefined,
-  ),
-  getBundle: vi.fn((name: string, _context?: unknown) => ({
-    name,
-    description: name,
-    files: [
+  list: vi.fn(
+    async (): Promise<readonly Skill[]> => [
       {
-        filename: 'SKILL.md',
-        content: '---\nname: "specd"\ndescription: "specd"\n---\n\n# ' + name,
+        name: 'specd',
+        description: 'specd',
+        templates: [],
+        kind: 'skill',
+        metadata: {
+          kind: 'skill',
+          supportedCapabilities: [],
+          requiredCapabilities: [],
+          requiredSharedTemplates: [],
+        },
       },
-      { filename: 'shared.md', content: 'shared-content', shared: true },
     ],
-    install: async () => {},
-    uninstall: async () => {},
-  })),
-  listSharedFiles: vi.fn(() => []),
+  ),
+  get: vi.fn(
+    async (name: string): Promise<Skill | undefined> =>
+      name === 'specd'
+        ? {
+            name,
+            description: name,
+            templates: [],
+            kind: 'skill',
+            metadata: {
+              kind: 'skill',
+              supportedCapabilities: [],
+              requiredCapabilities: [],
+              requiredSharedTemplates: [],
+            },
+          }
+        : undefined,
+  ),
+  getBundle: vi.fn(
+    async (name: string, _context?: unknown): Promise<SkillBundle> => ({
+      name,
+      description: name,
+      files: [
+        {
+          filename: 'SKILL.md',
+          content: '---\nname: "specd"\ndescription: "specd"\n---\n\n# ' + name,
+        },
+        { filename: 'shared.md', content: 'shared-content', shared: true },
+      ],
+      install: async () => {},
+      uninstall: async () => {},
+    }),
+  ),
+  listSharedFiles: vi.fn(async () => []),
 }
 
 vi.mock('@specd/skills', async (importOriginal) => {
@@ -113,6 +145,84 @@ describe('plugin-agent-codex create()', () => {
       await plugin.uninstall(config)
       await expect(readFile(sharedFilePath, 'utf8')).rejects.toThrow()
       await expect(readFile(userSkillFilePath, 'utf8')).resolves.toBe('# user-skill\n')
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given an agent, when install is called, then generates Codex-specific TOML wrapper', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+
+    try {
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      repositoryMock.get.mockImplementation(async (name: string) => {
+        if (name === 'specd-project-context-optimizer') {
+          return {
+            name: 'specd-project-context-optimizer',
+            description: 'AI Optimizer',
+            kind: 'agent',
+            templates: [
+              {
+                filename: 'SPECD-AGENT.md',
+                getContent: async () => 'prompt with """triple quotes"""',
+              },
+            ],
+            metadata: {
+              kind: 'agent',
+              name: 'specd-project-context-optimizer',
+              description: 'AI Optimizer',
+              supportedCapabilities: [],
+              requiredCapabilities: [],
+              requiredSharedTemplates: [],
+            },
+          }
+        }
+        return undefined
+      })
+      repositoryMock.getBundle.mockImplementation(async (name: string): Promise<SkillBundle> => {
+        if (name === 'specd-project-context-optimizer') {
+          return {
+            name: 'specd-project-context-optimizer',
+            description: 'AI Optimizer',
+            files: [{ filename: 'SPECD-AGENT.md', content: 'prompt with """triple quotes"""' }],
+            install: async () => {},
+            uninstall: async () => {},
+          }
+        }
+        return {
+          name,
+          description: name,
+          files: [],
+          install: async () => {},
+          uninstall: async () => {},
+        }
+      })
+
+      const result = await plugin.install(config, {
+        skills: [],
+        agents: ['specd-project-context-optimizer'],
+      })
+      expect(result.installed).toContainEqual(
+        expect.objectContaining({ skill: 'specd-project-context-optimizer' }),
+      )
+
+      const agentFilePath = path.join(
+        projectRoot,
+        '.codex',
+        'agents',
+        'specd-project-context-optimizer.toml',
+      )
+      const content = await readFile(agentFilePath, 'utf8')
+
+      expect(content).toContain('name = "specd-project-context-optimizer"')
+      expect(content).toContain(
+        'description = "Generates a high-density, token-efficient version of project-level context."',
+      )
+      expect(content).toContain('developer_instructions = """')
+      expect(content).toContain('prompt with \\"\\"\\"triple quotes\\"\\"\\"')
+      expect(content).toContain('"""')
     } finally {
       await rm(projectRoot, { recursive: true, force: true })
     }

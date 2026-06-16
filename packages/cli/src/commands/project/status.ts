@@ -1,9 +1,9 @@
-import path from 'node:path'
 import {
   createCodeGraphProvider,
   parseFingerprintMap,
   detectFingerprintMismatch,
   type GraphStatistics,
+  type HotspotResult,
 } from '@specd/code-graph'
 import { createVcsAdapter, type SpecdConfig } from '@specd/core'
 import { type Command } from 'commander'
@@ -48,13 +48,15 @@ export function registerProjectStatus(parent: Command): void {
           configPath: opts.config,
         })
 
-        const [workspaces, activeChanges, drafts, discarded, graphStats] = await Promise.all([
+        const [workspaces, activeChanges, drafts, discarded, graphData] = await Promise.all([
           kernel.project.listWorkspaces.execute(),
           kernel.changes.list.execute(),
           kernel.changes.listDrafts.execute(),
           kernel.changes.listDiscarded.execute(),
-          loadGraphStats(config),
+          loadGraphData(config, opts.graph ?? false),
         ])
+        const graphStats = graphData.stats
+        const hotspots = graphData.hotspots
 
         const specCounts = await Promise.all(
           workspaces.map(async (ws) => ({
@@ -106,8 +108,14 @@ export function registerProjectStatus(parent: Command): void {
         const llmOptimizedContext = config.llmOptimizedContext ?? false
 
         let contextData:
-          | Array<{ instruction: string; files: string[]; specs: string[] }>
+          | {
+              instructions: string[]
+              files: string[]
+              specs: string[]
+              optimizedContext?: string
+            }
           | undefined
+        let fullContext: string[] | undefined
         if (opts.context) {
           const compileConfig = {
             projectRoot: config.projectRoot,
@@ -132,22 +140,43 @@ export function registerProjectStatus(parent: Command): void {
             config: compileConfig,
           })
 
-          const firstContextEntry = config.context?.[0]
-          const instruction =
-            firstContextEntry !== undefined && 'instruction' in firstContextEntry
-              ? firstContextEntry.instruction
-              : ''
-          const files: string[] = [
-            path.join(config.projectRoot, '.specd', 'config'),
-            path.join(config.projectRoot, '.specd', 'metadata'),
-          ]
-          contextData = [
-            {
-              instruction,
-              files,
-              specs: ctxResult.specs.map((s) => s.specId),
-            },
-          ]
+          // Emit warnings to stderr
+          for (const w of ctxResult.warnings) {
+            process.stderr.write(`warning: ${w.message}\n`)
+          }
+
+          fullContext = ctxResult.contextEntries
+
+          const instructionEntries = (config.context ?? [])
+            .filter((e): e is { instruction: string } => 'instruction' in e)
+            .map((e) => e.instruction)
+
+          const fileEntries = (config.context ?? [])
+            .filter((e): e is { file: string } => 'file' in e)
+            .map((e) => e.file)
+
+          let specsList: string[] = []
+          let optimizedContext: string | undefined
+
+          const isFresh =
+            config.llmOptimizedContext &&
+            !ctxResult.warnings.some((w) => w.type === 'stale-optimization')
+          if (isFresh) {
+            optimizedContext = ctxResult.contextEntries[0]
+            const rawResult = await kernel.project.getProjectContext.execute({
+              config: { ...compileConfig, llmOptimizedContext: false },
+            })
+            specsList = rawResult.specs.map((s) => s.specId)
+          } else {
+            specsList = ctxResult.specs.map((s) => s.specId)
+          }
+
+          contextData = {
+            instructions: instructionEntries,
+            files: fileEntries,
+            specs: specsList,
+            ...(optimizedContext !== undefined ? { optimizedContext } : {}),
+          }
         }
 
         if (fmt !== 'text') {
@@ -157,6 +186,7 @@ export function registerProjectStatus(parent: Command): void {
               schemaRef: config.schemaRef,
               workspaces: workspaces.map((w) => ({
                 name: w.name,
+                prefix: w.prefix,
                 ownership: w.ownership,
                 codeRoot: w.codeRoot,
                 isExternal: w.isExternal,
@@ -180,6 +210,18 @@ export function registerProjectStatus(parent: Command): void {
                       symbolCount: graphStats.symbolCount,
                       relationCounts: graphStats.relationCounts,
                       languages: graphStats.languages,
+                      hotspots: hotspots
+                        ? hotspots.entries.map((e) => ({
+                            symbol: {
+                              id: e.symbol.id,
+                              name: e.symbol.name,
+                              kind: e.symbol.kind,
+                              filePath: e.symbol.filePath,
+                            },
+                            score: e.score,
+                            riskLevel: e.riskLevel,
+                          }))
+                        : [],
                     }
                   : {}),
               },
@@ -192,14 +234,13 @@ export function registerProjectStatus(parent: Command): void {
           return
         }
 
-        const firstContext = contextData?.[0]
         const lines = [
           `projectRoot: ${config.projectRoot}`,
           `schema: ${config.schemaRef}`,
           `workspaces:`,
           ...workspaces.map(
             (w) =>
-              `  ${w.name} [${w.ownership}, ${
+              `  ${w.name} [prefix: ${w.prefix}, ${w.ownership}, ${
                 w.isExternal ? 'external' : 'local'
               }, codeRoot: ${w.codeRoot}]`,
           ),
@@ -215,15 +256,31 @@ export function registerProjectStatus(parent: Command): void {
                 `graph.files: ${graphStats.fileCount}`,
                 `graph.symbols: ${graphStats.symbolCount}`,
                 `graph.languages: ${graphStats.languages.join(', ') || 'none'}`,
+                ...(hotspots && hotspots.entries.length > 0
+                  ? [
+                      `graph.hotspots:`,
+                      ...hotspots.entries
+                        .slice(0, 5)
+                        .map(
+                          (e) =>
+                            `  - [${e.symbol.kind}] ${e.symbol.name} (${e.symbol.filePath}) - score: ${e.score}, risk: ${e.riskLevel}`,
+                        ),
+                    ]
+                  : []),
               ]
             : []),
           `approvals.spec: ${approvals.specEnabled ? 'on' : 'off'}`,
           `approvals.signoff: ${approvals.signoffEnabled ? 'on' : 'off'}`,
           `llmOptimizedContext: ${llmOptimizedContext ? 'on' : 'off'}`,
-          ...(opts.context && firstContext !== undefined
+          ...(opts.context && fullContext !== undefined
             ? [
-                `context.instruction: ${firstContext.instruction.slice(0, 80)}...`,
-                `context.specs: ${firstContext.specs.join(', ')}`,
+                `context:`,
+                ...fullContext.map((c) =>
+                  c
+                    .split('\n')
+                    .map((l) => `  ${l}`)
+                    .join('\n'),
+                ),
               ]
             : []),
         ]
@@ -236,21 +293,34 @@ export function registerProjectStatus(parent: Command): void {
 }
 
 /**
- * Loads code graph statistics.
+ * Loads code graph statistics and optionally hotspots.
  *
- * @param config - Resolved project configuration used to create the graph provider.
- * @returns Graph statistics, or `null` when the graph is not available.
+ * @param config - Resolved project configuration.
+ * @param includeHotspots - Whether to load hotspot entries.
+ * @returns Graph statistics and hotspots, or nulls when unavailable.
  */
-async function loadGraphStats(config: SpecdConfig): Promise<GraphStatistics | null> {
+async function loadGraphData(
+  config: SpecdConfig,
+  includeHotspots: boolean,
+): Promise<{ stats: GraphStatistics | null; hotspots: HotspotResult | null }> {
   try {
     const provider = createCodeGraphProvider(config)
     await provider.open()
     try {
-      return await provider.getStatistics()
+      const stats = await provider.getStatistics()
+      let hotspots: HotspotResult | null = null
+      if (includeHotspots) {
+        try {
+          hotspots = await provider.getHotspots()
+        } catch {
+          // ignore
+        }
+      }
+      return { stats, hotspots }
     } finally {
       await provider.close()
     }
   } catch {
-    return null
+    return { stats: null, hotspots: null }
   }
 }

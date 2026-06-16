@@ -54,7 +54,7 @@ export async function checkProjectMetadataFreshness(
         {
           type: 'stale-optimization',
           message:
-            'Project-level optimized context is missing. Run specd-project-metadata skill to generate it.',
+            'Project-level optimized context is missing. Launch specd-project-context-optimizer agent to generate it.',
         },
       ],
     }
@@ -78,7 +78,7 @@ export async function checkProjectMetadataFreshness(
           {
             type: 'stale-optimization',
             message:
-              'Project-level optimized context is stale (config changed). Run specd-project-metadata skill to regenerate.',
+              'Project-level optimized context is stale (config changed). Launch specd-project-context-optimizer agent to regenerate.',
           },
         ],
       }
@@ -94,7 +94,7 @@ export async function checkProjectMetadataFreshness(
           warnings: [
             {
               type: 'stale-optimization',
-              message: `Project-level optimized context is stale (file '${fileInput.path}' changed). Run specd-project-metadata skill to regenerate.`,
+              message: `Project-level optimized context is stale (file '${fileInput.path}' changed). Launch specd-project-context-optimizer agent to regenerate.`,
             },
           ],
         }
@@ -124,7 +124,7 @@ export async function checkProjectMetadataFreshness(
           {
             type: 'stale-optimization',
             message:
-              'Project-level optimized context is stale (spec selection changed). Run specd-project-metadata skill to regenerate.',
+              'Project-level optimized context is stale (spec selection changed). Launch specd-project-context-optimizer agent to regenerate.',
           },
         ],
       }
@@ -139,7 +139,7 @@ export async function checkProjectMetadataFreshness(
           warnings: [
             {
               type: 'stale-optimization',
-              message: `Project-level optimized context is stale (spec '${specInput.id}' no longer in context). Run specd-project-metadata skill to regenerate.`,
+              message: `Project-level optimized context is stale (spec '${specInput.id}' no longer in context). Launch specd-project-context-optimizer agent to regenerate.`,
             },
           ],
         }
@@ -153,7 +153,7 @@ export async function checkProjectMetadataFreshness(
           warnings: [
             {
               type: 'stale-optimization',
-              message: `Project-level optimized context is stale (workspace '${spec.workspace}' not found). Run specd-project-metadata skill to regenerate.`,
+              message: `Project-level optimized context is stale (workspace '${spec.workspace}' not found). Launch specd-project-context-optimizer agent to regenerate.`,
             },
           ],
         }
@@ -168,7 +168,7 @@ export async function checkProjectMetadataFreshness(
           warnings: [
             {
               type: 'stale-optimization',
-              message: `Project-level optimized context is stale (spec '${specInput.id}' metadata missing). Run specd-project-metadata skill to regenerate.`,
+              message: `Project-level optimized context is stale (spec '${specInput.id}' metadata missing). Launch specd-project-context-optimizer agent to regenerate.`,
             },
           ],
         }
@@ -181,7 +181,7 @@ export async function checkProjectMetadataFreshness(
           warnings: [
             {
               type: 'stale-optimization',
-              message: `Project-level optimized context is stale (spec '${specInput.id}' changed). Run specd-project-metadata skill to regenerate.`,
+              message: `Project-level optimized context is stale (spec '${specInput.id}' changed). Launch specd-project-context-optimizer agent to regenerate.`,
             },
           ],
         }
@@ -196,7 +196,7 @@ export async function checkProjectMetadataFreshness(
       warnings: [
         {
           type: 'stale-optimization',
-          message: `Project-level optimized context is invalid: ${err instanceof Error ? err.message : String(err)}. Run specd-project-metadata skill to regenerate.`,
+          message: `Project-level optimized context is invalid: ${err instanceof Error ? err.message : String(err)}. Launch specd-project-context-optimizer agent to regenerate.`,
         },
       ],
     }

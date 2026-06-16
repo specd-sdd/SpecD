@@ -134,6 +134,7 @@ describe('CodeGraphProvider', () => {
       workspaces: [
         {
           name: 'default',
+          prefix: null,
           codeRoot,
           specRepo: makeMockRepo(),
           ownership: 'owned',

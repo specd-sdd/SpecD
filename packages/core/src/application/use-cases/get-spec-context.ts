@@ -206,23 +206,17 @@ export class GetSpecContext {
         })
       }
 
-      if (freshnessResult.allFresh) {
-        if (
-          llmOptimizedContext &&
-          metadata.optimizedContext !== undefined &&
-          metadata.optimizedContext !== ''
-        ) {
-          return {
-            spec: specLabel,
-            source,
-            mode,
-            stale: false,
-            ...(metadata.title !== undefined ? { title: metadata.title } : {}),
-            ...(metadata.description !== undefined ? { description: metadata.description } : {}),
-            optimizedContent: metadata.optimizedContext,
-          }
+      if (llmOptimizedContext) {
+        if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
+          warnings.push({
+            type: 'stale-optimization',
+            path: specLabel,
+            message: `Spec '${specLabel}' is missing LLM-optimized context. Launch specd-spec-context-optimizer agent to refresh.`,
+          })
         }
+      }
 
+      if (freshnessResult.allFresh) {
         if (mode === 'summary') {
           return {
             spec: specLabel,
@@ -241,6 +235,17 @@ export class GetSpecContext {
             ? (['rules', 'constraints'] as const)
             : sections
 
+        const hasRules = effectiveSections.includes('rules')
+        const hasConstraints = effectiveSections.includes('constraints')
+        const hasScenarios = effectiveSections.includes('scenarios')
+
+        const useOptimized =
+          llmOptimizedContext &&
+          metadata.optimizedContext !== undefined &&
+          metadata.optimizedContext !== '' &&
+          hasRules &&
+          hasConstraints
+
         return {
           spec: specLabel,
           source,
@@ -253,19 +258,17 @@ export class GetSpecContext {
                   (llmOptimizedContext && metadata.optimizedDescription) || metadata.description,
               }
             : {}),
-          ...(effectiveSections.includes('rules') &&
-          metadata.rules !== undefined &&
-          metadata.rules.length > 0
+          ...(useOptimized ? { optimizedContent: metadata.optimizedContext } : {}),
+          ...(!useOptimized && hasRules && metadata.rules !== undefined && metadata.rules.length > 0
             ? { rules: metadata.rules }
             : {}),
-          ...(effectiveSections.includes('constraints') &&
+          ...(!useOptimized &&
+          hasConstraints &&
           metadata.constraints !== undefined &&
           metadata.constraints.length > 0
             ? { constraints: metadata.constraints }
             : {}),
-          ...(effectiveSections.includes('scenarios') &&
-          metadata.scenarios !== undefined &&
-          metadata.scenarios.length > 0
+          ...(hasScenarios && metadata.scenarios !== undefined && metadata.scenarios.length > 0
             ? { scenarios: metadata.scenarios }
             : {}),
         }

@@ -1,5 +1,5 @@
 import { readdirSync, lstatSync, readFileSync, existsSync } from 'node:fs'
-import { join, relative, dirname } from 'node:path'
+import { join, relative, dirname, extname } from 'node:path'
 import ignore from 'ignore'
 
 /**
@@ -16,6 +16,25 @@ export const DEFAULT_EXCLUDE_PATHS: readonly string[] = [
   '.next/',
   '.nuxt/',
 ]
+
+/**
+ * Known binary and non-source file extensions that are skipped during discovery
+ * before any text decoding heuristics are applied.
+ */
+export const DEFAULT_BINARY_EXTENSIONS = new Set([
+  '.gif',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.pdf',
+  '.sql',
+  '.zip',
+  '.tiff',
+  '.pack',
+  '.ico',
+  '.war',
+  '.7z',
+])
 
 /**
  * Options controlling file discovery behaviour.
@@ -202,6 +221,11 @@ export function discoverFiles(
           walk(fullPath)
         }
       } else if (stat.isFile()) {
+        const ext = extname(entry).toLowerCase()
+        if (DEFAULT_BINARY_EXTENSIONS.has(ext)) {
+          continue
+        }
+
         const passAdapter = !hasAdapter || hasAdapter(relPath)
         if (!isIgnored(relPath, false) && passAdapter) {
           if (!allowedIg || allowedIg.test(relPath).ignored) {

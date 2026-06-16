@@ -1,5 +1,5 @@
 export * from './domain/index.js'
-export type { SharedFile, SkillRepository } from './application/ports/index.js'
+export type { SharedFile, SkillRepository, SkillRepositoryPort } from './application/ports/index.js'
 export {
   GetSkill,
   ListSkills,

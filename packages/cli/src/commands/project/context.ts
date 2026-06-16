@@ -26,6 +26,8 @@ export function registerProjectContext(parent: Command): void {
       'limit dependsOn traversal to N levels (requires --follow-deps)',
       parseInt,
     )
+    .option('--optimized', 'force prefer optimized context')
+    .option('--no-optimized', 'suppress preference for optimized context')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
     .addHelpText(
@@ -47,6 +49,7 @@ JSON/TOON output schema:
         scenarios?: boolean
         followDeps?: boolean
         depth?: number
+        optimized?: boolean
         format: string
         config?: string
       }) => {
@@ -71,10 +74,16 @@ JSON/TOON output schema:
               ? 'full'
               : config.contextMode)
 
+          const llmOptimizedContext = (() => {
+            if (opts.optimized === false) return false
+            if (opts.optimized === true) return true
+            return config.llmOptimizedContext ?? false
+          })()
+
           const compileConfig: CompileContextConfig = {
             projectRoot: config.projectRoot,
             configPath: config.configPath,
-            llmOptimizedContext: config.llmOptimizedContext,
+            llmOptimizedContext,
             ...(config.context !== undefined
               ? {
                   context: config.context.map((e) =>
@@ -98,7 +107,16 @@ JSON/TOON output schema:
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),
           })
 
+          const isOptimizedRequested =
+            llmOptimizedContext &&
+            (sectionFlags.length === 0 ||
+              (sectionFlags.includes('rules') && sectionFlags.includes('constraints')))
+
           for (const w of result.warnings) {
+            // Suppress stale-optimization warnings if user did not ask for optimized or if the sections requested don't support it
+            if (w.type === 'stale-optimization' && !isOptimizedRequested) {
+              continue
+            }
             process.stderr.write(`warning: ${w.message}\n`)
           }
 

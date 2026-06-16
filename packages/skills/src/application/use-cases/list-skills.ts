@@ -34,7 +34,7 @@ export class ListSkills {
    * @returns Skill collection.
    */
   async execute(_input: ListSkillsInput): Promise<ListSkillsOutput> {
-    const skills = this.repository.list()
+    const skills = await this.repository.list()
     return { skills }
   }
 }

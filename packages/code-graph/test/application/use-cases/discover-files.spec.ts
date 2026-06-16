@@ -139,6 +139,22 @@ describe('discoverFiles', () => {
     })
   })
 
+  describe('binary file filtering', () => {
+    it('skips known binary extensions even without hasAdapter', () => {
+      touch(root, 'src/main.ts')
+      touch(root, 'assets/logo.png')
+      touch(root, 'docs/manual.pdf')
+      touch(root, 'data/dump.sql')
+
+      const files = discoverFiles(root)
+
+      expect(files).toContain('src/main.ts')
+      expect(files).not.toContain('assets/logo.png')
+      expect(files).not.toContain('docs/manual.pdf')
+      expect(files).not.toContain('data/dump.sql')
+    })
+  })
+
   describe('DEFAULT_EXCLUDE_PATHS export', () => {
     it('includes expected built-in paths', () => {
       expect(DEFAULT_EXCLUDE_PATHS).toContain('node_modules/')

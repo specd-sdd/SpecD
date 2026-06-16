@@ -1,6 +1,12 @@
 import { parse, Lang } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
-import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import {
+  type LanguageAdapter,
+  type AdapterAnalyzeContext,
+  type ImportResolutionContext,
+  type ResolvedImports,
+  type RelationBuildContext,
+} from '../../domain/value-objects/language-adapter.js'
 import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
 import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
 import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/binding-fact.js'
@@ -11,6 +17,25 @@ import { type Relation, createRelation } from '../../domain/value-objects/relati
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../domain/value-objects/relation-type.js'
 import { findManifestField } from './find-manifest-field.js'
+import {
+  type FileAnalysisDraft,
+  type FileAnalysis,
+} from '../../domain/value-objects/file-analysis.js'
+import { type IndexSession } from '../../domain/value-objects/index-session.js'
+
+/**
+ * Determines whether an import declaration is file-only/side-effect only.
+ * @param declaration - The import declaration to test.
+ * @returns True if the import is file-only.
+ */
+function isFileOnlyImport(declaration: ImportDeclaration): boolean {
+  return (
+    declaration.kind === ImportDeclarationKind.SideEffect ||
+    declaration.kind === ImportDeclarationKind.Dynamic ||
+    declaration.kind === ImportDeclarationKind.Require ||
+    declaration.kind === ImportDeclarationKind.Blank
+  )
+}
 
 /**
  * Determines the tree-sitter language enum for a given file path based on its extension.
@@ -197,12 +222,21 @@ function findEnclosingSymbolIdByLine(
 /**
  * Represents a local class or interface declaration and the methods it owns.
  */
-interface TypeDeclarationInfo {
+interface TsTypeDeclarationInfo {
   readonly name: string
   readonly symbolId: string
-  readonly methodsByName: ReadonlyMap<string, string>
+  readonly methodsByName: Record<string, string>
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
+}
+
+/**
+ * Parser state representation for TypeScript.
+ */
+interface TypeScriptParserState {
+  readonly kind: 'ts'
+  readonly exportedNames: readonly string[]
+  readonly declarations: readonly TsTypeDeclarationInfo[]
 }
 
 /**
@@ -210,6 +244,24 @@ interface TypeDeclarationInfo {
  * Uses tree-sitter via ast-grep to extract symbols and relations from source code.
  */
 export class TypeScriptLanguageAdapter implements LanguageAdapter {
+  /**
+   * Resolves a qualified name to a path.
+   * @param _qualifiedName - Qualified name.
+   * @param _codeRoot - Code root.
+   * @param _repoRoot - Repo root.
+   * @returns Resolved path, or undefined.
+   */
+  resolveQualifiedNameToPath(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _qualifiedName: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _codeRoot: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _repoRoot?: string,
+  ): string | undefined {
+    return undefined
+  }
+
   /**
    * Returns the language identifiers this adapter handles.
    * @returns An array of supported language strings.
@@ -227,16 +279,32 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Parses a source file and extracts all symbol nodes (functions, classes, methods, types, etc.).
-   * @param filePath - Path to the source file.
-   * @param content - The source file content.
-   * @returns An array of extracted symbol nodes.
+   * Analyzes a TypeScript file.
+   * @param filePath - File path.
+   * @param content - File content.
+   * @param context - The adapter analyze context.
+   * @returns Extracted file analysis draft.
    */
-  extractSymbols(filePath: string, content: string): SymbolNode[] {
+  analyzeFile(
+    filePath: string,
+    content: string,
+    context: AdapterAnalyzeContext,
+  ): FileAnalysisDraft {
     const lang = langForFile(filePath)
-    const root = parse(lang, content).root()
+    const sgRoot = parse(lang, content)
+    // Keep the parsed SgRoot instance alive in the session state to prevent
+    // V8 garbage collection from running its native Rust finalizer during
+    // event loop yields. This avoids a SIGSEGV segmentation fault caused
+    // by a native concurrency/double-free bug in @ast-grep/napi.
+    let keepAlive = context.session.getAdapterState<unknown[]>('napi-keepalive')
+    if (!keepAlive) {
+      keepAlive = []
+      context.session.setAdapterState('napi-keepalive', keepAlive)
+    }
+    keepAlive.push(sgRoot)
+    const root = sgRoot.root()
     const symbols: SymbolNode[] = []
-    const seen = new Set<string>()
+    const seenSymbol = new Set<string>()
 
     const addSymbol = (
       name: string,
@@ -247,8 +315,8 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
-      if (seen.has(key)) return
-      seen.add(key)
+      if (seenSymbol.has(key)) return
+      seenSymbol.add(key)
       symbols.push(
         createSymbolNode({
           name,
@@ -327,7 +395,302 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       }
     }
 
-    return symbols
+    const imports = this.extractImportedNamesFromData(content, root)
+    const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports)
+    const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
+
+    const declarations = this.collectTypeDeclarations(root, symbols)
+    const exportedNames = new Set<string>()
+
+    for (const child of root.children()) {
+      if (nodeKind(child) !== 'export_statement') continue
+
+      const decl = child.field('declaration')
+      if (decl) {
+        const name = getName(decl)
+        if (name) exportedNames.add(name)
+
+        if (nodeKind(decl) === 'lexical_declaration' || nodeKind(decl) === 'variable_declaration') {
+          for (const declarator of decl.children()) {
+            if (nodeKind(declarator) === 'variable_declarator') {
+              const varName = declarator.field('name')?.text()
+              if (varName) exportedNames.add(varName)
+            }
+          }
+        }
+      }
+
+      for (const specChild of child.children()) {
+        if (nodeKind(specChild) === 'export_clause') {
+          for (const specifier of specChild.children()) {
+            if (nodeKind(specifier) === 'export_specifier') {
+              const nameNode = specifier.field('name')
+              if (nameNode) exportedNames.add(nameNode.text())
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      language:
+        lang === Lang.TypeScript
+          ? 'typescript'
+          : lang === Lang.Tsx
+            ? 'tsx'
+            : lang === Lang.JavaScript
+              ? 'javascript'
+              : 'jsx',
+      symbols,
+      imports,
+      bindingFacts,
+      callFacts,
+      parserState: {
+        kind: 'typescript',
+        declarations,
+        exportedNames: [...exportedNames],
+      },
+    }
+  }
+
+  /**
+   * Resolves raw imports extracted in Pass 1 into symbol mappings and file dependencies.
+   */
+  /**
+   * Resolves TypeScript imports.
+   * @param analysis - File analysis.
+   * @param context - Import resolution context.
+   * @returns Resolved imports.
+   */
+  resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
+    const importMap = new Map<string, string>()
+    const fileImports: string[] = []
+    const knownPackages = [...context.packageToWorkspace.keys()]
+    const { session, qualifiedNames, packageToWorkspace, codeRoot, repoRoot } = context
+
+    for (const imp of analysis.imports) {
+      if (isFileOnlyImport(imp)) {
+        const resolved = this.resolveFileImport(imp, analysis.filePath, session, codeRoot, repoRoot)
+        if (resolved !== undefined) {
+          fileImports.push(resolved)
+        }
+        continue
+      }
+
+      if (imp.isRelative) {
+        const resolved = this.resolveRelativeImportPath(analysis.filePath, imp.specifier)
+        const candidates = Array.isArray(resolved) ? resolved : [resolved]
+        for (const candidatePath of candidates) {
+          const target = session
+            .findSymbolsByFile(candidatePath)
+            .find((s) => s.name === imp.originalName)
+          if (target) {
+            importMap.set(imp.localName, target.id)
+            break
+          }
+        }
+      } else {
+        const qualifiedId = qualifiedNames.get(imp.specifier)
+        if (qualifiedId) {
+          importMap.set(imp.localName, qualifiedId)
+          continue
+        }
+
+        const pkgName = this.resolvePackageFromSpecifier(imp.specifier, knownPackages)
+        if (pkgName) {
+          const wsPrefix = packageToWorkspace.get(pkgName)
+          if (wsPrefix !== undefined) {
+            const candidates = session.findSymbolsByName(imp.originalName, wsPrefix + ':')
+            if (candidates.length > 0) {
+              importMap.set(imp.localName, candidates[0]!.id)
+            }
+          }
+        }
+
+        if (this.resolveQualifiedNameToPath && codeRoot) {
+          const resolvedPath = this.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
+          if (resolvedPath) {
+            fileImports.push(resolvedPath)
+            continue
+          }
+        }
+      }
+    }
+
+    return { importMap, fileImports }
+  }
+
+  /**
+   * Resolves a file import.
+   * @param imp - Import declaration.
+   * @param filePath - Path of the file.
+   * @param session - Index session.
+   * @param codeRoot - Code root.
+   * @param repoRoot - Repo root.
+   * @returns Resolved path, or undefined.
+   */
+  private resolveFileImport(
+    imp: ImportDeclaration,
+    filePath: string,
+    session: IndexSession,
+    codeRoot?: string,
+    repoRoot?: string,
+  ): string | undefined {
+    if (imp.isRelative) {
+      const resolved = this.resolveRelativeImportPath(filePath, imp.specifier)
+      const candidates = Array.isArray(resolved) ? resolved : [resolved]
+      return candidates.find((candidatePath) => session.findSymbolsByFile(candidatePath).length > 0)
+    }
+
+    if (!imp.isRelative && codeRoot) {
+      return this.resolveQualifiedNameToPath?.(imp.specifier, codeRoot, repoRoot)
+    }
+
+    return undefined
+  }
+
+  /**
+   * Builds TypeScript relations.
+   * @param analysis - File analysis.
+   * @param context - Relation build context.
+   * @returns Array of relations.
+   */
+  buildRelations(analysis: FileAnalysis, context: RelationBuildContext): Relation[] {
+    const relations: Relation[] = []
+
+    for (const symbol of analysis.symbols) {
+      relations.push(
+        createRelation({
+          source: analysis.filePath,
+          target: symbol.id,
+          type: RelationType.Defines,
+        }),
+      )
+    }
+
+    const tsState = analysis.parserState as TypeScriptParserState | undefined
+    const exportedNames = new Set(tsState?.exportedNames ?? [])
+    for (const symbol of analysis.symbols) {
+      if (exportedNames.has(symbol.name)) {
+        relations.push(
+          createRelation({
+            source: analysis.filePath,
+            target: symbol.id,
+            type: RelationType.Exports,
+          }),
+        )
+      }
+    }
+
+    for (const imp of analysis.imports) {
+      if (imp.isRelative) {
+        const resolved = this.resolveRelativeImportPath(analysis.filePath, imp.specifier)
+        const target = Array.isArray(resolved) ? resolved[0]! : resolved
+        relations.push(
+          createRelation({
+            source: analysis.filePath,
+            target,
+            type: RelationType.Imports,
+            metadata: { specifier: imp.specifier },
+          }),
+        )
+      }
+    }
+
+    const declarations = tsState?.declarations ?? []
+    const declarationsByName = new Map<string, TsTypeDeclarationInfo>(
+      declarations.map((declaration) => [declaration.name, declaration]),
+    )
+    const seen = new Set<string>()
+
+    for (const declaration of declarations) {
+      for (const parentName of declaration.extendsNames) {
+        const targetId =
+          context.resolvedImports.importMap.get(parentName) ??
+          declarationsByName.get(parentName)?.symbolId
+        if (!targetId) continue
+
+        const key = `${declaration.symbolId}:${RelationType.Extends}:${targetId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: declaration.symbolId,
+              target: targetId,
+              type: RelationType.Extends,
+            }),
+          )
+        }
+
+        const localTarget = declarationsByName.get(parentName)
+        if (localTarget) {
+          this.addOverrideRelations(
+            declaration,
+            localTarget,
+            RelationType.Overrides,
+            relations,
+            seen,
+          )
+        }
+      }
+
+      for (const contractName of declaration.implementsNames) {
+        const targetId =
+          context.resolvedImports.importMap.get(contractName) ??
+          declarationsByName.get(contractName)?.symbolId
+        if (!targetId) continue
+
+        const key = `${declaration.symbolId}:${RelationType.Implements}:${targetId}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          relations.push(
+            createRelation({
+              source: declaration.symbolId,
+              target: targetId,
+              type: RelationType.Implements,
+            }),
+          )
+        }
+
+        const localTarget = declarationsByName.get(contractName)
+        if (localTarget) {
+          this.addOverrideRelations(
+            declaration,
+            localTarget,
+            RelationType.Overrides,
+            relations,
+            seen,
+          )
+        }
+      }
+    }
+
+    const localSymbolsByName = new Map<string, string>()
+    for (const s of analysis.symbols) {
+      localSymbolsByName.set(s.name, s.id)
+    }
+
+    for (const call of analysis.callFacts) {
+      if (call.form === CallForm.Free && call.callerSymbolId) {
+        const calleeId =
+          context.resolvedImports.importMap.get(call.name) ?? localSymbolsByName.get(call.name)
+        if (calleeId) {
+          const key = `${call.callerSymbolId}->${calleeId}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            relations.push(
+              createRelation({
+                source: call.callerSymbolId,
+                target: calleeId,
+                type: RelationType.Calls,
+              }),
+            )
+          }
+        }
+      }
+    }
+
+    return relations
   }
 
   /**
@@ -387,14 +750,12 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Parses TypeScript/JavaScript import declarations from source code.
-   * @param filePath - Path to the source file.
-   * @param content - The source file content.
-   * @returns An array of parsed import declarations.
+   * Extracts imported names from TS AST.
+   * @param content - TS content.
+   * @param root - SgNode root.
+   * @returns Array of import declarations.
    */
-  extractImportedNames(filePath: string, content: string): ImportDeclaration[] {
-    const lang = langForFile(filePath)
-    const root = parse(lang, content).root()
+  private extractImportedNamesFromData(content: string, root: SgNode): ImportDeclaration[] {
     const results: ImportDeclaration[] = []
     const seen = new Set<string>()
 
@@ -504,14 +865,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts deterministic TypeScript binding facts for shared scoped resolution.
-   * @param filePath - Path to the source file.
-   * @param content - Source file content.
-   * @param symbols - Symbols extracted from the file.
-   * @param imports - Import declarations extracted from the file.
-   * @returns Binding facts for type uses, receivers, imports, and construction aliases.
+   * Extracts binding facts from TS content.
+   * @param filePath - Path of the file.
+   * @param content - TS content.
+   * @param symbols - SymbolNode array.
+   * @param imports - ImportDeclaration array.
+   * @returns Array of binding facts.
    */
-  extractBindingFacts(
+  private extractBindingFactsFromData(
     filePath: string,
     content: string,
     symbols: SymbolNode[],
@@ -568,13 +929,17 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts normalized TypeScript call facts for shared scoped resolution.
-   * @param filePath - Path to the source file.
-   * @param content - Source file content.
-   * @param symbols - Symbols extracted from the file.
-   * @returns Call facts for free, member/static, and constructor calls.
+   * Extracts call facts from TS content.
+   * @param filePath - Path of the file.
+   * @param content - TS content.
+   * @param symbols - SymbolNode array.
+   * @returns Array of call facts.
    */
-  extractCallFacts(filePath: string, content: string, symbols: SymbolNode[]): CallFact[] {
+  private extractCallFactsFromData(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+  ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
 
@@ -630,10 +995,10 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts `this` receiver bindings for class declarations.
-   * @param filePath - Path to the source file.
-   * @param content - Source file content.
-   * @param addFact - Fact accumulator callback.
+   * Extracts class receiver facts.
+   * @param filePath - Path of the file.
+   * @param content - TS content.
+   * @param addFact - Callback to add fact.
    */
   private extractClassReceiverFacts(
     filePath: string,
@@ -657,9 +1022,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts typed parameter facts from parameters and constructor parameter properties.
-   * @param content - Source file content.
-   * @param addFact - Fact accumulator callback.
+   * Extracts typed parameter facts.
+   * @param content - TS content.
+   * @param addFact - Callback to add fact.
    */
   private extractTypedParameterFacts(
     content: string,
@@ -684,9 +1049,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts return type references.
-   * @param content - Source file content.
-   * @param addFact - Fact accumulator callback.
+   * Extracts return type facts.
+   * @param content - TS content.
+   * @param addFact - Callback to add fact.
    */
   private extractReturnTypeFacts(
     content: string,
@@ -709,9 +1074,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts class or object property type references.
-   * @param content - Source file content.
-   * @param addFact - Fact accumulator callback.
+   * Extracts property type facts.
+   * @param content - TS content.
+   * @param addFact - Callback to add fact.
    */
   private extractPropertyTypeFacts(
     content: string,
@@ -736,9 +1101,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts aliases created by deterministic constructor calls.
-   * @param content - Source file content.
-   * @param addFact - Fact accumulator callback.
+   * Extracts construction alias facts.
+   * @param content - TS content.
+   * @param addFact - Callback to add fact.
    */
   private extractConstructionAliasFacts(
     content: string,
@@ -761,9 +1126,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts binding facts from type alias RHS references.
-   * @param content - Source file content.
-   * @param addFact - Callback to register a discovered binding fact.
+   * Extracts type alias RHS facts.
+   * @param content - TS content.
+   * @param addFact - Callback to add fact.
    */
   private extractTypeAliasRhsFacts(
     content: string,
@@ -788,11 +1153,11 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Returns whether a regex free-call match is syntax that should not be modeled as a call.
-   * @param content - Source content.
-   * @param index - Match start offset.
-   * @param name - Candidate callee name.
-   * @returns True when the candidate should be ignored.
+   * Checks if call is excluded.
+   * @param content - TS content.
+   * @param index - Index.
+   * @param name - Name.
+   * @returns True if excluded.
    */
   private isExcludedFreeCall(content: string, index: number, name: string): boolean {
     const before = content.slice(Math.max(index - 16, 0), index)
@@ -814,128 +1179,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts relations (defines, exports, imports, calls) from a parsed source file.
-   * @param filePath - Path to the source file.
-   * @param content - The source file content.
-   * @param symbols - Previously extracted symbols for this file.
-   * @param importMap - Map of imported names to their symbol ids for CALLS resolution.
-   * @returns An array of extracted relations.
+   * Collects type declarations.
+   * @param root - SgNode root.
+   * @param symbols - SymbolNode array.
+   * @returns Array of type declarations.
    */
-  extractRelations(
-    filePath: string,
-    content: string,
-    symbols: SymbolNode[],
-    importMap: Map<string, string>,
-  ): Relation[] {
-    const lang = langForFile(filePath)
-    const root = parse(lang, content).root()
-    const relations: Relation[] = []
-
-    for (const symbol of symbols) {
-      relations.push(
-        createRelation({
-          source: filePath,
-          target: symbol.id,
-          type: RelationType.Defines,
-        }),
-      )
-    }
-
-    this.extractExportRelations(root, filePath, symbols, relations)
-    this.extractImportRelations(root, filePath, relations)
-    this.extractHierarchyRelations(root, symbols, importMap, relations)
-    this.extractCallRelations(root, symbols, importMap, relations)
-
-    return relations
-  }
-
-  /**
-   * Extracts `EXTENDS`, `IMPLEMENTS`, and local `OVERRIDES` relations.
-   * @param root - The parsed source root.
-   * @param symbols - Symbols declared in the current file.
-   * @param importMap - Resolved imported type names.
-   * @param relations - Accumulator array for discovered relations.
-   */
-  private extractHierarchyRelations(
-    root: SgNode,
-    symbols: SymbolNode[],
-    importMap: Map<string, string>,
-    relations: Relation[],
-  ): void {
-    const declarations = this.collectTypeDeclarations(root, symbols)
-    const declarationsByName = new Map(
-      declarations.map((declaration) => [declaration.name, declaration]),
-    )
-    const seen = new Set<string>()
-
-    for (const declaration of declarations) {
-      for (const parentName of declaration.extendsNames) {
-        const targetId = importMap.get(parentName) ?? declarationsByName.get(parentName)?.symbolId
-        if (!targetId) continue
-
-        const key = `${declaration.symbolId}:${RelationType.Extends}:${targetId}`
-        if (!seen.has(key)) {
-          seen.add(key)
-          relations.push(
-            createRelation({
-              source: declaration.symbolId,
-              target: targetId,
-              type: RelationType.Extends,
-            }),
-          )
-        }
-
-        const localTarget = declarationsByName.get(parentName)
-        if (localTarget) {
-          this.addOverrideRelations(
-            declaration,
-            localTarget,
-            RelationType.Overrides,
-            relations,
-            seen,
-          )
-        }
-      }
-
-      for (const contractName of declaration.implementsNames) {
-        const targetId =
-          importMap.get(contractName) ?? declarationsByName.get(contractName)?.symbolId
-        if (!targetId) continue
-
-        const key = `${declaration.symbolId}:${RelationType.Implements}:${targetId}`
-        if (!seen.has(key)) {
-          seen.add(key)
-          relations.push(
-            createRelation({
-              source: declaration.symbolId,
-              target: targetId,
-              type: RelationType.Implements,
-            }),
-          )
-        }
-
-        const localTarget = declarationsByName.get(contractName)
-        if (localTarget) {
-          this.addOverrideRelations(
-            declaration,
-            localTarget,
-            RelationType.Overrides,
-            relations,
-            seen,
-          )
-        }
-      }
-    }
-  }
-
-  /**
-   * Builds local class/interface metadata needed for hierarchy extraction.
-   * @param root - Parsed source root.
-   * @param symbols - Symbols declared in the current file.
-   * @returns Local type declarations with method ownership and heritage data.
-   */
-  private collectTypeDeclarations(root: SgNode, symbols: SymbolNode[]): TypeDeclarationInfo[] {
-    const declarations: TypeDeclarationInfo[] = []
+  private collectTypeDeclarations(root: SgNode, symbols: SymbolNode[]): TsTypeDeclarationInfo[] {
+    const declarations: TsTypeDeclarationInfo[] = []
     const nodes: SgNode[] = []
     collectByKind(
       root,
@@ -960,12 +1210,12 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       const header = node.text().split('{')[0] ?? node.text()
       const extendsMatch = header.match(/\bextends\s+([^{]+?)(?:\bimplements\b|$)/)
       const implementsMatch = header.match(/\bimplements\s+([^{]+)$/)
-      const methodsByName = new Map<string, string>()
+      const methodsByName: Record<string, string> = {}
 
       for (const symbol of symbols) {
         if (symbol.kind !== SymbolKind.Method) continue
         if (symbol.line <= lineStart || symbol.line > lineEnd) continue
-        methodsByName.set(symbol.name, symbol.id)
+        methodsByName[symbol.name] = symbol.id
       }
 
       declarations.push({
@@ -985,22 +1235,22 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Emits method-level `OVERRIDES` relations for matching local declarations.
-   * @param source - Child declaration info.
-   * @param target - Base or contract declaration info.
-   * @param relationType - The hierarchy relation type to emit.
-   * @param relations - Accumulator array for discovered relations.
-   * @param seen - Deduplication set.
+   * Adds override relations.
+   * @param source - Source type info.
+   * @param target - Target type info.
+   * @param relationType - Relation type.
+   * @param relations - Relations array.
+   * @param seen - Seen relations set.
    */
   private addOverrideRelations(
-    source: TypeDeclarationInfo,
-    target: TypeDeclarationInfo,
+    source: TsTypeDeclarationInfo,
+    target: TsTypeDeclarationInfo,
     relationType: RelationType,
     relations: Relation[],
     seen: Set<string>,
   ): void {
-    for (const [methodName, methodId] of source.methodsByName.entries()) {
-      const targetMethodId = target.methodsByName.get(methodName)
+    for (const [methodName, methodId] of Object.entries(source.methodsByName)) {
+      const targetMethodId = target.methodsByName[methodName]
       if (!targetMethodId) continue
       const key = `${methodId}:${relationType}:${targetMethodId}`
       if (seen.has(key)) continue
@@ -1016,186 +1266,6 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts export relations by matching exported names to known symbols.
-   * @param root - The root AST node of the file.
-   * @param filePath - Path to the source file.
-   * @param symbols - Known symbols in this file.
-   * @param relations - Accumulator array for discovered relations.
-   */
-  private extractExportRelations(
-    root: SgNode,
-    filePath: string,
-    symbols: SymbolNode[],
-    relations: Relation[],
-  ): void {
-    const exportedNames = new Set<string>()
-
-    for (const child of root.children()) {
-      if (nodeKind(child) !== 'export_statement') continue
-
-      const decl = child.field('declaration')
-      if (decl) {
-        const name = getName(decl)
-        if (name) exportedNames.add(name)
-
-        if (nodeKind(decl) === 'lexical_declaration' || nodeKind(decl) === 'variable_declaration') {
-          for (const declarator of decl.children()) {
-            if (nodeKind(declarator) === 'variable_declarator') {
-              const varName = declarator.field('name')?.text()
-              if (varName) exportedNames.add(varName)
-            }
-          }
-        }
-      }
-
-      for (const specChild of child.children()) {
-        if (nodeKind(specChild) === 'export_clause') {
-          for (const specifier of specChild.children()) {
-            if (nodeKind(specifier) === 'export_specifier') {
-              const nameNode = specifier.field('name')
-              if (nameNode) exportedNames.add(nameNode.text())
-            }
-          }
-        }
-      }
-    }
-
-    for (const symbol of symbols) {
-      if (exportedNames.has(symbol.name)) {
-        relations.push(
-          createRelation({
-            source: filePath,
-            target: symbol.id,
-            type: RelationType.Exports,
-          }),
-        )
-      }
-    }
-  }
-
-  /**
-   * Extracts import relations from relative import statements.
-   * @param root - The root AST node of the file.
-   * @param filePath - Path to the source file.
-   * @param relations - Accumulator array for discovered relations.
-   */
-  private extractImportRelations(root: SgNode, filePath: string, relations: Relation[]): void {
-    for (const child of root.children()) {
-      if (nodeKind(child) !== 'import_statement') continue
-
-      const sourceNode = child.field('source')
-      if (!sourceNode) continue
-      const specifier = sourceNode.text().replace(/['"]/g, '')
-
-      if (!specifier.startsWith('.')) continue
-
-      const resolved = this.resolveRelativeImportPath(filePath, specifier)
-      const target = Array.isArray(resolved) ? resolved[0]! : resolved
-      relations.push(
-        createRelation({
-          source: filePath,
-          target,
-          type: RelationType.Imports,
-          metadata: { specifier },
-        }),
-      )
-    }
-  }
-
-  /**
-   * Extracts CALLS relations by walking call_expression nodes in the AST.
-   * Resolves callees via local symbols and the import map.
-   * @param root - The root AST node.
-   * @param symbols - Known symbols in this file.
-   * @param importMap - Map of imported names to their symbol ids.
-   * @param relations - Accumulator array for discovered relations.
-   */
-  private extractCallRelations(
-    root: SgNode,
-    symbols: SymbolNode[],
-    importMap: Map<string, string>,
-    relations: Relation[],
-  ): void {
-    const localSymbolsByName = new Map<string, string>()
-    for (const s of symbols) {
-      localSymbolsByName.set(s.name, s.id)
-    }
-
-    const seen = new Set<string>()
-
-    const walkCalls = (node: SgNode): void => {
-      if (nodeKind(node) === 'call_expression') {
-        const fnNode = node.field('function')
-        if (fnNode && nodeKind(fnNode) === 'identifier') {
-          const calleeName = fnNode.text()
-          const calleeId = importMap.get(calleeName) ?? localSymbolsByName.get(calleeName)
-
-          if (calleeId) {
-            const callerId = this.findEnclosingSymbolId(node, symbols)
-            if (callerId) {
-              const key = `${callerId}->${calleeId}`
-              if (!seen.has(key)) {
-                seen.add(key)
-                relations.push(
-                  createRelation({
-                    source: callerId,
-                    target: calleeId,
-                    type: RelationType.Calls,
-                  }),
-                )
-              }
-            }
-          }
-        }
-      }
-
-      for (const child of node.children()) {
-        walkCalls(child)
-      }
-    }
-
-    walkCalls(root)
-  }
-
-  /**
-   * Finds the id of the innermost enclosing function, method, or class for a node.
-   * @param node - The AST node to find the enclosing scope for.
-   * @param symbols - Known symbols in this file.
-   * @returns The symbol id of the enclosing scope, or undefined if at module level.
-   */
-  private findEnclosingSymbolId(node: SgNode, symbols: SymbolNode[]): string | undefined {
-    let current = node.parent()
-    while (current) {
-      const kind = nodeKind(current)
-      if (
-        kind === 'function_declaration' ||
-        kind === 'method_definition' ||
-        kind === 'arrow_function' ||
-        kind === 'function'
-      ) {
-        const name = getName(current)
-        if (name) {
-          const line = current.range().start.line + 1
-          return symbols.find((s) => s.name === name && s.line === line)?.id
-        }
-        // Arrow/function expression assigned to variable — check parent variable_declarator
-        if (kind === 'arrow_function' || kind === 'function') {
-          const declarator = current.parent()
-          if (declarator && nodeKind(declarator) === 'variable_declarator') {
-            const varName = declarator.field('name')?.text()
-            if (varName) {
-              const line = declarator.range().start.line + 1
-              return symbols.find((s) => s.name === varName && s.line === line)?.id
-            }
-          }
-        }
-      }
-      current = current.parent()
-    }
-    return undefined
-  }
-
-  /**
    * Resolves a relative import specifier to a file path.
    * Maps JS extensions to their TS equivalents (`.js` → `.ts`, `.jsx` → `.tsx`)
    * and appends `.ts` for extensionless specifiers.
@@ -1204,7 +1274,6 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @returns The resolved file path.
    */
   resolveRelativeImportPath(fromFile: string, specifier: string): string | string[] {
-    // Separate workspace prefix (e.g. "core:src/foo.ts" → "core:", "src/foo.ts")
     const colonIdx = fromFile.indexOf(':')
     const wsPrefix = colonIdx === -1 ? '' : fromFile.substring(0, colonIdx + 1)
     const relFile = colonIdx === -1 ? fromFile : fromFile.substring(colonIdx + 1)

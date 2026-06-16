@@ -164,45 +164,11 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:test/application/services/resolve-graph-selector.spec.ts"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:test/composition/code-graph-provider.spec.ts"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/index.ts"
-      }
-    ],
     "symbols": [
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/composition/create-code-graph-provider.ts",
-        "symbol": "createCodeGraphProvider"
-      },
       {
         "specId": "code-graph:composition",
         "file": "code-graph:src/composition/code-graph-provider.ts",
         "symbol": "CodeGraphProvider"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/application/services/resolve-graph-selector.ts",
-        "symbol": "resolveFileSelector"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/application/services/resolve-graph-selector.ts",
-        "symbol": "resolveSymbolSelector"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/composition/graph-store-factory.ts",
-        "symbol": "GraphStoreFactory"
       }
     ]
   },
@@ -210,5 +176,7 @@
     "spec.md": "sha256:c5d2fc1875b7df6027c8f1f478ab626ddf02e5c48010050463dbcabd27963836",
     "verify.md": "sha256:0cbc946a259a02c6257f57f36b10945c079e345eddef57913e10c27fc1d7636a"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "CodeGraphProvider facade + createCodeGraphProvider factory wiring store, indexer, adapters, traversal — defines @specd/code-graph public API surface.",
+  "optimizedContext": "# Composition\n## Rules\n- CodeGraphProvider: top-level API facade. Exposes index(), query (delegate to GraphStore), search (delegate to GraphStore), clear(), traversal (getUpstream/getDownstream), impact (analyzeImpact/analyzeFileImpact/analyzeSpecImpact/detectChanges), selector normalization (resolveFileSelector/resolveSymbolSelector), lifecycle (open/close). Thin orchestration — no domain logic.\n- Factory: `createCodeGraphProvider(config: SpecdConfig, options?)` — primary. Derives storage root, resolves backend via graphStoreId (default sqlite), merges registries, creates GraphStore, registers built-in adapters (TypeScript, Python, Go, PHP), creates IndexCodeGraph, returns wired provider. Legacy: `createCodeGraphProvider(options: CodeGraphOptions)` with storagePath, graphStoreId, graphStoreFactories, adapters. Overload detection by projectRoot vs storagePath. Built-in registry: ladybug, sqlite. Default: sqlite. Constructor not public.\n- Package exports: createCodeGraphProvider, CodeGraphProvider (type only), CodeGraphOptions, CodeGraphFactoryOptions, GraphStoreFactory, indexer types, traversal types, model types, query types, LanguageAdapter, CodeGraphError subclasses. Internal components NOT exported.\n- Lifecycle: explicit open/close (delegated to GraphStore). No auto-open/auto-close. Methods before open or after close throw StoreNotOpenError.\n- Dependency on @specd/core: runtime dependency for SpecdConfig, SpecdWorkspaceConfig. Provider stateless — does not cache config. Workspace targets via IndexOptions at each index() call.\n## Constraints\n- createCodeGraphProvider is only construction path — constructor not exported\n- Internal components not re-exported\n- LanguageAdapter interface exported for custom adapters\n- Backend selection registry-driven, not specd.yaml setting\n- Exactly one active GraphStore per construction path\n- CodeGraphProvider holds no domain logic — only delegates\n- Lifecycle explicit — no auto-open, no auto-close\n- Depends on @specd/core for SpecdConfig type"
 }

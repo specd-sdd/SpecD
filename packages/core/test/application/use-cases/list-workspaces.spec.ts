@@ -57,6 +57,7 @@ describe('ListWorkspaces', () => {
     expect(result).toHaveLength(2)
     expect(result[0]).toEqual({
       name: 'default',
+      prefix: null,
       codeRoot: '/project',
       isExternal: false,
       ownership: 'owned',
@@ -64,6 +65,7 @@ describe('ListWorkspaces', () => {
     })
     expect(result[1]).toEqual({
       name: 'core',
+      prefix: null,
       codeRoot: '/project/packages/core',
       isExternal: false,
       ownership: 'shared',

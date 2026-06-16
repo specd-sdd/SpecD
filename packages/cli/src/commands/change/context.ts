@@ -33,6 +33,8 @@ export function registerChangeContext(parent: Command): void {
       'limit dependsOn traversal to N levels (requires --follow-deps)',
       parseInt,
     )
+    .option('--optimized', 'force prefer optimized context')
+    .option('--no-optimized', 'suppress preference for optimized context')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--fingerprint <hash>', 'skip if context unchanged')
     .option('--config <path>', 'path to specd.yaml')
@@ -66,6 +68,7 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           includeChangeSpecs?: boolean
           followDeps?: boolean
           depth?: number
+          optimized?: boolean
           format: string
           fingerprint?: string
           config?: string
@@ -77,6 +80,12 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           }
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+
+          const llmOptimizedContext = (() => {
+            if (opts.optimized === false) return false
+            if (opts.optimized === true) return true
+            return config.llmOptimizedContext ?? false
+          })()
 
           const sectionFlags: SpecSection[] = []
           if (opts.rules) sectionFlags.push('rules')
@@ -112,7 +121,7 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           const compileConfig: CompileContextConfig = {
             projectRoot: config.projectRoot,
             configPath: config.configPath,
-            llmOptimizedContext: config.llmOptimizedContext,
+            llmOptimizedContext,
             ...(config.context !== undefined
               ? {
                   context: config.context.map((e) =>
@@ -150,7 +159,15 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
           }
 
           const fmt = parseFormat(opts.format)
+          const isOptimizedRequested =
+            llmOptimizedContext &&
+            (sectionFlags.length === 0 ||
+              (sectionFlags.includes('rules') && sectionFlags.includes('constraints')))
+
           for (const w of result.warnings) {
+            if (w.type === 'stale-optimization' && !isOptimizedRequested) {
+              continue
+            }
             process.stderr.write(`warning: ${w.message}\n`)
           }
 

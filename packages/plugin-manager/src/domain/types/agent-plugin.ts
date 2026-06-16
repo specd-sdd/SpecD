@@ -23,6 +23,11 @@ export interface AgentInstallOptions {
   readonly skills?: readonly string[]
 
   /**
+   * Optional agent-name filter. When omitted, install all agents.
+   */
+  readonly agents?: readonly string[]
+
+  /**
    * Recursive variables used for template rendering.
    */
   readonly variables?: Readonly<Record<string, TemplateVariable>>

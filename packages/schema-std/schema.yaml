@@ -358,12 +358,69 @@ artifacts:
       - specs (spec.md and deltas) — the final requirements the implementation must satisfy
       - verify (verify.md and deltas) — the verification scenarios the implementation must pass
 
-      The design artifact must fully materialize the implementation context.
-      Do not assume access to previous artifacts.
-      Every technical detail required for coding, testing, validation, integration, deployment,
-      and operation must be explicitly included.
-      Summarize and consolidate information from prior artifacts rather than referencing it.
-      The design must be independently consumable by both humans and AI agents.
+      The design artifact is the authoritative implementation contract and the single source of truth for implementation.
+      It must be fully self-contained, self-sufficient, and independently consumable. Do not assume access to any other artifact, document, specification, change request, task list, discussion, conversation, repository knowledge, tribal knowledge, external reference, or prior context.
+      Every piece of information required to implement the change must be explicitly present in this artifact. No implementation-critical information may exist only in another artifact.
+      Materialize, consolidate, and restate all relevant information from prior artifacts instead of referencing them. Do not use indirect references such as "see previous artifact", "as described earlier", "according to the specification", "see requirements", "refer to the tasks", or similar wording.
+      The design must contain every technical detail required to implement, test, validate, integrate, deploy, operate, maintain, troubleshoot, and evolve the solution.
+      The design must explicitly define, where applicable:
+
+      - Objectives and expected outcomes.
+      - Scope and non-scope.
+      - Functional requirements.
+      - Non-functional requirements.
+      - Constraints and rules.
+      - Assumptions.
+      - Architecture decisions.
+      - System boundaries.
+      - Component responsibilities.
+      - Interfaces and contracts.
+      - Public APIs.
+      - Internal APIs.
+      - Request and response formats.
+      - Events and messaging contracts.
+      - Data models.
+      - Schemas.
+      - Field definitions.
+      - Validation rules.
+      - State models and state transitions.
+      - Workflows and execution flows.
+      - Business rules.
+      - Permission and authorization requirements.
+      - Security requirements.
+      - Error handling behavior.
+      - Edge cases.
+      - Failure scenarios.
+      - Retry behavior.
+      - Concurrency considerations.
+      - Consistency requirements.
+      - Performance requirements.
+      - Scalability considerations.
+      - Configuration requirements.
+      - Feature flags.
+      - Migration requirements.
+      - Backward compatibility requirements.
+      - Dependency requirements.
+      - Integration requirements.
+      - Observability requirements.
+      - Logging requirements.
+      - Metrics requirements.
+      - Monitoring requirements.
+      - Testing requirements.
+      - Acceptance criteria.
+      - Operational considerations.
+
+      Do not leave implementation decisions to the implementer when those decisions can affect behavior, compatibility, correctness, security, performance, maintainability, or user experience.
+
+      Avoid vague guidance, high-level descriptions, placeholders, TODOs, implementation notes, future clarifications, or statements that require interpretation. Prefer explicit contracts, definitions, examples, schemas, and behavioral specifications.
+
+      The artifact must describe the final intended behavior, not merely implementation ideas or recommendations.
+
+      A developer or AI agent receiving only this design artifact must be able to implement the complete solution without consulting any other artifact and without making material technical assumptions.
+
+      If any information required for implementation is missing, incomplete, ambiguous, or implied by another artifact, expand the design until the missing information is explicitly captured.
+
+      The design is not a summary. The design is the complete implementation contract.
 
       Before writing, analyse the codebase to understand impact:
       - **Affected files discovery**: use the impact analysis to find every existing
@@ -418,7 +475,15 @@ artifacts:
       - design
     instruction: |
       Create the task list that breaks down the implementation into discrete,
-      trackable steps. The template contains `<!-- ... -->` comments with guidance —
+      minimal, trackable steps.
+      Tasks must represent the smallest practical unit of work.
+      Do not create broad implementation phases, feature-sized tasks, or tasks containing
+      multiple objectives. Continuously decompose work until each task corresponds
+      to a single change, implementation action, test, migration, validation,
+      or documentation update. Prefer over-segmentation rather than under-segmentation.
+      Each task must have a single responsibility and a clearly verifiable outcome.
+
+      The template contains `<!-- ... -->` comments with guidance —
       these are instructions for you, not content. Do NOT copy them into the output file.
       The tasks artifact is derived from design.md — every task
       must reference the concrete files, symbols, and approach documented there.
