@@ -4,17 +4,10 @@
 
 ### Requirement: File reading
 
-#### Scenario: Reads template files
+#### Scenario: Reads template files from skills and agents subfolders
 
-- **WHEN** getBundle is called
-- **THEN** template files are read from `packages/skills/templates/`
-
-#### Scenario: Shared template entries are marked in resolved bundle files
-
-- **GIVEN** `templates/shared/*.meta.json` associates `shared.md` to a skill
-- **WHEN** `getBundle` resolves that skill
-- **THEN** the resulting `ResolvedFile` for `shared.md` is marked as shared
-- **AND** files loaded from `templates/<skill-name>/` are not marked as shared
+- **WHEN** `getBundle` is called for a skill or an agent
+- **THEN** it reads from `packages/skills/templates/skills/` or `packages/skills/templates/agents/` respectively
 
 ### Requirement: createSkillRepository factory
 
@@ -25,18 +18,7 @@
 
 ### Requirement: TemplateReader
 
-#### Scenario: TemplateReader loads .md files lazily
+#### Scenario: TemplateReader loads .md.tpl files from categorized subfolders
 
-- **GIVEN** a skill with templates in `packages/skills/templates/<skill-name>/`
-- **WHEN** `getBundle` is called
-- **THEN** the TemplateReader loads `.md` files as `SkillTemplate` objects
-- **AND** content is loaded lazily via `getContent()`
-
-### Requirement: Shared file scanning
-
-#### Scenario: Scans templates/shared/ for .meta.json files
-
-- **WHEN** `getBundle` is called for a skill that uses shared files
-- **THEN** the infrastructure scans `templates/shared/` for `.meta.json` files
-- **AND** shared file content is loaded on demand
-- **AND** ResolvedFile entries are marked as shared
+- **WHEN** templates are loaded
+- **THEN** the `TemplateReader` correctly resolves paths under `skills/` or `agents/`

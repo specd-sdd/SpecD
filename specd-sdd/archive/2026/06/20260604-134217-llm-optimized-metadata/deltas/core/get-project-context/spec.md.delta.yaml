@@ -1,0 +1,31 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Project context optimization and invalidation'
+  content: |
+    When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.
+
+    The system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
+
+    - `specd.yaml`
+    - Referenced `contextFiles`
+    - Metadata of included specs
+
+    If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.
+
+    The warning message MUST include remediation instructions: "Launch specd-project-context-optimizer agent to generate it".
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Construction dependencies'
+  content: |
+    `GetProjectContext` depends on the following ports/services injected via constructor:
+
+    - `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces
+    - `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema
+    - `files` (`FileReader`) — for reading context entry files from disk
+    - `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
+    - `hasher` (`ContentHasher`) — for comparing content hashes against metadata
+
+    All dependencies are injected at construction time. The schema is resolved lazily on first access.

@@ -1,0 +1,45 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    The command MUST support:
+
+    ```bash
+    specd project context [options]
+    ```
+
+    - `--mode <mode>` — optional; `list|summary|full|hybrid`
+    - `--rules` — when present, includes only the rules sections of spec content in the output
+    - `--constraints` — when present, includes only the constraints sections of spec content in the output
+    - `--scenarios` — when present, includes only the scenarios sections of spec content in the output
+    - `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.
+    - `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
+    - `--optimized` — optional; force prefer optimized context
+    - `--no-optimized` — optional; suppress preference for optimized context
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.
+
+    Concretely:
+
+    1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)
+    2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)
+    3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
+    4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present
+    5. The collected specs are rendered according to the configured `contextMode`
+
+    By default, if `llmOptimizedContext` is enabled in config, the command MUST prefer optimized project-level and spec-level content from fresh metadata.
+
+    The effective `llmOptimizedContext` value is overridden to `false` if `--no-optimized` is passed, or if section flags are provided that exclude either rules or constraints (e.g. only `--rules` or only `--constraints` is passed).
+
+    When optimization is effectively enabled (including when both rules and constraints are requested or defaulted), it prefers optimized project-level and spec-level content from fresh metadata.
+
+    The command MUST suppress `stale-optimization` warnings when the effective `llmOptimizedContext` is `false` (such as when `--no-optimized` is passed, or when section flags bypass optimization).

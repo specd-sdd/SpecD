@@ -8,7 +8,8 @@
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-repository",
-    "skills:resolve-bundle"
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "implementation": [
     {
@@ -17,6 +18,10 @@
     },
     {
       "file": "plugin-agent-claude:test/install-skills.spec.ts"
+    },
+    {
+      "file": "plugin-agent-claude:src/domain/frontmatter/index.ts",
+      "symbols": ["agentFrontmatter"]
     }
   ]
 }

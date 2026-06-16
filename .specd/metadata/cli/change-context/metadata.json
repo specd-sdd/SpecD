@@ -17,7 +17,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change context <name> <step>\n  [--rules] [--constraints] [--scenarios]\n  [--include-change-specs]\n  [--follow-deps [--depth <n>]]\n  [--fingerprint <hash>]\n  [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to compile context for\n- `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)\n- `--rules` — when present, includes only the rules sections of full-mode spec content in the output\n- `--constraints` — when present, includes only the constraints sections of full-mode spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of full-mode spec content in the output\n- `--include-change-specs` — when present, directly includes the change's `specIds` in the collected context. By default, direct `specIds` inclusion is disabled; those specs may still appear if selected by include patterns or dependency traversal.\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: \"unchanged\"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available full-mode sections are included. When one or more are passed, only those sections appear in each full-mode spec's content block. Section flags have no effect on list-mode or summary-mode entries."
+        "```\nspecd change context <name> <step>\n  [--rules] [--constraints] [--scenarios]\n  [--include-change-specs]\n  [--follow-deps [--depth <n>]]\n  [--optimized] [--no-optimized]\n  [--fingerprint <hash>]\n  [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to compile context for\n- `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)\n- `--rules` — when present, includes only the rules sections of full-mode spec content in the output\n- `--constraints` — when present, includes only the constraints sections of full-mode spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of full-mode spec content in the output\n- `--include-change-specs` — when present, directly includes the change's `specIds` in the collected context. By default, direct `specIds` inclusion is disabled; those specs may still appear if selected by include patterns or dependency traversal.\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--optimized` — optional; force prefer optimized context\n- `--no-optimized` — optional; suppress preference for optimized context\n- `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: \"unchanged\"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available full-mode sections are included. When one or more are passed, only those sections appear in each full-mode spec's content block. Section flags have no effect on list-mode or summary-mode entries."
       ]
     },
     {
@@ -35,7 +35,7 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command invokes the `CompileContext` use case. The `CompileContextConfig`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.\n\nWhen `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.\n\nWhen `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint."
+        "The command invokes the `CompileContext` use case. The `CompileContextConfig`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.\n\nWhen `llmOptimizedContext` is active in project config, the CLI prefers optimized context by default, unless `--no-optimized` is passed, or section flags are explicitly provided that exclude either rules or constraints.\n\nThe effective `llmOptimizedContext` value is determined as follows:\n\n- If `--no-optimized` is passed, it is `false`.\n- If `--optimized` is passed, it is `true` (subject to section flag constraints).\n- If section flags are passed:\n  - If both rules and constraints are included in the requested sections (either because both `--rules` and `--constraints` are explicitly passed, or because no section flags are passed and the defaults apply), the effective value is `true` if configured or forced via `--optimized`.\n  - If only one of rules or constraints is explicitly requested (e.g. `--rules` without `--constraints`, or `--constraints` without `--rules`), the effective value is `false` (optimization is bypassed).\n- Otherwise, it falls back to the `llmOptimizedContext` value from the resolved project configuration (defaulting to `false`).\n\nWhen `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.\n\nWhen `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint."
       ]
     },
     {
@@ -74,7 +74,9 @@
     "dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed",
     "--include-change-specs is opt-in; without the flag, change.specIds are not direct seeds",
     "--depth without --follow-deps is a CLI usage error (exit code 1)",
-    "availableSteps, stepAvailable, and blockingArtifacts are rendered from CompileContext output; the CLI must not re-derive lifecycle readiness locally"
+    "availableSteps, stepAvailable, and blockingArtifacts are rendered from CompileContext output; the CLI must not re-derive lifecycle readiness locally",
+    "Section flags override llmOptimizedContext to false unless the combination of requested sections includes both rules and constraints",
+    "Optimization warnings for missing or stale optimized fields are suppressed whenever the effective llmOptimizedContext is false"
   ],
   "scenarios": [
     {
@@ -106,6 +108,18 @@
       "name": "--include-change-specs flag accepted",
       "when": ["specd change context my-change designing --include-change-specs is run"],
       "then": ["the command proceeds normally and requests direct change-spec seeding"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--optimized and --no-optimized flags accepted",
+      "when": [
+        "specd change context my-change designing --optimized is run",
+        "specd change context my-change designing --no-optimized is run"
+      ],
+      "then": [
+        "the command proceeds normally and forces optimization preference",
+        "the command proceeds normally and suppresses optimization preference"
+      ]
     },
     {
       "requirement": "Implementation tracking refresh before context compilation",
@@ -251,6 +265,42 @@
     },
     {
       "requirement": "Behaviour",
+      "name": "--no-optimized suppresses preference for optimized context",
+      "given": ["llmOptimizedContext: true in configuration"],
+      "when": ["specd change context my-change designing --no-optimized is executed"],
+      "then": [
+        "the CLI passes llmOptimizedContext: false into the CompileContext configuration request"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "--optimized forces preference for optimized context",
+      "given": ["llmOptimizedContext: false in configuration"],
+      "when": ["specd change context my-change designing --optimized is executed"],
+      "then": [
+        "the CLI passes llmOptimizedContext: true into the CompileContext configuration request"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags do not override llmOptimizedContext when both rules and constraints are requested",
+      "given": ["llmOptimizedContext: true in configuration"],
+      "when": ["specd change context my-change designing --rules --constraints is executed"],
+      "then": [
+        "the CLI passes llmOptimizedContext: true into the CompileContext configuration request"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags override llmOptimizedContext to false when only rules are requested",
+      "given": ["llmOptimizedContext: true in configuration"],
+      "when": ["specd change context my-change designing --rules is executed"],
+      "then": [
+        "the CLI passes llmOptimizedContext: false into the CompileContext configuration request"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
       "name": "Blocking artifacts come from CompileContext output",
       "given": ["CompileContext returns stepAvailable: false and blockingArtifacts: ['tasks']"],
       "when": ["specd change context my-change implementing is run"],
@@ -271,22 +321,23 @@
         "standard CLI warnings are emitted",
         "AND they include remediation instructions for the agent"
       ]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "name": "Warnings suppressed when raw sections or --no-optimized are requested",
+      "given": ["llmOptimizedContext: true", "AND some specs are missing optimization"],
+      "when": [
+        "specd change context my-change designing --no-optimized or specd change context my-change designing --rules is executed"
+      ],
+      "then": [
+        "stale-optimization warnings for missing or stale spec optimized fields are suppressed"
+      ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "cli:change-context",
-        "file": "cli:src/commands/change/context.ts",
-        "symbol": "registerChangeContext"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:c3b02c691094d0967d22074047ff3cfaeed6deb77620ac929248e8ab419dc11f",
-    "verify.md": "sha256:3a0f3f5da27b5027f7f882de2d8d72c44e2944427749f5e8bbdb8bdc8ffc1bba"
+    "spec.md": "sha256:b62cb02fb537e6c6d46571e3f5b9d417f616c1b37ff30a37c0222cc922e38a91",
+    "verify.md": "sha256:ff6e01833e2e7131677804597aa81627bb9607d69a0fcec85aa33cf2b82b7271"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "specd change context <name> <step> compiles agent context: spec content, project entries, step availability, fingerprint caching, optimization warnings.",
-  "optimizedContext": "# Change Context\n## Rules\n- Command: `specd change context <name> <step> [--rules] [--constraints] [--scenarios] [--include-change-specs] [--follow-deps [--depth <n>]] [--fingerprint <hash>] [--format text|json|toon]`. Section flags filter full-mode content only. --follow-deps traverses dependsOn transitively (default not). --depth only valid with --follow-deps (unlimited by default). --fingerprint short-circuits on match.\n- Optimization warning: when llmOptimizedContext:true, missing/stale optimized fields → warning with remediation instructions. Structured formats include warning state in data.\n- Implementation tracking refresh: before CompileContext, MUST call RefreshImplementationTracking. CLI does NOT invoke ImplementationDetector directly. Fingerprint short-circuit still refreshes first.\n- Behaviour: invokes CompileContext use case. --include-change-specs false by default (specs still reachable via patterns/traversal). Fingerprint match → minimal unchanged response; mismatch/omitted → full context with new fingerprint.\n- Output (text): 1st line = `Context Fingerprint: <sha256...>`. Project entries next with source labels, separated by `---`. Spec entries after: full-mode under `### Spec: <specId>`; summary/list-mode under `## Available context specs`. Non-full include `specd change spec-preview` instruction. dependsOnTraversal specs visually distinct from includePattern. Steps last. JSON/toon: structured result.\n- Step availability warning: step not available → stderr warning with blocking artifacts, context to stdout, exit 0.\n- Context warnings: CompileContext warnings → stderr warning lines, context to stdout, exit 0.\n- Error cases: change not found → exit 1. Schema not resolved → exit 3.\n## Constraints\n- Text mode: 1st line = Context Fingerprint, before any content\n- Text mode: project entries before spec entries, steps last\n- Each spec entry explicitly labeled list/summary/full\n- Non-full specs include spec-preview usage instruction\n- dependsOnTraversal specs under separate sub-heading from includePattern\n- Section flags apply only to full-mode spec content\n- Warnings to stderr, output to stdout\n- dependsOn traversal opt-in via --follow-deps\n- --include-change-specs opt-in\n- --depth without --follow-deps = usage error (exit 1)\n- availableSteps/stepAvailable/blockingArtifacts from CompileContext — CLI does not re-derive"
+  "generatedBy": "core"
 }

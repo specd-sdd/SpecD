@@ -57,7 +57,13 @@
     {
       "requirement": "supports --context flag",
       "rules": [
-        "When `--context` flag is provided, the output MUST include project context references:\n\n- Instruction entries (the directive text without reading files)\n- File entries (which files should be read without content)\n- Spec entries (which specs should be read without content)"
+        "When `--context` flag is provided, the output MUST include project context references.\n\nIn `text` mode:\n\n- The command MUST display the **full** project context (not truncated).\n- If `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedContext` from `project-metadata.json` if it is fresh.\n- If `llmOptimizedContext` is enabled but optimized context is missing or stale, the command MUST fall back to raw context entries and emit a `stale-optimization` warning.\n- The warning MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\".\n\nIn `json`/`toon` mode, the output MUST include:\n\n- Instruction entries (the directive text without reading files)\n- File entries (which files should be read without content)\n- Spec entries (which specs should be read without content)\n- `optimizedContext` (optional string, included if fresh and enabled)"
+      ]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "rules": [
+        "The command MUST emit a `stale-optimization` warning to stderr when `llmOptimizedContext` is enabled but optimized project context is missing or stale."
       ]
     },
     {
@@ -139,6 +145,23 @@
       "then": ["context references (instructions, files, specs) are included"]
     },
     {
+      "requirement": "supports --context flag",
+      "name": "Prefers optimized project context when fresh",
+      "given": ["llmOptimizedContext is enabled", "AND project-level optimized context is fresh"],
+      "when": ["specd project status --context is run"],
+      "then": ["it displays the optimized context content"]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "name": "Displays warning when project cache is stale",
+      "given": ["llmOptimizedContext: true", "AND project metadata is stale"],
+      "when": ["specd project status --context is run"],
+      "then": [
+        "a stale-optimization warning is emitted",
+        "AND the message mentions specd-project-context-optimizer"
+      ]
+    },
+    {
       "requirement": "includes config flags (always)",
       "name": "Output always includes config flags",
       "given": ["a configured specd project"],
@@ -169,16 +192,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:project-status",
-        "file": "cli:src/commands/project/status.ts"
+        "file": "cli:src/commands/project/status.ts",
+        "symbol": "registerProjectStatus"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8b189fad179f6cc5aec12a3736834a8e2e7954e508747678b584bf4551da7c36",
-    "verify.md": "sha256:884c6455704ee7c66581c8eb12b2343f1b0a29485be33c041fc17c1c05c7d46c"
+    "spec.md": "sha256:eb8d61d8805cd325d5c8998c96cfb516d3aaee80f28cbd219e8c2260e748c207",
+    "verify.md": "sha256:337068fde1f543beb92e038470fc02cea325fbee7cf5920522f4376b6be6f070"
   },
   "generatedBy": "core"
 }

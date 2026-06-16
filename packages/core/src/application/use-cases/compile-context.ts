@@ -287,11 +287,16 @@ export class CompileContext {
       warnings: optimizationWarnings,
     } = await checkProjectMetadataFreshness(input.config, this._files, this._hasher, workspaceMap)
 
+    const shouldUseOptimizedContext =
+      input.config.llmOptimizedContext === true &&
+      (input.sections === undefined ||
+        (input.sections.includes('rules') && input.sections.includes('constraints')))
+
     warnings.push(...optimizationWarnings)
 
     // Only use optimized project context if it's fresh AND none of the specs in it are being modified in this change.
     let useOptimizedProjectContext = false
-    if (isFresh && projectMeta) {
+    if (isFresh && projectMeta && shouldUseOptimizedContext) {
       const optimizedSpecIds = new Set(projectMeta.freshness.inputs.specMetadata.map((s) => s.id))
       const changeSpecIds = new Set(change.specIds)
       const hasOverlap = [...optimizedSpecIds].some((id) => changeSpecIds.has(id))
@@ -548,7 +553,7 @@ export class CompileContext {
       const source = sourceMap.get(specId) ?? 'includePattern'
 
       // Check for missing optimization if enabled
-      if (input.config.llmOptimizedContext && metadata !== null) {
+      if (shouldUseOptimizedContext && metadata !== null) {
         if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
           warnings.push({
             type: 'stale-optimization',
@@ -656,7 +661,7 @@ export class CompileContext {
               capPath,
               workspaceMap,
               sectionsFilter,
-              input.config.llmOptimizedContext,
+              shouldUseOptimizedContext,
             )
           } else {
             content = ''
@@ -668,11 +673,7 @@ export class CompileContext {
           }
 
           if (isFresh && metadata !== null) {
-            content = this._renderFromMetadata(
-              metadata,
-              sectionsFilter,
-              input.config.llmOptimizedContext,
-            )
+            content = this._renderFromMetadata(metadata, sectionsFilter, shouldUseOptimizedContext)
           } else {
             if (metadata !== null) {
               warnings.push({
@@ -697,7 +698,7 @@ export class CompileContext {
                 capPath,
                 workspaceMap,
                 sectionsFilter,
-                input.config.llmOptimizedContext,
+                shouldUseOptimizedContext,
               )
             } else {
               content = ''

@@ -30,6 +30,13 @@
 - **WHEN** `specd change context my-change designing --include-change-specs` is run
 - **THEN** the command proceeds normally and requests direct change-spec seeding
 
+#### Scenario: --optimized and --no-optimized flags accepted
+
+- **WHEN** `specd change context my-change designing --optimized` is run
+- **THEN** the command proceeds normally and forces optimization preference
+- **WHEN** `specd change context my-change designing --no-optimized` is run
+- **THEN** the command proceeds normally and suppresses optimization preference
+
 ### Requirement: Implementation tracking refresh before context compilation
 
 #### Scenario: Context command refreshes before CompileContext
@@ -150,6 +157,30 @@
 - **WHEN** `specd change context` is run with flags such as `--include-change-specs`, `--follow-deps`, `--depth`, or `--fingerprint`
 - **THEN** the command forwards those options into the `CompileContext` request
 
+#### Scenario: --no-optimized suppresses preference for optimized context
+
+- **GIVEN** `llmOptimizedContext: true` in configuration
+- **WHEN** `specd change context my-change designing --no-optimized` is executed
+- **THEN** the CLI passes `llmOptimizedContext: false` into the `CompileContext` configuration request
+
+#### Scenario: --optimized forces preference for optimized context
+
+- **GIVEN** `llmOptimizedContext: false` in configuration
+- **WHEN** `specd change context my-change designing --optimized` is executed
+- **THEN** the CLI passes `llmOptimizedContext: true` into the `CompileContext` configuration request
+
+#### Scenario: Section flags do not override llmOptimizedContext when both rules and constraints are requested
+
+- **GIVEN** `llmOptimizedContext: true` in configuration
+- **WHEN** `specd change context my-change designing --rules --constraints` is executed
+- **THEN** the CLI passes `llmOptimizedContext: true` into the `CompileContext` configuration request
+
+#### Scenario: Section flags override llmOptimizedContext to false when only rules are requested
+
+- **GIVEN** `llmOptimizedContext: true` in configuration
+- **WHEN** `specd change context my-change designing --rules` is executed
+- **THEN** the CLI passes `llmOptimizedContext: false` into the `CompileContext` configuration request
+
 #### Scenario: Blocking artifacts come from CompileContext output
 
 - **GIVEN** `CompileContext` returns `stepAvailable: false` and `blockingArtifacts: ['tasks']`
@@ -166,3 +197,10 @@
 - **WHEN** `specd change context` is run
 - **THEN** standard CLI warnings are emitted
 - **AND** they include remediation instructions for the agent
+
+#### Scenario: Warnings suppressed when raw sections or --no-optimized are requested
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** some specs are missing optimization
+- **WHEN** `specd change context my-change designing --no-optimized` or `specd change context my-change designing --rules` is executed
+- **THEN** stale-optimization warnings for missing or stale spec optimized fields are suppressed

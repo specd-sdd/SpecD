@@ -1,0 +1,25 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation traceability policy'
+  content: |
+    ### Requirement: Context optimization policy
+
+    #### Scenario: Agent delegates to optimizer subagent
+
+    - **GIVEN** `llmOptimizedContext` is enabled
+    - **AND** the runtime supports `agents`
+    - **WHEN** an orchestrator agent needs to optimize context
+    - **THEN** it launches `specd-project-context-optimizer` or `specd-spec-context-optimizer`
+    - **AND** it uses the returned optimized content
+
+    #### Scenario: Inline optimization fallback
+
+    - **GIVEN** `llmOptimizedContext` is enabled
+    - **AND** the runtime DOES NOT support `agents`
+    - **WHEN** an orchestrator agent needs to optimize context
+    - **THEN** it performs the optimization itself using "smart caveman" style

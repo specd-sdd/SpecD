@@ -1,0 +1,33 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Options include skills filter'
+  rename: 'Scenario: Options include skills and agents filter, recursive variables, and capability identifiers'
+  content: |
+    - **GIVEN** a request to install specific skills and agents
+    - **WHEN** `AgentInstallOptions` is provided
+    - **THEN** it can filter by `skills` and `agents` arrays
+    - **AND** it includes `variables` and `capabilities`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: AgentInstallResult'
+  content: |
+    ### Requirement: Agent installation and fallback
+
+    #### Scenario: Agent installed in agents directory
+
+    - **GIVEN** a runtime supports `agents`
+    - **WHEN** an agent is installed
+    - **THEN** it is placed in the designated `agents/` directory of the coding agent
+
+    #### Scenario: Agent fallback to shared directory
+
+    - **GIVEN** a runtime DOES NOT support `agents`
+    - **WHEN** an agent is installed
+    - **THEN** it is copied to the same directory as `shared.md`

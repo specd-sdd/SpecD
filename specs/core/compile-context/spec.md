@@ -8,13 +8,13 @@ AI agents entering a lifecycle step need relevant spec content and project conte
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
+`CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
 
 ```typescript
 class CompileContext {
   constructor(
     changes: ChangeRepository,
-    specs: ReadonlyMap<string, SpecRepository>,
+    listWorkspaces: ListWorkspaces,
     schemaProvider: SchemaProvider,
     files: FileReader,
     parsers: ArtifactParserRegistry,
@@ -58,13 +58,13 @@ After resolving the schema from config, `CompileContext` must compare `schema.na
 
 Every spec ID handled by `CompileContext` carries an explicit or implicit workspace qualifier:
 
-- **Explicit qualifier** (e.g. `billing:auth/login`) — the workspace name before `:` is used to look up the corresponding `SpecRepository` in the map.
+- **Explicit qualifier** (e.g. `billing:auth/login`) — the workspace name before `:` is used to look up the corresponding `SpecRepository` in the active workspaces list.
 - **No qualifier** (e.g. `auth/login`) — the workspace is inferred from context:
   - In include/exclude patterns at project level, an unqualified path resolves to `default`.
   - In include/exclude patterns at workspace level, an unqualified path resolves to that workspace.
   - In `dependsOn` entries from metadata, an unqualified path resolves to the same workspace as the spec that declared it.
 
-If a pattern or `dependsOn` entry references a workspace name that has no entry in the `specs` map, `CompileContext` must emit a warning and skip that path. It must not throw.
+If a pattern or `dependsOn` entry references a workspace name that has no entry in the active workspaces resolved via `ListWorkspaces`, `CompileContext` must emit a warning and skip that path. It must not throw.
 
 ### Requirement: Context spec collection
 
@@ -216,7 +216,7 @@ If a spec ID from an include pattern or `dependsOn` reference does not exist in 
 
 ### Requirement: Unknown workspace qualifiers emit a warning
 
-If a pattern or `dependsOn` entry references a workspace name that has no corresponding `SpecRepository` in the `specs` map (e.g. `billing:auth/*` when `billing` was not wired at bootstrap), `CompileContext` must emit a warning and skip the path. It must not throw.
+If a pattern or `dependsOn` entry references a workspace name that has no corresponding `SpecRepository` in the active workspaces resolved via `ListWorkspaces` (e.g. `billing:auth/*` when `billing` was not wired at bootstrap), `CompileContext` must emit a warning and skip the path. It must not throw.
 
 ### Requirement: Context fingerprint
 
@@ -245,14 +245,13 @@ The fingerprint enables clients to skip re-fetching unchanged context without co
 
 If `llmOptimizedContext: true` is active in the project configuration, the context compiler SHALL prefer `optimizedContext` for each spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`.
 
+**Strict Bypass**: `optimizedContext` usage is strictly bypassed (forced to `false`) if `sections` is passed but does not include both `rules` and `constraints`. This is because the monolithic optimized context cannot be filtered by individual sections. If `scenarios` are requested while `optimizedContext` is active, the scenarios MUST still be extracted and appended to the result. `optimizedDescription` preference is unaffected by this bypass.
+
 ### Requirement: Optimization warning signal
 
-When `llmOptimizedContext: true` is active, the compiler SHALL emit a warning if:
+When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimization` warning for each spec that is missing fresh optimized context.
 
-- The project-level optimized context is missing or stale.
-- Any spec included in the context is missing its `optimizedContext` field.
-
-The warning SHALL include remediation instructions for the agent.
+The warning message MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
 
 ## Constraints
 
@@ -263,7 +262,7 @@ The warning SHALL include remediation instructions for the agent.
 - A spec always appears at most once in the `specs` array, classified by its highest-priority source
 - `CompileContext` MUST NOT perform direct filesystem reads — all file access goes through `SpecRepository` (for spec files and metadata) or `FileReader` (for `config.context` file entries)
 - The caller resolves the config and constructs all `SpecRepository` and `FileReader` instances before calling the constructor
-- The `specs` map must contain one entry per workspace declared in `specd.yaml`; workspaces missing from the map produce a warning, not an error
+- The active workspaces resolved via `ListWorkspaces` must contain one entry per workspace declared in `specd.yaml`; workspaces missing from the active list produce a warning, not an error
 - Artifact instructions, rules, and delta context are NOT part of the result — they are retrieved via `GetArtifactInstruction`
 - `instruction:` hook entries are NOT part of the result — they are retrieved via `GetHookInstructions`
 - `dependsOn` traversal is opt-in via `followDeps: true`; when absent or `false`, step 5 is skipped entirely

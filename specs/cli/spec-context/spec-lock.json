@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "core:config", "core:get-spec-context"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/context.ts",
+      "symbols": ["registerSpecContext"]
+    }
+  ]
+}

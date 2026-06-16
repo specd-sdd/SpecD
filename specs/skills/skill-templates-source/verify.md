@@ -26,7 +26,8 @@
 #### Scenario: Migrated template tree is complete
 
 - **WHEN** the template source directory is validated
-- **THEN** it contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`
+- **THEN** it contains `skills/` (using `SKILL.md.tpl` and `skill.meta.json`)
+- **AND** it contains `agents/` (using `SPECD-AGENT.md.tpl` and `specd-agent.meta.json`)
 - **AND** it contains `shared/` for shared template source files
 
 #### Scenario: Shared consumer index is no longer authoritative
@@ -34,18 +35,17 @@
 - **WHEN** shared template ownership is reviewed
 - **THEN** `shared.meta.json` is not the source of truth for which skills require shared templates
 
-### Requirement: Skill template metadata contract
+### Requirement: Template metadata contract (skills and agents)
 
-#### Scenario: skill.meta.json declares supported, required, and shared requirements
+#### Scenario: Metadata files declare kind and requirements
 
-- **WHEN** a `skill.meta.json` file is inspected
-- **THEN** it declares `supportedCapabilities`
-- **AND** it declares `requiredCapabilities`
-- **AND** it declares `requiredSharedTemplates`
+- **WHEN** a `skill.meta.json` or `specd-agent.meta.json` file is inspected
+- **THEN** it declares `kind` (`skill` or `agent`)
+- **AND** it declares `supportedCapabilities`, `requiredCapabilities`, and `requiredSharedTemplates`
 
 #### Scenario: Initial capability catalogue is declared by the contract
 
-- **WHEN** the skill metadata contract is reviewed
+- **WHEN** the template metadata contract is reviewed
 - **THEN** the initial required capability identifiers are `mcp`, `agents`, and `frontmatter`
 
 ### Requirement: Capability-aware install-time rendering

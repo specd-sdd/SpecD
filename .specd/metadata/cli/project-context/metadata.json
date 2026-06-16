@@ -14,7 +14,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd project context\n  [--rules] [--constraints] [--scenarios]\n  [--follow-deps [--depth <n>]]\n  [--format text|json|toon]\n```\n\n- `--rules` — when present, includes only the rules sections of spec content in the output\n- `--constraints` — when present, includes only the constraints sections of spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of spec content in the output\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block."
+        "The command MUST support:\n\n```bash\nspecd project context [options]\n```\n\n- `--mode <mode>` — optional; `list|summary|full|hybrid`\n- `--rules` — when present, includes only the rules sections of spec content in the output\n- `--constraints` — when present, includes only the constraints sections of spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of spec content in the output\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--optimized` — optional; force prefer optimized context\n- `--no-optimized` — optional; suppress preference for optimized context\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block."
       ]
     },
     {
@@ -26,7 +26,7 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.\n\nConcretely:\n\n1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)\n2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)\n3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set\n4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present\n5. The collected specs are rendered according to the configured `contextMode`"
+        "The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.\n\nConcretely:\n\n1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)\n2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)\n3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set\n4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present\n5. The collected specs are rendered according to the configured `contextMode`\n\nBy default, if `llmOptimizedContext` is enabled in config, the command MUST prefer optimized project-level and spec-level content from fresh metadata.\n\nThe effective `llmOptimizedContext` value is overridden to `false` if `--no-optimized` is passed, or if section flags are provided that exclude either rules or constraints (e.g. only `--rules` or only `--constraints` is passed).\n\nWhen optimization is effectively enabled (including when both rules and constraints are requested or defaulted), it prefers optimized project-level and spec-level content from fresh metadata.\n\nThe command MUST suppress `stale-optimization` warnings when the effective `llmOptimizedContext` is `false` (such as when `--no-optimized` is passed, or when section flags bypass optimization)."
       ]
     },
     {
@@ -127,6 +127,40 @@
       "given": ["contextMode is list or summary"],
       "when": ["specd project context --rules --constraints is run"],
       "then": ["output remains list/summary shaped"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Prefers optimized content when enabled",
+      "given": [
+        "llmOptimizedContext is enabled in config",
+        "AND project-level optimized context is fresh"
+      ],
+      "when": ["specd project context is run"],
+      "then": ["it displays the optimized project context"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "--no-optimized forces raw sections",
+      "given": ["llmOptimizedContext is enabled in config"],
+      "when": ["specd project context --no-optimized is run"],
+      "then": ["it displays the raw project instructions", "AND it emits no optimization warnings"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags do not override optimization when both rules and constraints are requested",
+      "given": [
+        "llmOptimizedContext is enabled in config",
+        "AND project-level optimized context is fresh"
+      ],
+      "when": ["specd project context --rules --constraints is run"],
+      "then": ["it displays the optimized project context"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags override optimization when only rules are requested",
+      "given": ["llmOptimizedContext is enabled in config"],
+      "when": ["specd project context --rules is run"],
+      "then": ["it displays the raw project rules", "AND it emits no optimization warnings"]
     },
     {
       "requirement": "Output",
@@ -234,8 +268,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a059ac476e15d47cb65e2f4dec38e71f3755e868072d9f690dad4f76ed62a757",
-    "verify.md": "sha256:3523247a1a01d86d5e40455731425350cce7049044fef791cf996bb5f8eecafd"
+    "spec.md": "sha256:6cbd7d1cea9f6aab33c3b04d39140258e59893981bb48d751c3ac58218444a92",
+    "verify.md": "sha256:f7e36f82c08fe419b64a79dbbf249554548ea9833ee5a6fe3262a45a8e954276"
   },
   "generatedBy": "core"
 }

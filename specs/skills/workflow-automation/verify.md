@@ -106,3 +106,20 @@
 - **AND** tracked implementation files still remain in `open` state
 - **WHEN** the workflow approaches archive
 - **THEN** the agent explicitly resolves or ignores those tracked files instead of assuming link creation alone closed review
+
+### Requirement: Context optimization policy
+
+#### Scenario: Agent delegates to optimizer subagent
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** the runtime supports `agents`
+- **WHEN** an orchestrator agent needs to optimize context
+- **THEN** it launches `specd-project-context-optimizer` or `specd-spec-context-optimizer`
+- **AND** it uses the returned optimized content
+
+#### Scenario: Inline optimization fallback
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** the runtime DOES NOT support `agents`
+- **WHEN** an orchestrator agent needs to optimize context
+- **THEN** it performs the optimization itself using "smart caveman" style

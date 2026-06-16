@@ -66,6 +66,23 @@
 - **WHEN** `specd project status --context` runs
 - **THEN** context references (instructions, files, specs) are included
 
+#### Scenario: Prefers optimized project context when fresh
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** project-level optimized context is fresh
+- **WHEN** `specd project status --context` is run
+- **THEN** it displays the optimized context content
+
+### Requirement: Optimization warning signal
+
+#### Scenario: Displays warning when project cache is stale
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** project metadata is stale
+- **WHEN** `specd project status --context` is run
+- **THEN** a `stale-optimization` warning is emitted
+- **AND** the message mentions `specd-project-context-optimizer`
+
 ### Requirement: includes config flags (always)
 
 #### Scenario: Output always includes config flags

@@ -368,12 +368,35 @@
 - **WHEN** context is compiled
 - **THEN** the rendered output for that spec uses the standard `context`
 
+#### Scenario: Optimization bypassed when only rules requested
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec has fresh optimized metadata
+- **WHEN** context is compiled with `sections: ["rules"]`
+- **THEN** it displays the raw rules instead of optimized context
+- **AND** it emits no `stale-optimization` warnings
+
+#### Scenario: Warnings suppressed when optimization is bypassed by section flags
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec is missing optimized context
+- **WHEN** context is compiled with `sections: ["rules"]`
+- **THEN** it emits no `stale-optimization` warning for that spec
+
+#### Scenario: Scenarios are appended to optimized context when both are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec has fresh optimized metadata AND scenarios
+- **WHEN** context is compiled with `sections: ["rules", "constraints", "scenarios"]`
+- **THEN** it displays the optimized content
+- **AND** it appends the rendered scenarios
+
 ### Requirement: Optimization warning signal
 
 #### Scenario: Emits warning for missing spec optimization
 
-- **GIVEN** `llmOptimizedContext: true`
-- **AND** a spec in the context is missing its `optimizedContext` field
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec is missing optimized context
 - **WHEN** context is compiled
-- **THEN** a warning is emitted for that spec
-- **AND** it includes remediation instructions
+- **THEN** it emits a `stale-optimization` warning
+- **AND** the message mentions `specd-spec-context-optimizer`

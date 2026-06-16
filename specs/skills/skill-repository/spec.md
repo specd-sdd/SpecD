@@ -11,6 +11,8 @@ Defines the `SkillRepository` interface that provides access to skills and their
 The `list()` method MUST:
 
 - Return an array of all `Skill` objects (metadata only, no template content)
+- Scan both `templates/skills/` and `templates/agents/` directories
+- Correctlty set the `kind` property for each skill based on its parent directory
 - Return `readonly Skill[]`
 
 ### Requirement: get() method

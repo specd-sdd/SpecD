@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["skills:skill-repository-port"],
+  "implementation": [
+    {
+      "file": "skills:src/infrastructure/repository/skill-template-metadata-reader.ts",
+      "symbols": ["SkillTemplateMetadataReader"]
+    }
+  ]
+}

@@ -49,11 +49,12 @@ Title resolution is performed by `@specd/core` — the CLI receives the resolved
 
 When `--summary` is passed, a short summary is included for each spec, resolved in this order:
 
-1. `description` field from the spec's `.specd-metadata.yaml`, if present and non-empty
-2. Fallback: extracted from `spec.md` using this priority order (first match wins):
+1. `optimizedDescription` field from the spec's `.specd-metadata.yaml`, if present and non-empty
+2. `description` field from the spec's `.specd-metadata.yaml`, if present and non-empty
+3. Fallback: extracted from `spec.md` using this priority order (first match wins):
    a. First non-empty paragraph immediately after the `# H1` heading
    b. Body of the first section matching `## Overview`, `## Summary`, or `## Purpose` (first paragraph only)
-3. If no summary can be extracted, the field is omitted in `text` mode and `null` in `json`/`toon` mode
+4. If no summary can be extracted, the field is omitted in `text` mode and `null` in `json`/`toon` mode
 
 Summary extraction from `spec.md` is performed by `@specd/core` as a pure function — the CLI does not contain Markdown parsing logic.
 

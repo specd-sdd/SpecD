@@ -33,7 +33,7 @@
     {
       "requirement": "Summary resolution",
       "rules": [
-        "When `--summary` is passed, a short summary is included for each spec, resolved in this order:\n\n1. `description` field from the spec's `.specd-metadata.yaml`, if present and non-empty\n2. Fallback: extracted from `spec.md` using this priority order (first match wins):\n   a. First non-empty paragraph immediately after the `# H1` heading\n   b. Body of the first section matching `## Overview`, `## Summary`, or `## Purpose` (first paragraph only)\n3. If no summary can be extracted, the field is omitted in `text` mode and `null` in `json`/`toon` mode\n\nSummary extraction from `spec.md` is performed by `@specd/core` as a pure function — the CLI does not contain Markdown parsing logic."
+        "When `--summary` is passed, a short summary is included for each spec, resolved in this order:\n\n1. `optimizedDescription` field from the spec's `.specd-metadata.yaml`, if present and non-empty\n2. `description` field from the spec's `.specd-metadata.yaml`, if present and non-empty\n3. Fallback: extracted from `spec.md` using this priority order (first match wins):\n   a. First non-empty paragraph immediately after the `# H1` heading\n   b. Body of the first section matching `## Overview`, `## Summary`, or `## Purpose` (first paragraph only)\n4. If no summary can be extracted, the field is omitted in `text` mode and `null` in `json`/`toon` mode\n\nSummary extraction from `spec.md` is performed by `@specd/core` as a pure function — the CLI does not contain Markdown parsing logic."
       ]
     },
     {
@@ -115,6 +115,15 @@
       "given": ["default:auth/login has .specd-metadata.yaml with description: \"Handles login\""],
       "when": ["specd spec list --summary is run"],
       "then": ["the row for default:auth/login shows Handles login as its summary"]
+    },
+    {
+      "requirement": "Summary resolution",
+      "name": "Summary from metadata optimizedDescription",
+      "given": [
+        "default:auth/login has .specd-metadata.yaml with optimizedDescription: \"Terse login summary\""
+      ],
+      "when": ["specd spec list --summary is run"],
+      "then": ["the row for default:auth/login shows Terse login summary as its summary"]
     },
     {
       "requirement": "Summary resolution",
@@ -290,13 +299,13 @@
       {
         "specId": "cli:spec-list",
         "file": "cli:src/commands/spec/list.ts",
-        "symbol": "registerSpecList"
+        "symbol": "registerListSpecs"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b37dfdb7f854b2e91a45c8d49d19dfc358289814b3826ca18af3a1c910bceb0e",
-    "verify.md": "sha256:921da79cfe98382a2097e31779e80fa5ad5b0461e0e40cb4b52f6300f99b8a4f"
+    "spec.md": "sha256:a33609849df3a3d04a4fb3afe1e7c31bd1f963e92248492a5b1baf8079e7c71b",
+    "verify.md": "sha256:f89e44eda1884d1d4f36a5e82b22b16e704f6ce9fd7a19463a0f28168a1ce0c8"
   },
   "generatedBy": "core"
 }

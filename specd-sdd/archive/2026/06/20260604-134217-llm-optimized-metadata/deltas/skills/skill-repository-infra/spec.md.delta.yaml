@@ -1,0 +1,18 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: File reading'
+  content: |
+    The infrastructure MUST use `node:fs/promises` to read template files from `packages/skills/templates/skills/` and `packages/skills/templates/agents/`.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: TemplateReader'
+  content: |
+    A `TemplateReader` component MUST read `.md.tpl` files from `packages/skills/templates/skills/<name>/` or `packages/skills/templates/agents/<name>/` and return them as `SkillTemplate` objects with lazy content loading.
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Shared file scanning'

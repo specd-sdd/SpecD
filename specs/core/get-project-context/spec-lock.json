@@ -13,8 +13,7 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-project-context.ts",
-      "symbols": ["GetProjectContext"]
+      "file": "core:src/application/use-cases/_shared/project-metadata-freshness.ts"
     }
   ]
 }

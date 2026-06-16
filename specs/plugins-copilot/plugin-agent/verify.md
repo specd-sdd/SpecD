@@ -84,6 +84,14 @@
 - **WHEN** install writes shared files to the resolved shared location
 - **THEN** that location does not contain a `SKILL.md` file
 
+#### Scenario: Installs agent profiles to .github/agents/
+
+- **GIVEN** a request to install an agent
+- **WHEN** `install(config, options)` runs
+- **THEN** it copies the agent to `.github/agents/` (since `agents` capability is supported)
+- **AND** the file uses the `.agent.md` extension
+- **AND** the YAML frontmatter contains `tools` as a list
+
 ### Requirement: Uninstall behavior
 
 #### Scenario: Uninstall removes selected skill directories and keeps shared resources
@@ -100,3 +108,16 @@
 - **THEN** all specd-managed skill directories are removed
 - **AND** the resolved sharedFolder location is removed
 - **AND** unrelated user skill directories remain
+
+#### Scenario: Uninstall removes selected agent files
+
+- **GIVEN** multiple agents are installed
+- **WHEN** `uninstall(config, { agents: ['specd-project-context-optimizer'] })` is executed
+- **THEN** only `.github/agents/specd-project-context-optimizer.agent.md` is removed
+
+#### Scenario: Uninstall without filter removes all specd-managed agents
+
+- **GIVEN** specd-managed agents and unrelated user agents are installed under `.github/agents/`
+- **WHEN** `uninstall(config)` is executed without filters
+- **THEN** all specd-managed agent files are removed
+- **AND** unrelated user agent files remain

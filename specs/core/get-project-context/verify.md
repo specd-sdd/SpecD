@@ -206,8 +206,9 @@
 
 #### Scenario: Falls back and warns when project context is stale
 
-- **GIVEN** `llmOptimizedContext: true`
-- **AND** `specd.yaml` has changed (hash mismatch in `project-metadata.json`)
-- **WHEN** project context is retrieved
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** the project context cache is stale or missing (e.g. due to `specd.yaml` hash mismatch)
+- **WHEN** project context is compiled
 - **THEN** it falls back to raw compilation
-- **AND** emits a warning signal
+- **AND** it emits a warning
+- **AND** the warning message mentions `specd-project-context-optimizer`

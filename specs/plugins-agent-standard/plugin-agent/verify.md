@@ -73,6 +73,12 @@
 - **WHEN** install writes shared files to the resolved shared location
 - **THEN** that location does not contain a `SKILL.md` file
 
+#### Scenario: Fallback to shared location for agents
+
+- **GIVEN** a request to install an agent
+- **WHEN** `install(config, options)` runs
+- **THEN** it copies the agent to the same directory as `shared.md` (since `agents` capability is not supported)
+
 ### Requirement: allowed-tools configuration
 
 #### Scenario: Each skill has appropriate tool declarations

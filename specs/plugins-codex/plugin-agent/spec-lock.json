@@ -8,7 +8,8 @@
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-templates-source",
-    "skills:resolve-bundle"
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "implementation": [
     {
@@ -17,6 +18,10 @@
     },
     {
       "file": "plugin-agent-codex:test/install-skills.spec.ts"
+    },
+    {
+      "file": "plugin-agent-codex:src/domain/frontmatter/index.ts",
+      "symbols": ["agentFrontmatter"]
     }
   ]
 }

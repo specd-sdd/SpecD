@@ -3,10 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:command-resource-naming"],
+  "dependsOn": ["cli:command-resource-naming", "skills:agents"],
   "implementation": [
     {
-      "file": "skills:templates/specd-implement/SKILL.md"
+      "file": "skills:templates/shared/shared.md.tpl"
     }
   ]
 }

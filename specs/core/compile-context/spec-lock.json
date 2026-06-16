@@ -21,8 +21,7 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/compile-context.ts",
-      "symbols": ["_renderFromMetadata", "CompileContextConfig"]
+      "file": "core:src/application/use-cases/compile-context.ts"
     }
   ]
 }

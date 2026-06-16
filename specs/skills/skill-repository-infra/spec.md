@@ -8,26 +8,11 @@ Infrastructure implementation of `SkillRepositoryPort` using node:fs for file sy
 
 ### Requirement: File reading
 
-The infrastructure MUST use `node:fs/promises` to read template files from `packages/skills/templates/`.
+The infrastructure MUST use `node:fs/promises` to read template files from `packages/skills/templates/skills/` and `packages/skills/templates/agents/`.
 
 ### Requirement: TemplateReader
 
-A `TemplateReader` component MUST read `.md` files from `packages/skills/templates/<skill-name>/` and return them as `SkillTemplate` objects with lazy content loading.
-
-### Requirement: Shared file scanning
-
-The infrastructure MUST scan `templates/shared/` for `.meta.json` files containing:
-
-```json
-{
-  "filename": "...",
-  "skills": ["skill1", "skill2"]
-}
-```
-
-Each shared file's content is loaded on demand.
-
-When `getBundle()` adds a shared file to a skill bundle because the metadata lists the requested skill, the resulting `ResolvedFile` MUST be marked as shared. Skill-local template files read from `templates/<skill-name>/` MUST NOT be marked as shared.
+A `TemplateReader` component MUST read `.md.tpl` files from `packages/skills/templates/skills/<name>/` or `packages/skills/templates/agents/<name>/` and return them as `SkillTemplate` objects with lazy content loading.
 
 ### Requirement: createSkillRepository factory
 

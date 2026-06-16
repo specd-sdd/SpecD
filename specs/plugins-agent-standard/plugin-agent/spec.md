@@ -37,18 +37,21 @@ Unknown fields MUST NOT be represented in the structured value collection for ge
 
 ### Requirement: Application layer
 
-The application layer MUST include an `InstallSkills` use case that:
+The application layer MUST have an `InstallSkills` use case that orchestrates:
 
-1. reads skills from `@specd/skills`
-2. resolves the per-skill frontmatter source value collection
-3. declares only the Agent Skills standard-supported capability identifiers
-4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
-5. passes `variables.sharedFolder` only when overriding the default shared path contract
-6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
-7. writes files marked as shared to the rendered `sharedFolder` location under the project root
+1. Get skills via `@specd/skills`
+2. Resolve standard frontmatter source values for each skill
+3. Declare only the Standard agent supported capability identifiers (`['frontmatter']`)
+4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
+5. Pass `variables.sharedFolder` only when overriding the default shared path contract
+6. Install files not marked as shared to categorized directories relative to `projectRoot`:
+   - Skills to `.agents/skills/<skill-name>/`
+   - Agents to the same directory as the shared context file (since `agents` capability is not supported)
+7. Install files marked as shared to the rendered `sharedFolder` location under the project root
 
 The plugin MUST NOT prepend YAML frontmatter after bundle resolution.
 The plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.
+The plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants.
 
 ### Requirement: Frontmatter injection
 
@@ -103,6 +106,9 @@ Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/`
 
 ## Spec Dependencies
 
-- [`plugin-agent-opencode:plugin-agent`](../../plugins-opencode/plugin-agent/spec.md) — reference implementation for the clone
-- [`default:_global/commits`](../../../_global/commits/spec.md) — commit scope registration
-- [`skills:resolve-bundle`](../../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
+- [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
+- [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
+- [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
+- [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.

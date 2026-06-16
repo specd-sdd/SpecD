@@ -1,0 +1,25 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: supports --context flag'
+  content: |
+    #### Scenario: Prefers optimized project context when fresh
+
+    - **GIVEN** `llmOptimizedContext` is enabled
+    - **AND** project-level optimized context is fresh
+    - **WHEN** `specd project status --context` is run
+    - **THEN** it displays the optimized context content
+
+    ### Requirement: Optimization warning signal
+
+    #### Scenario: Displays warning when project cache is stale
+
+    - **GIVEN** `llmOptimizedContext: true`
+    - **AND** project metadata is stale
+    - **WHEN** `specd project status --context` is run
+    - **THEN** a `stale-optimization` warning is emitted
+    - **AND** the message mentions `specd-project-context-optimizer`

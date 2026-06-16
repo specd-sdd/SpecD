@@ -6,7 +6,8 @@
   "dependsOn": ["core:list-workspaces", "core:list-drafts", "core:list-changes"],
   "implementation": [
     {
-      "file": "cli:src/commands/project/status.ts"
+      "file": "cli:src/commands/project/status.ts",
+      "symbols": ["registerProjectStatus"]
     }
   ]
 }

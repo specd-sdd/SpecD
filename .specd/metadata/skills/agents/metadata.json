@@ -1,0 +1,108 @@
+{
+  "title": "skills:agents",
+  "description": "Defines specialized agents for LLM context optimization. These agents are responsible for transforming raw spec metadata and project context into ultra-terse, high-density representations that minimize token usage while preserving all semantic requirements and constraints.",
+  "dependsOn": ["skills:skill", "skills:workflow-automation"],
+  "context": [
+    "Defines specialized agents for LLM context optimization. These agents are responsible for transforming raw spec metadata and project context into ultra-terse, high-density representations that minimize token usage while preserving all semantic requirements and constraints."
+  ],
+  "rules": [
+    {
+      "requirement": "Optimizer agents",
+      "rules": [
+        "The system SHALL provide two specialized optimizer agents:\n\n1. `specd-project-context-optimizer` — specializes in project-level context (instructions and global constraints).\n2. `specd-spec-context-optimizer` — specializes in spec-level metadata (rules, constraints, and scenarios)."
+      ]
+    },
+    {
+      "requirement": "Agent prompt policy",
+      "rules": [
+        "Optimizer agents SHALL use a \"smart caveman\" style for their generated content:\n\n- Drop articles (a/an/the) and filler words.\n- Use fragments and terse prose.\n- Preserve all technical exactness (symbols, APIs, values, constants).\n- Maintain structural Markdown headings (`## Rules`, `## Constraints`)."
+      ]
+    },
+    {
+      "requirement": "Output density",
+      "rules": [
+        "Generated optimized context SHALL aim for a 50-70% reduction in tokens compared to the full rendered spec or raw metadata sections, without loss of normative information."
+      ]
+    },
+    {
+      "requirement": "Agent template purity",
+      "rules": [
+        "Agent template files (e.g. `SPECD-AGENT.md.tpl`) MUST contain **ONLY** the raw system prompt and instructions. They MUST NOT contain YAML frontmatter or any other metadata. All metadata (name, description, tools) MUST be defined in the associated `specd-agent.meta.json` file."
+      ]
+    },
+    {
+      "requirement": "Fallback behavior",
+      "rules": [
+        "When the target coding agent or plugin does not support specialized subagents (i.e. missing `agents` capability), the agent template SHALL be copied to the same directory as the shared context file (`shared.md`) for manual inspection or inline execution by the orchestrator agent."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Optimizer agents",
+      "name": "Agent availability",
+      "when": ["the skills repository is scanned"],
+      "then": [
+        "it finds specd-project-context-optimizer and specd-spec-context-optimizer",
+        "AND their kind is agent"
+      ]
+    },
+    {
+      "requirement": "Agent prompt policy",
+      "name": "Optimized context uses smart caveman style",
+      "when": ["an optimizer agent generates content"],
+      "then": [
+        "it uses terse fragments and drops articles",
+        "AND it preserves technical exactness (symbols, APIs)"
+      ]
+    },
+    {
+      "requirement": "Output density",
+      "name": "Significant token reduction",
+      "given": ["a full spec artifact"],
+      "when": ["the specd-spec-context-optimizer processes its metadata"],
+      "then": [
+        "the resulting optimizedContext uses 50-70% fewer tokens than the full rendered spec"
+      ]
+    },
+    {
+      "requirement": "Agent template purity",
+      "name": "Templates contain only instructions",
+      "when": ["an agent template (e.g., SPECD-AGENT.md.tpl) is read"],
+      "then": ["it does NOT contain YAML frontmatter", "AND it only contains the raw system prompt"]
+    },
+    {
+      "requirement": "Fallback behavior",
+      "name": "Manual inspection of agent prompts",
+      "when": ["the agents capability is missing"],
+      "then": [
+        "the agent definitions are still accessible to the orchestrator agent as files or skills"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "skills:agents",
+        "file": "skills:templates/agents/specd-spec-context-optimizer/specd-agent.meta.json"
+      },
+      {
+        "specId": "skills:agents",
+        "file": "skills:templates/agents/specd-project-context-optimizer/SPECD-AGENT.md.tpl"
+      },
+      {
+        "specId": "skills:agents",
+        "file": "skills:templates/agents/specd-project-context-optimizer/specd-agent.meta.json"
+      },
+      {
+        "specId": "skills:agents",
+        "file": "skills:templates/agents/specd-spec-context-optimizer/SPECD-AGENT.md.tpl"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:23d5969d8ac85e1062275a549fb6403af53e0eedf043b671b4471341b118b2a7",
+    "verify.md": "sha256:302d362aeb51e4d7962c6681ac57b957a7ef06a3219ad7fe7a39bb1917919eb1"
+  },
+  "generatedBy": "core"
+}

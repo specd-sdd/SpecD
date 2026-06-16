@@ -27,6 +27,7 @@ type TemplateVariable =
 
 interface AgentInstallOptions {
   skills?: string[] // specific skill names; omit = all
+  agents?: string[] // specific agent names; omit = all
   variables?: Record<string, TemplateVariable> // recursive template variables, including variables.frontmatter and variables.sharedFolder
   capabilities?: string[] // capability identifiers supported by the target runtime
 }
@@ -52,6 +53,12 @@ interface AgentInstallResult {
   skipped: Array<{ skill: string; reason: string }>
 }
 ```
+
+### Requirement: Agent installation and fallback
+
+When installing agents, the plugin SHALL determine the target directory based on the target runtime's conventions (e.g., `.claude/agents/`).
+
+If the target runtime does NOT support specialized agents (i.e., the `agents` capability is missing), the plugin SHALL copy the agent template to the same directory as the shared context file (`shared.md`).
 
 ### Requirement: isAgentPlugin type guard
 

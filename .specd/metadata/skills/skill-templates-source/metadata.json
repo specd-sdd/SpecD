@@ -9,19 +9,19 @@
     {
       "requirement": "Template source location",
       "rules": [
-        "Template files MUST live in `packages/skills/templates/<skill-name>/` using the `.md.tpl` extension.\n\nEach skill template directory MUST also contain a `skill.meta.json` file.\n\nInstalled skill files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix."
+        "Template files MUST live in categorized subdirectories under `packages/skills/templates/`:\n\n- `packages/skills/templates/skills/<skill-name>/` using the `SKILL.md.tpl` convention for standard skills.\n- `packages/skills/templates/agents/<agent-name>/` using the `SPECD-AGENT.md.tpl` convention for specialized agents.\n\nAll template source files MUST use the `.md.tpl` extension.\n\nEach skill or agent template directory MUST also contain a metadata file:\n\n- `skill.meta.json` for skills.\n- `specd-agent.meta.json` for agents.\n\nMetadata files (`skill.meta.json` and `specd-agent.meta.json`) share the same schema and serve the same purpose: declaring required capabilities and shared template dependencies. The different filenames are used strictly as discriminators for internal discovery and categorization.\n\nInstalled files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix."
       ]
     },
     {
       "requirement": "Template migration",
       "rules": [
-        "The template directory MUST contain:\n\n- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories\n- a `shared/` directory for shared template source files\n\nEach skill directory contains template files ending in `.md.tpl` plus a `skill.meta.json` file that declares the skill's template contract.\n\nThe current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates."
+        "The template directory structure SHALL be:\n\n- `templates/skills/` — contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`.\n- `templates/agents/` — contains specialized agents such as `specd-project-context-optimizer` and `specd-spec-context-optimizer`.\n- `templates/shared/` — contains shared template source files like `shared.md.tpl`.\n\nEach skill or agent directory contains its respective template file (`SKILL.md.tpl` or `SPECD-AGENT.md.tpl`) plus its metadata contract file.\n\nThe current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates."
       ]
     },
     {
-      "requirement": "Skill template metadata contract",
+      "requirement": "Template metadata contract (skills and agents)",
       "rules": [
-        "Each skill template directory MUST declare a `skill.meta.json` file with this shape:\n\n```json\n{\n  \"supportedCapabilities\": [\"mcp\", \"agents\", \"frontmatter\"],\n  \"requiredCapabilities\": [],\n  \"requiredSharedTemplates\": [\"shared.md\"]\n}\n```\n\n`supportedCapabilities` declares the capability identifiers that templates in that skill directory are allowed to reference.\n\n`requiredCapabilities` declares the capability identifiers that MUST be present for the skill's templates to be installable.\n\n`requiredSharedTemplates` declares the shared template filenames that the skill requires.\n\nThe initial required capability identifiers that the system MUST recognize are:\n\n- `mcp`\n- `agents`\n- `frontmatter`"
+        "Each skill or agent template directory MUST declare a metadata file (`skill.meta.json` or `specd-agent.meta.json`) with this shape:\n\n```json\n{\n  \"kind\": \"skill\" | \"agent\",\n  \"supportedCapabilities\": [\"mcp\", \"agents\", \"frontmatter\"],\n  \"requiredCapabilities\": [],\n  \"requiredSharedTemplates\": [\"shared.md\"]\n}\n```\n\n`kind` (required) MUST categorize the template as a standard `skill` or a specialized `agent`. This value MUST match the parent directory name (`skills/` or `agents/`).\n\n`supportedCapabilities` declares the capability identifiers that templates in that directory are allowed to reference.\n\n`requiredCapabilities` declares the capability identifiers that MUST be present for the templates to be installable.\n\n`requiredSharedTemplates` declares the shared template filenames required by the templates."
       ]
     },
     {
@@ -108,7 +108,8 @@
       "name": "Migrated template tree is complete",
       "when": ["the template source directory is validated"],
       "then": [
-        "it contains specd/, specd-archive/, specd-design/, specd-implement/, specd-new/, specd-metadata/, specd-compliance/, and specd-verify/",
+        "it contains skills/ (using SKILL.md.tpl and skill.meta.json)",
+        "AND it contains agents/ (using SPECD-AGENT.md.tpl and specd-agent.meta.json)",
         "AND it contains shared/ for shared template source files"
       ]
     },
@@ -121,19 +122,18 @@
       ]
     },
     {
-      "requirement": "Skill template metadata contract",
-      "name": "skill.meta.json declares supported, required, and shared requirements",
-      "when": ["a skill.meta.json file is inspected"],
+      "requirement": "Template metadata contract (skills and agents)",
+      "name": "Metadata files declare kind and requirements",
+      "when": ["a skill.meta.json or specd-agent.meta.json file is inspected"],
       "then": [
-        "it declares supportedCapabilities",
-        "AND it declares requiredCapabilities",
-        "AND it declares requiredSharedTemplates"
+        "it declares kind (skill or agent)",
+        "AND it declares supportedCapabilities, requiredCapabilities, and requiredSharedTemplates"
       ]
     },
     {
-      "requirement": "Skill template metadata contract",
+      "requirement": "Template metadata contract (skills and agents)",
       "name": "Initial capability catalogue is declared by the contract",
-      "when": ["the skill metadata contract is reviewed"],
+      "when": ["the template metadata contract is reviewed"],
       "then": ["the initial required capability identifiers are mcp, agents, and frontmatter"]
     },
     {
@@ -274,50 +274,13 @@
     "files": [
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:README.md"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-verify/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-archive/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-implement/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-design/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/shared/shared.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-new/SKILL.md.tpl"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:src/domain/skill-template-metadata.ts",
-        "symbol": "SkillTemplateMetadata"
+        "file": "skills:templates/agents"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3a51bd2dd4039d85019b6d6c58ba1bf66d7617628049ee258a4716ab6e011286",
-    "verify.md": "sha256:4e25373faff1eb1b75b4b530d12d8d2fbd407b4ad31262d31074d39a52fe2fa5"
+    "spec.md": "sha256:b758f0c32eac9c0c3ea88b296ecca13e9f53d0cf2d22840c3a9a211d0ab25484",
+    "verify.md": "sha256:e77b16368abf2b5e76ba3334962a0a75d289b254df8cc57d54cf8c24a191c945"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Defines how skill templates are sourced, stored, rendered, and linked to shared template content across supported agent runtimes.",
-  "optimizedContext": "# skills:skill-templates-source\n\n## Rules\n- Template source location: Template files MUST live in packages/skills/templates/<skill-name / using the .md.tpl extension.\n- Template migration: The template directory MUST contain: - specd/, specd-archive/, specd-design/, specd-implement/, specd-new/, specd-metadata/, specd-compliance/, specd-verify/ directories - a…\n- Skill template metadata contract: Each skill template directory MUST declare a skill.meta.json file with this shape: supportedCapabilities declares the capability identifiers that templates in that skill…\n- Capability-aware install-time rendering: Skill templates MUST support capability-aware install-time rendering.\n- Graph impact terminology in workflow templates: Workflow skill templates that instruct agents to run specd graph impact SHALL use clear user-facing terminology for impact direction and selector semantics: - dependents —…\n- Frontmatter source: Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime.\n- Frontmatter injection: Agent plugins MUST provide their capability list when installing a skill.\n- Agent frontmatter matrix: The plugin frontmatter models MUST cover the complete known field set per runtime: - Codex : name, description - Copilot : name, description, license, allowed-tools,…\n- Why no frontmatter in skills package: The skills package does not include static frontmatter blocks because each agent environment has different metadata fields and compatibility rules.\n- Implementation tracking instructions in templates: Workflow skill templates MUST include implementation-tracking guidance for active changes.\n- Dependencies: skills:skill\n\n## Constraints\n- Templates in the skills package MUST NOT contain static frontmatter YAML blocks.\n- Template source files in the skills package MUST use the .md.tpl extension.\n- Each skill directory MUST contain a skill.meta.json file.\n- shared.meta.json MUST NOT remain the canonical source for determining which skills require shared templates.\n- Templates MAY contain a frontmatter insertion point that is resolved by @specd/skills at install time.\n- Agent plugins are responsible for declaring supported runtime capabilities and providing structured variables.frontmatter data.\n- Agent plugins MUST NOT emit fields unsupported by their target runtime.\n- @specd/skills MUST perform the final frontmatter insertion for skill-local markdown files.\n- Installed markdown MUST NOT render absolute filesystem paths.\n- Workflow templates MUST use dependents/dependencies wording for graph impact guidance and MUST prefer --direction dependents / --direction dependencies; upstream / downstream may…\n- Workflow templates MUST use specd graph impact --file for file-based blast-radius checks and MUST NOT reference specd graph impact --changes.\n"
+  "generatedBy": "core"
 }

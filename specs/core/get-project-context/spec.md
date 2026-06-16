@@ -82,10 +82,10 @@ If extraction finds values for transformed fields but transform execution cannot
 
 ### Requirement: Construction dependencies
 
-`GetProjectContext` depends on the following ports injected via constructor:
+`GetProjectContext` depends on the following ports/services injected via constructor:
 
-- `specs` (`ReadonlyMap<string, SpecRepository>`) — per-workspace spec repositories
-- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema (replaces `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths`)
+- `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces
+- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema
 - `files` (`FileReader`) — for reading context entry files from disk
 - `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
 - `hasher` (`ContentHasher`) — for comparing content hashes against metadata
@@ -94,15 +94,17 @@ All dependencies are injected at construction time. The schema is resolved lazil
 
 ### Requirement: Project context optimization and invalidation
 
-If `llmOptimizedContext: true` is active, the use case SHALL attempt to load project-level metadata from `project-metadata.json`.
+When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.
 
-It SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
+The system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
 
 - `specd.yaml`
 - Referenced `contextFiles`
 - Metadata of included specs
 
-If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, it SHALL fall back to raw compilation and emit a signal for the caller to show a warning.
+If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.
+
+The warning message MUST include remediation instructions: "Launch specd-project-context-optimizer agent to generate it".
 
 ## Constraints
 

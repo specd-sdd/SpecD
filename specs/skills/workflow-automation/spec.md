@@ -71,6 +71,15 @@ Specifically:
 - when resolving or ignoring multiple files, agents SHOULD use comma-separated lists in the `--file` option for better efficiency
 - agents SHALL use implementation integrity review when stale symbol links or sidecar maintenance issues are present
 
+### Requirement: Context optimization policy
+
+When `llmOptimizedContext` is enabled, the system SHALL prefer using ultra-terse representations for all context compiled from metadata.
+
+Orchestrator agents SHOULD delegate context optimization to specialized subagents (`specd-project-context-optimizer`, `specd-spec-context-optimizer`) whenever the runtime supports subagent flows.
+
+If subagent flows are not supported, the orchestrator agent SHALL perform optimization inline following the "smart caveman" style defined in [`skills:agents`](../agents/spec.md).
+
 ## Spec Dependencies
 
 - [`cli:command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples
+- [`skills:agents`](../agents/spec.md) — defines specialized optimizer agents and their prompts.

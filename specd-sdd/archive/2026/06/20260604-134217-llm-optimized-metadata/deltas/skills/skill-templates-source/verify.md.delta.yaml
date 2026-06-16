@@ -1,0 +1,26 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Migrated template tree is complete'
+  content: |
+    - **WHEN** the template source directory is validated
+    - **THEN** it contains `skills/` (using `SKILL.md.tpl` and `skill.meta.json`)
+    - **AND** it contains `agents/` (using `SPECD-AGENT.md.tpl` and `specd-agent.meta.json`)
+    - **AND** it contains `shared/` for shared template source files
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Skill template metadata contract'
+  rename: 'Requirement: Template metadata contract (skills and agents)'
+  content: |
+    #### Scenario: Metadata files declare kind and requirements
+
+    - **WHEN** a `skill.meta.json` or `specd-agent.meta.json` file is inspected
+    - **THEN** it declares `kind` (`skill` or `agent`)
+    - **AND** it declares `supportedCapabilities`, `requiredCapabilities`, and `requiredSharedTemplates`
+
+    #### Scenario: Initial capability catalogue is declared by the contract
+
+    - **WHEN** the template metadata contract is reviewed
+    - **THEN** the initial required capability identifiers are `mcp`, `agents`, and `frontmatter`

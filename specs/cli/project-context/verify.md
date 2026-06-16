@@ -58,6 +58,34 @@
 - **WHEN** `specd project context --rules --constraints` is run
 - **THEN** output remains list/summary shaped
 
+#### Scenario: Prefers optimized content when enabled
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **AND** project-level optimized context is fresh
+- **WHEN** `specd project context` is run
+- **THEN** it displays the optimized project context
+
+#### Scenario: --no-optimized forces raw sections
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **WHEN** `specd project context --no-optimized` is run
+- **THEN** it displays the raw project instructions
+- **AND** it emits no optimization warnings
+
+#### Scenario: Section flags do not override optimization when both rules and constraints are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **AND** project-level optimized context is fresh
+- **WHEN** `specd project context --rules --constraints` is run
+- **THEN** it displays the optimized project context
+
+#### Scenario: Section flags override optimization when only rules are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **WHEN** `specd project context --rules` is run
+- **THEN** it displays the raw project rules
+- **AND** it emits no optimization warnings
+
 ### Requirement: Output
 
 #### Scenario: Text output — full mode renders complete spec content

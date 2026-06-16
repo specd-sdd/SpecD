@@ -7,7 +7,8 @@
 #### Scenario: Skill creation
 
 - **WHEN** a Skill object is created
-- **THEN** it has `name`, `description`, and `templates` properties
+- **THEN** it has `name`, `description`, `kind`, and `templates` properties
+- **AND** `kind` is either `'skill'` or `'agent'`
 
 ### Requirement: SkillTemplate interface
 

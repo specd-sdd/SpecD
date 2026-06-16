@@ -9,7 +9,7 @@
     {
       "requirement": "list() method",
       "rules": [
-        "The `list()` method MUST:\n\n- Return an array of all `Skill` objects (metadata only, no template content)\n- Return `readonly Skill[]`"
+        "The `list()` method MUST:\n\n- Return an array of all `Skill` objects (metadata only, no template content)\n- Scan both `templates/skills/` and `templates/agents/` directories\n- Correctlty set the `kind` property for each skill based on its parent directory\n- Return `readonly Skill[]`"
       ]
     },
     {
@@ -43,9 +43,12 @@
   "scenarios": [
     {
       "requirement": "list() method",
-      "name": "List returns skills",
+      "name": "List returns skills and agents with correct kind",
       "when": ["repository.list() is called"],
-      "then": ["an array of Skill objects is returned"]
+      "then": [
+        "it returns both skills and agents",
+        "AND each object has the correct kind property based on its source folder"
+      ]
     },
     {
       "requirement": "get() method",
@@ -120,34 +123,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "skills:skill-repository",
-        "file": "skills:test/infrastructure/skill-repository.spec.ts",
-        "symbol": "FsSkillRepository"
-      },
-      {
-        "specId": "skills:skill-repository",
-        "file": "skills:test/infrastructure/skill-repository.spec.ts",
-        "symbol": "TemplateRenderer"
-      },
-      {
-        "specId": "skills:skill-repository",
-        "file": "skills:src/infrastructure/repository/skill-template-metadata-reader.ts",
-        "symbol": "SkillTemplateMetadataReader"
-      },
-      {
-        "specId": "skills:skill-repository",
-        "file": "skills:src/infrastructure/repository/skill-repository.ts",
-        "symbol": "FsSkillRepository"
+        "file": "skills:src/infrastructure/repository/skill-repository.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f86ce0203152f3f5a23796d420daf14d6c7f24cc5c1729aa806ecc7bb882a9f3",
-    "verify.md": "sha256:6995ca2af4355767355c0de1d3e282e4fa58e97769f5912b9f099900470994a4"
+    "spec.md": "sha256:0381d4cf147dca53773f5c9878435914901f1ec752d93a1814dad3ac378dc862",
+    "verify.md": "sha256:c01e530a7b8827c3aedce4a457ddb4f0dbff18b029c4c656e12124c5ead6cabc"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Defines the SkillRepository interface that provides access to skills and their bundles.",
-  "optimizedContext": "# skills:skill-repository\n\n## Rules\n- list() method: The list() method MUST: - Return an array of all Skill objects (metadata only, no template content) - Return readonly Skill[]\n- get() method: The get() method MUST: - Accept a name: string parameter - Return Skill | undefined — the skill with that name, or undefined if not found\n- getBundle() method: The getBundle() method MUST: - accept name: string and optional structured render context - return SkillBundle with all template files resolved - load the target skill's…\n- listSharedFiles() method: The listSharedFiles() method MUST: - scan the templates/shared/ directory for shared template source files - return SharedFile[] where each SharedFile has: - filename: string -…\n- Dependencies: skills:skill, skills:skill-bundle, skills:skill-templates-source\n\n## Constraints\n- No I/O in the interface definition — implementations handle I/O.\n- Bundle resolution MUST support install-time rendering from structured context, not only flat string substitution.\n- Template source filenames and emitted bundle filenames MUST remain distinct: .md.tpl on disk in packages/skills/templates/, .md in resolved bundle output.\n- variables MUST support recursive values addressable by template path traversal.\n- Shared-file routing metadata MUST be preserved by rendering.\n- Shared template inclusion MUST be driven by each skill's requiredSharedTemplates declaration.\n- The repository MUST support internal normalization of sharedFolder without exposing absolute paths in rendered output.\n"
+  "generatedBy": "core"
 }

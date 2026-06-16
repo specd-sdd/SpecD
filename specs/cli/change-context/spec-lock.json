@@ -12,10 +12,5 @@
     "core:get-hook-instructions",
     "core:refresh-implementation-tracking"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/change/context.ts",
-      "symbols": ["registerChangeContext"]
-    }
-  ]
+  "implementation": []
 }

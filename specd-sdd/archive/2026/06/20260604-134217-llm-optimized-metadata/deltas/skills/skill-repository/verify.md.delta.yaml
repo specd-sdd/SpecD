@@ -1,0 +1,9 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: List returns skills'
+  rename: 'Scenario: List returns skills and agents with correct kind'
+  content: |
+    - **WHEN** `repository.list()` is called
+    - **THEN** it returns both skills and agents
+    - **AND** each object has the correct `kind` property based on its source folder

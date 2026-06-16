@@ -71,11 +71,25 @@ This is included by default, not behind a flag.
 
 ### Requirement: supports --context flag
 
-When `--context` flag is provided, the output MUST include project context references:
+When `--context` flag is provided, the output MUST include project context references.
+
+In `text` mode:
+
+- The command MUST display the **full** project context (not truncated).
+- If `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedContext` from `project-metadata.json` if it is fresh.
+- If `llmOptimizedContext` is enabled but optimized context is missing or stale, the command MUST fall back to raw context entries and emit a `stale-optimization` warning.
+- The warning MUST include remediation instructions: "Launch specd-project-context-optimizer agent to generate it".
+
+In `json`/`toon` mode, the output MUST include:
 
 - Instruction entries (the directive text without reading files)
 - File entries (which files should be read without content)
 - Spec entries (which specs should be read without content)
+- `optimizedContext` (optional string, included if fresh and enabled)
+
+### Requirement: Optimization warning signal
+
+The command MUST emit a `stale-optimization` warning to stderr when `llmOptimizedContext` is enabled but optimized project context is missing or stale.
 
 ### Requirement: defaults to text output
 

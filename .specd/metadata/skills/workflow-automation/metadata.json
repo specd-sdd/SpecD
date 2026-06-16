@@ -1,7 +1,7 @@
 {
   "title": "Workflow Automation",
   "description": "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations.",
-  "dependsOn": ["cli:command-resource-naming"],
+  "dependsOn": ["cli:command-resource-naming", "skills:agents"],
   "context": [
     "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction. This spec minimizes \"AI blindness\" by mandating human-optimized text for status checks and machine-optimized formats for data-intensive operations."
   ],
@@ -52,6 +52,12 @@
       "requirement": "Implementation traceability policy",
       "rules": [
         "AI agents SHALL maintain implementation traceability as part of normal change workflow.\n\nSpecifically:\n\n- agents MUST use `specd changes implementation add` to confirm relevant spec-to-file or spec-to-symbol links\n- agents MUST treat tracked implementation files as a review surface distinct from confirmed links\n- agents MUST explicitly resolve or ignore tracked implementation files before archive\n- when resolving or ignoring multiple files, agents SHOULD use comma-separated lists in the `--file` option for better efficiency\n- agents SHALL use implementation integrity review when stale symbol links or sidecar maintenance issues are present"
+      ]
+    },
+    {
+      "requirement": "Context optimization policy",
+      "rules": [
+        "When `llmOptimizedContext` is enabled, the system SHALL prefer using ultra-terse representations for all context compiled from metadata.\n\nOrchestrator agents SHOULD delegate context optimization to specialized subagents (`specd-project-context-optimizer`, `specd-spec-context-optimizer`) whenever the runtime supports subagent flows.\n\nIf subagent flows are not supported, the orchestrator agent SHALL perform optimization inline following the \"smart caveman\" style defined in [`skills:agents`](../agents/spec.md)."
       ]
     }
   ],
@@ -182,21 +188,36 @@
       "then": [
         "the agent explicitly resolves or ignores those tracked files instead of assuming link creation alone closed review"
       ]
+    },
+    {
+      "requirement": "Context optimization policy",
+      "name": "Agent delegates to optimizer subagent",
+      "given": ["llmOptimizedContext is enabled", "AND the runtime supports agents"],
+      "when": ["an orchestrator agent needs to optimize context"],
+      "then": [
+        "it launches specd-project-context-optimizer or specd-spec-context-optimizer",
+        "AND it uses the returned optimized content"
+      ]
+    },
+    {
+      "requirement": "Context optimization policy",
+      "name": "Inline optimization fallback",
+      "given": ["llmOptimizedContext is enabled", "AND the runtime DOES NOT support agents"],
+      "when": ["an orchestrator agent needs to optimize context"],
+      "then": ["it performs the optimization itself using \"smart caveman\" style"]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "skills:workflow-automation",
-        "file": "skills:templates/specd-implement/SKILL.md"
+        "file": "skills:templates/shared/shared.md.tpl"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4cb68e8ff731941bb2a6491cd3836e99cc8ffb3d3014f837eadec979738aaee9",
-    "verify.md": "sha256:8a1be13b58437046cba47b4468273c9771867953118088b58a7934bb20468c65"
+    "spec.md": "sha256:e90d045393495ad00ac1d6d3efc844dfdaf7df9bcf90f95f04b32d643ee3c49e",
+    "verify.md": "sha256:424fc58a62dfc99fe96abbc93f9e63ca074ed7faef7b55d82190af191e02de42"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "To ensure consistent and efficient agent interactions across the SpecD lifecycle by defining policies for diagnostic output and data extraction.",
-  "optimizedContext": "# Workflow Automation\n\n## Rules\n- Diagnostic Priority: AI agents SHALL prioritize text-based output (--format text) for all lifecycle status checks, transition attempts, and validation commands to ensure visibility of human-readable…\n- Data Extraction: AI agents SHALL use machine-optimized formats strictly when structured data extraction is required for subsequent tool calls or internal state management.\n- On-demand outline retrieval: When artifact-instruction responses provide only outline availability references (for example availableOutlines), AI agents MUST retrieve full outline content on demand using the…\n- Repair Strategy: Agents SHALL follow the \"Next Action\" recommendations provided in command outputs before attempting to repeat a failed lifecycle operation.\n- Canonical Command References: Agent-authored workflow instructions and examples MUST use canonical plural command groups for countable resources (for example: changes, specs, archives, drafts).\n- Command Necessity and Freshness: AI agents MUST avoid redundant command invocations when a prior command in the same skill execution already provides the required fields with equivalent semantics.\n- Structural Validation and Content Review: Agents SHALL treat specd changes validate as structural/state validation only.\n- Implementation traceability policy: AI agents SHALL maintain implementation traceability as part of normal change workflow.\n- Dependencies: cli:command-resource-naming\n\n## Constraints\n- None explicit.\n"
+  "generatedBy": "core"
 }
