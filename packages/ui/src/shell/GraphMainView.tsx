@@ -7,6 +7,18 @@ import { useSpecdDataPort } from '../context/specd-data-context.js'
 import { useAsyncResource } from '../hooks/use-async-resource.js'
 import { useStudioPanelActions } from '../hooks/use-studio-panel.js'
 
+type HotspotEntry = {
+  readonly riskLevel: string
+  readonly directCallers: number
+  readonly fileImporters: number
+  readonly symbol: {
+    readonly name: string
+    readonly kind: string
+    readonly filePath: string
+    readonly line: number
+  }
+}
+
 export function GraphMainView({
   refreshKey,
 }: {
@@ -23,10 +35,9 @@ export function GraphMainView({
   // Fetch hotspots
   const loadHotspots = React.useCallback(async () => {
     try {
-      const data = await port.getHotspots()
-      return (data as any).entries || []
+      return (await port.getHotspots()) as readonly HotspotEntry[]
     } catch {
-      return []
+      return [] as const
     }
   }, [port])
   const hotspots = useAsyncResource('graph-hotspots-main', loadHotspots, { refreshKey })
@@ -46,6 +57,7 @@ export function GraphMainView({
         action: 'index-graph',
       })
       status.refetch()
+      hotspots.refetch()
     } catch (err) {
       void appendOutput({
         message: `Graph indexing failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -160,7 +172,7 @@ export function GraphMainView({
               <p className="text-muted-foreground py-4">Analyzing graph hotspots...</p>
             ) : hotspots.data && hotspots.data.length > 0 ? (
               <div className="space-y-4">
-                {hotspots.data.slice(0, 10).map((hotspot: any, i: number) => (
+                {hotspots.data.slice(0, 10).map((hotspot, i) => (
                   <div key={i} className="flex flex-col gap-1 rounded border border-border/50 bg-background/50 p-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">

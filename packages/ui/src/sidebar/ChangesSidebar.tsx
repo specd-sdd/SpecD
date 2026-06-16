@@ -4,7 +4,6 @@ import * as React from 'react'
 import { Badge } from '../components/ui/badge.js'
 import { Button } from '../components/ui/button.js'
 import { Card } from '../components/ui/card.js'
-import { ScrollArea } from '../components/ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
 
 const STATE_BADGE: Record<string, string> = {
@@ -37,7 +36,7 @@ export function ChangesSidebar({
   onSelectArchived?: (name: string) => void
 }): React.ReactElement {
   return (
-    <div className="flex w-full min-w-0 flex-col text-xs pr-2">
+    <div className="flex w-full min-w-0 flex-col text-xs">
       {error ? (
         <div className="flex items-center gap-1 px-2 py-2 text-destructive">
           <AlertCircle className="h-3 w-3 shrink-0" />

@@ -16,6 +16,7 @@ export default tseslint.config(
       '**/.history/**',
       'packages/schema-std/**',
       'packages/mcp/**',
+      'packages/code-graph-electron/vendor/**',
       'dev/scripts/**',
       'packages/api/test/fixtures/**',
     ],
@@ -212,6 +213,18 @@ export default tseslint.config(
   // Test files (specs and helpers) — relax all quality rules
   {
     files: ['packages/*/test/**/*.ts', 'apps/*/test/**/*.ts', 'apps/*/test/**/*.tsx'],
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: [
+            'packages/*/test/*.ts',
+            'packages/*/test/*.tsx',
+            'apps/*/test/*.ts',
+            'apps/*/test/*.tsx',
+          ],
+        },
+      },
+    },
     rules: {
       'jsdoc/require-jsdoc': 'off',
       'jsdoc/require-description': 'off',
@@ -226,6 +239,15 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/await-thenable': 'off',
+    },
+  },
+  {
+    files: ['apps/specd-studio-desktop/test/**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: ['./apps/specd-studio-desktop/tsconfig.eslint.json'],
+      },
     },
   },
 )

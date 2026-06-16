@@ -53,6 +53,7 @@ export function StudioTopBar({
 
         <Button
           variant="outline"
+          data-testid="studio-open-command-palette"
           className="flex min-w-0 flex-1 items-center justify-start gap-2 border-border bg-background/50 px-3 py-2 text-left font-mono text-xs text-muted-foreground shadow-none transition-colors duration-150 hover:border-primary/30 hover:bg-background/70 hover:text-foreground"
           onClick={onOpenCommandPalette}
         >
@@ -63,7 +64,7 @@ export function StudioTopBar({
           </kbd>
         </Button>
 
-        <Button type="button" className="gap-1" onClick={onNewChange}>
+        <Button type="button" className="gap-1" data-testid="studio-new-change" onClick={onNewChange}>
           <Plus className="h-3 w-3" />
           New Change
         </Button>

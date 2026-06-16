@@ -32,7 +32,7 @@ const TabsList = React.forwardRef<
     return () => observer.disconnect()
   }, [checkOverflow])
 
-  React.useImperativeHandle(ref, () => internalRef.current as any)
+  React.useImperativeHandle(ref, () => internalRef.current!)
 
   const scroll = (direction: "left" | "right") => {
     const el = internalRef.current

@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const E2E_PORT = Number(process.env.STUDIO_E2E_PORT ?? 4450)
-const baseURL = process.env.STUDIO_E2E_BASE_URL || `http://127.0.0.1:${E2E_PORT}`
+const baseURL =
+  process.env.STUDIO_E2E_UI_BASE_URL ??
+  process.env.STUDIO_E2E_BASE_URL ??
+  `http://127.0.0.1:${E2E_PORT}`
 
 /**
  * E2E expects ui serve already running (see tests/e2e/README.md).

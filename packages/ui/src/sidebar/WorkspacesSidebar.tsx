@@ -22,7 +22,7 @@ export function WorkspacesSidebar({
   onSelectSpec: (workspace: string, path: string) => void
 }): React.ReactElement {
   return (
-    <div className="flex w-full min-w-0 flex-col text-xs pr-2">
+    <div className="flex w-full min-w-0 flex-col text-xs">
       {loading && entries.length === 0 ? (
         <p className="px-2 py-2 text-muted-foreground">Loading workspaces…</p>
       ) : entries.length === 0 ? (

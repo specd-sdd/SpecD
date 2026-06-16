@@ -20,10 +20,12 @@ export interface RemoteMultiComboboxProps<T> {
   search: (query: string) => Promise<T[]>
   getItemValue: (item: T) => string
   getItemLabel: (item: T) => string
+  getItemTestId?: (item: T) => string
   renderItem?: (item: T) => React.ReactNode
   placeholder?: string
   emptyMessage?: string
   className?: string
+  testId?: string
 }
 
 export function RemoteMultiCombobox<T>({
@@ -32,10 +34,12 @@ export function RemoteMultiCombobox<T>({
   search,
   getItemValue,
   getItemLabel,
+  getItemTestId,
   renderItem,
   placeholder = 'Search...',
   emptyMessage = 'No results found.',
   className,
+  testId,
 }: RemoteMultiComboboxProps<T>): React.ReactElement {
   const [query, setQuery] = React.useState('')
   const [results, setResults] = React.useState<T[]>([])
@@ -51,16 +55,18 @@ export function RemoteMultiCombobox<T>({
       return
     }
 
-    const timer = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const data = await searchRef.current(query)
-        setResults(data)
-      } catch {
-        setResults([])
-      } finally {
-        setLoading(false)
-      }
+    const timer = setTimeout(() => {
+      void (async () => {
+        setLoading(true)
+        try {
+          const data = await searchRef.current(query)
+          setResults(data)
+        } catch {
+          setResults([])
+        } finally {
+          setLoading(false)
+        }
+      })()
     }, 500)
 
     return () => clearTimeout(timer)
@@ -82,7 +88,7 @@ export function RemoteMultiCombobox<T>({
   )
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn('flex flex-col gap-2', className)} data-testid={testId}>
       <Combobox
         multiple
         items={results}
@@ -102,13 +108,17 @@ export function RemoteMultiCombobox<T>({
                 ))}
                 <ComboboxChipsInput
                   ref={inputRef}
+                  data-testid={testId ? `${testId}-input` : undefined}
                   placeholder={values.length === 0 ? placeholder : ''}
                 />
               </>
             )}
           </ComboboxValue>
         </ComboboxChips>
-        <ComboboxContent anchor={anchor}>
+        <ComboboxContent
+          anchor={anchor}
+          data-testid={testId ? `${testId}-content` : undefined}
+        >
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted-foreground bg-panel">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -121,7 +131,11 @@ export function RemoteMultiCombobox<T>({
           ) : (
             <ComboboxList>
               {(item: T) => (
-                <ComboboxItem key={itemToStringValue(item)} value={item}>
+                <ComboboxItem
+                  key={itemToStringValue(item)}
+                  value={item}
+                  data-testid={getItemTestId?.(item)}
+                >
                   {renderItem ? (
                     renderItem(item)
                   ) : (
