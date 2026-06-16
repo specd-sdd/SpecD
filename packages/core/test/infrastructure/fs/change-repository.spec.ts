@@ -176,6 +176,55 @@ describe('FsChangeRepository', () => {
       expect(loaded?.state).toBe('designing')
     })
 
+    it('given a newly created change, when save is called, then manifest.json persists updatedAt not before createdAt', async () => {
+      const createdAt = new Date('2024-03-15T10:00:00.000Z')
+      const change = makeChange('updated-at-on-create', createdAt)
+      await ctx.repo.save(change)
+
+      const manifestPath = path.join(
+        ctx.changesPath,
+        '20240315-100000-updated-at-on-create',
+        'manifest.json',
+      )
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        createdAt: string
+        updatedAt: string
+      }
+      const loaded = await ctx.repo.get('updated-at-on-create')
+
+      expect(new Date(manifest.updatedAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(manifest.createdAt).getTime(),
+      )
+      expect(loaded?.updatedAt.toISOString()).toBe(manifest.updatedAt)
+    })
+
+    it('given a persisted change transitions, when save is called again, then updatedAt advances in manifest and reload', async () => {
+      const change = makeChange('updated-at-advances')
+      await ctx.repo.save(change)
+
+      const manifestPath = path.join(
+        ctx.changesPath,
+        '20240115-100000-updated-at-advances',
+        'manifest.json',
+      )
+      const firstManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        updatedAt: string
+      }
+
+      change.transition('designing', actor)
+      await ctx.repo.save(change)
+
+      const secondManifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        updatedAt: string
+      }
+      const loaded = await ctx.repo.get('updated-at-advances')
+
+      expect(new Date(secondManifest.updatedAt).getTime()).toBeGreaterThan(
+        new Date(firstManifest.updatedAt).getTime(),
+      )
+      expect(loaded?.updatedAt.toISOString()).toBe(secondManifest.updatedAt)
+    })
+
     it('round-trips tracked implementation files and links', async () => {
       const change = makeChange('add-auth')
       change.trackImplementationFile('packages/core/src/login.ts', 'resolved')
@@ -1429,6 +1478,68 @@ describe('FsChangeRepository', () => {
 
       expect(loaded?.state).toBe('implementing')
       expect(loaded?.getArtifact('proposal')?.getFile('proposal')?.validatedHash).toBe(proposalHash)
+    })
+
+    it('excluded saved file does not self-invalidate during drift reconciliation', async () => {
+      const proposalContent = '# Proposal\n'
+      const proposalHash = sha256(proposalContent)
+
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'c3-excluded-drift',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: proposalHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const repo = makeRepoWithTypes(ctx.tmpDir, [makeArtifactTypes()[0]!])
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c3-excluded-drift')
+      await fs.writeFile(path.join(dir, 'proposal.md'), '# Proposal updated\n', 'utf8')
+
+      const invalidated = await repo.reconcileArtifactDrift(change, {
+        excludeFileKeys: ['proposal'],
+      })
+      const manifestPath = path.join(dir, 'manifest.json')
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        history: Array<{ type: string }>
+      }
+
+      expect(invalidated).toBe(false)
+      expect(change.state).toBe('implementing')
+      expect(manifest.history.filter((event) => event.type === 'invalidated')).toHaveLength(0)
     })
 
     it('repeated get with unchanged drift scope does not rewrite manifest', async () => {

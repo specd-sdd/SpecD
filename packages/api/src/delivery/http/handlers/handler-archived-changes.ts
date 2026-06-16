@@ -40,7 +40,7 @@ export function registerArchivedChangesRoutes(app: FastifyInstance): void {
         name,
         filename,
       })
-      return toArtifactContentDto(result)
+      return toArtifactContentDto(filename, result)
     }),
   )
 }

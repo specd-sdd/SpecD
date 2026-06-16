@@ -56,7 +56,7 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
         actor,
         ...(body.force === true ? { force: true } : {}),
       })
-      return toSaveArtifactContentDto(body.content, result)
+      return toSaveArtifactContentDto(filename, body.content, result)
     }),
   )
 

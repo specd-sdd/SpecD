@@ -1,6 +1,6 @@
 import type { ChangeDetailDto, ChangeStatusDto } from '@specd/client'
 import { isShelvedReadOnlySection, type ChangeListSection } from './change-list-section.js'
-import { ChevronDown, ChevronRight, FileText, Info, ShieldCheck } from 'lucide-react'
+import { FileText, Info, ShieldCheck } from 'lucide-react'
 import * as React from 'react'
 import {
   Accordion,
@@ -58,11 +58,8 @@ export type ChangeMainViewProps = {
   selectedArtifactFile?: string
   /** Active changes only: runs validate-all for every spec in the change. */
   onValidateAll?: () => void
-  /** Called after a successful description PATCH so the shell can refetch detail. */
-  onDescriptionSaved?: (detail: ChangeDetailDto) => void
   onScopeSaved?: (detail: ChangeDetailDto) => void
   onScopeInvalidated?: () => void
-  onInvalidationPolicySaved?: (detail: ChangeDetailDto) => void
   changeListSection?: ChangeListSection | null
   lifecycleBusy?: boolean
   onShelfToDrafts?: () => void
@@ -86,10 +83,8 @@ export function ChangeMainView({
   onSelectArtifact,
   selectedArtifactFile,
   onValidateAll,
-  onDescriptionSaved,
   onScopeSaved,
   onScopeInvalidated,
-  onInvalidationPolicySaved,
   changeListSection = null,
   lifecycleBusy = false,
   onShelfToDrafts,

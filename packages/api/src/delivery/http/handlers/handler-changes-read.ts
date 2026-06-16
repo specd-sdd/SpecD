@@ -279,7 +279,7 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
         name,
         filename,
       })
-      return toArtifactContentDto(result)
+      return toArtifactContentDto(filename, result)
     }),
   )
 
@@ -298,7 +298,7 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
         name,
         filename,
       })
-      return toArtifactContentDto(result)
+      return toArtifactContentDto(filename, result)
     }),
   )
 
@@ -313,7 +313,7 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
     apiHandler(async (ctx, req) => {
       const { name, filename } = req.params as { name: string; filename: string }
       const result = await ctx.kernel.changes.getArtifact.execute({ name, filename })
-      return toArtifactContentDto(result)
+      return toArtifactContentDto(filename, result)
     }),
   )
 

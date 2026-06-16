@@ -52,7 +52,7 @@ async function handleWorkspaceSpecWildcard(ctx: ApiContext, req: FastifyRequest)
     if (artifact === null) {
       throw new SpecNotFoundError(specId)
     }
-    return toArtifactContentDto({
+    return toArtifactContentDto(filename, {
       content: artifact.content,
       originalHash: artifact.originalHash ?? '',
     })

@@ -32,6 +32,10 @@ type SpecSearchResult = {
   description: string
 }
 
+function specIdTestToken(specId: string): string {
+  return specId.replace(/[^a-zA-Z0-9]+/g, '-')
+}
+
 function cloneDependsOn(
   source: Record<string, readonly string[]> | undefined,
   specIds: readonly string[],
@@ -206,8 +210,8 @@ export function EditChangeDialog({
         return
       }
       
-      const changeName = change!.name
-      detail = change!
+      const changeName = change.name
+      detail = change
 
       if (scopeDirty || metaDirty) {
         const patched = await patch(changeName, {
@@ -274,7 +278,13 @@ export function EditChangeDialog({
   return (
     <StudioDialog
       open={open}
-      title={isCreate ? 'Create new change' : confirmScope ? 'Confirm scope change' : `Edit change: ${change!.name}`}
+      title={
+        isCreate
+          ? 'Create new change'
+          : confirmScope
+            ? 'Confirm scope change'
+            : `Edit change: ${change?.name ?? ''}`
+      }
       titleId="change-scope-dialog-title"
       testId="studio-change-scope-dialog"
       className="flex max-h-[90vh] !w-[70vw] max-w-none flex-col"
@@ -413,7 +423,11 @@ export function EditChangeDialog({
                   search={searchSpecs}
                   getItemValue={(s) => s.specId}
                   getItemLabel={(s) => s.specId}
+                  getItemTestId={(s) =>
+                    `studio-change-scope-add-specs-item-${specIdTestToken(s.specId)}`
+                  }
                   placeholder="Search specs to add..."
+                  testId="studio-change-scope-add-specs"
                   renderItem={(s) => (
                     <div className="flex flex-col gap-0.5 text-left">
                       <span className="font-mono text-[11px] font-medium text-foreground">
@@ -433,6 +447,7 @@ export function EditChangeDialog({
                 size="sm"
                 variant="secondary"
                 className="shrink-0 h-8"
+                data-testid="studio-change-scope-add-specs-button"
                 disabled={saving || selectedSpecsToAdd.length === 0}
                 onClick={() => addSpecs(selectedSpecsToAdd)}
               >
@@ -517,8 +532,12 @@ export function EditChangeDialog({
                                     search={searchSpecs}
                                     getItemValue={(s) => s.specId}
                                     getItemLabel={(s) => s.specId}
+                                    getItemTestId={(s) =>
+                                      `studio-change-scope-add-deps-${specIdTestToken(specId)}-item-${specIdTestToken(s.specId)}`
+                                    }
                                     placeholder="depends-on spec id"
                                     className="w-full"
+                                    testId={`studio-change-scope-add-deps-${specIdTestToken(specId)}`}
                                     renderItem={(s) => (
                                       <div className="flex flex-col gap-0.5 text-left">
                                         <span className="font-mono text-[10px] font-medium text-foreground">
@@ -537,6 +556,7 @@ export function EditChangeDialog({
                                   variant="ghost"
                                   size="sm"
                                   className="h-8 shrink-0 text-[10px]"
+                                  data-testid={`studio-change-scope-add-deps-${specIdTestToken(specId)}-button`}
                                   disabled={saving || (pendingDeps[specId]?.length ?? 0) === 0}
                                   onClick={() => addDeps(specId, pendingDeps[specId] ?? [])}
                                 >

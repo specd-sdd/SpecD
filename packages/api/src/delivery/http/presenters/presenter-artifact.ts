@@ -3,10 +3,15 @@ import { type ArtifactContentDto } from '../dto/artifact-content.js'
 
 /**
  * Maps get-artifact result to DTO.
+ * @param filename
  * @param result
  */
-export function toArtifactContentDto(result: GetChangeArtifactResult): ArtifactContentDto {
+export function toArtifactContentDto(
+  filename: string,
+  result: GetChangeArtifactResult,
+): ArtifactContentDto {
   return {
+    filename,
     content: result.content,
     originalHash: result.originalHash,
   }
@@ -14,14 +19,17 @@ export function toArtifactContentDto(result: GetChangeArtifactResult): ArtifactC
 
 /**
  * Maps save-artifact result to DTO.
+ * @param filename
  * @param content
  * @param result
  */
 export function toSaveArtifactContentDto(
+  filename: string,
   content: string,
   result: SaveChangeArtifactResult,
 ): ArtifactContentDto {
   return {
+    filename,
     content,
     originalHash: result.contentHash,
     contentHash: result.contentHash,

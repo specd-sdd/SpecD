@@ -280,6 +280,7 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
   ArtifactContentDto: {
     type: 'object',
     properties: {
+      filename: { type: 'string' },
       content: { type: 'string' },
       originalHash: { type: 'string' },
       contentHash: { type: 'string' },

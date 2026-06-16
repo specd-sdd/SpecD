@@ -68,7 +68,6 @@ import { ArtifactEditor } from '../editor/ArtifactEditor.js'
 import { ArtifactDiffView } from '../editor/ArtifactDiffView.js'
 import { ArtifactMarkdownPreview } from '../editor/ArtifactMarkdownPreview.js'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs.js'
-import { cn } from '../lib/utils.js'
 
 export type ShellLayoutProps = {
   project: ProjectDto | undefined
@@ -786,15 +785,6 @@ export function ShellLayout({
                           ? undefined
                           : () => requestValidate('all')
                       }
-                      onDescriptionSaved={(detail) => {
-                        if (!isArchivedChange) {
-                          changeRead.detail.refetch()
-                          void pushOutput(
-                            `Updated description for change "${detail.name}"`,
-                            'save-description',
-                          )
-                        }
-                      }}
                       onScopeSaved={(detail) => {
                         if (!isArchivedChange) {
                           changeRead.detail.refetch()
@@ -810,15 +800,6 @@ export function ShellLayout({
                           void pushOutput(
                             '⚠ Spec scope updated — approvals may have been invalidated. Review workflow and artifacts.',
                             'scope-invalidate',
-                          )
-                        }
-                      }}
-                      onInvalidationPolicySaved={(detail) => {
-                        if (!isArchivedChange) {
-                          changeRead.detail.refetch()
-                          void pushOutput(
-                            `Updated invalidation policy for "${detail.name}" → ${detail.invalidationPolicy ?? 'downstream'}`,
-                            'save-invalidation-policy',
                           )
                         }
                       }}
@@ -884,7 +865,11 @@ export function ShellLayout({
 
                       <Tabs
                         value={inspectorMode}
-                        onValueChange={(v) => setInspectorMode(v as any)}
+                        onValueChange={(value) =>
+                          setInspectorMode(
+                            value as 'raw' | 'preview' | 'diff' | 'metadata' | 'outline',
+                          )
+                        }
                         className="flex min-h-0 flex-1 flex-col"
                       >
                         {/* mode tabs */}
@@ -1082,7 +1067,7 @@ export function ShellLayout({
             <ResizablePanel defaultSize={22} minSize={12} className="studio-panel">
               <Tabs
                 value={bottomTab}
-                onValueChange={(v) => setBottomTab(v as any)}
+                onValueChange={(value) => setBottomTab(value as 'Output' | 'Problems' | 'Logs')}
                 className="flex min-h-0 flex-1 flex-col"
               >
                 <TabsList className="shrink-0">

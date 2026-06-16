@@ -5,7 +5,6 @@ import type {
   GraphFileRefDto,
   GraphSymbolRefDto,
 } from '@specd/client'
-import { ChevronDown, ChevronRight } from 'lucide-react'
 import * as React from 'react'
 import {
   Accordion,
@@ -14,14 +13,12 @@ import {
   AccordionTrigger,
 } from '../components/ui/accordion.js'
 import { Badge } from '../components/ui/badge.js'
-import { Button } from '../components/ui/button.js'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '../components/ui/card.js'
-import { Separator } from '../components/ui/separator.js'
 import { cn } from '../lib/utils.js'
 import type { ChangeReadSection } from '../lib/change-read-routes.js'
 import { useChangeArtifacts } from '../hooks/use-change-artifact.js'
@@ -32,6 +29,7 @@ import { useImplementationReview } from '../hooks/use-implementation-review.js'
 import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
 import { useChangeArtifactList } from '../hooks/use-change-artifact-list.js'
 import { buildImpactViewModel, type ImpactSpecTracked } from './merge-impact-view.js'
+import { isMarkdownArtifactFilename } from '../lib/artifact-filename.js'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -288,14 +286,14 @@ export function ChangeTasksTab({
       ) : tasksArtifacts.data && tasksArtifacts.data.length > 0 ? (
         <div className="space-y-3">
           {tasksArtifacts.data.map((artifact) => (
-            <Card key={artifact.filename}>
+            <Card key={artifact.filename ?? 'unnamed-artifact'}>
               <CardHeader>
                 <CardTitle className="font-mono normal-case tracking-normal">
-                  {artifact.filename}
+                  {artifact.filename ?? '(unnamed artifact)'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {artifact.filename.endsWith('.md') ? (
+                {isMarkdownArtifactFilename(artifact.filename) ? (
                   <div className="studio-markdown-preview max-w-none text-sm text-foreground">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content}</ReactMarkdown>
                   </div>

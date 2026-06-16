@@ -1,6 +1,5 @@
 import type { ChangeDetailDto, ChangeHistoryEventDto, ChangeStatusDto } from '@specd/client'
 import * as React from 'react'
-import { Button } from '../components/ui/button.js'
 import {
   Card as StudioCard,
   CardContent,
