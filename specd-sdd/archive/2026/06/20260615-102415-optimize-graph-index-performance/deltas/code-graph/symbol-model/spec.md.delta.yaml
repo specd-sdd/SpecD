@@ -1,0 +1,90 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Scoped binding model'
+  content: |
+    The symbol model SHALL define immutable, language-agnostic value objects for deterministic scoped binding and call resolution. These value objects are analysis inputs and intermediate results that normalize source-language facts before they are converted into persisted graph relations.
+
+    The shared model SHALL represent:
+
+    - **Scope ownership**: file, class/type, method, function, and block scopes when the adapter can identify them deterministically.
+    - **Binding facts**: source-location-aware facts that bind a visible name or receiver to a declared, constructed, imported, inherited, framework-managed, or otherwise deterministic target type or symbol candidate.
+    - **Binding source kind**: local, parameter, property/field, class-managed, inherited, file/global, imported type, framework-managed, constructor call, and alias-from-known-binding.
+    - **Call facts**: source-location-aware facts for free calls, member calls, static calls, and constructor calls, including the enclosing caller symbol when known.
+    - **Resolution metadata**: deterministic reason strings and optional confidence or diagnostic metadata that explain why a binding or call candidate was accepted or dropped.
+
+    Binding facts and call facts MUST be immutable value objects with `readonly` properties. They MUST use workspace-prefixed file paths and symbol IDs when they reference graph entities.
+
+    **Cycle Detection**: The scoped binding environment resolution SHALL implement cycle detection when traversing the scope hierarchy (e.g., following `parentId` links). If a circular reference is detected, the traversal MUST be aborted to prevent infinite loops, and no resolution result SHALL be returned for that lookup.
+
+    The first iteration SHALL remain conservative. It MUST NOT model arbitrary runtime state, reflection, runtime container identifiers, interprocedural propagation, or whole-program data flow.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Symbol node'
+  content: |
+    ### Requirement: File analysis model
+
+    The code graph SHALL define immutable runtime analysis value objects that capture the complete compact result of analyzing a source file before relation resolution.
+
+    The shared runtime model MUST include:
+
+    - **`FileAnalysisDraft`** — adapter-emitted file analysis before the indexer assigns run-local file identity
+    - **`FileAnalysis`** — registered file analysis that includes the file's run-local ID, workspace-prefixed path, language, content hash, compact facts, and optional per-file parser state
+    - **`ParserState`** — optional compact parser-specific state retained only when it avoids repeated deterministic work later in the same indexing run
+    - **`AdapterSessionState`** — optional compact run-scoped adapter state retained only when it provides deterministic shared caches across multiple files in the same indexing run
+
+    `FileAnalysisDraft` and `FileAnalysis` MUST represent, at minimum:
+
+    - symbols emitted for the file
+    - import declarations emitted for the file
+    - deterministic binding facts emitted for the file
+    - deterministic call facts emitted for the file
+    - namespace or equivalent qualified-name context when the language supports it
+    - optional file/document node metadata already normalized for indexing
+
+    These runtime analysis value objects SHALL remain distinct from persisted graph-store entities. They exist to support in-memory indexing passes and MUST NOT require changes to persisted symbol IDs, relation IDs, or graph-store schemas.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: File analysis model'
+  content: |
+    ### Requirement: Shared indexing lookups
+
+    The symbol model SHALL support run-scoped lookup structures that make deterministic relation resolution bounded by relevant matches rather than full symbol scans.
+
+    The shared runtime lookup model MUST support:
+
+    - file lookup by workspace-prefixed path and run-local file ID
+    - symbol lookup by file, simple name, and qualified name
+    - traversal from file to symbols and symbol back to file
+    - lookup of specs and documents that participate in cross-entity relations during the same indexing run
+    - traversal between specs and covered symbols when that relationship is needed by later phases
+    - relation deduplication keys before final persistence
+
+    These lookups MAY be implemented by `IndexSession` and `SymbolIndex` collaborating internally, but the externally visible runtime model MUST preserve a common lookup contract across all built-in adapters and indexer phases.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Shared indexing lookups'
+  content: |
+    ### Requirement: Compact retained analysis state
+
+    The retained runtime analysis model MUST prioritize compact, immutable data over heavyweight parser artifacts to reduce garbage-collection pressure during large indexing runs.
+
+    Retained `ParserState`, `AdapterSessionState`, binding facts, call facts, imports, and lookup indexes MUST use plain data structures and MUST NOT retain AST nodes, parser trees, parser cursors, or equivalent heavyweight objects once per-file analysis completes.
