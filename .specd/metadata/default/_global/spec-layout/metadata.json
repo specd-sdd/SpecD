@@ -154,5 +154,7 @@
     "spec.md": "sha256:64dee3830d5120520694ea893ebf64af031ebad2d87ac360b7dc26d5b633ea7c",
     "verify.md": "sha256:1886469d30e4b6b4e813d3090fa9baf4a1abad7890fe99f3237f4655c9c284b4"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Global spec layout requirements.",
+  "optimizedContext": "Specs live under specs/_global or specs/<workspace>; each spec has paired spec.md and verify.md; deltas belong only in change directories.\n"
 }

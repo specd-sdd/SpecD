@@ -129,5 +129,7 @@
     "spec.md": "sha256:40b77a1d0fe2f715ab0733e116141da3734028175c0d83f605651eeaed7c6c53",
     "verify.md": "sha256:c401e34e489be2ca3736d24ba3cabb2d4f14a8c166574db7a56070bcbe1dbd6e"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Error handling conventions across specd.",
+  "optimizedContext": "User-facing errors must be typed, actionable, and machine-readable; packages should surface consistent error contracts and avoid ad hoc thrown strings.\n"
 }

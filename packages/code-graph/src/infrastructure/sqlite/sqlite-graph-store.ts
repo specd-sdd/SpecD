@@ -552,9 +552,7 @@ export class SQLiteGraphStore extends GraphStore {
     return rows.map((row) => this.mapSpecRow(row))
   }
 
-  async searchSymbols(
-    options: SearchOptions,
-  ): Promise<
+  async searchSymbols(options: SearchOptions): Promise<
     Array<{
       symbol: SymbolNode
       score: number
@@ -737,9 +735,7 @@ export class SQLiteGraphStore extends GraphStore {
     })
   }
 
-  async searchDocuments(
-    options: SearchOptions,
-  ): Promise<
+  async searchDocuments(options: SearchOptions): Promise<
     Array<{
       document: DocumentNode
       score: number
@@ -948,8 +944,10 @@ export class SQLiteGraphStore extends GraphStore {
       } finally {
         if (db.open) db.close()
       }
-    } catch {
-      rmSync(this.dbPath, { force: true })
+    } catch (error) {
+      if (shouldResetSQLiteDatabase(error)) {
+        rmSync(this.dbPath, { force: true })
+      }
     }
   }
 
@@ -1408,6 +1406,22 @@ export class SQLiteGraphStore extends GraphStore {
     const copy = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
     return new Float32Array(copy)
   }
+}
+
+/**
+ * Returns whether an sqlite open/probe failure means the on-disk database is unusable.
+ *
+ * @param error - Failure raised while probing the existing database.
+ * @returns True when the database should be discarded and rebuilt.
+ */
+function shouldResetSQLiteDatabase(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  return (
+    message.includes('file is not a database') ||
+    message.includes('database disk image is malformed') ||
+    message.includes('unsupported file format') ||
+    message.includes('no such table: meta')
+  )
 }
 
 function sanitizeFtsQuery(query: string): string {

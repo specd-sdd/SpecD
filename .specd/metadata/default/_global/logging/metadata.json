@@ -91,5 +91,7 @@
     "spec.md": "sha256:f2fb42bf418db441a956f48cec60ed302529761fc9010817ba4fb0d71c3f4fe6",
     "verify.md": "sha256:12697234dce805f8f3406a6313c2ad069d5075897099e25e0e1f7fc2b097dd78"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Unified logging conventions.",
+  "optimizedContext": "Packages should follow consistent log-level semantics and console-compatible logging behavior so observability remains uniform across runtimes.\n"
 }

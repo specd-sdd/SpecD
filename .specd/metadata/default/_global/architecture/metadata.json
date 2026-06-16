@@ -215,5 +215,7 @@
     "spec.md": "sha256:e4b6d93d9ad5dec95baa9994ed0c6c8824868b8ca0d8fc0dbae69830cad64e50",
     "verify.md": "sha256:bbb109d7836e60284481b7d0eef37bff5b3969ee0323078c0b5314fe36a762dd"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Architecture constraints for all specd packages.",
+  "optimizedContext": "Hexagonal architecture, pure domain, application ports only, manual DI, composition layer owns infrastructure wiring, no circular workspace dependencies.\n"
 }

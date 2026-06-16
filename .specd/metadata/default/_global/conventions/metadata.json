@@ -179,5 +179,7 @@
     "spec.md": "sha256:63e29def48b8d6733110c8d7f8bcde5f272a39607cda24e51717c767f693dd8f",
     "verify.md": "sha256:79310e52c401071cd52164ab363fa1ff87137b846c5db339aeb9ed4918051a88"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Global TypeScript and repository conventions.",
+  "optimizedContext": "ESM-only TypeScript monorepo conventions, naming, structure, error handling expectations, and repo-wide coding rules that apply unless a package spec overrides them.\n"
 }
