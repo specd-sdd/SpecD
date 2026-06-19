@@ -265,4 +265,74 @@ describe('graph search', () => {
     expect(out).toContain('      }')
     expect(out).toContain('<<<')
   })
+
+  it('preserves provider ordering for token-ranked symbol results', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchSymbols.mockResolvedValue([
+      {
+        symbol: {
+          id: 'core:src/repository.ts:function:change',
+          name: 'change',
+          kind: 'function',
+          filePath: 'core:src/repository.ts',
+          line: 1,
+          column: 0,
+        },
+        score: 400,
+        snippet: '',
+        startLine: 1,
+        endLine: 1,
+      },
+      {
+        symbol: {
+          id: 'core:src/repository.ts:function:changeLog',
+          name: 'changeLog',
+          kind: 'function',
+          filePath: 'core:src/repository.ts',
+          line: 2,
+          column: 0,
+        },
+        score: 300,
+        snippet: '',
+        startLine: 2,
+        endLine: 2,
+      },
+      {
+        symbol: {
+          id: 'core:src/repository.ts:function:prechange',
+          name: 'prechange',
+          kind: 'function',
+          filePath: 'core:src/repository.ts',
+          line: 3,
+          column: 0,
+        },
+        score: 200,
+        snippet: '',
+        startLine: 3,
+        endLine: 3,
+      },
+      {
+        symbol: {
+          id: 'core:src/repository.ts:function:exchangeRate',
+          name: 'exchangeRate',
+          kind: 'function',
+          filePath: 'core:src/repository.ts',
+          line: 4,
+          column: 0,
+        },
+        score: 100,
+        snippet: '',
+        startLine: 4,
+        endLine: 4,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'change', '--symbols'])
+
+    const out = getStdout()
+    expect(out.indexOf('function change\n')).toBeLessThan(out.indexOf('function changeLog\n'))
+    expect(out.indexOf('function changeLog\n')).toBeLessThan(out.indexOf('function prechange\n'))
+    expect(out.indexOf('function prechange\n')).toBeLessThan(out.indexOf('function exchangeRate\n'))
+  })
 })

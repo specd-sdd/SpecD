@@ -50,7 +50,7 @@
     {
       "requirement": "Full-text search implementation",
       "rules": [
-        "`LadybugGraphStore` SHALL implement symbol, spec, and document search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()`, `GraphStore.searchSpecs()`, and `GraphStore.searchDocuments()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- index document paths and full textual content\n- prioritize **exact identity matches** during search by applying a score boost to nodes where the query exactly matches the `path` or `name` column\n- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)\n- return results ordered from highest to lowest relevance, relying on the backend's ranking to prioritize records matching more search terms (precision mode)\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n- **`document_fts`** — covering `Document.content` and `Document.path`\n\nThe implementation MAY use stemming or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.\n\nPersisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change."
+        "`LadybugGraphStore` SHALL implement symbol, spec, and document search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()`, `GraphStore.searchSpecs()`, and `GraphStore.searchDocuments()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- index document paths and full textual content\n- keep the existing Ladybug discovery paths in place:\n  - `QUERY_FTS_INDEX`-based discovery for symbols and specs\n  - manual document candidate discovery for documents\n- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)\n- expand raw query tokens with the shared specd/code-aware lexical policy before applying identity-aware ranking\n- supplement the backend-native candidate set with identity-derived candidates when the native tokenization path would otherwise miss a strong identity hit required by the abstract contract\n- prioritize **exact canonical identity matches** during search by applying a score boost to nodes where the query exactly matches the primary identity column\n- prioritize **strong non-exact identity matches** ahead of generic content-only matches, including:\n  - symbol declared-name equality when comment-only hits would otherwise rank higher\n  - spec-id prefix, suffix, substring, and real component matches\n  - document canonical-path or config-relative-path prefix, suffix, substring, and real component matches\n- rerank the discovered candidate set using backend-local ranking logic after candidate retrieval rather than replacing candidate generation with whole-query string matching\n- count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens\n- return results ordered from highest to lowest relevance after identity preference is applied\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches\n\nObservable Ladybug ordering semantics MUST hold:\n\n- exact canonical identity matches rank first\n- identity-oriented non-exact hits rank ahead of body-only/comment-only/content-only hits\n- exact token identity matches outrank prefix token matches\n- prefix token matches outrank suffix token matches\n- suffix token matches outrank arbitrary substring token matches\n- real identity-component matches outrank arbitrary substring-only hits on the same identity field\n- candidates matching more expanded identity tokens outrank candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing\n- generic term frequency in spec/document body content MUST NOT outrank a stronger spec-id, symbol-name, or document-path match for the same query intent\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n- **`document_fts`** — covering `Document.content`, `Document.path`, and any backend-maintained alternate path search field needed to preserve document identity preference\n\nThe implementation MAY use stemming, weighted ranking, identity boost unions, or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.\n\nPersisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change."
       ]
     },
     {
@@ -231,6 +231,115 @@
       ]
     },
     {
+      "requirement": "Full-text search implementation",
+      "name": "Spec-id segment outranks content-only hit in Ladybug",
+      "given": [
+        "a spec with ID default:_global/architecture",
+        "AND another spec contains architecture more times only in its body content"
+      ],
+      "when": ["searchSpecs({ query: 'architecture' }) is called on the Ladybug backend"],
+      "then": ["default:_global/architecture is ranked ahead of the body-only hit"]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Symbol declared name outranks comment-only hit in Ladybug",
+      "given": [
+        "one symbol is named SearchSpecs",
+        "AND another symbol contains search specs only in comment text"
+      ],
+      "when": ["searchSymbols({ query: 'SearchSpecs' }) is called on the Ladybug backend"],
+      "then": ["the declared-name hit is ranked ahead of the comment-only hit"]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Alternate document path identity outranks body-only hit in Ladybug",
+      "given": [
+        "a document whose canonical path or backend-maintained alternate path identity contains graph-search",
+        "AND another document contains graph search only in body text"
+      ],
+      "when": ["searchDocuments({ query: 'graph-search' }) is called on the Ladybug backend"],
+      "then": ["the document-path hit is ranked ahead of the body-only hit"]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug expands specd-shaped tokens before reranking",
+      "given": [
+        "a spec with ID core:change",
+        "AND another spec mentions core change only in body content"
+      ],
+      "when": ["searchSpecs({ query: 'core:change' }) is called on the Ladybug backend"],
+      "then": [
+        "the backend treats core:change, core, and change as usable identity-ranking tokens",
+        "AND the spec-id hit is ranked ahead of the body-only hit"
+      ]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug expands CamelCase tokens before reranking",
+      "given": [
+        "a symbol named ArchiveChange",
+        "AND another symbol contains archive change only in comment text"
+      ],
+      "when": ["searchSymbols({ query: 'ArchiveChange' }) is called on the Ladybug backend"],
+      "then": [
+        "the backend treats archivechange, archive, and change as usable identity-ranking tokens",
+        "AND the declared-name hit is ranked ahead of the comment-only hit"
+      ]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug exact token match outranks prefix token match",
+      "given": [
+        "one candidate identity matches token change exactly",
+        "AND another candidate identity matches change only by prefix"
+      ],
+      "when": ["searchSymbols({ query: 'change' }) is called on the Ladybug backend"],
+      "then": ["the exact-token hit is ranked ahead of the prefix-only hit"]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug prefix token match outranks suffix token match",
+      "given": [
+        "one candidate identity matches token repo by prefix",
+        "AND another candidate identity matches repo only by suffix"
+      ],
+      "when": ["searchSymbols({ query: 'repo' }) is called on the Ladybug backend"],
+      "then": ["the prefix-token hit is ranked ahead of the suffix-only hit"]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug suffix token match outranks arbitrary substring token match",
+      "given": [
+        "one candidate identity matches token repository by suffix",
+        "AND another candidate identity matches repository only as an arbitrary substring"
+      ],
+      "when": ["searchDocuments({ query: 'repository' }) is called on the Ladybug backend"],
+      "then": ["the suffix-token hit is ranked ahead of the arbitrary-substring hit"]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug real component match outranks arbitrary substring match",
+      "given": [
+        "one spec ID is core:change",
+        "AND another spec ID contains substring core only inside a larger token such as score"
+      ],
+      "when": ["searchSpecs({ query: 'core' }) is called on the Ladybug backend"],
+      "then": ["the real component match is ranked ahead of the arbitrary-substring hit"]
+    },
+    {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug supplements native discovery for a strong suffix identity hit",
+      "given": [
+        "one symbol identity matches token change by suffix",
+        "AND Ladybug native tokenization alone would not surface that symbol through QUERY_FTS_INDEX"
+      ],
+      "when": ["searchSymbols({ query: 'change' }) is called on the Ladybug backend"],
+      "then": [
+        "the backend still returns that symbol as a candidate",
+        "AND it is ordered by the same identity-strength ladder instead of being omitted for lack of native tokenizer coverage"
+      ]
+    },
+    {
       "requirement": "Schema versioning",
       "name": "Incompatible schema version permits rebuild strategy",
       "given": [
@@ -310,29 +419,38 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "code-graph:ladybug-graph-store",
+        "file": "code-graph:test/infrastructure/ladybug/ladybug-graph-store.spec.ts"
+      }
+    ],
     "symbols": [
-      {
-        "specId": "code-graph:ladybug-graph-store",
-        "file": "code-graph:src/infrastructure/ladybug/schema.ts",
-        "symbol": "SCHEMA_VERSION"
-      },
-      {
-        "specId": "code-graph:ladybug-graph-store",
-        "file": "code-graph:src/infrastructure/ladybug/schema.ts",
-        "symbol": "SCHEMA_DDL"
-      },
       {
         "specId": "code-graph:ladybug-graph-store",
         "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
         "symbol": "LadybugGraphStore"
+      },
+      {
+        "specId": "code-graph:ladybug-graph-store",
+        "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
+        "symbol": "searchSymbols"
+      },
+      {
+        "specId": "code-graph:ladybug-graph-store",
+        "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
+        "symbol": "searchSpecs"
+      },
+      {
+        "specId": "code-graph:ladybug-graph-store",
+        "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
+        "symbol": "searchDocuments"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:70c2a8ee3e4fc9a17ea867bee57897a10552a213833afb502cdd26e7ce8b65b3",
-    "verify.md": "sha256:05bfe5d549c3f58d51796a741f8f0d788b6d763e5f56431969532b62d9e75756"
+    "spec.md": "sha256:0b670b896b8800b6a622566017c5bebf21583353c256b745f950b5ff1253b36a",
+    "verify.md": "sha256:3746417ebc5b0f30f4117be16bf2ced833bb099f878c2a64adca7d484275d81f"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "LadybugGraphStore: concrete GraphStore implementation using LadybugDB with FTS, schema versioning, and bulk loading.",
-  "optimizedContext": "# Ladybug Graph Store\n\n## Rules\n\n- `LadybugGraphStore` SHALL implement `GraphStore` using LadybugDB. Infrastructure adapter. Backend id: `ladybug`.\n- MUST open/close Ladybug DB safely, execute DDL on first use, track schema version, translate abstract ops to Ladybug queries.\n- SHALL use `configPath` as root. Derives: `{configPath}/graph` (persistence), `{configPath}/tmp` (scratch). DB files, lock/WAL/CSV live only under these dirs. Creates dirs on demand.\n- `recreate()`: discards all graph data under `{configPath}/graph`, including companion artifacts (lock, WAL). Backend ready for rebuild from scratch. Callers like `graph index --force` depend on this abstract behavior.\n- SHALL own Ladybug-specific schema for File, Symbol, Spec, Document, Meta (node tables), and relations: `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`.\n- Node tables:\n  - **File**: path (PK), language, contentHash, content, workspace\n  - **Symbol**: id (PK), name, searchName, kind, filePath, line, col, comment\n  - **Spec**: specId (PK), path, title, description, contentHash, content, workspace\n  - **Document**: path (PK), configRelativePath, contentHash, content, workspace\n  - **Meta**: key (PK), value\n- `COVERS_SYMBOL` MUST preserve edge metadata for stale-state surfacing after reload.\n- SHALL use Ladybug FTS for symbol/spec/document search. FTS indexes: `symbol_fts` (searchName, comment), `spec_fts` (title, description, content), `document_fts` (content, path).\n- MUST prioritize exact identity matches (path/name column) with score boost. Join multi-token queries with OR. Return results ordered by relevance. Derive match-aware snippets + 1-based line range.\n- SHALL track backend-specific schema version. On open: execute current schema, verify/record version, prepare FTS indexes. Incompatible version MAY require destructive rebuild.\n- SHALL support efficient bulk loading. MAY materialize CSV scratch files under `{configPath}/tmp`. Scoped to current run, cleaned up after success, SHOULD clean on failure.\n- SHALL use Ladybug prepared statement API (`conn.prepare()`, `$param` bindings) for all queries with user-supplied or externally-derived parameter values. MAY use `conn.query()` for DDL, constant DML, COPY, admin queries.\n\n## Constraints\n\n- Infrastructure adapter, not part of abstract graph-store contract\n- `ladybug` is stable backend id for multi-backend registration\n- File layout, FTS, schema, versioning defined here, not in `code-graph:graph-store`\n- All scratch/persisted artifacts rooted under configPath\n- Storage-agnostic consumers MUST NOT depend on this spec"
+  "generatedBy": "core"
 }

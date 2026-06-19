@@ -112,6 +112,79 @@
 - **WHEN** search APIs are used through the current graph-store contract
 - **THEN** there is still no separate file full-text result category introduced by this change
 
+#### Scenario: Spec-id segment outranks content-only hit in Ladybug
+
+- **GIVEN** a spec with ID `default:_global/architecture`
+- **AND** another spec contains `architecture` more times only in its body content
+- **WHEN** `searchSpecs({ query: 'architecture' })` is called on the Ladybug backend
+- **THEN** `default:_global/architecture` is ranked ahead of the body-only hit
+
+#### Scenario: Symbol declared name outranks comment-only hit in Ladybug
+
+- **GIVEN** one symbol is named `SearchSpecs`
+- **AND** another symbol contains `search specs` only in comment text
+- **WHEN** `searchSymbols({ query: 'SearchSpecs' })` is called on the Ladybug backend
+- **THEN** the declared-name hit is ranked ahead of the comment-only hit
+
+#### Scenario: Alternate document path identity outranks body-only hit in Ladybug
+
+- **GIVEN** a document whose canonical path or backend-maintained alternate path identity contains `graph-search`
+- **AND** another document contains `graph search` only in body text
+- **WHEN** `searchDocuments({ query: 'graph-search' })` is called on the Ladybug backend
+- **THEN** the document-path hit is ranked ahead of the body-only hit
+
+#### Scenario: Ladybug expands specd-shaped tokens before reranking
+
+- **GIVEN** a spec with ID `core:change`
+- **AND** another spec mentions `core change` only in body content
+- **WHEN** `searchSpecs({ query: 'core:change' })` is called on the Ladybug backend
+- **THEN** the backend treats `core:change`, `core`, and `change` as usable identity-ranking tokens
+- **AND** the spec-id hit is ranked ahead of the body-only hit
+
+#### Scenario: Ladybug expands CamelCase tokens before reranking
+
+- **GIVEN** a symbol named `ArchiveChange`
+- **AND** another symbol contains `archive change` only in comment text
+- **WHEN** `searchSymbols({ query: 'ArchiveChange' })` is called on the Ladybug backend
+- **THEN** the backend treats `archivechange`, `archive`, and `change` as usable identity-ranking tokens
+- **AND** the declared-name hit is ranked ahead of the comment-only hit
+
+#### Scenario: Ladybug exact token match outranks prefix token match
+
+- **GIVEN** one candidate identity matches token `change` exactly
+- **AND** another candidate identity matches `change` only by prefix
+- **WHEN** `searchSymbols({ query: 'change' })` is called on the Ladybug backend
+- **THEN** the exact-token hit is ranked ahead of the prefix-only hit
+
+#### Scenario: Ladybug prefix token match outranks suffix token match
+
+- **GIVEN** one candidate identity matches token `repo` by prefix
+- **AND** another candidate identity matches `repo` only by suffix
+- **WHEN** `searchSymbols({ query: 'repo' })` is called on the Ladybug backend
+- **THEN** the prefix-token hit is ranked ahead of the suffix-only hit
+
+#### Scenario: Ladybug suffix token match outranks arbitrary substring token match
+
+- **GIVEN** one candidate identity matches token `repository` by suffix
+- **AND** another candidate identity matches `repository` only as an arbitrary substring
+- **WHEN** `searchDocuments({ query: 'repository' })` is called on the Ladybug backend
+- **THEN** the suffix-token hit is ranked ahead of the arbitrary-substring hit
+
+#### Scenario: Ladybug real component match outranks arbitrary substring match
+
+- **GIVEN** one spec ID is `core:change`
+- **AND** another spec ID contains substring `core` only inside a larger token such as `score`
+- **WHEN** `searchSpecs({ query: 'core' })` is called on the Ladybug backend
+- **THEN** the real component match is ranked ahead of the arbitrary-substring hit
+
+#### Scenario: Ladybug supplements native discovery for a strong suffix identity hit
+
+- **GIVEN** one symbol identity matches token `change` by suffix
+- **AND** Ladybug native tokenization alone would not surface that symbol through `QUERY_FTS_INDEX`
+- **WHEN** `searchSymbols({ query: 'change' })` is called on the Ladybug backend
+- **THEN** the backend still returns that symbol as a candidate
+- **AND** it is ordered by the same identity-strength ladder instead of being omitted for lack of native tokenizer coverage
+
 ### Requirement: Schema versioning
 
 #### Scenario: Incompatible schema version permits rebuild strategy

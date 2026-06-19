@@ -11,11 +11,17 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/ports/graph-store.ts",
-      "symbols": ["GraphStore"]
+      "file": "code-graph:test/helpers/in-memory-graph-store.ts",
+      "symbols": ["InMemoryGraphStore", "searchSymbols", "searchSpecs", "searchDocuments"]
     },
     {
-      "file": "code-graph:test/helpers/in-memory-graph-store.ts"
+      "file": "code-graph:test/domain/ports/graph-store.contract.ts"
+    },
+    {
+      "file": "code-graph:src/domain/services/expand-search-query.ts"
+    },
+    {
+      "file": "code-graph:src/index.ts"
     }
   ]
 }

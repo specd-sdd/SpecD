@@ -11,11 +11,45 @@ import { type RelationType, RelationType as RT } from '../../domain/value-object
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { SCHEMA_DDL, SCHEMA_VERSION } from './schema.js'
+import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
+import { matchesExclude } from '../../domain/services/matches-exclude.js'
 import { mkdirSync, existsSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 const SYMBOL_DEPENDENCY_RELATION_TYPES = [RT.Calls, RT.Constructs, RT.UsesType] as const
+
+/**
+ * Expanded token set plus FTS-ready query string for identity-aware search.
+ */
+interface ExpandedIdentitySearchQuery {
+  readonly normalizedQuery: string
+  readonly rawTokens: readonly string[]
+  readonly expandedTokens: readonly string[]
+  readonly ftsQuery: string
+}
+
+/**
+ * Inputs required to rank a candidate result by identity strength.
+ */
+interface IdentityRankingInput {
+  readonly normalizedQuery: string
+  readonly rawTokens: readonly string[]
+  readonly expandedTokens: readonly string[]
+  readonly canonicalIdentity: string
+  readonly alternateIdentity?: string
+  readonly nativeScore: number
+}
+
+/**
+ * Computed identity-ranking factors for a search result candidate.
+ */
+interface IdentityRanking {
+  readonly tier: number
+  readonly tokenHits: number
+  readonly matchStrength: number
+  readonly nativeScore: number
+}
 
 /**
  * Unwraps a query result (or array of results) into an array of row records.
@@ -1317,9 +1351,7 @@ export class LadybugGraphStore extends GraphStore {
    * @param options - Search options including query, limit, and filters.
    * @returns Matching symbols with BM25 scores, ordered by relevance.
    */
-  async searchSymbols(
-    options: SearchOptions,
-  ): Promise<
+  async searchSymbols(options: SearchOptions): Promise<
     Array<{
       symbol: SymbolNode
       score: number
@@ -1330,9 +1362,11 @@ export class LadybugGraphStore extends GraphStore {
   > {
     this.ensureOpen()
     const top = options.limit ?? 20
+    const query = prepareExpandedSearchQuery(options.query)
+    if (query.ftsQuery.length === 0) return []
 
     const conditions: string[] = []
-    const params: Record<string, LbugValue> = { query: options.query }
+    const params: Record<string, LbugValue> = { query: query.ftsQuery }
     if (options.kinds && options.kinds.length > 0) {
       const kindConditions = options.kinds.map((kind, i) => {
         const key = `kind${i}`
@@ -1367,18 +1401,49 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-    const query = sanitizeFtsQuery(options.query)
-    if (query.length === 0) return []
-
-    params.query = query
-
-    params.rawQuery = options.query.trim()
-
     const rows = await execPrepared(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.parentId AS parentId, node.line AS line, node.col AS col, node.comment AS comment, (score + CASE WHEN node.id = $rawQuery THEN 1000000.0 ELSE 0.0 END + CASE WHEN node.name = $rawQuery THEN 1000.0 ELSE 0.0 END) AS score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.parentId AS parentId, node.line AS line, node.col AS col, node.comment AS comment, score AS nativeScore LIMIT 1000`,
       params,
     )
+
+    const candidates = new Map<string, { symbol: SymbolNode; nativeScore: number }>()
+    for (const r of rows) {
+      const symbol = this.rowToSymbol(r)
+      candidates.set(symbol.id, {
+        symbol,
+        nativeScore: Number(r['nativeScore'] ?? 0),
+      })
+    }
+
+    const allSymbols = await this.findSymbols({})
+    for (const symbol of allSymbols) {
+      if (candidates.has(symbol.id)) continue
+      if (
+        options.kinds &&
+        options.kinds.length > 0 &&
+        !options.kinds.includes(symbol.kind as never)
+      ) {
+        continue
+      }
+      if (options.filePattern !== undefined) {
+        const pattern = new RegExp(
+          '^' + options.filePattern.replaceAll('.', '\\.').replaceAll('*', '.*') + '$',
+          'i',
+        )
+        if (!pattern.test(symbol.filePath)) continue
+      }
+      if (options.workspace !== undefined && !symbol.filePath.startsWith(options.workspace + ':')) {
+        continue
+      }
+      if (matchesExclude(symbol.filePath, options.excludePaths, options.excludeWorkspaces)) {
+        continue
+      }
+      if (!matchesExpandedIdentity(query.expandedTokens, symbol.id, symbol.name)) {
+        continue
+      }
+      candidates.set(symbol.id, { symbol, nativeScore: 0 })
+    }
 
     const results: Array<{
       symbol: SymbolNode
@@ -1387,9 +1452,17 @@ export class LadybugGraphStore extends GraphStore {
       startLine: number
       endLine: number
     }> = []
-    for (const r of rows) {
-      const symbol = this.rowToSymbol(r)
-      const score = r['score'] as number
+    for (const { symbol, nativeScore } of candidates.values()) {
+      const score = composeIdentitySearchScore(
+        rankIdentityMatch({
+          normalizedQuery: query.normalizedQuery,
+          rawTokens: query.rawTokens,
+          expandedTokens: query.expandedTokens,
+          canonicalIdentity: symbol.id,
+          alternateIdentity: symbol.name,
+          nativeScore,
+        }),
+      )
       let snippet = ''
       let startLine = 1
       let endLine = 1
@@ -1433,7 +1506,7 @@ export class LadybugGraphStore extends GraphStore {
       results.push({ symbol, score, snippet, startLine, endLine })
     }
 
-    return results
+    return results.sort((a, b) => b.score - a.score).slice(0, top)
   }
 
   /**
@@ -1449,9 +1522,11 @@ export class LadybugGraphStore extends GraphStore {
   > {
     this.ensureOpen()
     const top = options.limit ?? 20
+    const query = prepareExpandedSearchQuery(options.query)
+    if (query.ftsQuery.length === 0) return []
 
     const conditions: string[] = []
-    const params: Record<string, LbugValue> = { query: options.query }
+    const params: Record<string, LbugValue> = { query: query.ftsQuery }
     if (options.workspace) {
       params.workspace = options.workspace
       conditions.push(`node.workspace = $workspace`)
@@ -1473,16 +1548,9 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
-    const query = sanitizeFtsQuery(options.query)
-    if (query.length === 0) return []
-
-    params.query = query
-
-    params.rawQuery = options.query.trim()
-
     const rows = await execPrepared(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', $query, k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, (score + CASE WHEN node.specId = $rawQuery THEN 1000000.0 ELSE 0.0 END) AS score ORDER BY score DESC LIMIT ${String(top)}`,
+      `CALL QUERY_FTS_INDEX('Spec', 'spec_fts', $query, k := 1000)${where} RETURN node.specId AS specId, node.path AS path, node.title AS title, node.description AS description, node.contentHash AS contentHash, node.content AS content, node.workspace AS workspace, score AS nativeScore LIMIT 1000`,
       params,
     )
 
@@ -1493,7 +1561,6 @@ export class LadybugGraphStore extends GraphStore {
       startLine: number
       endLine: number
     }> = []
-    const terms = options.query.split(/\s+/).filter((t) => t.length > 0)
     for (const row of rows) {
       const specId = row['specId'] as string
       const depRows = await execPrepared(
@@ -1502,7 +1569,10 @@ export class LadybugGraphStore extends GraphStore {
         { specId },
       )
       const content = (row['content'] as string) ?? ''
-      const { snippet, startLine, endLine } = this.extractMatchSnippet(content, terms)
+      const { snippet, startLine, endLine } = this.extractMatchSnippet(content, [
+        ...query.rawTokens,
+        ...query.expandedTokens,
+      ])
       results.push({
         spec: {
           specId,
@@ -1514,13 +1584,21 @@ export class LadybugGraphStore extends GraphStore {
           dependsOn: depRows.map((r) => r['target'] as string),
           workspace: (row['workspace'] as string) ?? '',
         },
-        score: row['score'] as number,
+        score: composeIdentitySearchScore(
+          rankIdentityMatch({
+            normalizedQuery: query.normalizedQuery,
+            rawTokens: query.rawTokens,
+            expandedTokens: query.expandedTokens,
+            canonicalIdentity: specId,
+            nativeScore: Number(row['nativeScore'] ?? 0),
+          }),
+        ),
         snippet,
         startLine,
         endLine,
       })
     }
-    return results
+    return results.sort((a, b) => b.score - a.score).slice(0, top)
   }
 
   /**
@@ -1528,9 +1606,7 @@ export class LadybugGraphStore extends GraphStore {
    * @param options - Search options including query and filters.
    * @returns An array of matching documents with their scores.
    */
-  async searchDocuments(
-    options: SearchOptions,
-  ): Promise<
+  async searchDocuments(options: SearchOptions): Promise<
     Array<{
       document: DocumentNode
       score: number
@@ -1541,10 +1617,9 @@ export class LadybugGraphStore extends GraphStore {
   > {
     this.ensureOpen()
     const top = options.limit ?? 20
-    const rawQuery = options.query.trim().toLowerCase()
-    if (rawQuery.length === 0) return []
+    const query = prepareExpandedSearchQuery(options.query)
+    if (query.ftsQuery.length === 0) return []
 
-    const terms = rawQuery.split(/\s+/).filter((term) => term.length > 0)
     const documents = await this.getAllDocuments()
     const results: Array<{
       document: DocumentNode
@@ -1557,7 +1632,8 @@ export class LadybugGraphStore extends GraphStore {
     for (const document of documents) {
       const text =
         `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
-      if (!terms.some((term) => text.includes(term))) continue
+      const nativeScore = countContentTokenHits(text, query.expandedTokens)
+      if (nativeScore === 0) continue
       if (options.workspace && document.workspace !== options.workspace) continue
       if (options.excludeWorkspaces?.includes(document.workspace)) continue
       if (options.excludePaths && options.excludePaths.length > 0) {
@@ -1568,12 +1644,21 @@ export class LadybugGraphStore extends GraphStore {
         if (excluded) continue
       }
 
-      const score =
-        1 +
-        (document.path.toLowerCase() === rawQuery ? 1_000_000 : 0) +
-        (document.configRelativePath.toLowerCase() === rawQuery ? 1_000 : 0)
+      const score = composeIdentitySearchScore(
+        rankIdentityMatch({
+          normalizedQuery: query.normalizedQuery,
+          rawTokens: query.rawTokens,
+          expandedTokens: query.expandedTokens,
+          canonicalIdentity: document.path,
+          alternateIdentity: document.configRelativePath,
+          nativeScore,
+        }),
+      )
 
-      const { snippet, startLine, endLine } = this.extractMatchSnippet(document.content, terms)
+      const { snippet, startLine, endLine } = this.extractMatchSnippet(document.content, [
+        ...query.rawTokens,
+        ...query.expandedTokens,
+      ])
       results.push({
         document,
         score,
@@ -1930,13 +2015,186 @@ export class LadybugGraphStore extends GraphStore {
 /**
  * Sanitizes a search query for Ladybug FTS.
  * Splits by whitespace, wraps tokens in double quotes, and joins with OR.
- * @param query - Raw user search input.
+ * @param rawQuery - Raw user search input.
  * @returns Sanitized query string for discovery mode.
  */
-function sanitizeFtsQuery(query: string): string {
-  const trimmed = query.trim()
-  if (trimmed.length === 0) return ''
-  const tokens = trimmed.split(/\s+/).filter((t) => t.length > 0)
+function prepareExpandedSearchQuery(rawQuery: string): ExpandedIdentitySearchQuery {
+  const query = expandSearchQuery(rawQuery)
+  return {
+    ...query,
+    ftsQuery: sanitizeFtsQuery(query.expandedTokens),
+  }
+}
+
+/**
+ * Normalizes raw string or token-array query input into non-empty tokens.
+ * @param query - Raw query text or expanded token list.
+ * @returns Lower-level FTS tokens with blanks removed.
+ */
+function normalizeSearchTokens(query: string | readonly string[]): readonly string[] {
+  if (typeof query !== 'string') {
+    const tokens: string[] = []
+    for (const token of query) {
+      if (token.trim().length > 0) {
+        tokens.push(token)
+      }
+    }
+    return tokens
+  }
+
+  const normalized = query.trim()
+  if (normalized.length === 0) {
+    return []
+  }
+  return normalized.split(/\s+/)
+}
+
+/**
+ * Sanitizes query tokens for Ladybug FTS `OR` matching.
+ * @param query - Raw query text or expanded token list.
+ * @returns Quoted FTS query string.
+ */
+function sanitizeFtsQuery(query: string | readonly string[]): string {
+  const tokens = normalizeSearchTokens(query)
   if (tokens.length === 0) return ''
   return tokens.map((token) => '"' + token.replaceAll('"', '""') + '"').join(' OR ')
+}
+
+/**
+ * Composes a sortable numeric score from identity-ranking dimensions.
+ * @param ranking - Ranking factors for one result candidate.
+ * @returns Combined score where identity dominates native relevance.
+ */
+function composeIdentitySearchScore(ranking: IdentityRanking): number {
+  return (
+    ranking.tier * 1_000_000 +
+    ranking.tokenHits * 10_000 +
+    ranking.matchStrength * 100 +
+    ranking.nativeScore
+  )
+}
+
+/**
+ * Ranks a result candidate by canonical and alternate identity strength.
+ * @param input - Identity-ranking inputs for one candidate.
+ * @returns The candidate's ranking factors.
+ */
+function rankIdentityMatch(input: IdentityRankingInput): IdentityRanking {
+  const canonical = input.canonicalIdentity.toLowerCase()
+  const alternate = input.alternateIdentity?.toLowerCase()
+
+  let tier = 1
+  if (canonical === input.normalizedQuery) {
+    tier = 5
+  } else if (alternate === input.normalizedQuery) {
+    tier = 4
+  } else if (
+    input.rawTokens.length === 1 &&
+    (canonical.startsWith(input.normalizedQuery) ||
+      alternate?.startsWith(input.normalizedQuery) === true)
+  ) {
+    tier = 3
+  }
+
+  let tokenHits = 0
+  let matchStrength = 0
+  for (const token of input.expandedTokens) {
+    const tokenStrength = Math.max(
+      strongestTokenMatch(token, canonical),
+      alternate === undefined ? 0 : strongestTokenMatch(token, alternate),
+    )
+    if (tokenStrength > 0) {
+      tokenHits++
+      matchStrength += tokenStrength
+      if (tier < 2) {
+        tier = 2
+      }
+    }
+  }
+
+  return {
+    tier,
+    tokenHits,
+    matchStrength,
+    nativeScore: input.nativeScore,
+  }
+}
+
+/**
+ * Returns the strongest match tier for one token against one identity string.
+ * @param token - Normalized search token.
+ * @param identity - Normalized candidate identity.
+ * @returns Match strength score from 0 to 40.
+ */
+function strongestTokenMatch(token: string, identity: string): number {
+  if (identity === token) {
+    return 40
+  }
+  if (identity.startsWith(token)) {
+    return 30
+  }
+  if (identity.endsWith(token)) {
+    return 20
+  }
+
+  const components = splitIdentityComponents(identity)
+  if (components.includes(token)) {
+    return 15
+  }
+
+  if (identity.includes(token)) {
+    return 10
+  }
+
+  return 0
+}
+
+/**
+ * Splits an identity into searchable structural components.
+ * @param identity - Normalized identity string.
+ * @returns Non-empty identity components.
+ */
+function splitIdentityComponents(identity: string): string[] {
+  return identity
+    .split(/[:/_.-]+/)
+    .map((component) => component.trim())
+    .filter((component) => component.length > 0)
+}
+
+/**
+ * Counts how many normalized query tokens appear in generic content text.
+ * @param text - Lower-cased content text to inspect.
+ * @param tokens - Normalized query tokens.
+ * @returns Number of matched tokens.
+ */
+function countContentTokenHits(text: string, tokens: readonly string[]): number {
+  let hits = 0
+  for (const token of tokens) {
+    if (text.includes(token)) {
+      hits++
+    }
+  }
+  return hits
+}
+
+/**
+ * Checks whether any expanded token matches either identity string.
+ * @param tokens - Expanded normalized query tokens.
+ * @param canonicalIdentity - Primary identity for the candidate.
+ * @param alternateIdentity - Optional secondary identity for the candidate.
+ * @returns `true` when at least one token matches an identity field.
+ */
+function matchesExpandedIdentity(
+  tokens: readonly string[],
+  canonicalIdentity: string,
+  alternateIdentity?: string,
+): boolean {
+  const canonical = canonicalIdentity.toLowerCase()
+  const alternate = alternateIdentity?.toLowerCase()
+  return tokens.some((token) => {
+    return (
+      strongestTokenMatch(token, canonical) > 0 ||
+      (alternate !== undefined && strongestTokenMatch(token, alternate) > 0)
+    )
+  })
 }

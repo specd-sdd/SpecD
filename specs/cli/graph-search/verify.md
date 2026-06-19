@@ -45,60 +45,67 @@
 - **THEN** the command successfully executes
 - **AND** it passes the document category filter to the graph provider
 
+#### Scenario: Identity-oriented partial query still prefers the intended result
+
+- **GIVEN** a spec with canonical identity `default:_global/architecture`
+- **AND** other specs contain the word `architecture` more times in their body content
+- **WHEN** `specd graph search "architecture" --specs` is run
+- **THEN** the identity-oriented target ranks ahead of results whose match is body-content frequency only
+
 ### Requirement: Search behaviour
 
 #### Scenario: Results ranked by relevance
 
 - **GIVEN** specs `hook-execution-model` (contains `hook execution` many times) and `architecture` (contains `hook` once)
-- **WHEN** `specd graph search \"hook execution\"` is run
+- **WHEN** `specd graph search "hook execution"` is run
 - **THEN** `hook-execution-model` appears before `architecture`
 - **AND** the higher-ranked result has the stronger relevance score
 
 #### Scenario: Search matches symbol comments
 
 - **GIVEN** a symbol with comment containing `executing the workflow hook`
-- **WHEN** `specd graph search \"execution\"` is run
+- **WHEN** `specd graph search "execution"` is run
 - **THEN** the symbol may be returned by the active backend's search implementation
 
 #### Scenario: Multi-word query matches across fields
 
 - **GIVEN** a spec with title `Workspace Integration` and content containing `import resolution`
-- **WHEN** `specd graph search \"workspace import\"` is run
+- **WHEN** `specd graph search "workspace import"` is run
 - **THEN** the spec is returned
 
 #### Scenario: No results
 
-- **WHEN** `specd graph search \"xyznonexistent\"` is run
+- **WHEN** `specd graph search "xyznonexistent"` is run
 - **THEN** `No results found.` is output
 
 #### Scenario: Missing config falls back to bootstrap mode
 
 - **GIVEN** no `specd.yaml` is found by autodiscovery
-- **WHEN** `specd graph search \"kernel\"` is run inside a repository
+- **WHEN** `specd graph search "kernel"` is run inside a repository
 - **THEN** the command searches in bootstrap mode against the resolved VCS root as workspace `default`
 
 #### Scenario: Multiple kinds are passed through to the query layer
 
-- **WHEN** `specd graph search \"transition\" --kind class,method,function` is run
+- **WHEN** `specd graph search "transition" --kind class,method,function` is run
 - **THEN** the command trims and validates all three kind tokens
 - **AND** the provider receives the full kind list rather than only the last token
 
 #### Scenario: Invalid kind token fails before query execution
 
-- **WHEN** `specd graph search \"transition\" --kind method,unknownKind\"` is run
+- **WHEN** `specd graph search "transition" --kind method,unknownKind"` is run
 - **THEN** the command exits with code 1
 - **AND** the search query is not executed
 
 #### Scenario: Search fails fast while indexing lock is present
 
 - **GIVEN** a `graph index` process currently holds the shared graph indexing lock
-- **WHEN** `specd graph search \"kernel\"` is run
+- **WHEN** `specd graph search "kernel"` is run
 - **THEN** the command exits with code 3 before opening the provider
 - **AND** it prints a short retry-later message explaining that the graph is currently being indexed
 
 #### Scenario: Search delegates document queries to the provider
 
-- **WHEN** `specd graph search \"Change\" --documents` is run
+- **WHEN** `specd graph search "Change" --documents` is run
 - **THEN** the command delegates to `CodeGraphProvider.searchDocuments`
 - **AND** it does not implement document ranking or matching logic in the CLI
 
@@ -128,6 +135,70 @@
 - **WHEN** a search result is returned in `json` or `toon` mode
 - **THEN** the entry includes `startLine` and `endLine` fields
 - **AND** the values represent the 1-based line range of the snippet in the source content
+
+#### Scenario: Spec-id segment outranks body-only hits
+
+- **GIVEN** a spec with identity `default:_global/architecture`
+- **AND** another spec contains the word `architecture` more times in its body content
+- **WHEN** `specd graph search "architecture" --specs` is run
+- **THEN** `default:_global/architecture` ranks ahead of the body-only hit
+
+#### Scenario: Symbol declared name outranks comment-only hit
+
+- **GIVEN** one symbol is named `SearchSpecs`
+- **AND** another symbol mentions `search specs` only in its comment text
+- **WHEN** `specd graph search "SearchSpecs" --symbols` is run
+- **THEN** the declared-name hit ranks ahead of the comment-only hit
+
+#### Scenario: Document path component outranks body-only hit
+
+- **GIVEN** one document path contains `graph-search`
+- **AND** another document mentions `graph search` only in its body text
+- **WHEN** `specd graph search "graph-search" --documents` is run
+- **THEN** the path-identity hit ranks ahead of the body-only hit
+
+#### Scenario: Search expands specd-shaped query tokens before identity-aware ranking
+
+- **GIVEN** a spec with identity `core:change`
+- **AND** another spec mentions `core change` only in body content
+- **WHEN** `specd graph search "core:change" --specs` is run
+- **THEN** the backend may use tokens including `core:change`, `core`, and `change`
+- **AND** the spec-id hit ranks ahead of the body-only hit
+
+#### Scenario: Search expands CamelCase query tokens before identity-aware ranking
+
+- **GIVEN** a symbol named `ArchiveChange`
+- **AND** another symbol mentions `archive change` only in comment text
+- **WHEN** `specd graph search "ArchiveChange" --symbols` is run
+- **THEN** the declared-name hit ranks ahead of the comment-only hit
+
+#### Scenario: Exact token identity match outranks prefix token match in rendered results
+
+- **GIVEN** one visible result matches token `change` exactly in identity
+- **AND** another visible result matches `change` only by prefix in identity
+- **WHEN** `specd graph search "change"` is run
+- **THEN** the exact-token hit is shown before the prefix-only hit
+
+#### Scenario: Prefix token identity match outranks suffix token match in rendered results
+
+- **GIVEN** one visible result matches token `repo` by prefix in identity
+- **AND** another visible result matches `repo` only by suffix in identity
+- **WHEN** `specd graph search "repo"` is run
+- **THEN** the prefix-token hit is shown before the suffix-only hit
+
+#### Scenario: Suffix token identity match outranks arbitrary substring token match in rendered results
+
+- **GIVEN** one visible result matches token `repository` by suffix in identity
+- **AND** another visible result matches `repository` only as an arbitrary identity substring
+- **WHEN** `specd graph search "repository"` is run
+- **THEN** the suffix-token hit is shown before the arbitrary-substring hit
+
+#### Scenario: Real identity component outranks arbitrary substring in rendered results
+
+- **GIVEN** one visible result has identity component `core`
+- **AND** another visible result contains substring `core` only inside a larger token such as `score`
+- **WHEN** `specd graph search "core"` is run
+- **THEN** the real identity-component hit is shown before the arbitrary-substring hit
 
 ### Requirement: Error cases
 

@@ -5,9 +5,11 @@ import { tmpdir } from 'node:os'
 import { LadybugGraphStore } from '../../../src/infrastructure/ladybug/ladybug-graph-store.js'
 import { SCHEMA_DDL, SCHEMA_VERSION } from '../../../src/infrastructure/ladybug/schema.js'
 import { graphStoreContractTests } from '../../domain/ports/graph-store.contract.js'
+import { createDocumentNode } from '../../../src/domain/value-objects/document-node.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
 import { createRelation } from '../../../src/domain/value-objects/relation.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 
@@ -189,5 +191,150 @@ describe('LadybugGraphStore hierarchy persistence', () => {
     await store.recreate()
 
     expect(existsSync(join(tempDir, 'graph'))).toBe(false)
+  })
+
+  it('expands specd/code-shaped queries before reranking Ladybug results', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+
+    const file = createFileNode({
+      path: 'core:src/archive.ts',
+      configRelativePath: 'packages/core/src/archive.ts',
+      language: 'typescript',
+      contentHash: 'sha256:archive',
+      workspace: 'core',
+      content: ['export function ArchiveChange() {}', 'export function fallback() {}'].join('\n'),
+    })
+    const declared = createSymbolNode({
+      name: 'ArchiveChange',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const commentOnly = createSymbolNode({
+      name: 'Fallback',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 2,
+      column: 0,
+      comment: 'Archive Change fallback handler',
+    })
+    const strongSpec = createSpecNode({
+      specId: 'core:change',
+      path: 'change',
+      title: 'Change',
+      description: 'Strong spec id match',
+      contentHash: 'sha256:spec-strong',
+      content: 'Change orchestration',
+      workspace: 'core',
+    })
+    const weakSpec = createSpecNode({
+      specId: 'core:scorekeeper',
+      path: 'scorekeeper',
+      title: 'Scorekeeper',
+      description: 'Contains core:change only in content',
+      contentHash: 'sha256:spec-weak',
+      content: 'core:change core:change core:change',
+      workspace: 'core',
+    })
+    const strongDocument = createDocumentNode({
+      path: 'core:docs/architecture.md',
+      configRelativePath: 'docs/architecture.md',
+      contentHash: 'sha256:doc-strong',
+      content: 'Architecture document',
+      workspace: 'core',
+    })
+    const weakDocument = createDocumentNode({
+      path: 'core:docs/notes.md',
+      configRelativePath: 'docs/notes.md',
+      contentHash: 'sha256:doc-weak',
+      content: 'docs/architecture.md docs/architecture.md docs/architecture.md',
+      workspace: 'core',
+    })
+
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    await store.bulkLoad({
+      files: [file],
+      documents: [strongDocument, weakDocument],
+      symbols: [declared, commentOnly],
+      specs: [strongSpec, weakSpec],
+      relations: [],
+    })
+
+    const symbolHits = await store.searchSymbols({ query: 'ArchiveChange' })
+    const specHits = await store.searchSpecs({ query: 'core:change' })
+    const documentHits = await store.searchDocuments({ query: 'docs/architecture.md' })
+
+    expect(symbolHits[0]?.symbol.id).toBe(declared.id)
+    expect(specHits[0]?.spec.specId).toBe(strongSpec.specId)
+    expect(documentHits[0]?.document.path).toBe(strongDocument.path)
+
+    await store.close()
+  })
+
+  it('keeps exact-prefix-suffix-substring ordering for Ladybug symbol reranking', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+
+    const file = createFileNode({
+      path: 'core:src/repository.ts',
+      configRelativePath: 'packages/core/src/repository.ts',
+      language: 'typescript',
+      contentHash: 'sha256:token-order',
+      workspace: 'core',
+      content: [
+        'export function change() {}',
+        'export function changeLog() {}',
+        'export function prechange() {}',
+        'export function exchangeRate() {}',
+      ].join('\n'),
+    })
+    const exact = createSymbolNode({
+      name: 'change',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const prefix = createSymbolNode({
+      name: 'changeLog',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 2,
+      column: 0,
+    })
+    const suffix = createSymbolNode({
+      name: 'prechange',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 3,
+      column: 0,
+    })
+    const substring = createSymbolNode({
+      name: 'exchangeRate',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 4,
+      column: 0,
+    })
+
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    await store.bulkLoad({
+      files: [file],
+      symbols: [exact, prefix, suffix, substring],
+      specs: [],
+      relations: [],
+    })
+
+    const hits = await store.searchSymbols({ query: 'change' })
+    expect(hits.slice(0, 4).map((hit) => hit.symbol.id)).toEqual([
+      exact.id,
+      prefix.id,
+      suffix.id,
+      substring.id,
+    ])
+
+    await store.close()
   })
 })

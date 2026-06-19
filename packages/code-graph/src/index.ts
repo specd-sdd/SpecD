@@ -76,6 +76,7 @@ export {
 
 // Domain services
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
+export { expandSearchQuery, expandSearchToken } from './domain/services/expand-search-query.js'
 export {
   computeGraphFingerprint,
   computeRootFingerprint,

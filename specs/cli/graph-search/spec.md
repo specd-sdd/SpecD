@@ -35,7 +35,7 @@ All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-wor
 
 `--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
 
-Search ranking MUST prioritize **exact matches** on primary identities (Spec IDs, Symbol Names, Document Paths) at the top of the result set, regardless of generic relevance scores.
+Search ranking MUST prioritize primary identities at the top of the result set ahead of generic content-only matches. Exact canonical identity matches remain the strongest signal, but strong non-exact identity-oriented matches such as token-aware primary-name equality, identity-prefix matches, identity-suffix matches, identity-substring matches, and identity-segment/path-component matches MUST also outrank results that match only through generic body, comment, or document-content relevance.
 
 ### Requirement: Search behaviour
 
@@ -47,7 +47,24 @@ It delegates to:
 - `provider.searchSpecs(options)` — search across spec title, description, and content
 - `provider.searchDocuments(options)` — search across document paths and textual content
 
-The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with exact identity matches boosted to the top.
+The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with primary-identity matches boosted ahead of generic content-only hits. Broad retrieval across backend-searchable fields remains in place; identity-aware logic changes ranking, not category coverage.
+
+Backends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking. That expansion MUST preserve the normalized original token and MUST additionally expand useful specd/code shapes such as:
+
+- `core:change` into tokens including `core:change`, `core`, and `change`
+- `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`
+
+Observable ranking semantics MUST hold across backends:
+
+- exact canonical identity matches MUST rank ahead of every non-exact result in the same category
+- exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits
+- exact token identity matches MUST rank ahead of prefix token matches
+- prefix token matches MUST rank ahead of suffix token matches
+- suffix token matches MUST rank ahead of arbitrary substring token matches
+- real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field
+- candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
+- prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content
+- symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent
 
 Search results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content.
 

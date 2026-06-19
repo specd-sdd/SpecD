@@ -11,12 +11,11 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/ladybug/schema.ts",
-      "symbols": ["SCHEMA_VERSION", "SCHEMA_DDL"]
+      "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "symbols": ["LadybugGraphStore", "searchSymbols", "searchSpecs", "searchDocuments"]
     },
     {
-      "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
-      "symbols": ["LadybugGraphStore"]
+      "file": "code-graph:test/infrastructure/ladybug/ladybug-graph-store.spec.ts"
     }
   ]
 }

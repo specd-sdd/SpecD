@@ -1,0 +1,82 @@
+- op: modified
+  description: Strengthen CLI-observable ranking semantics to token-aware primary-identity preference while preserving broad discovery.
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```text
+    specd graph search <query> [--symbols] [--specs] [--documents] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
+    - `--symbols` — optional; search only symbols
+    - `--specs` — optional; search only specs
+    - `--documents` — optional; search only textual non-code resources
+    - `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`
+    - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
+    - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
+    - `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)
+    - `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace
+    - `--limit <n>` — optional; maximum results per category, defaults to `10`
+    - `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format
+    - `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
+    - `--path <path>` — optional; repo-root bootstrap mode
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    `--config` and `--path` are mutually exclusive.
+
+    When no category flags (`--symbols`, `--specs`, `--documents`) are provided, all categories are searched.
+
+    All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.
+
+    `--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
+
+    Search ranking MUST prioritize primary identities at the top of the result set ahead of generic content-only matches. Exact canonical identity matches remain the strongest signal, but strong non-exact identity-oriented matches such as token-aware primary-name equality, identity-prefix matches, identity-suffix matches, identity-substring matches, and identity-segment/path-component matches MUST also outrank results that match only through generic body, comment, or document-content relevance.
+- op: modified
+  description: Clarify token-aware search behavior for exact and non-exact identity-oriented ranking.
+  selector:
+    type: section
+    matches: '^Requirement: Search behaviour$'
+  content: |
+    The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.
+
+    It delegates to:
+
+    - `provider.searchSymbols(options)` — search across symbol search text and symbol comments
+    - `provider.searchSpecs(options)` — search across spec title, description, and content
+    - `provider.searchDocuments(options)` — search across document paths and textual content
+
+    The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with primary-identity matches boosted ahead of generic content-only hits. Broad retrieval across backend-searchable fields remains in place; identity-aware logic changes ranking, not category coverage.
+
+    Backends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking. That expansion MUST preserve the normalized original token and MUST additionally expand useful specd/code shapes such as:
+
+    - `core:change` into tokens including `core:change`, `core`, and `change`
+    - `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`
+
+    Observable ranking semantics MUST hold across backends:
+
+    - exact canonical identity matches MUST rank ahead of every non-exact result in the same category
+    - exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits
+    - exact token identity matches MUST rank ahead of prefix token matches
+    - prefix token matches MUST rank ahead of suffix token matches
+    - suffix token matches MUST rank ahead of arbitrary substring token matches
+    - real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field
+    - candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
+    - prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content
+    - symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent
+
+    Search results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content.
+
+    Preview sources SHALL follow these rules:
+
+    - symbol previews SHALL be derived from persisted source-file content addressed through the symbol's file path and line location
+    - spec previews SHALL be derived from matched spec content when available, falling back to description context only when no better body excerpt is available
+    - document previews SHALL be derived from matched document content rather than from the beginning of the document
+
+    A symbol hit MAY be ranked because of symbol identity or attached comment text, but the preferred preview SHALL still be a code snippet around the symbol location unless no useful source snippet can be produced.
+
+    The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
+
+    The validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.
+
+    Before attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors.

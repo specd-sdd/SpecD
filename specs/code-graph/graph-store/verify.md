@@ -143,7 +143,7 @@
 - **WHEN** `removeSpec('core:config')` is called
 - **THEN** the `SpecNode` and all `DEPENDS_ON` relations where it appears as source or target are removed
 
-### Requirement: Search with exact-match prioritization
+### Requirement: Search with primary-identity prioritization
 
 #### Scenario: Symbol search matches normalized compound names
 
@@ -208,6 +208,79 @@
 - **WHEN** consumers use the abstract search contract
 - **THEN** the contract exposes search across symbols, specs, and documents only
 - **AND** no separate file full-text search category is implied by persisted file content
+
+#### Scenario: Spec-id segment outranks content-only hit
+
+- **GIVEN** a spec with ID `default:_global/architecture`
+- **AND** another spec contains `architecture` repeatedly only in its body content
+- **WHEN** `searchSpecs({ query: 'architecture' })` is executed
+- **THEN** the spec-id hit appears ahead of the content-only hit
+
+#### Scenario: Symbol declared name outranks comment-only hit
+
+- **GIVEN** a symbol whose declared name is `SearchSpecs`
+- **AND** another symbol contains `search specs` only in its comment text
+- **WHEN** `searchSymbols({ query: 'SearchSpecs' })` is executed
+- **THEN** the declared-name hit appears ahead of the comment-only hit
+
+#### Scenario: Document path component outranks body-only hit
+
+- **GIVEN** a document whose canonical path contains `graph-search`
+- **AND** another document contains `graph search` only in its body content
+- **WHEN** `searchDocuments({ query: 'graph-search' })` is executed
+- **THEN** the path-identity hit appears ahead of the body-only hit
+
+#### Scenario: Search expands specd-shaped tokens before identity ranking
+
+- **GIVEN** a spec with ID `core:change`
+- **AND** another spec mentions `core change` only in body content
+- **WHEN** `searchSpecs({ query: 'core:change' })` is executed
+- **THEN** the backend may use tokens including `core:change`, `core`, and `change`
+- **AND** the spec-id hit appears ahead of the body-only hit
+
+#### Scenario: Strong identity hit may be discovered outside backend-native FTS tokenization
+
+- **GIVEN** a backend whose native tokenizer does not surface every suffix or substring identity hit through its default full-text candidate set
+- **AND** one candidate still has the strongest observable identity evidence required by this contract
+- **WHEN** `searchSymbols(...)`, `searchSpecs(...)`, or `searchDocuments(...)` is executed
+- **THEN** that strong identity hit is still returned
+- **AND** it is ordered according to the required identity-strength ladder rather than being dropped for lack of native tokenizer coverage
+
+#### Scenario: Search expands CamelCase tokens before identity ranking
+
+- **GIVEN** a symbol named `ArchiveChange`
+- **AND** another symbol contains `archive change` only in comment text
+- **WHEN** `searchSymbols({ query: 'ArchiveChange' })` is executed
+- **THEN** the backend may use tokens including `archivechange`, `archive`, and `change`
+- **AND** the declared-name hit appears ahead of the comment-only hit
+
+#### Scenario: Exact token match outranks prefix token match
+
+- **GIVEN** one candidate identity matches token `change` exactly
+- **AND** another candidate identity matches `change` only by prefix
+- **WHEN** `searchSymbols({ query: 'change' })` is executed
+- **THEN** the exact-token hit appears ahead of the prefix-only hit
+
+#### Scenario: Prefix token match outranks suffix token match
+
+- **GIVEN** one candidate identity matches token `repo` by prefix
+- **AND** another candidate identity matches `repo` only by suffix
+- **WHEN** `searchSymbols({ query: 'repo' })` is executed
+- **THEN** the prefix-token hit appears ahead of the suffix-only hit
+
+#### Scenario: Suffix token match outranks arbitrary substring token match
+
+- **GIVEN** one candidate identity matches token `repository` by suffix
+- **AND** another candidate identity matches `repository` only as an arbitrary substring
+- **WHEN** `searchDocuments({ query: 'repository' })` is executed
+- **THEN** the suffix-token hit appears ahead of the arbitrary-substring hit
+
+#### Scenario: Real identity component outranks arbitrary substring match
+
+- **GIVEN** one spec ID is `core:change`
+- **AND** another spec ID contains substring `core` only inside a larger token such as `score`
+- **WHEN** `searchSpecs({ query: 'core' })` is executed
+- **THEN** the real component match appears ahead of the arbitrary-substring hit
 
 ### Requirement: Query methods
 
