@@ -45,4 +45,16 @@ describe('normalizeSnippet', () => {
     const result = normalizeSnippet(raw)
     expect(result).toBe('line 1\nline 2')
   })
+
+  it('strips ansi escape sequences before rendering', () => {
+    const raw = '\u001B[31m  red text\u001B[0m'
+    const result = normalizeSnippet(raw)
+    expect(result).toBe('red text')
+  })
+
+  it('strips non-printable control characters but preserves newline and tab semantics', () => {
+    const raw = '  hello\u0007\n\tworld\u0000'
+    const result = normalizeSnippet(raw, { tabWidth: 2 })
+    expect(result).toBe('hello\nworld')
+  })
 })

@@ -489,7 +489,12 @@ fresh graph.
 specd graph search "<query>" --format toon
 specd graph search "<query>" --symbols --kind function --format toon
 specd graph search "<query>" --specs --spec-content --format toon
+specd graph search "<query>" --documents --snippet --format toon
 ```
+
+`specd graph search` returns compact identity and location metadata by default.
+Add `--snippet` only when the workflow needs preview text. In `json` and `toon`,
+the `snippet` field is omitted unless `--snippet` is passed.
 
 **Impact analysis** — understand blast radius before making changes:
 

@@ -15,19 +15,19 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```text\nspecd graph search <query> [--symbols] [--specs] [--documents] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)\n- `--symbols` — optional; search only symbols\n- `--specs` — optional; search only specs\n- `--documents` — optional; search only textual non-code resources\n- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`\n- `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)\n- `--workspace <name>` — optional; filter both symbols and specs to a single workspace\n- `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)\n- `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace\n- `--limit <n>` — optional; maximum results per category, defaults to `10`\n- `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\nWhen no category flags (`--symbols`, `--specs`, `--documents`) are provided, all categories are searched.\n\nAll filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.\n\nSearch ranking MUST prioritize primary identities at the top of the result set ahead of generic content-only matches. Exact canonical identity matches remain the strongest signal, but strong non-exact identity-oriented matches such as token-aware primary-name equality, identity-prefix matches, identity-suffix matches, identity-substring matches, and identity-segment/path-component matches MUST also outrank results that match only through generic body, comment, or document-content relevance."
+        "```text\nspecd graph search <query> [--symbols] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]\n```\n\n- `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)\n- `--symbols` — optional; search only symbols\n- `--specs` — optional; search only specs\n- `--documents` — optional; search only textual non-code resources\n- `--snippet` — optional; include snippet previews in command output. In `text` mode it enables snippet blocks; in `json` and `toon` it enables the `snippet` field\n- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`\n- `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)\n- `--workspace <name>` — optional; filter both symbols and specs to a single workspace\n- `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)\n- `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace\n- `--limit <n>` — optional; maximum results per category, defaults to `10`\n- `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format\n- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning\n- `--path <path>` — optional; repo-root bootstrap mode\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\n`--config` and `--path` are mutually exclusive.\n\nWhen no category flags (`--symbols`, `--specs`, `--documents`) are provided, all categories are searched.\n\nAll filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.\n\n`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.\n\nSearch ranking MUST prioritize primary identities at the top of the result set ahead of generic content-only matches. Exact canonical identity matches remain the strongest signal, but strong non-exact identity-oriented matches such as token-aware primary-name equality, identity-prefix matches, identity-suffix matches, identity-substring matches, and identity-segment/path-component matches MUST also outrank results that match only through generic body, comment, or document-content relevance."
       ]
     },
     {
       "requirement": "Search behaviour",
       "rules": [
-        "The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — search across symbol search text and symbol comments\n- `provider.searchSpecs(options)` — search across spec title, description, and content\n- `provider.searchDocuments(options)` — search across document paths and textual content\n\nThe concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with primary-identity matches boosted ahead of generic content-only hits. Broad retrieval across backend-searchable fields remains in place; identity-aware logic changes ranking, not category coverage.\n\nBackends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking. That expansion MUST preserve the normalized original token and MUST additionally expand useful specd/code shapes such as:\n\n- `core:change` into tokens including `core:change`, `core`, and `change`\n- `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`\n\nObservable ranking semantics MUST hold across backends:\n\n- exact canonical identity matches MUST rank ahead of every non-exact result in the same category\n- exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits\n- exact token identity matches MUST rank ahead of prefix token matches\n- prefix token matches MUST rank ahead of suffix token matches\n- suffix token matches MUST rank ahead of arbitrary substring token matches\n- real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field\n- candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing\n- prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content\n- symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent\n\nSearch results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content.\n\nPreview sources SHALL follow these rules:\n\n- symbol previews SHALL be derived from persisted source-file content addressed through the symbol's file path and line location\n- spec previews SHALL be derived from matched spec content when available, falling back to description context only when no better body excerpt is available\n- document previews SHALL be derived from matched document content rather than from the beginning of the document\n\nA symbol hit MAY be ranked because of symbol identity or attached comment text, but the preferred preview SHALL still be a code snippet around the symbol location unless no useful source snippet can be produced.\n\nThe `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.\n\nThe validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.\n\nBefore attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors."
+        "The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — search across symbol search text and symbol comments\n- `provider.searchSpecs(options)` — search across spec title, description, and content\n- `provider.searchDocuments(options)` — search across document paths and textual content\n\nThe concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with primary-identity matches boosted ahead of generic content-only hits. Broad retrieval across backend-searchable fields remains in place; identity-aware logic changes ranking, not category coverage.\n\nBackends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking. That expansion MUST preserve the normalized original token and MUST additionally expand useful specd/code shapes such as:\n\n- `core:change` into tokens including `core:change`, `core`, and `change`\n- `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`\n\nObservable ranking semantics MUST hold across backends:\n\n- exact canonical identity matches MUST rank ahead of every non-exact result in the same category\n- exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits\n- exact token identity matches MUST rank ahead of prefix token matches\n- prefix token matches MUST rank ahead of suffix token matches\n- suffix token matches MUST rank ahead of arbitrary substring token matches\n- real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field\n- candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing\n- prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content\n- symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent\n\nSearch results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content, even when text-mode snippet rendering is not requested.\n\nPreview sources SHALL follow these rules:\n\n- symbol previews SHALL be derived from persisted source-file content addressed through the symbol's file path and line location\n- spec previews SHALL be derived from matched spec content when available, falling back to description context only when no better body excerpt is available\n- document previews SHALL be derived from matched document content rather than from the beginning of the document\n\nA symbol hit MAY be ranked because of symbol identity or attached comment text, but the preferred preview SHALL still be a code snippet around the symbol location unless no useful source snippet can be produced.\n\nThe `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.\n\nThe validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.\n\nBefore attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode, results are grouped by category.\n\nText mode SHALL include a category header for each category that has results. The header SHALL make the active result limit explicit.\n\nFormat: `<Category> (<N> shown, limit <limit>):`\nExample: `Symbols (10 shown, limit 10):`\n\nEach result SHALL render as a compact identity block:\n\n- the first line identifies the result entry (`[workspace]`, symbol/spec/document identity, and kind when applicable)\n- a second line MAY show location context such as `workspace`-relative file path and line number for symbols\n- preview content SHALL render in a separate snippet block preceded by a line range indicator\n\nFormat: `snippet @ L<startLine>-L<endLine>:`\nExample: `snippet @ L10-L15:`\n\nTo avoid collision with markdown formatting in the source text, snippets SHALL be wrapped in custom markers: `>>>` for the start and `<<<` for the end.\n\nText-mode symbol snippets SHALL use line-oriented source context around the matched symbol location:\n\n- include the matched line and a small window around it, with a baseline of 2-3 non-blank lines above and 2-3 non-blank lines below\n- blank lines do not count toward the context budget\n- preserve the original line order\n- expand tabs to spaces using tab width 2 before indentation normalization\n- compute the smallest common leading indentation across non-blank snippet lines\n- remove that common leading indentation from every snippet line before rendering\n- apply a fixed outer indent when rendering the snippet block\n\nText-mode spec and document snippets SHALL also be match-centered and rendered in a separate `snippet @ L<start>-L<end>:` block with `>>>` and `<<<` markers. They do not require code-specific indentation normalization beyond preserving readable literal text.\n\nText mode SHALL avoid misleading fixed-field truncation and SHALL NOT rely on raw boosted score magnitudes as the primary readability cue for exact matches.\n\nWhen no results are found, output `No results found.`\n\nIn `json` or `toon` mode, output remains category-grouped as `{ symbols: [...], specs: [...], documents: [...] }`. Each entry SHALL include `workspace`, `score`, `snippet`, `startLine`, and `endLine`.\n\nStructured output details:\n\n- symbol entries include the symbol payload plus `workspace`, `score`, `snippet`, `startLine`, and `endLine`\n- spec entries include `specId`, `path`, `title`, `description`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full spec `content` SHALL be omitted unless `--spec-content` is passed.\n- document entries include `path`, `configRelativePath`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full document `content` SHALL be omitted."
+        "In `text` mode, results are grouped by category.\n\nText mode SHALL include a category header for each category that has results. The header SHALL make the active result limit explicit.\n\nFormat: `<Category> (<N> shown, limit <limit>):`\nExample: `Symbols (10 shown, limit 10):`\n\nEach result SHALL render as a compact identity block:\n\n- the first line identifies the result entry (`[workspace]`, symbol/spec/document identity, and kind when applicable)\n- a second line SHALL show location context for the result\n- preview content SHALL render only when `--snippet` is explicitly passed\n\nDefault compact location context SHALL follow these rules:\n\n- symbol results SHALL show the workspace-relative file path and the symbol line and column\n- spec results SHALL show that the hit came from the spec and SHALL include the match line range derived from `startLine` and `endLine`\n- document results SHALL show the config-relative document path and SHALL include the match line range derived from `startLine` and `endLine`\n\nWhen `--snippet` is passed, preview content SHALL render in a separate snippet block preceded by a line range indicator.\n\nFormat: `snippet @ L<startLine>-L<endLine>:`\nExample: `snippet @ L10-L15:`\n\nTo avoid collision with markdown formatting in the source text, snippets SHALL be wrapped in custom markers: `>>>` for the start and `<<<` for the end.\n\nBefore any snippet is rendered in text mode, the CLI SHALL sanitize terminal-control content. ANSI escape sequences and non-printable control characters other than newline and tab MUST NOT be emitted literally in the rendered snippet block.\n\nText-mode symbol snippets SHALL use line-oriented source context around the matched symbol location:\n\n- include the matched line and a small window around it, with a baseline of 2-3 non-blank lines above and 2-3 non-blank lines below\n- blank lines do not count toward the context budget\n- preserve the original line order\n- expand tabs to spaces using tab width 2 before indentation normalization\n- compute the smallest common leading indentation across non-blank snippet lines\n- remove that common leading indentation from every snippet line before rendering\n- apply a fixed outer indent when rendering the snippet block\n\nText-mode spec and document snippets SHALL also be match-centered and rendered in a separate `snippet @ L<start>-L<end>:` block with `>>>` and `<<<` markers. They do not require code-specific indentation normalization beyond preserving readable literal text.\n\nText mode SHALL avoid misleading fixed-field truncation and SHALL NOT rely on raw boosted score magnitudes as the primary readability cue for exact matches.\n\nWhen no results are found, output `No results found.`\n\nIn `json` or `toon` mode, output remains category-grouped as `{ symbols: [...], specs: [...], documents: [...] }`.\n\nStructured output details:\n\n- symbol entries include the symbol payload plus `workspace`, `score`, `startLine`, and `endLine`\n- spec entries include `specId`, `path`, `title`, `description`, `workspace`, `score`, `startLine`, and `endLine`. Full spec `content` SHALL be omitted unless `--spec-content` is passed.\n- document entries include `path`, `configRelativePath`, `workspace`, `score`, `startLine`, and `endLine`. Full document `content` SHALL be omitted.\n- the `snippet` field SHALL be omitted from `json` and `toon` output unless `--snippet` is passed"
       ]
     },
     {
@@ -98,6 +98,15 @@
       "then": [
         "the command successfully executes",
         "AND it passes the document category filter to the graph provider"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Snippet flag enables preview emission",
+      "when": ["specd graph search \"hook\" --snippet is run"],
+      "then": [
+        "the command includes snippet previews in its output",
+        "AND omitting --snippet keeps previews out of the rendered payload by default"
       ]
     },
     {
@@ -339,6 +348,25 @@
     },
     {
       "requirement": "Output format",
+      "name": "Text output omits snippet blocks by default",
+      "when": ["specd graph search \"hook\" is run in text mode without --snippet"],
+      "then": [
+        "each visible result remains a compact identity block",
+        "AND no snippet block is rendered",
+        "AND location metadata remains visible for each result"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output renders snippets when requested",
+      "when": ["specd graph search \"hook\" --snippet is run in text mode"],
+      "then": [
+        "visible results may include snippet blocks",
+        "AND the location metadata still appears alongside the result identity"
+      ]
+    },
+    {
+      "requirement": "Output format",
       "name": "Category headers show explicit limits in text mode",
       "when": ["specd graph search \\\"hook\\\" --limit 5 is run in text mode"],
       "then": [
@@ -353,10 +381,37 @@
       "then": [
         "output is {\\\"symbols\\\":[...],\\\"specs\\\":[...],\\\"documents\\\":[...]}",
         "AND each entry includes a workspace field and a score field",
-        "AND each entry includes a snippet field",
         "AND each entry includes startLine and endLine fields",
+        "AND no entry includes a snippet field unless --snippet was passed",
         "AND spec entries include specId, path, title, description but NOT content",
         "AND document entries include path, configRelativePath but NOT content"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output includes snippet only when requested",
+      "when": ["specd graph search \"hook\" --format json --snippet is run"],
+      "then": [
+        "visible result entries include a snippet field",
+        "AND the entries still include startLine and endLine"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Toon output omits snippet unless requested",
+      "when": ["specd graph search \"hook\" --format toon is run without --snippet"],
+      "then": [
+        "visible result entries omit the snippet field",
+        "AND the entries still include startLine and endLine"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Toon output includes snippet when requested",
+      "when": ["specd graph search \"hook\" --format toon --snippet is run"],
+      "then": [
+        "visible result entries include a snippet field",
+        "AND the entries still include startLine and endLine"
       ]
     },
     {
@@ -365,7 +420,7 @@
       "when": ["specd graph search \\\"hook\\\" --format json --spec-content is run"],
       "then": [
         "spec entries include a content field with the full spec text",
-        "AND spec entries still include a snippet field"
+        "AND spec entries omit the snippet field unless --snippet is also passed"
       ]
     },
     {
@@ -390,7 +445,7 @@
       "when": ["specd graph search \\\"Change\\\" is run in text mode"],
       "then": [
         "stdout contains a Documents ( section",
-        "AND each document result shows the owning workspace, canonical path, and a fenced snippet block"
+        "AND each document result shows the owning workspace and match location metadata without requiring a snippet block"
       ]
     },
     {
@@ -404,7 +459,7 @@
       "requirement": "Output format",
       "name": "Text-mode symbol snippet uses normalized indentation",
       "given": ["a symbol preview is cut from indented source code"],
-      "when": ["the result is rendered in text mode"],
+      "when": ["the result is rendered in text mode with --snippet"],
       "then": [
         "tabs in the snippet are expanded to spaces using tab width 2 before indentation normalization",
         "AND the smallest common leading indentation across non-blank lines is removed",
@@ -414,11 +469,23 @@
     {
       "requirement": "Output format",
       "name": "Text-mode snippet block uses line range header and custom markers",
-      "when": ["any symbol, spec, or document preview is rendered in text mode"],
+      "when": ["any symbol, spec, or document preview is rendered in text mode with --snippet"],
       "then": [
         "the snippet is preceded by a header matching snippet @ L<start>-L<end>:",
         "AND the snippet is wrapped in >>> and <<< markers",
         "AND no triple-backtick fences are used for the block"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text-mode snippet sanitizes terminal control sequences",
+      "given": [
+        "a matched snippet source contains ANSI escape sequences or other non-printable terminal control characters"
+      ],
+      "when": ["specd graph search renders that preview in text mode with --snippet"],
+      "then": [
+        "the rendered snippet does not emit those control sequences literally",
+        "AND the remaining visible text stays readable"
       ]
     },
     {
@@ -456,16 +523,22 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:graph-search",
-        "file": "cli:test/commands/graph-search.spec.ts"
+        "file": "cli:src/commands/graph/normalize-snippet.ts",
+        "symbol": "normalizeSnippet"
+      },
+      {
+        "specId": "cli:graph-search",
+        "file": "cli:src/commands/graph/search.ts",
+        "symbol": "registerGraphSearch"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8035342ff02c51ed19f9ace29085e4a77e37d3c93d233b6e6d43fc0098ab04b3",
-    "verify.md": "sha256:1d1703585c05df77019ddc3c2abf647205760c8ad232a00d17f3c57c463df557"
+    "spec.md": "sha256:c5a85986ea462c85e9b5e87855e71378ab19ad90184e577749f57badf4dc1535",
+    "verify.md": "sha256:debb09f1586f4b767788fa3010b8aaabf873d821c07f377efeba02c693fe47d0"
   },
   "generatedBy": "core"
 }

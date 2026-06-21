@@ -100,6 +100,23 @@
 - **THEN** they prefer canonical workspace-prefixed paths or config-relative paths
 - **AND** they do not rely on implicit `default:` resolution
 
+### Requirement: Graph search snippet guidance in workflow templates
+
+#### Scenario: Workflow templates do not assume snippet-by-default text output
+
+- **WHEN** workflow skill templates show a `specd graph search` example for ordinary lookup or metadata gathering
+- **THEN** the example does not imply that a visible snippet block is returned by default
+
+#### Scenario: Workflow templates add --snippet when preview text is required
+
+- **WHEN** a workflow skill template instructs an agent to inspect preview text from a graph-search result
+- **THEN** the command example includes `--snippet`
+
+#### Scenario: Workflow templates describe structured snippet output as opt-in
+
+- **WHEN** a workflow skill template references `json` or `toon` graph-search output
+- **THEN** it describes the `snippet` field as omitted unless `--snippet` is passed
+
 ### Requirement: Frontmatter source
 
 #### Scenario: Runtime metadata is sourced from canonical contracts

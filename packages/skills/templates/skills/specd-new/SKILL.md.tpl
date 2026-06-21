@@ -60,10 +60,12 @@ different repository directory.
 
 #### Use code graph for deeper investigation
 
-When the user describes affected areas, use graph search to find related symbols and specs:
+When the user describes affected areas, use graph search to find related symbols and specs.
+Add `--snippet` only when you need preview text; omit it for metadata-only lookup:
 
 ```bash
 specd graph search "<keyword>" --format toon
+specd graph search "<keyword>" --snippet --format toon
 ```
 
 If the user mentions specific files or symbols, check their impact to understand scope:

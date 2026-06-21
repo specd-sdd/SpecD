@@ -37,6 +37,12 @@
       ]
     },
     {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "rules": [
+        "Workflow skill templates that instruct agents to run `specd graph search` SHALL describe snippet previews as opt-in output.\n\nSpecifically:\n\n- templates MUST NOT imply that `specd graph search` always returns visible snippet content by default\n- when a workflow example or instruction depends on reading preview text, the template SHALL include `--snippet`\n- when a workflow only needs identifiers, locations, or structured metadata, templates SHOULD omit `--snippet`\n- workflow guidance that mentions `json` or `toon` output SHALL describe the `snippet` field as omitted unless `--snippet` is passed"
+      ]
+    },
+    {
       "requirement": "Frontmatter source",
       "rules": [
         "Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and value collections MUST reflect those documented contracts exactly.\n\nAgent plugins MUST provide structured frontmatter data under `variables.frontmatter`; they MUST NOT pass prebuilt YAML frontmatter documents for direct insertion."
@@ -207,6 +213,28 @@
       ]
     },
     {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "name": "Workflow templates do not assume snippet-by-default text output",
+      "when": [
+        "workflow skill templates show a specd graph search example for ordinary lookup or metadata gathering"
+      ],
+      "then": ["the example does not imply that a visible snippet block is returned by default"]
+    },
+    {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "name": "Workflow templates add --snippet when preview text is required",
+      "when": [
+        "a workflow skill template instructs an agent to inspect preview text from a graph-search result"
+      ],
+      "then": ["the command example includes --snippet"]
+    },
+    {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "name": "Workflow templates describe structured snippet output as opt-in",
+      "when": ["a workflow skill template references json or toon graph-search output"],
+      "then": ["it describes the snippet field as omitted unless --snippet is passed"]
+    },
+    {
       "requirement": "Frontmatter source",
       "name": "Runtime metadata is sourced from canonical contracts",
       "when": ["plugin frontmatter models are reviewed"],
@@ -274,13 +302,21 @@
     "files": [
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:templates/agents"
+        "file": "skills:templates/shared/shared.md.tpl"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/skills/specd-design/SKILL.md.tpl"
+      },
+      {
+        "specId": "skills:skill-templates-source",
+        "file": "skills:templates/skills/specd-new/SKILL.md.tpl"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b758f0c32eac9c0c3ea88b296ecca13e9f53d0cf2d22840c3a9a211d0ab25484",
-    "verify.md": "sha256:e77b16368abf2b5e76ba3334962a0a75d289b254df8cc57d54cf8c24a191c945"
+    "spec.md": "sha256:887f1c12bdf5c2da82ccc88d91d4c27b8da46697cb34a869b2ecc8544cb20b00",
+    "verify.md": "sha256:61b6a6de6ba232461b9645e9a4c995741a91f977571c8f19818f6591c1513249"
   },
   "generatedBy": "core"
 }

@@ -86,6 +86,17 @@ Workflow skill templates that instruct agents to run `specd graph impact` SHALL 
 
 Templates MUST NOT ask for "downstream dependents" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents. When a workflow needs the blast radius of several files, it SHALL use `specd graph impact --file <path1> <path2> ...` rather than a separate change-detection selector.
 
+### Requirement: Graph search snippet guidance in workflow templates
+
+Workflow skill templates that instruct agents to run `specd graph search` SHALL describe snippet previews as opt-in output.
+
+Specifically:
+
+- templates MUST NOT imply that `specd graph search` always returns visible snippet content by default
+- when a workflow example or instruction depends on reading preview text, the template SHALL include `--snippet`
+- when a workflow only needs identifiers, locations, or structured metadata, templates SHOULD omit `--snippet`
+- workflow guidance that mentions `json` or `toon` output SHALL describe the `snippet` field as omitted unless `--snippet` is passed
+
 ### Requirement: Frontmatter source
 
 Frontmatter definitions MUST come from canonical skill metadata and vendor documentation for each target agent runtime. Plugin-specific frontmatter types and value collections MUST reflect those documented contracts exactly.

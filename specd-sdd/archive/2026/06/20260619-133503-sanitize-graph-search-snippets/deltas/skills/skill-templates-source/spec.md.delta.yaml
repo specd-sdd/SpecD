@@ -1,0 +1,20 @@
+- op: added
+  description: 'Require workflow templates to teach graph-search snippet behavior consistently.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Graph impact terminology in workflow templates$'
+  content: |
+    ### Requirement: Graph search snippet guidance in workflow templates
+
+    Workflow skill templates that instruct agents to run `specd graph search` SHALL describe snippet previews as opt-in output.
+
+    Specifically:
+
+    - templates MUST NOT imply that `specd graph search` always returns visible snippet content by default
+    - when a workflow example or instruction depends on reading preview text, the template SHALL include `--snippet`
+    - when a workflow only needs identifiers, locations, or structured metadata, templates SHOULD omit `--snippet`
+    - workflow guidance that mentions `json` or `toon` output SHALL describe the `snippet` field as omitted unless `--snippet` is passed

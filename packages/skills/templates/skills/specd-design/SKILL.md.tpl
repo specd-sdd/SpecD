@@ -144,7 +144,9 @@ specd graph hotspots --format toon
 ```
 
 Graph search helps you discover specs you might need to load as context. Hotspots help
-you identify high-coupling symbols that the design should handle carefully.
+you identify high-coupling symbols that the design should handle carefully. Add
+`--snippet` to graph-search commands only when the design work needs preview text;
+omit it when identifiers and locations are enough.
 
 When writing the **design** or **tasks** artifact, if you know specific files or symbols
 that will be modified, check their dependent impact:

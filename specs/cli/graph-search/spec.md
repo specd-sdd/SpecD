@@ -9,13 +9,14 @@ The code graph contains symbols with names and comments, and specs with titles, 
 ### Requirement: Command signature
 
 ```text
-specd graph search <query> [--symbols] [--specs] [--documents] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph search <query> [--symbols] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
 - `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
 - `--symbols` — optional; search only symbols
 - `--specs` — optional; search only specs
 - `--documents` — optional; search only textual non-code resources
+- `--snippet` — optional; include snippet previews in command output. In `text` mode it enables snippet blocks; in `json` and `toon` it enables the `snippet` field
 - `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`
 - `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
 - `--workspace <name>` — optional; filter both symbols and specs to a single workspace
@@ -66,7 +67,7 @@ Observable ranking semantics MUST hold across backends:
 - prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content
 - symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent
 
-Search results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content.
+Search results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content, even when text-mode snippet rendering is not requested.
 
 Preview sources SHALL follow these rules:
 
@@ -94,13 +95,23 @@ Example: `Symbols (10 shown, limit 10):`
 Each result SHALL render as a compact identity block:
 
 - the first line identifies the result entry (`[workspace]`, symbol/spec/document identity, and kind when applicable)
-- a second line MAY show location context such as `workspace`-relative file path and line number for symbols
-- preview content SHALL render in a separate snippet block preceded by a line range indicator
+- a second line SHALL show location context for the result
+- preview content SHALL render only when `--snippet` is explicitly passed
+
+Default compact location context SHALL follow these rules:
+
+- symbol results SHALL show the workspace-relative file path and the symbol line and column
+- spec results SHALL show that the hit came from the spec and SHALL include the match line range derived from `startLine` and `endLine`
+- document results SHALL show the config-relative document path and SHALL include the match line range derived from `startLine` and `endLine`
+
+When `--snippet` is passed, preview content SHALL render in a separate snippet block preceded by a line range indicator.
 
 Format: `snippet @ L<startLine>-L<endLine>:`
 Example: `snippet @ L10-L15:`
 
 To avoid collision with markdown formatting in the source text, snippets SHALL be wrapped in custom markers: `>>>` for the start and `<<<` for the end.
+
+Before any snippet is rendered in text mode, the CLI SHALL sanitize terminal-control content. ANSI escape sequences and non-printable control characters other than newline and tab MUST NOT be emitted literally in the rendered snippet block.
 
 Text-mode symbol snippets SHALL use line-oriented source context around the matched symbol location:
 
@@ -118,13 +129,14 @@ Text mode SHALL avoid misleading fixed-field truncation and SHALL NOT rely on ra
 
 When no results are found, output `No results found.`
 
-In `json` or `toon` mode, output remains category-grouped as `{ symbols: [...], specs: [...], documents: [...] }`. Each entry SHALL include `workspace`, `score`, `snippet`, `startLine`, and `endLine`.
+In `json` or `toon` mode, output remains category-grouped as `{ symbols: [...], specs: [...], documents: [...] }`.
 
 Structured output details:
 
-- symbol entries include the symbol payload plus `workspace`, `score`, `snippet`, `startLine`, and `endLine`
-- spec entries include `specId`, `path`, `title`, `description`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full spec `content` SHALL be omitted unless `--spec-content` is passed.
-- document entries include `path`, `configRelativePath`, `workspace`, `score`, `snippet`, `startLine`, and `endLine`. Full document `content` SHALL be omitted.
+- symbol entries include the symbol payload plus `workspace`, `score`, `startLine`, and `endLine`
+- spec entries include `specId`, `path`, `title`, `description`, `workspace`, `score`, `startLine`, and `endLine`. Full spec `content` SHALL be omitted unless `--spec-content` is passed.
+- document entries include `path`, `configRelativePath`, `workspace`, `score`, `startLine`, and `endLine`. Full document `content` SHALL be omitted.
+- the `snippet` field SHALL be omitted from `json` and `toon` output unless `--snippet` is passed
 
 ### Requirement: Error cases
 
@@ -153,7 +165,20 @@ The command accepts the following filter options applied at the store level:
 $ specd graph search "hook execution"
 Symbols (10 shown, limit 10):
   [core] method execute
-    src/use-cases/run-step-hooks.ts:108
+    src/use-cases/run-step-hooks.ts:108:7
+  ...
+
+Specs (10 shown, limit 10):
+  [core] core:hook-execution-model
+    match @ L42-L48
+  [cli] cli:change-run-hooks
+    match @ L12-L18
+  ...
+
+$ specd graph search "hook execution" --snippet
+Symbols (10 shown, limit 10):
+  [core] method execute
+    src/use-cases/run-step-hooks.ts:108:7
     snippet @ L105-L112:
       >>>
       execute(...) {
@@ -162,38 +187,10 @@ Symbols (10 shown, limit 10):
       <<<
   ...
 
-Specs (10 shown, limit 10):
-  [core] core:hook-execution-model
-    snippet @ L42-L48:
-      >>>
-      ...Workflow steps declare hooks via...
-      <<<
-  [cli] cli:change-run-hooks
-    snippet @ L12-L18:
-      >>>
-      ...Agent-driven workflow steps declare...
-      <<<
-  ...
-
-$ specd graph search "transition" --kind method --limit 3
-Symbols (3 shown, limit 3):
-  [core] method transition
-    src/domain/entities/change.ts:638
-    snippet @ L635-L642:
-      >>>
-      transition(...) {
-        ...
-      }
-      <<<
-  ...
-
 $ specd graph search "Change" --documents
 Documents (10 shown, limit 10):
   [default] docs/cli/cli-reference.md
-    snippet @ L80-L88:
-      >>>
-      ...graph search <query> [--symbols] [--specs] [--documents]...
-      <<<
+    match @ L80-L88
   ...
 ```
 

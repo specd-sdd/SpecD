@@ -322,7 +322,7 @@ to inspect merged full content for a specific spec in this change.
 
 If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode still prints `Context Fingerprint: <sha256...>` first and then `Context unchanged since last call.`. Structured output keeps the fingerprint plus the current step availability, available steps, and warnings, while omitting the full context body.
 
-`change status` also renders implementation tracking when the change has tracked files or confirmed links. The implementation block shows tracked files grouped by `open`, `resolved`, and `ignored`, then confirmed links and any stale symbol diagnostics available from the current code graph. When the graph is not indexed or stale, the command prints a graph-state hint instead of failing.
+`change status` also renders implementation tracking when the change has tracked files or confirmed links. The implementation block shows tracked files grouped by `open`, `resolved`, `ignored`, and `removed`, then confirmed links and any stale symbol diagnostics available from the current code graph. When the graph is not indexed or stale, the command prints a graph-state hint instead of failing.
 
 ### change implementation
 
@@ -338,8 +338,13 @@ Available subcommands:
 - `review` — show tracked files, confirmed links, stale symbol diagnostics, and out-of-scope sidecar preview
 - `add` — create or enrich a confirmed implementation link
 - `remove` — remove a file-level link or specific symbols
-- `ignore` — mark a tracked file as ignored
+- `ignore` — mark a tracked file as ignored (already-tracked missing files may be ignored)
 - `resolve` — mark a tracked file as reviewed/resolved
+- `unresolve` — reopen a resolved file back to `open`
+
+Tracked file states: `open`, `resolved`, `ignored`, `removed`. The `removed` state is assigned automatically by `refresh` when a tracked file no longer exists on disk; it cannot be set manually. Files in the `removed` state are excluded from `unresolve` — only a subsequent `refresh` can restore them to `open` if they reappear.
+
+File existence validation is performed by the core use case, not the CLI. The CLI delegates all validation and rejects operations with appropriate errors (`ImplementationFileNotFoundError`) when the target file does not exist on disk. The `ignore` action is an exception: files that are already tracked (including those missing from disk) may be ignored without an existence check. Untracked files must exist on disk before they can be ignored.
 
 Examples:
 
@@ -1128,6 +1133,7 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--symbols`                  | Search only symbols.                                                            |
 | `--specs`                    | Search only specs.                                                              |
 | `--documents`                | Search only documents.                                                          |
+| `--snippet`                  | Include snippet previews. Without it, output stays compact and location-first.  |
 | `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.     |
 | `--config <path>`            | Config file path. Mutually exclusive with `--path`.                             |
 | `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                  |
@@ -1138,6 +1144,16 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--limit <n>`                | Maximum number of results per category (default: 10).                           |
 | `--spec-content`             | Include full spec content in `json` or `toon` output.                           |
 | `--format text\|json\|toon`  | Output format.                                                                  |
+
+By default, text output shows a compact identity block plus location metadata:
+
+- symbols show `path:line:column`
+- specs show `match @ L<start>-L<end>`
+- documents show `match @ L<start>-L<end>`
+
+Pass `--snippet` when you want preview text. In `json` and `toon`, the `snippet` field
+is omitted unless `--snippet` is passed. `--spec-content` remains independent and only
+controls whether full spec content is included in structured output.
 
 Exact identifier matches are ranked ahead of fuzzy matches:
 

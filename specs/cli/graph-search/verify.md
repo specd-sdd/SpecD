@@ -45,6 +45,12 @@
 - **THEN** the command successfully executes
 - **AND** it passes the document category filter to the graph provider
 
+#### Scenario: Snippet flag enables preview emission
+
+- **WHEN** `specd graph search "hook" --snippet` is run
+- **THEN** the command includes snippet previews in its output
+- **AND** omitting `--snippet` keeps previews out of the rendered payload by default
+
 #### Scenario: Identity-oriented partial query still prefers the intended result
 
 - **GIVEN** a spec with canonical identity `default:_global/architecture`
@@ -216,6 +222,19 @@
 - **AND** specs are listed under a category header
 - **AND** each result renders identity separately from snippet content
 
+#### Scenario: Text output omits snippet blocks by default
+
+- **WHEN** `specd graph search "hook"` is run in text mode without `--snippet`
+- **THEN** each visible result remains a compact identity block
+- **AND** no snippet block is rendered
+- **AND** location metadata remains visible for each result
+
+#### Scenario: Text output renders snippets when requested
+
+- **WHEN** `specd graph search "hook" --snippet` is run in text mode
+- **THEN** visible results may include snippet blocks
+- **AND** the location metadata still appears alongside the result identity
+
 #### Scenario: Category headers show explicit limits in text mode
 
 - **WHEN** `specd graph search \"hook\" --limit 5` is run in text mode
@@ -227,16 +246,34 @@
 - **WHEN** `specd graph search \"hook\" --format json` is run
 - **THEN** output is `{\"symbols\":[...],\"specs\":[...],\"documents\":[...]}`
 - **AND** each entry includes a `workspace` field and a `score` field
-- **AND** each entry includes a `snippet` field
 - **AND** each entry includes `startLine` and `endLine` fields
+- **AND** no entry includes a `snippet` field unless `--snippet` was passed
 - **AND** spec entries include `specId`, `path`, `title`, `description` but NOT `content`
 - **AND** document entries include `path`, `configRelativePath` but NOT `content`
+
+#### Scenario: JSON output includes snippet only when requested
+
+- **WHEN** `specd graph search "hook" --format json --snippet` is run
+- **THEN** visible result entries include a `snippet` field
+- **AND** the entries still include `startLine` and `endLine`
+
+#### Scenario: Toon output omits snippet unless requested
+
+- **WHEN** `specd graph search "hook" --format toon` is run without `--snippet`
+- **THEN** visible result entries omit the `snippet` field
+- **AND** the entries still include `startLine` and `endLine`
+
+#### Scenario: Toon output includes snippet when requested
+
+- **WHEN** `specd graph search "hook" --format toon --snippet` is run
+- **THEN** visible result entries include a `snippet` field
+- **AND** the entries still include `startLine` and `endLine`
 
 #### Scenario: JSON with --spec-content includes full spec content
 
 - **WHEN** `specd graph search \"hook\" --format json --spec-content` is run
 - **THEN** spec entries include a `content` field with the full spec text
-- **AND** spec entries still include a `snippet` field
+- **AND** spec entries omit the `snippet` field unless `--snippet` is also passed
 
 #### Scenario: --spec-content with text format fails
 
@@ -254,7 +291,7 @@
 - **GIVEN** document search returns one or more matching documents
 - **WHEN** `specd graph search \"Change\"` is run in text mode
 - **THEN** stdout contains a `Documents (` section
-- **AND** each document result shows the owning workspace, canonical path, and a fenced snippet block
+- **AND** each document result shows the owning workspace and match location metadata without requiring a snippet block
 
 #### Scenario: Structured output includes documents array
 
@@ -265,17 +302,24 @@
 #### Scenario: Text-mode symbol snippet uses normalized indentation
 
 - **GIVEN** a symbol preview is cut from indented source code
-- **WHEN** the result is rendered in text mode
+- **WHEN** the result is rendered in text mode with `--snippet`
 - **THEN** tabs in the snippet are expanded to spaces using tab width 2 before indentation normalization
 - **AND** the smallest common leading indentation across non-blank lines is removed
 - **AND** the rendered snippet preserves the relative indentation of the code
 
 #### Scenario: Text-mode snippet block uses line range header and custom markers
 
-- **WHEN** any symbol, spec, or document preview is rendered in text mode
+- **WHEN** any symbol, spec, or document preview is rendered in text mode with `--snippet`
 - **THEN** the snippet is preceded by a header matching `snippet @ L<start>-L<end>:`
 - **AND** the snippet is wrapped in `>>>` and `<<<` markers
 - **AND** no triple-backtick fences are used for the block
+
+#### Scenario: Text-mode snippet sanitizes terminal control sequences
+
+- **GIVEN** a matched snippet source contains ANSI escape sequences or other non-printable terminal control characters
+- **WHEN** `specd graph search` renders that preview in text mode with `--snippet`
+- **THEN** the rendered snippet does not emit those control sequences literally
+- **AND** the remaining visible text stays readable
 
 #### Scenario: Exact identity hit does not require raw boosted score as primary cue
 

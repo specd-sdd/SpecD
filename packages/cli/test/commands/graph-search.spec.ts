@@ -155,7 +155,7 @@ describe('graph search', () => {
     expect(mockProvider.searchSpecs).not.toHaveBeenCalled()
   })
 
-  it('renders document results in text output', async () => {
+  it('renders compact document results in text output by default', async () => {
     const { mockProvider, getStdout } = setup()
     mockProvider.searchDocuments.mockResolvedValue([
       {
@@ -179,10 +179,9 @@ describe('graph search', () => {
     const out = getStdout()
     expect(out).toContain('Documents (1 shown, limit 10):')
     expect(out).toContain('docs/guide.md')
-    expect(out).toContain('snippet @ L1-L1:')
-    expect(out).toContain('>>>')
-    expect(out).toContain('# Guide')
-    expect(out).toContain('<<<')
+    expect(out).toContain('match @ L1-L1')
+    expect(out).not.toContain('snippet @ L1-L1:')
+    expect(out).not.toContain('>>>')
   })
 
   it('rejects invalid kind values before querying', async () => {
@@ -231,7 +230,7 @@ describe('graph search', () => {
     expect(getStderr()).toContain('--config and --path are mutually exclusive')
   })
 
-  it('renders normalized symbol snippets in text output', async () => {
+  it('renders normalized symbol snippets in text output when requested', async () => {
     const { mockProvider, getStdout } = setup()
     mockProvider.searchSymbols.mockResolvedValue([
       {
@@ -251,12 +250,12 @@ describe('graph search', () => {
     ])
 
     const program = makeSearchProgram()
-    await program.parseAsync(['node', 'specd', 'graph', 'search', 'foo', '--symbols'])
+    await program.parseAsync(['node', 'specd', 'graph', 'search', 'foo', '--symbols', '--snippet'])
 
     const out = getStdout()
     expect(out).toContain('Symbols (1 shown, limit 10):')
     expect(out).toContain('[core] function foo')
-    expect(out).toContain('src/test.ts:10')
+    expect(out).toContain('src/test.ts:10:1')
     expect(out).toContain('snippet @ L8-L12:')
     expect(out).toContain('>>>')
     // Normalized: common indent (2 spaces) removed, then margin (6 spaces) added
@@ -264,6 +263,236 @@ describe('graph search', () => {
     expect(out).toContain('        return 1')
     expect(out).toContain('      }')
     expect(out).toContain('<<<')
+  })
+
+  it('renders document snippets in text output only when requested', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchDocuments.mockResolvedValue([
+      {
+        document: {
+          path: 'root:docs/guide.md',
+          configRelativePath: 'docs/guide.md',
+          contentHash: 'sha256:doc',
+          content: '# Guide',
+          workspace: 'root',
+        },
+        score: 1000,
+        snippet: '# Guide',
+        startLine: 1,
+        endLine: 1,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'docs/guide.md',
+      '--documents',
+      '--snippet',
+    ])
+
+    const out = getStdout()
+    expect(out).toContain('Documents (1 shown, limit 10):')
+    expect(out).toContain('docs/guide.md')
+    expect(out).toContain('match @ L1-L1')
+    expect(out).toContain('snippet @ L1-L1:')
+    expect(out).toContain('>>>')
+    expect(out).toContain('# Guide')
+    expect(out).toContain('<<<')
+  })
+
+  it('omits snippet from json output by default', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchDocuments.mockResolvedValue([
+      {
+        document: {
+          path: 'root:docs/guide.md',
+          configRelativePath: 'docs/guide.md',
+          contentHash: 'sha256:doc',
+          content: '# Guide',
+          workspace: 'root',
+        },
+        score: 1000,
+        snippet: '# Guide',
+        startLine: 1,
+        endLine: 1,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'docs/guide.md',
+      '--documents',
+      '--format',
+      'json',
+    ])
+
+    const payload = JSON.parse(getStdout()) as {
+      documents: Array<Record<string, unknown>>
+    }
+    expect(payload.documents).toHaveLength(1)
+    expect(payload.documents[0]?.startLine).toBe(1)
+    expect(payload.documents[0]?.endLine).toBe(1)
+    expect(payload.documents[0]).not.toHaveProperty('snippet')
+  })
+
+  it('includes snippet in json output only when requested', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchDocuments.mockResolvedValue([
+      {
+        document: {
+          path: 'root:docs/guide.md',
+          configRelativePath: 'docs/guide.md',
+          contentHash: 'sha256:doc',
+          content: '# Guide',
+          workspace: 'root',
+        },
+        score: 1000,
+        snippet: '# Guide',
+        startLine: 1,
+        endLine: 1,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'docs/guide.md',
+      '--documents',
+      '--format',
+      'json',
+      '--snippet',
+    ])
+
+    const payload = JSON.parse(getStdout()) as {
+      documents: Array<Record<string, unknown>>
+    }
+    expect(payload.documents[0]?.snippet).toBe('# Guide')
+  })
+
+  it('keeps snippet omitted from toon output by default', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchSpecs.mockResolvedValue([
+      {
+        spec: {
+          specId: 'cli:graph-search',
+          path: 'graph-search',
+          title: 'Graph Search',
+          description: 'Search graph results.',
+          content: '# Graph Search',
+          workspace: 'cli',
+        },
+        score: 1000,
+        snippet: 'Graph Search',
+        startLine: 1,
+        endLine: 1,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'graph search',
+      '--specs',
+      '--format',
+      'toon',
+    ])
+
+    const out = getStdout()
+    expect(out).toContain('specs[1]')
+    expect(out).not.toContain('snippet:')
+  })
+
+  it('includes snippet in toon output when requested', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchSpecs.mockResolvedValue([
+      {
+        spec: {
+          specId: 'cli:graph-search',
+          path: 'graph-search',
+          title: 'Graph Search',
+          description: 'Search graph results.',
+          content: '# Graph Search',
+          workspace: 'cli',
+        },
+        score: 1000,
+        snippet: 'Graph Search',
+        startLine: 1,
+        endLine: 1,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'graph search',
+      '--specs',
+      '--format',
+      'toon',
+      '--snippet',
+    ])
+
+    const out = getStdout()
+    expect(out).toContain('specs[1]')
+    expect(out).toContain(
+      '{workspace,specId,path,title,description,score,startLine,endLine,snippet}',
+    )
+    expect(out).toContain(',Graph Search')
+  })
+
+  it('keeps spec content independent from snippet in json output', async () => {
+    const { mockProvider, getStdout } = setup()
+    mockProvider.searchSpecs.mockResolvedValue([
+      {
+        spec: {
+          specId: 'cli:graph-search',
+          path: 'graph-search',
+          title: 'Graph Search',
+          description: 'Search graph results.',
+          content: '# Graph Search',
+          workspace: 'cli',
+        },
+        score: 1000,
+        snippet: 'Graph Search',
+        startLine: 1,
+        endLine: 1,
+      },
+    ])
+
+    const program = makeSearchProgram()
+    await program.parseAsync([
+      'node',
+      'specd',
+      'graph',
+      'search',
+      'graph search',
+      '--specs',
+      '--format',
+      'json',
+      '--spec-content',
+    ])
+
+    const payload = JSON.parse(getStdout()) as {
+      specs: Array<Record<string, unknown>>
+    }
+    expect(payload.specs[0]?.content).toBe('# Graph Search')
+    expect(payload.specs[0]).not.toHaveProperty('snippet')
   })
 
   it('preserves provider ordering for token-ranked symbol results', async () => {

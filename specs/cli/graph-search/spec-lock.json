@@ -12,7 +12,12 @@
   ],
   "implementation": [
     {
-      "file": "cli:test/commands/graph-search.spec.ts"
+      "file": "cli:src/commands/graph/normalize-snippet.ts",
+      "symbols": ["normalizeSnippet"]
+    },
+    {
+      "file": "cli:src/commands/graph/search.ts",
+      "symbols": ["registerGraphSearch"]
     }
   ]
 }
