@@ -23,6 +23,15 @@
 - **THEN** `port-changes-mutate` discard runs
 - **AND** list refreshes on success
 
+### Requirement: rows must truncate long spec paths
+
+#### Scenario: Long spec paths truncate
+
+- **GIVEN** a spec with a deeply nested path exceeding sidebar width
+- **WHEN** sidebar tree renders
+- **THEN** path truncates with an ellipsis
+- **AND** full path is visible via native browser tooltip
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

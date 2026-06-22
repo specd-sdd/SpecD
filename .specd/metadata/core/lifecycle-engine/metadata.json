@@ -4,8 +4,8 @@
   "dependsOn": [
     "core:change",
     "core:workflow-model",
-    "default:_global/architecture",
-    "core:schema-format"
+    "core:schema-format",
+    "default:_global/architecture"
   ],
   "context": [
     "Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing \"liar context\" and ensuring consistent system behavior. The `LifecycleEngine` is a centralized domain service that combines the change's persisted state with schema-defined workflow rules to derive the authoritative effective state, available transitions, and machine-readable blockers."

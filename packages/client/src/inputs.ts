@@ -42,6 +42,7 @@ export interface ValidateChangeBatchInput {
 export interface TransitionChangeInput {
   readonly targetState: string
   readonly reason?: string
+  readonly skipHooks?: 'all'
 }
 
 /** Body for `PATCH /v1/changes/{name}`. */

@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Network, RefreshCw, AlertTriangle, FileText, Code, FolderTree } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.js'
 import { Button } from '../components/ui/button.js'
+import { type GraphSymbolRefDto } from '@specd/client'
 import { Badge } from '../components/ui/badge.js'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
 import { useAsyncResource } from '../hooks/use-async-resource.js'
@@ -11,12 +12,7 @@ type HotspotEntry = {
   readonly riskLevel: string
   readonly directCallers: number
   readonly fileImporters: number
-  readonly symbol: {
-    readonly name: string
-    readonly kind: string
-    readonly filePath: string
-    readonly line: number
-  }
+  readonly symbol: GraphSymbolRefDto
 }
 
 export function GraphMainView({
@@ -50,9 +46,9 @@ export function GraphMainView({
         level: 'info',
         action: 'index-graph',
       })
-      const result = await port.indexGraph({ force: true })
+      const result = await port.indexGraph({ force: false })
       void appendOutput({
-        message: `Graph indexing complete. Found ${result.filesIndexed} files, ${result.specsIndexed} specs. Took ${result.duration}ms.`,
+        message: `Graph indexing complete. Discovered ${result.filesDiscovered} files, ${result.specsDiscovered} specs. Indexed ${result.filesIndexed} files, ${result.specsIndexed} specs (skipped ${result.filesSkipped} files). Took ${result.duration}ms.`,
         level: 'info',
         action: 'index-graph',
       })
@@ -93,7 +89,7 @@ export function GraphMainView({
           onClick={() => void handleIndexGraph()}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${indexing ? 'animate-spin' : ''}`} />
-          {indexing ? 'Indexing...' : 'Force Reindex'}
+          {indexing ? 'Indexing...' : 'Reindex'}
         </Button>
       </div>
 
@@ -136,13 +132,17 @@ export function GraphMainView({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Documents
+              Files & Docs
             </CardTitle>
             <FolderTree className="h-4 w-4 text-studio-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">{s?.documentCount ?? 0}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Indexed files</p>
+            <div className="text-2xl font-bold font-mono">
+              {(s?.fileCount ?? 0) + (s?.documentCount ?? 0)}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {s?.fileCount ?? 0} code files, {s?.documentCount ?? 0} documents
+            </p>
           </CardContent>
         </Card>
 

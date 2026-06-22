@@ -607,6 +607,7 @@
       "then": ["the thrown error is ConfigValidationError"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:062cc4afc648e73f09062b4633e2af28924d34de3b7fda083ef86334fe3d2bd1",
     "verify.md": "sha256:19290502deecaffcb98e4195767fddab469f054f62d5fa1c504aae4677819ca0"

@@ -177,6 +177,7 @@
       "then": ["it exits with code 1"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:df85fa051d4d10455304d1f1b4f66ad0fa4884dbc0c4b8d58d606cee051232a3",
     "verify.md": "sha256:5975e182e6050023bef72e128bb9cdc0e85f035ecc66a1285419b8f817f3e7d6"

@@ -10,13 +10,13 @@
 - **WHEN** the view loads
 - **THEN** it calls `getGraphStatus`
 - **AND** it renders the "Ready", "Stale", or "Off" status
-- **AND** it renders counts for Specs, Documents, and Symbols
+- **AND** it renders counts for Specs, Files & Docs, and Symbols
 
-#### Scenario: Force reindex triggers API and output log
+#### Scenario: Reindex triggers API and output log
 
 - **GIVEN** `GraphMainView` is active
 - **WHEN** the user clicks "Force Reindex"
-- **THEN** it calls `indexGraph({ force: true })`
+- **THEN** it calls `indexGraph({ force: false })`
 - **AND** it pushes an info message to the Output panel
 
 ### Requirement: view surfaces high-impact graph hotspots

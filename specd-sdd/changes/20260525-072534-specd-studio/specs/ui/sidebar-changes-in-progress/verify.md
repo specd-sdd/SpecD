@@ -17,6 +17,15 @@
 - **THEN** `port-changes-read` opens the change Overview tab
 - **AND** no direct core import
 
+### Requirement: rows must truncate long change names
+
+#### Scenario: Long change names truncate
+
+- **GIVEN** a change with name exceeding sidebar width
+- **WHEN** sidebar renders
+- **THEN** name truncates with an ellipsis
+- **AND** full name is visible via native browser tooltip
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

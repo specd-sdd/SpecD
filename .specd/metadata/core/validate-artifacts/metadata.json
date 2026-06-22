@@ -6,12 +6,12 @@
     "core:change-layout",
     "core:change-manifest",
     "core:lifecycle-engine",
+    "core:schema-format",
     "core:delta-format",
     "core:selector-model",
     "core:storage",
     "default:_global/architecture",
-    "core:spec-id-format",
-    "core:schema-format"
+    "core:spec-id-format"
   ],
   "context": [
     "Artifacts must be structurally valid and conflict-free before a change can progress, yet no other code path is allowed to mark an artifact complete — a single chokepoint is needed to enforce this invariant. `ValidateArtifacts` is that chokepoint: it checks a change's artifact files against the active schema, enforces required artifacts, validates structural rules, detects delta conflicts, invalidates any outstanding approval when content has changed, and is the only path through which an artifact may reach `complete` status."

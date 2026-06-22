@@ -4,6 +4,10 @@ import {
   type SymbolNode,
   type SpecNode,
   type DocumentNode,
+  type IndexResult,
+  type IndexError,
+  type WorkspaceIndexBreakdown,
+  type HotspotEntry,
 } from '@specd/code-graph'
 import type { SpecdConfig } from '@specd/core'
 import { type GraphStatusDto } from '../dto/graph-status.js'
@@ -147,6 +151,55 @@ export function toGraphImpactDto(
 }
 
 /**
+ * Maps hotspots analysis result to a list of DTOs.
+ * @param config
+ * @param result
+ */
+export function toGraphHotspotsDto(
+  config: SpecdConfig,
+  result: { entries: readonly HotspotEntry[] },
+): readonly Record<string, unknown>[] {
+  return result.entries.map((entry) => ({
+    ...entry,
+    symbol: toGraphSymbolRefDto(config, entry.symbol),
+  }))
+}
+
+/**
+ * Maps indexing result to the shared DTO shape.
+ * @param result
+ */
+export function toGraphIndexResultDto(result: IndexResult): Record<string, unknown> {
+  return {
+    filesDiscovered: result.filesDiscovered,
+    filesIndexed: result.filesIndexed,
+    documentsIndexed: result.documentsIndexed,
+    filesRemoved: result.filesRemoved,
+    filesSkipped: result.filesSkipped,
+    specsDiscovered: result.specsDiscovered,
+    specsIndexed: result.specsIndexed,
+    errors: result.errors.map((e: IndexError) => ({
+      filePath: e.filePath,
+      message: e.message,
+    })),
+    duration: result.duration,
+    workspaces: result.workspaces.map((ws: WorkspaceIndexBreakdown) => ({
+      name: ws.name,
+      filesDiscovered: ws.filesDiscovered,
+      filesIndexed: ws.filesIndexed,
+      documentsIndexed: ws.documentsIndexed,
+      filesSkipped: ws.filesSkipped,
+      filesRemoved: ws.filesRemoved,
+      specsDiscovered: ws.specsDiscovered,
+      specsIndexed: ws.specsIndexed,
+    })),
+    vcsRef: result.vcsRef,
+    graphFingerprint: result.graphFingerprint,
+    fullRebuildReason: result.fullRebuildReason,
+  }
+}
+
+/**
  * Maps change-scoped graph view.
  * @param changeName
  * @param specIds
@@ -191,6 +244,7 @@ export function toGraphSymbolRefDto(
     workspace,
     workspaceRelativePath,
     projectRelativePath: toProjectRelativePath(config, workspace, workspaceRelativePath),
+    filePath: symbol.filePath,
     name: symbol.name,
     kind: symbol.kind ?? parsed.kind,
     line: symbol.line,

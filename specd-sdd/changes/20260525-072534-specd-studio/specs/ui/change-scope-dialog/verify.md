@@ -2,6 +2,23 @@
 
 ## Requirements
 
+### Requirement: dialog supports creation mode
+
+#### Scenario: Dialog initializes for creation
+
+- **GIVEN** `isCreateMode` is true
+- **WHEN** dialog opens
+- **THEN** change name input is rendered
+- **AND** save action invokes `createChange` port method
+
+### Requirement: dialog manages metadata edits
+
+#### Scenario: Dialog allows editing schema and invalidation policy
+
+- **WHEN** user modifies the schema selection or invalidation policy text
+- **THEN** internal state updates
+- **AND** save action persists these metadata fields
+
 ### Requirement: dialog shows high-impact warning
 
 #### Scenario: Warning visible on open
@@ -48,7 +65,7 @@
 - **WHEN** user adds dependency `default:architecture`
 - **THEN** dependency chip appears in that card’s body
 
-### Requirement: dialog persists scope and dependsOn on save
+### Requirement: dialog persists scope, dependsOn, and metadata on save
 
 #### Scenario: Scope PATCH on confirm
 

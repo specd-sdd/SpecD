@@ -76,7 +76,7 @@ Artifact and inspector panes MUST feel like a code editor / inspector: **`@monac
 
 ### Requirement: bottom panel and status bar are IDE-native
 
-The bottom panel (output, problems, logs, desktop terminal) MUST match IDE tool-window density and borders. Web shell bottom tabs MUST appear left-to-right as **Output**, **Problems**, **Logs**, with **Output** selected by default on mount. A thin status bar MUST show at minimum: workspace, branch (when available), API/server connection status, validation summary, and active runtime profile (local vs remote).
+The bottom panel (output, problems, logs, desktop terminal) MUST match IDE tool-window density and borders. Web shell bottom tabs MUST appear left-to-right as **Output**, **Problems**, **Logs**, with **Output** selected by default on mount. A thin status bar MUST show at minimum: workspace, branch (when available), API/server connection status, authentication details (for remote sessions), and active loading/activity status (with a rotating spinner when active).
 
 ### Requirement: semantic colors map to workflow states
 
@@ -118,9 +118,17 @@ Blocking confirmations (unsaved edits, validate drift, save conflicts, and simil
 
 Radix/shadcn `Dialog` and `AlertDialog` primitives MUST be the underlying implementation for Studio confirmation flows, with `StudioDialog` enforcing consistent composition and density across the application.
 
+### Requirement: top bar exposes docs, notifications, and theme controls
+
+The `StudioTopBar` component MUST expose three control buttons on the right side:
+
+1. **Docs** (`BookOpenText`): Redirects/opens the native browser to `https://getspecd.dev/docs/guide/getting-started`.
+2. **Notifications** (`Bell`): Shows a popover with project health checks: change overlaps/conflicts, stale graph warnings, and spec validation failures. Displays a red badge when any issues are active.
+3. **Appearance** (`SunMedium` / `Moon`): Toggles between light and dark visual themes. Persists selection in user storage.
+
 ## Constraints
 
-- v1 ships **dark theme only**; light theme is out of scope unless a future change adds it.
+- v1 supports both **light** and **dark** theme modes via a toggle in the top bar.
 - Theme tokens are presentation-only; they MUST NOT import `@specd/core`.
 - Reference draft `specd-studio-api-and-ui.md` MAY illustrate layouts; this spec wins on colors, density, and anti-patterns.
 

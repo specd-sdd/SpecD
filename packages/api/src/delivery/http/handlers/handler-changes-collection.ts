@@ -106,7 +106,16 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
     { ...apiRouteSchema({ response: { 200: 'ChangeOverlapsDto' } }) },
     apiHandler(async (ctx) => {
       const overlaps = await ctx.kernel.changes.detectOverlap.execute()
-      return overlaps
+      return {
+        hasOverlap: overlaps.hasOverlap,
+        entries: overlaps.entries.map((entry) => ({
+          specId: entry.specId,
+          changes: entry.changes.map((c) => ({
+            name: c.name,
+            state: c.state,
+          })),
+        })),
+      }
     }),
   )
 }

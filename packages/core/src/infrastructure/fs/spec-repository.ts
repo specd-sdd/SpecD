@@ -158,7 +158,8 @@ export class FsSpecRepository extends SpecRepository {
    * @returns The total spec count
    */
   override async count(): Promise<number> {
-    return this._countSpecs(this._specsPath)
+    const specs = await this.list()
+    return specs.length
   }
 
   /**
@@ -905,55 +906,6 @@ export class FsSpecRepository extends SpecRepository {
     for (const subdir of subdirs) {
       await this._walk(path.join(dir, subdir), root, results)
     }
-  }
-
-  /**
-   * Recursively counts leaf spec directories.
-   *
-   * @param dir - Absolute path to the directory to count
-   * @returns Total number of leaf spec directories found
-   */
-  private async _countSpecs(dir: string): Promise<number> {
-    let entries: string[]
-    try {
-      entries = await fs.readdir(dir)
-    } catch (err) {
-      if (isEnoent(err)) return 0
-      throw err
-    }
-
-    const subdirs: string[] = []
-    let hasFile = false
-
-    const stats = await Promise.all(
-      entries.map(async (entry) => {
-        try {
-          const stat = await fs.lstat(path.join(dir, entry))
-          return { isDir: stat.isDirectory(), isFile: stat.isFile() }
-        } catch {
-          return { isDir: false, isFile: false }
-        }
-      }),
-    )
-
-    for (const { isDir, isFile } of stats) {
-      if (isDir)
-        subdirs.push('dummy') // we only care that it's a directory
-      else if (isFile) hasFile = true
-    }
-
-    let count = hasFile ? 1 : 0
-    const subdirCounts = await Promise.all(
-      entries
-        .filter((_, i) => stats[i]!.isDir)
-        .map((entry) => this._countSpecs(path.join(dir, entry))),
-    )
-
-    for (const subCount of subdirCounts) {
-      count += subCount
-    }
-
-    return count
   }
 }
 

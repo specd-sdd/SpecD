@@ -139,6 +139,17 @@ function DesktopBootstrap(): ReactElement {
     return window.specd ? new FileUserStorage() : new LocalStorageUserStorage()
   }, [])
 
+  useEffect(() => {
+    const theme = storage.get<'light' | 'dark'>('theme') || 'dark'
+    if (theme === 'light') {
+      document.documentElement.classList.add('light')
+      document.documentElement.classList.remove('dark')
+    } else {
+      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    }
+  }, [storage])
+
   /**
    * Opens the shared project chooser dialog.
    *
@@ -175,7 +186,7 @@ function DesktopBootstrap(): ReactElement {
    * @param project - The resolved project metadata from the API.
    * @returns A promise that resolves when the session has switched.
    */
-  const handleConnectRemote = async (
+  const handleConnectRemote = (
     profile: RemoteConnectionProfile,
     project: ProjectDto,
   ): Promise<void> => {
@@ -187,6 +198,7 @@ function DesktopBootstrap(): ReactElement {
     })
     setSessionDialogOpen(false)
     setDialogError(undefined)
+    return Promise.resolve()
   }
 
   /**
@@ -351,7 +363,7 @@ function DesktopBootstrap(): ReactElement {
 
   if (!ipcReady) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0d1117] text-sm text-muted-foreground">
+      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
         Starting SpecD Studio…
       </div>
     )

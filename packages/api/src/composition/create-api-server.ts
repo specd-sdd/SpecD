@@ -7,6 +7,7 @@ import {
   createConfigLoader,
   createKernel,
   createLogFormatter,
+  Logger,
   LogRingBuffer,
   type SpecdConfig,
 } from '@specd/core'
@@ -77,6 +78,7 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
     logRing,
     logFormatter: createLogFormatter({ colorize: false }),
   })
+  Logger.info('API kernel booted', { projectRoot: config.projectRoot })
   const kernelActor = await resolveKernelActor(config)
   const registry = options.authRegistry ?? defaultAuthAdapterRegistry()
   const verifier = registry.resolve(auth.type, auth.config, { actorResolver: kernelActor })

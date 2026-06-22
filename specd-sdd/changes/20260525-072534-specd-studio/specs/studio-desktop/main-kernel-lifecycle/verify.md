@@ -64,3 +64,11 @@
 - **WHEN** CLI and API package dependencies are inspected
 - **THEN** they depend on `@specd/code-graph`
 - **AND** they do not depend on `@specd/code-graph-electron`
+
+### Requirement: desktop kernel configures plain-text logs
+
+#### Scenario: Local desktop logs are formatted without colors
+
+- **WHEN** desktop local kernel is created
+- **THEN** logFormatter has colorize set to false
+- **AND** log messages do not contain ANSI escape control codes

@@ -4,7 +4,9 @@ import type {
   ProjectDto,
   ProjectStatusDto,
   ValidateResultDto,
+  IUserStorage,
 } from '@specd/client'
+import { LocalStorageUserStorage } from '@specd/client'
 import * as React from 'react'
 import {
   ResizableHandle,
@@ -73,8 +75,8 @@ export type ShellLayoutProps = {
   project: ProjectDto | undefined
   projectStatus: ProjectStatusDto | undefined
   connectionLabel: string
-  runtimeLabel: string
   refreshKey: number
+  storage?: IUserStorage
   changes: {
     active: readonly ChangeSummaryDto[]
     drafts: readonly ChangeSummaryDto[]
@@ -102,11 +104,33 @@ export function ShellLayout({
   project,
   projectStatus,
   connectionLabel,
-  runtimeLabel,
   refreshKey,
+  storage: storageProp,
   changes,
   loading,
 }: ShellLayoutProps): React.ReactElement {
+  const storage = React.useMemo(() => {
+    return storageProp || new LocalStorageUserStorage()
+  }, [storageProp])
+
+  const [theme, setTheme] = React.useState<'light' | 'dark'>(() => {
+    return storage.get<'light' | 'dark'>('theme') || 'dark'
+  })
+
+  React.useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light')
+      document.documentElement.classList.remove('dark')
+    } else {
+      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    }
+    storage.set('theme', theme)
+  }, [theme, storage])
+
+  const handleToggleTheme = React.useCallback(() => {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
+  }, [])
   const [centerCtx, setCenterCtx] = React.useState<CenterContext>({ kind: 'empty' })
   const [changeView, setChangeView] = React.useState<ChangeView>('Overview')
   const [commandOpen, setCommandOpen] = React.useState(false)
@@ -669,6 +693,13 @@ export function ShellLayout({
       <StudioTopBar
         onOpenCommandPalette={() => setCommandOpen(true)}
         onNewChange={() => setCreateChangeOpen(true)}
+        project={project}
+        projectStatus={projectStatus}
+        activeChanges={changes.active}
+        refreshKey={refreshKey}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+        loadingActive={loading.active}
       />
 
       <CommandPalette
@@ -1014,6 +1045,7 @@ export function ShellLayout({
                                 filename={selectedArtifact?.filename}
                                 original={previewHook.data!.base ?? ''}
                                 modified={previewHook.data!.merged}
+                                theme={theme}
                               />
                             ) : (
                               <div className="flex h-full items-center justify-center p-4 text-center text-xs text-muted-foreground">
@@ -1051,6 +1083,7 @@ export function ShellLayout({
                               value={editorBuffer ?? ''}
                               readOnly={!canEditChangeArtifact}
                               onChange={canEditChangeArtifact ? setEditorBuffer : undefined}
+                              theme={theme}
                             />
                           )}
                         </TabsContent>
@@ -1080,9 +1113,7 @@ export function ShellLayout({
                       {tab}
                     </TabsTrigger>
                   ))}
-                  {validating ? (
-                    <span className="px-2 text-xs text-muted-foreground"> · validating…</span>
-                  ) : null}
+
                 </TabsList>
                 <TabsContent
                   value={bottomTab}
@@ -1116,18 +1147,18 @@ export function ShellLayout({
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <StudioLoadingBand
-        active={loading.active || Boolean(centerLoading) || validating}
-        label={
-          centerLoading && changeName ? `Loading ${changeName}…` : loading.label
-        }
-      />
       <StatusBar
         project={project}
         projectStatus={projectStatus}
         connectionLabel={connectionLabel}
-        runtimeLabel={runtimeLabel}
-        validationSummary={validationSummary}
+        loadingActive={loading.active || Boolean(centerLoading) || validating}
+        loadingLabel={
+          validating
+            ? 'validating…'
+            : centerLoading && changeName
+              ? `Loading ${changeName}…`
+              : loading.label
+        }
       />
 
       <UnsavedChangesDialog
@@ -1263,7 +1294,7 @@ function lineTone(message: string): string {
     return 'text-destructive'
   }
   if (message.startsWith('⚠')) {
-    return 'text-amber-400'
+    return 'text-amber-600 dark:text-amber-400'
   }
   return 'text-foreground'
 }

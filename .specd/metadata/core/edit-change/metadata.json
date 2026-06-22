@@ -332,6 +332,7 @@
       ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:b1d60a6c003564800895efafd8a82d09994ba15b137fd9f3766c27a03d35812f",
     "verify.md": "sha256:d16d12c29fa4fcf08d09c4deb6b844b04cbe39ab0270b026441c401292206743"

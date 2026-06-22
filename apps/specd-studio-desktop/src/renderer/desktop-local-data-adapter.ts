@@ -18,6 +18,8 @@ import type {
   GraphSearchResultDto,
   GraphSpecCoverageDto,
   GraphStatusDto,
+  HookInstructionsDto,
+  ArtifactInstructionDto,
   ImplementationReviewDto,
   OutlineChangeArtifactInput,
   OutlineSpecDraftInput,
@@ -43,6 +45,7 @@ import type {
   ValidateChangeInput,
   ValidateResultDto,
   WorkspaceSpecTreeDto,
+  WorkspaceSpecsValidateResultDto,
   WorkspaceSummaryDto,
 } from '@specd/client'
 
@@ -151,9 +154,12 @@ export function createDesktopLocalDataAdapter(bridge: DesktopBridge): SpecdDataP
         input,
       ]),
     getHookInstructions: (name: string) =>
-      invokePortMethod<CompiledContextDto>(bridge, 'getHookInstructions', [name]),
-    getArtifactInstruction: (name: string, filename: string) =>
-      invokePortMethod<CompiledContextDto>(bridge, 'getArtifactInstruction', [name, filename]),
+      invokePortMethod<HookInstructionsDto>(bridge, 'getHookInstructions', [name]),
+    getArtifactInstruction: (name: string, artifactId: string) =>
+      invokePortMethod<ArtifactInstructionDto>(bridge, 'getArtifactInstruction', [
+        name,
+        artifactId,
+      ]),
     getImplementationReview: (name: string) =>
       invokePortMethod<ImplementationReviewDto>(bridge, 'getImplementationReview', [name]),
     saveChangeArtifact: (name: string, filename: string, input: SaveChangeArtifactInput) =>
@@ -224,6 +230,11 @@ export function createDesktopLocalDataAdapter(bridge: DesktopBridge): SpecdDataP
         'getSpecArtifact',
         [workspace, specPath, filename],
       ).then((dto) => withArtifactFilename(filename, dto)),
+    validateSpecs: (workspace: string, specPath?: string) =>
+      invokePortMethod<WorkspaceSpecsValidateResultDto>(bridge, 'validateSpecs', [
+        workspace,
+        specPath,
+      ]),
     searchSpecs: (query: { readonly q: string; readonly workspace?: string }) =>
       invokePortMethod<readonly SpecSummaryDto[]>(bridge, 'searchSpecs', [query]),
     getGraphStatus: () => invokePortMethod<GraphStatusDto>(bridge, 'getGraphStatus'),

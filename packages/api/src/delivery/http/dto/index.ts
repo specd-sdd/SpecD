@@ -26,4 +26,6 @@ export type {
   ImplementationTrackingDto,
   TrackedImplementationFileDto,
 } from './implementation-review.js'
+export type { HookInstructionsDto } from './hook-instructions.js'
+export type { ArtifactInstructionDto } from './artifact-instruction.js'
 export type { HealthDto } from './health.js'

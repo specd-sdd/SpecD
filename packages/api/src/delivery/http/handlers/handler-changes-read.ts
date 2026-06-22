@@ -8,11 +8,13 @@ import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import {
   toArtifactListDtoFromView,
+  toArtifactInstructionDto,
   toChangeDetailDto,
   toChangeStatusDto,
+  toHookInstructionsDto,
+  toImplementationReviewDto,
 } from '../presenters/presenter-change.js'
 import { toArtifactContentDto } from '../presenters/presenter-artifact.js'
-import { toImplementationReviewDto } from '../presenters/presenter-change.js'
 import {
   apiRouteSchema,
   BOOLEAN_QUERY_SCHEMA,
@@ -474,11 +476,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const query = req.query as { step?: string; phase?: string }
-      return ctx.kernel.changes.getHookInstructions.execute({
+      const result = await ctx.kernel.changes.getHookInstructions.execute({
         name,
         step: query.step as import('@specd/core').ChangeState,
-        phase: (query.phase ?? 'pre') as 'pre' | 'post',
+        phase: (query.phase as 'pre' | 'post') ?? 'pre',
       })
+      return toHookInstructionsDto(result)
     }),
   )
 
@@ -492,7 +495,8 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
     },
     apiHandler(async (ctx, req) => {
       const { name, artifactId } = req.params as { name: string; artifactId: string }
-      return ctx.kernel.changes.getArtifactInstruction.execute({ name, artifactId })
+      const result = await ctx.kernel.changes.getArtifactInstruction.execute({ name, artifactId })
+      return toArtifactInstructionDto(result)
     }),
   )
 }

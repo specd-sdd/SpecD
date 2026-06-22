@@ -194,6 +194,18 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-archive",
+        "file": "cli:src/commands/change/archive.ts"
+      },
+      {
+        "specId": "cli:change-archive",
+        "file": "cli:src/index.ts"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:5fa3b7ed3772608426b6ed9a2e69b28380dc1e71462d9c6019b770788c700d98",
     "verify.md": "sha256:7cdd99751a68fb819648a4ed89d2b4ea8331aafe3b5063b7e8ad6859b10dfb5f"

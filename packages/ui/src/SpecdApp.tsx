@@ -29,7 +29,13 @@ export type SpecdAppProps = {
   onOpenLocalProject?: (path: string) => void
 }
 
-function StudioShell({ mode }: { mode: SpecdAppMode }): React.ReactElement {
+function StudioShell({
+  mode,
+  storage,
+}: {
+  mode: SpecdAppMode
+  storage: IUserStorage
+}): React.ReactElement {
   const { project, status, refreshKey } = useProjectPoll({ poll: true })
   const collections = useChangesCollection(refreshKey)
 
@@ -46,10 +52,16 @@ function StudioShell({ mode }: { mode: SpecdAppMode }): React.ReactElement {
 
   return (
     <ShellLayout
+      storage={storage}
       project={project.data}
       projectStatus={status.data}
-      connectionLabel={mode === 'desktop' ? 'Desktop session' : 'Remote API'}
-      runtimeLabel={mode}
+      connectionLabel={
+        mode === 'embedded'
+          ? 'Local session'
+          : mode === 'desktop'
+            ? 'Desktop session'
+            : 'Remote API'
+      }
       refreshKey={refreshKey}
       changes={{
         active: collections.active.data ?? [],
@@ -165,12 +177,23 @@ export function SpecdApp({
       : new LocalStorageUserStorage()
   }, [storageProp])
 
+  React.useEffect(() => {
+    const theme = storage.get<'light' | 'dark'>('theme') || 'dark'
+    if (theme === 'light') {
+      document.documentElement.classList.add('light')
+      document.documentElement.classList.remove('dark')
+    } else {
+      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    }
+  }, [storage])
+
   if (skipConnect && portProp) {
     return (
       <div className={className ?? 'h-screen w-screen overflow-hidden'}>
         <SpecdDataProvider port={portProp}>
           <StudioErrorBoundary>
-            <StudioShell mode={mode} />
+            <StudioShell mode={mode} storage={storage} />
           </StudioErrorBoundary>
         </SpecdDataProvider>
       </div>
@@ -195,7 +218,7 @@ export function SpecdApp({
         {(port) => (
           <SpecdDataProvider port={port}>
             <StudioErrorBoundary>
-              <StudioShell mode={mode} />
+              <StudioShell mode={mode} storage={storage} />
             </StudioErrorBoundary>
           </SpecdDataProvider>
         )}

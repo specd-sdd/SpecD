@@ -1,7 +1,7 @@
 {
   "title": "DraftChange",
   "description": "Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.",
-  "dependsOn": ["core:change", "default:_global/architecture", "core:drafted-change-view"],
+  "dependsOn": ["core:change", "core:drafted-change-view", "default:_global/architecture"],
   "context": [
     "Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted."
   ],

@@ -107,6 +107,7 @@
       ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:cf1b0bacea14a47932fe1edd20a5c1fce4b96f61b6aabbe8490f944706002862",
     "verify.md": "sha256:11e6a8239bb496ab5fcd58342465a2cc3318d3bd44a03b60e8c3b8767a2928ef"

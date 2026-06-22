@@ -2,6 +2,15 @@
 
 ## Requirements
 
+### Requirement: palette supports global remote search
+
+#### Scenario: Remote search aggregates symbol spec and document hits
+
+- **GIVEN** a search query is entered
+- **WHEN** results return
+- **THEN** they are grouped by Spec, Code Symbol, and Document hits
+- **AND** UI renders icons appropriate to each type
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

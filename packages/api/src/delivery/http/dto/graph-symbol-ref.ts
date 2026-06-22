@@ -4,6 +4,7 @@ export interface GraphSymbolRefDto {
   readonly workspace: string
   readonly workspaceRelativePath: string
   readonly projectRelativePath: string
+  readonly filePath: string
   readonly name: string
   readonly kind: string
   readonly line: number

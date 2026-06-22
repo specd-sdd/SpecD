@@ -5,6 +5,7 @@ import {
   Menu,
   type MenuItem,
   type MenuItemConstructorOptions,
+  shell,
 } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -177,6 +178,11 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  })
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url)
+    return { action: 'deny' }
   })
 
   mainWindow.once('ready-to-show', () => {

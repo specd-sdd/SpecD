@@ -45,6 +45,41 @@
     --editor: 220 15% 7%;
   }
 
+  .light {
+    --studio-bg-primary: #f6f8fa;
+    --studio-bg-secondary: #ffffff;
+    --studio-bg-elevated: #ffffff;
+    --studio-border: #d0d7de;
+    --studio-text: #24292f;
+    --studio-text-muted: #57606a;
+    --studio-text-disabled: #8c959f;
+    --studio-accent-selection: #0969da;
+    --studio-accent-focus: #0969da;
+    --studio-success: #1a7f37;
+    --studio-warning: #9a6700;
+    --studio-error: #cf222e;
+    --studio-lifecycle: #8250df;
+    --studio-info: #0598bc;
+    --studio-editor: #f6f8fa;
+
+    --background: 210 40% 98%;
+    --foreground: 220 24% 16%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 217 8% 38%;
+    --border: 220 13% 87%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 45%;
+    --primary: 217 91% 45%;
+    --primary-foreground: 210 40% 98%;
+    --accent: 210 20% 93%;
+    --accent-foreground: 220 24% 16%;
+    --destructive: 358 75% 47%;
+    --destructive-foreground: 210 40% 98%;
+    --panel: 0 0% 100%;
+    --panel-header: 210 20% 98%;
+    --editor: 210 20% 99%;
+  }
+
   * {
     @apply border-border;
   }

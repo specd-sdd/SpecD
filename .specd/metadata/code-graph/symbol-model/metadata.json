@@ -473,25 +473,16 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "code-graph:symbol-model",
-        "file": "code-graph:src/domain/value-objects/index.ts"
-      },
-      {
-        "specId": "code-graph:symbol-model",
-        "file": "code-graph:test/domain/value-objects/file-node.spec.ts"
-      },
-      {
-        "specId": "code-graph:symbol-model",
-        "file": "code-graph:test/domain/value-objects/symbol-node.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "code-graph:symbol-model",
-        "file": "code-graph:src/domain/value-objects/spec-node.ts",
-        "symbol": "createSpecNode"
+        "file": "code-graph:src/domain/value-objects/file-node.ts",
+        "symbol": "FileNode"
+      },
+      {
+        "specId": "code-graph:symbol-model",
+        "file": "code-graph:src/domain/value-objects/file-node.ts",
+        "symbol": "createFileNode"
       }
     ]
   },

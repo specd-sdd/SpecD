@@ -22,20 +22,21 @@ export function ArtifactEditor({
   value,
   onChange,
   readOnly = false,
+  theme = 'dark',
 }: {
   filename?: string
   value: string
   onChange?: (value: string) => void
   readOnly?: boolean
+  theme?: 'light' | 'dark'
 }): React.ReactElement {
   const language =
     filename?.endsWith('.yaml') || filename?.endsWith('.yml') ? 'yaml' : 'markdown'
 
+  const monacoTheme = theme === 'light' ? 'specd-studio-light' : 'specd-studio-dark'
+
   return (
-    <div
-      className="flex h-full min-h-0 flex-col"
-      style={{ backgroundColor: 'rgb(20, 22, 26)' }}
-    >
+    <div className="flex h-full min-h-0 flex-col bg-editor">
       {filename ? (
         <div className="border-b border-border px-2 py-0.5 font-mono text-xs text-muted-foreground">
           {filename}
@@ -45,8 +46,7 @@ export function ArtifactEditor({
         <React.Suspense
           fallback={
             <textarea
-              className="h-full w-full resize-none p-2 font-mono text-xs text-foreground outline-none"
-              style={{ backgroundColor: 'rgb(20, 22, 26)' }}
+              className="h-full w-full resize-none p-2 font-mono text-xs text-foreground outline-none bg-editor border-none"
               value={value}
               readOnly={readOnly}
               onChange={(e) => onChange?.(e.target.value)}
@@ -55,7 +55,7 @@ export function ArtifactEditor({
         >
           <MonacoEditor
             height="100%"
-            theme="specd-studio"
+            theme={monacoTheme}
             language={language}
             value={value}
             beforeMount={onMonacoBeforeMount}

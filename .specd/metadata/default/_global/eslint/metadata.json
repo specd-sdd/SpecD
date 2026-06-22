@@ -121,7 +121,5 @@
     "spec.md": "sha256:cbf52148d3d70d89911d05a46cf3c51adb27fd6860b86e578800ec58fa8de5b1",
     "verify.md": "sha256:e5a6830ee9ea6fa665c8cef868242888f1af151606625cecf0f254da7284a799"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "ESLint enforcement rules for repo conventions.",
-  "optimizedContext": "ESLint enforces repository conventions, type-aware checks, and architectural boundaries across all TypeScript workspaces.\n"
+  "generatedBy": "core"
 }

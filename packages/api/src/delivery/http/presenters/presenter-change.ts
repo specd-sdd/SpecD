@@ -3,6 +3,8 @@ import {
   type ChangeEvent,
   type DiscardedChangeView,
   type DraftedChangeView,
+  type GetArtifactInstructionResult,
+  type GetHookInstructionsResult,
   type GetImplementationReviewResult,
   type GetStatusResult,
   type ReadOnlyChangeView,
@@ -17,6 +19,47 @@ type TaskSummaryByType = ReadonlyMap<
   string,
   { readonly totalTasks: number; readonly completedTasks: number }
 >
+
+/**
+ * Maps hook instructions to the shared DTO shape.
+ *
+ * @param result - Core hook instructions result.
+ * @returns Hook instructions DTO.
+ */
+export function toHookInstructionsDto(result: GetHookInstructionsResult): Record<string, unknown> {
+  return {
+    phase: result.phase,
+    instructions: result.instructions.map((i) => ({
+      id: i.id,
+      text: i.text,
+    })),
+  }
+}
+
+/**
+ * Maps artifact instruction to the shared DTO shape.
+ *
+ * @param result - Core artifact instruction result.
+ * @returns Artifact instruction DTO.
+ */
+export function toArtifactInstructionDto(
+  result: GetArtifactInstructionResult,
+): Record<string, unknown> {
+  return {
+    artifactId: result.artifactId,
+    rulesPre: [...result.rulesPre],
+    instruction: result.instruction,
+    template: result.template,
+    delta: result.delta
+      ? {
+          formatInstructions: result.delta.formatInstructions,
+          domainInstructions: result.delta.domainInstructions,
+          availableOutlines: [...result.delta.availableOutlines],
+        }
+      : null,
+    rulesPost: [...result.rulesPost],
+  }
+}
 
 /**
  *

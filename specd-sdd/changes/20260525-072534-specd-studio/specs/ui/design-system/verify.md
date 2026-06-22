@@ -257,11 +257,11 @@
 - **THEN** status bar shows workspace label
 - **AND** API or server status indicator
 
-#### Scenario: Status bar shows validation and runtime profile
+#### Scenario: Status bar shows authentication and loading activity
 
-- **WHEN** validation state is known
-- **THEN** status bar reflects validation summary
-- **AND** shows local vs remote runtime when applicable
+- **WHEN** project connection requires auth or a background task runs
+- **THEN** status bar reflects authentication type for remote sessions
+- **AND** shows active loading status with spinner when loading is active
 
 ### Requirement: semantic colors map to workflow states
 
@@ -368,3 +368,37 @@
 - **GIVEN** draft scope `['ui:z', 'api:m', 'core:a']` in `studio-change-scope-spec-cards`
 - **WHEN** dialog shows the edit step
 - **THEN** card headers appear `api:m`, `core:a`, `ui:z`
+
+### Requirement: top bar exposes docs, notifications, and theme controls
+
+#### Scenario: Docs button links to getting-started guide
+
+- **WHEN** user clicks on Docs button
+- **THEN** app redirects or opens default browser to `https://getspecd.dev/docs/guide/getting-started`
+
+#### Scenario: Notifications popover displays health checks and conflicts
+
+- **GIVEN** stale graph index is true or change overlaps are detected
+- **WHEN** user clicks on Notifications button
+- **THEN** popover renders showing active warnings
+- **AND** indicator badge is visible on notifications button
+
+#### Scenario: Appearance button toggles theme between light and dark
+
+- **WHEN** user clicks on Appearance button
+- **THEN** visual theme toggles between light and dark modes
+- **AND** preference is persisted in user storage
+
+#### Scenario: Stored theme preference is applied synchronously at startup
+
+- **GIVEN** a stored theme preference (e.g. `light`) in user storage
+- **WHEN** the host application bootstraps (web or desktop)
+- **THEN** the stored theme class (e.g. `light`) is applied to `document.documentElement` immediately
+- **AND** UI elements like the loading screen and project dialog render in the correct theme without a flash
+
+#### Scenario: Background validation checks are deferred at startup
+
+- **GIVEN** the top bar is rendered during project loading or initial startup
+- **WHEN** the component mounts
+- **THEN** overlaps and closed-spec validations are not invoked immediately
+- **AND** the checks remain disabled until the loading phase completes and a 3-second delay has elapsed

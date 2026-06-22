@@ -1,5 +1,13 @@
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { dialog } from 'electron'
+
+const require = createRequire(import.meta.url)
+let codeGraphVersion = '0.0.0'
+try {
+  const pkg = require('@specd/code-graph/package.json') as { version?: string }
+  codeGraphVersion = pkg.version ?? '0.0.0'
+} catch {}
 import {
   readRecents,
   addRecentConnection,
@@ -10,40 +18,204 @@ import {
 import { getSetting, setSetting, removeSetting } from './settings-store.js'
 
 import {
-  DEFAULT_EXCLUDE_PATHS,
   type GraphStatistics,
   type SymbolKind,
   createCodeGraphProvider,
+  type IndexResult,
+  buildProjectGraphConfig,
 } from '@specd/code-graph-electron'
 import {
   createConfigLoader,
   createKernel,
+  createLogFormatter,
   createVcsActorResolver,
   createVcsAdapter,
+  Logger,
+  LogRingBuffer,
   SpecPath,
   type ArchivedChange,
   type Change,
   type ChangeEvent,
+  type ChangeState,
+  type CompileContextConfig,
+  type CompileContextResult,
+  type GetArtifactInstructionResult,
   type GetChangeArtifactResult,
+  type GetHookInstructionsResult,
   type GetImplementationReviewResult,
   type GetStatusResult,
   type Kernel,
+  type ProjectWorkspace,
   type ReadOnlyChangeView,
   type SaveChangeArtifactResult,
   type SpecdConfig,
+  type SpecListEntry,
+  type SpecSearchEntry,
+  type ValidateChangeBatchResult,
 } from '@specd/core'
 import {
   createIpcFailure,
   createIpcSuccess,
   isDraftAwareIpcMethod,
+  type AppendProjectLogInput,
+  type ArchivedChangeDetailDto,
+  type ArtifactContentDto,
+  type ArtifactInstructionDto,
+  type ChangeArtifactListItemDto,
+  type ChangeContextQuery,
+  type ChangeDetailDto,
+  type ChangeGraphViewDto,
+  type ChangeHistoryEventDto,
+  type ChangeStatusDto,
+  type ChangeSummaryDto,
+  type GraphFileRefDto,
+  type GraphImpactDto,
+  type GraphIndexInput,
+  type GraphIndexResultDto,
+  type GraphSearchResultDto,
+  type GraphStatusDto,
+  type GraphSymbolRefDto,
+  type HookInstructionsDto,
+  type ImplementationReviewDto,
   type IpcRequestEnvelope,
   type IpcResponseEnvelope,
+  type PreviewChangeQuery,
+  type ProjectDto,
+  type ProjectStatusDto,
+  type SpecDetailDto,
+  type SpecSummaryDto,
+  type TransitionChangeInput,
+  type UpdateImplementationTrackingInput,
+  type UpdateSpecDependenciesInput,
+  type ValidateBatchResultDto,
+  type WorkspaceSpecTreeDto,
+  type WorkspaceSummaryDto,
 } from '@specd/client'
 import type {
   OutlineChangeArtifactInput,
   OutlineSpecDraftInput,
   PreviewChangeDraftInput,
 } from '@specd/client'
+
+/**
+ * Maps a core batch validation result to the client DTO.
+ *
+ * @param result - Use-case batch result.
+ * @returns Batch validation DTO.
+ */
+function toValidateBatchResultDto(result: ValidateChangeBatchResult): ValidateBatchResultDto {
+  return {
+    passed: result.passed,
+    total: result.total,
+    results: result.results.map((step) => ({
+      spec: step.spec,
+      artifact: step.artifact,
+      passed: step.passed,
+      failures: step.failures.map((f) => ({
+        message: f.description,
+        artifactId: f.artifactId,
+        ...(f.filename !== undefined ? { path: f.filename } : {}),
+      })),
+      warnings: step.warnings.map((w) => w.description),
+      files: step.files.map((f) => f.filename),
+    })),
+  }
+}
+
+/**
+ * Maps project config to the compile-context input shape.
+ *
+ * @param config - Resolved project config.
+ * @returns Compile context configuration.
+ */
+function toCompileContextConfig(config: SpecdConfig): CompileContextConfig {
+  return {
+    projectRoot: config.projectRoot,
+    configPath: config.configPath,
+    llmOptimizedContext: config.llmOptimizedContext,
+    ...(config.context !== undefined
+      ? {
+          context: config.context.map((e) =>
+            'file' in e ? { file: e.file } : { instruction: e.instruction },
+          ),
+        }
+      : {}),
+    ...(config.contextIncludeSpecs !== undefined
+      ? { contextIncludeSpecs: [...config.contextIncludeSpecs] }
+      : {}),
+    ...(config.contextExcludeSpecs !== undefined
+      ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
+      : {}),
+    ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
+  }
+}
+
+/**
+ * Renders {@link CompileContextResult} as agent-facing markdown.
+ */
+function formatCompiledContextMarkdown(result: CompileContextResult): string {
+  const parts: string[] = [`Context Fingerprint: ${result.contextFingerprint}`]
+
+  for (const entry of result.projectContext) {
+    if (entry.source === 'file' && entry.path !== undefined) {
+      parts.push(`**Source: ${entry.path}**\n\n${entry.content}`)
+    } else {
+      parts.push(`**Source: instruction**\n\n${entry.content}`)
+    }
+  }
+
+  const fullSpecs = result.specs.filter((s) => s.mode === 'full')
+  if (fullSpecs.length > 0) {
+    const specParts = fullSpecs.map(
+      (s) => `### Spec: ${s.specId}\nMode: full\n\n${s.content ?? ''}`,
+    )
+    parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
+  }
+
+  const nonFullSpecs = result.specs.filter((s) => s.mode !== 'full')
+  if (nonFullSpecs.length > 0) {
+    const includePatternSpecs = nonFullSpecs.filter((s) => s.source !== 'dependsOnTraversal')
+    const depTraversalSpecs = nonFullSpecs.filter((s) => s.source === 'dependsOnTraversal')
+
+    const catalogueParts: string[] = [
+      'Use `specd changes spec-preview <change-name> <specId>` to load the merged full content of any change spec you need.',
+      '',
+    ]
+
+    if (includePatternSpecs.length > 0) {
+      catalogueParts.push('| Spec ID | Mode | Source | Title | Description |')
+      catalogueParts.push('|---------|------|--------|-------|-------------|')
+      for (const s of includePatternSpecs) {
+        catalogueParts.push(
+          `| ${s.specId} | ${s.mode} | ${s.source} | ${s.title ?? '—'} | ${s.description ?? '—'} |`,
+        )
+      }
+    }
+
+    if (depTraversalSpecs.length > 0) {
+      catalogueParts.push('', '### Via dependencies', '')
+      catalogueParts.push('| Spec ID | Mode | Source | Title | Description |')
+      catalogueParts.push('|---------|------|--------|-------|-------------|')
+      for (const s of depTraversalSpecs) {
+        catalogueParts.push(
+          `| ${s.specId} | ${s.mode} | ${s.source} | ${s.title ?? '—'} | ${s.description ?? '—'} |`,
+        )
+      }
+    }
+    parts.push(`## Available context specs\n\n${catalogueParts.join('\n')}`)
+  }
+
+  if (result.availableSteps.length > 0) {
+    const stepLines = result.availableSteps.map((s) =>
+      s.available
+        ? `- ${s.step}: available`
+        : `- ${s.step}: unavailable — requires: [${s.blockingArtifacts.join(', ')}]`,
+    )
+    parts.push(`## Available steps\n\n${stepLines.join('\n')}`)
+  }
+
+  return parts.join('\n\n---\n\n')
+}
 
 type TaskSummaryByType = ReadonlyMap<
   string,
@@ -52,6 +224,7 @@ type TaskSummaryByType = ReadonlyMap<
 
 let kernelPromise: Promise<Kernel> | undefined
 let loadedConfig: SpecdConfig | undefined
+let logRing: LogRingBuffer | undefined
 
 /**
  * Formats a date as an ISO string.
@@ -94,6 +267,30 @@ async function getConfig(): Promise<SpecdConfig> {
   return loadedConfig
 }
 
+export let activeProjectRoot: string | undefined = undefined
+
+/**
+ * Lazily boots the project kernel for local IPC.
+ *
+ * @returns Active project kernel.
+ */
+async function getKernel(): Promise<Kernel> {
+  if (kernelPromise === undefined) {
+    kernelPromise = (async () => {
+      const loader = createConfigLoader({ startDir: activeProjectRoot ?? process.cwd() })
+      loadedConfig = await loader.load()
+      logRing = new LogRingBuffer(1000)
+      const kernel = await createKernel(loadedConfig, {
+        logRing,
+        logFormatter: createLogFormatter({ colorize: false }),
+      })
+      Logger.info('Desktop kernel booted', { projectRoot: loadedConfig.projectRoot })
+      return kernel
+    })()
+  }
+  return kernelPromise
+}
+
 /**
  * Opens a graph provider for one operation and closes it afterwards.
  *
@@ -104,6 +301,7 @@ async function withGraphProvider<TResult>(
   run: (provider: ReturnType<typeof createCodeGraphProvider>) => Promise<TResult>,
 ): Promise<TResult> {
   const config = await getConfig()
+  Logger.info('Opening graph provider', { projectRoot: config.projectRoot })
   const provider = createCodeGraphProvider(config)
   await provider.open()
   try {
@@ -119,27 +317,36 @@ async function withGraphProvider<TResult>(
  * @param event - Domain history event.
  * @returns Serialized event.
  */
-function historyEventDto(event: ChangeEvent): Record<string, unknown> {
+function historyEventDto(event: ChangeEvent): ChangeHistoryEventDto {
   const base = {
-    type: event.type,
     at: iso(event.at),
     by: { name: event.by.name, email: event.by.email },
   }
   if (event.type === 'created') {
     return {
       ...base,
+      type: 'created' as const,
       specIds: [...event.specIds],
       schemaName: event.schemaName,
       schemaVersion: event.schemaVersion,
     }
   }
   if (event.type === 'transitioned') {
-    return { ...base, from: event.from, to: event.to }
+    return {
+      ...base,
+      type: 'transitioned' as const,
+      from: event.from,
+      to: event.to,
+    }
   }
   if (event.type === 'invalidated') {
-    return { ...base, cause: event.cause }
+    return {
+      ...base,
+      type: 'invalidated' as const,
+      cause: event.cause,
+    }
   }
-  return base
+  return { ...base, type: event.type as 'spec-approved' | 'signed-off' }
 }
 
 /**
@@ -152,7 +359,7 @@ function historyEventDto(event: ChangeEvent): Record<string, unknown> {
 function toChangeSummaryDto(
   change: Change | ReadOnlyChangeView,
   blockerCount = 0,
-): Record<string, unknown> {
+): ChangeSummaryDto {
   return {
     name: change.name,
     ...(change.description !== undefined ? { description: change.description } : {}),
@@ -169,7 +376,7 @@ function toChangeSummaryDto(
  * @param change - Change or read-only view.
  * @returns Detail DTO.
  */
-function toChangeDetailDto(change: Change | ReadOnlyChangeView): Record<string, unknown> {
+function toChangeDetailDto(change: Change | ReadOnlyChangeView): ChangeDetailDto {
   const specApproved = change.history.some((event) => event.type === 'spec-approved')
   const signoffApproved = change.history.some((event) => event.type === 'signed-off')
   return {
@@ -200,7 +407,7 @@ function toChangeDetailDto(change: Change | ReadOnlyChangeView): Record<string, 
  * @param result - Core status result.
  * @returns Status DTO.
  */
-function toChangeStatusDto(result: GetStatusResult): Record<string, unknown> {
+function toChangeStatusDto(result: GetStatusResult): ChangeStatusDto {
   const base = result.change ?? result.draftView
   if (base === undefined) {
     throw new Error('GetStatusResult missing change payload')
@@ -275,34 +482,40 @@ function toChangeStatusDto(result: GetStatusResult): Record<string, unknown> {
 }
 
 /**
- * Maps a change-artifact read result to the DTO shape.
+ * Maps a core artifact result to the client DTO shape.
  *
- * @param result - Core artifact result.
- * @returns Artifact DTO.
+ * @param filename - Target filename.
+ * @param result - Core artifact read result.
+ * @returns Artifact content DTO.
  */
-function toArtifactContentDto(result: GetChangeArtifactResult): Record<string, unknown> {
+function toArtifactContentDto(
+  filename: string,
+  result: GetChangeArtifactResult,
+): ArtifactContentDto {
   return {
+    filename,
     content: result.content,
-    originalHash: result.originalHash,
+    originalHash: result.originalHash ?? '',
   }
 }
 
 /**
- * Maps a change-artifact save result to the DTO shape.
+ * Maps a save-artifact result to the client DTO shape.
  *
- * @param content - Persisted content.
+ * @param filename - Target filename.
+ * @param content - Saved content.
  * @param result - Core save result.
- * @returns Artifact DTO.
+ * @returns Artifact content DTO.
  */
 function toSaveArtifactContentDto(
+  filename: string,
   content: string,
   result: SaveChangeArtifactResult,
-): Record<string, unknown> {
+): ArtifactContentDto {
   return {
+    filename,
     content,
     originalHash: result.contentHash,
-    contentHash: result.contentHash,
-    updatedAt: result.updatedAt,
   }
 }
 
@@ -319,8 +532,8 @@ function toArtifactListDtoFromView(
     hasTasksByType?: ReadonlyMap<string, boolean>
     taskSummaryByType?: TaskSummaryByType
   } = {},
-): readonly Record<string, unknown>[] {
-  const entries: Record<string, unknown>[] = []
+): ChangeArtifactListItemDto[] {
+  const entries: ChangeArtifactListItemDto[] = []
   for (const artifact of view.artifacts.values()) {
     for (const file of artifact.files.values()) {
       entries.push({
@@ -341,7 +554,7 @@ function toArtifactListDtoFromView(
  * @param config - Loaded project config.
  * @returns Project DTO.
  */
-function toProjectDto(config: SpecdConfig): Record<string, unknown> {
+function toProjectDto(config: SpecdConfig): ProjectDto {
   return {
     name: config.projectRoot.split('/').pop() ?? config.projectRoot,
     schemaRef: config.schemaRef,
@@ -355,6 +568,80 @@ function toProjectDto(config: SpecdConfig): Record<string, unknown> {
 }
 
 /**
+ * Maps indexing result to the shared DTO shape.
+ *
+ * @param result - Core indexing result.
+ * @returns Graph index DTO.
+ */
+function toGraphIndexResultDto(result: IndexResult): GraphIndexResultDto {
+  return {
+    filesDiscovered: result.filesDiscovered,
+    filesIndexed: result.filesIndexed,
+    documentsIndexed: result.documentsIndexed,
+    filesRemoved: result.filesRemoved,
+    filesSkipped: result.filesSkipped,
+    specsDiscovered: result.specsDiscovered,
+    specsIndexed: result.specsIndexed,
+    errors: result.errors.map((e) => ({
+      filePath: e.filePath,
+      message: e.message,
+    })),
+    duration: result.duration,
+    workspaces: result.workspaces.map((ws) => ({
+      name: ws.name,
+      filesDiscovered: ws.filesDiscovered,
+      filesIndexed: ws.filesIndexed,
+      filesSkipped: ws.filesSkipped,
+      filesRemoved: ws.filesRemoved,
+      specsDiscovered: ws.specsDiscovered,
+      specsIndexed: ws.specsIndexed,
+    })),
+    vcsRef: result.vcsRef,
+    graphFingerprint: result.graphFingerprint,
+    fullRebuildReason: result.fullRebuildReason,
+  }
+}
+
+/**
+ * Maps hook instructions to the shared DTO shape.
+ *
+ * @param result - Core hook instructions result.
+ * @returns Hook instructions DTO.
+ */
+function toHookInstructionsDto(result: GetHookInstructionsResult): HookInstructionsDto {
+  return {
+    phase: result.phase,
+    instructions: result.instructions.map((i) => ({
+      id: i.id,
+      text: i.text,
+    })),
+  }
+}
+
+/**
+ * Maps artifact instruction to the shared DTO shape.
+ *
+ * @param result - Core artifact instruction result.
+ * @returns Artifact instruction DTO.
+ */
+function toArtifactInstructionDto(result: GetArtifactInstructionResult): ArtifactInstructionDto {
+  return {
+    artifactId: result.artifactId,
+    rulesPre: [...result.rulesPre],
+    instruction: result.instruction,
+    template: result.template,
+    delta: result.delta
+      ? {
+          formatInstructions: result.delta.formatInstructions,
+          domainInstructions: result.delta.domainInstructions,
+          availableOutlines: [...result.delta.availableOutlines],
+        }
+      : null,
+    rulesPost: [...result.rulesPost],
+  }
+}
+
+/**
  * Maps project workspaces to the shared workspace-summary DTO shape.
  *
  * @param config - Loaded project config.
@@ -363,14 +650,13 @@ function toProjectDto(config: SpecdConfig): Record<string, unknown> {
  */
 function toWorkspaceSummaryDtos(
   config: SpecdConfig,
-  workspaces: Awaited<ReturnType<Kernel['project']['listWorkspaces']['execute']>>,
-): readonly Record<string, unknown>[] {
+  workspaces: readonly ProjectWorkspace[],
+): WorkspaceSummaryDto[] {
   const descriptors = new Map(config.workspaces.map((workspace) => [workspace.name, workspace]))
   return workspaces.map((workspace) => {
     const descriptor = descriptors.get(workspace.name)
     return {
       name: workspace.name,
-      ...(descriptor?.prefix !== undefined ? { prefix: descriptor.prefix } : {}),
       ...(workspace.ownership !== undefined ? { ownership: workspace.ownership } : {}),
       ...(descriptor?.specsPath !== undefined ? { specsPath: descriptor.specsPath } : {}),
       codeRoots: [workspace.codeRoot],
@@ -392,7 +678,7 @@ function toProjectStatusDto(input: {
   graphStats: GraphStatistics | null
   graphStale: boolean | null
   config: SpecdConfig
-}): Record<string, unknown> {
+}): ProjectStatusDto {
   return {
     activeChanges: input.activeCount,
     drafts: input.draftCount,
@@ -400,9 +686,13 @@ function toProjectStatusDto(input: {
     archived: input.archivedCount,
     graph: {
       indexed: input.graphStats !== null,
-      stale: input.graphStale,
-      symbolCount: input.graphStats?.symbolCount ?? null,
-      specCount: input.graphStats?.specCount ?? null,
+      ...(input.graphStale !== null ? { stale: input.graphStale } : {}),
+      ...(input.graphStats?.symbolCount !== undefined
+        ? { symbolCount: input.graphStats.symbolCount }
+        : {}),
+      ...(input.graphStats?.specCount !== undefined
+        ? { specCount: input.graphStats.specCount }
+        : {}),
     },
     auth: { type: input.config.api?.auth.type ?? 'disabled' },
   }
@@ -415,7 +705,7 @@ function toProjectStatusDto(input: {
  * @param stale - Staleness flag.
  * @returns Graph status DTO.
  */
-function toGraphStatusDto(stats: GraphStatistics, stale: boolean | null): Record<string, unknown> {
+function toGraphStatusDto(stats: GraphStatistics, stale: boolean | null): GraphStatusDto {
   return {
     lastIndexedAt: stats.lastIndexedAt ?? null,
     lastIndexedRef: stats.lastIndexedRef ?? null,
@@ -496,7 +786,7 @@ function parseGraphSymbolId(symbolId: string): { kind: string; column: number } 
  * @param graphFileId - `workspace:path` file id.
  * @returns Graph file DTO.
  */
-function toGraphFileRefDto(config: SpecdConfig, graphFileId: string): Record<string, unknown> {
+function toGraphFileRefDto(config: SpecdConfig, graphFileId: string): GraphFileRefDto {
   const workspace = getWorkspaceFromGraphPath(graphFileId)
   const workspaceRelativePath = getRelativePathFromGraphPath(graphFileId)
   return {
@@ -524,7 +814,7 @@ function toGraphSymbolRefDto(
     kind?: string
     column?: number
   },
-): Record<string, unknown> {
+): GraphSymbolRefDto {
   const workspace = getWorkspaceFromGraphPath(symbol.filePath)
   const workspaceRelativePath = getRelativePathFromGraphPath(symbol.filePath)
   const parsed = parseGraphSymbolId(symbol.id)
@@ -533,6 +823,7 @@ function toGraphSymbolRefDto(
     workspace,
     workspaceRelativePath,
     projectRelativePath: toProjectRelativePath(config, workspace, workspaceRelativePath),
+    filePath: symbol.filePath,
     name: symbol.name,
     kind: symbol.kind ?? parsed.kind,
     line: symbol.line,
@@ -566,13 +857,7 @@ function toGraphSearchResultDto(
     endLine: number
   }>,
   specs: Array<{
-    spec: {
-      workspace: string
-      specId: string
-      path: string
-      title: string
-      description?: string
-    }
+    spec: SpecSearchEntry | SpecListEntry
     score: number
     snippet: string
     startLine: number
@@ -585,7 +870,7 @@ function toGraphSearchResultDto(
     startLine: number
     endLine: number
   }>,
-): Record<string, unknown> {
+): GraphSearchResultDto {
   return {
     symbols: symbols.map(({ symbol, score, snippet, startLine, endLine }) => {
       const workspace = getWorkspaceFromGraphPath(symbol.filePath)
@@ -600,10 +885,10 @@ function toGraphSearchResultDto(
     }),
     specs: specs.map(({ spec, score, snippet, startLine, endLine }) => ({
       workspace: spec.workspace,
-      specId: spec.specId,
-      path: spec.path,
+      specId: 'specId' in spec ? (spec.specId as string) : `${spec.workspace}:${spec.path}`,
+      path: spec.path.toString(),
       title: spec.title,
-      description: spec.description,
+      description: 'summary' in spec ? (spec.summary ?? '') : '',
       score,
       snippet,
       startLine,
@@ -631,7 +916,7 @@ function toGraphSearchResultDto(
  * @param result - Core implementation-review result.
  * @returns Implementation-review DTO.
  */
-function toImplementationReviewDto(result: GetImplementationReviewResult): Record<string, unknown> {
+function toImplementationReviewDto(result: GetImplementationReviewResult): ImplementationReviewDto {
   return {
     specIds: [...result.specIds],
     implementationTracking: {
@@ -681,7 +966,7 @@ function toGraphImpactDto(
     risk?: string
   }>,
   specs: readonly string[] = [],
-): Record<string, unknown> {
+): GraphImpactDto {
   return {
     target,
     direction,
@@ -712,8 +997,8 @@ function toGraphImpactDto(
 function toChangeGraphViewDto(
   changeName: string,
   specIds: readonly string[],
-  specs: readonly Record<string, unknown>[],
-): Record<string, unknown> {
+  specs: ChangeGraphViewDto['specs'],
+): ChangeGraphViewDto {
   return { changeName, specIds: [...specIds], specs }
 }
 
@@ -726,13 +1011,13 @@ function toChangeGraphViewDto(
  */
 function toWorkspaceSpecTreeDto(
   workspace: string,
-  specs: Awaited<ReturnType<Kernel['specs']['list']['execute']>>,
-): Record<string, unknown> {
+  specs: readonly SpecListEntry[],
+): WorkspaceSpecTreeDto {
   return {
     workspace,
     specs: specs.map((spec) => ({
       specId: `${spec.workspace}:${spec.path}`,
-      path: spec.path,
+      path: spec.path.toString(),
       title: spec.title,
     })),
   }
@@ -753,7 +1038,7 @@ function toSpecDetailDto(input: {
   dependsOn: readonly string[]
   artifacts: readonly { filename: string; hash?: string }[]
   linkedChanges: readonly { name: string; description?: string; state: string }[]
-}): Record<string, unknown> {
+}): SpecDetailDto {
   return {
     specId: input.specId,
     workspace: input.workspace,
@@ -781,7 +1066,7 @@ function toSpecDetailDto(input: {
  */
 function toSpecSummaryDtos(
   results: Awaited<ReturnType<Kernel['specs']['search']['execute']>>,
-): readonly Record<string, unknown>[] {
+): SpecSummaryDto[] {
   return results.map((result) => ({
     specId: `${result.workspace}:${result.path}`,
     workspace: result.workspace,
@@ -834,14 +1119,15 @@ async function readArtifactTaskMapsForChange(
  * @param change - Archived change snapshot.
  * @returns Archived detail DTO.
  */
-function toArchivedChangeDetail(change: ArchivedChange): Record<string, unknown> {
+function toArchivedChangeDetail(change: ArchivedChange): ArchivedChangeDetailDto {
   const detail = toChangeDetailDto(change)
   const artifacts = [...change.artifacts.values()].flatMap((artifact) =>
     [...artifact.files.values()].map((file) => ({
       filename: file.filename,
-      artifactType: artifact.type,
+      type: artifact.type,
       hasTasks: false,
       state: file.status === 'missing' ? 'complete' : file.status,
+      displayStatus: file.displayStatus(),
     })),
   )
   return {
@@ -855,27 +1141,9 @@ function toArchivedChangeDetail(change: ArchivedChange): Record<string, unknown>
     archivedMeta: {
       archivedName: change.archivedName,
       archivedAt: iso(change.archivedAt),
-      artifactTypes: [...new Set(artifacts.map((artifact) => artifact.artifactType))],
+      artifactTypes: [...new Set(artifacts.map((artifact) => artifact.type))],
     },
   }
-}
-
-export let activeProjectRoot: string | undefined = undefined
-
-/**
- * Lazily boots the project kernel for local IPC.
- *
- * @returns Active project kernel.
- */
-async function getKernel(): Promise<Kernel> {
-  if (kernelPromise === undefined) {
-    kernelPromise = (async () => {
-      const loader = createConfigLoader({ startDir: activeProjectRoot ?? process.cwd() })
-      loadedConfig = await loader.load()
-      return createKernel(loadedConfig)
-    })()
-  }
-  return kernelPromise
 }
 
 /**
@@ -1091,7 +1359,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     case 'getChangeArtifact': {
       const [name, filename] = params as [string, string]
       const result = await kernel.changes.getArtifact.execute({ name, filename })
-      return createIpcSuccess(envelope.id, toArtifactContentDto(result))
+      return createIpcSuccess(envelope.id, toArtifactContentDto(filename, result))
     }
     case 'getDraft': {
       const [name] = params as [string]
@@ -1127,7 +1395,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         name,
         filename,
       })
-      return createIpcSuccess(envelope.id, toArtifactContentDto(result))
+      return createIpcSuccess(envelope.id, toArtifactContentDto(filename, result))
     }
     case 'getDiscarded': {
       const [name] = params as [string]
@@ -1163,7 +1431,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         name,
         filename,
       })
-      return createIpcSuccess(envelope.id, toArtifactContentDto(result))
+      return createIpcSuccess(envelope.id, toArtifactContentDto(filename, result))
     }
     case 'getReadOnlyChangeArtifact': {
       const [name, filename, origin] = params as [
@@ -1176,7 +1444,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         name,
         filename,
       })
-      return createIpcSuccess(envelope.id, toArtifactContentDto(result))
+      return createIpcSuccess(envelope.id, toArtifactContentDto(filename, result))
     }
     case 'getImplementationReview': {
       const [name] = params as [string]
@@ -1198,7 +1466,10 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         actor,
         ...(input.force === true ? { force: true } : {}),
       })
-      return createIpcSuccess(envelope.id, toSaveArtifactContentDto(input.content, result))
+      return createIpcSuccess(
+        envelope.id,
+        toSaveArtifactContentDto(filename, input.content, result),
+      )
     }
     case 'validateChange': {
       const [name, input] = params as [string, { specId?: string; artifactId?: string }?]
@@ -1224,7 +1495,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         name,
         ...(input?.artifactId !== undefined ? { artifactId: input.artifactId } : {}),
       })
-      return createIpcSuccess(envelope.id, result)
+      return createIpcSuccess(envelope.id, toValidateBatchResultDto(result))
     }
     case 'patchChange': {
       const [name, input] = params as [
@@ -1317,6 +1588,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     }
     case 'getSpecContext': {
       const [workspace, specPath] = params as [string, string]
+      const config = await getConfig()
       const context = await kernel.specs.getContext.execute({
         workspace,
         specPath: SpecPath.parse(specPath),
@@ -1348,11 +1620,24 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       }
       return createIpcSuccess(
         envelope.id,
-        toArtifactContentDto({
+        toArtifactContentDto(filename, {
           content: artifact.content,
           originalHash: artifact.originalHash ?? '',
         }),
       )
+    }
+    case 'validateSpecs': {
+      const [workspace, specPath] = params as [string, string | undefined]
+      const result = await kernel.specs.validate.execute({
+        ...(specPath !== undefined ? { specPath } : { workspace }),
+      })
+      return createIpcSuccess(envelope.id, {
+        passed: result.failed === 0,
+        totalSpecs: result.totalSpecs,
+        passedCount: result.passed,
+        failedCount: result.failed,
+        entries: result.entries,
+      })
     }
     case 'searchSpecs': {
       const [query] = params as [{ q: string; workspace?: string }]
@@ -1378,6 +1663,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         },
       ]
       const result = await withGraphProvider(async (provider) => {
+        const config = await getConfig()
         const limit = query.limit ?? 10
         const searchOpts = {
           query: query.q,
@@ -1426,6 +1712,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
             : query.direction
       const maxDepth = query.depth ?? 3
       const result = await withGraphProvider(async (provider) => {
+        const config = await getConfig()
         if (query.symbol !== undefined) {
           const impact = await provider.analyzeImpact(query.symbol, direction, maxDepth)
           return toGraphImpactDto(
@@ -1490,9 +1777,11 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       return createIpcSuccess(envelope.id, result)
     }
     case 'indexGraph': {
-      const [input] = params as [{ force?: boolean }?]
+      const [input = {}] = params as [GraphIndexInput?]
       const result = await withGraphProvider(async (provider) => {
+        const config = await getConfig()
         const workspaces = await kernel.project.listWorkspaces.execute()
+        const graphConfig = buildProjectGraphConfig(config)
         const vcs = await Promise.resolve(createVcsAdapter(config.projectRoot)).catch(() => null)
         const vcsRef = (await vcs?.ref()) ?? undefined
         if (input?.force === true) {
@@ -1500,41 +1789,29 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         }
         const indexResult = await provider.index({
           projectRoot: config.projectRoot,
-          workspaces: workspaces.map((ws) => ({
-            name: ws.name,
-            codeRoot: ws.codeRoot,
-            specRepo: ws.specRepo,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-          })),
-          graphConfig: {
-            includePaths: [...(config.graph?.includePaths ?? [])],
-            excludePaths: [...(config.graph?.excludePaths ?? DEFAULT_EXCLUDE_PATHS)],
-            workspaces: new Map(
-              config.workspaces.map((workspace) => [
-                workspace.name,
-                {
-                  ...(workspace.graph?.allowedPaths !== undefined
-                    ? { allowedPaths: [...workspace.graph.allowedPaths] }
-                    : {}),
-                  ...(workspace.graph?.excludePaths !== undefined
-                    ? { excludePaths: [...workspace.graph.excludePaths] }
-                    : {}),
-                  respectGitignore: workspace.graph?.respectGitignore ?? true,
-                },
-              ]),
-            ),
-          },
+          workspaces,
+          graphConfig,
+          codeGraphVersion,
           ...(vcsRef !== undefined ? { vcsRef } : {}),
         })
-        return indexResult
+        return toGraphIndexResultDto(indexResult)
       })
       return createIpcSuccess(envelope.id, result)
     }
     case 'getHotspots': {
+      const [query = {}] = params as [{ readonly minRisk?: string; readonly limit?: number }?]
       const result = await withGraphProvider(async (provider) => {
-        const hotspots = await provider.getHotspots()
-        return hotspots
+        const config = await getConfig()
+        const hotspots = await provider.getHotspots({
+          ...(query.minRisk !== undefined
+            ? { minRisk: query.minRisk as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }
+            : {}),
+          ...(query.limit !== undefined ? { limit: query.limit } : {}),
+        })
+        return hotspots.entries.map((entry) => ({
+          ...entry,
+          symbol: toGraphSymbolRefDto(config, entry.symbol),
+        }))
       })
       return createIpcSuccess(envelope.id, result)
     }
@@ -1549,6 +1826,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         throw new Error(`Spec not found: ${specId}`)
       }
       const result = await withGraphProvider(async (provider) => {
+        const config = await getConfig()
         const coveredFiles = await provider.getCoveredFiles(specId)
         const coveredSymbols = await provider.getCoveredSymbols(specId)
         return {
@@ -1573,6 +1851,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         throw new Error(`Change not found: ${name}`)
       }
       const result = await withGraphProvider(async (provider) => {
+        const config = await getConfig()
         const specs = await Promise.all(
           [...change.specIds].map(async (specId) => {
             const coveredFiles = (await provider.getCoveredFiles(specId)).map((relation) =>
@@ -1592,6 +1871,204 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         return toChangeGraphViewDto(name, [...change.specIds], specs)
       })
       return createIpcSuccess(envelope.id, result)
+    }
+    case 'detectOverlaps': {
+      const result = await kernel.changes.detectOverlap.execute()
+      return createIpcSuccess(envelope.id, {
+        hasOverlap: result.hasOverlap,
+        entries: result.entries.map((entry) => ({
+          specId: entry.specId,
+          changes: entry.changes.map((c) => ({
+            name: c.name,
+            state: c.state,
+          })),
+        })),
+      })
+    }
+    case 'getChangeContext': {
+      const [name, query = {}] = params as [string, ChangeContextQuery?]
+      const status = await kernel.changes.status.execute({ name })
+      const currentStep = status.change?.state ?? 'designing'
+      const config = await getConfig()
+
+      const context = await kernel.changes.compile.execute({
+        name,
+        step: (query.step as ChangeState) ?? currentStep,
+        config: toCompileContextConfig(config),
+        followDeps: query.followDeps ?? true,
+        depth: query.depth ?? 1,
+        includeChangeSpecs: query.includeChangeSpecs ?? true,
+      })
+      return createIpcSuccess(envelope.id, {
+        content: formatCompiledContextMarkdown(context),
+        warnings: context.warnings,
+      })
+    }
+    case 'previewChange': {
+      const [name, query] = params as [string, PreviewChangeQuery]
+      const result = await kernel.changes.preview.execute({
+        name,
+        specId: query.specId,
+      })
+      return createIpcSuccess(envelope.id, {
+        specId: query.specId,
+        files: result.files.map((file) => ({
+          filename: file.filename,
+          ...(file.base !== undefined && file.base !== null ? { base: file.base } : {}),
+          ...(file.merged !== undefined ? { merged: file.merged } : {}),
+        })),
+      })
+    }
+    case 'getHookInstructions': {
+      const [name] = params as [string]
+      const status = await kernel.changes.status.execute({ name })
+      if (!status.change) {
+        throw new Error(`Change not found: ${name}`)
+      }
+      const context = await kernel.changes.getHookInstructions.execute({
+        name,
+        step: status.change.state,
+        phase: 'pre',
+      })
+      return createIpcSuccess(envelope.id, toHookInstructionsDto(context))
+    }
+    case 'getArtifactInstruction': {
+      const [name, artifactId] = params as [string, string]
+      const context = await kernel.changes.getArtifactInstruction.execute({
+        name,
+        artifactId,
+      })
+      return createIpcSuccess(envelope.id, toArtifactInstructionDto(context))
+    }
+    case 'transitionChange': {
+      const [name, input] = params as [string, TransitionChangeInput]
+      const config = await getConfig()
+      const result = await kernel.changes.transition.execute({
+        name,
+        to: input.targetState as ChangeState,
+        approvalsSpec: config.approvals.spec,
+        approvalsSignoff: config.approvals.signoff,
+        ...(input.skipHooks === 'all' ? { skipHookPhases: new Set(['all']) } : {}),
+      })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result.change))
+    }
+    case 'draftChange': {
+      const [name] = params as [string]
+      const result = await kernel.changes.draft.execute({ name })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result))
+    }
+    case 'restoreChange': {
+      const [name] = params as [string]
+      const result = await kernel.changes.restore.execute({ name })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result))
+    }
+    case 'discardChange': {
+      const [name, input = {}] = params as [string, { reason?: string }?]
+      const result = await kernel.changes.discard.execute({
+        name,
+        reason: input.reason ?? 'Discarded via Studio Desktop',
+      })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result))
+    }
+    case 'archiveChange': {
+      const [name] = params as [string]
+      const result = await kernel.changes.archive.execute({ name })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result.archivedChange))
+    }
+    case 'approveSpec': {
+      const [name, input = {}] = params as [string, { reason?: string }?]
+      const config = await getConfig()
+      const result = await kernel.specs.approveSpec.execute({
+        name,
+        reason: input.reason ?? 'Approved via Studio Desktop',
+        approvalsSpec: config.approvals.spec,
+      })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result))
+    }
+    case 'approveSignoff': {
+      const [name, input = {}] = params as [string, { reason?: string }?]
+      const config = await getConfig()
+      const result = await kernel.specs.approveSignoff.execute({
+        name,
+        reason: input.reason ?? 'Signed off via Studio Desktop',
+        approvalsSignoff: config.approvals.signoff,
+      })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result))
+    }
+    case 'invalidateChange': {
+      const [name, input = {}] = params as [string, { reason?: string }?]
+      const result = await kernel.changes.invalidate.execute({
+        name,
+        reason: input.reason ?? 'Invalidated via Studio Desktop',
+      })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result.change))
+    }
+    case 'skipArtifact': {
+      const [name, artifactId] = params as [string, string]
+      const result = await kernel.changes.skipArtifact.execute({ name, artifactId })
+      return createIpcSuccess(envelope.id, toChangeDetailDto(result))
+    }
+    case 'updateSpecDependencies': {
+      const [name, body] = params as [string, UpdateSpecDependenciesInput]
+      const result = await kernel.changes.updateSpecDeps.execute({
+        name,
+        specId: body.specId,
+        ...(body.add !== undefined ? { add: body.add } : {}),
+        ...(body.remove !== undefined ? { remove: body.remove } : {}),
+        ...(body.set !== undefined ? { set: body.set } : {}),
+      })
+      return createIpcSuccess(envelope.id, {
+        name,
+        specId: result.specId,
+        dependsOn: [...result.dependsOn],
+      })
+    }
+    case 'updateImplementationTracking': {
+      const [name, body] = params as [string, UpdateImplementationTrackingInput]
+      const result = await kernel.changes.updateImplementationTracking.execute({
+        name,
+        action: body.action,
+        file: body.file,
+        ...(body.specId !== undefined ? { specId: body.specId } : {}),
+        ...(body.symbols !== undefined ? { symbols: body.symbols } : {}),
+      })
+      return createIpcSuccess(envelope.id, {
+        name,
+        implementationTracking: result.implementationTracking,
+      })
+    }
+    case 'readProjectLogs': {
+      const [options] = params as [{ readonly limit?: number; readonly prettier?: boolean }?]
+      const read = kernel.logs?.read
+      if (read === undefined) {
+        throw new Error('Log ring is not configured in desktop kernel')
+      }
+      const limit = options?.limit ?? 500
+      const prettier = options?.prettier ?? false
+      const result = read.execute({ limit, prettier })
+      return createIpcSuccess(envelope.id, result)
+    }
+    case 'appendProjectLog': {
+      const [input] = params as [AppendProjectLogInput]
+      const level = input.level ?? 'debug'
+      const message = input.message?.trim()
+      const context = input.context ?? {}
+      const log = Logger.child({ source: 'studio-desktop' })
+      switch (level) {
+        case 'debug':
+          log.debug(message, context)
+          break
+        case 'info':
+          log.info(message, context)
+          break
+        case 'warn':
+          log.warn(message, context)
+          break
+        case 'error':
+          log.error(message, context)
+          break
+      }
+      return createIpcSuccess(envelope.id, null)
     }
     default:
       if (isDraftAwareIpcMethod(envelope.method)) {

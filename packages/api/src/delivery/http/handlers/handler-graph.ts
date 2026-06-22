@@ -1,11 +1,12 @@
-import { type SymbolKind } from '@specd/code-graph'
+import { type SymbolKind, buildProjectGraphConfig } from '@specd/code-graph'
 import { createVcsAdapter, ChangeNotFoundError, SpecNotFoundError, SpecPath } from '@specd/core'
 import { type FastifyInstance } from 'fastify'
-import { buildProjectGraphConfig } from '../../../composition/build-project-graph-config.js'
 import { apiHandler } from '../handler-utils.js'
 import {
   toChangeGraphViewDto,
   toGraphFileRefDto,
+  toGraphHotspotsDto,
+  toGraphIndexResultDto,
   toGraphImpactDto,
   toGraphSearchResultDto,
   toGraphSymbolRefDto,
@@ -71,7 +72,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           graphConfig,
           ...(vcsRef !== undefined ? { vcsRef } : {}),
         })
-        return result
+        return toGraphIndexResultDto(result)
       } finally {
         await provider.close()
       }
@@ -293,7 +294,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
             : {}),
           ...(query.limit !== undefined ? { limit: Number(query.limit) } : {}),
         })
-        return result
+        return toGraphHotspotsDto(ctx.config, result)
       } finally {
         await provider.close()
       }

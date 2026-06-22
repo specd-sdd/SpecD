@@ -59,6 +59,14 @@
 - **THEN** each hit includes `snippet`, `startLine`, and `endLine`
 - **AND** preview context is available without a secondary fetch
 
+### Requirement: document hits expose file context
+
+#### Scenario: Document hits include workspace and project paths
+
+- **WHEN** graph search returns document hits
+- **THEN** each hit includes `workspace`, `path`, and `projectRelativePath`
+- **AND** exposes `snippet`, `startLine`, and `endLine` for preview
+
 ### Requirement: optional fields are omitted rather than null
 
 #### Scenario: Optional keys omitted when absent

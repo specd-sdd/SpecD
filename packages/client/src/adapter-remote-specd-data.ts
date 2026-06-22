@@ -12,6 +12,8 @@ import type {
 } from './dto/implementation-tracking.js'
 import type { ChangeStatusDto } from './dto/change-status.js'
 import type { ChangeSummaryDto } from './dto/change-summary.js'
+import type { ArtifactInstructionDto } from './dto/artifact-instruction.js'
+import type { HookInstructionsDto } from './dto/hook-instructions.js'
 import type { CompiledContextDto } from './dto/compiled-context.js'
 import type { GraphImpactDto } from './dto/graph-impact.js'
 import type { GraphIndexResultDto } from './dto/graph-index-result.js'
@@ -27,6 +29,7 @@ import type { ValidateBatchResultDto } from './dto/validate-batch-result.js'
 import type { ValidateResultDto } from './dto/validate-result.js'
 import type { WorkspaceSpecTreeDto } from './dto/workspace-spec-tree.js'
 import type { WorkspaceSummaryDto } from './dto/project.js'
+import type { WorkspaceSpecsValidateResultDto } from './dto/workspace-specs-validate-result.js'
 import type {
   ChangeContextQuery,
   OutlineChangeArtifactInput,
@@ -344,7 +347,7 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     })
   }
 
-  getHookInstructions(name: string, signal?: AbortSignal): Promise<CompiledContextDto> {
+  getHookInstructions(name: string, signal?: AbortSignal): Promise<HookInstructionsDto> {
     return this._transport.request({
       method: 'GET',
       path: `/changes/${enc(name)}/hook-instructions`,
@@ -354,12 +357,12 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
 
   getArtifactInstruction(
     name: string,
-    filename: string,
+    artifactId: string,
     signal?: AbortSignal,
-  ): Promise<CompiledContextDto> {
+  ): Promise<ArtifactInstructionDto> {
     return this._transport.request({
       method: 'GET',
-      path: `/changes/${enc(name)}/artifacts/${enc(filename)}/instruction`,
+      path: `/changes/${enc(name)}/artifacts/${enc(artifactId)}/instruction`,
       signal,
     })
   }
@@ -610,6 +613,19 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     })
   }
 
+  validateSpecs(
+    workspace: string,
+    specPath?: string,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceSpecsValidateResultDto> {
+    return this._transport.request({
+      method: 'POST',
+      path: `/workspaces/${enc(workspace)}/specs/validate`,
+      query: specPath !== undefined ? { specPath } : undefined,
+      signal,
+    })
+  }
+
   searchSpecs(query: {
     readonly q: string
     readonly workspace?: string
@@ -631,7 +647,9 @@ export class RemoteSpecdDataAdapter implements SpecdDataPort {
     return this._transport.request({
       method: 'POST',
       path: '/graph/index',
-      ...(input.force === true ? { body: { force: true } } : {}),
+      body: {
+        ...(input.force === true ? { force: true } : {}),
+      },
       signal: input.signal,
     })
   }

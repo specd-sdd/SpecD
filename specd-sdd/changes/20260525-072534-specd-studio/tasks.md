@@ -473,6 +473,16 @@ Read **each** `studio-desktop:*` spec before implementing that slice.
       Approach: use `@specd/code-graph-electron` for desktop-local graph execution, rebuild the vendored Electron SQLite addon before start, and keep CLI/API on `@specd/code-graph`.
       (Req: `studio-desktop:main-kernel-lifecycle`, `studio-desktop:ipc-handler-registry`)
 
+- [x] 16.5.4 Implement remaining PortChangesMutate and PortStudioPanel IPC handlers
+      `apps/specd-studio-desktop/src/main/ipc-handlers.ts`
+      Approach: implement missing lifecycle (transition, draft, archive, etc.), approvals, and project log methods to match the full SpecdDataPort interface.
+      (Req: `studio-desktop:ipc-handler-registry`, `client:port-changes-mutate`, `client:port-studio-panel`)
+
+- [x] 16.5.5 Fix local IPC DTO mappers and strict signatures
+      `apps/specd-studio-desktop/src/main/ipc-handlers.ts`, `packages/client/src/dto/`
+      Approach: enforce strict DTO mapping in local IPC handlers instead of generic Record returning. Introduce specific DTOs (`HookInstructionsDto`, `ArtifactInstructionDto`) to client and API, replacing `CompiledContextDto` payload mistakes. Ensure graph views, spec previews, and context loading work identically to the HTTP API, while satisfying strict TS checking.
+      (Req: `studio-desktop:ipc-handler-registry`)
+
 - [x] 16.6 Local and remote data adapters in renderer
       `apps/specd-studio-desktop/renderer/`
       Approach: local → IPC adapter without Authorization; remote → `adapter-remote-specd-data`
@@ -482,7 +492,7 @@ Read **each** `studio-desktop:*` spec before implementing that slice.
       `apps/specd-studio-desktop/` xterm + node-pty
       (Req: `studio-desktop:bottom-panel-terminal`)
 
-- [ ] 16.8 Expose storage IPC bridge in preload and main
+- [x] 16.8 Expose storage IPC bridge in preload and main
       `apps/specd-studio-desktop/src/main/ipc-handlers.ts`, `apps/specd-studio-desktop/src/preload/index.ts`
       Approach: implement IPC bridge for window.specd.storage; save/read JSON connection/recent settings under Electron's userData directory
       (Req: `client:user-storage-port` — FileUserStorage IPC bridge requirement)
@@ -512,12 +522,12 @@ Read `design.md` §Testing and proposal polling table.
       Approach: wire repeatable Playwright entrypoints for studio-web, separate API health from UI base URL, and cover remote command palette / create-change / edit-change flows.
       (Req: `studio-web:remote-bootstrap`, `ui:command-palette`, `ui:change-scope-dialog`)
 
-- [ ] 18.1 Integrated smoke: `specd ui serve`
+- [x] 18.1 Integrated smoke: `specd ui serve`
       Manual: loopback project with active change
       Approach: open Studio embedded; global poll updates sidebar; open change tab; verify `ifModifiedSince` after external manifest touch
       (Req: `ui:shell-layout`, `api:routes-changes-read`, polling model)
 
-- [ ] 18.2 Save and conflict smoke
+- [x] 18.2 Save and conflict smoke
       Manual: edit `proposal.md` in Studio, Save, provoke 409, exercise force/reload UI
       Approach: covers `SaveChangeArtifact` + `hooks-inspector-save` + `handler-changes-mutate`
       (Req: `core:save-change-artifact`, `ui:hooks-inspector-save`)
@@ -526,7 +536,7 @@ Read `design.md` §Testing and proposal polling table.
       Manual: open local folder via IPC; connect remote URL; recents menu
       (Req: `studio-desktop:welcome-and-file-menu`, `studio-desktop:desktop-local-data-adapter`, `studio-desktop:desktop-remote-profile`)
 
-- [ ] 18.4 Standalone web smoke
+- [x] 18.4 Standalone web smoke
       Manual: `studio-web` dev against `specd serve` on another port with CORS configured
       (Req: `studio-web:remote-bootstrap`, `api:middleware-cors`)
 
@@ -559,7 +569,7 @@ Read `design.md` §Testing and proposal polling table.
       `packages/ui/src/change/ChangeMainView.tsx`, `packages/ui/src/spec/SpecMainView.tsx`
       Approach: Replace custom accordions with shadcn `Accordion`.
 
-- [ ] 19.6 Phase 6: Card / Badge / Alert / Separator Migration
+- [x] 19.6 Phase 6: Card / Badge / Alert / Separator Migration
       Overview and Spec panels
       Approach: Continue replacing remaining ad hoc warning/error/divider blocks with shadcn `Card`, `Badge`, `Alert`, and `Separator`; `studio-card`/`studio-badge` now remain as wrapper skin classes behind shared primitives rather than feature-level widgets.
 
@@ -586,6 +596,18 @@ Read `design.md` §Testing and proposal polling table.
 - [x] 19.9 Phase 9: Top Bar and Shell Cleanup
       `StudioTopBar`, `ShellLayout`
       Approach: Replace raw buttons with shadcn `Button`, add `Tooltip` where appropriate, use `ScrollArea` for main containers, and normalize shell empty-state/status chrome.
+
+- [x] 19.9.1 Implement Docs button and Electron browser hook
+      `apps/specd-studio-desktop/src/main/index.ts`, `packages/ui/src/shell/StudioTopBar.tsx`
+      Approach: Route Docs link to `https://getspecd.dev/docs/guide/getting-started` and configure Electron `setWindowOpenHandler` in main process to route `_blank` requests to native system browser.
+
+- [x] 19.9.2 Implement Notifications popover and alerts
+      `packages/ui/src/shell/StudioTopBar.tsx`, IPC preloads/handlers
+      Approach: Connect Popover containing three diagnostics: change overlaps (`port.detectOverlaps()`), graph index staleness (`projectStatus.graph.stale`), and closed specs validation (`port.validateSpecs()`). Add visual error badges and alerts.
+
+- [x] 19.9.3 Implement dark/light theme toggle and Monaco integration
+      `packages/ui/src/shell/StudioTopBar.tsx`, `packages/ui/src/styles/globals.css`, `monaco-studio-theme.ts`
+      Approach: Add Sun/Moon theme toggler, hook theme classes to HTML body, register and swap dynamic Monaco Editor themes (`specd-studio-dark` / `specd-studio-light`), and persist choice in `IUserStorage`.
 
 - [x] 19.10 Phase 10: Final Cleanup and Artifact Closure
       All change artifacts

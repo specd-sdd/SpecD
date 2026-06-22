@@ -173,7 +173,5 @@
     "spec.md": "sha256:cf5977216e846311dd37f49660e134fa67ed1d85583b857289c86fb90da7cf2a",
     "verify.md": "sha256:d231692473762a2bb54913270bda6814b425486c45f931f59009b0c1cfac8173"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Documentation conventions for the monorepo.",
-  "optimizedContext": "Documentation lives under docs/, scoped by concern; keep structure consistent and place rationale in ADRs when decisions become architectural.\n"
+  "generatedBy": "core"
 }

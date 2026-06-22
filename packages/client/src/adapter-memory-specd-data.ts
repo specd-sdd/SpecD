@@ -24,11 +24,14 @@ import type { ArtifactContentDto } from './dto/artifact-content.js'
 import type { ReadOnlyChangeOrigin } from './port-changes-read.js'
 import type { ValidateBatchResultDto } from './dto/validate-batch-result.js'
 import type { ValidateResultDto } from './dto/validate-result.js'
+import type { ArtifactInstructionDto } from './dto/artifact-instruction.js'
+import type { HookInstructionsDto } from './dto/hook-instructions.js'
 import type { CompiledContextDto } from './dto/compiled-context.js'
 import type { PreviewResultDto } from './dto/preview-result.js'
 import type { SpecDetailDto } from './dto/spec-detail.js'
 import type { SpecContextDto } from './dto/spec-context.js'
 import type { SpecSummaryDto } from './dto/spec-summary.js'
+import type { WorkspaceSpecsValidateResultDto } from './dto/workspace-specs-validate-result.js'
 import type { GraphSearchResultDto } from './dto/graph-search.js'
 import type { GraphImpactDto } from './dto/graph-impact.js'
 import type { ChangeGraphViewDto } from './dto/change-graph-view.js'
@@ -264,12 +267,19 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     ])
   }
 
-  getHookInstructions(): Promise<CompiledContextDto> {
-    return this.getChangeContext()
+  getHookInstructions(): Promise<HookInstructionsDto> {
+    return Promise.resolve({ phase: 'pre', instructions: [] })
   }
 
-  getArtifactInstruction(): Promise<CompiledContextDto> {
-    return this.getChangeContext()
+  getArtifactInstruction(): Promise<ArtifactInstructionDto> {
+    return Promise.resolve({
+      artifactId: 'specs',
+      rulesPre: [],
+      instruction: null,
+      template: null,
+      delta: null,
+      rulesPost: [],
+    })
   }
 
   getImplementationReview(name: string): Promise<ImplementationReviewDto> {
@@ -524,6 +534,18 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     })
   }
 
+  validateSpecs(workspace: string, specPath?: string): Promise<WorkspaceSpecsValidateResultDto> {
+    void workspace
+    void specPath
+    return Promise.resolve({
+      passed: true,
+      totalSpecs: 0,
+      passedCount: 0,
+      failedCount: 0,
+      entries: [],
+    })
+  }
+
   searchSpecs(query: {
     readonly q: string
     readonly workspace?: string
@@ -550,6 +572,7 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
     return Promise.resolve({
       filesDiscovered: 0,
       filesIndexed: 0,
+      documentsIndexed: 0,
       filesRemoved: 0,
       filesSkipped: 0,
       specsDiscovered: 0,

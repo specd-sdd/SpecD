@@ -55,7 +55,7 @@ test.describe('SpecD Studio UI', () => {
     await openStudioShell(page)
     await expect(page.getByTestId('studio-shell')).toBeVisible()
     await expect(page.locator('.studio-panel-header', { hasText: /^Changes$/ })).toBeVisible()
-    await expect(page.locator('.studio-panel-header', { hasText: /^Workspaces$/ })).toBeVisible()
+    await expect(page.locator('.studio-panel-header', { hasText: /^Workspaces/ })).toBeVisible()
   })
 
   test('validate all shows drift warning and cancel keeps dialog closed', async ({ page }) => {
@@ -69,11 +69,11 @@ test.describe('SpecD Studio UI', () => {
     }
 
     await activeChanges.first().click()
-    await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible({
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible({
       timeout: 12_000,
     })
 
-    await page.getByRole('button', { name: 'Artifacts' }).click()
+    await page.getByRole('tab', { name: 'Artifacts' }).click()
     await expect(page.getByTestId('studio-artifacts-tab')).toBeVisible({ timeout: 5_000 })
     await page.getByTestId('studio-validate-all').click()
     const dialog = page.getByTestId('studio-validate-confirm-dialog')

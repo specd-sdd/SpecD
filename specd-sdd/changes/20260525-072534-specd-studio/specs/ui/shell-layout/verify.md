@@ -50,6 +50,29 @@
 - **WHEN** interval elapses
 - **THEN** no global poll requests fire
 
+### Requirement: editor area tabs support horizontal scrolling and navigation arrows
+
+#### Scenario: Tabs scroll when overflowing container
+
+- **GIVEN** editor area has more tabs than fit in view
+- **WHEN** user uses scroll wheel or trackpad over tabs
+- **THEN** tabs scroll horizontally
+
+#### Scenario: Navigation arrows appear when overflowing
+
+- **GIVEN** editor area has overflowing tabs
+- **WHEN** tab bar renders
+- **THEN** left and right navigation arrows are present
+- **AND** arrows are disabled when scrolled to extreme ends
+
+### Requirement: tab views display context via breadcrumbs
+
+#### Scenario: Context breadcrumbs render above tabs
+
+- **GIVEN** a change or spec tab is open
+- **WHEN** the main view renders
+- **THEN** a breadcrumb header displays the context (e.g. `CHANGES / my-change`) above the tab bar
+
 ### Requirement: global polling pauses when the window is unfocused
 
 #### Scenario: Blur stops global poll interval

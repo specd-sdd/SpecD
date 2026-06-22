@@ -24,29 +24,30 @@ function ArtifactDiffViewInner({
   filename,
   original,
   modified,
+  theme = 'dark',
 }: {
   filename?: string
   original: string
   modified: string
+  theme?: 'light' | 'dark'
 }): React.ReactElement {
   const language =
     filename?.endsWith('.yaml') || filename?.endsWith('.yml') ? 'yaml' : 'markdown'
 
+  const monacoTheme = theme === 'light' ? 'specd-studio-light' : 'specd-studio-dark'
+
   return (
-    <div
-      className="flex h-full min-h-0 flex-col"
-      style={{ backgroundColor: 'rgb(20, 22, 26)' }}
-    >
+    <div className="flex h-full min-h-0 flex-col bg-editor">
       <React.Suspense
         fallback={
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground bg-editor">
             Loading diff…
           </div>
         }
       >
         <DiffEditor
           height="100%"
-          theme="specd-studio"
+          theme={monacoTheme}
           language={language}
           original={original}
           modified={modified}

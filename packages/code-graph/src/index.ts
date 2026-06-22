@@ -1,5 +1,6 @@
 // Composition
 export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
+export { buildProjectGraphConfig } from './composition/build-project-graph-config.js'
 export {
   type CodeGraphFactoryOptions,
   type CodeGraphOptions,

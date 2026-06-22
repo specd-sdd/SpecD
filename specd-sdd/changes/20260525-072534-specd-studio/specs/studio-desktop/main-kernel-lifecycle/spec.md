@@ -29,6 +29,10 @@ The desktop package MUST:
 This wiring isolates the native SQLite runtime required by the Electron desktop
 host without retargeting CLI or API away from `@specd/code-graph`.
 
+### Requirement: desktop kernel configures plain-text logs
+
+The desktop kernel MUST receive `logFormatter: createLogFormatter({ colorize: false })` so that log readback through local IPC returns plain text without ANSI escape sequences.
+
 ## Spec Dependencies
 
 _none_

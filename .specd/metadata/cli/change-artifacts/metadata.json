@@ -93,6 +93,7 @@
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:464e8716d6dfd2730b43819dbe998121ff65987b4a378d62ea88a49c9a2ea0d1",
     "verify.md": "sha256:c6b9b826a36f44c80a53dbf6d363f19500231a495edf303295f18be67ff3c1b6"

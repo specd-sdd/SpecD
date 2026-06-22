@@ -133,6 +133,7 @@
       "then": ["it contains configPath: string, schemaRef: string, workspaces: readonly string[]"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:c91f0505b79fbc85bf3fd4c883aa6fbb48034c8a2af7a80a6755cd7202861e62",
     "verify.md": "sha256:f044cfa976b359c4ab2734bf2c3f84c68dd4da0eb3afb3dfeaf3f2318a9e31ae"

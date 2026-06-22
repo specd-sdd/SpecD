@@ -14,7 +14,7 @@
     "dev:renderer": "vite dev -c vite.renderer.config.ts",
     "rebuild:graph-sqlite-electron": "pnpm --filter @specd/code-graph-electron rebuild:vendored-sqlite-electron",
     "rebuild:graph-electron": "pnpm rebuild:graph-sqlite-electron",
-    "prestart": "pnpm build",
+    "prestart": "pnpm rebuild:graph-sqlite-electron",
     "start": "electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json",
     "test": "vitest run --passWithNoTests",

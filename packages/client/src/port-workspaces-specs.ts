@@ -4,6 +4,7 @@ import type { SpecContextDto } from './dto/spec-context.js'
 import type { SpecSummaryDto } from './dto/spec-summary.js'
 import type { WorkspaceSpecTreeDto } from './dto/workspace-spec-tree.js'
 import type { WorkspaceSummaryDto } from './dto/project.js'
+import type { WorkspaceSpecsValidateResultDto } from './dto/workspace-specs-validate-result.js'
 import type { OutlineSpecDraftInput } from './inputs.js'
 
 /** Workspace and canonical spec operations (`api:routes-workspaces`). */
@@ -32,6 +33,11 @@ export interface PortWorkspacesSpecs {
     filename: string,
     signal?: AbortSignal,
   ): Promise<ArtifactContentDto>
+  validateSpecs(
+    workspace: string,
+    specPath?: string,
+    signal?: AbortSignal,
+  ): Promise<WorkspaceSpecsValidateResultDto>
   searchSpecs(query: {
     readonly q: string
     readonly workspace?: string

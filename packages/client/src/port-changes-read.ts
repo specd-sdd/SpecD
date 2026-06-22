@@ -4,6 +4,8 @@ import type { ChangeStatusDto } from './dto/change-status.js'
 import type { CompiledContextDto } from './dto/compiled-context.js'
 import type { ImplementationReviewDto } from './dto/implementation-tracking.js'
 import type { PreviewResultDto } from './dto/preview-result.js'
+import type { HookInstructionsDto } from './dto/hook-instructions.js'
+import type { ArtifactInstructionDto } from './dto/artifact-instruction.js'
 import type {
   ChangeContextQuery,
   GetChangeStatusOptions,
@@ -83,11 +85,11 @@ export interface PortChangesRead {
     filename: string,
     input?: OutlineChangeArtifactInput,
   ): Promise<readonly Record<string, unknown>[]>
-  getHookInstructions(name: string, signal?: AbortSignal): Promise<CompiledContextDto>
+  getHookInstructions(name: string, signal?: AbortSignal): Promise<HookInstructionsDto>
   getArtifactInstruction(
     name: string,
-    filename: string,
+    artifactId: string,
     signal?: AbortSignal,
-  ): Promise<CompiledContextDto>
+  ): Promise<ArtifactInstructionDto>
   getImplementationReview(name: string, signal?: AbortSignal): Promise<ImplementationReviewDto>
 }

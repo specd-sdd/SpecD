@@ -392,7 +392,20 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
       archivedName: { type: 'string' },
       archivedAt: { type: 'string', format: 'date-time' },
       description: { type: 'string' },
-      archivedBy: { type: 'object', additionalProperties: true },
+      archivedBy: {
+        anyOf: [
+          { type: 'string' },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['name', 'email'],
+            properties: {
+              name: { type: 'string' },
+              email: { type: 'string' },
+            },
+          },
+        ],
+      },
       specIds: { type: 'array', items: { type: 'string' } },
       schemaName: { type: 'string' },
       schemaVersion: { type: 'integer' },
@@ -408,7 +421,20 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
       state: { type: 'string' },
       archivedName: { type: 'string' },
       archivedAt: { type: 'string', format: 'date-time' },
-      archivedBy: { type: 'object', additionalProperties: true },
+      archivedBy: {
+        anyOf: [
+          { type: 'string' },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['name', 'email'],
+            properties: {
+              name: { type: 'string' },
+              email: { type: 'string' },
+            },
+          },
+        ],
+      },
       specIds: { type: 'array', items: { type: 'string' } },
       specDependsOn: {
         type: 'object',
@@ -1042,6 +1068,7 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
     required: [
       'filesDiscovered',
       'filesIndexed',
+      'documentsIndexed',
       'filesRemoved',
       'filesSkipped',
       'specsDiscovered',
@@ -1056,6 +1083,7 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
     properties: {
       filesDiscovered: { type: 'integer' },
       filesIndexed: { type: 'integer' },
+      documentsIndexed: { type: 'integer' },
       filesRemoved: { type: 'integer' },
       filesSkipped: { type: 'integer' },
       specsDiscovered: { type: 'integer' },
@@ -1075,17 +1103,67 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
     },
   },
   GraphHotspotsResultDto: {
-    type: 'object',
-    additionalProperties: true,
+    type: 'array',
+    items: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['symbol', 'score', 'riskLevel', 'directCallers', 'fileImporters'],
+      properties: {
+        symbol: { $ref: 'GraphSymbolRefDto#' },
+        score: { type: 'number' },
+        riskLevel: { type: 'string' },
+        directCallers: { type: 'integer' },
+        fileImporters: { type: 'integer' },
+      },
+    },
   },
   WorkspaceSpecsValidateResultDto: {
     type: 'object',
+    additionalProperties: false,
+    required: ['passed', 'totalSpecs', 'passedCount', 'failedCount', 'entries'],
     properties: {
       passed: { type: 'boolean' },
       totalSpecs: { type: 'integer' },
       passedCount: { type: 'integer' },
       failedCount: { type: 'integer' },
-      entries: { type: 'array', items: { type: 'object' } },
+      entries: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['spec', 'passed', 'failures', 'warnings'],
+          properties: {
+            spec: { type: 'string' },
+            passed: { type: 'boolean' },
+            failures: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['description', 'artifactId'],
+                properties: {
+                  description: { type: 'string' },
+                  artifactId: { type: 'string' },
+                  filename: { type: 'string' },
+                },
+              },
+            },
+            warnings: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['description', 'artifactId'],
+                properties: {
+                  description: { type: 'string' },
+                  artifactId: { type: 'string' },
+                  filename: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   },
   SpecMetadataBody: {
@@ -1123,11 +1201,46 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
   },
   HookInstructionsDto: {
     type: 'object',
-    additionalProperties: true,
+    additionalProperties: false,
+    required: ['phase', 'instructions'],
+    properties: {
+      phase: { type: 'string', enum: ['pre', 'post'] },
+      instructions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['id', 'text'],
+          properties: {
+            id: { type: 'string' },
+            text: { type: 'string' },
+          },
+        },
+      },
+    },
   },
   ArtifactInstructionDto: {
     type: 'object',
-    additionalProperties: true,
+    additionalProperties: false,
+    required: ['artifactId', 'rulesPre', 'instruction', 'template', 'delta', 'rulesPost'],
+    properties: {
+      artifactId: { type: 'string' },
+      rulesPre: { type: 'array', items: { type: 'string' } },
+      instruction: { type: 'string', nullable: true },
+      template: { type: 'string', nullable: true },
+      delta: {
+        type: 'object',
+        nullable: true,
+        additionalProperties: false,
+        required: ['formatInstructions', 'domainInstructions', 'availableOutlines'],
+        properties: {
+          formatInstructions: { type: 'string' },
+          domainInstructions: { type: 'string', nullable: true },
+          availableOutlines: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      rulesPost: { type: 'array', items: { type: 'string' } },
+    },
   },
   JsonObjectDto: {
     type: 'object',

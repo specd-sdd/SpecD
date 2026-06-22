@@ -18,7 +18,9 @@ The codebase has already moved beyond the original greenfield plan in a few area
 
 - Desktop local mode now boots through dedicated `tsup` main/preload builds, with the preload bridge decoupled from runtime ESM imports so Electron can render the shell instead of stalling on startup.
 - Desktop renderer bootstrap now keeps React hooks in a stable order while IPC readiness changes, avoiding the blank-window failure mode that previously appeared during initial startup.
-- Desktop local IPC already covers project, change, archived change, workspace/spec, and graph methods used by the current UI, via `studio-desktop:ipc-handler-registry` and `studio-desktop:desktop-local-data-adapter`.
+- Desktop local IPC already covers project, change, archived change, workspace/spec, and graph methods used by the current UI, via `studio-desktop:ipc-handler-registry` and `studio-desktop:desktop-local-data-adapter`. Remaining methods from `PortChangesMutate` (lifecycle, approvals, skip, updateDeps) and `PortStudioPanel` (project logs) are implemented in phase 16.5.4 to complete the contract.
+- Desktop local IPC now strictly maps all core returns to specific `@specd/client` DTOs rather than relying on loose generic typing, ensuring runtime alignment with the HTTP JSON serialization boundaries.
+- The `HookInstructionsDto` and `ArtifactInstructionDto` types have been extracted from `CompiledContextDto` payload mistakes to properly define instruction shapes across both HTTP and IPC protocols.
 - Desktop-local graph execution now uses `@specd/code-graph-electron` from `apps/specd-studio-desktop/src/main/ipc-handlers.ts`, with package-level rebuild wiring for the vendored Electron SQLite addon before startup.
 - Desktop build/start now rebuilds `@specd/ui` before bundling `@specd/studio-desktop`, so the Electron host consumes current `ui/dist` output instead of stale published artifacts.
 - `@specd/ui` and `studio-web` already include automated UI verification for command palette categories, remote spec/dependency search in the create-change dialog, and opening the edit-change dialog.
@@ -376,6 +378,31 @@ We introduce a unified mechanism to store platform-agnostic client configuration
   - Remote connection details are deferred into a dedicated `ConnectPanel` dialog so the initial chooser remains fixed-size across desktop viewports.
   - Detects if running within Electron (via `window.specd` bridge). If present, desktop mode exposes local project selection plus bounded, scrollable recent files/connections.
   - Uses `IUserStorage` to load and display recent connections/projects.
+
+---
+
+### Top Bar Controls (Docs, Notifications, and Themes)
+
+The top bar exposes native tools to assist users in navigating documentation, inspecting workspace alerts, and toggling themes.
+
+- **Docs Action Routing**:
+  - The Docs button links to `https://getspecd.dev/docs/guide/getting-started`.
+  - In web applications, this acts as a standard target link.
+  - In desktop mode, the Electron main process configures a `setWindowOpenHandler` on startup to capture external `_blank` navigation calls and forward them safely to the host system default web browser via `shell.openExternal`.
+
+- **Notifications Diagnostics & Popover**:
+  - The Popover triggers dynamic background validation checks on mount and global tick.
+  - **Overlaps**: Queries `port.detectOverlaps()` to find conflicting changes across concurrent workspace drafts.
+  - **Staleness**: Checks `projectStatus.graph.stale` to alert users when a graph index refresh is necessary.
+  - **Closed Spec Validations**: Calls the `validateSpecs(workspace)` IPC/API bridge method to validate committed specifications in the workspace root, reporting errors in specs not currently part of any active change.
+  - **Indicator Dot**: A red blinking badge renders on the notifications bell icon if any of the diagnostics report active warnings or failures.
+  - **Deferred Validation Execution**: To prevent CPU and filesystem resource contention at startup, overlaps and closed-spec validations are deferred until the initial project loading settles. A 3-second delay timer from mount combined with a check on the `loadingActive` status governs the activation of these background checks.
+
+- **Appearance Theme Toggling**:
+  - Toggles between dark mode (default) and light mode.
+  - Setting changes are propagated by appending the `.light` class to `document.documentElement` and updating Monaco Editor instances to use `specd-studio-light` or `specd-studio-dark` dynamically.
+  - Theme choices are persisted to disk/localStorage using the `IUserStorage` port.
+  - The theme is loaded and applied synchronously at startup during module bootstrap (in both `DesktopBootstrap` and `SpecdApp`) to ensure that splash/loading screens, project chooser dialogs, and backdrop states render immediately using the user's stored theme preference (avoiding light/dark flash).
 
 ---
 

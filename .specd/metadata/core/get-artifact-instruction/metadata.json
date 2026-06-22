@@ -2,12 +2,12 @@
   "title": "GetArtifactInstruction",
   "description": "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its composition rules and delta guidance — but this is instruction content, not context. `CompileContext` handles context (specs, metadata, available steps); `GetArtifactInstruction` handles the artifact-specific instructions: the schema instruction, composition rules (`rules.pre`/`rules.post`), and delta instructions with existing artifact outlines. The skill retrieves these at the right moment — after loading context but before doing the work.",
   "dependsOn": [
+    "core:schema-format",
     "core:delta-format",
     "core:change",
     "core:schema-merge",
     "core:template-variables",
-    "core:lifecycle-engine",
-    "core:schema-format"
+    "core:lifecycle-engine"
   ],
   "context": [
     "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its composition rules and delta guidance — but this is instruction content, not context. `CompileContext` handles context (specs, metadata, available steps); `GetArtifactInstruction` handles the artifact-specific instructions: the schema instruction, composition rules (`rules.pre`/`rules.post`), and delta instructions with existing artifact outlines. The skill retrieves these at the right moment — after loading context but before doing the work."

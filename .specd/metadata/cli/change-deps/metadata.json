@@ -1,1 +1,148 @@
-{"title":"change deps","description":"When a spec depends on other specs for context, those relationships need to be declared so that `CompileContext` can include them automatically. `specd change deps <name> <specId>` manages the `dependsOn` dependencies for a single spec within an active change, stored in the change manifest's `specDependsOn` field and used as the highest-priority source for `dependsOn` resolution.","dependsOn":["core:change","core:change-manifest","core:compile-context"],"context":["When a spec depends on other specs for context, those relationships need to be declared so that `CompileContext` can include them automatically. `specd change deps <name> <specId>` manages the `dependsOn` dependencies for a single spec within an active change, stored in the change manifest's `specDependsOn` field and used as the highest-priority source for `dependsOn` resolution."],"rules":[{"requirement":"Command signature","rules":["```\nspecd change deps <name> [<specId>]\n  [--add <id>...]\n  [--remove <id>...]\n  [--set <id>...]\n  [--format text|json|toon]\n  [--config <path>]\n```\n\n- `<name>` — required positional; the change name\n- `[<specId>]` — optional positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)\n- `--add <id>` — repeatable; adds dependency spec IDs to this spec's `dependsOn`\n- `--remove <id>` — repeatable; removes dependency spec IDs\n- `--set <id>` — repeatable; replaces all dependencies (mutually exclusive with `--add`/`--remove`)"]},{"requirement":"Output","rules":["**Text format (default):**\n\nWhen modifying a specific spec:\n\n```\nupdated deps for <specId> in change <name>\ndependsOn: dep1, dep2, dep3\n```\n\nWhen displaying a specific spec (`change deps <name> <specId>` with no flags):\n\n```\nspec dependencies for <specId> in change <name>:\ndependsOn: dep1, dep2\n```\n\nWhen listing all dependencies (`change deps <name>` with no `<specId>` and no flags):\n\n```\nspec dependencies for change <name>:\n- workspace:spec-path-1: dep1, dep2\n- workspace:spec-path-2: (none)\n```\n\n**JSON/toon format:**\n\nWhen targeting a specific spec (modify or display):\n\n```json\n{\n  \"result\": \"ok\",\n  \"name\": \"<name>\",\n  \"specId\": \"<specId>\",\n  \"dependsOn\": [\"dep1\", \"dep2\"]\n}\n```\n\nWhen listing all:\n\n```json\n{\n  \"result\": \"ok\",\n  \"name\": \"<name>\",\n  \"specDependsOn\": {\n    \"spec1\": [\"dep1\"],\n    \"spec2\": []\n  }\n}\n```"]},{"requirement":"Error cases","rules":["All errors exit with code 1 and write to stderr:\n\n- Change not found\n- `specId` not in `change.specIds`\n- `--set` used with `--add` or `--remove`\n- `--remove` value not in current deps\n- Modification flags (`--add`, `--remove`, `--set`) provided without a `<specId>`"]}],"constraints":["--set is mutually exclusive with --add and --remove","The command delegates to the UpdateSpecDeps use case in @specd/core for modifications.","Listing and display modes use GetStatus or direct repository access to retrieve dependencies."],"scenarios":[{"requirement":"Command signature","name":"Add deps to a spec in the change","given":["a change add-auth with specIds: [\"default:auth/login\"]"],"when":["specd change deps add-auth auth/login --add auth/shared --add auth/jwt"],"then":["the command exits with code 0","AND the output is:"]},{"requirement":"Command signature","name":"Remove deps from a spec in the change","given":["a change add-auth with specDependsOn: { \"default:auth/login\": [\"default:auth/shared\", \"default:auth/jwt\"] }"],"when":["specd change deps add-auth auth/login --remove auth/jwt"],"then":["the command exits with code 0","AND the output includes dependsOn: auth/shared"]},{"requirement":"Command signature","name":"Set (replace) deps for a spec","given":["a change add-auth with existing deps for auth/login"],"when":["specd change deps add-auth auth/login --set auth/session"],"then":["the command exits with code 0","AND the output includes dependsOn: auth/session","AND previous deps are fully replaced"]},{"requirement":"Command signature","name":"List all dependencies in the change","given":["a change with multiple specs and some dependencies"],"when":["specd change deps <name> is run without <specId> or flags"],"then":["the command exits with code 0","AND the output lists all specs in the change and their dependencies"]},{"requirement":"Command signature","name":"Display dependencies for a specific spec","given":["a change with specIds: ['core:a'] and some dependencies for it"],"when":["specd change deps <name> core:a is run without flags"],"then":["the command exits with code 0","AND the output shows the dependencies for core:a"]},{"requirement":"Output","name":"JSON output format","given":["a change add-auth with specIds: [\"default:auth/login\"]"],"when":["specd change deps add-auth auth/login --add auth/shared --format json"],"then":["the output is valid JSON with result: \"ok\", name, specId, and dependsOn array"]},{"requirement":"Output","name":"No deps remaining shows none","given":["a change with deps [\"default:auth/shared\"] for auth/login"],"when":["specd change deps add-auth auth/login --remove auth/shared"],"then":["the output includes dependsOn: (none)"]},{"requirement":"Error cases","name":"Error when change not found","when":["specd change deps nonexistent auth/login --add auth/shared"],"then":["the command exits with code 1","AND stderr indicates the change was not found"]},{"requirement":"Error cases","name":"Error when specId not in change.specIds","given":["a change add-auth with specIds: [\"default:auth/login\"]"],"when":["specd change deps add-auth billing/invoices --add auth/shared"],"then":["the command exits with code 1","AND stderr indicates the specId is not part of the change"]},{"requirement":"Error cases","name":"Error when --set used with --add","when":["specd change deps add-auth auth/login --set auth/session --add auth/shared"],"then":["the command exits with code 1","AND stderr indicates --set is mutually exclusive with --add/--remove"]},{"requirement":"Error cases","name":"Error when removing non-existent dep","given":["a change add-auth with no deps for auth/login"],"when":["specd change deps add-auth auth/login --remove auth/shared"],"then":["the command exits with code 1","AND stderr indicates the dep was not found"]},{"requirement":"Error cases","name":"Error when modification flags provided without specId","when":["specd change deps <name> --add core:other"],"then":["the command exits with code 1","AND stderr indicates modification flags require a specId"]}],"implementation":{"symbols":[{"specId":"cli:change-deps","file":"cli:src/commands/change/deps.ts","symbol":"registerChangeDeps"}]},"contentHashes":{"spec.md":"sha256:0b7ae7d02462f80ca547afcbde4b63e2f755043c1125d60513de587df21ca4e7","verify.md":"sha256:3450175d537de114fbf1ce1ea1b97437eaed6dc48f1a1baec91d980ddf67bff8"},"generatedBy":"agent","optimizedDescription":"Manage per-spec dependsOn in active changes for CompileContext resolution.","optimizedContext":"# change deps\n\n## Rules\n\n- **Signature**: `specd change deps <name> [<specId>] [--add <id>...] [--remove <id>...] [--set <id>...] [--format text|json|toon] [--config <path>]`\n  - `<name>` required, `<specId>` must be in `change.specIds`\n  - `--set` × `--add`/`--remove`: mutually exclusive\n\n- **Output text**: modify → `updated deps for <specId> in change <name>` + `dependsOn: dep1, dep2` | display → `spec dependencies for <specId> in change <name>:` + `dependsOn: dep1` | list → `spec dependencies for change <name>:` + `- ws:path: dep1, dep2`\n- **Output JSON/toon**: specific → `{ result: \"ok\", name, specId, dependsOn: [...] }` | list → `{ result: \"ok\", name, specDependsOn: { id: [...] } }`\n\n- **Errors**: exit 1, stderr. Change not found | specId not in change.specIds | --set with --add/--remove | --remove not in deps | mod flags w/o specId\n\n## Constraints\n\n- `--set` mutually exclusive with `--add`/`--remove`\n- Delegates to `UpdateSpecDeps` (@specd/core) for modifications\n- Listing/display uses `GetStatus` or direct repo access"}
+{
+  "title": "change deps",
+  "description": "When a spec depends on other specs for context, those relationships need to be declared so that `CompileContext` can include them automatically. `specd change deps <name> <specId>` manages the `dependsOn` dependencies for a single spec within an active change, stored in the change manifest's `specDependsOn` field and used as the highest-priority source for `dependsOn` resolution.",
+  "dependsOn": ["core:change", "core:change-manifest", "core:compile-context"],
+  "context": [
+    "When a spec depends on other specs for context, those relationships need to be declared so that `CompileContext` can include them automatically. `specd change deps <name> <specId>` manages the `dependsOn` dependencies for a single spec within an active change, stored in the change manifest's `specDependsOn` field and used as the highest-priority source for `dependsOn` resolution."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd change deps <name> [<specId>]\n  [--add <id>...]\n  [--remove <id>...]\n  [--set <id>...]\n  [--format text|json|toon]\n  [--config <path>]\n```\n\n- `<name>` — required positional; the change name\n- `[<specId>]` — optional positional; the spec within the change whose dependencies are being managed (must be in `change.specIds`)\n- `--add <id>` — repeatable; adds dependency spec IDs to this spec's `dependsOn`\n- `--remove <id>` — repeatable; removes dependency spec IDs\n- `--set <id>` — repeatable; replaces all dependencies (mutually exclusive with `--add`/`--remove`)"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "rules": [
+        "**Text format (default):**\n\nWhen modifying a specific spec:\n\n```\nupdated deps for <specId> in change <name>\ndependsOn: dep1, dep2, dep3\n```\n\nWhen displaying a specific spec (`change deps <name> <specId>` with no flags):\n\n```\nspec dependencies for <specId> in change <name>:\ndependsOn: dep1, dep2\n```\n\nWhen listing all dependencies (`change deps <name>` with no `<specId>` and no flags):\n\n```\nspec dependencies for change <name>:\n- workspace:spec-path-1: dep1, dep2\n- workspace:spec-path-2: (none)\n```\n\n**JSON/toon format:**\n\nWhen targeting a specific spec (modify or display):\n\n```json\n{\n  \"result\": \"ok\",\n  \"name\": \"<name>\",\n  \"specId\": \"<specId>\",\n  \"dependsOn\": [\"dep1\", \"dep2\"]\n}\n```\n\nWhen listing all:\n\n```json\n{\n  \"result\": \"ok\",\n  \"name\": \"<name>\",\n  \"specDependsOn\": {\n    \"spec1\": [\"dep1\"],\n    \"spec2\": []\n  }\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "All errors exit with code 1 and write to stderr:\n\n- Change not found\n- `specId` not in `change.specIds`\n- `--set` used with `--add` or `--remove`\n- `--remove` value not in current deps\n- Modification flags (`--add`, `--remove`, `--set`) provided without a `<specId>`"
+      ]
+    }
+  ],
+  "constraints": [
+    "--set is mutually exclusive with --add and --remove",
+    "The command delegates to the UpdateSpecDeps use case in @specd/core for modifications.",
+    "Listing and display modes use GetStatus or direct repository access to retrieve dependencies."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Add deps to a spec in the change",
+      "given": ["a change add-auth with specIds: [\"default:auth/login\"]"],
+      "when": ["specd change deps add-auth auth/login --add auth/shared --add auth/jwt"],
+      "then": ["the command exits with code 0", "AND the output is:"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Remove deps from a spec in the change",
+      "given": [
+        "a change add-auth with specDependsOn: { \"default:auth/login\": [\"default:auth/shared\", \"default:auth/jwt\"] }"
+      ],
+      "when": ["specd change deps add-auth auth/login --remove auth/jwt"],
+      "then": ["the command exits with code 0", "AND the output includes dependsOn: auth/shared"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Set (replace) deps for a spec",
+      "given": ["a change add-auth with existing deps for auth/login"],
+      "when": ["specd change deps add-auth auth/login --set auth/session"],
+      "then": [
+        "the command exits with code 0",
+        "AND the output includes dependsOn: auth/session",
+        "AND previous deps are fully replaced"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "List all dependencies in the change",
+      "given": ["a change with multiple specs and some dependencies"],
+      "when": ["specd change deps <name> is run without <specId> or flags"],
+      "then": [
+        "the command exits with code 0",
+        "AND the output lists all specs in the change and their dependencies"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Display dependencies for a specific spec",
+      "given": ["a change with specIds: ['core:a'] and some dependencies for it"],
+      "when": ["specd change deps <name> core:a is run without flags"],
+      "then": ["the command exits with code 0", "AND the output shows the dependencies for core:a"]
+    },
+    {
+      "requirement": "Output",
+      "name": "JSON output format",
+      "given": ["a change add-auth with specIds: [\"default:auth/login\"]"],
+      "when": ["specd change deps add-auth auth/login --add auth/shared --format json"],
+      "then": ["the output is valid JSON with result: \"ok\", name, specId, and dependsOn array"]
+    },
+    {
+      "requirement": "Output",
+      "name": "No deps remaining shows none",
+      "given": ["a change with deps [\"default:auth/shared\"] for auth/login"],
+      "when": ["specd change deps add-auth auth/login --remove auth/shared"],
+      "then": ["the output includes dependsOn: (none)"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Error when change not found",
+      "when": ["specd change deps nonexistent auth/login --add auth/shared"],
+      "then": ["the command exits with code 1", "AND stderr indicates the change was not found"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Error when specId not in change.specIds",
+      "given": ["a change add-auth with specIds: [\"default:auth/login\"]"],
+      "when": ["specd change deps add-auth billing/invoices --add auth/shared"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr indicates the specId is not part of the change"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Error when --set used with --add",
+      "when": ["specd change deps add-auth auth/login --set auth/session --add auth/shared"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr indicates --set is mutually exclusive with --add/--remove"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Error when removing non-existent dep",
+      "given": ["a change add-auth with no deps for auth/login"],
+      "when": ["specd change deps add-auth auth/login --remove auth/shared"],
+      "then": ["the command exits with code 1", "AND stderr indicates the dep was not found"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Error when modification flags provided without specId",
+      "when": ["specd change deps <name> --add core:other"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr indicates modification flags require a specId"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:change-deps",
+        "file": "cli:src/commands/change/deps.ts",
+        "symbol": "registerChangeDeps"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:0b7ae7d02462f80ca547afcbde4b63e2f755043c1125d60513de587df21ca4e7",
+    "verify.md": "sha256:3450175d537de114fbf1ce1ea1b97437eaed6dc48f1a1baec91d980ddf67bff8"
+  },
+  "generatedBy": "core"
+}

@@ -10,8 +10,8 @@ Studio UI for **Graph Main View**: the central workspace view for the Code Graph
 
 When `GraphMainView` is active in the central workspace, it MUST display a high-level summary of the codebase's graph state.
 The view MUST show the current index status (`getGraphStatus`), distinguishing between "Ready", "Stale", and "Off".
-It MUST provide a manual "Force Reindex" button that triggers `indexGraph({ force: true })` and displays the progress/result in the global Output panel.
-It MUST display aggregate counts for Specifications, Documents, and Code Symbols sourced from the graph status.
+It MUST provide a manual "Reindex" button that triggers `indexGraph({ force: false })` and displays the progress/result in the global Output panel.
+It MUST display aggregate counts for Specifications, Files & Docs (code files and documents), and Code Symbols sourced from the graph status.
 
 ### Requirement: view surfaces high-impact graph hotspots
 

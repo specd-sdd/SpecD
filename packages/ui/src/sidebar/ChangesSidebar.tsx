@@ -7,12 +7,12 @@ import { Card } from '../components/ui/card.js'
 import { cn } from '../lib/utils.js'
 
 const STATE_BADGE: Record<string, string> = {
-  exploring: 'text-sky-400',
-  designing: 'text-violet-400',
-  implementing: 'text-amber-400',
-  verifying: 'text-orange-400',
-  done: 'text-emerald-400',
-  archivable: 'text-emerald-500',
+  exploring: 'text-sky-600 dark:text-sky-400',
+  designing: 'text-violet-600 dark:text-violet-400',
+  implementing: 'text-amber-600 dark:text-amber-400',
+  verifying: 'text-orange-600 dark:text-orange-400',
+  done: 'text-emerald-600 dark:text-emerald-400',
+  archivable: 'text-emerald-600 dark:text-emerald-500',
   archived: 'text-muted-foreground',
 }
 

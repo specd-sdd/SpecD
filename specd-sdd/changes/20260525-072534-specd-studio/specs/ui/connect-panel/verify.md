@@ -2,6 +2,14 @@
 
 ## Requirements
 
+### Requirement: view is composed using shadcn primitives
+
+#### Scenario: Form built with shadcn primitives
+
+- **WHEN** component renders
+- **THEN** it uses shadcn `Input`, `Label`, `Button`, and `Card`/`Dialog` primitives
+- **AND** standard focus and validation styles apply
+
 ### Requirement: connect panel collects API URL and optional token
 
 #### Scenario: Test connection calls GET /v1/project

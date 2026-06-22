@@ -209,17 +209,17 @@ function SpecContextPanel({
   return (
     <div className="studio-scrollbar min-h-0 flex-1 overflow-auto p-3 text-xs">
       {warnings.length > 0 ? (
-        <Alert className="mb-3 border-amber-500/30 bg-amber-500/10 text-amber-100 [&>svg]:hidden">
-          <AlertTitle className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200/80">
+        <Alert className="mb-3 border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-100 [&>svg]:hidden">
+          <AlertTitle className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-800 dark:text-amber-200/80">
             Warnings
           </AlertTitle>
           <AlertDescription>
           <ul className="space-y-2">
             {warnings.map((warning) => (
               <li key={`${warning.type}:${warning.path ?? warning.message}`}>
-                <div className="font-mono text-[11px] text-amber-100">{warning.message}</div>
+                <div className="font-mono text-[11px] text-amber-800 dark:text-amber-100">{warning.message}</div>
                 {warning.path ? (
-                  <div className="text-[10px] text-amber-200/70">{warning.path}</div>
+                  <div className="text-[10px] text-amber-700 dark:text-amber-200/70">{warning.path}</div>
                 ) : null}
               </li>
             ))}
@@ -522,12 +522,12 @@ function SpecArtifactsList({
 }
 
 const STATE_COLOR: Record<string, string> = {
-  exploring: 'text-sky-400',
-  designing: 'text-violet-400',
-  implementing: 'text-amber-400',
-  verifying: 'text-orange-400',
-  done: 'text-emerald-400',
-  archivable: 'text-emerald-500',
+  exploring: 'text-sky-600 dark:text-sky-400',
+  designing: 'text-violet-600 dark:text-violet-400',
+  implementing: 'text-amber-600 dark:text-amber-400',
+  verifying: 'text-orange-600 dark:text-orange-400',
+  done: 'text-emerald-600 dark:text-emerald-400',
+  archivable: 'text-emerald-600 dark:text-emerald-500',
 }
 
 function LinkedChangesPanel({

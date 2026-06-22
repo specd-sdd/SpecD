@@ -334,7 +334,7 @@ export function EditChangeDialog({
           {!isCreate && (
             <Alert className="shrink-0 border-amber-500/40 bg-amber-500/10 text-foreground [&>svg]:text-amber-500">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-              <AlertTitle className="text-[11px] font-medium text-amber-200/90">
+              <AlertTitle className="text-[11px] font-medium text-amber-800 dark:text-amber-200/90">
                 High-impact edits
               </AlertTitle>
               <AlertDescription className="space-y-1 text-[11px] leading-relaxed">

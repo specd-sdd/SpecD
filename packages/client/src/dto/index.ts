@@ -1,3 +1,8 @@
+export type {
+  ArchivedChangeDetailDto,
+  ArchivedChangeIndexEntryDto,
+  ArchivedChangeListDto,
+} from './archived-change.js'
 export type { ArtifactContentDto } from './artifact-content.js'
 export type { ArtifactListDto, ArtifactListEntryDto } from './artifact-list.js'
 export type { ChangeDetailDto, ChangeHistoryEventDto } from './change-detail.js'
@@ -32,5 +37,8 @@ export type { SpecContextDto, SpecContextEntryDto, SpecContextWarningDto } from 
 export type { SpecSummaryDto } from './spec-summary.js'
 export type { ValidateBatchResultDto, ValidateBatchStepResultDto } from './validate-batch-result.js'
 export type { ValidateResultDto } from './validate-result.js'
+export type { HookInstructionsDto } from './hook-instructions.js'
+export type { ArtifactInstructionDto } from './artifact-instruction.js'
 export type { WorkspaceSpecTreeDto } from './workspace-spec-tree.js'
+export type { WorkspaceSpecsValidateResultDto } from './workspace-specs-validate-result.js'
 export type { LogEntryDto, LogReadDto } from './log-read.js'

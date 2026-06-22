@@ -1,19 +1,17 @@
 import type { Monaco } from '@monaco-editor/react'
 
-const THEME_ID = 'specd-studio'
-
-/** Studio Monaco surface — rgb(20, 22, 26) */
 export const MONACO_SURFACE_HEX = '#14161a'
+export const MONACO_LIGHT_HEX = '#ffffff'
 
 let registered = false
 
 /**
- * Registers a Monaco theme with a fixed Studio editor background.
- * Safe to call on every mount; defines the theme once.
+ * Registers Monaco themes with a fixed Studio editor background.
+ * Safe to call on every mount; defines the themes once.
  */
 export function onMonacoBeforeMount(monaco: Monaco): void {
   if (!registered) {
-    monaco.editor.defineTheme(THEME_ID, {
+    monaco.editor.defineTheme('specd-studio-dark', {
       base: 'vs-dark',
       inherit: true,
       rules: [],
@@ -27,8 +25,24 @@ export function onMonacoBeforeMount(monaco: Monaco): void {
         'diffEditor.removedLineBackground': '#f851491f',
       },
     })
+
+    monaco.editor.defineTheme('specd-studio-light', {
+      base: 'vs',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': MONACO_LIGHT_HEX,
+        'editorGutter.background': MONACO_LIGHT_HEX,
+        'editor.lineHighlightBackground': '#f6f8fa',
+        'editorWidget.background': '#ffffff',
+        'editorPane.background': '#ffffff',
+        'diffEditor.insertedLineBackground': '#1a7f371f',
+        'diffEditor.removedLineBackground': '#cf222e1f',
+      },
+    })
     registered = true
   }
 
-  monaco.editor.setTheme(THEME_ID)
+  const isLight = document.documentElement.classList.contains('light')
+  monaco.editor.setTheme(isLight ? 'specd-studio-light' : 'specd-studio-dark')
 }

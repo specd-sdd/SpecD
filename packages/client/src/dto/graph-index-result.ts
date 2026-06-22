@@ -19,6 +19,7 @@ export interface GraphIndexErrorDto {
 export interface GraphIndexResultDto {
   readonly filesDiscovered: number
   readonly filesIndexed: number
+  readonly documentsIndexed: number
   readonly filesRemoved: number
   readonly filesSkipped: number
   readonly specsDiscovered: number
