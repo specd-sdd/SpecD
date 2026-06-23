@@ -4,7 +4,6 @@ import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { SaveChangeArtifact } from '../../../src/application/use-cases/save-change-artifact.js'
-import { GetChangeArtifact } from '../../../src/application/use-cases/get-change-artifact.js'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
 import { SaveRequiresForceError } from '../../../src/application/errors/save-requires-force-error.js'
 import { ChangeArtifactFileNotFoundError } from '../../../src/application/errors/change-artifact-file-not-found-error.js'
@@ -110,22 +109,6 @@ describe('SaveChangeArtifact', () => {
     expect(persisted?.updatedAt.getTime()).toBeGreaterThan(
       new Date('2026-05-25T10:00:00.000Z').getTime(),
     )
-  })
-})
-
-describe('GetChangeArtifact', () => {
-  it('returns content and originalHash from repository', async () => {
-    const change = makeChangeWithProposal()
-    const repo = makeChangeRepository([change])
-    vi.spyOn(repo, 'artifact').mockResolvedValue(
-      new SpecArtifact('proposal.md', '# Title', 'sha256:hash'),
-    )
-
-    const sut = new GetChangeArtifact(repo)
-    const result = await sut.execute({ name: 'studio-save', filename: 'proposal.md' })
-
-    expect(result.content).toBe('# Title')
-    expect(result.originalHash).toBe('sha256:hash')
   })
 })
 

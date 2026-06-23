@@ -1,0 +1,88 @@
+- op: removed
+  description: Drop obsolete mutate scenario from content requirement
+  selector:
+    type: section
+    matches: 'Scenario: Read uses ChangeRepository.mutate'
+    parent:
+      type: section
+      matches: 'Requirement: GetChangeArtifact returns content and originalHash'
+
+- op: added
+  description: Assert read-only repository access
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: GetChangeArtifact returns content and originalHash'
+    after:
+      type: section
+      matches: 'Scenario: Untracked filename fails'
+  content: |
+    #### Scenario: Read does not call mutate
+
+    - **WHEN** use case executes
+    - **THEN** loads change via `get` and artifact bytes via `artifact`
+    - **AND** does not invoke `ChangeRepository.mutate` or `save`
+
+- op: removed
+  description: Remove duplicate happy-path scenario from confinement requirement
+  selector:
+    type: section
+    matches: 'Scenario: Tracked file returns content and hash'
+    parent:
+      type: section
+      matches: 'Requirement: GetChangeArtifact enforces tracked-file confinement'
+
+- op: removed
+  description: Remove obsolete mutate scenario from confinement requirement
+  selector:
+    type: section
+    matches: 'Scenario: Read uses ChangeRepository.mutate'
+    parent:
+      type: section
+      matches: 'Requirement: GetChangeArtifact enforces tracked-file confinement'
+
+- op: removed
+  description: Replace generic untracked scenario with confinement-specific wording
+  selector:
+    type: section
+    matches: 'Scenario: Untracked filename fails'
+    parent:
+      type: section
+      matches: 'Requirement: GetChangeArtifact enforces tracked-file confinement'
+
+- op: added
+  description: Clarify confinement failure happens before artifact read
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: GetChangeArtifact enforces tracked-file confinement'
+  content: |
+    #### Scenario: Untracked filename fails before read
+
+    - **WHEN** filename is not tracked on the change manifest
+    - **THEN** `ChangeArtifactFileNotFoundError` (or equivalent typed error)
+    - **AND** `artifact` is not called
+
+- op: added
+  description: Verify scenarios for new read-only requirement
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: GetChangeArtifact enforces tracked-file confinement'
+  content: |
+    ### Requirement: GetChangeArtifact is read-only
+
+    #### Scenario: Repeated reads keep updatedAt stable
+
+    - **GIVEN** change `foo` with known `updatedAt`
+    - **WHEN** `GetChangeArtifact` runs twice for the same tracked filename
+    - **THEN** manifest `updatedAt` is unchanged after both reads
+
+    #### Scenario: HTTP GET artifact does not bump revision clock
+
+    - **GIVEN** API client calls `GET /changes/{name}/artifacts/{filename}`
+    - **WHEN** no save or other mutation occurs between requests
+    - **THEN** subsequent `GET /changes/{name}/status` reports the same `updatedAt`

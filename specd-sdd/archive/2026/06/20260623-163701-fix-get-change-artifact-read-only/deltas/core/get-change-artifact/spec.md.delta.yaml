@@ -1,0 +1,25 @@
+- op: modified
+  description: Replace mutate-based read with read-only repository access
+  selector:
+    type: section
+    matches: 'Requirement: GetChangeArtifact returns content and originalHash'
+  content: |
+    The use case MUST load the change with `ChangeRepository.get(name)` and call `artifact(change, filename)`, returning `{ content, originalHash }` or a typed not-found error.
+
+    The use case MUST NOT call `ChangeRepository.mutate`, `save`, or any other persistence primitive that advances `updatedAt`.
+
+- op: added
+  description: Explicit read-only contract for manifest revision clock
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: GetChangeArtifact enforces tracked-file confinement'
+  content: |
+    ### Requirement: GetChangeArtifact is read-only
+
+    `execute` MUST be a read operation with no manifest side effects.
+
+    Repeated invocations with unchanged artifact content MUST NOT advance `Change.updatedAt` or persist a manifest revision solely from the read.

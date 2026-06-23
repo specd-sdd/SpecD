@@ -1,3 +1,4 @@
+import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { ChangeArtifactFileNotFoundError } from '../errors/change-artifact-file-not-found-error.js'
 import { findTrackedArtifactFile } from './_shared/find-tracked-artifact-file.js'
@@ -34,20 +35,23 @@ export class GetChangeArtifact {
    * @returns File content and `originalHash` for the next save
    */
   async execute(input: GetChangeArtifactInput): Promise<GetChangeArtifactResult> {
-    return this._changes.mutate(input.name, async (change) => {
-      if (findTrackedArtifactFile(change, input.filename) === undefined) {
-        throw new ChangeArtifactFileNotFoundError(input.filename, input.name)
-      }
+    const change = await this._changes.get(input.name)
+    if (change === null) {
+      throw new ChangeNotFoundError(input.name)
+    }
 
-      const artifact = await this._changes.artifact(change, input.filename)
-      if (artifact === null) {
-        throw new ChangeArtifactFileNotFoundError(input.filename, input.name)
-      }
+    if (findTrackedArtifactFile(change, input.filename) === undefined) {
+      throw new ChangeArtifactFileNotFoundError(input.filename, input.name)
+    }
 
-      return {
-        content: artifact.content,
-        originalHash: artifact.originalHash ?? '',
-      }
-    })
+    const artifact = await this._changes.artifact(change, input.filename)
+    if (artifact === null) {
+      throw new ChangeArtifactFileNotFoundError(input.filename, input.name)
+    }
+
+    return {
+      content: artifact.content,
+      originalHash: artifact.originalHash ?? '',
+    }
   }
 }

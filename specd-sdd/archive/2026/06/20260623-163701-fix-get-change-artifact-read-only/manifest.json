@@ -1,0 +1,387 @@
+{
+  "name": "fix-get-change-artifact-read-only",
+  "createdAt": "2026-06-23T16:37:01.130Z",
+  "updatedAt": "2026-06-23T17:28:18.603Z",
+  "description": "Make GetChangeArtifact read-only so GET artifact does not persist manifest or bump updatedAt",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:get-change-artifact"],
+  "specDependsOn": {
+    "core:get-change-artifact": ["core:change-repository-port", "core:change"]
+  },
+  "invalidationPolicy": "none",
+  "trackedImplementationFiles": [
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Makefile",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/4292fa9a667d77b27488aa109b010a85bce8e4e7a1c7aa0370cea902395c3866.intermediate.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/Release/better_sqlite3.node.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/Release/obj.target/better_sqlite3/src/better_sqlite3.o.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/Release/obj.target/deps/locate_sqlite3.stamp.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/Release/obj.target/sqlite3/gen/sqlite3/sqlite3.o.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/Release/obj.target/test_extension/deps/test_extension.o.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/Release/sqlite3.a.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/.deps/Release/test_extension.node.d",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/obj.target/better_sqlite3/src/better_sqlite3.o",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/obj.target/deps/locate_sqlite3.stamp",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/obj.target/sqlite3/gen/sqlite3/sqlite3.o",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/obj.target/test_extension/deps/test_extension.o",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/obj/gen/sqlite3/sqlite3.c",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/obj/gen/sqlite3/sqlite3.h",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/obj/gen/sqlite3/sqlite3ext.h",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/sqlite3.a",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/Release/test_extension.node",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/better_sqlite3.target.mk",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/binding.Makefile",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/config.gypi",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/deps/locate_sqlite3.target.mk",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/deps/sqlite3.Makefile",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/deps/sqlite3.target.mk",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/gyp-mac-tool",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/vendor/better-sqlite3/build/test_extension.target.mk",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-163701-fix-get-change-artifact-read-only/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-163701-fix-get-change-artifact-read-only/deltas/core/get-change-artifact/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-163701-fix-get-change-artifact-read-only/deltas/core/get-change-artifact/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-163701-fix-get-change-artifact-read-only/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-163701-fix-get-change-artifact-read-only/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-163701-fix-get-change-artifact-read-only/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-163701-fix-get-change-artifact-read-only/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-change-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/save-change-artifact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-change-artifact.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:get-change-artifact",
+      "file": "packages/core/src/application/use-cases/get-change-artifact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetChangeArtifact"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:c51dd687cf79ac1a6b2359b9dacefae5e8bb52096516de89f4ead4e6b359add7"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-change-artifact",
+          "filename": "deltas/core/get-change-artifact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9f874f18bb56135564bfbbefd37017e7e8954a90c294dc32327cb0886e8cb14f"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-change-artifact",
+          "filename": "deltas/core/get-change-artifact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b63864c9021722ab6cf77e7ec9a9a8da87d27e9745272c0ecf525129c5389782"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:7ba7e45e7c6333107870620b00eb20a180ba69f883c2acab31b9f66d4582fb09"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:5b5f0350ef932041390a029589b348bfa21d2b2466e6c0a6ed63d2fcf50f192e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-23T16:37:01.130Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:get-change-artifact"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-23T16:37:01.143Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-change-artifact"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-change-artifact"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T16:44:34.335Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T16:56:32.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:04:53.462Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:14:41.022Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:25:33.522Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:25:47.253Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-23T17:28:02.195Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"fix-get-change-artifact-read-only\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:28:18.602Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-23T17:28:18.617Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}
