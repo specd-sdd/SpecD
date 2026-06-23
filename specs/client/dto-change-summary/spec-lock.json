@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-change-summary"],
+  "implementation": [
+    {
+      "file": "client:src/dto/change-summary.ts",
+      "symbols": ["ChangeSummaryDto"]
+    }
+  ]
+}

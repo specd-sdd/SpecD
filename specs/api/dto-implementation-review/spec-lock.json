@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "core:change"],
+  "implementation": []
+}

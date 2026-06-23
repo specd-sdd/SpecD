@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "api:dto-graph"],
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/presenters/presenter-graph.ts",
+      "symbols": [
+        "toGraphStatusDto",
+        "toGraphSearchResultDto",
+        "toGraphImpactDto",
+        "toChangeGraphViewDto"
+      ]
+    }
+  ]
+}

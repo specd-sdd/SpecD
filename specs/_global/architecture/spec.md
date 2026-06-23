@@ -62,6 +62,17 @@ Packages that serve as delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/
 
 Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `core`. `mcp` → `core`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles.
 
+### Requirement: SpecD Studio package graph
+
+SpecD Studio adds owned delivery and presentation packages:
+
+- **`@specd/api`** — HTTP server: handlers, presenters, DTOs, auth registry, composition. MUST delegate to `@specd/core` kernel use cases; MUST NOT duplicate lifecycle rules.
+- **`@specd/client`** — `SpecdDataPort`, transports, and adapters for HTTP and IPC. MUST NOT import `@specd/core`.
+- **`@specd/ui`** — React IDE shell and hooks. MUST consume `@specd/client` only; MUST NOT import `@specd/core`.
+- **`specd-studio-web`** / **`specd-studio-desktop`** — hosts that wire UI to remote HTTP or local IPC/kernel.
+
+Dependency direction: `ui` → `client` → (HTTP | IPC) → `api` → `core`. CLI MAY start `api` via `specd serve` / `specd ui serve` but MUST NOT implement HTTP handlers itself.
+
 ## Constraints
 
 - In any package with business logic, `domain/` must not import from `application/`, `infrastructure/`, or `composition/`

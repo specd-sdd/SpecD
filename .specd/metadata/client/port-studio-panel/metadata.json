@@ -1,0 +1,72 @@
+{
+  "title": "Port Studio Panel",
+  "description": "Client port methods for Studio remote log access and debug trace writes. User-visible Output/Problems buffers are local UI session state rather than remote API resources.",
+  "dependsOn": ["client:specd-data-port", "api:routes-project-logs"],
+  "context": [
+    "Client port methods for Studio remote log access and debug trace writes. User-visible Output/Problems buffers are local UI session state rather than remote API resources."
+  ],
+  "rules": [
+    {
+      "requirement": "readProjectLogs and appendProjectLog",
+      "rules": [
+        "`readProjectLogs({ limit?, prettier? }, signal?)` MUST `GET /v1/logs`. `appendProjectLog({ level?, message, context? })` MUST `POST /v1/logs`. Log messages are for tracing (action ids); they MUST NOT repeat full studio output user text as the primary log message."
+      ]
+    },
+    {
+      "requirement": "output buffering is local to the UI session",
+      "rules": [
+        "The port MUST NOT expose methods for listing or appending Studio output lines. Output/Problems entries belong to a local session buffer owned by `@specd/ui` or the Studio host."
+      ]
+    },
+    {
+      "requirement": "trace logs remain independent from local output",
+      "rules": [
+        "`appendProjectLog` MUST NOT be specified as a persistence path for the local output buffer. The UI MAY emit a debug trace for an action and also append a separate local output line, but those are distinct channels."
+      ]
+    },
+    {
+      "requirement": "SpecdDataPort composes PortStudioPanel",
+      "rules": [
+        "`SpecdDataPort` MUST extend `PortStudioPanel` so `@specd/ui` hooks call the port only."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "readProjectLogs and appendProjectLog",
+      "name": "Remote adapter calls logs routes",
+      "when": ["appendProjectLog is invoked"],
+      "then": ["HTTP POST targets /v1/logs", "AND readProjectLogs uses GET /v1/logs"]
+    },
+    {
+      "requirement": "output buffering is local to the UI session",
+      "name": "Remote adapter does not implement studio output transport methods",
+      "when": ["RemoteSpecdDataAdapter is inspected"],
+      "then": [
+        "Studio output is not loaded or appended through a dedicated remote output endpoint",
+        "AND output buffering is delegated to local UI state"
+      ]
+    },
+    {
+      "requirement": "trace logs remain independent from local output",
+      "name": "Appending a project log does not define local output persistence",
+      "when": ["appendProjectLog is invoked for a debug trace"],
+      "then": [
+        "the port writes only to /v1/logs",
+        "AND any user-facing output line must be managed separately by the UI session buffer"
+      ]
+    },
+    {
+      "requirement": "SpecdDataPort composes PortStudioPanel",
+      "name": "Memory adapter implements studio panel methods",
+      "when": ["MemorySpecdDataAdapter is inspected"],
+      "then": ["it implements the remaining PortStudioPanel log methods"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:33aae39dfe40cf530ba879e787d46e01506e6a007d89751b5104d641899b7914",
+    "verify.md": "sha256:13821d10619ece164f231712413c70f7b51a8dabc89d2d6f426bf43d6e34e4aa"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,83 @@
+{
+  "title": "Inspector Delta Preview",
+  "description": "Studio UI for **Inspector Delta Preview**: read-only merged markdown for spec-scoped change artifacts via `PreviewSpec`, including **unsaved** delta text.",
+  "dependsOn": [
+    "core:preview-artifact-overrides",
+    "ui:inspector-unsaved-draft",
+    "client:specd-data-port"
+  ],
+  "context": [
+    "Studio UI for **Inspector Delta Preview**: read-only merged markdown for spec-scoped change artifacts via `PreviewSpec`, including **unsaved** delta text."
+  ],
+  "rules": [
+    {
+      "requirement": "preview uses saved preview when clean",
+      "rules": [
+        "When the artifact buffer matches saved content, Preview MUST call `previewChange` (GET `/preview`)."
+      ]
+    },
+    {
+      "requirement": "preview uses draft when dirty",
+      "rules": [
+        "When the buffer is dirty, Preview MUST call `previewChangeDraft` with `artifactOverrides` mapping the open change filename to `editorBuffer`."
+      ]
+    },
+    {
+      "requirement": "non-spec-preview artifacts preview raw buffer",
+      "rules": [
+        "For change artifacts that do not use spec-preview merge (e.g. `proposal.md`), Preview MUST render `editorBuffer` directly without calling preview endpoints."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "preview uses saved preview when clean",
+      "name": "Clean state uses GET preview",
+      "given": ["buffer matches disk content"],
+      "when": ["Preview tab is selected"],
+      "then": ["previewChange (GET) is used", "AND POST preview is not called"]
+    },
+    {
+      "requirement": "preview uses draft when dirty",
+      "name": "Dirty delta shows draft merge",
+      "given": ["user edited delta YAML in editor without save"],
+      "when": ["Preview tab is selected"],
+      "then": [
+        "previewChangeDraft is invoked with override for open filename",
+        "AND merged markdown reflects unsaved delta"
+      ]
+    },
+    {
+      "requirement": "non-spec-preview artifacts preview raw buffer",
+      "name": "Proposal preview is buffer markdown",
+      "given": ["proposal.md open with local edits"],
+      "when": ["Preview is selected"],
+      "then": ["rendered content equals editor buffer", "AND no spec-preview API call"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "view uses SpecdDataPort hooks only — primary path",
+      "when": ["Components MUST consume data through SpecdDataPort hooks and"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "view uses SpecdDataPort hooks only — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:a9d2ab3ef2f3f174f2e6b1c9d2b0b6f6ab4db0785a7e04f4f65a72e8ac1381ed",
+    "verify.md": "sha256:d31203f5ea76fcd68169b74ac242d1a05c252365d3d8917dd196f9ef505c531a"
+  },
+  "generatedBy": "core"
+}

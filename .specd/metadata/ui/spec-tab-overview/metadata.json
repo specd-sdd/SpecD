@@ -1,0 +1,157 @@
+{
+  "title": "Spec Tab Overview",
+  "description": "Studio UI for **Spec Tab Overview**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tab Overview**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Spec Tab Overview**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tab Overview**."
+  ],
+  "rules": [
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "rules": [
+        "While the Overview tab is visible, the view MUST refresh spec detail via `getSpec` on tab-scoped poll ticks. New specs in the tree are already discovered by the global workspace poll.\n\nThe Overview presentation MUST also serve as the primary place for spec metadata summary; Studio MUST NOT require a separate **Metadata** tab to read the current spec's identity and description. Metadata MUST be presented using shadcn **`Card`** components and **`Badge`** status indicators."
+      ]
+    },
+    {
+      "requirement": "linked changes tab lists active changes referencing the current spec",
+      "rules": [
+        "When the user selects the **Linked Changes** center tab, Studio MUST read the embedded `linkedChanges[]` summaries from the current `getSpec()` detail response and list the active changes whose `specIds` include the open spec's `specId`.\n\nEach row SHOULD show:\n\n- change name\n- description when present\n- lifecycle state with its corresponding state color\n\nThe list MUST NOT show unrelated active changes, drafts, or archived items. If no active change references the current spec, the UI MUST show an explicit empty state instead of throwing."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Visible spec tab refreshes metadata",
+      "given": ["spec tab for core:kernel is active"],
+      "when": ["light poll interval elapses"],
+      "then": ["spec metadata hook refetches", "AND tree discovery still uses global poll"]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Overview replaces a dedicated metadata tab",
+      "given": ["a loaded spec"],
+      "when": ["user stays on Overview"],
+      "then": [
+        "the user can read the current spec summary there",
+        "AND no separate Metadata tab is required"
+      ]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Hidden spec tab stops metadata poll",
+      "given": ["user switches away from spec tab"],
+      "when": ["poll would have fired"],
+      "then": ["no metadata request is sent", "AND last data remains rendered"]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "New spec appears via workspace tree poll",
+      "given": ["agent adds a spec file on disk"],
+      "when": ["global workspace poll runs"],
+      "then": ["tree shows new node", "AND spec tab poll does not scan filesystem directly"]
+    },
+    {
+      "requirement": "linked changes tab lists active changes referencing the current spec",
+      "name": "Linked Changes filters active changes by specId",
+      "given": [
+        "open spec core:kernel",
+        "AND active changes include one that contains core:kernel and another that does not"
+      ],
+      "when": ["user selects Linked Changes tab"],
+      "then": [
+        "UI lists only the change that references core:kernel",
+        "AND the data comes from the current spec detail payload",
+        "AND unrelated active changes are excluded"
+      ]
+    },
+    {
+      "requirement": "linked changes tab lists active changes referencing the current spec",
+      "name": "Linked Changes hidden tab pauses overlap poll",
+      "given": ["user leaves Linked Changes tab"],
+      "when": ["global poll ticks"],
+      "then": ["linked-change list does not refetch until tab visible again"]
+    },
+    {
+      "requirement": "linked changes tab lists active changes referencing the current spec",
+      "name": "Linked Changes shows description and colored state",
+      "given": ["a referenced active change has a description and lifecycle state"],
+      "when": ["user selects Linked Changes"],
+      "then": ["the row shows the description text", "AND the state badge uses the state color"]
+    },
+    {
+      "requirement": "linked changes tab lists active changes referencing the current spec",
+      "name": "No referencing active changes shows empty state",
+      "given": ["no active change contains the current spec's specId"],
+      "when": ["user selects Linked Changes"],
+      "then": ["the UI renders an explicit empty state"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:spec-tab-overview",
+        "file": "ui:src/spec/SpecOverview.tsx",
+        "symbol": "SpecOverview"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:bc1f552511e6f4bdb439305abbd010db853f6afd69489e8ad12dd8069b30a0a6",
+    "verify.md": "sha256:fcf28d3115d9bde87a6c85966de10f6fd02495a13d67fcb2818cf10c2daa9686"
+  },
+  "generatedBy": "core"
+}

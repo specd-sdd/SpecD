@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:port-studio-panel", "client:specd-data-port", "ui:shell-layout"],
+  "implementation": [
+    {
+      "file": "ui:src/shell/ShellLayout.tsx",
+      "symbols": ["ShellLayout"]
+    }
+  ]
+}

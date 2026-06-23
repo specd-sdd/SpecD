@@ -1,0 +1,53 @@
+{
+  "title": "DTO Validate Batch Result",
+  "description": "Typed mirror of `POST /changes/{name}/validate-all` for `@specd/client` and `@specd/api`.",
+  "dependsOn": [
+    "api:dto-validate-batch-result",
+    "default:_global/architecture",
+    "default:_global/conventions"
+  ],
+  "context": [
+    "Typed mirror of `POST /changes/{name}/validate-all` for `@specd/client` and `@specd/api`."
+  ],
+  "rules": [
+    {
+      "requirement": "ValidateBatchResultDto",
+      "rules": [
+        "MUST include `passed: boolean`, `total: number`, `results: ValidateBatchStepResultDto[]`."
+      ]
+    },
+    {
+      "requirement": "ValidateBatchStepResultDto",
+      "rules": [
+        "Each step MUST include:\n\n- `spec: string | null`\n- `artifact: string`\n- `passed: boolean`\n- `failures` — same failure shape as single validate (`message`, `artifactId`, optional `path`)\n- `warnings: string[]`\n- `files: string[]`\n\nAPI and client packages MUST keep structurally identical DTOs under `dto/validate-batch-result.ts`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "ValidateBatchResultDto",
+      "name": "Client parses batch response",
+      "when": ["client parses POST .../validate-all JSON"],
+      "then": ["ValidateBatchResultDto matches API wire shape field-for-field"]
+    },
+    {
+      "requirement": "ValidateBatchStepResultDto",
+      "name": "ValidateBatchStepResultDto — primary path",
+      "when": ["Each step MUST include: - spec: string |"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "ValidateBatchStepResultDto",
+      "name": "ValidateBatchStepResultDto — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:c15dd2d8ae0eec95eb9f0f343381b839f3f58f17e0b9c261187f5aa8cf833cab",
+    "verify.md": "sha256:93110e014af7a6e11eb208fd77db8a839442e1ea74dbb83f06d7e03642e2bb72"
+  },
+  "generatedBy": "core"
+}

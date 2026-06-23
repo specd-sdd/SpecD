@@ -28,6 +28,10 @@ If no flags are provided, the console destination SHALL default to `info`.
 
 The CLI SHALL pass its defined console destination to the `Kernel` via the `additionalDestinations` array in `createKernel()`.
 
+### Requirement: Shared formatter with kernel
+
+When resolving CLI context, the CLI MUST call `createLogFormatter({ colorize: process.stdout.isTTY })` and pass the instance to `createKernel` via `KernelOptions.logFormatter` so console pretty output and in-memory log readback use the same formatting as Studio `GET /v1/logs?prettier=true`.
+
 ### Requirement: Callback Interception (Optional)
 
 The CLI MAY register a `callback` destination if it needs to intercept logs for specialized UI components (e.g., progress bars, dashboard updates). If used, it MUST provide an `onLog` handler that consumes `LogEntry` objects.

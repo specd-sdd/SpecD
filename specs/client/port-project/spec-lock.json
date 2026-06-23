@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "client:specd-data-port"],
+  "implementation": [
+    {
+      "file": "client:src/port-project.ts",
+      "symbols": ["PortProject"]
+    }
+  ]
+}

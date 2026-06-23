@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-spec-detail"],
+  "implementation": [
+    {
+      "file": "client:src/dto/spec-detail.ts",
+      "symbols": ["SpecDetailDto"]
+    }
+  ]
+}

@@ -9,7 +9,7 @@
     {
       "requirement": "PluginType",
       "rules": [
-        "The spec MUST define a runtime const array of known plugin types and derive the `PluginType` union from it:\n\n```typescript\nexport const PLUGIN_TYPES = ['agent'] as const\nexport type PluginType = (typeof PLUGIN_TYPES)[number]\n```\n\nAdding a new plugin type requires only adding a string to the `PLUGIN_TYPES` array — both compile-time type and runtime validation update automatically."
+        "The spec MUST define a runtime const array of known plugin types and derive the `PluginType` union from it:\n\n```typescript\nexport const PLUGIN_TYPES = ['agent', 'ui'] as const\nexport type PluginType = (typeof PLUGIN_TYPES)[number]\n```\n\nAdding a new plugin type requires only adding a string to the `PLUGIN_TYPES` array — both compile-time type and runtime validation update automatically.\n\nManifest `pluginType` values MUST be members of `PLUGIN_TYPES`. The loader MUST reject unknown manifest types before invoking `create()`."
       ]
     },
     {
@@ -101,9 +101,10 @@
       "then": ["it includes type, description, and optional default and required"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:4bcf43c289de774e4e0486400bab8c1c97927ab226899d6786ae87529371af84",
-    "verify.md": "sha256:f181eac7a678b0ce8e7289c8ae1e73c839a2e6980070d2ac05111e09fa2ad549"
+    "spec.md": "sha256:92f5e455bdb230f4dad8df79f195e3a14f50a92a5a5c0823a735e99a4fd9d504",
+    "verify.md": "sha256:b495ee3dd5c1ff1a473165d003992347c4d0b0ed4a8470f611f837b92d0e7136"
   },
   "generatedBy": "core"
 }

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port"],
+  "implementation": [
+    {
+      "file": "ui:src/sidebar/ChangesSidebar.tsx",
+      "symbols": ["ChangesSidebar"]
+    }
+  ]
+}

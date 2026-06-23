@@ -16,10 +16,7 @@
   "implementation": [
     {
       "file": "core:src/domain/entities/change.ts",
-      "symbols": ["invalidate"]
-    },
-    {
-      "file": "core:test/domain/entities/change.spec.ts"
+      "symbols": ["Change", "ChangeProps"]
     }
   ]
 }

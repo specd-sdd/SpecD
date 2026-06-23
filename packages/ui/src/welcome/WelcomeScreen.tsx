@@ -208,7 +208,7 @@ export function OpenProjectDialog({
   )
 
   const panel = (
-    <div className="flex h-[28rem] w-[min(48rem,calc(100vw-2rem))] min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-panel shadow-2xl">
+    <div className="flex h-auto max-h-[90vh] md:h-[28rem] md:min-h-[28rem] w-[min(48rem,calc(100vw-2rem))] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-panel shadow-2xl">
       <div className="border-b border-border bg-panel-header px-6 py-4">
         <div className="flex items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-sm font-semibold text-primary">
@@ -224,8 +224,8 @@ export function OpenProjectDialog({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="border-b border-border bg-background/40 lg:border-b-0 lg:border-r">
+      <div className="studio-scrollbar grid min-h-0 flex-1 gap-0 overflow-y-auto md:overflow-visible md:grid-cols-[18rem_minmax(0,1fr)]">
+        <aside className="border-b border-border bg-background/40 md:border-b-0 md:border-r">
           <div className="flex h-full min-h-0 flex-col p-5">
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -249,7 +249,7 @@ export function OpenProjectDialog({
                   No recent sessions yet.
                 </div>
               ) : (
-                <div className="studio-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
+                <div className="studio-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1 max-h-[13.5rem]">
                   {recents.map((item, idx) => (
                     <div
                       key={`${item.kind}-${item.path ?? item.apiBaseUrl ?? idx}`}
@@ -313,7 +313,7 @@ export function OpenProjectDialog({
         </aside>
 
         <main className="min-h-0 bg-panel">
-          <div className="flex h-full min-h-0 flex-col justify-between gap-6 p-6 lg:p-7">
+          <div className="flex h-full min-h-0 flex-col justify-between gap-6 p-6 md:p-7">
             <div className="max-w-2xl">
               <h2 className="text-3xl font-semibold tracking-tight text-foreground">
                 Open a SpecD Project

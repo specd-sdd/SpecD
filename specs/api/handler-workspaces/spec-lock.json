@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:routes-workspaces",
+    "core:kernel"
+  ],
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/handlers/handler-workspaces.ts",
+      "symbols": ["registerWorkspacesRoutes"]
+    }
+  ]
+}

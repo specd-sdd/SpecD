@@ -104,14 +104,16 @@ export function GraphMainView({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {s?.lastIndexedAt !== null ? (
+              {s?.stale ? (
+                <span className="text-amber-500">Stale</span>
+              ) : s?.lastIndexedAt !== null ? (
                 <span className="text-emerald-500">Ready</span>
               ) : (
                 <span className="text-amber-500">Off</span>
               )}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              {s?.stale ? 'Stale (needs update)' : 'Up to date'}
+              {s?.stale ? 'Graph needs reindexing' : s?.lastIndexedAt !== null ? 'Up to date' : 'No index exists'}
             </p>
           </CardContent>
         </Card>

@@ -1,0 +1,209 @@
+{
+  "title": "Change Tab Events",
+  "description": "Studio UI for **Change Tab Events**: lifecycle history from `ChangeDetailDto.history`, loaded through `SpecdDataPort` and rendered as expandable accordions. Works for **active** and **archived** changes (archived detail comes from `getArchivedChange`).",
+  "dependsOn": ["client:specd-data-port", "client:dto-change-detail", "ui:change-tab-artifacts"],
+  "context": [
+    "Studio UI for **Change Tab Events**: lifecycle history from `ChangeDetailDto.history`, loaded through `SpecdDataPort` and rendered as expandable accordions. Works for **active** and **archived** changes (archived detail comes from `getArchivedChange`)."
+  ],
+  "rules": [
+    {
+      "requirement": "events tab renders change detail history",
+      "rules": [
+        "The Events tab MUST render `history[]` from the loaded `ChangeDetailDto` passed by the shell. It MUST NOT call artifact or graph endpoints. For **active** changes, while Events (or Overview) is visible, the shell MUST refetch detail via `getChange` when the global change poll tick advances (`useChangesRead` with `detailRefreshKey`). For **drafted** and **discarded** changes, the shell MUST refetch via `getDraft` / `getDiscarded` through the same hook with the correct `listSection`. For **archived** changes, history MUST come from the archived snapshot (`getArchivedChange`) without live polling."
+      ]
+    },
+    {
+      "requirement": "history list is newest first",
+      "rules": [
+        "The UI MUST display events in reverse chronological order (most recent at the top) without mutating the DTO order on the wire."
+      ]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "rules": [
+        "Each history row MUST be a collapsible accordion item using the shadcn **`Accordion`** component (with `type=\"multiple\"`). The interaction pattern MUST be consistent with change **Artifacts** type groups (`ui:change-tab-artifacts`): chevron, clickable header, `aria-expanded`.\n\n- **Collapsed:** summary shows `type`, `at`, and a single-line actor when `by` is present.\n- **Expanded:** panel shows `by` when present, then **all other fields** on `ChangeHistoryEventDto` except `type` and `at` (e.g. `from`/`to`, `cause`, `specIds`, `artifactHashes`, sync deltas) as labeled rows. Object or array values MAY render in a scrollable monospace block (`max-height` capped). When no extra fields exist, the panel MUST show a short empty-state message.\n- **Toggle:** clicking the header expands or collapses that row only; multiple rows MUST stay open at once."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "`ChangeEventsTab` MUST receive detail via parent hooks (`useChangesRead` / `useArchivedChange`) and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While detail is loading or fails, the tab MUST show `Loading history…`, a human-readable error, or `No change detail` — matching other change tabs."
+      ]
+    },
+    {
+      "requirement": "component SHALL avoid infinite render loops from unstable dependencies",
+      "rules": [
+        "The Events tab component SHALL stabilize all array and object references passed as dependencies to downstream components or hooks. It MUST use `useMemo` for derived mappings (including reversed history lists) and use static constants for default empty values to ensure stable prop references."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "events tab renders change detail history",
+      "name": "Active change shows history from getChange",
+      "given": ["an active change with lifecycle history"],
+      "when": ["user selects the Events tab"],
+      "then": [
+        "rows reflect ChangeDetailDto.history",
+        "AND no artifact or graph port methods are invoked from the tab component"
+      ]
+    },
+    {
+      "requirement": "events tab renders change detail history",
+      "name": "Archived change shows snapshot history",
+      "given": ["an archived change context"],
+      "when": ["user selects Events"],
+      "then": [
+        "history renders from getArchivedChange detail",
+        "AND no live change-status polling runs for that context"
+      ]
+    },
+    {
+      "requirement": "events tab renders change detail history",
+      "name": "Shell refetches detail while Events is visible",
+      "given": ["active change and Events tab visible"],
+      "when": ["global change poll tick advances"],
+      "then": [
+        "shell reloads change detail (history may update)",
+        "AND Events tab receives the new detail prop"
+      ]
+    },
+    {
+      "requirement": "history list is newest first",
+      "name": "Latest event appears at top",
+      "given": ["history ordered oldest-to-newest on the wire"],
+      "when": ["Events tab renders"],
+      "then": ["the first visible row is the most recent event", "AND older events appear below"]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "name": "Collapsed row shows summary only",
+      "given": ["Events tab is open"],
+      "when": ["user has not expanded a row"],
+      "then": [
+        "row shows event type, at, and actor line when by exists",
+        "AND detail fields are hidden"
+      ]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "name": "Click expands full event payload",
+      "given": ["a transitioned event with from and to on the DTO"],
+      "when": ["user clicks the row header"],
+      "then": [
+        "expanded panel lists from, to, and by",
+        "AND chevron indicates open state (aria-expanded=true)"
+      ]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "name": "Complex values use scrollable monospace block",
+      "given": ["an event field whose value serializes to multi-line JSON (e.g. artifactHashes)"],
+      "when": ["user expands the row"],
+      "then": [
+        "that field renders in a bounded scrollable monospace block",
+        "AND single-line scalars stay inline"
+      ]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "name": "Event with only base fields shows empty detail message",
+      "given": ["a history event whose DTO has only type, at, and optional by"],
+      "when": ["user expands the row"],
+      "then": ["panel shows that no additional fields are present", "AND summary remains visible"]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "name": "Click again collapses row",
+      "given": ["an expanded event row"],
+      "when": ["user clicks the header again"],
+      "then": ["detail panel hides", "AND summary line remains visible"]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "name": "Multiple rows may stay expanded",
+      "given": ["at least two history events"],
+      "when": ["user expands two different row headers"],
+      "then": ["both detail panels are visible", "AND collapsing one does not collapse the other"]
+    },
+    {
+      "requirement": "events render as expandable accordions",
+      "name": "Events tab exposes stable test ids",
+      "given": ["Events tab with at least one event"],
+      "when": ["UI renders"],
+      "then": [
+        "container has data-testid=\"studio-events-tab\"",
+        "AND each row has data-testid=\"studio-event-row-{index}\" with zero-based index"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": [
+        "@specd/ui does not import @specd/core",
+        "AND ChangeEventsTab does not call the port directly"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["shell loads change detail for Events"],
+      "then": [
+        "calls go through SpecdDataPort (getChange or getArchivedChange)",
+        "AND no direct repository or kernel import in the tab"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Loading without detail shows spinner text",
+      "given": ["detail request in flight and no cached detail"],
+      "when": ["Events tab is shown"],
+      "then": ["UI shows Loading history…"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["detail hook rejects with an error"],
+      "when": ["Events tab is shown"],
+      "then": ["UI renders the error message", "AND does not show a stale history list"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Missing detail shows empty state",
+      "given": ["no detail object after load settled"],
+      "when": ["Events tab is shown"],
+      "then": ["UI shows No change detail"]
+    },
+    {
+      "requirement": "component SHALL avoid infinite render loops from unstable dependencies",
+      "name": "Events tab memoizes reversed history",
+      "given": ["Events tab receives detail prop"],
+      "when": ["tab re-renders without detail.history changing"],
+      "then": [
+        "events array reference remains stable",
+        "AND downstream Accordion does not perform unnecessary reconciliation"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-tab-events",
+        "file": "ui:src/change/ChangeMainView.tsx",
+        "symbol": "ChangeMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d743dc5bf81dbf0388293a49d2f756166b8912871dacdf1902eb846b5aaaff40",
+    "verify.md": "sha256:d8e97047f452d5fee53991bf65e8cfa45590af85acb1d9438de26af8a4211b33"
+  },
+  "generatedBy": "core"
+}

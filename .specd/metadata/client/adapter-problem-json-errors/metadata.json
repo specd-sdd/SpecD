@@ -1,0 +1,87 @@
+{
+  "title": "Adapter Problem Json Errors",
+  "description": "SpecD Studio capability **Adapter Problem Json Errors** (`client:adapter-problem-json-errors`). Translate HTTP problem responses into typed errors the UI can display. This spec is canonical after archive: implementers rely on the requirements below, not change-only documents.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "SpecD Studio capability **Adapter Problem Json Errors** (`client:adapter-problem-json-errors`). Translate HTTP problem responses into typed errors the UI can display. This spec is canonical after archive: implementers rely on the requirements below, not change-only documents."
+  ],
+  "rules": [
+    {
+      "requirement": "problem+json is parsed into SpecdClientError",
+      "rules": [
+        "When response `Content-Type` is `application/problem+json`, the adapter MUST parse `status`, `title`, `detail`, and specd-specific extension fields into a throwable error type."
+      ]
+    },
+    {
+      "requirement": "409 conflict preserves conflict metadata",
+      "rules": [
+        "For `ArtifactConflictError` (HTTP 409), the adapter MUST preserve enough detail for `ui:hooks-inspector-save` to show a conflict UI."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "problem+json is parsed into SpecdClientError",
+      "name": "Problem body becomes SpecdClientError",
+      "given": ["response Content-Type is problem+json"],
+      "when": ["transport parses failure"],
+      "then": ["error includes status and title", "AND specd code extension is preserved"]
+    },
+    {
+      "requirement": "problem+json is parsed into SpecdClientError",
+      "name": "Non-problem HTML is not mislabeled",
+      "given": ["reverse proxy returns HTML error page"],
+      "when": ["transport parses response"],
+      "then": ["generic HTTP error is thrown", "AND parser does not throw parse exception"]
+    },
+    {
+      "requirement": "problem+json is parsed into SpecdClientError",
+      "name": "Success responses bypass parser",
+      "when": ["HTTP 200 returns JSON DTO"],
+      "then": ["body deserializes normally", "AND no error is thrown"]
+    },
+    {
+      "requirement": "409 conflict preserves conflict metadata",
+      "name": "409 retains conflict metadata",
+      "given": ["server returns 409 problem body"],
+      "when": ["adapter throws"],
+      "then": [
+        "error type is recognizable by save hook",
+        "AND detail includes hash conflict context"
+      ]
+    },
+    {
+      "requirement": "409 conflict preserves conflict metadata",
+      "name": "Inspector can show conflict UI",
+      "when": ["save hook receives adapter error"],
+      "then": ["UI offers keep local or reload server", "AND buffer not silently overwritten"]
+    },
+    {
+      "requirement": "409 conflict preserves conflict metadata",
+      "name": "Non-409 errors use generic mapping",
+      "when": ["server returns 400 problem"],
+      "then": ["error surfaces validation message", "AND no conflict-specific UI"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:adapter-problem-json-errors",
+        "file": "client:src/adapter-problem-json-errors.ts",
+        "symbol": "withProblemJsonErrors"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:ee763f2d6f94eef2a2bf5cd26812daf1ca209e64b69f50972568df203edc4e70",
+    "verify.md": "sha256:be368b265c0d5043ab4ba97e906796b60911405fc32d0b1b6f63e9dc0744a9c6"
+  },
+  "generatedBy": "core"
+}

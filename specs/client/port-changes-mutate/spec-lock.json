@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "client:port-changes-mutate-validate-all",
+    "client:dto-validate-batch-result",
+    "client:specd-data-port"
+  ],
+  "implementation": [
+    {
+      "file": "client:src/port-changes-mutate.ts",
+      "symbols": ["PortChangesMutate"]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "title": "Composition Graph Provider",
+  "description": "Graph routes must not construct `@specd/code-graph` providers ad hoc with divergent paths or freshness rules. This spec centralizes provider creation from `SpecdConfig` so index, search, impact, and linkage handlers share one implementation and expose stale-state signals to the UI.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Graph routes must not construct `@specd/code-graph` providers ad hoc with divergent paths or freshness rules. This spec centralizes provider creation from `SpecdConfig` so index, search, impact, and linkage handlers share one implementation and expose stale-state signals to the UI."
+  ],
+  "rules": [
+    {
+      "requirement": "provider is created from project configuration",
+      "rules": [
+        "The factory MUST accept the resolved `SpecdConfig` (workspaces, code roots) and return a provider exposing index, search, impact, stats, and linkage operations used by `api:routes-graph`."
+      ]
+    },
+    {
+      "requirement": "indexing preparation follows the merged project-assembly model",
+      "rules": [
+        "API graph composition MUST support the same project-level indexing preparation used by CLI:\n\n- orchestrated workspaces from `ListWorkspaces`\n- effective graph config assembled from project config\n- one project-level provider index call\n\nAny helper kept in `api` for this flow MUST mirror the CLI assembly semantics rather than reconstructing an older workspace-target contract."
+      ]
+    },
+    {
+      "requirement": "stale state is observable",
+      "rules": [
+        "The provider (or its stats call) MUST expose freshness/stale signals consumed by `GET /v1/graph/status` so the UI can warn when the index is out of date."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "provider is created from project configuration",
+      "name": "Provider binds to project graph paths",
+      "given": ["specd.yaml declares workspaces"],
+      "when": ["API server bootstrap creates graph provider"],
+      "then": ["provider reads project root from config", "AND index paths match workspace layout"]
+    },
+    {
+      "requirement": "provider is created from project configuration",
+      "name": "Missing graph index yields empty provider state",
+      "given": ["no .specd/graph index on disk"],
+      "when": ["provider is constructed"],
+      "then": ["provider reports not indexed", "AND handlers can still expose status DTO"]
+    },
+    {
+      "requirement": "provider is created from project configuration",
+      "name": "Reconfigured project rebuilds provider",
+      "when": ["server restarts after config change"],
+      "then": ["new provider instance uses updated paths", "AND old in-memory graph is not reused"]
+    },
+    {
+      "requirement": "indexing preparation follows the merged project-assembly model",
+      "name": "API graph indexing assembles project-level input before provider call",
+      "when": ["API prepares a graph index request"],
+      "then": [
+        "it combines ListWorkspaces output with effective graph config",
+        "AND the provider receives one project-level index input instead of legacy per-workspace targets"
+      ]
+    },
+    {
+      "requirement": "stale state is observable",
+      "name": "Stale flag true when index older than sources",
+      "given": ["source file newer than graph index mtime"],
+      "when": ["GET /v1/graph/status runs"],
+      "then": ["stale: true in response", "AND CLI-equivalent freshness message available"]
+    },
+    {
+      "requirement": "stale state is observable",
+      "name": "Fresh index reports stale false",
+      "given": ["graph index rebuilt after last edit"],
+      "when": ["status endpoint is queried"],
+      "then": ["stale: false", "AND last indexed timestamp is exposed"]
+    },
+    {
+      "requirement": "stale state is observable",
+      "name": "POST index clears stale after success",
+      "given": ["status was stale"],
+      "when": ["POST /v1/graph/index completes"],
+      "then": ["subsequent status shows stale: false", "AND indexedAt advances"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "api:composition-graph-provider",
+        "file": "api:src/composition/graph-provider.ts"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e0ec20a0bb7a54f69e1f4cc28d22394cc59ef98e4b6e3bec782942244aed8deb",
+    "verify.md": "sha256:075b1b1ca75c9a46c3508f1af83573b8c2b8a431dcc45ae04c80e4f1c480bbe1"
+  },
+  "generatedBy": "core"
+}

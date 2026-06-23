@@ -1,0 +1,104 @@
+{
+  "title": "Sidebar Graph Entry",
+  "description": "Studio UI for **Sidebar Graph Entry**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Graph Entry**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Sidebar Graph Entry**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Graph Entry**."
+  ],
+  "rules": [
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "rules": [
+        "The sidebar MUST render lists from global poll hooks (`hooks-changes-collection`, `hooks-workspaces-specs`, etc.). The Graph entry MUST be implemented using a shadcn **`Button`** (variant ghost) and a shadcn **`Badge`** to indicate status (ready, stale, etc.). Row actions (open, restore, discard) MUST call the appropriate mutate port methods."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "name": "Sidebar lists refresh on global poll",
+      "given": ["shell global poll is running"],
+      "when": ["poll tick fires"],
+      "then": ["changes/drafts/discarded lists update", "AND row actions stay wired to ports"]
+    },
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "name": "Open action calls read port",
+      "when": ["user clicks open on a change row"],
+      "then": ["port-changes-read opens the change tab", "AND no direct core import"]
+    },
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "name": "Discard calls mutate port",
+      "when": ["user discards a draft from sidebar"],
+      "then": ["port-changes-mutate discard runs", "AND list refreshes on success"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:sidebar-graph-entry",
+        "file": "ui:src/sidebar/WorkspacesSidebar.tsx",
+        "symbol": "WorkspacesSidebar"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:5795e9077ad603bfddea053150a2a475c12d7d15a174bb6fc3ef37be0ee00844",
+    "verify.md": "sha256:cf4fda00623102fd8e92266f9d84160f5b8e94984b06d42966a7b47608a9f9ca"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-preview-result"],
+  "implementation": [
+    {
+      "file": "client:src/dto/preview-result.ts",
+      "symbols": ["PreviewResultDto"]
+    }
+  ]
+}

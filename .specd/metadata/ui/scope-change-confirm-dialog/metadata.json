@@ -1,0 +1,69 @@
+{
+  "title": "Scope Change Confirm Dialog",
+  "description": "Second step inside [`ui:change-metadata-editor`](../change-metadata-editor/spec.md) **`ChangeScopeDialog`**: when the user saves a **scope** change (add/remove `specIds`), Studio MUST confirm before PATCH because approvals are invalidated and removed specs lose scaffolded artifacts.",
+  "dependsOn": ["ui:change-metadata-editor", "ui:design-system"],
+  "context": [
+    "Second step inside [`ui:change-metadata-editor`](../change-metadata-editor/spec.md) **`ChangeScopeDialog`**: when the user saves a **scope** change (add/remove `specIds`), Studio MUST confirm before PATCH because approvals are invalidated and removed specs lose scaffolded artifacts."
+  ],
+  "rules": [
+    {
+      "requirement": "scope confirm is a step inside ChangeScopeDialog",
+      "rules": [
+        "When **Save changes** includes `addSpecIds` or `removeSpecIds`, the dialog MUST switch to a confirm view with copy from `buildScopeChangeConfirmMessage` and **Back** / **Apply scope change** actions (using shadcn `Button` components) — not a separate top-level modal on Overview."
+      ]
+    },
+    {
+      "requirement": "dependency-only saves skip scope confirm",
+      "rules": [
+        "When only `specDependsOn` values changed, **Save changes** MUST apply dependency PATCHes without the scope confirm step."
+      ]
+    },
+    {
+      "requirement": "modal copy explains scope invalidation",
+      "rules": [
+        "The confirm sub-step body MUST explain that approvals are invalidated and list specs to add (`+ id`) and remove (`− id`) using copy from `buildScopeChangeConfirmMessage`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "scope confirm is a step inside ChangeScopeDialog",
+      "name": "Confirm sub-step after Save when scope changed",
+      "given": ["user changed spec scope in studio-change-scope-dialog"],
+      "when": ["user clicks Save changes"],
+      "then": [
+        "dialog title becomes confirm scope change",
+        "AND body lists specs to add and remove",
+        "AND action buttons (Back, Apply scope change) use shadcn Button components",
+        "AND no PATCH runs until Apply scope change"
+      ]
+    },
+    {
+      "requirement": "scope confirm is a step inside ChangeScopeDialog",
+      "name": "Back returns to editor",
+      "given": ["confirm sub-step is showing"],
+      "when": ["user clicks Back"],
+      "then": ["warning and scope/dependency editors are visible again"]
+    },
+    {
+      "requirement": "dependency-only saves skip scope confirm",
+      "name": "Only dependsOn changed",
+      "given": ["draft specIds match persisted scope"],
+      "when": ["user clicks Save changes"],
+      "then": ["confirm sub-step does not appear", "AND dependency PATCHes may run directly"]
+    },
+    {
+      "requirement": "modal copy explains scope invalidation",
+      "name": "Body lists adds and removes",
+      "given": ["user will add ui:new and remove core:old"],
+      "when": ["confirm sub-step renders"],
+      "then": ["body mentions invalidate or approvals", "AND lists + ui:new and − core:old"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:86ae88bff76853c293ea01a52e4108fa7e3050ef18f4828bd1b854555db0b1bb",
+    "verify.md": "sha256:09b2d10155e3cac30f5aa9c445397bf740e3d64d3ab58fb87eb3d68295659cca"
+  },
+  "generatedBy": "core"
+}

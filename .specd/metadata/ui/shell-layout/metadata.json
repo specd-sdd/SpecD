@@ -1,0 +1,425 @@
+{
+  "title": "Shell Layout",
+  "description": "SpecD Studio is a spec-work IDE: sidebars for changes and workspaces, a tabbed editor area, inspector for artifacts, and a bottom panel (Output, Problems, Logs). The shell also orchestrates global polling so agent activity off-screen (new changes, specs on disk) appears without keeping every change tab on a heavy refresh loop.",
+  "dependsOn": ["ui:design-system", "client:specd-data-port"],
+  "context": [
+    "SpecD Studio is a spec-work IDE: sidebars for changes and workspaces, a tabbed editor area, inspector for artifacts, and a bottom panel (Output, Problems, Logs). The shell also orchestrates global polling so agent activity off-screen (new changes, specs on disk) appears without keeping every change tab on a heavy refresh loop."
+  ],
+  "rules": [
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "rules": [
+        "The layout MUST render a left sidebar (changes, workspaces, graph entry), a central tab workspace, a right-hand inspector host, and a bottom panel host with three tabs in order **Output**, **Problems**, **Logs** (full studio output stream; warn/error filter; specd in-memory log readback). The default selected bottom tab MUST be **Output**.\n\nThe left sidebar sections for **Changes** and **Workspaces - Specs** MUST be vertically resizable. The shell MUST implement this using shadcn **`Resizable`** panel group components, allowing the user to adjust the proportion of the sidebar allocated to each section."
+      ]
+    },
+    {
+      "requirement": "shell orchestrates global polling while focused",
+      "rules": [
+        "While the Studio window has focus, a **global poll** every **2–3 seconds** refreshes project scope without requiring an open change tab:\n\n- `ui:hooks-project` → `getProject`, `getProjectStatus`\n- `ui:hooks-changes-collection` + sidebars → list changes, drafts, discarded, archived, overlaps\n- `ui:hooks-workspaces-specs` + workspace tree → spec tree metadata\n- Graph entry → cheap `graph/status`"
+      ]
+    },
+    {
+      "requirement": "editor area tabs support horizontal scrolling and navigation arrows",
+      "rules": [
+        "When the central tab workspace or right-hand inspector host contains more tabs than the available width, the tab bar MUST support fluid horizontal scrolling (e.g. via trackpad or mouse wheel). Navigation arrows (← and →) MUST appear at the right end of the tab bar when desbordamiento exists, allowing the user to scroll programmatically. Arrows MUST be disabled visually when the scroll limit is reached in their respective direction."
+      ]
+    },
+    {
+      "requirement": "tab views display context via breadcrumbs",
+      "rules": [
+        "To stabilize tab bar height and provide persistent context, change and spec tab views MUST display their qualified name or path (e.g. `CHANGES / <name>` or `SPECS / <path>`) in a thin breadcrumb header immediately above the horizontal tab bar. The tab bar itself MUST remain single-line and MUST NOT contain trailing name/path metadata that could cause height jumps on narrow viewports."
+      ]
+    },
+    {
+      "requirement": "global polling pauses when the window is unfocused",
+      "rules": [
+        "The global poll interval MUST NOT run while the browser window or Electron app lacks focus."
+      ]
+    },
+    {
+      "requirement": "shell never imports @specd/core",
+      "rules": [
+        "All data MUST flow through `SpecdDataPort` hooks; direct `@specd/core` imports are forbidden."
+      ]
+    },
+    {
+      "requirement": "shell applies design-system theme at application root",
+      "rules": [
+        "`SpecdApp` MUST import the centralized theme from `ui:design-system` (CSS variables or equivalent) before any feature chrome renders. Shell regions (sidebar, tabs, inspector, bottom panel, status bar) MUST consume design tokens—not ad hoc colors or card-dashboard styling."
+      ]
+    },
+    {
+      "requirement": "shell routes archived changes through archived read port",
+      "rules": [
+        "When the user opens a change from the Archive sidebar section, the shell MUST load detail via `getArchivedChange`, MUST skip active-change status polling, and MUST disable inspector save and validate. Archived artifact body reads MUST use the archived read-only artifact route, not active `getChangeArtifact`."
+      ]
+    },
+    {
+      "requirement": "shell routes drafted and discarded changes through read-only ports",
+      "rules": [
+        "When the open change name appears in the **Drafts** or **Discarded** sidebar collection (and not archived), the shell MUST set `listSection` to `draft` or `discarded` and MUST pass it to [`ui:hooks-changes-read`](../hooks-changes-read/spec.md) (`useChangesRead`, `useChangeArtifact`, and artifact list hooks). The shell MUST NOT call `getChange` or `getChangeStatus` for that name while it is shelved or discarded. Shelved read-only MUST mirror archived UX boundaries: banner in the center column, no Save/Validate in the inspector, Monaco `readOnly`, Overview editors disabled — without altering the archived snapshot flow (`getArchivedChange`, archived banner, archived artifact list/body reads)."
+      ]
+    },
+    {
+      "requirement": "read-only change tabs load once (no per-change polling)",
+      "rules": [
+        "Global sidebar polling continues to refresh the lists, but the open drafted/discarded/archived change views are static. The shell MUST NOT schedule per-change polling (status, artifacts, tab refresh keys) for these read-only sections. Drafted changes MAY load workflow status once on open, but MUST NOT poll while kept open."
+      ]
+    },
+    {
+      "requirement": "validate requires drift confirmation",
+      "rules": [
+        "**Validate** and **Validate All** MUST show [`ui:validate-confirm-dialog`](../validate-confirm-dialog/spec.md) before calling `validateChange`. Scoped validate MUST pass `specId` and `artifactId` derived from the open change artifact; **Validate All** MUST validate each spec in `change.specIds`.\n\nThe **Validate All** action MUST be offered from the change **Artifacts** tab and the **Command Palette** (as \"Validate change artifacts\"), but only when a valid, editable change is currently selected. Change tabs that require live change APIs (Tasks, Coverage, Context) MUST show read-only messaging for archived context. Workflow and validation status from `getChangeStatus` MUST appear on the Overview tab only (not a separate Validation tab)."
+      ]
+    },
+    {
+      "requirement": "shell delegates tab-scoped polling to visible center tabs",
+      "rules": [
+        "The global poll refresh key MUST NOT force every change or spec tab to refetch. Child views MUST adopt the latest global tick only while their tab is visible (frozen refresh key while hidden) so Artifacts, Tasks, spec Overview/Dependencies, and similar tabs do not reload in the background."
+      ]
+    },
+    {
+      "requirement": "opening a spec auto-selects the primary artifact",
+      "rules": [
+        "When the user opens a spec in the workspace tree and that spec exposes a canonical `spec.md` artifact, the shell MUST preselect that `spec.md` artifact in the right inspector automatically."
+      ]
+    },
+    {
+      "requirement": "bottom panel polls only the remote logs channel",
+      "rules": [
+        "`readProjectLogs` polling MUST run only while **Logs** is active. **Output** and **Problems** MUST render from local session state and MUST NOT poll a dedicated studio-specific output endpoint. Switching bottom tabs MUST NOT append output lines."
+      ]
+    },
+    {
+      "requirement": "metadata and artifact saves log to Output",
+      "rules": [
+        "Artifact save ([`ui:hooks-inspector-save`](../hooks-inspector-save/spec.md)), description/policy PATCH, successful scope dialog save, and validation MUST append to the local output buffer consumed by [`ui:bottom-panel-output`](../bottom-panel-output/spec.md). Debug traces MUST call `appendProjectLog` with the **action id** as the message and user text in `context` only (not a duplicate log line). Validation with warnings or errors SHOULD select the **Problems** tab; other actions SHOULD select **Output**."
+      ]
+    },
+    {
+      "requirement": "graph sidebar opens central overview",
+      "rules": [
+        "Opening the graph entry from the sidebar MUST switch the central workspace to the **Graph Main View**; it MUST NOT append a graph status line to the local output buffer."
+      ]
+    },
+    {
+      "requirement": "shell orchestrates global command and search navigation",
+      "rules": [
+        "The shell MUST host a global **Command Palette** (⌘K) and orchestrate navigation from search results:\n\n- Selection of a **Specification** in the palette MUST open that spec in the central workspace.\n- Selection of a **Code Symbol** MUST (in v1) log the selection to Output; subsequent versions MAY implement direct source file navigation.\n- Selection of a **Document** MUST (in v1) log the selection to Output."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "Layout renders sidebar tabs and inspector regions",
+      "when": ["<SpecdApp> mounts"],
+      "then": ["left sidebar visible", "AND central tabs and right inspector hosts exist"]
+    },
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "Bottom panel host is available",
+      "when": ["shell mounts"],
+      "then": [
+        "bottom panel renders with tabs in order Output, Problems, Logs",
+        "AND Output is the initially selected tab"
+      ]
+    },
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "Bottom panel tab order is Output Problems Logs",
+      "when": ["user inspects bottom tab strip"],
+      "then": ["left-to-right order is Output, Problems, Logs", "AND no other tab precedes Output"]
+    },
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "Regions survive route navigation",
+      "when": ["user switches change tabs"],
+      "then": ["chrome persists", "AND only tab content swaps"]
+    },
+    {
+      "requirement": "shell orchestrates global polling while focused",
+      "name": "Global poll refreshes project and sidebars",
+      "given": ["window focused"],
+      "when": ["2–3s poll elapses"],
+      "then": ["project hooks refetch", "AND sidebar lists refetch"]
+    },
+    {
+      "requirement": "shell orchestrates global polling while focused",
+      "name": "Poll does not require open change tab",
+      "given": ["no change tab open"],
+      "when": ["global poll runs"],
+      "then": ["workspace tree still updates", "AND drafts list still updates"]
+    },
+    {
+      "requirement": "shell orchestrates global polling while focused",
+      "name": "Unfocused window pauses poll",
+      "given": ["window blurred"],
+      "when": ["interval elapses"],
+      "then": ["no global poll requests fire"]
+    },
+    {
+      "requirement": "editor area tabs support horizontal scrolling and navigation arrows",
+      "name": "Tabs scroll when overflowing container",
+      "given": ["editor area has more tabs than fit in view"],
+      "when": ["user uses scroll wheel or trackpad over tabs"],
+      "then": ["tabs scroll horizontally"]
+    },
+    {
+      "requirement": "editor area tabs support horizontal scrolling and navigation arrows",
+      "name": "Navigation arrows appear when overflowing",
+      "given": ["editor area has overflowing tabs"],
+      "when": ["tab bar renders"],
+      "then": [
+        "left and right navigation arrows are present",
+        "AND arrows are disabled when scrolled to extreme ends"
+      ]
+    },
+    {
+      "requirement": "tab views display context via breadcrumbs",
+      "name": "Context breadcrumbs render above tabs",
+      "given": ["a change or spec tab is open"],
+      "when": ["the main view renders"],
+      "then": [
+        "a breadcrumb header displays the context (e.g. CHANGES / my-change) above the tab bar"
+      ]
+    },
+    {
+      "requirement": "global polling pauses when the window is unfocused",
+      "name": "Blur stops global poll interval",
+      "when": ["user switches to another application"],
+      "then": ["timers for global poll are cleared or skipped"]
+    },
+    {
+      "requirement": "global polling pauses when the window is unfocused",
+      "name": "Focus resumes polling",
+      "when": ["user returns to Studio window"],
+      "then": ["next poll tick schedules", "AND data refreshes"]
+    },
+    {
+      "requirement": "global polling pauses when the window is unfocused",
+      "name": "Hidden change tab does not restart global poll",
+      "given": ["global poll paused by blur"],
+      "when": ["user shows hidden tab"],
+      "then": ["global poll remains paused until focus returns"]
+    },
+    {
+      "requirement": "shell never imports @specd/core",
+      "name": "Shell package has no core dependency",
+      "when": ["dependency graph of @specd/ui is inspected"],
+      "then": ["no import from @specd/core", "AND ports used via hooks"]
+    },
+    {
+      "requirement": "shell never imports @specd/core",
+      "name": "Command palette uses hooks only",
+      "when": ["palette action runs"],
+      "then": ["invokes SpecdDataPort path", "AND no direct kernel import"]
+    },
+    {
+      "requirement": "shell never imports @specd/core",
+      "name": "Adding core import fails boundary check",
+      "when": ["contributor adds @specd/core import to shell"],
+      "then": ["lint or architectural test fails"]
+    },
+    {
+      "requirement": "shell applies design-system theme at application root",
+      "name": "SpecdApp imports theme before chrome",
+      "when": ["SpecdApp mounts"],
+      "then": [
+        "design-system theme module is loaded at root",
+        "AND --studio-bg-primary or equivalent tokens apply to the app shell"
+      ]
+    },
+    {
+      "requirement": "shell applies design-system theme at application root",
+      "name": "Shell regions use token backgrounds",
+      "when": ["sidebar and tab strip render"],
+      "then": [
+        "backgrounds use secondary/elevated tokens from design-system",
+        "AND not hard-coded marketing card colors"
+      ]
+    },
+    {
+      "requirement": "shell applies design-system theme at application root",
+      "name": "Status bar uses design-system chrome",
+      "when": ["shell is complete"],
+      "then": [
+        "status bar uses thin IDE strip styling from tokens",
+        "AND border separator uses #30363D token"
+      ]
+    },
+    {
+      "requirement": "shell routes archived changes through archived read port",
+      "name": "Archive selection uses getArchivedChange",
+      "when": ["user opens a change from Archive sidebar section"],
+      "then": [
+        "shell loads via getArchivedChange",
+        "AND inspector save and validate are disabled",
+        "AND archived artifact reads use the read-only archived artifact path rather than active getChangeArtifact"
+      ]
+    },
+    {
+      "requirement": "shell routes archived changes through archived read port",
+      "name": "Archived change skips getChange polling",
+      "given": ["archived center context"],
+      "when": ["global poll ticks"],
+      "then": ["shell does not call getChange or getChangeStatus for that name"]
+    },
+    {
+      "requirement": "read-only change tabs load once (no per-change polling)",
+      "name": "Drafted change does not poll status or artifacts",
+      "given": ["drafted change open in the shell"],
+      "when": ["global poll ticks"],
+      "then": [
+        "shell does not call getDraftStatus repeatedly",
+        "AND change artifact list does not refetch on every tick"
+      ]
+    },
+    {
+      "requirement": "shell routes drafted and discarded changes through read-only ports",
+      "name": "Draft sidebar selection uses getDraft",
+      "given": ["change dummy-draft is listed under Drafts only"],
+      "when": ["user opens it from the sidebar"],
+      "then": [
+        "shell passes listSection draft to useChangesRead",
+        "AND overview loads without Change 'dummy-draft' not found"
+      ]
+    },
+    {
+      "requirement": "shell routes drafted and discarded changes through read-only ports",
+      "name": "Discarded sidebar selection uses getDiscarded",
+      "given": ["change is listed under Discarded only"],
+      "when": ["user opens it from the sidebar"],
+      "then": ["shell passes listSection discarded", "AND does not call getChange for that name"]
+    },
+    {
+      "requirement": "shell routes drafted and discarded changes through read-only ports",
+      "name": "Active change keeps getChange",
+      "given": ["change is in the In progress list"],
+      "when": ["user opens it"],
+      "then": ["shell passes listSection active or null", "AND useChangesRead calls getChange"]
+    },
+    {
+      "requirement": "validate requires drift confirmation",
+      "name": "validate requires drift confirmation — primary path",
+      "when": [
+        "Validate and Validate All MUST show [ui:validate-confirm-dialog](../validate-confirm-dialog/spec.md) before"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "validate requires drift confirmation",
+      "name": "validate requires drift confirmation — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "shell delegates tab-scoped polling to visible center tabs",
+      "name": "Hidden change tab does not refetch on global tick",
+      "given": ["user is on Overview tab only"],
+      "when": ["global poll increments"],
+      "then": [
+        "Artifacts tab hooks do not refetch",
+        "AND visible Overview may refetch detail when applicable"
+      ]
+    },
+    {
+      "requirement": "opening a spec auto-selects the primary artifact",
+      "name": "Opening a spec preselects spec.md in the inspector",
+      "given": ["workspace spec ui:foo exposes canonical spec.md"],
+      "when": ["user opens that spec from the workspace tree"],
+      "then": ["the right inspector opens automatically", "AND the selected file is spec.md"]
+    },
+    {
+      "requirement": "bottom panel polls only the remote logs channel",
+      "name": "Logs tab does not poll studio output",
+      "given": ["user selects bottom Logs tab"],
+      "when": ["global poll ticks"],
+      "then": ["no dedicated studio-output poll is invoked", "AND readProjectLogs may run"]
+    },
+    {
+      "requirement": "bottom panel polls only the remote logs channel",
+      "name": "Output tab does not poll project logs",
+      "given": ["user selects bottom Output tab"],
+      "when": ["global poll ticks"],
+      "then": ["readProjectLogs is not invoked", "AND Output still renders local buffered entries"]
+    },
+    {
+      "requirement": "bottom panel polls only the remote logs channel",
+      "name": "Switching bottom tabs does not append output",
+      "given": ["local output buffer has N entries"],
+      "when": ["user toggles between Output and Logs"],
+      "then": ["entry count stays N until an explicit user action appends"]
+    },
+    {
+      "requirement": "metadata and artifact saves log to Output",
+      "name": "successful actions append local output and optional debug trace",
+      "when": [
+        "artifact save, description/policy PATCH, successful scope dialog save, or validation succeeds"
+      ],
+      "then": [
+        "a local output entry is appended",
+        "AND a remote debug trace may be written via appendProjectLog"
+      ]
+    },
+    {
+      "requirement": "metadata and artifact saves log to Output",
+      "name": "output buffer discards oldest rows beyond the cap",
+      "given": ["the shell already holds 400 local output entries"],
+      "when": ["another action appends a new output entry"],
+      "then": ["the oldest entry is discarded", "AND total retained entries remain 400"]
+    },
+    {
+      "requirement": "graph sidebar opens central overview",
+      "name": "Opening graph sidebar entry switches center workspace",
+      "when": ["the user opens the graph entry from the sidebar"],
+      "then": [
+        "the shell switches to the central Graph Main View",
+        "AND local output entry count is unchanged"
+      ]
+    },
+    {
+      "requirement": "shell orchestrates global command and search navigation",
+      "name": "Navigating to a spec from palette",
+      "when": ["user selects a Specification from the Command Palette"],
+      "then": ["the central workspace switches to the selected spec"]
+    },
+    {
+      "requirement": "shell orchestrates global command and search navigation",
+      "name": "Navigating to a symbol logs to output",
+      "when": ["user selects a Code Symbol from the Command Palette"],
+      "then": ["the shell appends a navigation log to the Output panel"]
+    },
+    {
+      "requirement": "shell orchestrates global command and search navigation",
+      "name": "Navigating to a document logs to output",
+      "when": ["user selects a Document from the Command Palette"],
+      "then": ["the shell appends a navigation log to the Output panel"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/SpecdApp.tsx",
+        "symbol": "StudioShell"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/SpecdApp.tsx",
+        "symbol": "SpecdApp"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/shell/ShellLayout.tsx",
+        "symbol": "ShellLayout"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:0a5c8bd7a3268f426504bdf9720546ff893678a841f451828942a5469146aafa",
+    "verify.md": "sha256:7ca533a97dbb4e3ae07e361e46bd196cd74130b02b0508c9c5af80c98c3bdf09"
+  },
+  "generatedBy": "core"
+}

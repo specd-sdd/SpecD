@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "client:adapter-remote-specd-data"],
+  "implementation": [
+    {
+      "file": "ui:src/connect/ConnectPanel.tsx",
+      "symbols": ["ConnectPanel", "ConnectPanelProps"]
+    }
+  ]
+}

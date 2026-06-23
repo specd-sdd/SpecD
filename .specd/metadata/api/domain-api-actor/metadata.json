@@ -1,0 +1,86 @@
+{
+  "title": "Domain Api Actor",
+  "description": "Value object representing an authenticated API principal when server auth is enabled (future types). v1 uses `disabled` and relies on core `ActorResolver` instead.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Value object representing an authenticated API principal when server auth is enabled (future types). v1 uses `disabled` and relies on core `ActorResolver` instead."
+  ],
+  "rules": [
+    {
+      "requirement": "ApiActor carries stable identity fields",
+      "rules": [
+        "`ApiActor` MUST include non-empty `id` and `name` strings and a string `email` (MAY be empty when the provider has no email). It MAY include `roles: string[]` for authorization hints in future types."
+      ]
+    },
+    {
+      "requirement": "ApiActor is immutable on the request",
+      "rules": [
+        "Once attached to request context, `ApiActor` MUST NOT be mutated by handlers or middleware."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "ApiActor carries stable identity fields",
+      "name": "ApiActor requires id and name",
+      "when": ["verifier constructs ApiActor for a successful auth"],
+      "then": ["id and name are non-empty strings", "AND email is a string (may be empty)"]
+    },
+    {
+      "requirement": "ApiActor carries stable identity fields",
+      "name": "Roles array is optional",
+      "given": ["provider returns no roles claim"],
+      "when": ["ApiActor is attached to context"],
+      "then": ["roles may be omitted", "AND handlers still receive id/name/email"]
+    },
+    {
+      "requirement": "ApiActor carries stable identity fields",
+      "name": "Invalid empty id is rejected at construction",
+      "when": ["verifier attempts to build ApiActor with empty id"],
+      "then": ["construction fails before handler runs", "AND request does not reach kernel"]
+    },
+    {
+      "requirement": "ApiActor is immutable on the request",
+      "name": "Handlers cannot mutate ApiActor on context",
+      "when": ["handler tries to change actor.email after attach"],
+      "then": ["mutation does not affect stored context", "AND TypeScript prevents mutation"]
+    },
+    {
+      "requirement": "ApiActor is immutable on the request",
+      "name": "Middleware attach is single assignment",
+      "when": ["auth middleware completes"],
+      "then": [
+        "ApiActor is set once on the context object",
+        "AND later middleware reads the same values"
+      ]
+    },
+    {
+      "requirement": "ApiActor is immutable on the request",
+      "name": "Frozen actor survives presenter chain",
+      "given": ["ApiActor attached before handler"],
+      "when": ["presenter and kernel run"],
+      "then": ["actor fields are unchanged at response time"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:domain-api-actor",
+        "file": "api:src/domain/auth/api-actor.ts",
+        "symbol": "ApiActor"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:097a67312a831246468c0a55c9e47199afb394c0c66dc9cb515930b7a5b490a7",
+    "verify.md": "sha256:42445351df5e7c1efef82c5a418051ae35a6bab3b43b60c17b888f98ba799e33"
+  },
+  "generatedBy": "core"
+}

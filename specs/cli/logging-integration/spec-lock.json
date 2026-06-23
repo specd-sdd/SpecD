@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:kernel-logging", "core:logger-port", "default:_global/architecture"],
+  "implementation": []
+}

@@ -69,6 +69,16 @@ Field definitions:
 
 The JSON serialization of each event type is unchanged.
 
+### Requirement: updatedAt revision clock
+
+Each manifest MUST include **`updatedAt`** (ISO 8601).
+
+- On **create**, `updatedAt` MUST equal `createdAt`.
+- On **every** manifest persist (`save`), `updatedAt` MUST be set to the save timestamp (validate-only writes, artifact saves, transitions, edit, scaffold sync, draft/discard paths that rewrite the manifest).
+- `createdAt` remains immutable.
+
+Legacy manifests without `updatedAt` MUST be accepted on load; the repository MUST derive an initial value once (for example max of `createdAt` and latest `history[].at`) and persist it on the next save.
+
 ### Requirement: Archive outcome history events
 
 The active change manifest history MUST preserve explicit failed-archive traceability.

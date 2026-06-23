@@ -1,0 +1,91 @@
+{
+  "title": "Middleware Cors",
+  "description": "Allow browser-based Studio (`specd-studio-web`, desktop remote) to call an API on a different origin than the static UI host.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Allow browser-based Studio (`specd-studio-web`, desktop remote) to call an API on a different origin than the static UI host."
+  ],
+  "rules": [
+    {
+      "requirement": "allowed origins are configurable",
+      "rules": [
+        "The server MUST accept a configuration list of allowed origins. Preflight `OPTIONS` and actual responses MUST include appropriate `Access-Control-Allow-*` headers for listed origins."
+      ]
+    },
+    {
+      "requirement": "credentials mode is explicit",
+      "rules": [
+        "When the Studio client sends credentialed requests (cookies or `Authorization`), CORS configuration MUST set `Access-Control-Allow-Credentials` consistently with the allowed origins list."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "allowed origins are configurable",
+      "name": "Configured origin receives ACAO header",
+      "given": ["api.cors.origins lists https://studio.example"],
+      "when": ["browser preflight from that origin"],
+      "then": [
+        "Access-Control-Allow-Origin echoes allowed origin",
+        "AND disallowed origin is rejected"
+      ]
+    },
+    {
+      "requirement": "allowed origins are configurable",
+      "name": "Wildcard disabled when credentials enabled",
+      "given": ["credentials mode requires explicit origins"],
+      "when": ["server starts with credentials true"],
+      "then": ["* is not emitted", "AND startup fails or config validation errors"]
+    },
+    {
+      "requirement": "allowed origins are configurable",
+      "name": "Omitted origin config uses safe default",
+      "when": ["specd serve runs without cors origins in yaml"],
+      "then": [
+        "only same-origin or documented default applies",
+        "AND behavior is stable across restarts"
+      ]
+    },
+    {
+      "requirement": "credentials mode is explicit",
+      "name": "Allow-Credentials set when enabled",
+      "given": ["api.cors.credentials: true"],
+      "when": ["allowed origin preflight succeeds"],
+      "then": ["Access-Control-Allow-Credentials: true", "AND cookies may be sent cross-origin"]
+    },
+    {
+      "requirement": "credentials mode is explicit",
+      "name": "Credentials false omits allow-credentials",
+      "given": ["credentials disabled in config"],
+      "when": ["CORS preflight runs"],
+      "then": ["Allow-Credentials header absent", "AND anonymous cross-origin reads still work"]
+    },
+    {
+      "requirement": "credentials mode is explicit",
+      "name": "Browser blocked request surfaces clear failure",
+      "when": ["UI calls API from disallowed origin with credentials"],
+      "then": ["browser blocks response", "AND Studio connect panel shows CORS hint"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:middleware-cors",
+        "file": "api:src/delivery/http/middleware/cors.ts",
+        "symbol": "registerCorsMiddleware"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e56fc2482690180e95a51e50eef1c7d8c39e08267e2b2d2919cfec53990e50b4",
+    "verify.md": "sha256:f05383b6de8bb2b579c4e70ed6a784f72734129ab5f2bdede83465c18ae344a8"
+  },
+  "generatedBy": "core"
+}

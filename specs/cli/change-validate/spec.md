@@ -132,22 +132,19 @@ If `--artifact` is provided with an artifact ID that does not exist in the activ
 
 ### Requirement: Batch mode (--all)
 
-With `--all`, the command validates the change using the active schema's artifact DAG instead of looping `specIds` with a full multi-artifact pass per spec.
+With `--all`, the command validates the change by delegating to **`kernel.changes.validateBatch`** (`core:validate-change-batch`). The CLI MUST call `validateBatch.execute({ name, artifactId? })` once and format `batch.results` for text/json/toon output.
 
 `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
 
-The batch driver MUST walk `schema.artifactDag().topologicalOrder()`. For each artifact type in that order:
+The CLI MUST NOT walk `schema.artifactDag()` locally or invoke `ValidateArtifacts` in a nested loop over `specIds`. DAG scheduling and per-step validation live in `@specd/core`.
 
-- **`scope: change`** — invoke `ValidateArtifacts` once for that artifact type with **no `specPath` field** in the use-case input (do not pass a placeholder `specIds[0]`).
-- **`scope: spec`** — invoke `ValidateArtifacts` once per `specId` in the change for that artifact type.
+When `--artifact <artifactId>` is combined with `--all`, the CLI MUST pass `{ name, artifactId }` to `validateBatch.execute`.
 
-When `--artifact <artifactId>` is combined with `--all`, the driver MUST use the same topological walk but execute only steps whose artifact id matches `<artifactId>`.
+Individual validation failures MUST NOT abort the batch early — the use case runs all scheduled steps and aggregates results.
 
-Individual validation failures MUST NOT abort the batch early — all scheduled steps run and results are aggregated.
+**Text output:** each step's result is printed as in single-spec mode (success or failure block), followed by a summary line reporting how many steps passed versus scheduled.
 
-**Text output:** each scheduled step's result is printed as in single-spec mode (success or failure block), followed by a summary line reporting how many steps passed versus scheduled.
-
-**JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<specId or null for change-scoped>", artifact: "<artifactId>", passed: <bool>, failures: [...], warnings: [...] }] }` — one entry per scheduled validation step. Each step MUST include a `warnings` array (possibly empty). Structural optimisation hints from the use case MAY be mapped into `warnings`; the field name MUST NOT be `notes` in batch JSON output.
+**JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<specId or null for change-scoped>", artifact: "<artifactId>", passed: <bool>, failures: [...], warnings: [...], files: [...] }] }` — one entry per scheduled validation step. Each step MUST include a `warnings` array (possibly empty). Structural optimisation hints from the use case MAY be mapped into `warnings`; the field name MUST NOT be `notes` in batch JSON output.
 
 The process exits with code 1 if any step has failures, 0 if all pass.
 
@@ -155,7 +152,7 @@ The process exits with code 1 if any step has failures, 0 if all pass.
 
 - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
 - The command marks artifacts as complete in the manifest when they pass
-- Batch mode schedules validation from `artifactDag().topologicalOrder()` and artifact `scope`; it does not invoke a full multi-artifact `ValidateArtifacts` pass per `specId`
+- Batch mode (`--all`) delegates to `ValidateChangeBatch`; single-spec mode still uses `ValidateArtifacts`
 
 ## Examples
 
@@ -172,3 +169,4 @@ specd change validate update-billing default:billing/invoices --artifact specs
 - [`core:change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
 - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+- [`core:validate-change-batch`](../../core/validate-change-batch/spec.md) — batch validation use case delegated to by `--all`

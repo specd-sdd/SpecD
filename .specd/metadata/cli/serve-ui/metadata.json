@@ -1,0 +1,112 @@
+{
+  "title": "Serve Ui",
+  "description": "`specd ui serve` is the “open Studio on this repo” experience: HTTP API plus the **active UI plugin** from `specd.yaml` `plugins.ui`. Bundle plugins embed static `dist/` on the API origin; own-server plugins (`hasServer() === true`) run their HTTP server after `init`.",
+  "dependsOn": [
+    "plugin-manager:ui-plugin-type",
+    "api:composition-create-api-server",
+    "cli:serve-api"
+  ],
+  "context": [
+    "`specd ui serve` is the “open Studio on this repo” experience: HTTP API plus the **active UI plugin** from `specd.yaml` `plugins.ui`. Bundle plugins embed static `dist/` on the API origin; own-server plugins (`hasServer() === true`) run their HTTP server after `init`."
+  ],
+  "rules": [
+    {
+      "requirement": "ui serve inherits serve-api flags plus open",
+      "rules": [
+        "`specd ui serve` MUST expose all `cli:serve-api` flags and add `--open|-o`. It MUST NOT expose `--ui-dist`."
+      ]
+    },
+    {
+      "requirement": "ui serve loads the configured UI plugin",
+      "rules": [
+        "The command MUST read the first `plugins.ui[].name` entry, load it via `plugin-manager:load-plugin-use-case`, and require a `plugin-manager:ui-plugin-type` instance.\n\nWhen no UI plugin is declared, the command MUST throw `core:ui-plugin-errors` `UiPluginNotConfiguredError` (`UI_PLUGIN_NOT_CONFIGURED`) so the CLI prints a structured `SpecdError` (not a generic `Error`)."
+      ]
+    },
+    {
+      "requirement": "embedded plugins mount static dist on the API",
+      "rules": [
+        "When the active UI plugin returns `hasServer() === false`, the command MUST pass `getStaticRoot()` to `createApiServer` as `uiDistPath` so `api:http-server-static-ui` serves the bundle on the same origin as `/v1`."
+      ]
+    },
+    {
+      "requirement": "own-server plugins start after API listen",
+      "rules": [
+        "When the active UI plugin has `hasServer() === true`, the command MUST start the API without static UI, listen, then call `init` with `UiServeContext` including `apiBaseUrl` (`{listenUrl}/v1`). It MUST print `getServerUrl()` for the plugin-owned UI server."
+      ]
+    },
+    {
+      "requirement": "own-server ui serve merges CORS origins",
+      "rules": [
+        "When the active UI plugin has `hasServer() === true`, `specd ui serve` MUST merge the plugin UI origin (from `getServerUrl()`) into effective `api.cors.origins` for that process, in addition to any origins declared in `specd.yaml`, so the Vite host can call the API on a different port without browser CORS errors."
+      ]
+    },
+    {
+      "requirement": "embedded Studio skips remote connect gate",
+      "rules": [
+        "When the embedded bundle is used, the client MUST use same-origin `/v1` and MUST NOT require `ui:connect-panel` before showing the IDE."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "ui serve inherits serve-api flags plus open",
+      "name": "ui-dist flag is not registered",
+      "when": ["specd ui serve --help is run"],
+      "then": ["output does not list --ui-dist", "AND --open is listed"]
+    },
+    {
+      "requirement": "ui serve loads the configured UI plugin",
+      "name": "Missing plugins.ui throws UiPluginNotConfiguredError",
+      "given": ["specd.yaml has no plugins.ui entry"],
+      "when": ["specd ui serve runs"],
+      "then": [
+        "the command exits non-zero",
+        "AND stderr shows error: with UI_PLUGIN_NOT_CONFIGURED semantics via UiPluginNotConfiguredError",
+        "AND the message mentions specd plugins install with @specd/plugin-ui-studio or @specd/studio-web",
+        "AND the message does not instruct editing plugins.ui manually in specd.yaml"
+      ]
+    },
+    {
+      "requirement": "embedded plugins mount static dist on the API",
+      "name": "Bundle plugin passes uiDistPath",
+      "given": ["active UI plugin has hasServer() === false"],
+      "when": ["specd ui serve starts"],
+      "then": ["createApiServer receives uiDistPath from getStaticRoot()"]
+    },
+    {
+      "requirement": "own-server plugins start after API listen",
+      "name": "Own-server plugin receives apiBaseUrl in init",
+      "given": ["active UI plugin has hasServer() === true"],
+      "when": ["API is listening and init runs"],
+      "then": ["UiServeContext.apiBaseUrl ends with /v1"]
+    },
+    {
+      "requirement": "own-server ui serve merges CORS origins",
+      "name": "Own-server plugin origin is added to CORS allowlist",
+      "given": ["active UI plugin has hasServer() === true"],
+      "when": ["specd ui serve starts the plugin dev server on a different origin"],
+      "then": ["API CORS configuration allows that origin in addition to any configured origins"]
+    },
+    {
+      "requirement": "embedded Studio skips remote connect gate",
+      "name": "Bundle plugin uses same-origin API",
+      "given": ["active UI plugin has hasServer() === false"],
+      "when": ["the user opens the embedded Studio URL"],
+      "then": ["the client uses same-origin /v1 without showing ui:connect-panel first"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:serve-ui",
+        "file": "cli:src/commands/serve/serve-ui.ts",
+        "symbol": "registerServeUi"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:2a81079904ffe2a27d65110208d4472f318dcdff5e9e2607166cf9b9a48414ae",
+    "verify.md": "sha256:089506853560cb49b8b9e0d26bd291bf09625e10c5f26a400bd23d6bb64c22cb"
+  },
+  "generatedBy": "core"
+}

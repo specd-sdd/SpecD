@@ -1,0 +1,157 @@
+{
+  "title": "Dto Graph Impact",
+  "description": "Stable JSON wire shape for **Dto Graph Impact** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:dto-graph-file-ref",
+    "api:dto-graph-symbol-ref"
+  ],
+  "context": [
+    "Stable JSON wire shape for **Dto Graph Impact** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules."
+  ],
+  "rules": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "rules": [
+        "The **Dto Graph Impact** wire shape MUST use camelCase property names stable across Studio releases. OpenAPI generation MUST derive schemas from these names."
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "rules": [
+        "[`api:presenter-graph`](../presenter-graph/spec.md) MUST map kernel or graph results into this DTO and MUST NOT embed lifecycle, validation, or approval logic."
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "rules": [
+        "`GraphImpactDto.symbols[]` MUST use the reusable shape defined by\n[`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) plus optional impact-specific fields\nsuch as `risk` and required traversal `depth`.\n\n`GraphImpactDto.files[]` MUST use the reusable shape defined by\n[`api:dto-graph-file-ref`](../dto-graph-file-ref/spec.md) plus optional impact-specific fields such\nas `risk`.\n\n`GraphImpactDto.specs[]` MUST expose affected spec ids as canonical `workspace:capability-path`\nstrings. The array MUST always be present, even when empty."
+      ]
+    },
+    {
+      "requirement": "impact response exposes aggregate blast-radius metrics",
+      "rules": [
+        "`GraphImpactDto` MUST expose the aggregate analysis fields returned by graph impact:\n\n- `riskLevel`\n- `directDepsCount`\n- `indirectDepsCount`\n- `transitiveDepsCount`\n- `affectedFilesCount`\n- `affectedProcesses`\n\n`GraphImpactDto.files[]` MUST be present as an array for all graph-impact responses, even when\nempty, so clients can render a stable `Specs` / `Symbols` / `Files` layout without shape-guards."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "OpenAPI lists camelCase properties",
+      "when": ["schema is generated for this DTO"],
+      "then": ["property names are camelCase", "AND no snake_case aliases"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Runtime JSON matches schema",
+      "when": ["handler returns success body"],
+      "then": ["JSON keys match schema", "AND clients deserialize without mapping"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Breaking rename fails schema check",
+      "when": ["required field renamed without version bump"],
+      "then": ["OpenAPI diff or test fails", "AND Studio documents migration"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not add business rules to DTO",
+      "given": ["kernel returns a status result with blockers"],
+      "when": ["presenter maps to this DTO"],
+      "then": ["DTO fields reflect kernel data", "AND presenter does not alter lifecycle state"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not embed lifecycle or approval logic",
+      "when": ["presenter maps kernel or graph results"],
+      "then": [
+        "lifecycle state in the DTO matches kernel output",
+        "AND no validation or approval rules are applied in the presenter"
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Identical kernel fixture yields identical JSON",
+      "given": ["a fixed kernel or graph fixture"],
+      "when": ["presenter serializes twice"],
+      "then": ["both JSON bodies are byte-identical"]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Impact symbol entries match graph symbol ref shape",
+      "when": ["impact returns affected symbols"],
+      "then": [
+        "each symbol entry satisfies [api:dto-graph-symbol-ref](../dto-graph-symbol-ref/spec.md)",
+        "AND optional risk MAY be added without replacing the reusable ref fields"
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Impact file entries match graph file ref shape",
+      "when": ["impact returns affected files"],
+      "then": [
+        "each file entry satisfies [api:dto-graph-file-ref](../dto-graph-file-ref/spec.md)",
+        "AND optional risk MAY be added without replacing the reusable ref fields"
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Impact spec entries expose canonical spec ids",
+      "when": ["impact returns affected specs"],
+      "then": [
+        "each specs[] entry is a canonical workspace:capability-path id",
+        "AND the array is present even when no specs are affected"
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Impact symbol entries expose traversal depth",
+      "when": ["impact returns affected symbols"],
+      "then": [
+        "each symbol entry includes depth",
+        "AND depth matches the underlying graph traversal distance"
+      ]
+    },
+    {
+      "requirement": "impact response exposes aggregate blast-radius metrics",
+      "name": "Impact response exposes aggregate analysis metrics",
+      "when": ["graph impact is serialized"],
+      "then": [
+        "JSON includes riskLevel, dependency counts, affected file count, and affectedProcesses",
+        "AND clients can assess blast radius without recomputing aggregates"
+      ]
+    },
+    {
+      "requirement": "impact response exposes aggregate blast-radius metrics",
+      "name": "Impact response keeps stable arrays",
+      "when": ["presenter serializes graph impact without affected specs or files"],
+      "then": [
+        "specs and files are still present as empty arrays",
+        "AND clients do not need optional guards for those collections"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:dto-graph-impact",
+        "file": "api:src/delivery/http/dto/graph-impact.ts",
+        "symbol": "GraphImpactDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:cdac42fcf9f2995a480c51494133464ce37fa59e5edf758e09878bacccccbb61",
+    "verify.md": "sha256:c3657e33cfdcee265876ff0fb3e4c015a40e373cde1cb59d56be9c4eacb95188"
+  },
+  "generatedBy": "core"
+}

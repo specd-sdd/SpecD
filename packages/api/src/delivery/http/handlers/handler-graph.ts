@@ -37,7 +37,16 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       await provider.open()
       try {
         const stats = await provider.getStatistics()
-        return toGraphStatusDto(stats, null)
+        let stale = false
+        const currentRef = await Promise.resolve(createVcsAdapter(ctx.config.projectRoot))
+          .then((vcs) => vcs.ref())
+          .catch(() => null)
+        if (stats.lastIndexedRef !== null && currentRef !== null) {
+          stale = stats.lastIndexedRef !== currentRef
+        } else if (stats.lastIndexedAt !== undefined && stats.lastIndexedAt !== null) {
+          stale = Date.now() - new Date(stats.lastIndexedAt).getTime() > 24 * 60 * 60 * 1000
+        }
+        return toGraphStatusDto(stats, stale)
       } finally {
         await provider.close()
       }

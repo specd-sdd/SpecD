@@ -1,0 +1,82 @@
+{
+  "title": "Http Server Static Ui",
+  "description": "When `specd ui serve` runs, the browser loads Studio from the same origin as the API so the connect gate can be skipped. This spec defines how the Node server serves the built `@specd/ui` dist: static assets with correct content types and SPA fallback for client-side deep links.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "When `specd ui serve` runs, the browser loads Studio from the same origin as the API so the connect gate can be skipped. This spec defines how the Node server serves the built `@specd/ui` dist: static assets with correct content types and SPA fallback for client-side deep links."
+  ],
+  "rules": [
+    {
+      "requirement": "static assets are served from configured dist path",
+      "rules": [
+        "Given `uiDistPath`, the server MUST serve files from that directory at `/` (or configured base) with correct content types."
+      ]
+    },
+    {
+      "requirement": "SPA fallback returns index.html",
+      "rules": [
+        "Unknown non-API GET paths that look like client routes MUST fall back to `index.html` so React Router can handle deep links."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "static assets are served from configured dist path",
+      "name": "JS bundle served from ui-dist",
+      "given": ["ui-dist points at built Studio assets"],
+      "when": ["browser requests /assets/index.js"],
+      "then": ["HTTP 200", "AND Content-Type matches file extension"]
+    },
+    {
+      "requirement": "static assets are served from configured dist path",
+      "name": "Missing asset returns 404",
+      "when": ["browser requests unknown static path"],
+      "then": ["HTTP 404", "AND not HTML error page from API router"]
+    },
+    {
+      "requirement": "static assets are served from configured dist path",
+      "name": "Custom ui-dist flag overrides default",
+      "when": ["specd ui serve --ui-dist ./custom runs"],
+      "then": ["files are read from custom directory", "AND default package dist is not used"]
+    },
+    {
+      "requirement": "SPA fallback returns index.html",
+      "name": "Unknown path serves index.html",
+      "when": ["browser requests /changes/foo from static host"],
+      "then": ["HTTP 200", "AND body is SPA index.html"]
+    },
+    {
+      "requirement": "SPA fallback returns index.html",
+      "name": "Existing static file bypasses fallback",
+      "when": ["browser requests real asset under /assets/"],
+      "then": ["actual file bytes returned", "AND index.html is not substituted"]
+    },
+    {
+      "requirement": "SPA fallback returns index.html",
+      "name": "API paths are not captured by SPA fallback",
+      "when": ["client requests /v1/project"],
+      "then": ["JSON API response", "AND not index.html"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:http-server-static-ui",
+        "file": "api:src/composition/create-api-server.ts",
+        "symbol": "createApiServer"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:479e62b7e5e11a19baf6284ba6b4fc8572b6455d2e8b65ec0190338b5dc746be",
+    "verify.md": "sha256:7aec1c5ceda75d1cebc0e7d43ea39c0f7b2fdfc073336887d4c50f278c61e595"
+  },
+  "generatedBy": "core"
+}

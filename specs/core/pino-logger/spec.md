@@ -22,6 +22,12 @@ The `PinoLogger` MUST implement the behavior for each `LogDestination` type:
 - **`file`**: Writes to the specified file path. MUST ensure the file is opened for writing in JSON format.
 - **`callback`**: For each log event, the adapter MUST construct a `LogEntry` object following the core contract and invoke the provided `onLog` callback.
 
+### Requirement: Pretty format uses LogFormatter
+
+When `createDefaultLogger` receives a `LogFormatter` (from `createLogFormatter()`), destinations with `format: 'pretty'` MUST render each log event through `LogFormatter.format(LogEntry)` instead of attaching a standalone `pino-pretty` stream that bypasses the port.
+
+`createDefaultLogger` MUST accept an optional `{ formatter?: LogFormatter }` second argument.
+
 ### Requirement: Level Filtering
 
 The `PinoLogger` MUST respect the `level` threshold of each `LogDestination` independently. Messages below the threshold SHALL be discarded with minimal performance overhead.

@@ -1,0 +1,63 @@
+{
+  "title": "core:ui-plugin-errors",
+  "description": "`specd ui serve` and UI plugin install paths MUST surface structured `SpecdError` subclasses instead of generic `Error` so the CLI and API can print consistent, actionable messages.",
+  "dependsOn": ["default:_global/error-handling-conventions"],
+  "context": [
+    "`specd ui serve` and UI plugin install paths MUST surface structured `SpecdError` subclasses instead of generic `Error` so the CLI and API can print consistent, actionable messages."
+  ],
+  "rules": [
+    {
+      "requirement": "UiPluginNotConfiguredError",
+      "rules": [
+        "`@specd/core` MUST export `UiPluginNotConfiguredError` extending `SpecdError` with:\n\n- `code`: `UI_PLUGIN_NOT_CONFIGURED`\n- Message that directs the user to `specd plugins install @specd/plugin-ui-studio` or `@specd/studio-web` (which persists `plugins.ui` in `specd.yaml`); MUST NOT instruct manual `plugins.ui` editing\n\nThrown when `specd ui serve` runs and `plugins.ui` is empty or absent."
+      ]
+    },
+    {
+      "requirement": "UiPluginTypeMismatchError",
+      "rules": [
+        "`@specd/core` MUST export `UiPluginTypeMismatchError` with:\n\n- `code`: `UI_PLUGIN_TYPE_MISMATCH`\n- Read-only `pluginName` — configured package from `plugins.ui[0].name`\n- Thrown when the loaded package fails `isUiPlugin`"
+      ]
+    },
+    {
+      "requirement": "UiPluginBundleMissingError",
+      "rules": [
+        "`@specd/core` MUST export `UiPluginBundleMissingError` with:\n\n- `code`: `UI_PLUGIN_BUNDLE_MISSING`\n- Read-only `staticRoot` — path checked for `index.html`\n- Thrown when a bundle UI plugin `install` requires built output and `index.html` is missing"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "UiPluginNotConfiguredError",
+      "name": "Error code is stable",
+      "when": ["UiPluginNotConfiguredError is constructed"],
+      "then": ["code equals UI_PLUGIN_NOT_CONFIGURED"]
+    },
+    {
+      "requirement": "UiPluginNotConfiguredError",
+      "name": "Message points to plugins install only",
+      "when": ["UiPluginNotConfiguredError is constructed"],
+      "then": [
+        "the message includes specd plugins install with @specd/plugin-ui-studio or @specd/studio-web",
+        "AND the message does not instruct manual plugins.ui editing in specd.yaml"
+      ]
+    },
+    {
+      "requirement": "UiPluginTypeMismatchError",
+      "name": "pluginName is exposed",
+      "when": ["UiPluginTypeMismatchError is thrown for @specd/foo"],
+      "then": ["pluginName is @specd/foo"]
+    },
+    {
+      "requirement": "UiPluginBundleMissingError",
+      "name": "staticRoot is exposed",
+      "when": ["UiPluginBundleMissingError is thrown for /var/dist"],
+      "then": ["staticRoot is /var/dist"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:3b0f5a5efedd9ab9f19070e4fe0a245302525d744c2f95ee6b8892a72317523b",
+    "verify.md": "sha256:e0c406febce3c3bf799250ad1e516879f4ffd8f47682ad3897b8c48523ae9de9"
+  },
+  "generatedBy": "core"
+}

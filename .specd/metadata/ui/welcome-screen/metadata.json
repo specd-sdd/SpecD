@@ -1,0 +1,120 @@
+{
+  "title": "Spec: Welcome Screen",
+  "description": "Define the shared project-entry UI shown when there is no active connection in `@specd/ui`, and reused by the desktop host as an overlay dialog when opening or switching projects.",
+  "dependsOn": ["default:_global/architecture", "client:user-storage-port", "ui:connect-panel"],
+  "context": [
+    "Define the shared project-entry UI shown when there is no active connection in `@specd/ui`, and reused by the desktop host as an overlay dialog when opening or switching projects."
+  ],
+  "rules": [
+    {
+      "requirement": "Render welcome screen when no active connection",
+      "rules": [
+        "The `@specd/ui` package SHALL export a `WelcomeScreen` component.\n`SpecdApp` SHALL render the `WelcomeScreen` component when there is no active connection profile.\nThe same shared UI SHALL also be reusable as a desktop modal dialog for project switching while a session is already mounted."
+      ]
+    },
+    {
+      "requirement": "Compact open-project chooser",
+      "rules": [
+        "The `WelcomeScreen` SHALL render a compact chooser with separate actions for opening a local workspace and opening the remote connection flow.\nThe initial chooser MUST fit within the desktop viewport without requiring page scroll."
+      ]
+    },
+    {
+      "requirement": "Remote server connection dialog",
+      "rules": [
+        "The `WelcomeScreen` SHALL open the remote connection flow in a secondary dialog that allows specifying a server URL and an optional access token, delegating connection logic to `ConnectPanel`."
+      ]
+    },
+    {
+      "requirement": "Electron local project action",
+      "rules": [
+        "The `WelcomeScreen` SHALL detect whether it is running within Electron (via checking for `window.specd` bridge).\nIf `window.specd` is present, the component SHALL render an \"Open local project\" button to trigger directory selection via Electron's dialog."
+      ]
+    },
+    {
+      "requirement": "Display recent connections and projects",
+      "rules": [
+        "The `WelcomeScreen` SHALL retrieve the list of recent connection profiles and local projects using the injected `IUserStorage` port and display them as clickable items to quickly restore a session.\nWhen the recent list exceeds the available height, it SHALL remain scrollable within the chooser rather than expanding beyond the dialog bounds."
+      ]
+    }
+  ],
+  "constraints": [
+    "The WelcomeScreen MUST NOT import @specd/core.",
+    "Visual styling MUST use Studio design system tokens and follow dark IDE theme principles (density, anti-SaaS color palettes).",
+    "Desktop hosts SHALL be able to control the chooser as a modal without forking a desktop-specific alternate project-entry component."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Render welcome screen when no active connection",
+      "name": "App renders WelcomeScreen when activeProfile is null",
+      "given": ["SpecdApp is initialized with no active connection profile"],
+      "when": ["the main shell mounts"],
+      "then": ["the WelcomeScreen component is visible"]
+    },
+    {
+      "requirement": "Render welcome screen when no active connection",
+      "name": "Desktop host reuses shared project chooser as modal",
+      "given": ["a desktop session is already mounted"],
+      "when": ["the host requests project switching"],
+      "then": [
+        "the same shared project-entry UI is rendered as a modal overlay",
+        "AND no desktop-only alternate chooser component is required"
+      ]
+    },
+    {
+      "requirement": "Compact open-project chooser",
+      "name": "WelcomeScreen renders separate local and remote entry actions",
+      "given": ["the WelcomeScreen is mounted"],
+      "then": [
+        "it renders a local workspace action and a remote connection action",
+        "AND the first view remains bounded within the desktop viewport"
+      ]
+    },
+    {
+      "requirement": "Remote server connection dialog",
+      "name": "Remote connection opens in second dialog",
+      "given": ["the WelcomeScreen is mounted"],
+      "when": ["the user chooses the remote connection action"],
+      "then": [
+        "a secondary dialog opens with server URL and token fields",
+        "AND submitting delegates the values to ConnectPanel"
+      ]
+    },
+    {
+      "requirement": "Electron local project action",
+      "name": "Open local project shown in Electron",
+      "given": ["window.specd bridge is defined (running in Electron)"],
+      "when": ["WelcomeScreen renders"],
+      "then": ["the \"Open local project\" button is visible and interactive"]
+    },
+    {
+      "requirement": "Electron local project action",
+      "name": "Open local project hidden in browser",
+      "given": ["window.specd is undefined (running in browser)"],
+      "when": ["WelcomeScreen renders"],
+      "then": ["the \"Open local project\" button is NOT rendered"]
+    },
+    {
+      "requirement": "Display recent connections and projects",
+      "name": "WelcomeScreen loads and lists recent items",
+      "given": ["IUserStorage contains saved recent connections"],
+      "when": ["WelcomeScreen mounts"],
+      "then": ["it queries IUserStorage", "AND displays the items as clickable shortcuts"]
+    },
+    {
+      "requirement": "Display recent connections and projects",
+      "name": "Recent list scrolls within chooser bounds",
+      "given": ["enough recent entries to exceed the chooser height"],
+      "when": ["WelcomeScreen renders"],
+      "then": [
+        "the recent items remain accessible via internal scrolling",
+        "AND the dialog height stays fixed within the viewport"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:efe52f9ed227d5db768299659f92ec6d039d77fcbcb9541707f87ad9fafca88c",
+    "verify.md": "sha256:c8854f78731c26c20fba5e841752ead3ca733f31cb2fdbb0dd5815e54590d556"
+  },
+  "generatedBy": "core"
+}

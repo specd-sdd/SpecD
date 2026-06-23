@@ -1,0 +1,210 @@
+{
+  "title": "Inspector Metadata & Outline",
+  "description": "Studio UI for **Inspector Metadata & Outline**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Inspector Metadata & Outline**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Inspector Metadata & Outline**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Inspector Metadata & Outline**."
+  ],
+  "rules": [
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "rules": [
+        "The inspector MUST support preview, delta edit, full diff, **Metadata**, **Outline**, and canonical read-only modes (UI labels: Edit/Raw, Preview, Diff, Metadata, Outline). Canonical workspace spec artifacts MUST be read-only in Studio v1."
+      ]
+    },
+    {
+      "requirement": "metadata mode shows artifact file metadata",
+      "rules": [
+        "Metadata mode MUST render artifact file metadata (path, kind, hash when present) and MUST show readonly YAML body when the filename is a metadata artifact (`metadata.yaml` or under `metadata/`)."
+      ]
+    },
+    {
+      "requirement": "outline mode uses draft-aware endpoints",
+      "rules": [
+        "Outline mode MUST load navigable structure for the open artifact:\n\n- **Change artifacts:** `outlineChangeArtifact(change, filename, { content })` so in-progress (unsaved) bodies are outlined from the editor buffer.\n- **Workspace spec artifacts (read-only):** `getSpecOutline` or `outlineSpecDraft` when the buffer differs from saved.\n\nWhen outline is unavailable for the file type, the UI MUST show a clear empty state. The tab MUST be labeled **Outline**, not Schema."
+      ]
+    },
+    {
+      "requirement": "preview and diff honor unsaved editor buffer",
+      "rules": [
+        "For spec-scoped change artifacts, Preview and Diff MUST call `previewChangeDraft` with `artifactOverrides` mapping the open filename to the current editor buffer when the artifact is dirty. Non–spec-preview artifacts MUST render Preview from the editor buffer directly."
+      ]
+    },
+    {
+      "requirement": "unsaved changes are visible and guarded",
+      "rules": [
+        "When editor buffer differs from last loaded `originalHash` content, the inspector MUST show an unsaved indicator beside Save. Closing the artifact panel or navigating away MUST prompt to Save, Discard, or Cancel."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Preview mode shows merged delta",
+      "given": ["change artifact has pending delta"],
+      "when": ["user selects preview in inspector"],
+      "then": ["inspector shows merged preview", "AND editor is read-only in preview"]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Canonical workspace spec is read-only",
+      "given": ["workspace canonical spec.md is open"],
+      "when": ["user attempts to edit in inspector"],
+      "then": ["save is disabled", "AND content is display-only"]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Delta edit mode enables save hook",
+      "given": ["editable change artifact is open"],
+      "when": ["user edits and saves"],
+      "then": ["hooks-inspector-save runs", "AND hash conflict surfaces 409 UI"]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Metadata mode shows file info panel",
+      "when": ["user selects Metadata in inspector"],
+      "then": [
+        "UI shows artifact metadata fields",
+        "AND does not enable save for workspace canonical specs"
+      ]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Outline mode loads outline for change artifact",
+      "given": ["change artifact specs/ui/foo/spec.md open"],
+      "when": ["user selects Outline in inspector"],
+      "then": [
+        "UI calls outlineChangeArtifact with current buffer",
+        "AND renders outline JSON or empty state"
+      ]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Preview with dirty buffer uses draft preview",
+      "given": ["dirty delta in editor"],
+      "when": ["user selects Preview"],
+      "then": [
+        "UI calls previewChangeDraft with artifact override",
+        "AND merged output matches unsaved edit"
+      ]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Unsaved indicator and close guard",
+      "given": ["dirty change artifact"],
+      "when": ["user attempts to close inspector"],
+      "then": ["unsaved dialog is shown per ui:inspector-unsaved-draft"]
+    },
+    {
+      "requirement": "metadata mode shows artifact file metadata",
+      "name": "metadata mode shows artifact file metadata — primary path",
+      "when": ["Metadata mode MUST render artifact file metadata (path,"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "metadata mode shows artifact file metadata",
+      "name": "metadata mode shows artifact file metadata — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "outline mode uses draft-aware endpoints",
+      "name": "outline mode uses draft-aware endpoints — primary path",
+      "when": ["Outline mode MUST load navigable structure for the"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "outline mode uses draft-aware endpoints",
+      "name": "outline mode uses draft-aware endpoints — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "preview and diff honor unsaved editor buffer",
+      "name": "preview and diff honor unsaved editor buffer — primary path",
+      "when": ["For spec-scoped change artifacts, Preview and Diff MUST"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "preview and diff honor unsaved editor buffer",
+      "name": "preview and diff honor unsaved editor buffer — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "unsaved changes are visible and guarded",
+      "name": "unsaved changes are visible and guarded — primary path",
+      "when": ["When editor buffer differs from last loaded originalHash"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "unsaved changes are visible and guarded",
+      "name": "unsaved changes are visible and guarded — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:53f16e1b5be192cf79a1bfc025ac57198e90fa7ee7a7e26b2e75ccc70403dcd0",
+    "verify.md": "sha256:20563ca1ffe9dcb4fb8728d0815995f2b79b5e68a73984146ed1b3d29def0dc9"
+  },
+  "generatedBy": "core"
+}

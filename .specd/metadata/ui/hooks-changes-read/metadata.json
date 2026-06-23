@@ -1,0 +1,195 @@
+{
+  "title": "Hooks Changes Read",
+  "description": "Open change tabs need fresh status and artifacts when an agent edits `manifest.json`, but refetching the full DAG every second is wasteful. These hooks poll change status with `ifModifiedSince` against manifest `updatedAt` and only reload the data each tab actually displays.\n\nShelved drafts and discarded changes live outside the active change store; read hooks MUST call the dedicated port methods (`getDraft` / `getDiscarded`, etc.) instead of `getChange`, which returns 404 for those names.",
+  "dependsOn": ["client:specd-data-port", "client:port-changes-read"],
+  "context": [
+    "Open change tabs need fresh status and artifacts when an agent edits `manifest.json`, but refetching the full DAG every second is wasteful. These hooks poll change status with `ifModifiedSince` against manifest `updatedAt` and only reload the data each tab actually displays.\n\nShelved drafts and discarded changes live outside the active change store; read hooks MUST call the dedicated port methods (`getDraft` / `getDiscarded`, etc.) instead of `getChange`, which returns 404 for those names."
+  ],
+  "rules": [
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "rules": [
+        "`useChangesRead`, `useChangeArtifact`, `useChangeArtifactList`, and multi-file change artifact readers MUST accept an optional `listSection` (`active` | `draft` | `discarded` | null). When `listSection` is `draft`, hooks MUST call `getDraft`, `getDraftStatus`, `listDraftArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `draft`. When `listSection` is `discarded`, hooks MUST call `getDiscarded`, `getDiscardedStatus`, `listDiscardedArtifacts`, and `getReadOnlyChangeArtifact` with `readOnlyOrigin` `discarded`. Otherwise hooks MUST call the active-change methods (`getChange`, `getChangeStatus`, `listChangeArtifacts`, `getChangeArtifact`).\n\nArchived change detail remains loaded through `getArchivedChange`, but artifact body reads for archived snapshots MUST route through `getReadOnlyChangeArtifact(..., 'archived')`. Archived artifact lists MAY come directly from archived detail instead of `listChangeArtifacts`.\n\nArtifact list hooks MUST preserve task metadata (`hasTasks`, optional task counters) from the port so downstream UI can resolve task-capable files without relying on a fixed filename.\n\nShared routing logic MAY live in `change-read-routes` under `@specd/ui`. Cache keys MUST include the section bucket so switching lists does not reuse stale active-change data.\n\nThe shell MUST derive `listSection` from which sidebar collection contains the open change name and MUST pass it into these hooks."
+      ]
+    },
+    {
+      "requirement": "shelved and archived views do not poll change status or artifacts",
+      "rules": [
+        "Drafted, discarded, and archived change tabs are read-only and do not change while open. Hooks MUST support disabling polling so the shell can load these resources once and then stop refreshing:\n\n- `useChangesRead` MUST allow the shell to skip `get*Status` polling for drafted/discarded/archived.\n- Artifact list and artifact body hooks MUST avoid refresh-key polling for drafted/discarded/archived (selection changes still load once)."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    },
+    {
+      "requirement": "hooks MUST prevent infinite render loops through stable results",
+      "rules": [
+        "Hooks that return arrays or complex objects from async resources (e.g. `useChangeArtifactList`, `useChangeArtifacts`) SHALL ensure the returned references are stable when data is unchanged. They MUST avoid returning new array/object literals on every render when data sources or dependencies have not logically changed.\n\nMulti-artifact readers MUST memoize their normalized parameter sets (e.g. filenames) using stringified representations (e.g. `join('|')`) to prevent re-triggering loads when a parent component passes a new array reference containing identical content."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Drafted change loads via getDraft",
+      "given": ["change dummy-draft exists only under drafts"],
+      "when": ["shell opens it with listSection draft"],
+      "then": [
+        "useChangesRead calls getDraft(\"dummy-draft\")",
+        "AND does not call getChange for that name"
+      ]
+    },
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Discarded change loads via getDiscarded",
+      "given": ["change exists only under discarded"],
+      "when": ["shell opens it with listSection discarded"],
+      "then": ["useChangesRead calls getDiscarded", "AND does not call getChange"]
+    },
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Active change still uses getChange",
+      "given": ["change is in the active list"],
+      "when": ["shell opens it with listSection active or null"],
+      "then": ["useChangesRead calls getChange and getChangeStatus"]
+    },
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Draft artifact list uses listDraftArtifacts",
+      "given": ["drafted change and Artifacts tab visible"],
+      "when": ["useChangeArtifactList loads"],
+      "then": ["port receives listDraftArtifacts(name)", "AND not listChangeArtifacts"]
+    },
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Inspector artifact body uses draft route when drafted",
+      "given": ["drafted change and user selects an artifact file"],
+      "when": ["useChangeArtifact loads content"],
+      "then": ["port receives getReadOnlyChangeArtifact(name, filename, 'draft')"]
+    },
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Inspector artifact body uses discarded route when discarded",
+      "given": ["discarded change and user selects an artifact file"],
+      "when": ["useChangeArtifact loads content"],
+      "then": ["port receives getReadOnlyChangeArtifact(name, filename, 'discarded')"]
+    },
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Archived artifact body uses archived route when archived",
+      "given": ["archived change and user selects an artifact file"],
+      "when": ["useChangeArtifact loads content"],
+      "then": ["port receives getReadOnlyChangeArtifact(name, filename, 'archived')"]
+    },
+    {
+      "requirement": "read hooks route by sidebar list section",
+      "name": "Task-capable artifact lists preserve metadata for downstream tabs",
+      "given": ["change artifact list contains task-capable rows"],
+      "when": ["useChangeArtifactList resolves"],
+      "then": [
+        "the hook preserves hasTasks",
+        "AND optional task counters remain available to tabs that need them"
+      ]
+    },
+    {
+      "requirement": "shelved and archived views do not poll change status or artifacts",
+      "name": "Drafted detail loads once (no poll refreshKey)",
+      "given": ["drafted change open in the shell"],
+      "when": ["global poll ticks"],
+      "then": ["shell does not refetch drafted detail or status automatically"]
+    },
+    {
+      "requirement": "shelved and archived views do not poll change status or artifacts",
+      "name": "Discarded view does not poll status",
+      "given": ["discarded change open in the shell"],
+      "when": ["global poll ticks"],
+      "then": ["shell does not call getDiscardedStatus for that name"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    },
+    {
+      "requirement": "hooks MUST prevent infinite render loops through stable results",
+      "name": "Hook returns stable array reference when data is unchanged",
+      "given": ["useChangeArtifactList has loaded data"],
+      "when": ["component re-renders without a port refresh"],
+      "then": [
+        "the returned items and scopeGroups arrays are referentially equal to previous result",
+        "AND no downstream effect is re-triggered"
+      ]
+    },
+    {
+      "requirement": "hooks MUST prevent infinite render loops through stable results",
+      "name": "Multi-artifact reader memoizes normalized filenames",
+      "given": ["useChangeArtifacts called with ['a.md']"],
+      "when": [
+        "parent re-renders and passes a new array ['a.md'] (different reference, same content)"
+      ],
+      "then": [
+        "normalizedFilenames reference remains stable",
+        "AND useAsyncResource does not re-trigger a load"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:hooks-changes-read",
+        "file": "ui:src/hooks/use-changes-read.ts",
+        "symbol": "useChangesRead"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e4f04861ef58dc9f36e33a7caebdd630749589a7eccc6c1d2d1380abf1c10c27",
+    "verify.md": "sha256:44ca8067e590b14a9760e3efbeb5351a0df2b70d9b39ac573f3eed8b8186c36d"
+  },
+  "generatedBy": "core"
+}

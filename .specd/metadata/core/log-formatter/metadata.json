@@ -1,0 +1,96 @@
+{
+  "title": "LogFormatter",
+  "description": "Human-readable log lines MUST use one shared formatter so CLI console output, `ReadLog` pretty mode, and future delivery layers stay visually consistent. v1 default implementation is **pino-pretty** via `PinoPrettyLogFormatter`.",
+  "dependsOn": [
+    "core:logger-port",
+    "core:pino-logger",
+    "core:read-log",
+    "default:_global/architecture"
+  ],
+  "context": [
+    "Human-readable log lines MUST use one shared formatter so CLI console output, `ReadLog` pretty mode, and future delivery layers stay visually consistent. v1 default implementation is **pino-pretty** via `PinoPrettyLogFormatter`."
+  ],
+  "rules": [
+    {
+      "requirement": "LogFormatter port",
+      "rules": [
+        "The application layer MUST define a `LogFormatter` port with `format(entry: LogEntry): string` where `LogEntry` is the contract from `core:logger-port`."
+      ]
+    },
+    {
+      "requirement": "createLogFormatter factory",
+      "rules": [
+        "`@specd/core` composition MUST export `createLogFormatter(options?)` returning the default `LogFormatter` implementation (`PinoPrettyLogFormatter` in v1).\n\nOptions MAY include `colorize` (boolean, default `true` when stdout is a TTY is decided by callers; factory default `true`)."
+      ]
+    },
+    {
+      "requirement": "PinoPrettyLogFormatter",
+      "rules": [
+        "Infrastructure MUST provide `PinoPrettyLogFormatter` implementing `LogFormatter` using `pino-pretty` (`prettyFactory`) so each `LogEntry` maps to a pino-shaped record (`time`, numeric `level`, `msg`, spread context) before prettifying."
+      ]
+    },
+    {
+      "requirement": "consumers use the factory",
+      "rules": [
+        "- `createKernel` MUST call `createLogFormatter()` once per kernel and pass the instance to `createDefaultLogger` and to `ReadLog` when `logRing` is wired.\n- `createCliKernel` / CLI context MUST pass the same factory-produced formatter into `createKernel` (via `KernelOptions.logFormatter`) so console and Studio readback match.\n- `ReadLog` MUST NOT embed ad hoc `formatPrettyLine` string building; pretty output MUST delegate to the injected `LogFormatter`."
+      ]
+    },
+    {
+      "requirement": "pretty console destination",
+      "rules": [
+        "When a `LogDestination` has `format: 'pretty'`, `createDefaultLogger` MUST render lines through the supplied `LogFormatter` instead of wiring a raw `pino-pretty` stream that bypasses the port."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "LogFormatter port",
+      "name": "format returns a single line",
+      "given": ["a LogEntry with message hello"],
+      "when": ["createLogFormatter().format(entry) runs"],
+      "then": ["the result is a non-empty string containing hello"]
+    },
+    {
+      "requirement": "createLogFormatter factory",
+      "name": "factory is exported from core composition",
+      "when": ["@specd/core composition is imported"],
+      "then": ["createLogFormatter is defined"]
+    },
+    {
+      "requirement": "PinoPrettyLogFormatter",
+      "name": "level label appears in pretty output",
+      "given": ["an entry with level warn and message check"],
+      "when": ["formatted with default factory"],
+      "then": [
+        "the line includes check",
+        "AND reflects warn severity (label or color path via pino-pretty)"
+      ]
+    },
+    {
+      "requirement": "consumers use the factory",
+      "name": "ReadLog pretty mode uses injected formatter",
+      "given": ["a test double formatter that returns FORMATTED"],
+      "when": ["ReadLog.execute({ prettier: true }) runs"],
+      "then": ["lines is ['FORMATTED']"]
+    },
+    {
+      "requirement": "pretty console destination",
+      "name": "pretty console destination — primary path",
+      "when": ["When a LogDestination has format: 'pretty', createDefaultLogger MUST"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "pretty console destination",
+      "name": "pretty console destination — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:c5292c7fa7d96fe897151783626adb48732757905493be4f4466f1c2ad4106e6",
+    "verify.md": "sha256:643c799ff9ae63b120d1ded9d5430cd6d9093c2843ce5f109eae8c740b7c9459"
+  },
+  "generatedBy": "core"
+}

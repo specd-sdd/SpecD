@@ -1,0 +1,90 @@
+{
+  "title": "Outline Change Artifact",
+  "description": "Change-directory artifacts (including **new specs** under `specs/` and deltas under `deltas/`) must be outlineable before they exist in the workspace tree. `OutlineChangeArtifact` loads content from the change (or accepts a Studio **draft** body) and delegates to [`core:outline-artifact-content`](../outline-artifact-content/spec.md).",
+  "dependsOn": [
+    "core:outline-artifact-content",
+    "core:get-change-artifact",
+    "core:change-repository-port"
+  ],
+  "context": [
+    "Change-directory artifacts (including **new specs** under `specs/` and deltas under `deltas/`) must be outlineable before they exist in the workspace tree. `OutlineChangeArtifact` loads content from the change (or accepts a Studio **draft** body) and delegates to [`core:outline-artifact-content`](../outline-artifact-content/spec.md)."
+  ],
+  "rules": [
+    {
+      "requirement": "input names change and filename",
+      "rules": [
+        "`execute` MUST accept `name` (change), `filename` (change-relative path), optional `content` (draft override), and optional `full` / `hints`."
+      ]
+    },
+    {
+      "requirement": "draft content skips repository read",
+      "rules": [
+        "When `content` is provided, the use case MUST NOT call `ChangeRepository.artifact` for that request; it MUST outline the supplied string."
+      ]
+    },
+    {
+      "requirement": "saved content loads via GetChangeArtifact path",
+      "rules": [
+        "When `content` is omitted, the use case MUST load bytes through `ChangeRepository.artifact(change, filename)`. Missing file MUST throw an error surfaced as HTTP 404 at the API boundary."
+      ]
+    },
+    {
+      "requirement": "change must exist",
+      "rules": ["Unknown change name MUST throw `ChangeNotFoundError`."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "input names change and filename",
+      "name": "input names change and filename — primary path",
+      "when": ["execute MUST accept name (change), filename (change-relative path),"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "input names change and filename",
+      "name": "input names change and filename — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "draft content skips repository read",
+      "name": "Draft outlines in-progress new spec file",
+      "given": ["change tracks specs/ui/demo/spec.md not present in workspace"],
+      "when": ["execute is called with content set to markdown body"],
+      "then": ["outline is returned", "AND ChangeRepository.artifact is not invoked"]
+    },
+    {
+      "requirement": "draft content skips repository read",
+      "name": "Saved file read from change directory",
+      "given": ["artifact exists on disk under change path"],
+      "when": ["content is omitted"],
+      "then": ["repository load supplies bytes", "AND outline matches file content"]
+    },
+    {
+      "requirement": "saved content loads via GetChangeArtifact path",
+      "name": "saved content loads via GetChangeArtifact path — primary path",
+      "when": ["When content is omitted, the use case MUST"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "saved content loads via GetChangeArtifact path",
+      "name": "saved content loads via GetChangeArtifact path — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "change must exist",
+      "name": "Unknown change throws",
+      "when": ["change name does not exist"],
+      "then": ["ChangeNotFoundError throws"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:163dc64bcf1890ef04f5b265771977c7f9e63f598351518bd0bbb7f17966fb04",
+    "verify.md": "sha256:80ce9b994c6ac0752d199bcca618b84a2edf4276a7073a5c886e821f5fdb66d7"
+  },
+  "generatedBy": "core"
+}

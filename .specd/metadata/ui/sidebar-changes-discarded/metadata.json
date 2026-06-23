@@ -1,0 +1,115 @@
+{
+  "title": "Sidebar Changes Discarded",
+  "description": "Studio UI for **Sidebar Changes Discarded**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes Discarded**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Sidebar Changes Discarded**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes Discarded**."
+  ],
+  "rules": [
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "rules": [
+        "The sidebar MUST render a list of discarded changes from global poll hooks. Each row navigates to the change Overview — the sidebar MUST NOT expose per-row action buttons. A discarded change is permanently abandoned; its Overview shows a read-only notice to that effect."
+      ]
+    },
+    {
+      "requirement": "discarded rows show name only without per-row state",
+      "rules": [
+        "Rows in the **Discarded** section MUST display the change `name` only. They MUST NOT show per-row lifecycle `state` text (the section heading already identifies the list)."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "name": "Sidebar lists refresh on global poll",
+      "given": ["shell global poll is running"],
+      "when": ["poll tick fires"],
+      "then": ["discarded list updates", "AND no action buttons are rendered on sidebar rows"]
+    },
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "name": "Open action calls read port",
+      "when": ["user clicks a discarded change row"],
+      "then": [
+        "shell opens the change Overview tab (read-only notice)",
+        "AND useChangesRead loads detail via getDiscarded (not getChange)",
+        "AND no direct core import"
+      ]
+    },
+    {
+      "requirement": "discarded rows show name only without per-row state",
+      "name": "Discarded row shows name without state badge",
+      "given": ["Discarded section lists changes"],
+      "when": ["sidebar renders each row"],
+      "then": ["row shows change name only", "AND does not show per-row lifecycle state text"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:sidebar-changes-discarded",
+        "file": "ui:src/sidebar/ChangesSidebar.tsx",
+        "symbol": "ChangesSidebar"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:73e2e7386d09786d139e8975f66f7836150fefb9fac3bcf12b4cb7c1594b348d",
+    "verify.md": "sha256:46804efeef869b228466a63714e6a59c5312431702e1b640780d2dcb082c512f"
+  },
+  "generatedBy": "core"
+}

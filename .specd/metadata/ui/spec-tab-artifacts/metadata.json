@@ -1,0 +1,116 @@
+{
+  "title": "Spec Tab Artifacts",
+  "description": "Studio UI for **Spec Tab Artifacts**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tab Artifacts**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Spec Tab Artifacts**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tab Artifacts**."
+  ],
+  "rules": [
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "rules": [
+        "While the spec tab is visible, the view MUST refresh spec metadata for that path on a light interval. New specs in the tree are already discovered by the global workspace poll.\n\nCanonical spec artifacts are inherently complete/read-only in Studio v1. Their list rows MUST keep neutral filename text, but the leading artifact icon SHOULD use the success/green treatment to signal that complete state."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Visible spec tab refreshes metadata",
+      "given": ["spec tab for core:kernel is active"],
+      "when": ["light poll interval elapses"],
+      "then": ["spec metadata hook refetches", "AND tree discovery still uses global poll"]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Hidden spec tab stops metadata poll",
+      "given": ["user switches away from spec tab"],
+      "when": ["poll would have fired"],
+      "then": ["no metadata request is sent", "AND last data remains rendered"]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "New spec appears via workspace tree poll",
+      "given": ["agent adds a spec file on disk"],
+      "when": ["global workspace poll runs"],
+      "then": ["tree shows new node", "AND spec tab poll does not scan filesystem directly"]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Canonical artifact rows use green icon only",
+      "given": ["a spec with canonical artifacts in the Artifacts tab"],
+      "when": ["the file list renders"],
+      "then": [
+        "each row shows a success/green file icon",
+        "AND the artifact filename text remains neutral"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:spec-tab-artifacts",
+        "file": "ui:src/spec/SpecMainView.tsx",
+        "symbol": "SpecMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:ab4ac235d537541a9f9fe59dd2720ab18d11a460d71777d72a7cf6ed579719e7",
+    "verify.md": "sha256:35b89f333c912813bbf8a1f3d9ddd63e68acfad7caa3fca71cc276a2a583b579"
+  },
+  "generatedBy": "core"
+}

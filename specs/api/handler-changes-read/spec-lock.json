@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:routes-changes-read",
+    "core:kernel",
+    "core:get-change-artifact",
+    "core:get-read-only-change-artifact",
+    "core:get-status"
+  ],
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/handlers/handler-changes-read.ts",
+      "symbols": ["registerChangesReadRoutes"]
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "title": "Routes Workspaces",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Workspaces** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group covers workspace discovery and top-level canonical spec tree listing only.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Workspaces** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group covers workspace discovery and top-level canonical spec tree listing only."
+  ],
+  "rules": [
+    {
+      "requirement": "GET workspaces lists orchestrated project workspaces",
+      "rules": [
+        "`GET /v1/workspaces` MUST use `ListWorkspaces` as the source of truth for workspace identity, ownership, code roots, and declaration order.\n\nThe response MAY enrich those rows with static descriptor fields from `SpecdConfig` such as `prefix` and `specsPath`, but it MUST NOT bypass `ListWorkspaces` by rebuilding the workspace list from raw config alone."
+      ]
+    },
+    {
+      "requirement": "GET workspace spec tree lists canonical specs without artifact bodies",
+      "rules": [
+        "`GET /v1/workspaces/{ws}/specs` MUST return the canonical spec tree for the selected workspace from `kernel.specs.list`.\n\nEach entry MUST provide discovery metadata needed to navigate canonical specs, but this route MUST NOT inline canonical artifact bodies or per-spec detail payloads. Canonical spec detail, artifact reads, outline, context, and metadata actions belong to `api:routes-specs-read`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "GET workspaces lists orchestrated project workspaces",
+      "name": "Workspaces endpoint returns orchestrated workspaces in declaration order",
+      "given": ["specd.yaml lists core and cli"],
+      "when": ["GET /v1/workspaces"],
+      "then": ["JSON array includes both ids", "AND rows preserve the same workspace ordering"]
+    },
+    {
+      "requirement": "GET workspaces lists orchestrated project workspaces",
+      "name": "Empty workspace config yields empty list",
+      "given": ["no workspaces configured"],
+      "when": ["workspaces endpoint is called"],
+      "then": ["HTTP 200 with []", "AND UI shows empty state"]
+    },
+    {
+      "requirement": "GET workspaces lists orchestrated project workspaces",
+      "name": "Response may enrich orchestrated rows with descriptor fields",
+      "when": ["GET /v1/workspaces is serialized"],
+      "then": [
+        "each row may include config-derived prefix or specsPath",
+        "AND the underlying workspace membership still comes from ListWorkspaces"
+      ]
+    },
+    {
+      "requirement": "GET workspaces lists orchestrated project workspaces",
+      "name": "Workspace ids are stable keys for tree route",
+      "when": ["UI selects workspace from list"],
+      "then": ["same id works in /v1/specs/tree?workspace=", "AND no duplicate ids"]
+    },
+    {
+      "requirement": "GET workspace spec tree lists canonical specs without artifact bodies",
+      "name": "Versioned API path",
+      "when": ["client calls the documented route with /v1 prefix"],
+      "then": ["route handler is reached", "AND unprefixed legacy path is not registered"]
+    },
+    {
+      "requirement": "GET workspace spec tree lists canonical specs without artifact bodies",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "GET workspace spec tree lists canonical specs without artifact bodies",
+      "name": "GET /v1/workspaces/{ws}/specs returns tree payload only",
+      "when": ["client calls GET /v1/workspaces/{ws}/specs"],
+      "then": [
+        "HTTP status is 2xx",
+        "AND JSON body contains tree metadata without canonical artifact file bodies"
+      ]
+    },
+    {
+      "requirement": "GET workspace spec tree lists canonical specs without artifact bodies",
+      "name": "Per-spec detail is not served from the tree route",
+      "when": ["client needs a canonical spec detail document"],
+      "then": [
+        "it must follow the per-spec wildcard route",
+        "AND the tree response remains a discovery payload rather than a detail payload"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-workspaces",
+        "file": "api:src/delivery/http/handlers/handler-workspaces.ts",
+        "symbol": "registerWorkspacesRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:b245c9a02546bdd37f8381f870167f2dc0f29f67e676278a72b213266708ae6a",
+    "verify.md": "sha256:e29085cd44f082853ef7984eba356a80aab308a905c9516eb2029aa479d202f2"
+  },
+  "generatedBy": "core"
+}

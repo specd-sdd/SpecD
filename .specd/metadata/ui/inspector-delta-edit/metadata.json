@@ -1,0 +1,98 @@
+{
+  "title": "Inspector Delta Edit",
+  "description": "Studio UI for **Inspector Delta Edit**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Inspector Delta Edit**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Inspector Delta Edit**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Inspector Delta Edit**."
+  ],
+  "rules": [
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "rules": [
+        "The inspector MUST support preview, delta edit, full diff, metadata/schema, and canonical read-only modes. Canonical workspace spec artifacts MUST be read-only in Studio v1."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Preview mode shows merged delta",
+      "given": ["change artifact has pending delta"],
+      "when": ["user selects preview in inspector"],
+      "then": ["inspector shows merged preview", "AND editor is read-only in preview"]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Canonical workspace spec is read-only",
+      "given": ["workspace canonical spec.md is open"],
+      "when": ["user attempts to edit in inspector"],
+      "then": ["save is disabled", "AND content is display-only"]
+    },
+    {
+      "requirement": "inspector mode selects preview delta or read-only canonical",
+      "name": "Delta edit mode enables save hook",
+      "given": ["editable change artifact is open"],
+      "when": ["user edits and saves"],
+      "then": ["hooks-inspector-save runs", "AND hash conflict surfaces 409 UI"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:b94a8e89dc4a2db959b322983d88a4adfd7f4a6d3d334078a4812f7c9bea2ab1",
+    "verify.md": "sha256:2616484ce2a58bbf413a7d47e8118efb3f519fb38f923c5aa4ffa2175a036b8c"
+  },
+  "generatedBy": "core"
+}

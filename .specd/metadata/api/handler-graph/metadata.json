@@ -1,0 +1,169 @@
+{
+  "title": "Handler Graph",
+  "description": "HTTP handlers for **graph** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Graph**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:routes-graph",
+    "core:kernel"
+  ],
+  "context": [
+    "HTTP handlers for **graph** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Graph**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+  ],
+  "rules": [
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "rules": [
+        "The module MUST implement every method, path, query, and body declared in [`api:routes-graph`](../routes-graph/spec.md) under the `/v1` prefix. It MUST NOT expose undocumented routes."
+      ]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
+      "rules": [
+        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `createCodeGraphProvider` → stats, index, search, impact, hotspots\n- change-scoped graph view composed from change `specIds`"
+      ]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "rules": [
+        "Successful responses MUST be produced by the matching `api:presenter-*` module and conform to the corresponding `api:dto-*` spec."
+      ]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "rules": [
+        "Thrown kernel errors and validation failures MUST be converted through `api:problem-json` to `application/problem+json` responses with appropriate HTTP status codes."
+      ]
+    },
+    {
+      "requirement": "graph indexing uses CLI-aligned project assembly",
+      "rules": [
+        "For `POST /v1/graph/index`, the handler MUST assemble the provider input from orchestrated project state:\n\n- `kernel.project.listWorkspaces.execute()`\n- effective graph config derived from `SpecdConfig`\n- optional project VCS ref when available\n\nIt MUST NOT build a parallel legacy workspace-target shape that bypasses the merged graph input model."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "name": "Only documented /v1 routes are registered",
+      "when": ["HTTP server route table is inspected after bootstrap"],
+      "then": [
+        "every handler path matches api:routes-graph under /v1",
+        "AND no undocumented shadow routes exist"
+      ]
+    },
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "name": "Declared GET route returns presenter-shaped JSON",
+      "when": ["client calls a documented GET route with valid fixtures"],
+      "then": ["HTTP status is 2xx", "AND body matches the paired api:dto-* spec"]
+    },
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "name": "Undeclared verb on a path returns 405",
+      "when": ["client calls a route with a verb not declared in the routes spec"],
+      "then": ["HTTP 405 is returned", "AND response uses application/problem+json when mapped"]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
+      "name": "Handler invokes createCodeGraphProvider → stats, index, search, impact, hotspots",
+      "when": ["a valid request for this handler is processed"],
+      "then": [
+        "createCodeGraphProvider → stats, index, search, impact, hotspots runs inside @specd/core",
+        "AND handler does not reimplement lifecycle or validation rules"
+      ]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
+      "name": "Handler invokes change-scoped graph view composed from change specIds",
+      "when": ["a valid request for this handler is processed"],
+      "then": [
+        "change-scoped graph view composed from change specIds runs inside @specd/core",
+        "AND handler does not reimplement lifecycle or validation rules"
+      ]
+    },
+    {
+      "requirement": "graph indexing uses CLI-aligned project assembly",
+      "name": "Graph index builds provider input from ListWorkspaces and project graph config",
+      "when": ["POST /v1/graph/index is handled"],
+      "then": [
+        "the handler loads workspaces from kernel.project.listWorkspaces.execute()",
+        "AND it assembles effective graph config from project configuration before calling the provider"
+      ]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "name": "Successful body passes through presenter",
+      "given": ["kernel returns a successful result object"],
+      "when": ["handler builds the HTTP 200 response"],
+      "then": [
+        "matching api:presenter-* mapped the result",
+        "AND JSON conforms to paired api:dto-*"
+      ]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "name": "Presenter output stays stable for fixed fixture",
+      "given": ["a fixed kernel fixture for this route"],
+      "when": ["the same request is handled twice"],
+      "then": ["both JSON bodies are identical", "AND presenter did not mutate kernel state"]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "name": "Unknown change name returns 404 before presenter",
+      "when": ["route targets a change that does not exist"],
+      "then": ["HTTP 404 problem+json is returned", "AND presenter is not invoked"]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Kernel error maps to problem+json",
+      "when": ["kernel throws a domain error for this route"],
+      "then": ["Content-Type is application/problem+json", "AND body includes status and title"]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Validation failure maps to 4xx problem+json",
+      "when": ["ValidateArtifacts or input validation rejects the request"],
+      "then": ["HTTP 4xx is returned", "AND problem payload describes the failing constraint"]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Unexpected throw does not return plain text",
+      "when": ["an unhandled exception escapes the handler stack"],
+      "then": [
+        "response is not text/plain HTML",
+        "AND client receives problem+json or framework 500 mapping"
+      ]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Read-only routes may omit actor on kernel calls",
+      "when": ["handler serves a read-only GET that does not write history"],
+      "then": [
+        "kernel read use case still succeeds",
+        "AND no history event is written for the call"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:handler-graph",
+        "file": "api:src/delivery/http/handlers/handler-graph.ts",
+        "symbol": "registerGraphRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d2274b56085d690e598216177ddce8de04144ce2a65b862425217e5dfbb7bd56",
+    "verify.md": "sha256:d59665eecca3d5feb0225f8fce1cf35126f2f2f147d6e0a01ee5be72156b7c21"
+  },
+  "generatedBy": "core"
+}

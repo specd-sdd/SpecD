@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "core:get-spec-outline-draft"],
+  "implementation": [
+    {
+      "file": "ui:src/spec/SpecMainView.tsx",
+      "symbols": ["SpecMainView"]
+    }
+  ]
+}

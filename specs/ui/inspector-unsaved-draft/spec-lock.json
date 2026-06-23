@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "ui:design-system",
+    "ui:hooks-inspector-save",
+    "client:port-changes-read",
+    "ui:inspector-metadata-schema"
+  ],
+  "implementation": []
+}

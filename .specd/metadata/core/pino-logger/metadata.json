@@ -25,6 +25,12 @@
       ]
     },
     {
+      "requirement": "Pretty format uses LogFormatter",
+      "rules": [
+        "When `createDefaultLogger` receives a `LogFormatter` (from `createLogFormatter()`), destinations with `format: 'pretty'` MUST render each log event through `LogFormatter.format(LogEntry)` instead of attaching a standalone `pino-pretty` stream that bypasses the port.\n\n`createDefaultLogger` MUST accept an optional `{ formatter?: LogFormatter }` second argument."
+      ]
+    },
+    {
       "requirement": "Level Filtering",
       "rules": [
         "The `PinoLogger` MUST respect the `level` threshold of each `LogDestination` independently. Messages below the threshold SHALL be discarded with minimal performance overhead."
@@ -83,6 +89,25 @@
       "then": ["the onLog handler MUST be called with a correctly populated LogEntry object"]
     },
     {
+      "requirement": "Pretty format uses LogFormatter",
+      "name": "Pretty destination uses formatter port",
+      "given": ["createDefaultLogger is called with a LogFormatter instance"],
+      "when": ["a console destination has format: 'pretty'"],
+      "then": [
+        "each emitted line is produced via LogFormatter.format(LogEntry)",
+        "AND no standalone pino-pretty stream bypasses the port"
+      ]
+    },
+    {
+      "requirement": "Pretty format uses LogFormatter",
+      "name": "Factory accepts optional formatter argument",
+      "when": ["createDefaultLogger(destinations, { formatter }) is invoked"],
+      "then": [
+        "pretty destinations use the supplied formatter",
+        "AND JSON file destinations remain unchanged"
+      ]
+    },
+    {
       "requirement": "Level Filtering",
       "name": "Efficient filtering",
       "given": ["a destination with level error"],
@@ -103,9 +128,10 @@
       "then": ["the LogEntry received by the callback MUST include context.component === 'test'"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:a2c19dca4a0f1134906307958a1102cd5a29a4ab7b098196fbbe84a75c652cc8",
-    "verify.md": "sha256:ea244ec5f76d1eef2858f213c7e2539885c2fbc4ce53c0e8893cf77df8b90045"
+    "spec.md": "sha256:7f49f3672c2d6457aae8d44db1ce055fa42f0a050bdb53853c9432e255397b64",
+    "verify.md": "sha256:e4747fb644cd3c79ee3ed1a2f86a7ebe5a711437741c91454844357bd638c9d9"
   },
   "generatedBy": "core"
 }

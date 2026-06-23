@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "client:src/ipc/envelope.ts",
+      "symbols": [
+        "IpcErrorEnvelope",
+        "IpcRequestEnvelope",
+        "IpcResponseEnvelope",
+        "createIpcRequest",
+        "createIpcSuccess",
+        "createIpcFailure"
+      ]
+    }
+  ]
+}

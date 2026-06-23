@@ -1,0 +1,77 @@
+{
+  "title": "Dto Graph File Ref",
+  "description": "Stable JSON wire shape for a reusable **graph file reference** returned by `@specd/api` and\nconsumed by `@specd/client`. Graph endpoints use this DTO to expose file identity and resolved\npath context without forcing Studio to parse `workspace:path` strings itself.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Stable JSON wire shape for a reusable **graph file reference** returned by `@specd/api` and\nconsumed by `@specd/client`. Graph endpoints use this DTO to expose file identity and resolved\npath context without forcing Studio to parse `workspace:path` strings itself."
+  ],
+  "rules": [
+    {
+      "requirement": "graph file refs expose canonical id and resolved path context",
+      "rules": [
+        "`GraphFileRefDto` MUST declare:\n\n- `id` — canonical graph file identifier, using the existing `workspace:path` format\n- `workspace` — workspace name parsed from the canonical identifier\n- `workspaceRelativePath` — file path relative to the workspace `codeRoot`\n- `projectRelativePath` — file path relative to the loaded project root\n\nThe DTO MUST NOT require clients to split `id` in order to recover workspace or path fields needed\nfor navigation."
+      ]
+    },
+    {
+      "requirement": "graph file refs use stable camelCase field names",
+      "rules": [
+        "The **Dto Graph File Ref** wire shape MUST use camelCase property names stable across Studio\nreleases. OpenAPI generation MUST derive schemas from these names."
+      ]
+    },
+    {
+      "requirement": "api computes project-relative file context",
+      "rules": [
+        "`@specd/api` MUST compute `projectRelativePath` using the loaded `SpecdConfig.workspaces`\ndefinition rather than requiring `@specd/code-graph` to know project-root presentation concerns."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only\ndisabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw\nChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "graph file refs expose canonical id and resolved path context",
+      "name": "File ref includes resolved path fields",
+      "when": ["an API graph route returns a file reference"],
+      "then": [
+        "the JSON object includes id, workspace, workspaceRelativePath, and",
+        "AND the client does not need to parse workspace:path to render file labels"
+      ]
+    },
+    {
+      "requirement": "graph file refs expose canonical id and resolved path context",
+      "name": "Canonical id remains stable",
+      "when": ["the same graph file is returned by multiple graph endpoints"],
+      "then": [
+        "id uses the same canonical workspace:path identifier everywhere",
+        "AND resolved path fields are additive rather than replacing the canonical id"
+      ]
+    },
+    {
+      "requirement": "graph file refs use stable camelCase field names",
+      "name": "OpenAPI lists camelCase properties",
+      "when": ["schema is generated for this DTO"],
+      "then": ["property names are camelCase", "AND no snake_case aliases are emitted"]
+    },
+    {
+      "requirement": "api computes project-relative file context",
+      "name": "API derives project-relative path from workspace config",
+      "given": ["workspace codeRoot and project root are both known to the API"],
+      "when": ["a graph file ref is serialized"],
+      "then": [
+        "projectRelativePath is derived by the API presenter layer",
+        "AND @specd/code-graph does not need project-root presentation logic"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:c7c412a3e250dd3068cb780927b076e82e37f0771ab053feda304cd49c44e43a",
+    "verify.md": "sha256:9cc33ddcc5c2ff277cfb6b795a86614065c5c82036ba4323892597dc9c09cb8b"
+  },
+  "generatedBy": "core"
+}

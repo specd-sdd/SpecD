@@ -11,11 +11,13 @@ Defines the base plugin interface (`SpecdPlugin`) that all specd plugins must im
 The spec MUST define a runtime const array of known plugin types and derive the `PluginType` union from it:
 
 ```typescript
-export const PLUGIN_TYPES = ['agent'] as const
+export const PLUGIN_TYPES = ['agent', 'ui'] as const
 export type PluginType = (typeof PLUGIN_TYPES)[number]
 ```
 
 Adding a new plugin type requires only adding a string to the `PLUGIN_TYPES` array — both compile-time type and runtime validation update automatically.
+
+Manifest `pluginType` values MUST be members of `PLUGIN_TYPES`. The loader MUST reject unknown manifest types before invoking `create()`.
 
 ### Requirement: SpecdPlugin interface
 

@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port"],
+  "implementation": [
+    {
+      "file": "studio-desktop:src/main/index.ts"
+    }
+  ]
+}

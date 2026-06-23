@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-artifact-content"],
+  "implementation": [
+    {
+      "file": "client:src/dto/artifact-content.ts",
+      "symbols": ["ArtifactContentDto"]
+    }
+  ]
+}

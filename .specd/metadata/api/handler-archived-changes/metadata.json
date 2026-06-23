@@ -1,0 +1,176 @@
+{
+  "title": "Handler Archived Changes",
+  "description": "HTTP handlers for **archived changes** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Archived Changes**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:routes-archived-changes",
+    "core:kernel"
+  ],
+  "context": [
+    "HTTP handlers for **archived changes** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Archived Changes**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+  ],
+  "rules": [
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "rules": [
+        "The module MUST implement every method, path, query, and body declared in [`api:routes-archived-changes`](../routes-archived-changes/spec.md) under the `/v1` prefix. It MUST NOT expose undocumented routes."
+      ]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
+      "rules": [
+        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `GetArchivedChange`\n- `GetReadOnlyChangeArtifact` for archived artifact body reads"
+      ]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "rules": [
+        "Successful responses MUST be produced by the matching `api:presenter-*` module and conform to the corresponding `api:dto-*` spec."
+      ]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "rules": [
+        "Thrown kernel errors and validation failures MUST be converted through `api:problem-json` to `application/problem+json` responses with appropriate HTTP status codes."
+      ]
+    },
+    {
+      "requirement": "archived detail preserves read-only change fields",
+      "rules": [
+        "The handler MUST preserve the merged archived read model fields instead of collapsing detail down to legacy archive-only metadata. In particular, detail responses MUST keep read-only change fields such as `description`, `history`, `workspaces`, `specDependsOn`, and artifact metadata derived from the archived change view."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact, core:get-change-artifact, and core:get-read-only-change-artifact as appropriate — not raw repository access from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "name": "Only documented /v1 routes are registered",
+      "when": ["HTTP server route table is inspected after bootstrap"],
+      "then": [
+        "every handler path matches api:routes-archived-changes under /v1",
+        "AND no undocumented shadow routes exist"
+      ]
+    },
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "name": "Declared GET route returns presenter-shaped JSON",
+      "when": ["client calls a documented GET route with valid fixtures"],
+      "then": ["HTTP status is 2xx", "AND body matches the paired api:dto-* spec"]
+    },
+    {
+      "requirement": "handler implements the routes contract under /v1",
+      "name": "Undeclared verb on a path returns 405",
+      "when": ["client calls a route with a verb not declared in the routes spec"],
+      "then": ["HTTP 405 is returned", "AND response uses application/problem+json when mapped"]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
+      "name": "Archived detail delegates to GetArchivedChange",
+      "when": ["GET /v1/archived-changes/{name} is handled"],
+      "then": [
+        "handler invokes GetArchivedChange",
+        "AND no local filtering duplicates kernel rules"
+      ]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
+      "name": "Archived artifact GET delegates to GetReadOnlyChangeArtifact",
+      "when": ["GET /v1/archived-changes/{name}/artifacts/{filename} is handled"],
+      "then": [
+        "handler invokes GetReadOnlyChangeArtifact",
+        "AND no local file-system reads bypass kernel rules"
+      ]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
+      "name": "Presenter only maps kernel output",
+      "given": ["kernel returns archived rows"],
+      "when": ["handler builds JSON response"],
+      "then": ["presenter maps fields", "AND no extra business validation in handler"]
+    },
+    {
+      "requirement": "archived detail preserves read-only change fields",
+      "name": "Detail keeps read-only change metadata",
+      "when": ["archived detail is serialized"],
+      "then": [
+        "response includes history, workspaces, and artifact metadata",
+        "AND the handler does not collapse the result to legacy archive-only fields"
+      ]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "name": "Successful body passes through presenter",
+      "given": ["kernel returns a successful result object"],
+      "when": ["handler builds the HTTP 200 response"],
+      "then": [
+        "matching api:presenter-* mapped the result",
+        "AND JSON conforms to paired api:dto-*"
+      ]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "name": "Presenter output stays stable for fixed fixture",
+      "given": ["a fixed kernel fixture for this route"],
+      "when": ["the same request is handled twice"],
+      "then": ["both JSON bodies are identical", "AND presenter did not mutate kernel state"]
+    },
+    {
+      "requirement": "successful responses use presenters and DTO wire shapes",
+      "name": "Unknown change name returns 404 before presenter",
+      "when": ["route targets a change that does not exist"],
+      "then": ["HTTP 404 problem+json is returned", "AND presenter is not invoked"]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Kernel error maps to problem+json",
+      "when": ["kernel throws a domain error for this route"],
+      "then": ["Content-Type is application/problem+json", "AND body includes status and title"]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Validation failure maps to 4xx problem+json",
+      "when": ["ValidateArtifacts or input validation rejects the request"],
+      "then": ["HTTP 4xx is returned", "AND problem payload describes the failing constraint"]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Unexpected throw does not return plain text",
+      "when": ["an unhandled exception escapes the handler stack"],
+      "then": [
+        "response is not text/plain HTML",
+        "AND client receives problem+json or framework 500 mapping"
+      ]
+    },
+    {
+      "requirement": "failures map to RFC 7807 problem+json",
+      "name": "Read-only routes may omit actor on kernel calls",
+      "when": ["handler serves a read-only GET that does not write history"],
+      "then": [
+        "kernel read use case still succeeds",
+        "AND no history event is written for the call"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:handler-archived-changes",
+        "file": "api:src/delivery/http/handlers/handler-archived-changes.ts",
+        "symbol": "registerArchivedChangesRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:6934075761b09bff5735124121fca6a2ac223d7140e5e1d64b6d2466385b80be",
+    "verify.md": "sha256:43e38962061cbcd59173ed62fd9c4cbfa12ddf7092cbc15a95e731a57a4638f3"
+  },
+  "generatedBy": "core"
+}

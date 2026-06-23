@@ -1,0 +1,113 @@
+{
+  "title": "Dto Graph Search",
+  "description": "Client-side type for **Dto Graph Search**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "api:dto-graph-search",
+    "client:dto-graph-symbol-ref"
+  ],
+  "context": [
+    "Client-side type for **Dto Graph Search**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits."
+  ],
+  "rules": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "rules": [
+        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names."
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "rules": [
+        "DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI."
+      ]
+    },
+    {
+      "requirement": "symbol hits use reusable graph symbol refs",
+      "rules": [
+        "The client DTO for graph search symbol hits MUST reuse\n[`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) for the nested `symbol` payload\nrather than declaring duplicate location fields inline.\n\nThe client DTO MUST also preserve graph-search preview fields on both symbol and spec hits:\n\n- `snippet`\n- `startLine`\n- `endLine`"
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Client type fields match API DTO",
+      "when": ["TypeScript compiles client against paired api:dto-*"],
+      "then": ["property names match", "AND required/optional semantics match"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Sample API JSON parses without renaming",
+      "given": ["fixture JSON from API presenter"],
+      "when": ["client deserializes response"],
+      "then": ["no custom field aliases in adapter", "AND hooks read properties directly"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Drift fails client compile or test",
+      "when": ["API DTO adds required field without client update"],
+      "then": ["build or contract test fails", "AND prevents silent UI breakage"]
+    },
+    {
+      "requirement": "symbol hits use reusable graph symbol refs",
+      "name": "Client deserializes nested symbol refs without duplicate fields",
+      "given": ["API JSON with graph search symbol hits"],
+      "when": ["the client deserializes the response"],
+      "then": [
+        "the nested symbol object satisfies",
+        "AND the client does not declare duplicate inline location fields for search hits"
+      ]
+    },
+    {
+      "requirement": "symbol hits use reusable graph symbol refs",
+      "name": "Client preserves graph-search preview fields",
+      "given": ["API JSON with snippet, startLine, and endLine"],
+      "when": ["the client deserializes the response"],
+      "then": [
+        "those fields remain available on symbol and spec hits",
+        "AND Studio can render previews directly from the DTO"
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Types imported from shared package",
+      "when": ["client and api packages build"],
+      "then": ["DTO definitions have single source", "AND no duplicated interface copies"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "OpenAPI generation feeds both sides",
+      "given": ["OpenAPI schema generated from Zod"],
+      "when": ["client types generated or re-exported"],
+      "then": ["schemas align with api:dto-* spec", "AND Studio release notes document changes"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Manual duplicate DTO is rejected in review",
+      "when": ["contributor adds parallel interface in client"],
+      "then": ["lint or architectural test fails", "AND must use shared/generated types"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:dto-graph-search",
+        "file": "client:src/dto/graph-search.ts",
+        "symbol": "GraphSearchResultDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:03afb50e080f7b72b35158a92ba9674d780e2176abd9facf1d0a5eb37ce3f9db",
+    "verify.md": "sha256:eb16e02d889d68a3576d7b15a78c2766316de0b50e216763eb13d38e6aa622aa"
+  },
+  "generatedBy": "core"
+}

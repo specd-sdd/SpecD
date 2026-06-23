@@ -1,0 +1,102 @@
+{
+  "title": "Sidebar Changes Drafts",
+  "description": "Studio UI for **Sidebar Changes Drafts**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes Drafts**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Sidebar Changes Drafts**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes Drafts**."
+  ],
+  "rules": [
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "rules": [
+        "The sidebar MUST render a list of drafted changes from global poll hooks (`hooks-changes-collection`). Each row navigates to the change Overview — the sidebar MUST NOT expose per-row action buttons (Restore, Discard, etc.). All lifecycle actions are surfaced in the change **Overview** tab after opening the change."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "name": "Sidebar lists refresh on global poll",
+      "given": ["shell global poll is running"],
+      "when": ["poll tick fires"],
+      "then": ["drafts list updates", "AND no action buttons are rendered on sidebar rows"]
+    },
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "name": "Open action calls read port",
+      "when": ["user clicks a draft row"],
+      "then": [
+        "shell opens the change Overview tab",
+        "AND useChangesRead loads detail via getDraft (not getChange)",
+        "AND no direct core import"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:sidebar-changes-drafts",
+        "file": "ui:src/sidebar/ChangesSidebar.tsx",
+        "symbol": "ChangesSidebar"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:5d796002bb676dff336d60bd0d8067f9aa1b94917a789a802958dfba485b94c6",
+    "verify.md": "sha256:c5e881a99f04afe189ab0d9c8195f859a14e4398998f5cd502072a2375aaf74b"
+  },
+  "generatedBy": "core"
+}

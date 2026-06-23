@@ -1,0 +1,110 @@
+{
+  "title": "Http Server Bootstrap",
+  "description": "Studio serves HTTP for the remote profile and embedded `ui serve` mode; listeners must start reliably, expose API routes under `/v1`, and shut down cleanly. This spec defines process-level server lifecycle: bind, mount handlers, health probe with auth metadata, and graceful SIGINT handling.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Studio serves HTTP for the remote profile and embedded `ui serve` mode; listeners must start reliably, expose API routes under `/v1`, and shut down cleanly. This spec defines process-level server lifecycle: bind, mount handlers, health probe with auth metadata, and graceful SIGINT handling."
+  ],
+  "rules": [
+    {
+      "requirement": "API routes are mounted under /v1",
+      "rules": [
+        "All Studio API route plugins MUST be registered under the `/v1` prefix. Non-API paths MAY serve static UI when configured."
+      ]
+    },
+    {
+      "requirement": "health endpoint reports readiness and auth type",
+      "rules": [
+        "`GET /v1/health` (or equivalent) MUST return HTTP 200 with a JSON body that includes effective `auth.type` and does not leak secrets."
+      ]
+    },
+    {
+      "requirement": "SIGINT triggers graceful shutdown",
+      "rules": [
+        "On `SIGINT` (and `SIGTERM` where supported), the server MUST stop accepting new connections and close within a bounded timeout."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "API routes are mounted under /v1",
+      "name": "Change routes live under /v1/changes",
+      "when": ["integration client calls documented change route"],
+      "then": ["path starts with /v1", "AND router does not expose unprefixed duplicates"]
+    },
+    {
+      "requirement": "API routes are mounted under /v1",
+      "name": "Project routes are prefixed",
+      "when": ["GET /v1/project is requested"],
+      "then": ["HTTP 200 JSON", "AND unprefixed /project is not registered"]
+    },
+    {
+      "requirement": "API routes are mounted under /v1",
+      "name": "Graph routes share /v1 namespace",
+      "when": ["GET /v1/graph/status is requested"],
+      "then": ["handler is reachable", "AND legacy non-/v1 graph paths are absent"]
+    },
+    {
+      "requirement": "health endpoint reports readiness and auth type",
+      "name": "Health returns 200 when server ready",
+      "given": ["kernel and routes mounted"],
+      "when": ["GET /v1/health is called"],
+      "then": ["HTTP 200", "AND body includes readiness indicator"]
+    },
+    {
+      "requirement": "health endpoint reports readiness and auth type",
+      "name": "Health exposes effective auth type",
+      "given": ["api.auth.type is disabled"],
+      "when": ["health endpoint responds"],
+      "then": ["auth.type is disabled", "AND no secrets in payload"]
+    },
+    {
+      "requirement": "health endpoint reports readiness and auth type",
+      "name": "Health fails before bootstrap completes",
+      "given": ["server still starting"],
+      "when": ["health is probed early"],
+      "then": ["non-ready status or connection refused", "AND load balancer can retry"]
+    },
+    {
+      "requirement": "SIGINT triggers graceful shutdown",
+      "name": "SIGINT closes HTTP server",
+      "given": ["server listening"],
+      "when": ["process receives SIGINT"],
+      "then": ["server stops accepting new connections", "AND in-flight requests drain or timeout"]
+    },
+    {
+      "requirement": "SIGINT triggers graceful shutdown",
+      "name": "Second SIGINT forces exit",
+      "given": ["graceful shutdown started"],
+      "when": ["SIGINT is sent again"],
+      "then": ["process exits with non-zero code", "AND no hung listeners"]
+    },
+    {
+      "requirement": "SIGINT triggers graceful shutdown",
+      "name": "Shutdown releases kernel resources",
+      "when": ["graceful shutdown completes"],
+      "then": ["graph provider handles closed", "AND process exits cleanly"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:http-server-bootstrap",
+        "file": "api:src/composition/create-api-server.ts",
+        "symbol": "createApiServer"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:44c12218cb4aa3a20baa99aa1219fb52355e8690cb596ece14a9f8094062b021",
+    "verify.md": "sha256:37f8b2c7107f7d8d1f0cf5c9e4f899e5858bed51022adc8a4a8662be0261b324"
+  },
+  "generatedBy": "core"
+}

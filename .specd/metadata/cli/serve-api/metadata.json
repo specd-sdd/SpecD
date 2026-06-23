@@ -1,0 +1,105 @@
+{
+  "title": "Serve Api",
+  "description": "Developers and agents need an API-only entry point for a repo without bundling the UI. `specd serve` discovers `specd.yaml`, starts `createApiServer` on loopback, and in v1 accepts only `--auth disabled` so local Studio behavior matches embedded serve.",
+  "dependsOn": ["api:composition-create-api-server"],
+  "context": [
+    "Developers and agents need an API-only entry point for a repo without bundling the UI. `specd serve` discovers `specd.yaml`, starts `createApiServer` on loopback, and in v1 accepts only `--auth disabled` so local Studio behavior matches embedded serve."
+  ],
+  "rules": [
+    {
+      "requirement": "serve command exposes port host config and auth flags",
+      "rules": [
+        "The CLI MUST register `specd serve` with `--port|-p` (default 4400), `--host|-h` (default 127.0.0.1), `--config|-c`, and `--auth`."
+      ]
+    },
+    {
+      "requirement": "serve auth flag accepts only disabled in v1",
+      "rules": [
+        "When `--auth` is provided, the only accepted value MUST be `disabled`; any other value MUST exit with a non-zero status and an explanatory message."
+      ]
+    },
+    {
+      "requirement": "serve discovers project and starts default auth registry",
+      "rules": [
+        "The command MUST discover `specd.yaml`, build `createApiServer` with `defaultAuthAdapterRegistry()`, and listen until SIGINT."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "serve command exposes port host config and auth flags",
+      "name": "specd serve accepts port and host flags",
+      "when": ["specd serve --port 4500 --host 0.0.0.0 runs"],
+      "then": ["server binds to requested host/port", "AND project is discovered from cwd"]
+    },
+    {
+      "requirement": "serve command exposes port host config and auth flags",
+      "name": "Default port is 4400 on loopback",
+      "when": ["specd serve runs without port flag"],
+      "then": ["listens on 127.0.0.1:4400", "AND health responds on /v1"]
+    },
+    {
+      "requirement": "serve command exposes port host config and auth flags",
+      "name": "Config path flag is honored",
+      "when": ["specd serve -c ./other.yaml runs"],
+      "then": ["loaded config comes from given path", "AND auth uses that file api.auth"]
+    },
+    {
+      "requirement": "serve auth flag accepts only disabled in v1",
+      "name": "serve --auth disabled starts",
+      "when": ["specd serve --auth disabled runs"],
+      "then": ["exit code 0", "AND effective auth is disabled"]
+    },
+    {
+      "requirement": "serve auth flag accepts only disabled in v1",
+      "name": "Invalid auth flag exits",
+      "when": ["specd serve --auth jwt runs"],
+      "then": ["non-zero exit", "AND stderr mentions only disabled is supported"]
+    },
+    {
+      "requirement": "serve auth flag accepts only disabled in v1",
+      "name": "Omitted auth uses yaml default",
+      "given": ["specd.yaml sets api.auth.type: disabled"],
+      "when": ["specd serve runs"],
+      "then": ["server starts", "AND project payload shows auth.type: disabled"]
+    },
+    {
+      "requirement": "serve discovers project and starts default auth registry",
+      "name": "serve loads specd.yaml from cwd",
+      "given": ["valid project in current directory"],
+      "when": ["specd serve starts"],
+      "then": ["kernel bootstraps", "AND GET /v1/project succeeds"]
+    },
+    {
+      "requirement": "serve discovers project and starts default auth registry",
+      "name": "Default auth registry registers disabled verifier",
+      "when": ["serve starts without --auth override"],
+      "then": ["AuthAdapterRegistry has disabled factory", "AND middleware uses disabled verifier"]
+    },
+    {
+      "requirement": "serve discovers project and starts default auth registry",
+      "name": "Missing project fails fast",
+      "when": ["specd serve runs outside a project"],
+      "then": ["non-zero exit", "AND stderr mentions missing specd.yaml"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:serve-api",
+        "file": "cli:src/commands/serve/serve-api.ts",
+        "symbol": "resolveServeAuth"
+      },
+      {
+        "specId": "cli:serve-api",
+        "file": "cli:src/commands/serve/serve-api.ts",
+        "symbol": "registerServeApi"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e519590e746178e5712ac29b8e02b1d6b5db2a13bc581286da9a17bb047d2327",
+    "verify.md": "sha256:9aec0a59df7b205b0e4b919b01864a30da635463c6f2a5eab7d0f7585f6b8a93"
+  },
+  "generatedBy": "core"
+}

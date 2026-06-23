@@ -794,6 +794,36 @@
 - **WHEN** config is loaded
 - **THEN** `approvals.signoff` is `true`
 
+### Requirement: API authentication settings
+
+#### Scenario: Omitted api.auth defaults to disabled
+
+- **GIVEN** `specd.yaml` has no `api` section
+- **WHEN** configuration is loaded for serve
+- **THEN** effective `api.auth.type` is `disabled`
+
+#### Scenario: Explicit disabled type is accepted
+
+- **GIVEN** `specd.yaml` sets `api.auth.type: disabled`
+- **WHEN** startup validation runs
+- **THEN** configuration loads successfully
+- **AND** `createApiServer` resolves the disabled verifier
+
+#### Scenario: Unknown auth type fails startup validation
+
+- **GIVEN** `specd.yaml` sets `api.auth.type: bearer`
+- **WHEN** startup validation runs before listen
+- **THEN** validation fails with an error naming supported v1 types
+- **AND** HTTP server does not start
+
+### Requirement: UI plugins
+
+#### Scenario: Omitted plugins.ui disables ui serve plugin selection
+
+- **GIVEN** `specd.yaml` has no `plugins.ui`
+- **WHEN** `specd ui serve` resolves the active UI plugin
+- **THEN** it fails with `UI_PLUGIN_NOT_CONFIGURED`
+
 ### Requirement: Config writer port
 
 #### Scenario: ConfigWriter port defines initProject method

@@ -1,0 +1,101 @@
+{
+  "title": "Hooks Project",
+  "description": "React data hooks for **Hooks Project**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports.",
+  "dependsOn": ["client:specd-data-port", "client:port-project"],
+  "context": [
+    "React data hooks for **Hooks Project**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports."
+  ],
+  "rules": [
+    {
+      "requirement": "hooks expose getProject and getProjectStatus",
+      "rules": [
+        "The hook surface MUST call `client:port-project` methods `getProject()` and `getProjectStatus()` and return `{ data, error, isLoading, refetch }` (or equivalent) to consumers."
+      ]
+    },
+    {
+      "requirement": "hooks participate in the global project poll",
+      "rules": [
+        "While the shell global poll runs, these hooks MUST refresh project and project status on the 2–3 second interval."
+      ]
+    },
+    {
+      "requirement": "hooks dedupe concurrent fetches",
+      "rules": [
+        "Parallel mounts MUST share one in-flight request per cache key to avoid stampedes."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "hooks expose getProject and getProjectStatus",
+      "name": "getProject returns project DTO",
+      "when": ["hooks-project mounts"],
+      "then": ["getProject() invoked", "AND data rendered in shell"]
+    },
+    {
+      "requirement": "hooks expose getProject and getProjectStatus",
+      "name": "getProjectStatus returns status DTO",
+      "when": ["getProjectStatus() invoked"],
+      "then": ["counts and graph flags available to UI"]
+    },
+    {
+      "requirement": "hooks expose getProject and getProjectStatus",
+      "name": "Hooks expose loading and error tuple",
+      "when": ["port call fails"],
+      "then": ["error populated", "AND loading clears"]
+    },
+    {
+      "requirement": "hooks participate in the global project poll",
+      "name": "Project hooks refetch on global poll",
+      "given": ["window focused"],
+      "when": ["global poll fires"],
+      "then": ["getProject and getProjectStatus refetch", "AND header counts update"]
+    },
+    {
+      "requirement": "hooks participate in the global project poll",
+      "name": "Poll shares dedupe cache with manual refresh",
+      "when": ["user triggers manual refresh during poll"],
+      "then": ["single in-flight project request", "AND both callers receive result"]
+    },
+    {
+      "requirement": "hooks participate in the global project poll",
+      "name": "Blur pauses project poll",
+      "given": ["window blurred"],
+      "when": ["poll interval elapses"],
+      "then": ["project hooks not called", "AND stale banner may show until focus"]
+    },
+    {
+      "requirement": "hooks dedupe concurrent fetches",
+      "name": "Parallel mounts share in-flight request",
+      "when": ["two components mount same hook key"],
+      "then": ["one network call", "AND both receive result"]
+    },
+    {
+      "requirement": "hooks dedupe concurrent fetches",
+      "name": "Cache key separates changes",
+      "when": ["hooks for change a and b mount"],
+      "then": ["distinct in-flight keys", "AND no cross-change data leak"]
+    },
+    {
+      "requirement": "hooks dedupe concurrent fetches",
+      "name": "Unmount does not cancel shared in-flight",
+      "given": ["request still needed by sibling mount"],
+      "when": ["one component unmounts"],
+      "then": ["in-flight completes for remaining mount"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:hooks-project",
+        "file": "ui:src/hooks/use-project-poll.ts",
+        "symbol": "useProjectPoll"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d26c25e03c215bf858954c034f74ddb49dbc5c86cd28e0950f71aaece2b0028f",
+    "verify.md": "sha256:f55a3e5b09c9bccfde2a3bf74b60f90ad06ffcdb32b79d03f2cab826b22a1798"
+  },
+  "generatedBy": "core"
+}

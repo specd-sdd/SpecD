@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "client:src/adapter-bearer-auth.ts",
+      "symbols": ["withBearerAuth"]
+    }
+  ]
+}

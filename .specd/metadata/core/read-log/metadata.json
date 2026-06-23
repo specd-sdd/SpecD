@@ -1,0 +1,107 @@
+{
+  "title": "ReadLog",
+  "description": "Studio and API need readback of recent specd log lines from an **in-memory ring** populated at kernel bootstrap. v1 MUST NOT expose file-path or arbitrary filesystem log reads (security).",
+  "dependsOn": ["core:log-formatter", "core:kernel", "default:_global/architecture"],
+  "context": [
+    "Studio and API need readback of recent specd log lines from an **in-memory ring** populated at kernel bootstrap. v1 MUST NOT expose file-path or arbitrary filesystem log reads (security)."
+  ],
+  "rules": [
+    {
+      "requirement": "ReadLog reads only the injected ring buffer",
+      "rules": [
+        "`ReadLog` MUST accept a `LogRingBuffer` at construction and `execute({ limit?, prettier? })` MUST return the newest entries (newest first) up to `limit` (default 500)."
+      ]
+    },
+    {
+      "requirement": "no filesystem log reads",
+      "rules": [
+        "`ReadLog` MUST NOT read `specd.log` or any user-supplied path. File logging remains a separate `Logger` destination only."
+      ]
+    },
+    {
+      "requirement": "structured or pretty output",
+      "rules": [
+        "When `prettier` is false, the result MUST expose `entries[]` with `timestamp`, `level`, `message`, and `context`. When `prettier` is true, the result MUST expose `lines[]` where each line is `LogFormatter.format(entry)` for the corresponding ring entry (formatter supplied at construction, default from `createLogFormatter()`)."
+      ]
+    },
+    {
+      "requirement": "LogFormatter injection",
+      "rules": [
+        "`ReadLog` MUST accept `LogReadBuffer` and `LogFormatter` at construction. The kernel MUST pass the same `LogFormatter` instance used for `createDefaultLogger` when wiring `kernel.logs.read`."
+      ]
+    },
+    {
+      "requirement": "kernel exposes logs.read when ring is wired",
+      "rules": [
+        "`createKernel` MUST register a callback destination that pushes to the ring when `KernelOptions.logRing` is set, and MUST attach `kernel.logs.read` as `ReadLog` for that ring."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "ReadLog reads only the injected ring buffer",
+      "name": "Newest entries returned first",
+      "given": ["a ring with two pushed entries"],
+      "when": ["ReadLog.execute({ limit: 2 }) runs"],
+      "then": ["the first entry is the most recently pushed message"]
+    },
+    {
+      "requirement": "ReadLog reads only the injected ring buffer",
+      "name": "Limit caps result size",
+      "given": ["a ring with more than limit entries"],
+      "when": ["execute({ limit: 10 }) runs"],
+      "then": ["at most 10 entries are returned"]
+    },
+    {
+      "requirement": "no filesystem log reads",
+      "name": "ReadLog has no file path parameter",
+      "when": ["ReadLogInput is inspected"],
+      "then": [
+        "there is no files or path field",
+        "AND implementation does not call fs.readFile for log readback"
+      ]
+    },
+    {
+      "requirement": "structured or pretty output",
+      "name": "Prettier mode returns lines only",
+      "when": ["execute({ prettier: true }) runs"],
+      "then": ["lines is populated", "AND entries is omitted"]
+    },
+    {
+      "requirement": "structured or pretty output",
+      "name": "Prettier lines use LogFormatter",
+      "given": ["a formatter double that prefixes each line with fmt:"],
+      "when": ["execute({ prettier: true }) runs on one entry with message x"],
+      "then": ["lines[0] starts with fmt:"]
+    },
+    {
+      "requirement": "LogFormatter injection",
+      "name": "LogFormatter injection — primary path",
+      "when": ["ReadLog MUST accept LogReadBuffer and LogFormatter at construction."],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "LogFormatter injection",
+      "name": "LogFormatter injection — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "kernel exposes logs.read when ring is wired",
+      "name": "API server kernel has logs.read",
+      "given": ["createApiServer bootstrap"],
+      "when": ["kernel is created with logRing"],
+      "then": [
+        "kernel.logs.read is defined",
+        "AND POST log lines appear in subsequent read results"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:b2a08e2f40a03e229a3a585a797ef62ccd4b7f3249a76b00a38c4a20d6898963",
+    "verify.md": "sha256:1bdb2abb83b957cced4f985703adf1a12e846e777cd6cd277c7e385463c30468"
+  },
+  "generatedBy": "core"
+}

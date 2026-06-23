@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "api:dto-graph-impact",
+    "client:dto-graph-file-ref",
+    "client:dto-graph-symbol-ref"
+  ],
+  "implementation": [
+    {
+      "file": "client:src/dto/graph-impact.ts",
+      "symbols": ["GraphImpactDto"]
+    }
+  ]
+}

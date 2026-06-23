@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["ui:design-system", "client:specd-data-port"],
+  "implementation": [
+    {
+      "file": "ui:src/SpecdApp.tsx",
+      "symbols": ["StudioShell", "SpecdApp"]
+    },
+    {
+      "file": "ui:src/shell/ShellLayout.tsx",
+      "symbols": ["ShellLayout"]
+    }
+  ]
+}

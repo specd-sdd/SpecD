@@ -1,0 +1,127 @@
+{
+  "title": "Change Tab Context",
+  "description": "Studio UI for **Change Tab Context**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Context**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Change Tab Context**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Context**."
+  ],
+  "rules": [
+    {
+      "requirement": "change tab refetches compiled context for selected step when updatedAt advances",
+      "rules": [
+        "While this change tab is visible for an **active** change, the view MUST load compiled context via `getChangeContext(name, { includeChangeSpecs: true, step: change.state })` and refresh on tab-scoped poll ticks. The rendered body MUST include change-scoped spec content (full or catalogue), not only project-level `context:` entries from `specd.yaml`. Polling MUST pause when the tab is hidden or the window lacks focus.\n\nFor **drafted**, **discarded**, and **archived** changes, compiled context is not available in Studio v1. The Context tab MUST be hidden (not selectable) for these sections."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "change tab refetches compiled context for selected step when updatedAt advances",
+      "name": "Unchanged status skips tab refetch",
+      "given": ["tab is visible", "AND cached updatedAt matches server"],
+      "when": ["getChangeStatus returns { unchanged: true }"],
+      "then": ["tab does not refetch heavy views", "AND spinner stops without data swap"]
+    },
+    {
+      "requirement": "change tab refetches compiled context for selected step when updatedAt advances",
+      "name": "Advanced updatedAt refetches tab data",
+      "given": ["status returns newer updatedAt"],
+      "when": ["tab poll observes revision bump"],
+      "then": ["only this tab data sources reload", "AND other tabs are unaffected"]
+    },
+    {
+      "requirement": "change tab refetches compiled context for selected step when updatedAt advances",
+      "name": "Hidden tab pauses polling",
+      "given": ["change tab was visible then hidden"],
+      "when": ["poll interval fires"],
+      "then": ["no tab-scoped context request is sent", "AND cache is retained until visible again"]
+    },
+    {
+      "requirement": "change tab refetches compiled context for selected step when updatedAt advances",
+      "name": "Context tab loads compiled context when visible",
+      "given": ["active change"],
+      "when": ["user selects Context tab"],
+      "then": ["UI calls getChangeContext", "AND renders compiled context text"]
+    },
+    {
+      "requirement": "change tab refetches compiled context for selected step when updatedAt advances",
+      "name": "Drafted change hides Context tab",
+      "given": ["drafted change open in the shell"],
+      "when": ["user inspects change tabs"],
+      "then": ["Context is not shown as a selectable tab"]
+    },
+    {
+      "requirement": "change tab refetches compiled context for selected step when updatedAt advances",
+      "name": "Archived change hides Context tab",
+      "given": ["archived change open in the shell"],
+      "when": ["user inspects change tabs"],
+      "then": ["Context is not shown as a selectable tab"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-tab-context",
+        "file": "ui:src/change/ChangeMainView.tsx",
+        "symbol": "ChangeMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:df47a42a29d6f0cac928c2f827ab4b81f074a89c7fee3245c12b69443272cbe5",
+    "verify.md": "sha256:068ffe9c824676c4383ca53eca30eff9d332249f4e648a3c5c8f7ad61473e1cc"
+  },
+  "generatedBy": "core"
+}

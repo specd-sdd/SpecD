@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:routes-changes-mutate",
+    "core:kernel",
+    "core:save-change-artifact"
+  ],
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/handlers/handler-changes-mutate.ts",
+      "symbols": ["registerChangesMutateRoutes"]
+    }
+  ]
+}

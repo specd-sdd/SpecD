@@ -36,6 +36,12 @@
       ]
     },
     {
+      "requirement": "Shared LogFormatter per kernel",
+      "rules": [
+        "`createKernel()` MUST invoke `createLogFormatter()` once per kernel bootstrap and pass the resulting `LogFormatter` to `createDefaultLogger` and to `ReadLog` when `KernelOptions.logRing` is set.\n\n`KernelOptions` MAY include optional `logFormatter` to override the default (used by CLI to pass a TTY-aware formatter instance)."
+      ]
+    },
+    {
       "requirement": "Log Directory Guarantee",
       "rules": [
         "The `Kernel` (or the default logger factory) SHALL ensure that the `{configPath}/log/` directory exists before the logging implementation attempts to write to the log file."
@@ -85,6 +91,25 @@
       "then": ["the createDefaultLogger infrastructure factory MUST be used to build the adapter"]
     },
     {
+      "requirement": "Shared LogFormatter per kernel",
+      "name": "Kernel creates formatter once",
+      "when": ["createKernel(config) runs without KernelOptions.logFormatter"],
+      "then": [
+        "createLogFormatter() is invoked once per bootstrap",
+        "AND the same instance is passed to createDefaultLogger and ReadLog when logRing is set"
+      ]
+    },
+    {
+      "requirement": "Shared LogFormatter per kernel",
+      "name": "CLI override via KernelOptions",
+      "given": ["KernelOptions.logFormatter is provided"],
+      "when": ["createKernel initializes logging"],
+      "then": [
+        "the override formatter is used for logger and readback",
+        "AND createLogFormatter() is not called again"
+      ]
+    },
+    {
       "requirement": "Log Directory Guarantee",
       "name": "Directory creation",
       "given": ["the directory {configPath}/log/ does not exist"],
@@ -92,9 +117,28 @@
       "then": ["it MUST ensure the directory is created automatically"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:kernel-logging",
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "Kernel"
+      },
+      {
+        "specId": "core:kernel-logging",
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "KernelOptions"
+      },
+      {
+        "specId": "core:kernel-logging",
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:c06c298a0c7bc9f7730a20e140e5b76297fbb019a38611c0c82e8dd17fbe62da",
-    "verify.md": "sha256:379eff29ffec41c14a7c52a500530b1278b2ac6fe51af647d49075120cbcdd32"
+    "spec.md": "sha256:59ac5e89862a6a6da5a1d521e6d1090c38e640ba69b544f2fccb20bc34a13d8b",
+    "verify.md": "sha256:f11dd1ca71fe0693f84d81b3e0be2477c48dd291d4b614d9d41e97bf27789bd5"
   },
   "generatedBy": "core"
 }

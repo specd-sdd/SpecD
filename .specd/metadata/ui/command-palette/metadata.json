@@ -1,0 +1,133 @@
+{
+  "title": "Command Palette",
+  "description": "Studio UI for **Command Palette**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Command Palette**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Command Palette**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Command Palette**."
+  ],
+  "rules": [
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    },
+    {
+      "requirement": "view is composed using shadcn Command and Dialog primitives",
+      "rules": [
+        "The Command Palette MUST be implemented using shadcn's `CommandDialog`, `CommandInput`, `CommandList`, `CommandEmpty`, `CommandGroup`, and `CommandItem` primitives. It MUST preserve existing keyboard shortcuts (Escape to close, Arrow keys to navigate, Enter to select) via the underlying `cmdk` component. Custom search inputs and manual results lists MUST NOT be used."
+      ]
+    },
+    {
+      "requirement": "palette supports global remote search",
+      "rules": [
+        "The Command Palette MUST provide a global search capability powered by the `searchGraph` API:\n\n- Studio MUST perform a debounced remote search (300ms delay) as the user types in the palette input.\n- Results MUST be categorized and displayed in the following order: **Actions**, **Specifications**, **Code Symbols**, and **Documents**.\n- **Actions** MUST be contextual: high-impact commands such as \"Validate change artifacts\" MUST only be displayed if a valid, editable change is currently selected in the Studio.\n- Each **Specification** result MUST show its `specId` and title; selection MUST navigate to that spec's view.\n- Each **Code Symbol** result MUST show the symbol name, kind, workspace, file path, and line number.\n- Each **Document** result MUST show its file path and workspace.\n- For all search categories, the UI MUST display the full search snippet returned by the API (using `whitespace-pre-wrap` and no line-clamping) to ensure the relevant context is fully visible.\n- Results MUST be limited to a sensible number (e.g., 10 per category) to maintain performance.\n- The UI MUST show an animated loading state while the remote search is in flight."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "palette supports global remote search",
+      "name": "Remote search aggregates symbol spec and document hits",
+      "given": ["a search query is entered"],
+      "when": ["results return"],
+      "then": [
+        "they are grouped by Spec, Code Symbol, and Document hits",
+        "AND UI renders icons appropriate to each type"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view is composed using shadcn Command and Dialog primitives",
+      "name": "CommandPalette renders CommandDialog",
+      "when": ["CommandPalette is open"],
+      "then": [
+        "it renders shadcn CommandDialog",
+        "AND standard shadcn structure (CommandInput, CommandList, CommandGroup, CommandItem) is present"
+      ]
+    },
+    {
+      "requirement": "view is composed using shadcn Command and Dialog primitives",
+      "name": "Keyboard navigation is preserved",
+      "given": ["CommandPalette is open"],
+      "when": ["user presses ArrowDown or ArrowUp", "user presses Enter", "user presses Escape"],
+      "then": [
+        "highlight moves through the list",
+        "the highlighted action is executed",
+        "the CommandPalette closes"
+      ]
+    },
+    {
+      "requirement": "view is composed using shadcn Command and Dialog primitives",
+      "name": "Empty state shows when no actions match",
+      "given": ["CommandPalette is open with actions"],
+      "when": ["user types a query that matches no actions"],
+      "then": ["CommandEmpty renders \"No matches found.\""]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:command-palette",
+        "file": "ui:src/shell/CommandPalette.tsx",
+        "symbol": "CommandPalette"
+      },
+      {
+        "specId": "ui:command-palette",
+        "file": "ui:src/shell/CommandPalette.tsx",
+        "symbol": "defaultCommandPaletteActions"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:7555248e72ee2703a0b2db777f6734bdc23334da746e78bc4f21606ee63b09ff",
+    "verify.md": "sha256:5a0a2d2666c2fdd05de0c6c62bd7189efb58c4c60bb9f49c866b4af86f3d7251"
+  },
+  "generatedBy": "core"
+}

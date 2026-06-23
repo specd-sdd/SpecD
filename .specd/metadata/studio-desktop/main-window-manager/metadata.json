@@ -1,0 +1,77 @@
+{
+  "title": "Main Window Manager",
+  "description": "Electron desktop host concern — **Main Window Manager**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Electron desktop host concern — **Main Window Manager**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer."
+  ],
+  "rules": [
+    {
+      "requirement": "window title reflects the active project or connection",
+      "rules": [
+        "When a local project is open, the title MUST include the project name; for remote-only sessions, the title MUST include the API host or profile label."
+      ]
+    },
+    {
+      "requirement": "window close prompts when dirty editors exist",
+      "rules": [
+        "If the artifact editor has unsaved buffers, closing the window MUST prompt the user before discarding (delegate to UI state)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "window title reflects the active project or connection",
+      "name": "Local project name in title bar",
+      "given": ["folder my-app open"],
+      "when": ["window renders"],
+      "then": ["title includes project folder name", "AND Specd branding prefix present"]
+    },
+    {
+      "requirement": "window title reflects the active project or connection",
+      "name": "Remote connection shows host",
+      "given": ["connected to https://ci.example"],
+      "when": ["window renders"],
+      "then": ["title includes host", "AND not local folder name"]
+    },
+    {
+      "requirement": "window title reflects the active project or connection",
+      "name": "Title updates on profile switch",
+      "when": ["user switches from local to remote"],
+      "then": ["title changes without restart", "AND matches active profile"]
+    },
+    {
+      "requirement": "window close prompts when dirty editors exist",
+      "name": "Close blocked while editor dirty",
+      "given": ["unsaved artifact buffer"],
+      "when": ["user closes window"],
+      "then": ["confirmation dialog shown", "AND close aborted if user cancels"]
+    },
+    {
+      "requirement": "window close prompts when dirty editors exist",
+      "name": "Clean buffers allow immediate close",
+      "given": ["no dirty editors"],
+      "when": ["user closes window"],
+      "then": ["app exits without prompt", "AND buffers were saved or pristine"]
+    },
+    {
+      "requirement": "window close prompts when dirty editors exist",
+      "name": "Save-all option in close dialog",
+      "when": ["user chooses save all on close prompt"],
+      "then": ["pending saves run", "AND window closes only after success"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "studio-desktop:main-window-manager",
+        "file": "studio-desktop:src/main/index.ts"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:dcd5013aedfcf7a1ca9ea0044d6252f0a0af35895e9643a2a4ae10b00c157363",
+    "verify.md": "sha256:e3e9d4f7b260269191b5f11cd84e2f4fa5407ac761d89fce78653baf2b15524d"
+  },
+  "generatedBy": "core"
+}

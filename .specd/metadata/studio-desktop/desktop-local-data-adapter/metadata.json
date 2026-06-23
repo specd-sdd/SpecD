@@ -1,0 +1,66 @@
+{
+  "title": "Desktop Local Data Adapter",
+  "description": "Electron desktop host concern — **Desktop Local Data Adapter**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Renderer-side `SpecdDataPort` that calls IPC instead of HTTP for the local desktop profile.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Electron desktop host concern — **Desktop Local Data Adapter**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Renderer-side `SpecdDataPort` that calls IPC instead of HTTP for the local desktop profile."
+  ],
+  "rules": [
+    {
+      "requirement": "local adapter is selected for opened project folders",
+      "rules": [
+        "When the user opens a local project in desktop, the renderer MUST use this adapter instead of `adapter-remote-specd-data`."
+      ]
+    },
+    {
+      "requirement": "local adapter does not attach Authorization headers",
+      "rules": ["The local profile MUST NOT use `client:adapter-bearer-auth`."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "local adapter is selected for opened project folders",
+      "name": "Open folder switches renderer to IPC adapter",
+      "when": ["user opens local project via welcome"],
+      "then": ["SpecdDataPort uses IPC implementation", "AND remote HTTP adapter not active"]
+    },
+    {
+      "requirement": "local adapter is selected for opened project folders",
+      "name": "Remote connect keeps HTTP adapter",
+      "when": ["user connects to remote URL"],
+      "then": ["HTTP transport selected", "AND IPC adapter not used for data"]
+    },
+    {
+      "requirement": "local adapter is selected for opened project folders",
+      "name": "Profile switch swaps adapter instance",
+      "when": ["user moves from local to remote profile"],
+      "then": ["hooks rebind to new adapter", "AND port interface unchanged"]
+    },
+    {
+      "requirement": "local adapter does not attach Authorization headers",
+      "name": "IPC invoke has no Authorization metadata",
+      "when": ["local adapter calls listChanges"],
+      "then": ["IPC envelope has no bearer field", "AND main process uses kernel actor resolver"]
+    },
+    {
+      "requirement": "local adapter does not attach Authorization headers",
+      "name": "Accidental token in local profile is ignored",
+      "given": ["stale token stored from remote session"],
+      "when": ["local adapter runs"],
+      "then": ["IPC still omits Authorization", "AND token not sent to main"]
+    },
+    {
+      "requirement": "local adapter does not attach Authorization headers",
+      "name": "Remote adapter still attaches bearer when configured",
+      "given": ["remote profile with token"],
+      "when": ["HTTP transport runs"],
+      "then": ["Authorization header present", "AND local and remote paths differ by design"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:23bf043712962538711ee03ffe1d0896f66ec2f1975b1e148487594914e7ec2a",
+    "verify.md": "sha256:99e994c86ded2e357939d12d7d3f3876a800a1a531c7bf270cad1453527627f3"
+  },
+  "generatedBy": "core"
+}

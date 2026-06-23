@@ -1,0 +1,92 @@
+{
+  "title": "Get Read Only Change Artifact",
+  "description": "Studio and HTTP read routes for **drafted**, **discarded**, and (future) **archived** changes must load tracked artifact bytes without exposing a mutable `Change` aggregate to application or delivery layers. `GetReadOnlyChangeArtifact` is the shared use case: it validates against a {@link ReadOnlyChangeView} and loads content through `ChangeRepository.artifactReadOnly`.",
+  "dependsOn": [
+    "core:change-repository-port",
+    "core:read-only-change-view",
+    "core:get-draft",
+    "core:get-discarded",
+    "core:get-change-artifact"
+  ],
+  "context": [
+    "Studio and HTTP read routes for **drafted**, **discarded**, and (future) **archived** changes must load tracked artifact bytes without exposing a mutable `Change` aggregate to application or delivery layers. `GetReadOnlyChangeArtifact` is the shared use case: it validates against a {@link ReadOnlyChangeView} and loads content through `ChangeRepository.artifactReadOnly`."
+  ],
+  "rules": [
+    {
+      "requirement": "GetReadOnlyChangeArtifact returns content and originalHash",
+      "rules": [
+        "For `readOnlyOrigin` `draft` or `discarded`, the use case MUST load the view via `getDraft` or `getDiscarded`, verify the filename is tracked on that view, then call `artifactReadOnly(readOnlyOrigin, name, filename)` and return `{ content, originalHash }` or a typed not-found error.\n\nFor `readOnlyOrigin` `archived`, the use case MUST load the archived snapshot via `ArchiveRepository.get(name)`, verify the filename is tracked on that archived read-only view, then load bytes through the archive repository artifact reader and return `{ content, originalHash }`."
+      ]
+    },
+    {
+      "requirement": "GetReadOnlyChangeArtifact does not expose Change",
+      "rules": [
+        "The use case MUST NOT return a `Change` entity and MUST NOT call `mutate`, `mutateDraft`, or `get(name)` for active storage. HTTP handlers and Studio MUST invoke this use case (or the client port equivalent) for `/drafts/*`, `/discarded/*`, and archived artifact body routes — not `GetChangeArtifact`."
+      ]
+    },
+    {
+      "requirement": "GetReadOnlyChangeArtifact enforces tracked-file confinement",
+      "rules": [
+        "The same tracked-file guard as `GetChangeArtifact` MUST apply: untracked filenames MUST fail before `artifactReadOnly` reads disk."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "GetReadOnlyChangeArtifact returns content and originalHash",
+      "name": "Drafted tracked file returns content and hash",
+      "given": ["drafted change foo with tracked proposal.md"],
+      "when": ["GetReadOnlyChangeArtifact runs with readOnlyOrigin draft"],
+      "then": ["returns UTF-8 content", "AND originalHash has sha256 prefix"]
+    },
+    {
+      "requirement": "GetReadOnlyChangeArtifact returns content and originalHash",
+      "name": "Discarded tracked file returns content and hash",
+      "given": ["discarded change bar with tracked tasks.md"],
+      "when": ["GetReadOnlyChangeArtifact runs with readOnlyOrigin discarded"],
+      "then": ["returns UTF-8 content", "AND originalHash is present"]
+    },
+    {
+      "requirement": "GetReadOnlyChangeArtifact returns content and originalHash",
+      "name": "Archived tracked file returns content and hash",
+      "given": ["archived change baz with tracked tasks.md"],
+      "when": ["GetReadOnlyChangeArtifact runs with readOnlyOrigin archived"],
+      "then": ["returns UTF-8 content", "AND originalHash is present"]
+    },
+    {
+      "requirement": "GetReadOnlyChangeArtifact does not expose Change",
+      "name": "Draft load uses view and artifactReadOnly only",
+      "when": ["use case executes for a drafted change"],
+      "then": [
+        "getDraft is invoked",
+        "AND artifactReadOnly is invoked",
+        "AND mutate and get for active storage are not invoked"
+      ]
+    },
+    {
+      "requirement": "GetReadOnlyChangeArtifact does not expose Change",
+      "name": "HTTP handler delegates to use case",
+      "when": ["GET /v1/drafts/:name/artifacts/:filename or archived artifact GET succeeds"],
+      "then": [
+        "handler called getReadOnlyChangeArtifact.execute",
+        "AND handler did not call ChangeRepository.artifact directly"
+      ]
+    },
+    {
+      "requirement": "GetReadOnlyChangeArtifact enforces tracked-file confinement",
+      "name": "Untracked filename fails",
+      "given": ["a read-only change view without the requested filename"],
+      "when": ["use case runs"],
+      "then": [
+        "typed not-found or validation error",
+        "AND artifactReadOnly is not called when manifest has no tracked entry"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:88793e909cf2d3a7bdd0ecd651921e069b9b1acedbe03349dabbfe4cf8dff1db",
+    "verify.md": "sha256:73f37a3eca8fbefce268c53828d73f4aa31562367389e09f0c65bb00d5af2031"
+  },
+  "generatedBy": "core"
+}

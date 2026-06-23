@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "ui:src/styles/globals.css"
+    },
+    {
+      "file": "ui:src/shell/StatusBar.tsx",
+      "symbols": ["StatusBar"]
+    },
+    {
+      "file": "ui:src/shell/StudioTopBar.tsx",
+      "symbols": ["StudioTopBar"]
+    }
+  ]
+}

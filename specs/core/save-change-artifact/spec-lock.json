@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change-repository-port", "core:change"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/save-change-artifact.ts",
+      "symbols": ["SaveChangeArtifact"]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:logger-port",
+    "core:pino-logger",
+    "core:config",
+    "default:_global/architecture"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["Kernel", "KernelOptions", "createKernel"]
+    }
+  ]
+}

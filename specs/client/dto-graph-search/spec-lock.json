@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "api:dto-graph-search",
+    "client:dto-graph-symbol-ref"
+  ],
+  "implementation": [
+    {
+      "file": "client:src/dto/graph-search.ts",
+      "symbols": ["GraphSearchResultDto"]
+    }
+  ]
+}

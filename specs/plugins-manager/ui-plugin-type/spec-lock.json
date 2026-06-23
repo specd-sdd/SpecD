@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["plugin-manager:specd-plugin-type", "plugin-manager:plugin-loader", "core:config"],
+  "implementation": []
+}

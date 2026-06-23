@@ -1,0 +1,121 @@
+{
+  "title": "Routes Project",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Project** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Project-level read and schema validation.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Project** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Project-level read and schema validation."
+  ],
+  "rules": [
+    {
+      "requirement": "project routes expose config status context and schema",
+      "rules": [
+        "The API MUST provide `GET /project`, `/project/status`, `/project/context`, `/project/schema`, and `POST /project/schema/validate` under `/v1`."
+      ]
+    },
+    {
+      "requirement": "project status aggregates lists and graph freshness",
+      "rules": [
+        "`GET /project/status` MUST compose active/draft/discarded/archive counts and graph freshness/stale flags equivalent to CLI `project status`."
+      ]
+    },
+    {
+      "requirement": "GET project echoes auth type for clients",
+      "rules": [
+        "`GET /project` MUST include `auth: { type }` matching effective server configuration without secrets."
+      ]
+    },
+    {
+      "requirement": "project-route inputs are schema-validated",
+      "rules": [
+        "Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.\n\nFor `GET /project/context`, boolean and numeric query flags such as `followDeps` and `depth` MUST reject malformed values with HTTP 400 `application/problem+json` and code `INVALID_REQUEST`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "project routes expose config status context and schema",
+      "name": "GET /project returns project envelope",
+      "when": ["GET /v1/project"],
+      "then": ["workspaces and schema metadata returned", "AND auth.type included without secrets"]
+    },
+    {
+      "requirement": "project routes expose config status context and schema",
+      "name": "GET /project returns expected payload",
+      "when": ["client calls GET /project"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "project routes expose config status context and schema",
+      "name": "POST /project/schema/validate returns expected payload",
+      "when": ["client calls POST /project/schema/validate"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "project status aggregates lists and graph freshness",
+      "name": "GET /project/status includes graph freshness",
+      "when": ["GET /v1/project/status"],
+      "then": ["list counts match CLI project status", "AND graph stale flag is exposed"]
+    },
+    {
+      "requirement": "project status aggregates lists and graph freshness",
+      "name": "GET /project/status returns expected payload",
+      "when": ["client calls GET /project/status"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "project status aggregates lists and graph freshness",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "GET project echoes auth type for clients",
+      "name": "GET /project exposes auth type",
+      "when": ["GET /v1/project on running server"],
+      "then": ["auth.type matches effective config", "AND no token material in JSON"]
+    },
+    {
+      "requirement": "GET project echoes auth type for clients",
+      "name": "GET /project returns expected payload",
+      "when": ["client calls GET /project"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "GET project echoes auth type for clients",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "project-route inputs are schema-validated",
+      "name": "Project context rejects malformed depth",
+      "when": ["client calls GET /v1/project/context?depth=zero"],
+      "then": [
+        "HTTP 400 is returned",
+        "AND body is application/problem+json",
+        "AND code is INVALID_REQUEST"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-project",
+        "file": "api:src/delivery/http/handlers/handler-project.ts",
+        "symbol": "registerProjectRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:eb606a70cc454b7b03dce20fdf4b9a6f4688519653b61cf442fc591ca8a62b53",
+    "verify.md": "sha256:1c2cb8c4d7917cfc4ded466e1f3db269524989aaeac96f4cc7a1be8e1b3676c9"
+  },
+  "generatedBy": "core"
+}

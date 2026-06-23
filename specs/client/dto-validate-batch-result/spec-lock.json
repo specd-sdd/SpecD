@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "api:dto-validate-batch-result",
+    "default:_global/architecture",
+    "default:_global/conventions"
+  ],
+  "implementation": []
+}

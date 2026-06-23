@@ -1,0 +1,229 @@
+{
+  "title": "Change Tab Overview",
+  "description": "Studio UI for **Change Tab Overview**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Overview**.",
+  "dependsOn": ["client:specd-data-port", "ui:change-metadata-editor"],
+  "context": [
+    "Studio UI for **Change Tab Overview**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Overview**."
+  ],
+  "rules": [
+    {
+      "requirement": "change tab refetches conditional status when updatedAt advances",
+      "rules": [
+        "While this change tab is visible, the view MUST call `getChangeStatus(name, { ifModifiedSince })` using the last seen `updatedAt`. When the API returns `unchanged: true`, the view MUST skip heavy refetch. When `updatedAt` advances, the view MUST refetch **conditional status**. Polling MUST pause when the tab is hidden or the window lacks focus. After a successful Save, the view MUST refetch immediately."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    },
+    {
+      "requirement": "overview includes workflow and validation status",
+      "rules": [
+        "Overview MUST embed `getChangeStatus` results for the open **active** or **drafted** change: next action, blockers, and lifecycle transitions. Overview MUST NOT duplicate the Artifacts tab (no per-artifact file list on Overview). Next actions and blockers MUST be displayed using shadcn **`Card`** or **`Alert`** components as appropriate for their severity.\n\nFor **archived** and **discarded** changes, the shell MUST NOT poll workflow status. The **Workflow & validation** card MUST show the embedded message **Workflow status unavailable.** (same copy as archived), not an API error from `getChangeStatus`."
+      ]
+    },
+    {
+      "requirement": "overview hosts change metadata editor",
+      "rules": [
+        "Overview MUST delegate description, invalidation policy, read-only specs/deps, and scope dialog to [`ui:change-metadata-editor`](../change-metadata-editor/spec.md). Layout order: title → lifecycle actions → metadata block → workflow & validation → summary cards → specs & dependencies → recent events."
+      ]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "rules": [
+        "The Overview header MUST render a `ChangeLifecycleActions` block immediately below the change title. The block's content depends on which sidebar list the open change belongs to:\n\n- **active** — shows **Shelf to drafts**, **Discard** (destructive), and **Archive** (only when state is `archivable` or `signed-off`). Overview editors (description, scope, invalidation) are enabled.\n- **draft** / **discarded** — shelved read-only: same banner pattern as archived (distinct copy), no Overview editors, no Validate All, inspector Monaco read-only without Save/Validate, lifecycle actions only where applicable (restore/discard on draft; none on discarded).\n- **draft** — shows **Restore to active** and **Discard** (destructive).\n- **discarded** — shows a read-only notice (\"permanently discarded, cannot be restored\").\n- **archived** or `null` — no lifecycle block is rendered.\n\nEach lifecycle action MUST open a Studio confirmation modal (`ChangeLifecycleConfirmDialog`) before calling the port. Discard MUST use a destructive-styled modal that states the action is irreversible. Lifecycle actions MUST be disabled while `lifecycleBusy` is true to prevent double-submission. After each action the shell MUST refetch both `getChange` detail and `getChangeStatus` for the open change.\n\nThe **Discard permanently** control MUST be visually separated from reversible actions (right-aligned with a divider when other actions are present)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "change tab refetches conditional status when updatedAt advances",
+      "name": "Unchanged status skips tab refetch",
+      "given": ["tab is visible", "AND cached updatedAt matches server"],
+      "when": ["getChangeStatus returns { unchanged: true }"],
+      "then": ["tab does not refetch heavy views", "AND spinner stops without data swap"]
+    },
+    {
+      "requirement": "change tab refetches conditional status when updatedAt advances",
+      "name": "Advanced updatedAt refetches tab data",
+      "given": ["status returns newer updatedAt"],
+      "when": ["tab poll observes revision bump"],
+      "then": ["only this tab data sources reload", "AND other tabs are unaffected"]
+    },
+    {
+      "requirement": "change tab refetches conditional status when updatedAt advances",
+      "name": "Hidden tab pauses polling",
+      "given": ["change tab was visible then hidden"],
+      "when": ["poll interval fires"],
+      "then": ["no tab-scoped status request is sent", "AND cache is retained until visible again"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    },
+    {
+      "requirement": "overview includes workflow and validation status",
+      "name": "Blockers appear on Overview",
+      "given": ["getChangeStatus returns blockers for the open change"],
+      "when": ["Overview is visible"],
+      "then": [
+        "blockers are listed in the workflow section on Overview",
+        "AND there is no separate Validation tab to open"
+      ]
+    },
+    {
+      "requirement": "overview hosts change metadata editor",
+      "name": "Specs readonly panel on Overview",
+      "given": ["change with multiple specs"],
+      "when": ["user opens Overview"],
+      "then": [
+        "studio-change-specs-readonly lists specs and dependencies",
+        "AND inline scope chips are not on Overview"
+      ]
+    },
+    {
+      "requirement": "overview hosts change metadata editor",
+      "name": "Draft Overview shows specs without scope dialog affordances",
+      "given": ["a drafted change with multiple specs"],
+      "when": ["user opens Overview"],
+      "then": [
+        "studio-change-specs-readonly lists specs and dependencies",
+        "AND studio-edit-spec-scope is not visible"
+      ]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Active change shows shelf and discard",
+      "given": ["an active in-progress change is open"],
+      "when": ["Overview renders"],
+      "then": [
+        "\"Shelf to drafts\" and \"Discard\" buttons appear in the header area",
+        "AND \"Restore to active\" is not shown"
+      ]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Draft change shows restore and discard",
+      "given": ["a drafted change is open"],
+      "when": ["Overview renders"],
+      "then": [
+        "\"Restore to active\" and \"Discard\" buttons appear",
+        "AND \"Shelf to drafts\" is not shown"
+      ]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Discarded change shows read-only notice",
+      "given": ["a discarded change is open"],
+      "when": ["Overview renders"],
+      "then": ["a read-only notice is shown instead of action buttons"]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Discarded change shows workflow status unavailable",
+      "given": ["a discarded change is open"],
+      "when": ["Overview renders the Workflow & validation card"],
+      "then": [
+        "UI does not call getChangeStatus for that name",
+        "AND shows Workflow status unavailable."
+      ]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Archived change shows workflow status unavailable",
+      "given": ["an archived change is open"],
+      "when": ["Overview renders the Workflow & validation card"],
+      "then": ["UI does not call getChangeStatus", "AND shows Workflow status unavailable."]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Lifecycle actions require Studio confirmation modal",
+      "given": ["an active change is open"],
+      "when": ["user clicks \"Shelf to drafts\" or \"Discard permanently\""],
+      "then": ["studio-change-lifecycle-confirm-dialog opens before the port call executes"]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Discard is separated from safe actions",
+      "given": ["an active change with shelf and discard available"],
+      "when": ["Overview renders lifecycle actions"],
+      "then": ["\"Discard permanently\" is right-aligned and separated from shelf/archive controls"]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Lifecycle actions disabled while busy",
+      "given": ["a lifecycle action is in flight"],
+      "when": ["the action is pending"],
+      "then": ["all lifecycle buttons are disabled", "AND double-submission is prevented"]
+    },
+    {
+      "requirement": "overview surfaces lifecycle actions",
+      "name": "Archive shown only when archivable",
+      "given": [
+        "an active change in state archivable or signed-off",
+        "active change in any other state"
+      ],
+      "when": ["Overview renders"],
+      "then": ["\"Archive\" button is shown", "\"Archive\" button is not shown"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-tab-overview",
+        "file": "ui:src/change/ChangeOverview.tsx",
+        "symbol": "ChangeOverview"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d21f4d2c37046534738b261162d9ce025c676b1cb1884788246f93e5fa0ae1c8",
+    "verify.md": "sha256:2bcc66477612a5679998ab39d17bb09987f2bcf2d1d369cecd2b27c3d61bd507"
+  },
+  "generatedBy": "core"
+}

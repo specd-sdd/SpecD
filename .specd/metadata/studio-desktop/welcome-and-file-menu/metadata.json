@@ -1,0 +1,112 @@
+{
+  "title": "Welcome And File Menu",
+  "description": "Electron desktop host concern — **Welcome And File Menu**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Electron desktop host concern — **Welcome And File Menu**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API."
+  ],
+  "rules": [
+    {
+      "requirement": "welcome offers local open and remote connect",
+      "rules": [
+        "First run MUST show the shared project chooser with local workspace and remote API options.\nThe File menu MUST expose a single `Open SpecD Project...` command that opens the same chooser rather than separate local and remote entries.\nWithin that chooser, remote configuration MUST open in a secondary dialog and local opening MUST trigger the native directory picker."
+      ]
+    },
+    {
+      "requirement": "switching projects is confirmation-driven",
+      "rules": [
+        "Opening the chooser from the File menu while a project is already mounted MUST keep the current session visible in the background.\nThe current session MUST remain active until the newly selected local workspace or remote connection has been validated successfully."
+      ]
+    },
+    {
+      "requirement": "recent connections are reachable from the menu",
+      "rules": [
+        "File menu MUST list recent local paths and remote profiles from `studio-desktop:recent-connections`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "welcome offers local open and remote connect",
+      "name": "Welcome shows open folder and remote chooser actions",
+      "when": ["app launches without project"],
+      "then": [
+        "local open and remote connect controls are visible",
+        "AND triggers native directory picker"
+      ]
+    },
+    {
+      "requirement": "welcome offers local open and remote connect",
+      "name": "File menu opens the shared chooser",
+      "given": ["the desktop window is already open"],
+      "when": ["the user selects Open SpecD Project... from the File menu"],
+      "then": [
+        "the shared project chooser opens",
+        "AND there are no separate File menu entries for local and remote flows"
+      ]
+    },
+    {
+      "requirement": "welcome offers local open and remote connect",
+      "name": "Welcome opens remote dialog on demand",
+      "when": ["welcome screen renders", "AND the user chooses the remote action"],
+      "then": [
+        "URL and token fields become available in a secondary dialog",
+        "AND Test Connection runs health check"
+      ]
+    },
+    {
+      "requirement": "welcome offers local open and remote connect",
+      "name": "Successful local open dismisses welcome",
+      "when": ["user picks valid project folder"],
+      "then": ["main window shows IDE", "AND welcome hidden"]
+    },
+    {
+      "requirement": "switching projects is confirmation-driven",
+      "name": "Opening chooser does not discard current session",
+      "given": ["a project is already open in the desktop host"],
+      "when": ["the user opens Open SpecD Project..."],
+      "then": [
+        "the current project remains visible behind the chooser",
+        "AND it is not closed immediately"
+      ]
+    },
+    {
+      "requirement": "switching projects is confirmation-driven",
+      "name": "Failed replacement keeps current session",
+      "given": ["a project is already open in the desktop host"],
+      "when": [
+        "the user attempts to switch projects and the new local or remote target fails validation"
+      ],
+      "then": [
+        "the current session remains active",
+        "AND the chooser reports the failure without forcing a close"
+      ]
+    },
+    {
+      "requirement": "recent connections are reachable from the menu",
+      "name": "File menu lists recent hosts",
+      "given": ["stored recents exist"],
+      "when": ["user opens File menu"],
+      "then": ["recent entries shown", "AND selecting one reconnects"]
+    },
+    {
+      "requirement": "recent connections are reachable from the menu",
+      "name": "Menu recents match welcome list",
+      "when": ["recents updated from welcome connect"],
+      "then": ["same hosts appear in menu", "AND order consistent"]
+    },
+    {
+      "requirement": "recent connections are reachable from the menu",
+      "name": "Empty recents hides submenu items",
+      "given": ["no stored recents"],
+      "when": ["File menu opens"],
+      "then": ["recents section empty or disabled", "AND no broken placeholders"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:7a864af237defe535eb8c018d987289d714c9973de1d9859f679efc97bc943c2",
+    "verify.md": "sha256:6d4eeab0e126754c482bcd01bcbba819fe4c5ac29faac7a7b2794eb3bf086708"
+  },
+  "generatedBy": "core"
+}

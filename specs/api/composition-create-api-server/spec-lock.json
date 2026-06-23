@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:auth-adapter-registry",
+    "api:middleware-auth",
+    "core:kernel"
+  ],
+  "implementation": [
+    {
+      "file": "api:src/composition/create-api-server.ts",
+      "symbols": ["CreateApiServerOptions", "ApiServer", "createApiServer"]
+    }
+  ]
+}

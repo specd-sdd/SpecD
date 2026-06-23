@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change-repository-port",
+    "core:read-only-change-view",
+    "core:get-draft",
+    "core:get-discarded",
+    "core:get-change-artifact"
+  ],
+  "implementation": []
+}

@@ -63,7 +63,6 @@ import {
   CommandPalette,
   defaultCommandPaletteActions,
 } from './CommandPalette.js'
-import { StudioLoadingBand } from './StudioLoadingBand.js'
 import { StudioTopBar } from './StudioTopBar.js'
 import { StatusBar } from './StatusBar.js'
 import { ArtifactEditor } from '../editor/ArtifactEditor.js'
@@ -620,13 +619,6 @@ export function ShellLayout({
   const detailLoading = activeDetail.isLoading
   const centerLoading = centerCtx.kind === 'change' && changeName && detailLoading
 
-  const validationSummary = React.useMemo(() => {
-    if (validating) return 'validating'
-    if (problems.some((e) => e.message.startsWith('✗'))) return 'errors'
-    if (problems.some((e) => e.message.startsWith('⚠'))) return 'warnings'
-    if (problems.length > 0) return 'passed'
-    return 'idle'
-  }, [problems, validating])
 
   const refetchOpenChange = React.useCallback(() => {
     if (!isArchivedChange) {

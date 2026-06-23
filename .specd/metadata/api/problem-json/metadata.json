@@ -1,0 +1,87 @@
+{
+  "title": "Problem Json",
+  "description": "Remote Studio adapters and the connect panel need predictable JSON errors, not stack traces or HTML. This spec requires mapping specd and kernel failures to RFC 7807 `application/problem+json` responses with stable codes consumed by `client:adapter-problem-json-errors`.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Remote Studio adapters and the connect panel need predictable JSON errors, not stack traces or HTML. This spec requires mapping specd and kernel failures to RFC 7807 `application/problem+json` responses with stable codes consumed by `client:adapter-problem-json-errors`."
+  ],
+  "rules": [
+    {
+      "requirement": "error responses use application/problem+json",
+      "rules": [
+        "When a handler or middleware surfaces a failure, the response MUST use `Content-Type: application/problem+json` and include at least `type`, `title`, and `status` fields compatible with RFC 7807."
+      ]
+    },
+    {
+      "requirement": "SpecdError codes are preserved in the problem body",
+      "rules": [
+        "When the thrown error is a `SpecdError` (or subclass), the problem payload MUST include the specd error code and any safe detail fields expected by `client:adapter-problem-json-errors`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "error responses use application/problem+json",
+      "name": "Kernel error maps to problem+json",
+      "when": ["handler catches SpecdError"],
+      "then": ["Content-Type is application/problem+json", "AND status matches error"]
+    },
+    {
+      "requirement": "error responses use application/problem+json",
+      "name": "Validation failure uses problem shape",
+      "when": ["input validation fails on route"],
+      "then": ["HTTP 400 with problem body", "AND includes title field"]
+    },
+    {
+      "requirement": "error responses use application/problem+json",
+      "name": "Unexpected errors still use JSON envelope",
+      "when": ["unhandled throw escapes handler"],
+      "then": ["response is not HTML", "AND client adapter can parse or fallback"]
+    },
+    {
+      "requirement": "SpecdError codes are preserved in the problem body",
+      "name": "Specd code extension is included",
+      "given": ["ArtifactConflictError thrown"],
+      "when": ["mapped to HTTP response"],
+      "then": ["problem body includes specd code", "AND client can branch on 409"]
+    },
+    {
+      "requirement": "SpecdError codes are preserved in the problem body",
+      "name": "Safe details only in payload",
+      "when": ["error mapped to problem"],
+      "then": ["no stack traces in production body", "AND title is human-readable"]
+    },
+    {
+      "requirement": "SpecdError codes are preserved in the problem body",
+      "name": "Client adapter reads extensions",
+      "when": ["remote adapter parses problem body"],
+      "then": ["SpecdClientError preserves code", "AND UI shows message"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:problem-json",
+        "file": "api:src/delivery/http/problem-json.ts",
+        "symbol": "ProblemJsonBody"
+      },
+      {
+        "specId": "api:problem-json",
+        "file": "api:src/delivery/http/problem-json.ts",
+        "symbol": "toProblemJson"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d667cadd5eef748ce77c4fd027dc63cadc170201d6f4c2236823a463da4bc92a",
+    "verify.md": "sha256:5c958ec7d247e119e8ca8e21214f05eb4b5084b8f4dd316708b5fd0051285c74"
+  },
+  "generatedBy": "core"
+}

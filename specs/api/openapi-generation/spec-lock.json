@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "implementation": [
+    {
+      "file": "api:src/composition/create-api-server.ts",
+      "symbols": ["createApiServer"]
+    },
+    {
+      "file": "api:src/delivery/http/openapi-schemas.ts",
+      "symbols": ["registerApiOpenApiSchemas"]
+    }
+  ]
+}

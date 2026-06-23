@@ -40,6 +40,20 @@
 - **WHEN** the CLI calls `createKernel`
 - **THEN** it MUST include the prepared console destination in the `additionalDestinations` array
 
+### Requirement: Shared formatter with kernel
+
+#### Scenario: CLI passes TTY-aware formatter
+
+- **GIVEN** `process.stdout.isTTY` is true
+- **WHEN** CLI resolves kernel context
+- **THEN** `createLogFormatter({ colorize: true })` is passed via `KernelOptions.logFormatter`
+
+#### Scenario: Non-TTY disables colorize
+
+- **GIVEN** stdout is not a TTY
+- **WHEN** CLI resolves kernel context
+- **THEN** `createLogFormatter({ colorize: false })` is passed to the kernel
+
 ### Requirement: Callback Interception (Optional)
 
 #### Scenario: UI component updates

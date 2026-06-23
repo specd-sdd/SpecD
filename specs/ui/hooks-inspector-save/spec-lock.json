@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "client:port-changes-mutate"],
+  "implementation": [
+    {
+      "file": "ui:src/hooks/use-change-artifact.ts",
+      "symbols": ["useChangeArtifact"]
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "title": "Connect Panel",
+  "description": "Studio UI for **Connect Panel**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Remote Studio connection: API base URL and optional token (standalone web and desktop remote profile).",
+  "dependsOn": ["client:specd-data-port", "client:adapter-remote-specd-data"],
+  "context": [
+    "Studio UI for **Connect Panel**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Remote Studio connection: API base URL and optional token (standalone web and desktop remote profile)."
+  ],
+  "rules": [
+    {
+      "requirement": "view is composed using shadcn primitives",
+      "rules": [
+        "The Connect Panel MUST be composed using shadcn `Card`, `Input`, `Button`, and `Alert` components to ensure consistency with the Studio design system."
+      ]
+    },
+    {
+      "requirement": "connect panel collects API URL and optional token",
+      "rules": [
+        "The form MUST require API base URL and MAY collect an optional bearer token. “Test connection” MUST call `GET /v1/project` or health before saving the profile."
+      ]
+    },
+    {
+      "requirement": "connect panel displays auth type from API only",
+      "rules": [
+        "After a successful test, the UI MUST show `auth.type` from the API response and MUST NOT read `specd.yaml` in the browser renderer."
+      ]
+    },
+    {
+      "requirement": "embedded Studio skips connect panel gating",
+      "rules": [
+        "When `SpecdApp` runs in embedded mode (`specd ui serve`), the connect panel MUST NOT block access to the IDE."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "view is composed using shadcn primitives",
+      "name": "Form built with shadcn primitives",
+      "when": ["component renders"],
+      "then": [
+        "it uses shadcn Input, Label, Button, and Card/Dialog primitives",
+        "AND standard focus and validation styles apply"
+      ]
+    },
+    {
+      "requirement": "connect panel collects API URL and optional token",
+      "name": "Test connection calls GET /v1/project",
+      "when": ["user enters base URL and clicks Test connection"],
+      "then": ["request succeeds before profile save", "AND auth type is shown from response"]
+    },
+    {
+      "requirement": "connect panel collects API URL and optional token",
+      "name": "Saved profile restores on reload",
+      "given": ["user saved URL and token"],
+      "when": ["app reloads"],
+      "then": ["profile loads from storage", "AND IDE can mount without re-entry"]
+    },
+    {
+      "requirement": "connect panel collects API URL and optional token",
+      "name": "Invalid URL shows connection error",
+      "when": ["Test connection targets unreachable host"],
+      "then": ["human-readable error is shown", "AND profile is not saved"]
+    },
+    {
+      "requirement": "connect panel displays auth type from API only",
+      "name": "Auth type shown from API response",
+      "given": ["test connection succeeded"],
+      "when": ["connect panel renders status"],
+      "then": ["UI shows auth.type from JSON", "AND specd.yaml is not read in renderer"]
+    },
+    {
+      "requirement": "connect panel displays auth type from API only",
+      "name": "Secrets are not displayed",
+      "given": ["response includes auth metadata only"],
+      "when": ["panel renders"],
+      "then": ["no tokens from server are shown", "AND user token field remains local"]
+    },
+    {
+      "requirement": "connect panel displays auth type from API only",
+      "name": "Mismatching auth type still allows connect",
+      "given": ["remote server uses disabled"],
+      "when": ["user saves profile"],
+      "then": ["Studio stores profile", "AND client omits Bearer for disabled"]
+    },
+    {
+      "requirement": "embedded Studio skips connect panel gating",
+      "name": "Embedded mode opens IDE directly",
+      "given": ["specd ui serve embedded configuration"],
+      "when": ["user opens the served URL"],
+      "then": ["<SpecdApp> renders without connect form"]
+    },
+    {
+      "requirement": "embedded Studio skips connect panel gating",
+      "name": "Embedded API calls use same-origin /v1",
+      "given": ["embedded profile is active"],
+      "when": ["hooks load project data"],
+      "then": ["requests target /v1 on the served origin", "AND no remote base URL is configured"]
+    },
+    {
+      "requirement": "embedded Studio skips connect panel gating",
+      "name": "Connect panel is not mounted in embedded mode",
+      "when": ["shell renders for embedded bootstrap"],
+      "then": ["connect form component is absent", "AND user lands directly in the IDE layout"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:connect-panel",
+        "file": "ui:src/connect/ConnectPanel.tsx",
+        "symbol": "ConnectPanel"
+      },
+      {
+        "specId": "ui:connect-panel",
+        "file": "ui:src/connect/ConnectPanel.tsx",
+        "symbol": "ConnectPanelProps"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:b522d78b168c56977d11517501152badfcd083f862451cf219c9eabc18e53df9",
+    "verify.md": "sha256:4e5cf5a3bcfa7cc6d01db3419466a8ea57f027ed61b6b65af51f54ef6f67f37c"
+  },
+  "generatedBy": "core"
+}

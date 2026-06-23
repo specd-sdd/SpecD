@@ -1,0 +1,43 @@
+- op: modified
+  description: '--all delegates to ValidateChangeBatch in core'
+  selector:
+    type: section
+    matches: 'Requirement: Batch mode \(--all\)'
+  content: |
+    With `--all`, the command validates the change by delegating to **`kernel.changes.validateBatch`** (`core:validate-change-batch`). The CLI MUST call `validateBatch.execute({ name, artifactId? })` once and format `batch.results` for text/json/toon output.
+
+    `--all` is mutually exclusive with the `<workspace:capability-path>` positional — providing both exits with `error: --all and <specPath> are mutually exclusive`. Omitting both exits with `error: either <specPath> or --all is required`.
+
+    The CLI MUST NOT walk `schema.artifactDag()` locally or invoke `ValidateArtifacts` in a nested loop over `specIds`. DAG scheduling and per-step validation live in `@specd/core`.
+
+    When `--artifact <artifactId>` is combined with `--all`, the CLI MUST pass `{ name, artifactId }` to `validateBatch.execute`.
+
+    Individual validation failures MUST NOT abort the batch early — the use case runs all scheduled steps and aggregates results.
+
+    **Text output:** each step's result is printed as in single-spec mode (success or failure block), followed by a summary line reporting how many steps passed versus scheduled.
+
+    **JSON output:** `{ passed: <bool>, total: M, results: [{ spec: "<specId or null for change-scoped>", artifact: "<artifactId>", passed: <bool>, failures: [...], warnings: [...], files: [...] }] }` — one entry per scheduled validation step. Each step MUST include a `warnings` array (possibly empty). Structural optimisation hints from the use case MAY be mapped into `warnings`; the field name MUST NOT be `notes` in batch JSON output.
+
+    The process exits with code 1 if any step has failures, 0 if all pass.
+
+- op: modified
+  description: 'Batch delegates to core use case'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Validation output (failures and warnings) goes to stdout; only CLI/system errors go to stderr
+    - The command marks artifacts as complete in the manifest when they pass
+    - Batch mode (`--all`) delegates to `ValidateChangeBatch`; single-spec mode still uses `ValidateArtifacts`
+
+- op: modified
+  description: 'Add core:validate-change-batch dependency introduced by batch mode'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
+    - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
+    - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+    - [`core:validate-change-batch`](../../core/validate-change-batch/spec.md) — batch validation use case delegated to by `--all`

@@ -1,0 +1,87 @@
+{
+  "title": "Hooks Workspaces Specs",
+  "description": "React data hooks for **Hooks Workspaces Specs**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports.",
+  "dependsOn": ["client:specd-data-port", "client:port-workspaces-specs"],
+  "context": [
+    "React data hooks for **Hooks Workspaces Specs**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports."
+  ],
+  "rules": [
+    {
+      "requirement": "hooks load workspaces and spec tree metadata",
+      "rules": [
+        "The hooks MUST call `listWorkspaces` and spec tree/list methods on `client:port-workspaces-specs`.\n\nWhen a spec detail view is active, the spec hooks MUST also load structured spec context through `getSpecContext()` and preserve that structure for the consuming component."
+      ]
+    },
+    {
+      "requirement": "workspace tree refreshes on global poll",
+      "rules": [
+        "Tree metadata MUST refresh on the global poll interval; per-spec detail loads when a spec tab becomes visible."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "hooks load workspaces and spec tree metadata",
+      "name": "Workspaces hook calls list endpoint",
+      "when": ["workspace sidebar mounts"],
+      "then": ["listWorkspaces via port invoked", "AND tree receives workspace ids"]
+    },
+    {
+      "requirement": "hooks load workspaces and spec tree metadata",
+      "name": "Spec tree metadata loads per workspace",
+      "given": ["workspace core selected"],
+      "when": ["tree expands"],
+      "then": ["metadata fetched without inline bodies", "AND nodes show titles from metadata"]
+    },
+    {
+      "requirement": "hooks load workspaces and spec tree metadata",
+      "name": "Search uses workspaces port filter",
+      "when": ["user searches specs scoped to workspace"],
+      "then": ["searchSpecs includes workspace param", "AND results limited to scope"]
+    },
+    {
+      "requirement": "hooks load workspaces and spec tree metadata",
+      "name": "Spec hook preserves structured context payload",
+      "when": ["spec detail hook requests context for the selected spec"],
+      "then": [
+        "it calls getSpecContext",
+        "AND the returned entries[] and warnings[] remain available to the view without markdown flattening"
+      ]
+    },
+    {
+      "requirement": "workspace tree refreshes on global poll",
+      "name": "Tree refetches on global poll tick",
+      "given": ["workspace sidebar visible"],
+      "when": ["global poll runs"],
+      "then": ["tree metadata hook refetches", "AND new spec file appears as node"]
+    },
+    {
+      "requirement": "workspace tree refreshes on global poll",
+      "name": "Hidden sidebar skips tree poll",
+      "given": ["user collapsed workspace panel"],
+      "when": ["poll fires"],
+      "then": ["no tree refetch", "AND cache retained until panel shown"]
+    },
+    {
+      "requirement": "workspace tree refreshes on global poll",
+      "name": "Selection preserved across refresh",
+      "given": ["spec core:foo selected"],
+      "when": ["tree poll completes without structural change"],
+      "then": ["selection remains on core:foo", "AND scroll position stable"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:hooks-workspaces-specs",
+        "file": "ui:src/hooks/use-workspace-specs.ts",
+        "symbol": "useWorkspaceSpecs"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:4978a658037e2d801a04ecd915d7f5d5ec5e89a868024a92065a5aa4ed20bbaf",
+    "verify.md": "sha256:f76514340304b67a75096ff4b9e34e77d196f92cdbff2eb6a30805414b13e917"
+  },
+  "generatedBy": "core"
+}

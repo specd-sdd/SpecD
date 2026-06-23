@@ -1,0 +1,121 @@
+{
+  "title": "Dto Change Status",
+  "description": "Stable JSON wire shape for **Dto Change Status** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Stable JSON wire shape for **Dto Change Status** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules."
+  ],
+  "rules": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "rules": [
+        "The **Dto Change Status** wire shape MUST use camelCase property names stable across Studio releases. OpenAPI generation MUST derive schemas from these names."
+      ]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "rules": [
+        "The type MUST include at least:\n\n- `updatedAt: string` (ISO 8601) — revision clock from manifest\n- `unchanged?: boolean` when conditional poll matches `ifModifiedSince`\n- artifact DAG, blockers, `nextAction`, task completion, implementation projection\n- `totalTasks?: number` and `completedTasks?: number` as change-level aggregate counters summed across all task-capable artifacts\n- per-artifact `hasTasks: boolean` plus optional `totalTasks` / `completedTasks` when that artifact type is task-capable"
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "rules": [
+        "[`api:presenter-change`](../presenter-change/spec.md) MUST map kernel or graph results into this DTO and MUST NOT embed lifecycle, validation, or approval logic."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "OpenAPI lists camelCase properties",
+      "when": ["schema is generated for this DTO"],
+      "then": ["property names are camelCase", "AND no snake_case aliases"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Runtime JSON matches schema",
+      "when": ["handler returns success body"],
+      "then": ["JSON keys match schema", "AND clients deserialize without mapping"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Breaking rename fails schema check",
+      "when": ["required field renamed without version bump"],
+      "then": ["OpenAPI diff or test fails", "AND Studio documents migration"]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "name": "Full success payload includes mandatory fields",
+      "when": ["handler returns complete DTO"],
+      "then": ["all mandatory properties exist", "AND types match spec"]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "name": "Task-capable artifacts expose aggregate counters",
+      "given": ["kernel returns one or more task-capable artifacts"],
+      "when": ["presenter maps the status DTO"],
+      "then": [
+        "each task-capable artifact row includes hasTasks",
+        "AND the DTO includes change-level completedTasks / totalTasks summed across those artifacts"
+      ]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "name": "Partial kernel data still maps required fields",
+      "given": ["kernel returns minimal valid object"],
+      "when": ["presenter maps"],
+      "then": ["mandatory fields populated or explicit defaults documented"]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "name": "Missing mandatory input fails presenter or handler",
+      "when": ["kernel omits required field"],
+      "then": ["error before response sent", "AND no incomplete JSON"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not add business rules to DTO",
+      "given": ["kernel returns a status result with blockers"],
+      "when": ["presenter maps to this DTO"],
+      "then": ["DTO fields reflect kernel data", "AND presenter does not alter lifecycle state"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not embed lifecycle or approval logic",
+      "when": ["presenter maps kernel or graph results"],
+      "then": [
+        "lifecycle state in the DTO matches kernel output",
+        "AND no validation or approval rules are applied in the presenter"
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Identical kernel fixture yields identical JSON",
+      "given": ["a fixed kernel or graph fixture"],
+      "when": ["presenter serializes twice"],
+      "then": ["both JSON bodies are byte-identical"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:dto-change-status",
+        "file": "api:src/delivery/http/dto/change-status.ts",
+        "symbol": "ChangeStatusDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:034ed058075d92cd15a968e8a78dcb42e2124688b8f7005b3f58ae129744fefa",
+    "verify.md": "sha256:94ea07845bee4a8499ec8375eb55c53aeb84cbc1951086baf3aeb126814946cd"
+  },
+  "generatedBy": "core"
+}

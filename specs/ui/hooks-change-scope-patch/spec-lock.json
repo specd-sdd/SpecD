@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["ui:change-scope-dialog", "ui:design-system"],
+  "implementation": []
+}

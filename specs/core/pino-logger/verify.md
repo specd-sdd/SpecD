@@ -43,6 +43,21 @@
 - **WHEN** logging a message
 - **THEN** the `onLog` handler MUST be called with a correctly populated `LogEntry` object
 
+### Requirement: Pretty format uses LogFormatter
+
+#### Scenario: Pretty destination uses formatter port
+
+- **GIVEN** `createDefaultLogger` is called with a `LogFormatter` instance
+- **WHEN** a `console` destination has `format: 'pretty'`
+- **THEN** each emitted line is produced via `LogFormatter.format(LogEntry)`
+- **AND** no standalone `pino-pretty` stream bypasses the port
+
+#### Scenario: Factory accepts optional formatter argument
+
+- **WHEN** `createDefaultLogger(destinations, { formatter })` is invoked
+- **THEN** pretty destinations use the supplied formatter
+- **AND** JSON file destinations remain unchanged
+
 ### Requirement: Level Filtering
 
 #### Scenario: Efficient filtering

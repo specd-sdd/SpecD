@@ -1,0 +1,73 @@
+{
+  "title": "DTO Validate Batch Result",
+  "description": "Stable JSON wire shape for `POST /changes/{name}/validate-all` returned by `@specd/api` and mirrored by `@specd/client`.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Stable JSON wire shape for `POST /changes/{name}/validate-all` returned by `@specd/api` and mirrored by `@specd/client`."
+  ],
+  "rules": [
+    {
+      "requirement": "ValidateBatchResultDto",
+      "rules": [
+        "MUST include `passed: boolean`, `total: number`, `results: ValidateBatchStepResultDto[]`."
+      ]
+    },
+    {
+      "requirement": "ValidateBatchStepResultDto",
+      "rules": [
+        "Each step MUST include `spec: string | null`, `artifact: string`, `passed: boolean`, `failures` (`message`, `artifactId`, optional `path`), `warnings: string[]`, `files: string[]`."
+      ]
+    },
+    {
+      "requirement": "parity with client DTO",
+      "rules": [
+        "[`client:dto-validate-batch-result`](../client/dto-validate-batch-result/spec.md) MUST stay structurally identical to this wire shape."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "ValidateBatchResultDto",
+      "name": "Batch response parses in API and client",
+      "when": ["OpenAPI or client types describe validate-all response"],
+      "then": [
+        "passed, total, and results are required",
+        "AND each result includes spec, artifact, passed, failures, warnings, files"
+      ]
+    },
+    {
+      "requirement": "ValidateBatchStepResultDto",
+      "name": "ValidateBatchStepResultDto — primary path",
+      "when": ["Each step MUST include spec: string | null,"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "ValidateBatchStepResultDto",
+      "name": "ValidateBatchStepResultDto — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "parity with client DTO",
+      "name": "parity with client DTO — primary path",
+      "when": [
+        "[client:dto-validate-batch-result](../client/dto-validate-batch-result/spec.md) MUST stay structurally identical to this wire"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "parity with client DTO",
+      "name": "parity with client DTO — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:16105464548be7e7a4afadafb13994646c8f6a328c16428529d93a044d3bac69",
+    "verify.md": "sha256:dab67c8327c14afb41cc83c324a5aa9f41a820ec3c34a0212dc425334208bae2"
+  },
+  "generatedBy": "core"
+}

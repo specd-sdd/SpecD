@@ -1,0 +1,86 @@
+{
+  "title": "Routes Project Logs",
+  "description": "HTTP contract for project-scoped log readback and generic log append routes under `/v1`. Studio session output is local UI state, while remote logging uses the generic project log channel only.",
+  "dependsOn": [
+    "core:read-log",
+    "api:composition-create-api-server",
+    "default:_global/architecture"
+  ],
+  "context": [
+    "HTTP contract for project-scoped log readback and generic log append routes under `/v1`. Studio session output is local UI state, while remote logging uses the generic project log channel only."
+  ],
+  "rules": [
+    {
+      "requirement": "GET and POST /v1/logs",
+      "rules": [
+        "- `GET /v1/logs?limit=&prettier=` MUST call `kernel.logs.read` and return `{ entries? }` or `{ lines? }`.\n- When `prettier=true`, `lines[]` MUST be plain text suitable for the Studio web UI (no ANSI color escape sequences).\n- `POST /v1/logs` MUST accept `{ level, message, context? }` with `level` in `debug|info|warn|error`, MUST write via `Logger.child({ source: 'studio' })`, and MUST NOT accept file paths."
+      ]
+    },
+    {
+      "requirement": "no studio-specific output resource is exposed",
+      "rules": [
+        "The API MUST expose no studio-specific output resource under `/v1`. Remote logging is limited to the generic `/v1/logs` channel.\n\nRequests to unknown studio-specific output paths under `/v1` MUST return HTTP 404 with `application/problem+json` and code `NOT_FOUND`, consistent with other unknown API routes under `/v1`."
+      ]
+    },
+    {
+      "requirement": "limits are server-enforced",
+      "rules": [
+        "`limit` query parameters for `/logs` MUST be parsed as positive integers capped at 500."
+      ]
+    },
+    {
+      "requirement": "log-route inputs are schema-validated",
+      "rules": [
+        "Every `query` and `body` shape accepted by `/logs` MUST be declared in Fastify route schema and validated before handler logic runs.\n\n`level` MUST reject values outside `debug|info|warn|error`. `message` MUST reject blank or missing input. Malformed input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`."
+      ]
+    }
+  ],
+  "constraints": ["MUST NOT expose endpoints that read log files from disk or arbitrary paths."],
+  "scenarios": [
+    {
+      "requirement": "GET and POST /v1/logs",
+      "name": "POST then GET returns studio log line",
+      "when": ["client POSTs { level: \"debug\", message: \"studio action\" } to /v1/logs"],
+      "then": ["response is 200", "AND GET /v1/logs includes that message in entries"]
+    },
+    {
+      "requirement": "GET and POST /v1/logs",
+      "name": "POST rejects invalid level",
+      "when": ["client POSTs an unsupported level"],
+      "then": ["response is a problem+json error"]
+    },
+    {
+      "requirement": "no studio-specific output resource is exposed",
+      "name": "studio-specific output paths are rejected",
+      "when": ["client calls a studio-specific output path under /v1"],
+      "then": [
+        "HTTP 404 is returned",
+        "AND body is application/problem+json",
+        "AND code is NOT_FOUND",
+        "AND Studio session output must be maintained locally by the UI host"
+      ]
+    },
+    {
+      "requirement": "limits are server-enforced",
+      "name": "Excessive limit is capped",
+      "when": ["client requests limit=99999"],
+      "then": ["at most 500 entries are returned"]
+    },
+    {
+      "requirement": "log-route inputs are schema-validated",
+      "name": "POST logs rejects invalid level",
+      "when": ["client POSTs { \"level\": \"trace\", \"message\": \"bad\" } to /v1/logs"],
+      "then": [
+        "HTTP 400 is returned",
+        "AND body is application/problem+json",
+        "AND code is INVALID_REQUEST"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:1347ea846ac52479c4ddba8f3a83c053c0be6e03ad566f662d379966eb4c6329",
+    "verify.md": "sha256:533132d113dc87af3e393a30b70118218c07abf878ee7e8dcebedd83a6dd3d00"
+  },
+  "generatedBy": "core"
+}

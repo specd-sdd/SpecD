@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "ui:design-system",
+    "ui:shell-layout",
+    "ui:bottom-panel-output",
+    "ui:bottom-panel-problems",
+    "client:port-changes-mutate"
+  ],
+  "implementation": []
+}

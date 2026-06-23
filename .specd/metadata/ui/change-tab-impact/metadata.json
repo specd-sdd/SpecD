@@ -1,0 +1,168 @@
+{
+  "title": "Change Tab Coverage",
+  "description": "Studio UI for **Change Tab Coverage**: implementation footprint for an active change — manifest\n**accepted links** and **tracked files**, merged with change-scoped **code-graph** coverage.\nStudio UI component: **Change Tab Coverage**.",
+  "dependsOn": [
+    "client:specd-data-port",
+    "ui:design-system",
+    "client:port-changes-read",
+    "client:dto-implementation-review",
+    "client:dto-change-graph-view",
+    "client:port-graph",
+    "api:dto-implementation-review"
+  ],
+  "context": [
+    "Studio UI for **Change Tab Coverage**: implementation footprint for an active change — manifest\n**accepted links** and **tracked files**, merged with change-scoped **code-graph** coverage.\nStudio UI component: **Change Tab Coverage**."
+  ],
+  "rules": [
+    {
+      "requirement": "coverage tab loads manifest tracking and graph view",
+      "rules": [
+        "While this change tab is visible for an **active** change, the view MUST load:\n\n1. `getImplementationReview(name)` — manifest `implementationTracking.links` and `implementationTracking.trackedFiles`\n2. `getChangeGraphView(name)` — per-spec `coveredFiles` / `coveredSymbols`\n\nBoth MUST refresh on tab-scoped poll ticks. Polling MUST pause when the tab is hidden or the window lacks focus. Archived changes MUST NOT call these endpoints (read-only messaging only).\n\nThe visible tab label MUST be `Coverage`.\n\nFor **drafted**, **discarded**, and **archived** changes, implementation coverage is not available\nin Studio v1. The Coverage tab MUST be hidden (not selectable) for these sections."
+      ]
+    },
+    {
+      "requirement": "coverage is grouped by spec",
+      "rules": [
+        "The UI MUST render one card per spec ID (union of change `specIds`, manifest links, and graph coverage), ordered per [`ui:design-system`](../design-system/spec.md). Within each card, subsections appear in order:\n\n1. **Accepted links** — manifest links for that spec, merged with matching code-graph files/symbols for the link file\n2. **Graph (not linked)** — graph symbols first, then graph files, for that spec not covered by an accepted link (omitted when empty)\n3. **Tracked · resolved**, then **open**, then **ignored** — tracked files assigned to that spec when uniquely matchable via links or graph paths\n\nTracked files that match zero or multiple specs MUST appear under a final **Tracked files (unassigned)** section."
+      ]
+    },
+    {
+      "requirement": "empty specs are omitted",
+      "rules": [
+        "Spec cards with no accepted links, no graph-only rows, and no tracked files MUST NOT be rendered."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "coverage tab loads manifest tracking and graph view",
+      "name": "Coverage tab calls review and graph endpoints",
+      "given": ["active change with manifest tracking"],
+      "when": ["user selects Coverage tab"],
+      "then": [
+        "UI calls getImplementationReview and getChangeGraphView",
+        "AND waits for both before rendering sections"
+      ]
+    },
+    {
+      "requirement": "coverage tab loads manifest tracking and graph view",
+      "name": "Hidden tab pauses polling",
+      "given": ["Coverage tab was visible then hidden"],
+      "when": ["poll interval fires"],
+      "then": ["no tab-scoped review or graph request is sent"]
+    },
+    {
+      "requirement": "coverage tab loads manifest tracking and graph view",
+      "name": "Archived change skips data fetch",
+      "given": ["archived shell context"],
+      "when": ["user selects Coverage tab"],
+      "then": [
+        "UI does not call getImplementationReview or getChangeGraphView",
+        "AND shows read-only archived messaging"
+      ]
+    },
+    {
+      "requirement": "coverage tab loads manifest tracking and graph view",
+      "name": "Drafted change hides Coverage tab",
+      "given": ["drafted change open in the shell"],
+      "when": ["user inspects change tabs"],
+      "then": ["Coverage is not shown as a selectable tab"]
+    },
+    {
+      "requirement": "coverage is grouped by spec",
+      "name": "One card per spec with accepted links inside",
+      "given": ["change has links for ui:foo and core:bar"],
+      "when": ["Coverage tab renders"],
+      "then": [
+        "two spec cards are shown with specId headers",
+        "AND each card lists only links for that spec"
+      ]
+    },
+    {
+      "requirement": "coverage is grouped by spec",
+      "name": "Graph not linked appears under the same spec card",
+      "given": ["graph coverage for ui:foo includes files without accepted links"],
+      "when": ["Coverage tab renders"],
+      "then": ["Graph (not linked) subsection appears inside the ui:foo card"]
+    },
+    {
+      "requirement": "coverage is grouped by spec",
+      "name": "Graph not linked shows symbols before files",
+      "given": ["graph coverage for one spec includes both extra symbols and extra files"],
+      "when": ["Coverage tab renders"],
+      "then": ["the subsection lists graph symbols before graph files"]
+    },
+    {
+      "requirement": "coverage is grouped by spec",
+      "name": "Tracked files appear under assigned spec",
+      "given": ["tracked file uniquely matches a link for one spec"],
+      "when": ["Coverage tab renders"],
+      "then": ["file appears under that spec’s tracked subsections (resolved / open / ignored)"]
+    },
+    {
+      "requirement": "coverage is grouped by spec",
+      "name": "Ambiguous tracked files use unassigned section",
+      "given": ["tracked file matches no spec or multiple specs"],
+      "when": ["Coverage tab renders"],
+      "then": ["file appears in Tracked files (unassigned) at the bottom"]
+    },
+    {
+      "requirement": "empty specs are omitted",
+      "name": "empty specs are omitted — primary path",
+      "when": ["Spec cards with no accepted links, no graph-only"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "empty specs are omitted",
+      "name": "empty specs are omitted — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Loading shows single progress message",
+      "when": ["review or graph request is in flight"],
+      "then": ["UI shows loading text before sections render"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns an error"],
+      "when": ["hook promise rejects"],
+      "then": ["UI renders the error message"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-tab-impact",
+        "file": "ui:src/change/ChangeMainView.tsx",
+        "symbol": "ChangeMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:98f3a84f9fd1a04a0e8cdb12cea36dd31353a82a14306d43e5bab8ac862d7c4a",
+    "verify.md": "sha256:f73b75c00fa733b6ddd476071f8c3fc4e6c696b4de60cc7a23e746fb5b20dc57"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["ui:inspector-delta-preview", "ui:inspector-unsaved-draft"],
+  "implementation": []
+}

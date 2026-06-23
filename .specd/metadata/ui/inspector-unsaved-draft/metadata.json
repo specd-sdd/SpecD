@@ -1,0 +1,116 @@
+{
+  "title": "Inspector Unsaved Draft",
+  "description": "Studio artifact inspector MUST make edit state obvious and prevent silent data loss when the user closes the panel or navigates away with a dirty buffer.",
+  "dependsOn": [
+    "ui:design-system",
+    "ui:hooks-inspector-save",
+    "client:port-changes-read",
+    "ui:inspector-metadata-schema"
+  ],
+  "context": [
+    "Studio artifact inspector MUST make edit state obvious and prevent silent data loss when the user closes the panel or navigates away with a dirty buffer."
+  ],
+  "rules": [
+    {
+      "requirement": "dirty state derived from buffer vs saved content",
+      "rules": [
+        "For editable change artifacts, the UI MUST treat the editor as dirty when `editorBuffer !== loadedArtifactContent` (after initial sync). Workspace canonical artifacts are never dirty in v1 (read-only)."
+      ]
+    },
+    {
+      "requirement": "unsaved indicator beside Save",
+      "rules": [
+        "When dirty, the inspector chrome MUST show a visible unsaved indicator adjacent to the Save control (icon or label). The indicator MUST clear after successful save when buffer matches new `originalHash` content."
+      ]
+    },
+    {
+      "requirement": "close and navigation require confirmation when dirty",
+      "rules": [
+        "When dirty, the following MUST open a modal with **Save**, **Discard**, and **Cancel**:\n\n- closing the artifact panel (✕)\n- selecting a different artifact in the same change\n- selecting a different change or spec in the sidebar\n\n**Cancel** MUST leave the panel open with buffer unchanged. **Discard** MUST proceed without save. **Save** MUST persist via `saveChangeArtifact` then proceed only on success."
+      ]
+    },
+    {
+      "requirement": "preview diff outline use draft pipelines when dirty",
+      "rules": [
+        "While dirty, Preview and Diff MUST use [`core:preview-artifact-overrides`](../core/preview-artifact-overrides/spec.md) (POST preview). Outline MUST pass current buffer to outline draft endpoints. See [`ui:inspector-metadata-schema`](../inspector-metadata-schema/spec.md)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "dirty state derived from buffer vs saved content",
+      "name": "dirty state derived from buffer vs saved content — primary path",
+      "when": ["For editable change artifacts, the UI MUST treat"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "dirty state derived from buffer vs saved content",
+      "name": "dirty state derived from buffer vs saved content — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "unsaved indicator beside Save",
+      "name": "Dirty shows indicator",
+      "given": ["user edited change artifact text"],
+      "when": ["buffer differs from last loaded content"],
+      "then": ["unsaved indicator is visible next to Save"]
+    },
+    {
+      "requirement": "unsaved indicator beside Save",
+      "name": "Save clears indicator",
+      "given": ["dirty buffer"],
+      "when": ["save succeeds"],
+      "then": ["indicator disappears", "AND buffer matches saved content"]
+    },
+    {
+      "requirement": "close and navigation require confirmation when dirty",
+      "name": "Close panel prompts when dirty",
+      "given": ["dirty artifact open"],
+      "when": ["user clicks close on inspector"],
+      "then": [
+        "modal offers Save, Discard, Cancel",
+        "AND modal chrome conforms to ui:design-system (StudioDialog)",
+        "AND Cancel keeps panel open"
+      ]
+    },
+    {
+      "requirement": "close and navigation require confirmation when dirty",
+      "name": "Discard closes without save",
+      "given": ["dirty artifact"],
+      "when": ["user chooses Discard on modal"],
+      "then": ["panel closes", "AND edits are not persisted"]
+    },
+    {
+      "requirement": "close and navigation require confirmation when dirty",
+      "name": "Save then close on confirm",
+      "given": ["dirty artifact"],
+      "when": ["user chooses Save on modal and save succeeds"],
+      "then": ["navigation or close completes"]
+    },
+    {
+      "requirement": "close and navigation require confirmation when dirty",
+      "name": "Clean close needs no modal",
+      "given": ["no edits since load or save"],
+      "when": ["user closes panel"],
+      "then": ["no modal is shown"]
+    },
+    {
+      "requirement": "preview diff outline use draft pipelines when dirty",
+      "name": "Preview uses draft merge when dirty",
+      "given": ["dirty delta artifact"],
+      "when": ["user opens Preview tab"],
+      "then": [
+        "UI calls previewChangeDraft with override for open filename",
+        "AND rendered markdown matches buffer merge"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:60b832b9329ca98cddb199e3d9df44ac115d308e271760fece11b17d74fd7f18",
+    "verify.md": "sha256:df1d3efc884094d92e859261776f8bab4aba006c5968007225b2a1b9d31f2737"
+  },
+  "generatedBy": "core"
+}

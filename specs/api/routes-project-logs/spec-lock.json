@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:read-log",
+    "api:composition-create-api-server",
+    "default:_global/architecture"
+  ],
+  "implementation": []
+}

@@ -1,0 +1,114 @@
+{
+  "title": "Sidebar Changes In Progress",
+  "description": "Studio UI for **Sidebar Changes In Progress**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes In Progress**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Sidebar Changes In Progress**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes In Progress**."
+  ],
+  "rules": [
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "rules": [
+        "The sidebar MUST render a list of active in-progress changes from global poll hooks. Sections MUST be enclosed in shadcn **`Card`** components. Each row MUST be implemented using a shadcn **`Button`** (variant ghost) that navigates to the change Overview — the sidebar MUST NOT expose per-row action buttons (Draft, Discard, Archive, etc.). All lifecycle actions are surfaced in the change **Overview** tab after opening the change."
+      ]
+    },
+    {
+      "requirement": "rows must truncate long change names",
+      "rules": [
+        "Each change row MUST support text truncation (\"...\") when the sidebar width is constrained, using flexbox-based `min-w-0` and `truncate` rules applied to the button and its children."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "name": "Sidebar lists refresh on global poll",
+      "given": ["shell global poll is running"],
+      "when": ["poll tick fires"],
+      "then": ["active changes list updates", "AND no action buttons are rendered on sidebar rows"]
+    },
+    {
+      "requirement": "sidebar renders global poll data — navigation only",
+      "name": "Open action calls read port",
+      "when": ["user clicks an active change row"],
+      "then": ["port-changes-read opens the change Overview tab", "AND no direct core import"]
+    },
+    {
+      "requirement": "rows must truncate long change names",
+      "name": "Long change names truncate",
+      "given": ["a change with name exceeding sidebar width"],
+      "when": ["sidebar renders"],
+      "then": [
+        "name truncates with an ellipsis",
+        "AND full name is visible via native browser tooltip"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:sidebar-changes-in-progress",
+        "file": "ui:src/sidebar/ChangesSidebar.tsx",
+        "symbol": "ChangesSidebar"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:27e8b92e83f3b29b831c9eb0db823beba7a2bfc2de4c95b54ecf492ee8f1a7d8",
+    "verify.md": "sha256:27e5718810efe36805818d505711df25e4b160ec0509544d57ab01c4fdc2ea08"
+  },
+  "generatedBy": "core"
+}

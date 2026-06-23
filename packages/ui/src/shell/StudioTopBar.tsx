@@ -143,7 +143,7 @@ export function StudioTopBar({
             className="w-80 border-border bg-panel p-0 shadow-lg text-foreground"
             align="end"
           >
-            <div className="flex flex-col max-h-[350px] overflow-y-auto">
+            <div className="studio-scrollbar flex flex-col max-h-[350px] overflow-y-auto">
               <div className="border-b border-border bg-panel-header px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground flex justify-between items-center">
                 <span>System Health</span>
                 {hasNotifications && (

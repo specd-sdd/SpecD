@@ -1,0 +1,108 @@
+{
+  "title": "Hooks Changes Mutate",
+  "description": "React data hooks for **Hooks Changes Mutate**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports.",
+  "dependsOn": ["client:specd-data-port", "client:port-changes-mutate"],
+  "context": [
+    "React data hooks for **Hooks Changes Mutate**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports."
+  ],
+  "rules": [
+    {
+      "requirement": "mutate hooks delegate to port-changes-mutate",
+      "rules": [
+        "Validate, transition, patch, and lifecycle actions MUST invoke the corresponding methods on `client:port-changes-mutate`."
+      ]
+    },
+    {
+      "requirement": "mutate hooks surface save conflicts to the inspector",
+      "rules": [
+        "HTTP 409 responses from save MUST be forwarded to `ui:hooks-inspector-save` for conflict UI; hooks MUST NOT swallow `ArtifactConflictError`."
+      ]
+    },
+    {
+      "requirement": "usePatchChange delegates metadata PATCH",
+      "rules": [
+        "`usePatchChange` MUST call `port.patchChange` and expose `isPatching`, `error`, and optional `onPatched` callback for description, invalidation policy, and scope changes."
+      ]
+    },
+    {
+      "requirement": "scope dialog uses updateSpecDependencies",
+      "rules": [
+        "[`ui:change-scope-dialog`](../change-scope-dialog/spec.md) MUST call `port.updateSpecDependencies(name, { specId, set })` per spec whose `dependsOn` list changed, then refetch `getChange` for fresh detail."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "mutate hooks delegate to port-changes-mutate",
+      "name": "Transition calls port-changes-mutate",
+      "when": ["user approves a lifecycle transition in UI"],
+      "then": ["transitionChange runs via port", "AND status refetch follows success"]
+    },
+    {
+      "requirement": "mutate hooks delegate to port-changes-mutate",
+      "name": "409 from save is forwarded",
+      "given": ["save returns ArtifactConflictError"],
+      "when": ["mutate hook completes"],
+      "then": ["error reaches inspector save hook", "AND error is not swallowed"]
+    },
+    {
+      "requirement": "mutate hooks delegate to port-changes-mutate",
+      "name": "Validate uses mutate port with scope",
+      "when": ["user clicks Validate on artifact tab"],
+      "then": ["validateChange receives file/artifact scope", "AND problems update"]
+    },
+    {
+      "requirement": "mutate hooks surface save conflicts to the inspector",
+      "name": "409 from save reaches inspector",
+      "given": ["save returns conflict"],
+      "when": ["mutate hook completes"],
+      "then": ["error forwarded to save hook", "AND inspector shows conflict UI"]
+    },
+    {
+      "requirement": "mutate hooks surface save conflicts to the inspector",
+      "name": "Non-conflict errors use toast",
+      "when": ["save returns 400 validation error"],
+      "then": ["generic error message shown", "AND no conflict dialog"]
+    },
+    {
+      "requirement": "mutate hooks surface save conflicts to the inspector",
+      "name": "Successful mutate clears error state",
+      "when": ["transition succeeds"],
+      "then": ["mutate hook error cleared", "AND status refetch scheduled"]
+    },
+    {
+      "requirement": "usePatchChange delegates metadata PATCH",
+      "name": "usePatchChange delegates metadata PATCH — primary path",
+      "when": ["usePatchChange MUST call port.patchChange and expose isPatching, error,"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "usePatchChange delegates metadata PATCH",
+      "name": "usePatchChange delegates metadata PATCH — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "scope dialog uses updateSpecDependencies",
+      "name": "scope dialog uses updateSpecDependencies — primary path",
+      "when": [
+        "[ui:change-scope-dialog](../change-scope-dialog/spec.md) MUST call port.updateSpecDependencies(name, { specId, set })"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "scope dialog uses updateSpecDependencies",
+      "name": "scope dialog uses updateSpecDependencies — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:328a47c828e5a9f37c9f3a60f9ba2ca02adf00019e632f2d51e9458c42316163",
+    "verify.md": "sha256:74f8318884f0185a8c20a55d21ed1d3e1e472c5564731a4d4b5809c7f028d881"
+  },
+  "generatedBy": "core"
+}

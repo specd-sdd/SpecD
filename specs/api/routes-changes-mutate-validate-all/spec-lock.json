@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:validate-change-batch",
+    "api:routes-changes-mutate",
+    "api:dto-validate-batch-result"
+  ],
+  "implementation": []
+}

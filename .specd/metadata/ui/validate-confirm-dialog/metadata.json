@@ -1,0 +1,95 @@
+{
+  "title": "Validate Confirm Dialog",
+  "description": "Before structural validation runs, Studio MUST warn that re-validation can **invalidate** the change and cause **approval drift** on already-validated artifacts, which marks downstream DAG steps as needing review.",
+  "dependsOn": [
+    "ui:design-system",
+    "ui:shell-layout",
+    "ui:bottom-panel-output",
+    "ui:bottom-panel-problems",
+    "client:port-changes-mutate"
+  ],
+  "context": [
+    "Before structural validation runs, Studio MUST warn that re-validation can **invalidate** the change and cause **approval drift** on already-validated artifacts, which marks downstream DAG steps as needing review."
+  ],
+  "rules": [
+    {
+      "requirement": "validate actions require explicit confirmation",
+      "rules": [
+        "**Validate** (inspector, current artifact) and **Validate All** (Artifacts tab toolbar on active changes) MUST open a confirmation modal with **Continue** and **Cancel** before calling `validateChange`. Modal chrome MUST follow [`ui:design-system`](../design-system/spec.md) (`StudioDialog` using shadcn `Button` components for actions).\n\n**Cancel** MUST close the modal without invoking validation. **Continue** MUST run validation, append each result line to the studio **Output** stream (with `error` / `warn` / `info` levels), and select the **Problems** tab when any line is a warning or error.\n\n**Validate All** MUST call `validateChangeAll` once (DAG batch on the server via [`ui:hooks-change-validate`](hooks-change-validate/spec.md)), even when an artifact editor tab is open. **Validate** (inspector) MUST validate only the open change artifact (`validateChange` with `specId` + `artifactId` from filename)."
+      ]
+    },
+    {
+      "requirement": "modal copy explains invalidation and drift",
+      "rules": [
+        "The modal body MUST state that validation re-runs schema checks for the targeted scope and that content differing from recorded approval hashes can invalidate the change and affect downstream artifact-DAG steps."
+      ]
+    },
+    {
+      "requirement": "problems panel is not overwritten by status polling",
+      "rules": [
+        "Workflow blockers from `getChangeStatus` MUST remain on **Overview**. The **Problems** panel is a filter of studio output (warn/error only) and MUST NOT be cleared or replaced by status polling."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "validate actions require explicit confirmation",
+      "name": "Validate All opens confirm before API call",
+      "given": ["user is on the Artifacts tab for an active change"],
+      "when": ["user clicks Validate All"],
+      "then": [
+        "confirm modal is shown per ui:design-system (StudioDialog with shadcn Button components)",
+        "AND neither validateChange nor validateChangeAll is called until user clicks Continue"
+      ]
+    },
+    {
+      "requirement": "validate actions require explicit confirmation",
+      "name": "Cancel dismisses confirm without validating",
+      "when": ["confirm modal is open and user clicks Cancel"],
+      "then": ["modal closes", "AND no validation request is sent"]
+    },
+    {
+      "requirement": "validate actions require explicit confirmation",
+      "name": "Inspector Validate uses artifact scope copy",
+      "when": ["user clicks Validate in the inspector with a change artifact open"],
+      "then": [
+        "confirm modal mentions the artifact filename",
+        "AND validation runs with specId and artifactId derived from that file on Continue"
+      ]
+    },
+    {
+      "requirement": "validate actions require explicit confirmation",
+      "name": "Validate All ignores open artifact selection",
+      "when": ["user clicks Validate All while a change artifact tab is open"],
+      "then": [
+        "confirm modal copy targets all specs in the change",
+        "AND on Continue [ui:hooks-change-validate](hooks-change-validate/spec.md) calls validateChangeAll once (not a per-spec loop)"
+      ]
+    },
+    {
+      "requirement": "modal copy explains invalidation and drift",
+      "name": "Body mentions invalidate and drift",
+      "when": ["confirm modal is displayed"],
+      "then": ["body text references invalidation or drift and downstream DAG review"]
+    },
+    {
+      "requirement": "problems panel is not overwritten by status polling",
+      "name": "problems panel is not overwritten by status p… — primary path",
+      "when": ["Workflow blockers from getChangeStatus MUST remain on Overview."],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "problems panel is not overwritten by status polling",
+      "name": "problems panel is not overwritten by status p… — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:844e72cfd15090a3790abfcf3057086979d2561d880ce59b744247745741714a",
+    "verify.md": "sha256:e7b1e65b14a2daffe90388548b134c3cc38743078120098fc92e018aae945511"
+  },
+  "generatedBy": "core"
+}

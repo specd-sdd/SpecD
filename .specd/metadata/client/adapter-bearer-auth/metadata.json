@@ -1,0 +1,122 @@
+{
+  "title": "Adapter Bearer Auth",
+  "description": "Standalone `specd-studio-web` and desktop remote profiles may point at an API that eventually requires tokens. This adapter only adds `Authorization: Bearer` on outbound HTTP for remote profiles; it does not implement server auth and is unused for embedded same-origin or desktop local IPC.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "Standalone `specd-studio-web` and desktop remote profiles may point at an API that eventually requires tokens. This adapter only adds `Authorization: Bearer` on outbound HTTP for remote profiles; it does not implement server auth and is unused for embedded same-origin or desktop local IPC."
+  ],
+  "rules": [
+    {
+      "requirement": "bearer header is added only for remote connection profiles",
+      "rules": [
+        "When the active Studio connection profile includes a non-empty API token, outgoing HTTP requests MUST include `Authorization: Bearer <token>`."
+      ]
+    },
+    {
+      "requirement": "embedded and desktop local profiles omit Authorization",
+      "rules": [
+        "Same-origin `specd ui serve` and desktop local IPC profiles MUST NOT add an `Authorization` header."
+      ]
+    },
+    {
+      "requirement": "bearer adapter does not validate tokens",
+      "rules": [
+        "The adapter MUST NOT validate tokens locally; HTTP 401 responses MUST be handled by `client:adapter-problem-json-errors`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "bearer header is added only for remote connection profiles",
+      "name": "Remote profile sends Authorization",
+      "given": ["connection profile includes token sekret"],
+      "when": ["HTTP transport issues a request"],
+      "then": ["request headers include Authorization: Bearer sekret"]
+    },
+    {
+      "requirement": "bearer header is added only for remote connection profiles",
+      "name": "Embedded profile omits Authorization",
+      "given": ["Studio runs embedded same-origin"],
+      "when": ["HTTP transport issues a request"],
+      "then": ["Authorization header is absent"]
+    },
+    {
+      "requirement": "bearer header is added only for remote connection profiles",
+      "name": "Empty token omits Authorization header",
+      "given": ["remote profile is selected but token is empty"],
+      "when": ["HTTP transport issues a request"],
+      "then": [
+        "Authorization header is absent",
+        "AND request still targets the configured base URL"
+      ]
+    },
+    {
+      "requirement": "embedded and desktop local profiles omit Authorization",
+      "name": "Same-origin ui serve omits Authorization",
+      "given": ["Studio uses embedded specd ui serve profile"],
+      "when": ["HTTP transport issues a same-origin request"],
+      "then": ["Authorization header is absent"]
+    },
+    {
+      "requirement": "embedded and desktop local profiles omit Authorization",
+      "name": "Desktop local IPC omits Authorization",
+      "given": ["desktop app uses local IPC data adapter"],
+      "when": ["data call does not go through HTTP transport"],
+      "then": ["bearer adapter is not in the IPC path", "AND no Authorization header is injected"]
+    },
+    {
+      "requirement": "embedded and desktop local profiles omit Authorization",
+      "name": "Switching to remote profile adds Bearer",
+      "given": ["user selects a remote profile with token configured"],
+      "when": ["next HTTP request is sent through remote transport"],
+      "then": ["Authorization: Bearer … header is present"]
+    },
+    {
+      "requirement": "bearer adapter does not validate tokens",
+      "name": "Adapter does not verify JWT or API key locally",
+      "when": ["bearer middleware attaches a token to the request"],
+      "then": ["adapter does not parse or reject the token", "AND no local 401 is synthesized"]
+    },
+    {
+      "requirement": "bearer adapter does not validate tokens",
+      "name": "HTTP 401 is handled by problem-json errors adapter",
+      "given": ["remote API returns HTTP 401 with problem body"],
+      "when": ["transport receives the response"],
+      "then": [
+        "client:adapter-problem-json-errors surfaces the failure",
+        "AND bearer adapter does not mask the 401"
+      ]
+    },
+    {
+      "requirement": "bearer adapter does not validate tokens",
+      "name": "Invalid token reaches the server unchanged",
+      "given": ["profile stores token bad"],
+      "when": ["HTTP request is issued"],
+      "then": [
+        "header is Authorization: Bearer bad",
+        "AND server decides validity; adapter does not short-circuit"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:adapter-bearer-auth",
+        "file": "client:src/adapter-bearer-auth.ts",
+        "symbol": "withBearerAuth"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:7310f405ce3572a1caa3d6fc7c6aef5b2ae3abb606ead3842c5064ecc4e60f3e",
+    "verify.md": "sha256:1ee7145f89a8b600e8e343ab28a5ef9d0e363485ae7fafe0effc729b76795931"
+  },
+  "generatedBy": "core"
+}

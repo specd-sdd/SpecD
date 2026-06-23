@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["plugin-manager:ui-plugin-type", "studio-web:vite-host", "core:ui-plugin-errors"],
+  "implementation": []
+}

@@ -8,7 +8,7 @@ Without a single entity that owns spec work end-to-end, lifecycle state, approva
 
 ### Requirement: Identity
 
-A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `createdAt` timestamp recorded at creation time. Both are immutable.
+A Change has a unique, user-defined slug name (e.g. `add-auth-flow`), a `createdAt` timestamp recorded at creation time, and an **`updatedAt`** revision timestamp loaded from the manifest. `name` and `createdAt` are immutable. `updatedAt` MUST satisfy `updatedAt >= createdAt`.
 
 Identities in specd are represented by the `ActorIdentity` interface:
 

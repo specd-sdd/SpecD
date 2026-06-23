@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "plugin-manager:ui-plugin-type",
+    "api:composition-create-api-server",
+    "cli:serve-api"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/serve/serve-ui.ts",
+      "symbols": ["registerServeUi"]
+    }
+  ]
+}

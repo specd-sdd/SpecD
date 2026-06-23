@@ -1,0 +1,109 @@
+{
+  "title": "Spec Metadata Presentation",
+  "description": "Studio UI for spec metadata presentation: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio MUST present spec identity and descriptive metadata without a dedicated **Metadata** center tab.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for spec metadata presentation: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio MUST present spec identity and descriptive metadata without a dedicated **Metadata** center tab."
+  ],
+  "rules": [
+    {
+      "requirement": "overview owns spec metadata presentation",
+      "rules": [
+        "Studio MUST NOT expose a separate **Metadata** center tab for specs.\n\nThe spec **Overview** tab MUST surface the metadata that matters for normal reading:\n\n- spec identity (`specId`)\n- title\n- description\n- workspace/path context when relevant inside the overview content itself, not in a dedicated spec header bar\n\nTab-scoped detail polling remains owned by the visible Overview and sibling detail tabs; there is no metadata-only poll loop."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "overview owns spec metadata presentation",
+      "name": "Metadata tab is not offered",
+      "when": ["user opens a spec in Studio"],
+      "then": [
+        "the center tab strip does not include a Metadata tab",
+        "AND metadata remains available through Overview presentation"
+      ]
+    },
+    {
+      "requirement": "overview owns spec metadata presentation",
+      "name": "Overview carries the metadata summary",
+      "given": ["a loaded spec with title and description"],
+      "when": ["user views Overview"],
+      "then": [
+        "the main spec metadata is visible there",
+        "AND Studio does not require a separate spec header bar for that summary"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:spec-tab-metadata",
+        "file": "ui:src/spec/SpecMainView.tsx",
+        "symbol": "SpecMainView"
+      },
+      {
+        "specId": "ui:spec-tab-metadata",
+        "file": "ui:src/tabs/SpecTabs.tsx",
+        "symbol": "SpecTabs"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:f505643ca5a3ff3b71c328c8be156473053785b9544617234007ab46c2bb917e",
+    "verify.md": "sha256:b8c2dede27c15a30ad891102e0a198c200f187e281a8098ed66cb0c2e81dd1d3"
+  },
+  "generatedBy": "core"
+}

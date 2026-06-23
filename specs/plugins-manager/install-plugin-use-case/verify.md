@@ -36,6 +36,13 @@
 - **THEN** it loads the plugin via `PluginLoader`
 - **AND** validates it is an `AgentPlugin`
 
+#### Scenario: UI plugin rejected by InstallPlugin
+
+- **GIVEN** a loaded UI plugin (`isUiPlugin` is true)
+- **WHEN** `InstallPlugin.execute()` is called
+- **THEN** `PluginValidationError` is thrown
+- **AND** the message or detail mentions `InstallUiPlugin`
+
 ### Requirement: Error handling
 
 #### Scenario: Non-agent plugin rejected

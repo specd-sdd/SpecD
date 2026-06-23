@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "client:dto-change-detail", "ui:change-tab-artifacts"],
+  "implementation": [
+    {
+      "file": "ui:src/change/ChangeMainView.tsx",
+      "symbols": ["ChangeMainView"]
+    }
+  ]
+}

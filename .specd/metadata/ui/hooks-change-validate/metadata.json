@@ -1,0 +1,63 @@
+{
+  "title": "Hooks Change Validate",
+  "description": "Studio validation orchestration in `packages/ui/src/hooks/use-change-validate.ts`: one HTTP batch for **Validate All**, one single-step call for the open artifact.",
+  "dependsOn": [
+    "client:port-changes-mutate-validate-all",
+    "client:port-changes-mutate",
+    "ui:validate-confirm-dialog",
+    "core:validate-change-batch"
+  ],
+  "context": [
+    "Studio validation orchestration in `packages/ui/src/hooks/use-change-validate.ts`: one HTTP batch for **Validate All**, one single-step call for the open artifact."
+  ],
+  "rules": [
+    {
+      "requirement": "runChangeValidation uses server batch for Validate All",
+      "rules": [
+        "When `filename` is omitted, MUST call `port.validateChangeAll(changeName, { artifactId? })` once and flatten with `flattenBatchValidateResult`. MUST NOT loop `change.specIds` with `validateChange`.\n\nWhen `filename` is set, MUST call `port.validateChange` with derived `specId` and `artifactId`."
+      ]
+    },
+    {
+      "requirement": "flattenBatchValidateResult for shell output",
+      "rules": [
+        "MUST merge batch step failures, warnings, and files into `ValidateResultDto` so the shell can append lines to [`ui:bottom-panel-output`](../bottom-panel-output/spec.md) with appropriate levels; [`ui:bottom-panel-problems`](../bottom-panel-problems/spec.md) derives warn/error lines from that stream."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "runChangeValidation uses server batch for Validate All",
+      "name": "Validate All single port call",
+      "when": ["runChangeValidation runs without filename"],
+      "then": ["validateChangeAll is invoked once", "AND validateChange is not invoked"]
+    },
+    {
+      "requirement": "runChangeValidation uses server batch for Validate All",
+      "name": "Inspector validate single step",
+      "when": ["runChangeValidation runs with a change-relative filename"],
+      "then": [
+        "validateChange is invoked once with derived ids",
+        "AND validateChangeAll is not invoked"
+      ]
+    },
+    {
+      "requirement": "flattenBatchValidateResult for shell output",
+      "name": "flattenBatchValidateResult for shell output — primary path",
+      "when": ["MUST merge batch step failures, warnings, and files"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "flattenBatchValidateResult for shell output",
+      "name": "flattenBatchValidateResult for shell output — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:02e9734301c8fa8c5736adb79849d6a401ce3a77a01e35bb08b05f1632b6ad5c",
+    "verify.md": "sha256:80f04ce298cd7d0a32708d88568854f4fa89150d9a3495f0e64b486cadad8d82"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,204 @@
+{
+  "title": "Change Tab Artifacts",
+  "description": "Studio UI for **Change Tab Artifacts**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Artifacts**.",
+  "dependsOn": ["client:specd-data-port", "ui:design-system"],
+  "context": [
+    "Studio UI for **Change Tab Artifacts**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Artifacts**."
+  ],
+  "rules": [
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "rules": [
+        "While the Artifacts tab is visible for an **active** change, the view MUST load the artifact list via `listChangeArtifacts(name)` (not only `getChangeStatus` short-circuit). For a **drafted** change it MUST use `listDraftArtifacts(name)`; for **discarded** it MUST use `listDiscardedArtifacts(name)`. The UI MUST use the shadcn **`Accordion`** component (with `type=\"multiple\"`) to group artifacts into two top-level **scope** sections, in order: **Change**, then **Spec**.\n\n**Change scope:** files whose paths are not under `specs/` or `deltas/` (e.g. `proposal.md`, `design.md`, `tasks.md`). Within Change, group by artifact type (`proposal`, `design`, `tasks`, …). Each artifact type appears **once**, ordered by the schema artifact DAG topological order (`proposal` → `specs` → `verify` → `design` → `tasks`, change-scoped types only). Files within a type sort ascending by full path.\n\n**Spec scope:** files under `specs/` or `deltas/` (any artifact type). Group by `specId` (`workspace:capability-path`) using [`ui:design-system`](../design-system/spec.md) ascending order. Within each spec, list all artifact files for that spec together (specs, verify, deltas, etc.): if a `spec.md` exists among those paths it MUST be first; remaining files sort ascending by full path. Artifact rows MUST be implemented using shadcn **`Button`** components for consistent interaction.\n\nTab-scoped poll MUST adopt global ticks only while the tab is visible. For **archived** changes, the tab MUST render the archived snapshot `artifacts[]` metadata from `getArchivedChange` without calling `listChangeArtifacts`, preserving the same grouped **Change** / **Spec** layout as active changes wherever the archived snapshot contains those files."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "artifacts tab exposes validate all for active changes",
+      "rules": [
+        "For **active** (non-archived) changes, the Artifacts tab MUST render a **Validate All** control (`data-testid=\"studio-validate-all\"`) in a tab toolbar above the artifact accordion. Clicking it MUST delegate to shell validate flow ([`ui:validate-confirm-dialog`](../validate-confirm-dialog/spec.md)). Archived changes MUST NOT show this control."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Unchanged status skips tab refetch",
+      "given": ["tab is visible", "AND cached updatedAt matches server"],
+      "when": ["getChangeStatus returns { unchanged: true }"],
+      "then": ["tab does not refetch heavy views", "AND spinner stops without data swap"]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Advanced updatedAt refetches tab data",
+      "given": ["status returns newer updatedAt"],
+      "when": ["tab poll observes revision bump"],
+      "then": ["only this tab data sources reload", "AND other tabs are unaffected"]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Hidden tab pauses polling",
+      "given": ["change tab was visible then hidden"],
+      "when": ["poll interval fires"],
+      "then": [
+        "no tab-scoped artifact list request is sent",
+        "AND cache is retained until visible again"
+      ]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Artifacts tab uses listChangeArtifacts endpoint",
+      "given": ["active change"],
+      "when": ["user selects Artifacts tab"],
+      "then": [
+        "UI calls listChangeArtifacts",
+        "AND renders grouped files even when status returns unchanged: true"
+      ]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Drafted change uses listDraftArtifacts",
+      "given": ["drafted change open with listSection draft"],
+      "when": ["user selects Artifacts tab"],
+      "then": ["UI calls listDraftArtifacts", "AND does not call listChangeArtifacts"]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Discarded change uses listDiscardedArtifacts",
+      "given": ["discarded change open with listSection discarded"],
+      "when": ["user selects Artifacts tab"],
+      "then": ["UI calls listDiscardedArtifacts"]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Tasks tab skips fetch when tasks artifact is missing",
+      "given": ["status shows tasks artifact as missing"],
+      "when": ["user opens Tasks tab for a drafted change"],
+      "then": [
+        "UI does not call getChange for tasks.md",
+        "AND shows a missing-tasks message instead of Change '<name>' not found"
+      ]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Artifacts grouped by scope change then spec",
+      "given": ["active change with proposal.md and at least one specs/.../spec.md"],
+      "when": ["user opens the Artifacts tab"],
+      "then": [
+        "UI shows a Change section before a Spec section",
+        "AND proposal.md appears under Change grouped by artifact type",
+        "AND spec paths appear under Spec grouped by specId"
+      ]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Change scope types follow DAG order without duplicates",
+      "given": ["active change with proposal.md, design.md, and tasks.md"],
+      "when": ["user opens the Artifacts tab"],
+      "then": [
+        "Change section lists artifact types in order proposal, design, tasks",
+        "AND each type appears at most once"
+      ]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Spec scope lists spec.md first within a spec",
+      "given": ["active change with specs/ui/foo/spec.md and specs/ui/foo/verify.md"],
+      "when": ["user opens the Artifacts tab under Spec for ui:foo"],
+      "then": ["spec.md is listed before verify.md"]
+    },
+    {
+      "requirement": "change tab refetches status (artifact DAG) when updatedAt advances",
+      "name": "Archived artifacts tab shows snapshot artifact files",
+      "given": ["archived change context"],
+      "when": ["user selects Artifacts tab"],
+      "then": [
+        "UI lists archived snapshot artifact files grouped in the standard layout",
+        "AND does not call listChangeArtifacts"
+      ]
+    },
+    {
+      "requirement": "artifacts tab exposes validate all for active changes",
+      "name": "Active change shows Validate All on Artifacts tab",
+      "given": ["an active change"],
+      "when": ["user selects Artifacts"],
+      "then": [
+        "data-testid=\"studio-artifacts-tab\" is visible",
+        "AND data-testid=\"studio-validate-all\" is visible in the tab toolbar"
+      ]
+    },
+    {
+      "requirement": "artifacts tab exposes validate all for active changes",
+      "name": "Archived change hides Validate All",
+      "given": ["archived change context"],
+      "when": ["user selects Artifacts"],
+      "then": ["no studio-validate-all control is rendered"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-tab-artifacts",
+        "file": "ui:src/change/ChangeMainView.tsx",
+        "symbol": "ChangeMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:7006d9f4e025dfd1b9244bacca174db9bcb8a911e32285185d565f1cc228b3ed",
+    "verify.md": "sha256:f01ca6043510034e30f8a4a5fa8776e5f804d51aa9ad491ebdab98f974a11c39"
+  },
+  "generatedBy": "core"
+}

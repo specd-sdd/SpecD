@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "client:port-changes-read",
+    "client:port-workspaces-specs",
+    "ui:inspector-metadata-schema"
+  ],
+  "implementation": []
+}

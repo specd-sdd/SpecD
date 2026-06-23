@@ -1,0 +1,78 @@
+{
+  "title": "Routes Changes Mutate — validate-all",
+  "description": "HTTP batch validation for Studio and agents: one request walks the change artifact DAG (parity with `specd changes validate --all`).",
+  "dependsOn": [
+    "core:validate-change-batch",
+    "api:routes-changes-mutate",
+    "api:dto-validate-batch-result"
+  ],
+  "context": [
+    "HTTP batch validation for Studio and agents: one request walks the change artifact DAG (parity with `specd changes validate --all`)."
+  ],
+  "rules": [
+    {
+      "requirement": "POST validate-all delegates to ValidateChangeBatch",
+      "rules": [
+        "`POST /v1/changes/{name}/validate-all` MUST accept optional JSON/query `{ artifactId?: string }` and invoke `kernel.changes.validateBatch.execute({ name, artifactId? })`.\n\nThe handler MUST NOT loop `specIds` or call `validate` per spec."
+      ]
+    },
+    {
+      "requirement": "response shape",
+      "rules": [
+        "The response MUST be `ValidateBatchResultDto`:\n\n```json\n{\n  \"passed\": false,\n  \"total\": 12,\n  \"results\": [\n    {\n      \"spec\": null,\n      \"artifact\": \"proposal\",\n      \"passed\": true,\n      \"failures\": [],\n      \"warnings\": [],\n      \"files\": [\"proposal.md\"]\n    }\n  ]\n}\n```\n\nFailures MUST map `description` → `message` and include optional `path` from filename metadata."
+      ]
+    },
+    {
+      "requirement": "single-step validate unchanged",
+      "rules": [
+        "`POST /v1/changes/{name}/validate` remains the **single-step** endpoint (`specId` / `artifactId` → one `ValidateArtifacts` pass, flat `ValidateResultDto`). Batch and single-step MUST NOT share the same response DTO."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "POST validate-all delegates to ValidateChangeBatch",
+      "name": "Active change returns batch envelope",
+      "given": ["API server with an active change"],
+      "when": ["POST /v1/changes/{name}/validate-all with {}"],
+      "then": [
+        "HTTP 200 with passed, total, and results[]",
+        "AND each result has spec, artifact, passed, failures, warnings, files"
+      ]
+    },
+    {
+      "requirement": "POST validate-all delegates to ValidateChangeBatch",
+      "name": "artifactId query filters steps",
+      "given": ["active change"],
+      "when": ["POST .../validate-all with { \"artifactId\": \"proposal\" }"],
+      "then": ["every results[].artifact equals proposal"]
+    },
+    {
+      "requirement": "response shape",
+      "name": "response shape — primary path",
+      "when": ["The response MUST be ValidateBatchResultDto: json { passed:"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "response shape",
+      "name": "response shape — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "single-step validate unchanged",
+      "name": "validate endpoint still returns flat DTO",
+      "when": [
+        "POST /v1/changes/{name}/validate with { \"specId\": \"core:foo\", \"artifactId\": \"specs\" }"
+      ],
+      "then": ["body has top-level passed, failures, warnings, files without results array"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:5654b3e994b425f755646f47f2310dfaa6b1b7d312d5bf66fc231cc8637ef653",
+    "verify.md": "sha256:8f017f5f1fb1e52a9fdf4ef07fa9679582a4628bcc86fc3e32c9efc6cb195416"
+  },
+  "generatedBy": "core"
+}

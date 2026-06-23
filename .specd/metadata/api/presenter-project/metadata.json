@@ -1,0 +1,90 @@
+{
+  "title": "Presenter Project",
+  "description": "Maps kernel or graph results into the matching `dto-*` response for **Presenter Project**. Presenters are pure formatting at the HTTP boundary so handlers do not embed lifecycle or validation logic.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "api:dto-project"],
+  "context": [
+    "Maps kernel or graph results into the matching `dto-*` response for **Presenter Project**. Presenters are pure formatting at the HTTP boundary so handlers do not embed lifecycle or validation logic."
+  ],
+  "rules": [
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "rules": [
+        "Given the same kernel or graph result, the presenter MUST produce the same DTO JSON shape, omitting optional properties when values are absent."
+      ]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "rules": [
+        "The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in `@specd/core` use cases."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "name": "Presenter output matches paired DTO",
+      "given": ["fixed kernel or graph fixture"],
+      "when": ["presenter serializes to JSON"],
+      "then": ["shape matches api:dto-* spec", "AND OpenAPI schema validates sample"]
+    },
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "name": "Presenter leaves kernel blockers unchanged",
+      "given": ["kernel returns known blockers"],
+      "when": ["presenter maps response"],
+      "then": ["blocker codes equal kernel", "AND no new blockers invented"]
+    },
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "name": "Repeated mapping is deterministic",
+      "when": ["presenter called twice on same input"],
+      "then": ["outputs are identical", "AND no time-dependent fields unless documented"]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "name": "Presenter output matches paired DTO",
+      "given": ["fixed kernel or graph fixture"],
+      "when": ["presenter serializes to JSON"],
+      "then": ["shape matches api:dto-* spec", "AND OpenAPI schema validates sample"]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "name": "Presenter leaves kernel blockers unchanged",
+      "given": ["kernel returns known blockers"],
+      "when": ["presenter maps response"],
+      "then": ["blocker codes equal kernel", "AND no new blockers invented"]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "name": "Repeated mapping is deterministic",
+      "when": ["presenter called twice on same input"],
+      "then": ["outputs are identical", "AND no time-dependent fields unless documented"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:presenter-project",
+        "file": "api:src/delivery/http/presenters/presenter-project.ts",
+        "symbol": "toProjectDto"
+      },
+      {
+        "specId": "api:presenter-project",
+        "file": "api:src/delivery/http/presenters/presenter-project.ts",
+        "symbol": "toProjectStatusDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:04653be8f9a4f96ab4bdba2d4db75e9fc4889637744ac02492e6219255d5a07a",
+    "verify.md": "sha256:10794a3f6afb66038154918967dbd9d5f7204a6dd56c296543e782475c970f60"
+  },
+  "generatedBy": "core"
+}

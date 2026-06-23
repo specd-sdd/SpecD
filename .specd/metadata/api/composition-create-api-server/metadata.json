@@ -1,0 +1,173 @@
+{
+  "title": "Composition Create Api Server",
+  "description": "SpecD Studio and `specd serve` need one factory that turns a discovered project into a listening HTTP server without reimplementing CLI workflow rules. `createApiServer` loads `api.auth` from `specd.yaml`, resolves the auth adapter once at startup, constructs a single process-scoped `Kernel`, registers all Studio routes under `/v1`, and can optionally mount the built `@specd/ui` bundle for embedded `specd ui serve`.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:auth-adapter-registry",
+    "api:middleware-auth",
+    "core:kernel"
+  ],
+  "context": [
+    "SpecD Studio and `specd serve` need one factory that turns a discovered project into a listening HTTP server without reimplementing CLI workflow rules. `createApiServer` loads `api.auth` from `specd.yaml`, resolves the auth adapter once at startup, constructs a single process-scoped `Kernel`, registers all Studio routes under `/v1`, and can optionally mount the built `@specd/ui` bundle for embedded `specd ui serve`."
+  ],
+  "rules": [
+    {
+      "requirement": "createApiServer accepts project host port and auth configuration",
+      "rules": [
+        "The factory MUST accept `{ projectRoot, host, port, auth, authRegistry?, uiDistPath? }` and return a listenable HTTP server."
+      ]
+    },
+    {
+      "requirement": "auth configuration is read from specd.yaml api.auth only",
+      "rules": [
+        "Effective auth MUST come from `specd.yaml` `api.auth` merged with CLI overrides. v1 MUST reject any `--auth` value other than `disabled`."
+      ]
+    },
+    {
+      "requirement": "one kernel per process with per-request context",
+      "rules": [
+        "The factory MUST call `createKernel` once per process with a `LogRingBuffer` (callback destination) and build per-request context via `createApiContext`.\n\nThe kernel MUST receive `logFormatter: createLogFormatter({ colorize: false })` so Studio log readback (`GET /v1/logs?prettier=true`) returns plain text without ANSI escape sequences."
+      ]
+    },
+    {
+      "requirement": "all API routes mount under /v1",
+      "rules": [
+        "Route plugins for project, changes, workspaces, specs, graph, and logs MUST register under the `/v1` prefix."
+      ]
+    },
+    {
+      "requirement": "health or project payload exposes auth type without secrets",
+      "rules": [
+        "`GET /v1/health` and/or `GET /v1/project` MUST echo `auth: { type }` matching effective configuration without returning tokens or key material."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "createApiServer accepts project host port and auth configuration",
+      "name": "Factory returns listening server",
+      "when": ["createApiServer({ projectRoot, host, port, auth }) runs"],
+      "then": ["HTTP server listens on host/port", "AND return value is stoppable"]
+    },
+    {
+      "requirement": "createApiServer accepts project host port and auth configuration",
+      "name": "Invalid project root fails fast",
+      "when": ["projectRoot lacks specd.yaml"],
+      "then": ["startup error before listen", "AND no partial route registration"]
+    },
+    {
+      "requirement": "createApiServer accepts project host port and auth configuration",
+      "name": "Optional uiDistPath serves static files",
+      "given": ["uiDistPath provided"],
+      "when": ["server starts"],
+      "then": ["/ serves UI assets", "AND /v1 still serves API"]
+    },
+    {
+      "requirement": "auth configuration is read from specd.yaml api.auth only",
+      "name": "CLI rejects non-disabled auth in v1",
+      "when": ["specd serve --auth bearer runs"],
+      "then": ["non-zero exit", "AND stderr explains only disabled supported"]
+    },
+    {
+      "requirement": "auth configuration is read from specd.yaml api.auth only",
+      "name": "Effective auth from yaml not studio keys",
+      "given": ["specd.yaml sets api.auth.type: disabled"],
+      "when": ["server boots"],
+      "then": ["middleware uses disabled verifier", "AND no studio.* auth keys consulted"]
+    },
+    {
+      "requirement": "auth configuration is read from specd.yaml api.auth only",
+      "name": "CLI override merges with yaml",
+      "given": ["yaml and --auth disabled"],
+      "when": ["createApiServer resolves auth"],
+      "then": ["effective type is disabled"]
+    },
+    {
+      "requirement": "one kernel per process with per-request context",
+      "name": "Single kernel shared across requests",
+      "when": ["two HTTP requests hit running server"],
+      "then": ["same Kernel instance", "AND separate createApiContext per request"]
+    },
+    {
+      "requirement": "one kernel per process with per-request context",
+      "name": "Context includes graph provider factory",
+      "when": ["handler calls createGraphProvider()"],
+      "then": ["factory closes over project config", "AND graph routes use provider"]
+    },
+    {
+      "requirement": "one kernel per process with per-request context",
+      "name": "Process exit closes server",
+      "when": ["SIGINT received"],
+      "then": ["server stops accepting connections", "AND kernel teardown is bounded"]
+    },
+    {
+      "requirement": "all API routes mount under /v1",
+      "name": "Project route is under /v1",
+      "when": ["GET /v1/project requested"],
+      "then": ["handler responds", "AND GET /project is not registered"]
+    },
+    {
+      "requirement": "all API routes mount under /v1",
+      "name": "Changes routes are under /v1",
+      "when": ["GET /v1/changes requested"],
+      "then": ["collection handler runs"]
+    },
+    {
+      "requirement": "all API routes mount under /v1",
+      "name": "Graph routes are under /v1",
+      "when": ["GET /v1/graph/status requested"],
+      "then": ["graph handler runs"]
+    },
+    {
+      "requirement": "health or project payload exposes auth type without secrets",
+      "name": "GET project echoes auth type",
+      "when": ["GET /v1/project succeeds"],
+      "then": ["JSON includes auth: { type }", "AND no tokens or key paths in body"]
+    },
+    {
+      "requirement": "health or project payload exposes auth type without secrets",
+      "name": "Health endpoint is safe to expose",
+      "when": ["GET /v1/health called"],
+      "then": ["HTTP 200", "AND body has no secret material"]
+    },
+    {
+      "requirement": "health or project payload exposes auth type without secrets",
+      "name": "Auth type matches effective configuration",
+      "given": ["yaml sets disabled"],
+      "when": ["project endpoint queried"],
+      "then": ["auth.type is disabled"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:composition-create-api-server",
+        "file": "api:src/composition/create-api-server.ts",
+        "symbol": "CreateApiServerOptions"
+      },
+      {
+        "specId": "api:composition-create-api-server",
+        "file": "api:src/composition/create-api-server.ts",
+        "symbol": "ApiServer"
+      },
+      {
+        "specId": "api:composition-create-api-server",
+        "file": "api:src/composition/create-api-server.ts",
+        "symbol": "createApiServer"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:3c0396777f99607dfc1880e9c8678e456a48f9e6b62d5013834d25f73ead744d",
+    "verify.md": "sha256:d91ea960935f4d30d21c2ec60870f7d8a1e8c8a3c463efff66bf62c1f2061b53"
+  },
+  "generatedBy": "core"
+}

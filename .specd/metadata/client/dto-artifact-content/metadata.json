@@ -1,0 +1,83 @@
+{
+  "title": "Dto Artifact Content",
+  "description": "Client-side type for **Dto Artifact Content**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits.",
+  "dependsOn": ["default:_global/architecture", "api:dto-artifact-content"],
+  "context": [
+    "Client-side type for **Dto Artifact Content**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits."
+  ],
+  "rules": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "rules": [
+        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names."
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "rules": [
+        "DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Client type fields match API DTO",
+      "when": ["TypeScript compiles client against paired api:dto-*"],
+      "then": ["property names match", "AND required/optional semantics match"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Sample API JSON parses without renaming",
+      "given": ["fixture JSON from API presenter"],
+      "when": ["client deserializes response"],
+      "then": ["no custom field aliases in adapter", "AND hooks read properties directly"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Drift fails client compile or test",
+      "when": ["API DTO adds required field without client update"],
+      "then": ["build or contract test fails", "AND prevents silent UI breakage"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Types imported from shared package",
+      "when": ["client and api packages build"],
+      "then": ["DTO definitions have single source", "AND no duplicated interface copies"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "OpenAPI generation feeds both sides",
+      "given": ["OpenAPI schema generated from Zod"],
+      "when": ["client types generated or re-exported"],
+      "then": ["schemas align with api:dto-* spec", "AND Studio release notes document changes"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Manual duplicate DTO is rejected in review",
+      "when": ["contributor adds parallel interface in client"],
+      "then": ["lint or architectural test fails", "AND must use shared/generated types"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:dto-artifact-content",
+        "file": "client:src/dto/artifact-content.ts",
+        "symbol": "ArtifactContentDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:9b8cd3a4512936189ba006d0b42a322fc6f567dbcf44837d2cf312d650e0ce2d",
+    "verify.md": "sha256:c0a7f5003818a0d17f982b2f49f2bb6f1a48499f7911fc38a445723236931cf6"
+  },
+  "generatedBy": "core"
+}

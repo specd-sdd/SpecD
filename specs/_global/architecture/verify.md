@@ -108,3 +108,23 @@
 - **WHEN** a system component reads external YAML or structured data
 - **THEN** it must validate that data against a formal schema at the boundary
 - **AND** no unvalidated external structure may leak into domain or application logic
+
+### Requirement: SpecD Studio package graph
+
+#### Scenario: UI package does not import core
+
+- **WHEN** `@specd/ui` dependency graph is inspected
+- **THEN** it depends on `@specd/client`
+- **AND** it does not import `@specd/core`
+
+#### Scenario: Client package does not import core
+
+- **WHEN** `@specd/client` is built
+- **THEN** adapters call HTTP or IPC transports only
+- **AND** no direct kernel imports exist in client sources
+
+#### Scenario: API handlers delegate to kernel use cases
+
+- **WHEN** an HTTP handler serves a mutating route
+- **THEN** handler invokes kernel use case via composition context
+- **AND** lifecycle rules are not reimplemented in api package

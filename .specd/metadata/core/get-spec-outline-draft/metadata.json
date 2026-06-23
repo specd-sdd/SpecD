@@ -1,0 +1,62 @@
+{
+  "title": "Get Spec Outline Draft",
+  "description": "Workspace canonical specs are read-only in Studio v1, but the inspector may still need an outline of **unsaved buffer text** (e.g. future edit flows) or consistent API shape. This extends workspace `GetSpecOutline` with optional `content` + `filename` to outline draft bytes without reading `SpecRepository`.",
+  "dependsOn": ["core:outline-artifact-content"],
+  "context": [
+    "Workspace canonical specs are read-only in Studio v1, but the inspector may still need an outline of **unsaved buffer text** (e.g. future edit flows) or consistent API shape. This extends workspace `GetSpecOutline` with optional `content` + `filename` to outline draft bytes without reading `SpecRepository`."
+  ],
+  "rules": [
+    {
+      "requirement": "content plus filename short-circuits repository",
+      "rules": [
+        "When `GetSpecOutlineInput.content` and `filename` are both set, `execute` MUST return a single outline result from [`core:outline-artifact-content`](../outline-artifact-content/spec.md) and MUST NOT require the spec to exist in the workspace tree."
+      ]
+    },
+    {
+      "requirement": "repository path unchanged without content",
+      "rules": [
+        "When `content` is omitted, behavior MUST match workspace `GetSpecOutline` (load artifacts from spec repo, schema-driven filename set)."
+      ]
+    },
+    {
+      "requirement": "filename required with content",
+      "rules": [
+        "When `content` is provided without `filename`, the use case MUST throw a clear error (`SpecNotFoundError` or equivalent message)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "content plus filename short-circuits repository",
+      "name": "Draft outline without workspace spec file",
+      "given": ["content is markdown and filename is spec.md"],
+      "when": ["GetSpecOutline executes"],
+      "then": ["one outline result is returned", "AND spec repository get is not called"]
+    },
+    {
+      "requirement": "repository path unchanged without content",
+      "name": "repository path unchanged without content — primary path",
+      "when": ["When content is omitted, behavior MUST match workspace"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "repository path unchanged without content",
+      "name": "repository path unchanged without content — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "filename required with content",
+      "name": "Content without filename fails",
+      "when": ["only content is provided"],
+      "then": ["execute throws before outline"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:13cd595a29ec0ebbc2b8aa2a8baa7dd9176d88d2c6d9a0a976aa5d5ef9167b48",
+    "verify.md": "sha256:d69213d3f66ea9e085c233eb3cccb2ce9137ff43ceb3506c145c0a32fdd033d6"
+  },
+  "generatedBy": "core"
+}

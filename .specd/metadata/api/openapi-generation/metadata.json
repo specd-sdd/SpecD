@@ -1,0 +1,89 @@
+{
+  "title": "Openapi Generation",
+  "description": "SpecD Studio capability **Openapi Generation** (`api:openapi-generation`). Generate a machine-readable OpenAPI 3.1 document from route and DTO schemas. This spec is canonical after archive: implementers rely on the requirements below, not change-only documents.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "SpecD Studio capability **Openapi Generation** (`api:openapi-generation`). Generate a machine-readable OpenAPI 3.1 document from route and DTO schemas. This spec is canonical after archive: implementers rely on the requirements below, not change-only documents."
+  ],
+  "rules": [
+    {
+      "requirement": "OpenAPI is generated from Fastify route schemas",
+      "rules": [
+        "The OpenAPI document MUST be generated from the Fastify route `schema` declarations (params/query/body/response) and shared DTO schemas, using `@fastify/swagger` (or an equivalent OpenAPI generator).\n\nThe implementation MUST NOT maintain a hand-written OpenAPI document (paths/schemas) in parallel to the route/DTO definitions."
+      ]
+    },
+    {
+      "requirement": "document version tracks API prefix",
+      "rules": ["The generated document MUST describe the `/v1` surface only."]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "OpenAPI is generated from Fastify route schemas",
+      "name": "Each routes spec path appears in OpenAPI",
+      "when": ["OpenAPI is generated from the mounted Fastify routes"],
+      "then": ["documented HTTP methods exist", "AND request/response schemas reference DTO specs"]
+    },
+    {
+      "requirement": "OpenAPI is generated from Fastify route schemas",
+      "name": "DTO changes update component schemas",
+      "given": ["api:dto-change-status adds field"],
+      "when": ["OpenAPI is regenerated"],
+      "then": ["component schema includes new property", "AND CI diff catches drift"]
+    },
+    {
+      "requirement": "OpenAPI is generated from Fastify route schemas",
+      "name": "Undocumented handler routes are absent",
+      "when": ["generated OpenAPI is compared to the mounted router"],
+      "then": ["no orphan paths in doc", "AND no orphan paths only in code"]
+    },
+    {
+      "requirement": "document version tracks API prefix",
+      "name": "Info version matches /v1 contract",
+      "when": ["openapi.json info.version is read"],
+      "then": [
+        "version bumps when breaking /v1 change ships",
+        "AND patch releases documented in changelog"
+      ]
+    },
+    {
+      "requirement": "document version tracks API prefix",
+      "name": "Servers entry uses configured base URL",
+      "given": ["serve binds to http://127.0.0.1:4400"],
+      "when": ["OpenAPI servers section is generated"],
+      "then": ["server URL matches runtime", "AND paths remain relative to /v1"]
+    },
+    {
+      "requirement": "document version tracks API prefix",
+      "name": "Breaking rename requires version bump",
+      "when": ["required JSON field renamed"],
+      "then": ["OpenAPI version increments or CI fails", "AND clients know to regenerate types"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:openapi-generation",
+        "file": "api:src/composition/create-api-server.ts",
+        "symbol": "createApiServer"
+      },
+      {
+        "specId": "api:openapi-generation",
+        "file": "api:src/delivery/http/openapi-schemas.ts",
+        "symbol": "registerApiOpenApiSchemas"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:93a4579399fd759dc24622487ed860f6f90a52a87649c596cee2a8c93db27f09",
+    "verify.md": "sha256:3ceb043d1ac4606bfffd6fe5ce05f180326d08cd84270266574f2e43b48abb33"
+  },
+  "generatedBy": "core"
+}

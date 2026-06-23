@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:dto-change-detail", "ui:hooks-changes-mutate", "core:edit-change"],
+  "implementation": []
+}

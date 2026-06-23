@@ -1,0 +1,111 @@
+{
+  "title": "Dto Artifact Content",
+  "description": "Stable JSON wire shape for **Dto Artifact Content** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Stable JSON wire shape for **Dto Artifact Content** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules."
+  ],
+  "rules": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "rules": [
+        "The **Dto Artifact Content** wire shape MUST use camelCase property names stable across Studio releases. OpenAPI generation MUST derive schemas from these names."
+      ]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "rules": [
+        "The type MUST include at least:\n\n- `content: string`\n- `originalHash: string` (`sha256:` prefix)\n- `filename: string`"
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "rules": [
+        "[`api:presenter-artifact`](../presenter-artifact/spec.md) MUST map kernel or graph results into this DTO and MUST NOT embed lifecycle, validation, or approval logic."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "OpenAPI lists camelCase properties",
+      "when": ["schema is generated for this DTO"],
+      "then": ["property names are camelCase", "AND no snake_case aliases"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Runtime JSON matches schema",
+      "when": ["handler returns success body"],
+      "then": ["JSON keys match schema", "AND clients deserialize without mapping"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Breaking rename fails schema check",
+      "when": ["required field renamed without version bump"],
+      "then": ["OpenAPI diff or test fails", "AND Studio documents migration"]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "name": "Full success payload includes mandatory fields",
+      "when": ["handler returns complete DTO"],
+      "then": ["all mandatory properties exist", "AND types match spec"]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "name": "Partial kernel data still maps required fields",
+      "given": ["kernel returns minimal valid object"],
+      "when": ["presenter maps"],
+      "then": ["mandatory fields populated or explicit defaults documented"]
+    },
+    {
+      "requirement": "DTO includes mandatory Studio fields",
+      "name": "Missing mandatory input fails presenter or handler",
+      "when": ["kernel omits required field"],
+      "then": ["error before response sent", "AND no incomplete JSON"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not add business rules to DTO",
+      "given": ["kernel returns a status result with blockers"],
+      "when": ["presenter maps to this DTO"],
+      "then": ["DTO fields reflect kernel data", "AND presenter does not alter lifecycle state"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not embed lifecycle or approval logic",
+      "when": ["presenter maps kernel or graph results"],
+      "then": [
+        "lifecycle state in the DTO matches kernel output",
+        "AND no validation or approval rules are applied in the presenter"
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Identical kernel fixture yields identical JSON",
+      "given": ["a fixed kernel or graph fixture"],
+      "when": ["presenter serializes twice"],
+      "then": ["both JSON bodies are byte-identical"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:dto-artifact-content",
+        "file": "api:src/delivery/http/dto/artifact-content.ts",
+        "symbol": "ArtifactContentDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:0081f53b4cc484ccf5024f68a3e09c6766fd231f3dc8ce60414ce40aaf0e0461",
+    "verify.md": "sha256:2d6bd6dc9d65a3ad49d2091dde8e8aa7f9fd795827985463686db9b5016643b3"
+  },
+  "generatedBy": "core"
+}

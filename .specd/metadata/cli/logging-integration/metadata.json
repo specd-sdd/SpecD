@@ -25,6 +25,12 @@
       ]
     },
     {
+      "requirement": "Shared formatter with kernel",
+      "rules": [
+        "When resolving CLI context, the CLI MUST call `createLogFormatter({ colorize: process.stdout.isTTY })` and pass the instance to `createKernel` via `KernelOptions.logFormatter` so console pretty output and in-memory log readback use the same formatting as Studio `GET /v1/logs?prettier=true`."
+      ]
+    },
+    {
       "requirement": "Callback Interception (Optional)",
       "rules": [
         "The CLI MAY register a `callback` destination if it needs to intercept logs for specialized UI components (e.g., progress bars, dashboard updates). If used, it MUST provide an `onLog` handler that consumes `LogEntry` objects."
@@ -79,6 +85,20 @@
       ]
     },
     {
+      "requirement": "Shared formatter with kernel",
+      "name": "CLI passes TTY-aware formatter",
+      "given": ["process.stdout.isTTY is true"],
+      "when": ["CLI resolves kernel context"],
+      "then": ["createLogFormatter({ colorize: true }) is passed via KernelOptions.logFormatter"]
+    },
+    {
+      "requirement": "Shared formatter with kernel",
+      "name": "Non-TTY disables colorize",
+      "given": ["stdout is not a TTY"],
+      "when": ["CLI resolves kernel context"],
+      "then": ["createLogFormatter({ colorize: false }) is passed to the kernel"]
+    },
+    {
       "requirement": "Callback Interception (Optional)",
       "name": "UI component updates",
       "given": ["a CLI command that uses a progress bar"],
@@ -96,9 +116,10 @@
       ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:38a43f2f5c9debded98cee33b827ee1715aef4b2f6d602b7e4fd3977fd2fc476",
-    "verify.md": "sha256:53a25af9bcc05cc7105ad65cadc7e9ea5f00d1001967e2e3071c6bd9ba15a213"
+    "spec.md": "sha256:4a0de913982fc5f834c9be30429a77f6a60a77658f18f37fa7af1ee2c733fb7e",
+    "verify.md": "sha256:863d76e1a3e95ecdb468b6f4ef4181bd3f6bab103289378dee2d1ede376c961c"
   },
   "generatedBy": "core"
 }

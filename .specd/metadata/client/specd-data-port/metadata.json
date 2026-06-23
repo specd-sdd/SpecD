@@ -1,0 +1,95 @@
+{
+  "title": "Specd Data Port",
+  "description": "`@specd/ui` must never import `@specd/core`. `SpecdDataPort` is the single aggregated interface the IDE uses for project, change, workspace spec, graph, and remote log data, implemented by HTTP remote, in-memory fakes, or desktop IPC.",
+  "dependsOn": ["client:port-studio-panel", "default:_global/architecture"],
+  "context": [
+    "`@specd/ui` must never import `@specd/core`. `SpecdDataPort` is the single aggregated interface the IDE uses for project, change, workspace spec, graph, and remote log data, implemented by HTTP remote, in-memory fakes, or desktop IPC."
+  ],
+  "rules": [
+    {
+      "requirement": "SpecdDataPort aggregates all port method groups",
+      "rules": [
+        "The interface MUST compose `port-project`, `port-changes-collection`, `port-changes-read`, `port-changes-mutate`, `port-workspaces-specs`, `port-graph`, `port-archived-changes`, and `port-studio-panel`.\n\nThe `port-studio-panel` contribution is limited to remote log readback and debug trace writes. User-visible Output/Problems session buffers are local UI state and MUST NOT be modeled as remote `SpecdDataPort` methods."
+      ]
+    },
+    {
+      "requirement": "multiple adapters implement the same port interface",
+      "rules": [
+        "Production implementations include `adapter-remote-specd-data`, `adapter-memory-specd-data`, and desktop IPC local; they MUST expose identical method signatures."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "SpecdDataPort aggregates all port method groups",
+      "name": "Port composes project collection read mutate groups",
+      "when": ["UI imports SpecdDataPort type"],
+      "then": [
+        "interface includes project, changes, workspaces, graph, archived methods",
+        "AND consumers depend on aggregate only"
+      ]
+    },
+    {
+      "requirement": "SpecdDataPort aggregates all port method groups",
+      "name": "Output session buffer is not exposed as a remote port method",
+      "when": ["SpecdDataPort is inspected after the output-locality change"],
+      "then": [
+        "no dedicated remote output-buffer contract is required",
+        "AND bottom-panel output/problems remain local UI state"
+      ]
+    },
+    {
+      "requirement": "SpecdDataPort aggregates all port method groups",
+      "name": "Graph methods delegate to port-graph",
+      "when": ["getGraphStatus() is called"],
+      "then": ["underlying port-graph HTTP or IPC runs", "AND UI does not call code-graph directly"]
+    },
+    {
+      "requirement": "SpecdDataPort aggregates all port method groups",
+      "name": "Breaking port change fails compile",
+      "when": ["port method signature changes"],
+      "then": ["adapters and UI fail TypeScript build", "AND contract drift is caught early"]
+    },
+    {
+      "requirement": "multiple adapters implement the same port interface",
+      "name": "Remote and memory adapters are interchangeable",
+      "given": ["fixture data seeded in memory adapter"],
+      "when": ["same UI hook runs against both adapters"],
+      "then": ["hook API identical", "AND results shape match"]
+    },
+    {
+      "requirement": "multiple adapters implement the same port interface",
+      "name": "Desktop local uses IPC implementation",
+      "given": ["Electron local profile"],
+      "when": ["hook fetches change status"],
+      "then": ["IPC adapter services call", "AND no HTTP to localhost required"]
+    },
+    {
+      "requirement": "multiple adapters implement the same port interface",
+      "name": "Adapter selection is profile-driven",
+      "when": ["user switches from local to remote profile"],
+      "then": ["renderer swaps adapter instance", "AND port interface unchanged"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:specd-data-port",
+        "file": "client:src/specd-data-port.ts",
+        "symbol": "SpecdDataPort"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:057b6e73b29ef6a958d11ef9c0d760501f2b80ca46f52a735fa3793fb47763ca",
+    "verify.md": "sha256:aa16cdcecc882fff9adb1520fb3df4faff31213c60ee9501990b1abfdd0bf2da"
+  },
+  "generatedBy": "core"
+}

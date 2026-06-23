@@ -1,0 +1,152 @@
+{
+  "title": "Change Tab Tasks",
+  "description": "Studio UI for **Change Tab Tasks**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Tasks**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Change Tab Tasks**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Change Tab Tasks**."
+  ],
+  "rules": [
+    {
+      "requirement": "change tab refetches task-capable artifacts when needed when updatedAt advances",
+      "rules": [
+        "While this change tab is visible, the view MUST call `getChangeStatus(name, { ifModifiedSince })` using the last seen `updatedAt`. When the API returns `unchanged: true`, the view MUST skip heavy refetch. When `updatedAt` advances, the view MUST refetch task-capable artifact content when needed through the matching change read route. Polling MUST pause when the tab is hidden or the window lacks focus. After a successful Save, the view MUST refetch immediately.\n\nTask-capable artifacts are not identified by a fixed filename. The view MUST resolve them from API metadata (`hasTasks`) and MUST render every tracked file belonging to task-capable artifacts, not just the first file.\n\nThe tasks summary shown for a change MUST use API-provided aggregate counters (`totalTasks`, `completedTasks`) that represent the sum across all task-capable artifacts in that change.\n\nFor **archived** changes, the tab MUST derive task-capable artifact presence from the archived snapshot detail (`getArchivedChange`) and MUST load each tracked body through the archived read-only artifact route instead of showing a blanket unavailable message.\n\nWhen a rendered tasks file ends with `.md`, the body MUST be rendered as Markdown. Other file formats MAY be rendered as plain text. Each rendered file MUST show its filename in the section header."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    },
+    {
+      "requirement": "component SHALL avoid infinite render loops from unstable dependencies",
+      "rules": [
+        "The Tasks tab component SHALL stabilize all array and object references passed as dependencies to downstream hooks (e.g. `useChangeArtifacts`). It MUST use `useMemo` for derived mappings and use static constants for default empty values to prevent continuous re-triggering of effect-based resource loading."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "change tab refetches task-capable artifacts when needed when updatedAt advances",
+      "name": "Unchanged status skips tab refetch",
+      "given": ["tab is visible", "AND cached updatedAt matches server"],
+      "when": ["getChangeStatus returns { unchanged: true }"],
+      "then": ["tab does not refetch heavy views", "AND spinner stops without data swap"]
+    },
+    {
+      "requirement": "change tab refetches task-capable artifacts when needed when updatedAt advances",
+      "name": "Advanced updatedAt refetches tab data",
+      "given": ["status returns newer updatedAt"],
+      "when": ["tab poll observes revision bump"],
+      "then": ["only this tab data sources reload", "AND other tabs are unaffected"]
+    },
+    {
+      "requirement": "change tab refetches task-capable artifacts when needed when updatedAt advances",
+      "name": "Hidden tab pauses polling",
+      "given": ["change tab was visible then hidden"],
+      "when": ["poll interval fires"],
+      "then": ["no tab-scoped status request is sent", "AND cache is retained until visible again"]
+    },
+    {
+      "requirement": "change tab refetches task-capable artifacts when needed when updatedAt advances",
+      "name": "Tasks tab loads every task-capable file when visible",
+      "given": ["active (non-archived) change with one or more task-capable artifacts"],
+      "when": ["user selects Tasks tab"],
+      "then": [
+        "UI loads every tracked file from artifacts marked hasTasks",
+        "AND displays aggregate completedTasks/totalTasks from getChangeStatus when present"
+      ]
+    },
+    {
+      "requirement": "change tab refetches task-capable artifacts when needed when updatedAt advances",
+      "name": "Markdown task files render as markdown with filename headers",
+      "given": ["a task-capable artifact file named tasks-plan.md"],
+      "when": ["the Tasks tab renders it"],
+      "then": [
+        "the filename appears in the rendered section header",
+        "AND the body is rendered as Markdown rather than plain preformatted text"
+      ]
+    },
+    {
+      "requirement": "change tab refetches task-capable artifacts when needed when updatedAt advances",
+      "name": "Archived change loads tasks from archived snapshot",
+      "given": ["shell context is archived"],
+      "when": ["user selects Tasks tab"],
+      "then": [
+        "UI loads every tracked task-capable body through the archived read-only artifact route when present",
+        "AND falls back to the missing-tasks message only when the archived snapshot has no task-capable artifact files"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    },
+    {
+      "requirement": "component SHALL avoid infinite render loops from unstable dependencies",
+      "name": "Tasks tab passes stable references to hooks",
+      "given": ["Tasks tab is visible"],
+      "when": ["parent component (e.g. ChangeTabPanels) re-renders"],
+      "then": [
+        "tasksEntry and selectedTaskFiles maintain stable references",
+        "AND useChangeArtifacts does not cycle through infinite reloads"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-tab-tasks",
+        "file": "ui:src/change/ChangeMainView.tsx",
+        "symbol": "ChangeMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:53177fe7381f65055ca11793266864ae8a7812d3edabf496eb3ce0549238fae4",
+    "verify.md": "sha256:9d307a50fcadce9615cc56b104c413dcc40d5ac695282c7a88df266a4e36fcda"
+  },
+  "generatedBy": "core"
+}

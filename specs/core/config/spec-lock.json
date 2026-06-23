@@ -12,17 +12,5 @@
     "core:workspace",
     "default:_global/logging"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/specd-config.ts",
-      "symbols": ["SpecdWorkspaceGraphConfig", "SpecdGraphConfig", "SpecdConfig"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["FsConfigLoader"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
-    }
-  ]
+  "implementation": []
 }

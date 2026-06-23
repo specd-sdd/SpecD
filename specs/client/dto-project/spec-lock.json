@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-project"],
+  "implementation": [
+    {
+      "file": "client:src/dto/project.ts",
+      "symbols": ["ProjectDto"]
+    }
+  ]
+}

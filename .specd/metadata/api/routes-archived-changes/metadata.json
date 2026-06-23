@@ -1,0 +1,95 @@
+{
+  "title": "Routes Archived Changes",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Archived Changes** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Read-only HTTP contract for archived changes.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Archived Changes** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Read-only HTTP contract for archived changes."
+  ],
+  "rules": [
+    {
+      "requirement": "GET archived change returns read-only archived detail",
+      "rules": [
+        "`GET /v1/archived-changes/{name}` MUST return archived metadata and manifest snapshot via `GetArchivedChange`. Unknown name MUST return 404 with `application/problem+json`.\n\nThe success body MUST reflect the merged archived read model rather than the pre-merge minimal DTO. It MUST include at least:\n\n- `name`\n- `state`\n- `archivedName`\n- `archivedAt` (ISO-8601)\n- `specIds`\n- `schemaName`\n- `schemaVersion`\n- `history`\n- `workspaces`\n- `artifacts` as read-only artifact metadata entries\n\nThe archived `artifacts[]` payload MUST list only files actually present in the archived snapshot. Manifest placeholders that remained `missing` before archive MUST NOT be surfaced as clickable archived artifact rows.\n\nArchived artifact rows MUST also preserve task metadata (`hasTasks`) and MAY include `totalTasks` / `completedTasks` derived from the archived content using the current schema's task-completion rules so Studio can render archived task tabs without assuming `tasks.md`.\n\nIt MAY also expose `description`, `specDependsOn`, `updatedAt`, `archivedBy`, and `archivedMeta`. Archived detail MUST NOT be served from `GET /v1/changes/{name}`."
+      ]
+    },
+    {
+      "requirement": "GET archived artifact body returns tracked read-only content",
+      "rules": [
+        "`GET /v1/archived-changes/{name}/artifacts/{filename}` MUST return the tracked artifact content for that archived snapshot via `GetReadOnlyChangeArtifact` with `readOnlyOrigin` `archived`.\n\nUnknown change or untracked filename MUST return a typed problem+json error. This route MUST NOT fall through to active `/v1/changes/{name}/artifacts/{filename}` handling."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "GET archived change returns read-only archived detail",
+      "name": "Unknown resource returns 404 problem+json",
+      "when": ["client requests missing change name"],
+      "then": ["HTTP 404", "AND Content-Type is application/problem+json"]
+    },
+    {
+      "requirement": "GET archived change returns read-only archived detail",
+      "name": "GET /v1/archived-changes/{name} returns expected payload",
+      "when": ["client calls GET /v1/archived-changes/{name}"],
+      "then": [
+        "HTTP status is 2xx",
+        "AND JSON body includes name, state, archivedName, archivedAt, specIds, schemaName, schemaVersion, history, workspaces, and artifacts",
+        "AND archived artifacts[] does not contain rows with state missing",
+        "AND task-capable archived artifact rows preserve hasTasks",
+        "AND task counters may be exposed from archived content when available"
+      ]
+    },
+    {
+      "requirement": "GET archived change returns read-only archived detail",
+      "name": "Archived change snapshot is not served from active change route",
+      "given": ["change exists only in archive"],
+      "when": ["client calls GET /v1/changes/{name}"],
+      "then": [
+        "HTTP 404 problem+json",
+        "AND archived snapshot is available at /v1/archived-changes/{name}"
+      ]
+    },
+    {
+      "requirement": "GET archived artifact body returns tracked read-only content",
+      "name": "GET /v1/archived-changes/{name}/artifacts/{filename} returns content",
+      "when": ["client calls the archived artifact GET route for a tracked file"],
+      "then": ["HTTP status is 2xx", "AND JSON body includes content"]
+    },
+    {
+      "requirement": "GET archived artifact body returns tracked read-only content",
+      "name": "Archived artifact route does not use active artifact path",
+      "given": ["change exists only in archive"],
+      "when": ["client requests an artifact body"],
+      "then": [
+        "the archived route succeeds",
+        "AND active /v1/changes/{name}/artifacts/{filename} does not become the fallback"
+      ]
+    },
+    {
+      "requirement": "GET archived artifact body returns tracked read-only content",
+      "name": "Kernel errors serialize as problem+json",
+      "when": ["kernel throws a domain error for this route"],
+      "then": ["Content-Type is application/problem+json", "AND body includes status and title"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-archived-changes",
+        "file": "api:src/delivery/http/handlers/handler-archived-changes.ts",
+        "symbol": "registerArchivedChangesRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:14e046ff4ac585ff7088dbb3a25b936ab34db047f7487e86e67b1275cdccb4d8",
+    "verify.md": "sha256:b7e318de53230a3c4a96b3941b005860b0825abb78f7728b2e8e1a4f32412675"
+  },
+  "generatedBy": "core"
+}

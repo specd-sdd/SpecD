@@ -172,7 +172,7 @@ export function SpecdApp({
 
   const storage = React.useMemo(() => {
     if (storageProp) return storageProp
-    return typeof window !== 'undefined' && (window as any).specd
+    return typeof window !== 'undefined' && (window as Window & { specd?: unknown }).specd
       ? new FileUserStorage()
       : new LocalStorageUserStorage()
   }, [storageProp])

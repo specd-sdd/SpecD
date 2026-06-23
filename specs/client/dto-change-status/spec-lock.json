@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-change-status"],
+  "implementation": [
+    {
+      "file": "client:src/dto/change-status.ts",
+      "symbols": ["ChangeStatusDto"]
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "title": "Middleware Auth",
+  "description": "Auth policy must apply uniformly before any `/v1` handler runs. Middleware holds the verifier resolved at startup so v1 local mode is pass-through while future types can reject unauthenticated calls with RFC 7807 problems.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:port-api-token-verifier",
+    "api:auth-adapter-registry"
+  ],
+  "context": [
+    "Auth policy must apply uniformly before any `/v1` handler runs. Middleware holds the verifier resolved at startup so v1 local mode is pass-through while future types can reject unauthenticated calls with RFC 7807 problems."
+  ],
+  "rules": [
+    {
+      "requirement": "middleware uses startup-resolved verifier only",
+      "rules": [
+        "The middleware MUST use the `ApiTokenVerifier` instance produced by `auth-adapter-registry.resolve` at server startup and MUST NOT construct verifier implementations inline."
+      ]
+    },
+    {
+      "requirement": "disabled auth never returns 401 for missing credentials",
+      "rules": [
+        "When effective `api.auth.type` is `disabled`, missing or empty `Authorization` MUST NOT produce HTTP 401."
+      ]
+    },
+    {
+      "requirement": "middleware attaches identity to request context",
+      "rules": [
+        "After verification (or pass-through), middleware MUST attach the resolved identity to the object returned by `createApiContext` so mutating handlers pass the correct actor into kernel use cases."
+      ]
+    },
+    {
+      "requirement": "enforcing auth types return 401 problem+json on failure",
+      "rules": [
+        "When a future registered auth type requires credentials and `verify` fails, middleware MUST respond with HTTP 401 and `application/problem+json` without invoking route handlers."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "middleware uses startup-resolved verifier only",
+      "name": "Verifier instance is injected at startup",
+      "when": ["HTTP server composes middleware"],
+      "then": ["same verifier reference is used", "AND middleware does not new verifier classes"]
+    },
+    {
+      "requirement": "middleware uses startup-resolved verifier only",
+      "name": "Handlers do not select auth implementation",
+      "when": ["route handler runs"],
+      "then": ["handler relies on context from middleware", "AND no inline auth logic"]
+    },
+    {
+      "requirement": "middleware uses startup-resolved verifier only",
+      "name": "Registry resolve happens once",
+      "given": ["server boot calls resolve"],
+      "when": ["second request arrives"],
+      "then": ["middleware does not call resolve again"]
+    },
+    {
+      "requirement": "disabled auth never returns 401 for missing credentials",
+      "name": "No Authorization passes through",
+      "when": ["Authorization header is absent"],
+      "then": ["status is not 401 from auth middleware", "AND handler executes"]
+    },
+    {
+      "requirement": "disabled auth never returns 401 for missing credentials",
+      "name": "Empty Bearer passes through in v1",
+      "when": ["Authorization: Bearer header is empty"],
+      "then": ["middleware does not return 401", "AND kernel may still reject business rules"]
+    },
+    {
+      "requirement": "disabled auth never returns 401 for missing credentials",
+      "name": "Health and project routes stay reachable",
+      "when": ["GET /v1/project without credentials"],
+      "then": ["HTTP 200", "AND payload includes auth.type"]
+    },
+    {
+      "requirement": "middleware attaches identity to request context",
+      "name": "Context carries actor after middleware",
+      "when": ["mutating handler reads context"],
+      "then": ["actor is defined", "AND kernel save receives it"]
+    },
+    {
+      "requirement": "middleware attaches identity to request context",
+      "name": "Read-only routes may omit actor requirement",
+      "when": ["GET status without mutation"],
+      "then": ["handler still receives context", "AND no history write occurs"]
+    },
+    {
+      "requirement": "middleware attaches identity to request context",
+      "name": "Failed verify stops before handler on future types",
+      "given": ["future enforcing auth type configured"],
+      "when": ["verify fails"],
+      "then": ["handler not run", "AND 401 returned — deferred in v1"]
+    },
+    {
+      "requirement": "enforcing auth types return 401 problem+json on failure",
+      "name": "Failed verify returns problem+json",
+      "given": ["future auth requires token", "AND token invalid"],
+      "when": ["middleware verify fails"],
+      "then": ["HTTP 401", "AND Content-Type is application/problem+json"]
+    },
+    {
+      "requirement": "enforcing auth types return 401 problem+json on failure",
+      "name": "Handler chain stops on auth failure",
+      "when": ["verify fails under enforcing type"],
+      "then": ["route handler is not invoked", "AND response body includes title"]
+    },
+    {
+      "requirement": "enforcing auth types return 401 problem+json on failure",
+      "name": "Success attaches identity before handler",
+      "given": ["valid token under enforcing type"],
+      "when": ["verify succeeds"],
+      "then": ["context includes mapped actor", "AND handler runs"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:middleware-auth",
+        "file": "api:src/delivery/http/middleware/auth.ts",
+        "symbol": "registerAuthMiddleware"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:3e150cdc74588adc46520fe9b06254faa5be21479922bd8fda68ce58a6ef0dd0",
+    "verify.md": "sha256:293e52f948f86d0de36652471735048ff4ccffb1607930876029ce4af422ab30"
+  },
+  "generatedBy": "core"
+}

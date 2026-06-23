@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "implementation": [
+    {
+      "file": "api:src/application/auth/auth-adapter-registry.ts",
+      "symbols": ["AuthAdapterBootstrapContext", "AuthAdapterFactory", "AuthAdapterRegistry"]
+    },
+    {
+      "file": "api:src/composition/default-auth-registry.ts",
+      "symbols": ["defaultAuthAdapterRegistry"]
+    }
+  ]
+}

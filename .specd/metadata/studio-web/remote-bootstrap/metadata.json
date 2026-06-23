@@ -1,0 +1,74 @@
+{
+  "title": "Remote Bootstrap",
+  "description": "Browser host for standalone Studio — **Remote Bootstrap**. Does not load a project kernel; users supply an API base URL and optional token before the shared `@specd/ui` IDE mounts.",
+  "context": [
+    "Browser host for standalone Studio — **Remote Bootstrap**. Does not load a project kernel; users supply an API base URL and optional token before the shared `@specd/ui` IDE mounts."
+  ],
+  "rules": [
+    {
+      "requirement": "connection is required before SpecdApp mounts",
+      "rules": [
+        "On cold start, the app MUST show `ui:connect-panel` until `GET /v1/project` (or health) succeeds against the configured base URL."
+      ]
+    },
+    {
+      "requirement": "connection profile persists locally",
+      "rules": [
+        "API base URL and optional token MUST persist in browser storage and restore on reload."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "connection is required before SpecdApp mounts",
+      "name": "Cold start shows connect panel",
+      "when": ["standalone web app loads"],
+      "then": ["connect panel is visible", "AND SpecdApp is not mounted yet"]
+    },
+    {
+      "requirement": "connection is required before SpecdApp mounts",
+      "name": "Successful health mounts IDE",
+      "when": ["GET /v1/project succeeds"],
+      "then": ["connect panel closes", "AND IDE layout renders"]
+    },
+    {
+      "requirement": "connection is required before SpecdApp mounts",
+      "name": "Failed test keeps gate",
+      "when": ["health check fails"],
+      "then": ["connect panel remains", "AND error explains failure"]
+    },
+    {
+      "requirement": "connection profile persists locally",
+      "name": "Saved profile restores URL on reload",
+      "given": ["user saved remote profile"],
+      "when": ["browser reloads standalone web app"],
+      "then": ["URL prefilled from localStorage", "AND user can connect without retyping host"]
+    },
+    {
+      "requirement": "connection profile persists locally",
+      "name": "Token persistence follows remember setting",
+      "when": ["user connects without remember token"],
+      "then": ["token not in localStorage", "AND session may keep token in memory only"]
+    },
+    {
+      "requirement": "connection profile persists locally",
+      "name": "Clear profile removes stored entry",
+      "when": ["user clears saved connection"],
+      "then": ["localStorage entry removed", "AND connect gate shows on next load"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "studio-web:remote-bootstrap",
+        "file": "studio-web:src/main.tsx"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:b35f066a8d888a1f8af1998cdd0f1e2baa8d7a9f1a37ded61eeefdef1f492e83",
+    "verify.md": "sha256:e05946fb70b04c9b36ab3021efb1c7d16341c796b1fd2a52d177e6f7ead57795"
+  },
+  "generatedBy": "core",
+  "dependsOn": []
+}

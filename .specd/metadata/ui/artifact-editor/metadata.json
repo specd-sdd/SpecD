@@ -1,0 +1,137 @@
+{
+  "title": "Artifact Editor",
+  "description": "Human review happens in Monaco: open a tracked artifact, edit, Save with optimistic concurrency, Validate, and find-in-file. The editor coordinates with `hooks-inspector-save` and mutate hooks so conflicts surface as 409 UX instead of silent overwrites.",
+  "dependsOn": ["client:specd-data-port", "ui:hooks-inspector-save", "core:save-change-artifact"],
+  "context": [
+    "Human review happens in Monaco: open a tracked artifact, edit, Save with optimistic concurrency, Validate, and find-in-file. The editor coordinates with `hooks-inspector-save` and mutate hooks so conflicts surface as 409 UX instead of silent overwrites."
+  ],
+  "rules": [
+    {
+      "requirement": "editor loads artifact via section-aware read hook",
+      "rules": [
+        "Opening a tracked change artifact MUST fetch `{ content, originalHash }` through `useChangeArtifact` (or equivalent), which MUST call `getChangeArtifact` for **active** changes and `getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)` for **drafted** (`draft`) and **discarded** (`discarded`), matching the shell `listSection`. Content MUST bind to Monaco state."
+      ]
+    },
+    {
+      "requirement": "save button uses inspector save hook",
+      "rules": [
+        "Save MUST call `ui:hooks-inspector-save` and MUST be disabled while a save is in flight or the artifact is read-only."
+      ]
+    },
+    {
+      "requirement": "validate button runs ValidateArtifacts for current scope",
+      "rules": [
+        "Validate MUST call the mutate hook for the current file, artifact type, or whole change per the active tab context."
+      ]
+    },
+    {
+      "requirement": "editor supports in-file find and replace",
+      "rules": [
+        "Monaco find/replace MUST be available in-editor without a dedicated core use case."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "editor loads artifact via section-aware read hook",
+      "name": "Open file fetches content and hash",
+      "when": ["user opens proposal.md on an active change"],
+      "then": ["getChangeArtifact populates Monaco", "AND originalHash is stored for save"]
+    },
+    {
+      "requirement": "editor loads artifact via section-aware read hook",
+      "name": "Drafted change artifact uses getReadOnlyChangeArtifact",
+      "given": ["drafted change with listSection draft"],
+      "when": ["user opens an artifact in the inspector"],
+      "then": [
+        "getReadOnlyChangeArtifact with readOnlyOrigin draft populates Monaco",
+        "AND getChangeArtifact is not called"
+      ]
+    },
+    {
+      "requirement": "editor loads artifact via section-aware read hook",
+      "name": "Save button disabled while in flight",
+      "when": ["save request is pending"],
+      "then": ["Save is disabled", "AND second click does not duplicate PUT"]
+    },
+    {
+      "requirement": "editor loads artifact via section-aware read hook",
+      "name": "Read-only artifact disables save",
+      "given": ["canonical workspace spec artifact"],
+      "when": ["editor renders content"],
+      "then": ["Save is hidden or disabled", "AND buffer edits are not sent"]
+    },
+    {
+      "requirement": "save button uses inspector save hook",
+      "name": "Save toolbar wires to save hook",
+      "when": ["user clicks Save in artifact editor"],
+      "then": ["hooks-inspector-save invoked", "AND content and hash sent"]
+    },
+    {
+      "requirement": "save button uses inspector save hook",
+      "name": "Save disabled when read-only",
+      "given": ["canonical read-only artifact"],
+      "when": ["editor renders"],
+      "then": ["Save hidden or disabled", "AND hook not called on click"]
+    },
+    {
+      "requirement": "save button uses inspector save hook",
+      "name": "Save disabled while request in flight",
+      "when": ["save pending"],
+      "then": ["button disabled", "AND duplicate PUT prevented"]
+    },
+    {
+      "requirement": "validate button runs ValidateArtifacts for current scope",
+      "name": "Validate calls scoped ValidateArtifacts",
+      "when": ["user clicks Validate in editor toolbar"],
+      "then": ["mutate hook validate runs with file scope", "AND problems panel updates"]
+    },
+    {
+      "requirement": "validate button runs ValidateArtifacts for current scope",
+      "name": "Validate disabled without open change",
+      "given": ["no active change tab"],
+      "when": ["toolbar renders"],
+      "then": ["Validate disabled", "AND no port call"]
+    },
+    {
+      "requirement": "validate button runs ValidateArtifacts for current scope",
+      "name": "Validate errors stay in problems panel",
+      "given": ["validation returns findings"],
+      "when": ["validate completes"],
+      "then": ["findings listed", "AND click navigates to artifact"]
+    },
+    {
+      "requirement": "editor supports in-file find and replace",
+      "name": "Find opens Monaco find widget",
+      "when": ["user presses editor find shortcut"],
+      "then": ["find widget visible", "AND search is scoped to buffer"]
+    },
+    {
+      "requirement": "editor supports in-file find and replace",
+      "name": "Replace updates buffer only",
+      "when": ["user replaces one match"],
+      "then": ["editor text changes", "AND save not auto-triggered"]
+    },
+    {
+      "requirement": "editor supports in-file find and replace",
+      "name": "Find respects read-only mode",
+      "given": ["read-only artifact"],
+      "when": ["user opens find"],
+      "then": ["find works", "AND replace disabled or hidden"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:artifact-editor",
+        "file": "ui:src/editor/ArtifactEditor.tsx",
+        "symbol": "ArtifactEditor"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d70e99978e6de0a2a75625a3a1efa996220f76d1534c2d8091d94aae900f3d46",
+    "verify.md": "sha256:ab2d87fcf3081e4fe8cb02f0c6b443d697a3ff6965a634376eba0945c69d8abd"
+  },
+  "generatedBy": "core"
+}

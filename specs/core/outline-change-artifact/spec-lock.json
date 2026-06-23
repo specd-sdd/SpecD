@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:outline-artifact-content",
+    "core:get-change-artifact",
+    "core:change-repository-port"
+  ],
+  "implementation": []
+}

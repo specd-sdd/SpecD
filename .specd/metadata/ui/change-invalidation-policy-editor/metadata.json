@@ -1,0 +1,53 @@
+{
+  "title": "Change Invalidation Policy Editor",
+  "description": "Inline editor for change **invalidation policy** on Overview. Updates drift behaviour for future edits; does not invalidate approvals by itself (`core:edit-change`).",
+  "dependsOn": ["client:dto-change-detail", "ui:hooks-changes-mutate", "core:edit-change"],
+  "context": [
+    "Inline editor for change **invalidation policy** on Overview. Updates drift behaviour for future edits; does not invalidate approvals by itself (`core:edit-change`)."
+  ],
+  "rules": [
+    {
+      "requirement": "select policy and save when dirty",
+      "rules": [
+        "MUST offer `none`, `surgical`, `downstream`, `global` (default display `downstream` when DTO omits field). **Save** (`studio-change-invalidation-policy-save`) MUST call `patchChange({ invalidationPolicy })`."
+      ]
+    },
+    {
+      "requirement": "helper copy explains non-invalidating save",
+      "rules": [
+        "MUST state that the policy affects future drift invalidation only, not current approvals."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": ["MUST NOT import `@specd/core`."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "select policy and save when dirty",
+      "name": "Save sends invalidationPolicy",
+      "given": ["user selected surgical differing from saved"],
+      "when": ["user clicks Save"],
+      "then": ["patchChange includes { invalidationPolicy: \"surgical\" }"]
+    },
+    {
+      "requirement": "helper copy explains non-invalidating save",
+      "name": "Copy visible",
+      "when": ["editor renders"],
+      "then": ["helper text mentions future drift only"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "No core import",
+      "when": ["package boundary is checked"],
+      "then": ["component has no @specd/core import"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:901e83e777ccd3f677afe59be7e6105337b259a2279e4944022559a63a04c2eb",
+    "verify.md": "sha256:a40e624ff3808f4151c34365a1c009a522a79572493b7df1a6b33b0f7610c4f7"
+  },
+  "generatedBy": "core"
+}

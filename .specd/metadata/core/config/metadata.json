@@ -135,6 +135,18 @@
       ]
     },
     {
+      "requirement": "API authentication settings",
+      "rules": [
+        "`specd.yaml` MAY include an optional top-level **`api`** section for HTTP API delivery (`specd serve`, `specd ui serve`). Studio renderer code MUST NOT read this section from disk; it discovers effective auth only via API responses (`GET /v1/project`, `GET /v1/health`).\n\n**`api.auth`** MUST be an object with:\n\n- **`type`** (string, required when `api.auth` is present) — v1 MUST allow only **`disabled`**. Loaders MUST default to `{ type: 'disabled' }` when `api.auth` is omitted.\n- **`config`** (optional object) — reserved for future verifier-specific settings; MUST be ignored when `type` is `disabled`.\n\n**`api.cors`** (optional, separate requirement in `api:middleware-cors`) MAY be documented in the same `api` section in examples; cors behaviour is specified by API specs, not duplicated here.\n\nStartup validation (`Requirement: Startup validation`) MUST reject unknown `api.auth.type` values in v1 with a clear error before the HTTP server listens.\n\nCLI `specd serve` / `specd ui serve` `--auth` MAY override `api.auth.type` for that process only; v1 MUST reject any value other than `disabled`."
+      ]
+    },
+    {
+      "requirement": "UI plugins",
+      "rules": [
+        "`specd.yaml` MAY declare **`plugins.ui`** as an array of `{ name, config? }` entries (same shape as `plugins.agents`). v1 uses the **first** entry as the active Studio UI plugin for `specd ui serve`.\n\nDistribution installs SHOULD use `@specd/plugin-ui-studio` (`hasServer() === false`). Monorepo development MAY use `@specd/studio-web` (`hasServer() === true`)."
+      ]
+    },
+    {
       "requirement": "Logging configuration",
       "rules": [
         "`specd.yaml` MAY declare a `logging` section at the root. This section is OPTIONAL. If omitted, the system SHALL fallback to built-in defaults.\n\n- **`level`** (optional) — sets the minimum log level for the project. Supported values MUST include `trace`, `debug`, `info`, `warn`, `error`, and `silent`. Defaults to `info`."
@@ -1240,6 +1252,40 @@
       "then": ["approvals.signoff is true"]
     },
     {
+      "requirement": "API authentication settings",
+      "name": "Omitted api.auth defaults to disabled",
+      "given": ["specd.yaml has no api section"],
+      "when": ["configuration is loaded for serve"],
+      "then": ["effective api.auth.type is disabled"]
+    },
+    {
+      "requirement": "API authentication settings",
+      "name": "Explicit disabled type is accepted",
+      "given": ["specd.yaml sets api.auth.type: disabled"],
+      "when": ["startup validation runs"],
+      "then": [
+        "configuration loads successfully",
+        "AND createApiServer resolves the disabled verifier"
+      ]
+    },
+    {
+      "requirement": "API authentication settings",
+      "name": "Unknown auth type fails startup validation",
+      "given": ["specd.yaml sets api.auth.type: bearer"],
+      "when": ["startup validation runs before listen"],
+      "then": [
+        "validation fails with an error naming supported v1 types",
+        "AND HTTP server does not start"
+      ]
+    },
+    {
+      "requirement": "UI plugins",
+      "name": "Omitted plugins.ui disables ui serve plugin selection",
+      "given": ["specd.yaml has no plugins.ui"],
+      "when": ["specd ui serve resolves the active UI plugin"],
+      "then": ["it fails with UI_PLUGIN_NOT_CONFIGURED"]
+    },
+    {
       "requirement": "Config writer port",
       "name": "ConfigWriter port defines initProject method",
       "when": ["ConfigWriter interface is inspected"],
@@ -1266,39 +1312,10 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:config",
-        "file": "core:test/infrastructure/fs/config-loader.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:config",
-        "file": "core:src/application/specd-config.ts",
-        "symbol": "SpecdWorkspaceGraphConfig"
-      },
-      {
-        "specId": "core:config",
-        "file": "core:src/application/specd-config.ts",
-        "symbol": "SpecdGraphConfig"
-      },
-      {
-        "specId": "core:config",
-        "file": "core:src/application/specd-config.ts",
-        "symbol": "SpecdConfig"
-      },
-      {
-        "specId": "core:config",
-        "file": "core:src/infrastructure/fs/config-loader.ts",
-        "symbol": "FsConfigLoader"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:fb74e0f7bb929d717b0abb39ab0971a895f3826b56b3e3c0526753c3a33bd645",
-    "verify.md": "sha256:60889d07c358b6ca2922cc1764fa25ffd18010624b0de0dbe23af374e65fea1d"
+    "spec.md": "sha256:90317c9b1bb4359ca5be72d9562d0a2721c8f3f484ad04d2aa32fd325814fb19",
+    "verify.md": "sha256:f0cd2b32aa3f5536e571454f236d5b9dc585ede9f94dd403d6ddadbacab3990e"
   },
   "generatedBy": "core"
 }

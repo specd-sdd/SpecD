@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-workspace-spec-tree"],
+  "implementation": [
+    {
+      "file": "client:src/dto/workspace-spec-tree.ts",
+      "symbols": ["WorkspaceSpecTreeDto"]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "ui:change-metadata-editor"],
+  "implementation": [
+    {
+      "file": "ui:src/change/ChangeOverview.tsx",
+      "symbols": ["ChangeOverview"]
+    }
+  ]
+}

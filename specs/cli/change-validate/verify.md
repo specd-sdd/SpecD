@@ -186,3 +186,14 @@
 - **GIVEN** a batch where all scheduled steps pass
 - **WHEN** `specd change validate my-change --all --format json` is run
 - **THEN** output includes `passed`, `total`, and `results[]` with `artifact` and `spec` (null for change-scoped steps) per entry
+
+#### Scenario: --all uses kernel validateBatch
+
+- **WHEN** `specd changes validate <name> --all` runs
+- **THEN** CLI calls `kernel.changes.validateBatch.execute({ name })` once
+- **AND** does not loop `specIds` with `ValidateArtifacts` directly in the CLI layer
+
+#### Scenario: --all --artifact forwards filter
+
+- **WHEN** `specd changes validate <name> --all --artifact specs` runs
+- **THEN** `validateBatch.execute` receives `{ name, artifactId: 'specs' }`

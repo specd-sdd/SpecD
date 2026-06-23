@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "client:port-changes-mutate-validate-all",
+    "client:port-changes-mutate",
+    "ui:validate-confirm-dialog",
+    "core:validate-change-batch"
+  ],
+  "implementation": []
+}

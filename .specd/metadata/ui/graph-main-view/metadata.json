@@ -1,0 +1,89 @@
+{
+  "title": "Graph Main View",
+  "description": "Studio UI for **Graph Main View**: the central workspace view for the Code Graph. It surfaces global graph statistics, index status, and provides a centralized view of high-risk architectural hotspots. Studio UI component: **Graph Main View**.",
+  "dependsOn": ["client:specd-data-port", "ui:design-system"],
+  "context": [
+    "Studio UI for **Graph Main View**: the central workspace view for the Code Graph. It surfaces global graph statistics, index status, and provides a centralized view of high-risk architectural hotspots. Studio UI component: **Graph Main View**."
+  ],
+  "rules": [
+    {
+      "requirement": "view renders graph overview and index controls",
+      "rules": [
+        "When `GraphMainView` is active in the central workspace, it MUST display a high-level summary of the codebase's graph state.\nThe view MUST show the current index status (`getGraphStatus`), distinguishing between \"Ready\", \"Stale\", and \"Off\".\nIt MUST provide a manual \"Reindex\" button that triggers `indexGraph({ force: false })` and displays the progress/result in the global Output panel.\nIt MUST display aggregate counts for Specifications, Files & Docs (code files and documents), and Code Symbols sourced from the graph status."
+      ]
+    },
+    {
+      "requirement": "view surfaces high-impact graph hotspots",
+      "rules": [
+        "The view MUST fetch and display architectural hotspots using the `getHotspots` port method.\nIt MUST render a list of the most critical symbols (e.g., top 10), showing their `riskLevel` as a Badge (e.g., `CRITICAL` in red), the symbol name and kind, direct/indirect dependencies, and the specs that currently cover them."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "view renders graph overview and index controls",
+      "name": "Graph status is rendered",
+      "given": ["GraphMainView is active"],
+      "when": ["the view loads"],
+      "then": [
+        "it calls getGraphStatus",
+        "AND it renders the \"Ready\", \"Stale\", or \"Off\" status",
+        "AND it renders counts for Specs, Files & Docs, and Symbols"
+      ]
+    },
+    {
+      "requirement": "view renders graph overview and index controls",
+      "name": "Reindex triggers API and output log",
+      "given": ["GraphMainView is active"],
+      "when": ["the user clicks \"Force Reindex\""],
+      "then": [
+        "it calls indexGraph({ force: false })",
+        "AND it pushes an info message to the Output panel"
+      ]
+    },
+    {
+      "requirement": "view surfaces high-impact graph hotspots",
+      "name": "Hotspots are loaded and rendered",
+      "given": ["GraphMainView is active"],
+      "when": ["the view loads"],
+      "then": [
+        "it calls getHotspots",
+        "AND renders the symbols with their risk levels (e.g., CRITICAL) and dependency counts"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "View uses hooks exclusively",
+      "when": ["UI package dependency graph is inspected"],
+      "then": [
+        "GraphMainView imports from context/specd-data-context.js",
+        "AND it does not import from @specd/core"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Loading state is shown for hotspots",
+      "given": ["getHotspots is in flight"],
+      "when": ["the view renders"],
+      "then": ["a loading indicator is displayed in the Hotspots section"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:5ddcf5b809ff6d372fba54fd4a507e0829a5ba2fbfb0c10a8152de78e67b9808",
+    "verify.md": "sha256:518e3f6b25352597ecbfe5db616d3f93972ead39dd0c54dec6766c08e3a2c3a2"
+  },
+  "generatedBy": "core"
+}

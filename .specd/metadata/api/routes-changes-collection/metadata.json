@@ -1,0 +1,184 @@
+{
+  "title": "Routes Changes Collection",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Changes Collection** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP for listing and creating changes.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Changes Collection** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP for listing and creating changes."
+  ],
+  "rules": [
+    {
+      "requirement": "collection routes list changes drafts discarded and archived",
+      "rules": [
+        "The API MUST expose `GET /changes`, `/drafts`, `/discarded`, `/archived-changes`, and `/changes/overlaps` mapping to the corresponding kernel list and overlap operations."
+      ]
+    },
+    {
+      "requirement": "drafts and discarded are read-only collections",
+      "rules": [
+        "`GET /drafts` and `GET /discarded` MUST return read-only summaries backed by drafted/discarded views. These collections exist for navigation and inspection only; lifecycle mutation entry points for drafts live under `/drafts/{name}/*` and MUST NOT be mixed into `/changes/{name}/*`."
+      ]
+    },
+    {
+      "requirement": "POST changes creates a new change",
+      "rules": [
+        "`POST /changes` MUST accept a `CreateChange` input body and return the created change summary."
+      ]
+    },
+    {
+      "requirement": "POST changes separates request validation from schema preconditions",
+      "rules": [
+        "`POST /changes` MUST validate the request body shape through Fastify route schema before handler logic runs. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`.\n\nAfter request validation succeeds, the handler MUST load the active schema and reject change creation when the schema resolves only to a raw reference rather than a compiled schema object. This rejection is a business precondition failure, not a request-shape validation error."
+      ]
+    },
+    {
+      "requirement": "list responses include summary fields for sidebars",
+      "rules": [
+        "List endpoints MUST return `name`, description snippet, derived lifecycle state, `updatedAt` when known, and blocker count sufficient for Studio sidebars."
+      ]
+    },
+    {
+      "requirement": "archived-changes list returns paginated archive index rows",
+      "rules": [
+        "`GET /v1/archived-changes` MUST mirror the merged `ListArchived` contract by returning an object with:\n\n- `items`: archive index rows\n- `meta`: pagination metadata\n\nEach archive index row MUST include at least `name`, `archivedName`, `archivedAt`, `specIds`, `schemaName`, `schemaVersion`, `workspaces`, and `artifacts`. Studio maps those rows to archived sidebar summaries without fetching full archived detail first."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "collection routes list changes drafts discarded and archived",
+      "name": "GET /changes returns sidebar summaries",
+      "when": ["GET /v1/changes is called"],
+      "then": [
+        "each row includes name, state, and updatedAt",
+        "AND blocker count is present when known"
+      ]
+    },
+    {
+      "requirement": "drafts and discarded are read-only collections",
+      "name": "GET /drafts returns sidebar summaries (read-only)",
+      "when": ["GET /v1/drafts is called"],
+      "then": [
+        "each row includes name, state, and updatedAt",
+        "AND response is navigation-only (no per-row action fields)"
+      ]
+    },
+    {
+      "requirement": "drafts and discarded are read-only collections",
+      "name": "GET /discarded returns sidebar summaries (read-only)",
+      "when": ["GET /v1/discarded is called"],
+      "then": ["each row includes name, state, and updatedAt"]
+    },
+    {
+      "requirement": "drafts and discarded are read-only collections",
+      "name": "GET archived-changes returns archive index payload",
+      "when": ["client calls GET /v1/archived-changes"],
+      "then": [
+        "HTTP status is 2xx",
+        "AND body contains items and meta",
+        "AND each item includes name and archivedName"
+      ]
+    },
+    {
+      "requirement": "drafts and discarded are read-only collections",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "POST changes creates a new change",
+      "name": "POST /changes validates input",
+      "when": ["POST /v1/changes with invalid body"],
+      "then": ["HTTP 400 problem+json", "AND no change directory created"]
+    },
+    {
+      "requirement": "POST changes creates a new change",
+      "name": "POST /changes returns expected payload",
+      "when": ["client calls POST /changes"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "POST changes separates request validation from schema preconditions",
+      "name": "Invalid request shape fails before schema lookup",
+      "when": ["POST /v1/changes omits required request fields"],
+      "then": [
+        "HTTP 400 application/problem+json is returned",
+        "AND the handler does not create a change"
+      ]
+    },
+    {
+      "requirement": "POST changes separates request validation from schema preconditions",
+      "name": "Raw active schema blocks creation as business precondition",
+      "given": ["the active schema resolves only to a raw reference"],
+      "when": ["client sends an otherwise valid POST /v1/changes"],
+      "then": [
+        "change creation is rejected after request validation",
+        "AND the failure is reported as a schema precondition, not as an input-shape validation error"
+      ]
+    },
+    {
+      "requirement": "POST changes separates request validation from schema preconditions",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "list responses include summary fields for sidebars",
+      "name": "Each change row includes name and state",
+      "when": ["GET /v1/changes returns list"],
+      "then": [
+        "items have name and lifecycle state",
+        "AND UI can render sidebar without detail fetch"
+      ]
+    },
+    {
+      "requirement": "list responses include summary fields for sidebars",
+      "name": "updatedAt is present for polling",
+      "when": ["list endpoint serializes changes"],
+      "then": ["updatedAt ISO string on each row", "AND hooks can compare for refresh"]
+    },
+    {
+      "requirement": "list responses include summary fields for sidebars",
+      "name": "Blocker count included when known",
+      "given": ["change has validation blockers"],
+      "when": ["list response is built"],
+      "then": ["summary includes blocker count or flag", "AND full findings are not inlined"]
+    },
+    {
+      "requirement": "archived-changes list returns paginated archive index rows",
+      "name": "GET archived-changes returns both identifiers and pagination metadata",
+      "when": ["client calls GET /v1/archived-changes"],
+      "then": [
+        "each items element includes name and archivedName",
+        "AND the response includes meta.total, meta.count, and meta.limit",
+        "AND Studio can render archive rows without an additional lookup"
+      ]
+    },
+    {
+      "requirement": "archived-changes list returns paginated archive index rows",
+      "name": "Empty archive returns an empty list",
+      "when": ["there are no archived changes"],
+      "then": ["HTTP 200 is returned with items: []", "AND no synthetic placeholder rows are added"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-changes-collection",
+        "file": "api:src/delivery/http/handlers/handler-changes-collection.ts",
+        "symbol": "registerChangesCollectionRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:2c4e2a2b590f25f66932b4fb34b3437cbc125ad176017d507f3515c4f067196f",
+    "verify.md": "sha256:512b85670f74a40f1c690a750e88e62a2c48171e63ca8dea10fc2ad4b336abae"
+  },
+  "generatedBy": "core"
+}

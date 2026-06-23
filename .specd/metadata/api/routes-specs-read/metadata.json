@@ -1,0 +1,201 @@
+{
+  "title": "Routes Specs Read",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Specs Read** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group owns canonical workspace spec detail, artifact read access, outline/context helpers, metadata actions, and spec search.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Specs Read** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group owns canonical workspace spec detail, artifact read access, outline/context helpers, metadata actions, and spec search."
+  ],
+  "rules": [
+    {
+      "requirement": "wildcard spec detail route serves canonical spec detail",
+      "rules": [
+        "`GET /v1/workspaces/{ws}/specs/{path}` MUST resolve the canonical workspace spec and return spec detail metadata including artifact filenames, hashes when known, declared dependencies, and active linked change summaries.\n\nThere MUST NOT be a dedicated reverse-lookup route for “linked changes by spec”; linked active change summaries belong in this detail response."
+      ]
+    },
+    {
+      "requirement": "canonical artifact reads stay in specs-read",
+      "rules": [
+        "`GET /v1/workspaces/{ws}/specs/{path}/artifacts/{filename}` MUST return canonical artifact content for display-only use. Studio v1 MUST NOT expose a mutating route for canonical workspace artifacts."
+      ]
+    },
+    {
+      "requirement": "POST spec outline accepts draft content",
+      "rules": [
+        "`POST /workspaces/{ws}/specs/{path}/outline` MUST accept JSON body `{ filename: string, content: string }` and MUST call `GetSpecOutline` with `content` + `filename` (draft outline without requiring workspace file). `GET .../outline?filename=` MUST continue to outline saved canonical artifacts."
+      ]
+    },
+    {
+      "requirement": "metadata actions are exposed on the wildcard spec route",
+      "rules": [
+        "`POST /v1/workspaces/{ws}/specs/{path}/metadata` MUST support two mutually exclusive actions on the canonical spec:\n\n- saving provided metadata content\n- generating metadata when `generate=true`\n\nThe route group MUST treat metadata as a workspace-spec read-side utility hosted on the wildcard route, even though it performs persistence."
+      ]
+    },
+    {
+      "requirement": "context and search follow canonical spec contracts",
+      "rules": [
+        "`GET /v1/workspaces/{ws}/specs/{path}/context` MUST forward `followDeps` and `depth` query semantics to the canonical spec context use case.\n\nWhen the caller does not override the shape, the route MUST request the full structured context view for the root spec, enabling grouped `rules`, `constraints`, and `scenarios` sections when metadata provides them.\n\nThe spec context response MUST expose the structured `GetSpecContext` shape directly:\n\n- `entries[]` with `spec`, `source`, `mode`, `stale`\n- optional `title`, `description`, `optimizedContent`\n- optional grouped `rules`, `constraints`, and `scenarios`\n- `warnings[]` objects with warning `type`, `message`, and optional `path`\n\nThe route MUST NOT coerce spec context into the project/change `CompiledContextDto` markdown shape.\n\n`GET /v1/specs/search` MUST accept `q` and optional `workspace`, delegate to `kernel.specs.search`, and return canonical spec summaries."
+      ]
+    },
+    {
+      "requirement": "spec-read route inputs are schema-validated",
+      "rules": [
+        "Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.\n\nThis includes wildcard params, canonical artifact reads, context queries, `GET /specs/search`, POST metadata requests, and outline drafts. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "wildcard spec detail route serves canonical spec detail",
+      "name": "Versioned API path",
+      "when": ["client calls the documented route with /v1 prefix"],
+      "then": ["route handler is reached", "AND unprefixed legacy path is not registered"]
+    },
+    {
+      "requirement": "wildcard spec detail route serves canonical spec detail",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "wildcard spec detail route serves canonical spec detail",
+      "name": "Detail payload includes linked active change summaries",
+      "when": ["client calls GET /v1/workspaces/{ws}/specs/{path}"],
+      "then": [
+        "response includes canonical spec detail fields",
+        "AND linked active changes are embedded in the response with name, state, and optional description"
+      ]
+    },
+    {
+      "requirement": "wildcard spec detail route serves canonical spec detail",
+      "name": "There is no linked-changes reverse-lookup endpoint",
+      "when": ["client searches for GET .../linked-changes under workspace specs"],
+      "then": ["route is not registered", "AND HTTP 404"]
+    },
+    {
+      "requirement": "canonical artifact reads stay in specs-read",
+      "name": "Canonical artifact body is served from workspace spec route",
+      "when": ["client calls GET /v1/workspaces/{ws}/specs/{path}/artifacts/{filename}"],
+      "then": [
+        "response includes content and originalHash",
+        "AND the artifact is read from the canonical workspace spec"
+      ]
+    },
+    {
+      "requirement": "canonical artifact reads stay in specs-read",
+      "name": "Canonical workspace artifact cannot be mutated",
+      "when": ["client attempts a mutating verb on a workspace canonical artifact route"],
+      "then": [
+        "Studio v1 does not expose a write route",
+        "AND on-disk canonical spec content is unchanged"
+      ]
+    },
+    {
+      "requirement": "POST spec outline accepts draft content",
+      "name": "POST outline with draft body",
+      "given": ["workspace ws and spec path foo/bar"],
+      "when": [
+        "POST /v1/workspaces/ws/specs/foo/bar/outline with { filename: \"spec.md\", content: \"# H\\n\" }"
+      ],
+      "then": ["HTTP 200", "AND response is JSON array of outline entries"]
+    },
+    {
+      "requirement": "metadata actions are exposed on the wildcard spec route",
+      "name": "POST metadata saves provided metadata content",
+      "when": [
+        "client POSTs { metadata: \"title: X\\n\" } to /v1/workspaces/{ws}/specs/{path}/metadata"
+      ],
+      "then": ["metadata is persisted for the canonical spec", "AND response confirms success"]
+    },
+    {
+      "requirement": "metadata actions are exposed on the wildcard spec route",
+      "name": "POST metadata generate rebuilds metadata",
+      "when": ["client POSTs { generate: true } to /v1/workspaces/{ws}/specs/{path}/metadata"],
+      "then": [
+        "metadata generation is triggered for that canonical spec",
+        "AND response confirms generation"
+      ]
+    },
+    {
+      "requirement": "context and search follow canonical spec contracts",
+      "name": "GET context forwards canonical spec context query",
+      "when": ["client calls GET /v1/workspaces/{ws}/specs/{path}/context?followDeps=true&depth=1"],
+      "then": [
+        "HTTP 200 is returned",
+        "AND response contains context entries and warnings from the canonical spec context use case"
+      ]
+    },
+    {
+      "requirement": "context and search follow canonical spec contracts",
+      "name": "GET context returns structured spec context payload",
+      "when": ["client calls GET /v1/workspaces/{ws}/specs/{path}/context"],
+      "then": [
+        "each entry includes spec, source, mode, and stale",
+        "AND grouped fields like rules, constraints, scenarios, or optimizedContent are preserved when present",
+        "AND response is not flattened into CompiledContextDto.content"
+      ]
+    },
+    {
+      "requirement": "context and search follow canonical spec contracts",
+      "name": "GET context defaults to full structured mode",
+      "when": [
+        "client calls GET /v1/workspaces/{ws}/specs/{path}/context without extra shape flags"
+      ],
+      "then": [
+        "the root entry uses mode = full",
+        "AND the route requests rules, constraints, and scenarios sections from the use case"
+      ]
+    },
+    {
+      "requirement": "context and search follow canonical spec contracts",
+      "name": "Search with q returns canonical spec summaries",
+      "when": ["GET /v1/specs/search?q=archive"],
+      "then": [
+        "results include matching canonical spec summaries",
+        "AND optional workspace filtering narrows the result set"
+      ]
+    },
+    {
+      "requirement": "spec-read route inputs are schema-validated",
+      "name": "Search rejects missing q",
+      "when": ["client calls GET /v1/specs/search without q"],
+      "then": [
+        "HTTP 400 is returned",
+        "AND body is application/problem+json",
+        "AND code is INVALID_REQUEST"
+      ]
+    },
+    {
+      "requirement": "spec-read route inputs are schema-validated",
+      "name": "Metadata rejects empty body",
+      "when": ["client POSTs {} to /v1/workspaces/{ws}/specs/{path}/metadata"],
+      "then": ["HTTP 400 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "spec-read route inputs are schema-validated",
+      "name": "Context rejects malformed numeric depth",
+      "when": ["client calls /v1/workspaces/{ws}/specs/{path}/context?depth=zero"],
+      "then": ["HTTP 400 is returned", "AND code is INVALID_REQUEST"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-specs-read",
+        "file": "api:src/delivery/http/handlers/handler-specs-read.ts",
+        "symbol": "registerSpecsReadRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:5ca62075ccf4d12d609edb1649ec5a212d5fbc6635f18d4cbcefdf5937a3967e",
+    "verify.md": "sha256:a8059f79b31fc9c8126b7d4b2bcad7ffdecad2e045b70ebd0c4101fc40d8516d"
+  },
+  "generatedBy": "core"
+}

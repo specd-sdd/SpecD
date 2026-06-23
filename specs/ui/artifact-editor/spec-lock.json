@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "ui:hooks-inspector-save", "core:save-change-artifact"],
+  "implementation": [
+    {
+      "file": "ui:src/editor/ArtifactEditor.tsx",
+      "symbols": ["ArtifactEditor"]
+    }
+  ]
+}

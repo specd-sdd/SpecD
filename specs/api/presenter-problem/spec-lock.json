@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "api:problem-json"],
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/presenters/presenter-problem.ts"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "title": "Hooks Change Scope Patch",
+  "description": "Pure helpers for [`ui:change-scope-dialog`](../change-scope-dialog/spec.md): compute `addSpecIds` / `removeSpecIds` deltas and build confirm copy.",
+  "dependsOn": ["ui:change-scope-dialog", "ui:design-system"],
+  "context": [
+    "Pure helpers for [`ui:change-scope-dialog`](../change-scope-dialog/spec.md): compute `addSpecIds` / `removeSpecIds` deltas and build confirm copy."
+  ],
+  "rules": [
+    {
+      "requirement": "computeSpecScopeDelta returns symmetric diff",
+      "rules": [
+        "Given saved and draft `specIds` arrays, MUST return `addSpecIds` (in draft not saved) and `removeSpecIds` (in saved not draft)."
+      ]
+    },
+    {
+      "requirement": "buildScopeChangeConfirmMessage warns invalidation",
+      "rules": [
+        "Message MUST name the change, warn that scope changes invalidate approvals and may remove scaffolded dirs, and list `+` / `−` spec IDs per [`ui:design-system`](../design-system/spec.md) ascending order."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "computeSpecScopeDelta returns symmetric diff",
+      "name": "Detects add and remove",
+      "when": ["saved is [a] and draft is [b]"],
+      "then": ["addSpecIds is [b] and removeSpecIds is [a]"]
+    },
+    {
+      "requirement": "buildScopeChangeConfirmMessage warns invalidation",
+      "name": "Message includes invalidate keyword",
+      "when": ["message is built for a non-empty delta"],
+      "then": ["text mentions invalidate or approvals"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:9f9dd27630ad08cf0a8f348c37d41b05ef981e8e9797d16cb219dc8e2853de1f",
+    "verify.md": "sha256:8f20e70d2aada0b2c6048ac80002554f8011a27898e0fda1a165cffff1007079"
+  },
+  "generatedBy": "core"
+}

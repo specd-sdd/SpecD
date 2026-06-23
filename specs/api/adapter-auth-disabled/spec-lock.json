@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "implementation": [
+    {
+      "file": "api:src/infrastructure/auth/disabled-verifier.ts",
+      "symbols": ["DisabledAuthVerifier"]
+    }
+  ]
+}

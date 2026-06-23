@@ -1,0 +1,72 @@
+{
+  "title": "Spec: User Storage Port",
+  "description": "Define the platform-agnostic client storage interface `IUserStorage` and its LocalStorage and FileStorage adapters in `@specd/client` to allow unified persistence for profiles and recent connections in both web and desktop environments.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "Define the platform-agnostic client storage interface `IUserStorage` and its LocalStorage and FileStorage adapters in `@specd/client` to allow unified persistence for profiles and recent connections in both web and desktop environments."
+  ],
+  "rules": [
+    {
+      "requirement": "IUserStorage interface exists",
+      "rules": [
+        "The `@specd/client` package SHALL export the `IUserStorage` interface defined as:\n\n```typescript\nexport interface IUserStorage {\n  get<T>(key: string): T | null\n  set<T>(key: string, value: T): void\n  remove(key: string): void\n}\n```"
+      ]
+    },
+    {
+      "requirement": "LocalStorageUserStorage implementation",
+      "rules": [
+        "The `@specd/client` package SHALL implement and export `LocalStorageUserStorage` which implements `IUserStorage` and persists data in the browser's native `window.localStorage`."
+      ]
+    },
+    {
+      "requirement": "FileUserStorage implementation",
+      "rules": [
+        "The `@specd/client` package SHALL implement and export `FileUserStorage` which implements `IUserStorage` and persists data on the local filesystem by coordinating with the Electron main process via `window.specd.storage` (preloaded IPC bridge)."
+      ]
+    }
+  ],
+  "constraints": [
+    "Client storage implementations MUST NOT import @specd/core.",
+    "The storage interface SHALL handle JSON serialization and deserialization internally for objects/arrays."
+  ],
+  "scenarios": [
+    {
+      "requirement": "IUserStorage interface exists",
+      "name": "IUserStorage interface defines correct signatures",
+      "when": ["the IUserStorage interface is inspected"],
+      "then": [
+        "it exposes get<T>(key: string): T | null, set<T>(key: string, value: T): void, and remove(key: string): void"
+      ]
+    },
+    {
+      "requirement": "LocalStorageUserStorage implementation",
+      "name": "LocalStorageUserStorage reads and writes to localStorage",
+      "given": ["a clean browser window.localStorage"],
+      "when": ["LocalStorageUserStorage.set(\"profile\", { name: \"test\" }) is called"],
+      "then": [
+        "localStorage.getItem(\"profile\") contains the serialized JSON",
+        "AND LocalStorageUserStorage.get(\"profile\") returns { name: \"test\" }"
+      ]
+    },
+    {
+      "requirement": "LocalStorageUserStorage implementation",
+      "name": "LocalStorageUserStorage removes from localStorage",
+      "given": ["a value exists in window.localStorage"],
+      "when": ["LocalStorageUserStorage.remove(\"profile\") is called"],
+      "then": ["the key is removed from window.localStorage"]
+    },
+    {
+      "requirement": "FileUserStorage implementation",
+      "name": "FileUserStorage coordinates via preload bridge",
+      "given": ["window.specd.storage mock is defined in the renderer environment"],
+      "when": ["FileUserStorage.set(\"recent\", [\"project1\"]) is called"],
+      "then": ["it delegates to the preloaded IPC bridge"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:4761766f7cc50c7f6488bf044c7d5d6f0f1ccde275480eb36760cd58ade8aef8",
+    "verify.md": "sha256:c6f56fe808f7ac2be52e365bca64c48cc6eb67c6cf934030dfaffc4dab44e6fd"
+  },
+  "generatedBy": "core"
+}

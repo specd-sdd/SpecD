@@ -18,7 +18,7 @@
     {
       "requirement": "Identity",
       "rules": [
-        "A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `createdAt` timestamp recorded at creation time. Both are immutable.\n\nIdentities in specd are represented by the `ActorIdentity` interface:\n\n- **`name`** — human-readable name of the actor\n- **`email`** — unique identifier (often a real email, but may be a hash or masked value)\n- **`provider`** — optional identifier of the identity source (e.g. 'git', 'ldap')\n- **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)\n- **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)"
+        "A Change has a unique, user-defined slug name (e.g. `add-auth-flow`), a `createdAt` timestamp recorded at creation time, and an **`updatedAt`** revision timestamp loaded from the manifest. `name` and `createdAt` are immutable. `updatedAt` MUST satisfy `updatedAt >= createdAt`.\n\nIdentities in specd are represented by the `ActorIdentity` interface:\n\n- **`name`** — human-readable name of the actor\n- **`email`** — unique identifier (often a real email, but may be a hash or masked value)\n- **`provider`** — optional identifier of the identity source (e.g. 'git', 'ldap')\n- **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)\n- **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)"
       ]
     },
     {
@@ -178,6 +178,28 @@
       "name": "Change name immutable after creation",
       "when": ["a Change is created with name add-auth-flow"],
       "then": ["the name cannot be changed by any subsequent operation"]
+    },
+    {
+      "requirement": "Identity",
+      "name": "updatedAt invariant on load",
+      "when": ["a Change is loaded from manifest"],
+      "then": ["updatedAt is present", "AND updatedAt >= createdAt"]
+    },
+    {
+      "requirement": "Identity",
+      "name": "Factory rejects updatedAt before createdAt",
+      "when": ["manifest load supplies updatedAt earlier than createdAt"],
+      "then": ["Change construction fails", "AND error explains invalid revision clock"]
+    },
+    {
+      "requirement": "Identity",
+      "name": "Identity fields remain immutable except revision",
+      "given": ["an existing Change entity"],
+      "when": ["caller attempts to mutate name or createdAt"],
+      "then": [
+        "mutation is rejected or ignored per entity rules",
+        "AND updatedAt updates only via repository save paths"
+      ]
     },
     {
       "requirement": "Workspaces and specs",
@@ -899,23 +921,22 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:change",
-        "file": "core:test/domain/entities/change.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:change",
         "file": "core:src/domain/entities/change.ts",
-        "symbol": "invalidate"
+        "symbol": "Change"
+      },
+      {
+        "specId": "core:change",
+        "file": "core:src/domain/entities/change.ts",
+        "symbol": "ChangeProps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:76ab6aca4a19c13b82b9b376d6f6b7e287aa0fd8029ad4b9033fdd883e4d7e8d",
-    "verify.md": "sha256:40b8b5fe1003dbd999a4cf8d01ca971a3a5e956e20c6876430e89eae2dec55f9"
+    "spec.md": "sha256:572e0d95e653c8f25ad96cb1974f8f7ee201d7e1c6811c5a8787bfeb91e692c5",
+    "verify.md": "sha256:465deee9a45e9cd9caf5f9ac58d7bf08c1e5cbd7947a83efd0c398379da0b5fa"
   },
   "generatedBy": "core"
 }

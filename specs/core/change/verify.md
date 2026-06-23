@@ -9,6 +9,25 @@
 - **WHEN** a Change is created with name `add-auth-flow`
 - **THEN** the name cannot be changed by any subsequent operation
 
+#### Scenario: updatedAt invariant on load
+
+- **WHEN** a Change is loaded from manifest
+- **THEN** `updatedAt` is present
+- **AND** `updatedAt >= createdAt`
+
+#### Scenario: Factory rejects updatedAt before createdAt
+
+- **WHEN** manifest load supplies `updatedAt` earlier than `createdAt`
+- **THEN** Change construction fails
+- **AND** error explains invalid revision clock
+
+#### Scenario: Identity fields remain immutable except revision
+
+- **GIVEN** an existing Change entity
+- **WHEN** caller attempts to mutate `name` or `createdAt`
+- **THEN** mutation is rejected or ignored per entity rules
+- **AND** `updatedAt` updates only via repository save paths
+
 ### Requirement: Workspaces and specs
 
 #### Scenario: Workspaces derived from specIds

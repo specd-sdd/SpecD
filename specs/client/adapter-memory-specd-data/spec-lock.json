@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "client:src/adapter-memory-specd-data.ts",
+      "symbols": ["MemorySpecdDataAdapter", "createMemorySpecdDataAdapter"]
+    }
+  ]
+}

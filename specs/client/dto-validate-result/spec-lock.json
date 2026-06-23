@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "api:dto-validate-result"],
+  "implementation": [
+    {
+      "file": "client:src/dto/validate-result.ts",
+      "symbols": ["ValidateResultDto"]
+    }
+  ]
+}

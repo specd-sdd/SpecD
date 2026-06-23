@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "client:port-changes-collection"],
+  "implementation": [
+    {
+      "file": "ui:src/hooks/use-changes-collection.ts",
+      "symbols": ["useChangesCollection"]
+    }
+  ]
+}

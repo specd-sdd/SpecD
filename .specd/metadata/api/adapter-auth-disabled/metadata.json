@@ -1,0 +1,117 @@
+{
+  "title": "Adapter Auth Disabled",
+  "description": "Local Studio (`specd serve`, `specd ui serve`, desktop IPC) must not demand API tokens while still recording the same git/OS actor the CLI uses in change history. The disabled verifier satisfies `ApiTokenVerifier` and pairs with `api:adapter-api-actor-resolver` so mutating routes receive a real `ActorResolver` identity.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Local Studio (`specd serve`, `specd ui serve`, desktop IPC) must not demand API tokens while still recording the same git/OS actor the CLI uses in change history. The disabled verifier satisfies `ApiTokenVerifier` and pairs with `api:adapter-api-actor-resolver` so mutating routes receive a real `ActorResolver` identity."
+  ],
+  "rules": [
+    {
+      "requirement": "disabled verifier accepts requests without Authorization",
+      "rules": [
+        "When `api.auth.type` is `disabled`, `verify()` MUST succeed with no `Authorization` header and MUST NOT inspect Bearer tokens."
+      ]
+    },
+    {
+      "requirement": "disabled verifier does not synthesize ApiActor",
+      "rules": [
+        "The adapter MUST NOT construct an `ApiActor` from HTTP metadata; actor for history comes from `api:adapter-api-actor-resolver` delegating to core `ActorResolver`."
+      ]
+    },
+    {
+      "requirement": "middleware treats disabled auth as pass-through",
+      "rules": [
+        "With `disabled`, `middleware-auth` MUST call `next()` without returning 401 for missing credentials."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "disabled verifier accepts requests without Authorization",
+      "name": "verify succeeds with no header",
+      "given": ["api.auth.type is disabled"],
+      "when": ["verify(undefined) is called"],
+      "then": ["verification succeeds", "AND Bearer token is not read from headers"]
+    },
+    {
+      "requirement": "disabled verifier accepts requests without Authorization",
+      "name": "Empty Authorization header is ignored",
+      "given": ["client sends Authorization: header"],
+      "when": ["middleware runs disabled verifier"],
+      "then": ["verification succeeds", "AND handler is reached"]
+    },
+    {
+      "requirement": "disabled verifier accepts requests without Authorization",
+      "name": "Invalid Bearer is not rejected in v1",
+      "given": ["client sends nonsense Bearer token"],
+      "when": ["middleware runs disabled verifier"],
+      "then": ["request is not rejected with 401 by auth middleware"]
+    },
+    {
+      "requirement": "disabled verifier does not synthesize ApiActor",
+      "name": "No ApiActor is attached from verifier",
+      "when": ["disabled verifier completes"],
+      "then": [
+        "verifier does not construct ApiActor",
+        "AND actor comes from actor-resolver adapter"
+      ]
+    },
+    {
+      "requirement": "disabled verifier does not synthesize ApiActor",
+      "name": "History uses git actor",
+      "given": ["git identity configured"],
+      "when": ["mutating kernel call runs"],
+      "then": ["history by matches git user", "AND not HTTP header metadata"]
+    },
+    {
+      "requirement": "disabled verifier does not synthesize ApiActor",
+      "name": "Future auth types may attach ApiActor separately",
+      "given": ["disabled remains effective type in v1"],
+      "when": ["request is processed"],
+      "then": ["only pass-through auth applies", "AND registry has no bearer verifier"]
+    },
+    {
+      "requirement": "middleware treats disabled auth as pass-through",
+      "name": "Missing credentials call next()",
+      "when": ["request has no Authorization header"],
+      "then": ["middleware calls next()", "AND response is not 401 from auth"]
+    },
+    {
+      "requirement": "middleware treats disabled auth as pass-through",
+      "name": "Handler receives context actor",
+      "when": ["handler runs after middleware"],
+      "then": [
+        "createApiContext includes actor from resolver",
+        "AND mutations pass actor to kernel"
+      ]
+    },
+    {
+      "requirement": "middleware treats disabled auth as pass-through",
+      "name": "Anonymous local Studio session works",
+      "given": ["specd ui serve on loopback"],
+      "when": ["browser calls mutating route without token"],
+      "then": ["operation succeeds when kernel allows", "AND no auth wall at middleware"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:adapter-auth-disabled",
+        "file": "api:src/infrastructure/auth/disabled-verifier.ts",
+        "symbol": "DisabledAuthVerifier"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:c52cb0420c2e83dc6b3ef15ed1fead90576cb1ca48ad97b935f8ea49515259f2",
+    "verify.md": "sha256:088de538d9f627493865e1742953da8a1aa57de54a4f358ae6bef56021c7c867"
+  },
+  "generatedBy": "core"
+}

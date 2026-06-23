@@ -1,0 +1,44 @@
+{
+  "title": "Bottom Panel Terminal",
+  "description": "Electron desktop host concern — **Bottom Panel Terminal**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Electron desktop host concern — **Bottom Panel Terminal**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel."
+  ],
+  "rules": [
+    {
+      "requirement": "terminal cwd defaults to open project root",
+      "rules": [
+        "When a local project is active, new terminal sessions MUST start with `cwd` set to the project root unless the user overrides."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "terminal cwd defaults to open project root",
+      "name": "New terminal uses project root cwd",
+      "given": ["local project is open at /repo"],
+      "when": ["user opens integrated terminal"],
+      "then": ["PTY cwd is /repo", "AND shell prompt reflects directory"]
+    },
+    {
+      "requirement": "terminal cwd defaults to open project root",
+      "name": "Remote-only session uses sensible cwd",
+      "given": ["no local project"],
+      "when": ["terminal opens"],
+      "then": ["cwd falls back to user home or app default", "AND does not assume project path"]
+    },
+    {
+      "requirement": "terminal cwd defaults to open project root",
+      "name": "Closing project disposes terminal sessions",
+      "when": ["user closes project"],
+      "then": ["PTY processes are terminated", "AND no orphaned shells"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:8da19c88afcdb047f04d46fe4b383c3a45f4b4930133656dac1905403dcf2a0a",
+    "verify.md": "sha256:57802f58341226dcb7b18c9947d66931b683d1da06a207f1d449e80acbdd1164"
+  },
+  "generatedBy": "core"
+}

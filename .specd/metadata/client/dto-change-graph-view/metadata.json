@@ -1,0 +1,106 @@
+{
+  "title": "Dto Change Graph View",
+  "description": "Client-side type for **Dto Change Graph View**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "api:dto-change-graph-view",
+    "client:dto-graph-file-ref",
+    "client:dto-graph-symbol-ref"
+  ],
+  "context": [
+    "Client-side type for **Dto Change Graph View**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits."
+  ],
+  "rules": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "rules": [
+        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names."
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "rules": [
+        "DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI."
+      ]
+    },
+    {
+      "requirement": "change graph view mirrors specs array wire shape",
+      "rules": [
+        "`ChangeGraphViewDto` MUST declare `changeName`, `specIds`, and `specs` where each spec entry\nincludes `specId`, `coveredFiles`, and `coveredSymbols`.\n\n`coveredFiles[]` MUST reuse [`client:dto-graph-file-ref`](../dto-graph-file-ref/spec.md).\n\n`coveredSymbols[]` MUST reuse [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md).\n\nThe client MUST NOT declare or consume a `links` field for this endpoint."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Client type fields match API DTO",
+      "when": ["TypeScript compiles client against paired api:dto-*"],
+      "then": ["property names match", "AND required/optional semantics match"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Sample API JSON parses without renaming",
+      "given": ["fixture JSON from API presenter"],
+      "when": ["client deserializes response"],
+      "then": ["no custom field aliases in adapter", "AND hooks read properties directly"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Drift fails client compile or test",
+      "when": ["API DTO adds required field without client update"],
+      "then": ["build or contract test fails", "AND prevents silent UI breakage"]
+    },
+    {
+      "requirement": "change graph view mirrors specs array wire shape",
+      "name": "Client deserializes specs not links",
+      "given": ["API JSON with specs array"],
+      "when": ["remote adapter parses graph view"],
+      "then": [
+        "ChangeGraphViewDto.specs is populated",
+        "AND coveredFiles[] match [client:dto-graph-file-ref](../dto-graph-file-ref/spec.md)",
+        "AND coveredSymbols[] match [client:dto-graph-symbol-ref](../dto-graph-symbol-ref/spec.md)",
+        "AND no links property is read"
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Types imported from shared package",
+      "when": ["client and api packages build"],
+      "then": ["DTO definitions have single source", "AND no duplicated interface copies"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "OpenAPI generation feeds both sides",
+      "given": ["OpenAPI schema generated from Zod"],
+      "when": ["client types generated or re-exported"],
+      "then": ["schemas align with api:dto-* spec", "AND Studio release notes document changes"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Manual duplicate DTO is rejected in review",
+      "when": ["contributor adds parallel interface in client"],
+      "then": ["lint or architectural test fails", "AND must use shared/generated types"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:dto-change-graph-view",
+        "file": "client:src/dto/change-graph-view.ts",
+        "symbol": "ChangeGraphViewDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:b5ab7ded5f804792446a78082f826b33ba55f7fa6732e933b564a734f817d009",
+    "verify.md": "sha256:22945c89cbb3c673d8c6ec6a03b0e665c3aa98e3a0ac65ba7d4f7752038acf4f"
+  },
+  "generatedBy": "core"
+}

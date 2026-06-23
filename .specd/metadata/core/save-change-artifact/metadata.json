@@ -1,0 +1,155 @@
+{
+  "title": "Save Change Artifact",
+  "description": "Studio Save and `PUT` artifact routes must share one pipeline with the CLI: approval guards, optimistic `originalHash`, drift reconciliation, and manifest `updatedAt` bumps. Without a dedicated use case, HTTP handlers would call `saveArtifact` directly and skip invalidation rules agents rely on.",
+  "dependsOn": ["core:change-repository-port", "core:change"],
+  "context": [
+    "Studio Save and `PUT` artifact routes must share one pipeline with the CLI: approval guards, optimistic `originalHash`, drift reconciliation, and manifest `updatedAt` bumps. Without a dedicated use case, HTTP handlers would call `saveArtifact` directly and skip invalidation rules agents rely on."
+  ],
+  "rules": [
+    {
+      "requirement": "SaveChangeArtifact input shape",
+      "rules": [
+        "The use case MUST accept `name`, `filename`, `content`, `originalHash`, `actor`, and optional `force` defaulting to `false`."
+      ]
+    },
+    {
+      "requirement": "save rejects untracked files and approval-guarded writes",
+      "rules": [
+        "`filename` MUST be tracked on the manifest. When `activeSpecApproval` or `activeSignoff` is set and `force` is false, the use case MUST throw `SaveRequiresForceError` before writing."
+      ]
+    },
+    {
+      "requirement": "optimistic concurrency uses originalHash",
+      "rules": [
+        "When `originalHash` does not match persisted content, the use case MUST throw `ArtifactConflictError` (HTTP 409 at the API boundary)."
+      ]
+    },
+    {
+      "requirement": "successful save resets file state and bumps manifest updatedAt",
+      "rules": [
+        "After write, the saved file MUST be `in-progress`, its validated baseline cleared, drift reconciliation MUST run on other files, and `save(change)` MUST set a new manifest `updatedAt`."
+      ]
+    },
+    {
+      "requirement": "SaveChangeArtifact returns hash revision and invalidation flag",
+      "rules": ["The result MUST include `{ contentHash, updatedAt, invalidated: boolean }`."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "SaveChangeArtifact input shape",
+      "name": "Save accepts required fields",
+      "when": ["SaveChangeArtifact is invoked"],
+      "then": [
+        "input includes name, filename, content, originalHash, actor",
+        "AND force defaults false"
+      ]
+    },
+    {
+      "requirement": "SaveChangeArtifact input shape",
+      "name": "Missing actor fails",
+      "when": ["save runs without actor"],
+      "then": ["validation error before write", "AND manifest is unchanged"]
+    },
+    {
+      "requirement": "SaveChangeArtifact input shape",
+      "name": "Force flag is optional",
+      "given": ["caller omits force"],
+      "when": ["save runs under approval guard"],
+      "then": ["treated as force: false", "AND SaveRequiresForceError may throw"]
+    },
+    {
+      "requirement": "save rejects untracked files and approval-guarded writes",
+      "name": "Guard blocks save without force",
+      "given": ["activeSpecApproval is set", "AND force is false"],
+      "when": ["save is attempted"],
+      "then": ["SaveRequiresForceError throws", "AND file is not written"]
+    },
+    {
+      "requirement": "save rejects untracked files and approval-guarded writes",
+      "name": "Force allows guarded save",
+      "given": ["approval guard active"],
+      "when": ["save runs with force: true"],
+      "then": ["content persists", "AND invalidation flag may be true"]
+    },
+    {
+      "requirement": "save rejects untracked files and approval-guarded writes",
+      "name": "Untracked filename fails before guard",
+      "when": ["filename is not on manifest"],
+      "then": ["error before approval check", "AND no partial write"]
+    },
+    {
+      "requirement": "optimistic concurrency uses originalHash",
+      "name": "Matching hash allows save",
+      "given": ["originalHash matches disk"],
+      "when": ["save executes"],
+      "then": ["file updates", "AND new hash returned"]
+    },
+    {
+      "requirement": "optimistic concurrency uses originalHash",
+      "name": "Stale hash throws ArtifactConflictError",
+      "given": ["disk changed since read"],
+      "when": ["save uses old hash"],
+      "then": ["ArtifactConflictError is thrown", "AND API maps to HTTP 409"]
+    },
+    {
+      "requirement": "optimistic concurrency uses originalHash",
+      "name": "Conflict does not bump updatedAt",
+      "when": ["save fails with conflict"],
+      "then": ["manifest updatedAt unchanged", "AND other files untouched"]
+    },
+    {
+      "requirement": "successful save resets file state and bumps manifest updatedAt",
+      "name": "Saved file becomes in-progress",
+      "when": ["save succeeds"],
+      "then": ["artifact state is in-progress", "AND validated baseline cleared"]
+    },
+    {
+      "requirement": "successful save resets file state and bumps manifest updatedAt",
+      "name": "Manifest updatedAt advances",
+      "when": ["save completes"],
+      "then": ["change.updatedAt is new ISO timestamp", "AND clients can poll with ifModifiedSince"]
+    },
+    {
+      "requirement": "successful save resets file state and bumps manifest updatedAt",
+      "name": "Drift reconciliation runs on siblings",
+      "given": ["other files were drifted"],
+      "when": ["save succeeds"],
+      "then": ["drift hook revisits other artifacts", "AND invalidation may be true"]
+    },
+    {
+      "requirement": "SaveChangeArtifact returns hash revision and invalidation flag",
+      "name": "Result includes contentHash and updatedAt",
+      "when": ["save succeeds"],
+      "then": ["contentHash is returned", "AND updatedAt matches manifest"]
+    },
+    {
+      "requirement": "SaveChangeArtifact returns hash revision and invalidation flag",
+      "name": "Invalidated flag reflects side effects",
+      "given": ["save triggers invalidation"],
+      "when": ["result is returned"],
+      "then": ["invalidated: true", "AND UI may refetch status"]
+    },
+    {
+      "requirement": "SaveChangeArtifact returns hash revision and invalidation flag",
+      "name": "Clean save returns invalidated false",
+      "given": ["no sibling drift changes"],
+      "when": ["save succeeds"],
+      "then": ["invalidated: false"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:save-change-artifact",
+        "file": "core:src/application/use-cases/save-change-artifact.ts",
+        "symbol": "SaveChangeArtifact"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:285b25da1e42de47c1d15b53e7bb0ec78b645628ddffe5727b7616da19d4397d",
+    "verify.md": "sha256:20f25a2932a93a80502c6b5730f390e5a597fd0e6cf080aa15cc1edca4b48a00"
+  },
+  "generatedBy": "core"
+}

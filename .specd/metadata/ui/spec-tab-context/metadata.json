@@ -1,0 +1,184 @@
+{
+  "title": "Spec Tab Context",
+  "description": "Studio UI for **Spec Tab Context**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tab Context**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Spec Tab Context**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tab Context**."
+  ],
+  "rules": [
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "rules": [
+        "While the spec tab is visible, the view MUST refresh spec metadata for that path on a light interval. New specs in the tree are already discovered by the global workspace poll."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "rules": [
+        "The spec context tab MUST render the structured `getSpecContext()` payload for the selected spec.\n\nIt MUST show:\n\n- each context entry identity (`spec`, source, mode, stale state)\n- entry metadata sections such as title/description\n- grouped rules, constraints, scenarios, and optimized content when present\n- advisory warnings separately from the entry bodies\n\nStructured entry fields beyond the identity header MUST be rendered in separate collapsible sections using shadcn **`Accordion`** (type multiple) so the user can inspect one field at a time instead of reading a single long body.\n\nFor the Studio default presentation:\n...\n\n- the optimized-content section appears before description, rules, constraints, and scenarios\n- all field sections start expanded\n- when a field is absent, the section still appears and explicitly states that the field is unavailable\n\nStructured content fields in spec context are Markdown-authored content. The tab SHOULD render them as Markdown rather than plain preformatted text so lists, emphasis, headings, and links remain readable.\n\nThis applies not only to freeform description/content fields, but also to grouped rule text, constraint text, scenario names, scenario requirement labels, and scenario clause lines.\n\nGrouped rule headings and scenario headings SHOULD be visually emphasized relative to body text. Constraint entries SHOULD appear as a Markdown-rendered list, without wrapping each item in a separate card-like panel.\n\nIt MUST NOT assume spec context arrives as a single markdown `content` string."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Visible spec tab refreshes metadata",
+      "given": ["spec tab for core:kernel is active"],
+      "when": ["light poll interval elapses"],
+      "then": ["spec metadata hook refetches", "AND tree discovery still uses global poll"]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "Hidden spec tab stops metadata poll",
+      "given": ["user switches away from spec tab"],
+      "when": ["poll would have fired"],
+      "then": ["no metadata request is sent", "AND last data remains rendered"]
+    },
+    {
+      "requirement": "spec tab polls metadata while visible",
+      "name": "New spec appears via workspace tree poll",
+      "given": ["agent adds a spec file on disk"],
+      "when": ["global workspace poll runs"],
+      "then": ["tree shows new node", "AND spec tab poll does not scan filesystem directly"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "name": "Structured context entry is visible",
+      "given": ["port returns a root entry with title, description, and grouped rules"],
+      "when": ["user opens the spec Context tab"],
+      "then": [
+        "the spec id/source metadata is shown",
+        "AND rules are rendered as grouped lists instead of hidden raw JSON"
+      ]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "name": "Entry fields are separated into accordions",
+      "given": ["a context entry includes description, constraints, and scenarios"],
+      "when": ["the tab renders that entry"],
+      "then": [
+        "each field group is shown in its own collapsible section",
+        "AND the user can expand one group without forcing all other groups open"
+      ]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "name": "Sections start open and missing fields stay visible",
+      "given": ["a context entry is missing optimized content or description"],
+      "when": ["the tab renders"],
+      "then": [
+        "those sections still appear at the top of the entry",
+        "AND each missing section explicitly states that the field is unavailable",
+        "AND the sections start expanded by default"
+      ]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "name": "Markdown fields render as Markdown",
+      "given": ["description or optimized content includes Markdown lists or emphasis"],
+      "when": ["the field accordion is opened"],
+      "then": [
+        "the content is rendered as Markdown",
+        "AND the user does not see the field as a raw plain-text blob"
+      ]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "name": "Grouped rule and scenario text render as Markdown",
+      "given": ["rules, constraints, or scenario clause lines include Markdown formatting"],
+      "when": ["the corresponding accordion sections are opened"],
+      "then": [
+        "those grouped entries are rendered as Markdown too",
+        "AND formatting is preserved consistently across all structured content fields"
+      ]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "name": "Constraints render as a normal list",
+      "given": ["a context entry contains multiple constraints"],
+      "when": ["the Constraints section is rendered"],
+      "then": [
+        "the constraints appear as a list",
+        "AND each item still preserves its Markdown formatting",
+        "AND the UI does not wrap each constraint inside a separate padded card"
+      ]
+    },
+    {
+      "requirement": "view renders structured spec context entries",
+      "name": "Warnings are shown separately from entry bodies",
+      "given": ["context response includes warnings"],
+      "when": ["the tab renders"],
+      "then": [
+        "warnings appear in a dedicated warning area",
+        "AND entry content remains visible below"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:spec-tab-context",
+        "file": "ui:src/spec/SpecMainView.tsx",
+        "symbol": "SpecMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:756cd8d6477d941f435c4104f85b31daaaa6b7923dc10194f3977278be638460",
+    "verify.md": "sha256:4f70ede6eeebae7658a1d7c32a4cf070af537c3cb7682fb0fed256550ca5aa5a"
+  },
+  "generatedBy": "core"
+}

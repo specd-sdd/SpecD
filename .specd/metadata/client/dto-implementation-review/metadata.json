@@ -1,0 +1,86 @@
+{
+  "title": "Dto Implementation Review",
+  "description": "Client-side type for **Dto Implementation Review**, kept in parity with [`api:dto-implementation-review`](../../api/dto-implementation-review/spec.md) so remote and embedded Studio render the same JSON the API emits for `getImplementationReview`.",
+  "dependsOn": ["default:_global/architecture", "api:dto-implementation-review"],
+  "context": [
+    "Client-side type for **Dto Implementation Review**, kept in parity with [`api:dto-implementation-review`](../../api/dto-implementation-review/spec.md) so remote and embedded Studio render the same JSON the API emits for `getImplementationReview`."
+  ],
+  "rules": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "rules": [
+        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-implementation-review` spec. The client MUST NOT invent alternate property names."
+      ]
+    },
+    {
+      "requirement": "types live in packages/client/src/dto/implementation-tracking.ts",
+      "rules": [
+        "`ImplementationReviewDto`, `ImplementationTrackingDto`, `ImplementationLinkDto`, and `TrackedImplementationFileDto` MUST be exported from `@specd/client` and re-exported via `dto/index.ts`."
+      ]
+    },
+    {
+      "requirement": "port-changes-read uses ImplementationReviewDto",
+      "rules": [
+        "`getImplementationReview(name)` MUST return `Promise<ImplementationReviewDto>`, not `Record<string, unknown>`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Client type fields match API DTO",
+      "when": ["TypeScript compiles client against paired api:dto-implementation-review"],
+      "then": [
+        "ImplementationReviewDto property names match API JSON",
+        "AND nested implementationTracking.links / trackedFiles shapes match"
+      ]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Remote adapter parses without aliases",
+      "given": ["fixture JSON from GET .../implementation-review"],
+      "when": ["adapter-remote-specd-data.getImplementationReview resolves"],
+      "then": [
+        "result is typed as ImplementationReviewDto",
+        "AND hooks read implementationTracking directly"
+      ]
+    },
+    {
+      "requirement": "types live in packages/client/src/dto/implementation-tracking.ts",
+      "name": "types live in packages/client/src/dto/impleme… — primary path",
+      "when": [
+        "ImplementationReviewDto, ImplementationTrackingDto, ImplementationLinkDto, and TrackedImplementationFileDto MUST be exported"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "types live in packages/client/src/dto/implementation-tracking.ts",
+      "name": "types live in packages/client/src/dto/impleme… — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "port-changes-read uses ImplementationReviewDto",
+      "name": "Port signature is not untyped Record",
+      "when": ["PortChangesRead is inspected"],
+      "then": [
+        "getImplementationReview return type is ImplementationReviewDto",
+        "AND not Record<string, unknown>"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:003d4078413adc0e25a983c4d9f373fed4128842f7a26b2ef66502587397e8cc",
+    "verify.md": "sha256:f9a9f7a2e21f5bd55ed186707860c81b3487c5969522b36e17551e8ac5588abc"
+  },
+  "generatedBy": "core"
+}

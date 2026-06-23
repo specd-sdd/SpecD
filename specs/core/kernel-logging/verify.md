@@ -41,6 +41,21 @@
 - **WHEN** `createKernel(config)` is called
 - **THEN** the `createDefaultLogger` infrastructure factory MUST be used to build the adapter
 
+### Requirement: Shared LogFormatter per kernel
+
+#### Scenario: Kernel creates formatter once
+
+- **WHEN** `createKernel(config)` runs without `KernelOptions.logFormatter`
+- **THEN** `createLogFormatter()` is invoked once per bootstrap
+- **AND** the same instance is passed to `createDefaultLogger` and `ReadLog` when `logRing` is set
+
+#### Scenario: CLI override via KernelOptions
+
+- **GIVEN** `KernelOptions.logFormatter` is provided
+- **WHEN** `createKernel` initializes logging
+- **THEN** the override formatter is used for logger and readback
+- **AND** `createLogFormatter()` is not called again
+
 ### Requirement: Log Directory Guarantee
 
 #### Scenario: Directory creation

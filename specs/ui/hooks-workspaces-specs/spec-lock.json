@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "client:port-workspaces-specs"],
+  "implementation": [
+    {
+      "file": "ui:src/hooks/use-workspace-specs.ts",
+      "symbols": ["useWorkspaceSpecs"]
+    }
+  ]
+}

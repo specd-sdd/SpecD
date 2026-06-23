@@ -1,0 +1,124 @@
+{
+  "title": "Port Archived Changes",
+  "description": "TypeScript surface for **Port Archived Changes** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC.",
+  "dependsOn": ["default:_global/architecture", "client:specd-data-port"],
+  "context": [
+    "TypeScript surface for **Port Archived Changes** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC."
+  ],
+  "rules": [
+    {
+      "requirement": "port exposes Archived Changes operations",
+      "rules": [
+        "The interface MUST declare asynchronous methods equivalent to the HTTP routes in the matching `api:routes-*` group:\n\n- `getArchivedChange(name)` → `ChangeDetailDto` with `state: 'archived'` and `archivedMeta` populated from `GET /v1/archived-changes/{name}`"
+      ]
+    },
+    {
+      "requirement": "listArchived maps archive list rows for Studio sidebar",
+      "rules": [
+        "`listArchived()` on `port-changes-collection` MUST call `GET /v1/archived-changes` and map each `{ name, archivedName }` row to `ChangeSummaryDto` with `name` (and optional `description` from `archivedName` for tooling). The sidebar Archive section MUST NOT render per-row `state: archived` labels; section title suffices."
+      ]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "rules": [
+        "Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types."
+      ]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "rules": [
+        "HTTP failures MUST be translated by `adapter-problem-json-errors` into errors the UI hooks can display."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "port exposes Archived Changes operations",
+      "name": "Port methods mirror routes contract",
+      "when": ["adapter implements this port group"],
+      "then": ["each method maps to documented /v1 route", "AND types match DTO specs"]
+    },
+    {
+      "requirement": "port exposes Archived Changes operations",
+      "name": "List changes hits collection HTTP route",
+      "when": ["listChanges() is called on remote adapter"],
+      "then": ["GET /v1/changes is requested", "AND response parses to typed rows"]
+    },
+    {
+      "requirement": "port exposes Archived Changes operations",
+      "name": "IPC adapter exposes same method names",
+      "when": ["desktop IPC adapter handles port call"],
+      "then": ["method name and arity match interface", "AND return shape matches HTTP path"]
+    },
+    {
+      "requirement": "listArchived maps archive list rows for Studio sidebar",
+      "name": "listArchived maps archive list rows for Studi… — primary path",
+      "when": ["listArchived() on port-changes-collection MUST call GET /v1/archived-changes and"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "listArchived maps archive list rows for Studio sidebar",
+      "name": "listArchived maps archive list rows for Studi… — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "Remote and IPC adapters share types",
+      "when": ["TypeScript compiles both adapters against port interface"],
+      "then": ["parameters match", "AND return types match"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "UI hooks do not branch on transport",
+      "when": ["hook calls getChangeStatus"],
+      "then": ["same method signature for HTTP and IPC", "AND only adapter selection differs"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "Signature drift fails build",
+      "when": ["port interface adds required field"],
+      "then": ["adapters fail compile until updated"]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "HTTP 404 becomes typed client error",
+      "when": ["remote call returns 404 problem+json"],
+      "then": ["adapter throws parseable error", "AND hook shows message"]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "Network failure is not swallowed",
+      "when": ["fetch throws network error"],
+      "then": ["hook receives error", "AND loading state clears"]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "Success bypasses error mapper",
+      "when": ["HTTP 200 returns DTO"],
+      "then": ["no error thrown", "AND data returned to hook"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:port-archived-changes",
+        "file": "client:src/port-archived-changes.ts",
+        "symbol": "PortArchivedChanges"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:309aa33c99ce60a1b74ada4b237801ed3083b4b729256b646f2e1dd068910a82",
+    "verify.md": "sha256:9250a0da4ed96d594137a3fedc5a4a0bcc53c4171b732e0ea1623ffcf1567a4a"
+  },
+  "generatedBy": "core"
+}

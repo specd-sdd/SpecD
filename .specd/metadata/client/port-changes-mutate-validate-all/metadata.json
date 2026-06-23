@@ -1,0 +1,95 @@
+{
+  "title": "Port Changes Mutate — validateChangeAll",
+  "description": "Client port method for DAG batch validation (`POST .../validate-all`).",
+  "dependsOn": ["api:routes-changes-mutate-validate-all", "client:dto-validate-batch-result"],
+  "context": ["Client port method for DAG batch validation (`POST .../validate-all`)."],
+  "rules": [
+    {
+      "requirement": "validateChangeAll on SpecdDataPort",
+      "rules": [
+        "`SpecdDataPort` MUST declare:\n\n```typescript\nvalidateChangeAll(\n  name: string,\n  input?: { artifactId?: string },\n  signal?: AbortSignal,\n): Promise<ValidateBatchResultDto>\n```"
+      ]
+    },
+    {
+      "requirement": "remote adapter path",
+      "rules": [
+        "`adapter-remote-specd-data` MUST `POST /changes/{name}/validate-all` with JSON body `input ?? {}`."
+      ]
+    },
+    {
+      "requirement": "memory adapter stub",
+      "rules": [
+        "`adapter-memory-specd-data` MAY return `{ passed: true, total: 0, results: [] }` for UI tests without a kernel."
+      ]
+    },
+    {
+      "requirement": "validateChange remains single-step",
+      "rules": [
+        "`validateChange(name, { specId?, artifactId? })` MUST continue to call `POST .../validate` only."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "validateChangeAll on SpecdDataPort",
+      "name": "Remote adapter POST path",
+      "when": ["adapter-remote-specd-data.validateChangeAll('feat', { artifactId: 'tasks' }) runs"],
+      "then": [
+        "transport issues POST /v1/changes/feat/validate-all with body { \"artifactId\": \"tasks\" }"
+      ]
+    },
+    {
+      "requirement": "validateChangeAll on SpecdDataPort",
+      "name": "validateChange stays single-step",
+      "when": ["validateChange is called with { specId, artifactId }"],
+      "then": ["transport issues POST /v1/changes/{name}/validate only"]
+    },
+    {
+      "requirement": "remote adapter path",
+      "name": "remote adapter path — primary path",
+      "when": [
+        "adapter-remote-specd-data MUST POST /changes/{name}/validate-all with JSON body input"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "remote adapter path",
+      "name": "remote adapter path — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "memory adapter stub",
+      "name": "memory adapter stub — primary path",
+      "when": ["adapter-memory-specd-data MAY return { passed: true, total: 0,"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "memory adapter stub",
+      "name": "memory adapter stub — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "validateChange remains single-step",
+      "name": "validateChange remains single-step — primary path",
+      "when": ["validateChange(name, { specId?, artifactId? }) MUST continue to"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "validateChange remains single-step",
+      "name": "validateChange remains single-step — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:071eaf7e206bc5169455aafaf158e3efb2e5bf8ca64904e02ac97a8366b1615c",
+    "verify.md": "sha256:3f48f02adc173bf47d43a5f8becc622744ade8de5a30776a9ac5fa4807547d53"
+  },
+  "generatedBy": "core"
+}

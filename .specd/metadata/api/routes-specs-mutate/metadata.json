@@ -1,0 +1,75 @@
+{
+  "title": "Routes Specs Mutate",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Specs Mutate** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group is limited to workspace-level spec validation.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Specs Mutate** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. This route group is limited to workspace-level spec validation."
+  ],
+  "rules": [
+    {
+      "requirement": "POST validate runs structural ValidateSpecs",
+      "rules": [
+        "`POST /v1/workspaces/{ws}/specs/validate` MUST run `ValidateSpecs` either for the whole workspace or for a single canonical spec selected by the optional `specPath` query parameter."
+      ]
+    },
+    {
+      "requirement": "spec validation inputs are schema-validated",
+      "rules": [
+        "The route MUST declare schema validation for `ws` params and optional `specPath` query input before handler logic runs. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "POST validate runs structural ValidateSpecs",
+      "name": "Versioned API path",
+      "when": ["client calls the documented route with /v1 prefix"],
+      "then": ["route handler is reached", "AND unprefixed legacy path is not registered"]
+    },
+    {
+      "requirement": "POST validate runs structural ValidateSpecs",
+      "name": "POST validate runs ValidateSpecs",
+      "when": ["POST /v1/workspaces/{ws}/specs/validate is called with specPath"],
+      "then": ["ValidateSpecs executes", "AND response lists structural validation findings"]
+    },
+    {
+      "requirement": "POST validate runs structural ValidateSpecs",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "spec validation inputs are schema-validated",
+      "name": "Validate rejects empty workspace id or malformed params",
+      "when": ["route params do not satisfy the declared schema"],
+      "then": ["HTTP 400 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "spec validation inputs are schema-validated",
+      "name": "Validate rejects blank specPath query",
+      "when": ["POST /v1/workspaces/{ws}/specs/validate?specPath="],
+      "then": ["HTTP 400 is returned", "AND code is INVALID_REQUEST"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-specs-mutate",
+        "file": "api:src/delivery/http/handlers/handler-specs-mutate.ts",
+        "symbol": "registerSpecsMutateRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:9ae6732d6b4e44d4e7916609574f3dfcebe4e11e757e258ac7daab9eddb64106",
+    "verify.md": "sha256:ccab8bf7a29589a4c22c161219ad80759db59b15941d929400cbe7b8ad9c1d1f"
+  },
+  "generatedBy": "core"
+}

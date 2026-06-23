@@ -1,0 +1,95 @@
+{
+  "title": "Outline Artifact Content",
+  "description": "Studio Outline (and CLI `specs outline`) need a single parser entry point that turns **raw artifact bytes** into navigable outline trees without requiring a workspace spec or change file on disk. `outlineArtifactContent` centralizes format inference, parse, and `outline()` so `GetSpecOutline` and `OutlineChangeArtifact` do not duplicate parser wiring.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "Studio Outline (and CLI `specs outline`) need a single parser entry point that turns **raw artifact bytes** into navigable outline trees without requiring a workspace spec or change file on disk. `outlineArtifactContent` centralizes format inference, parse, and `outline()` so `GetSpecOutline` and `OutlineChangeArtifact` do not duplicate parser wiring."
+  ],
+  "rules": [
+    {
+      "requirement": "input is content and filename only",
+      "rules": [
+        "The function MUST accept `content` (string), `filename` (for extension / format inference), `ArtifactParserRegistry`, and optional `{ full?, hints? }`. It MUST NOT read the filesystem."
+      ]
+    },
+    {
+      "requirement": "output matches spec outline entry shape",
+      "rules": [
+        "The result MUST include `filename`, `outline` (readonly tree), and optional `selectorHints` when `hints: true`."
+      ]
+    },
+    {
+      "requirement": "unknown format throws ParserNotRegisteredError",
+      "rules": [
+        "When `inferFormat(filename)` fails or no parser is registered, the function MUST throw `ParserNotRegisteredError` with the filename in the message."
+      ]
+    },
+    {
+      "requirement": "parse errors propagate",
+      "rules": [
+        "Parser `parse` failures MUST propagate to callers (HTTP layer maps to problem+json)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "input is content and filename only",
+      "name": "Markdown content yields section outline",
+      "given": ["markdown with ## Requirements heading"],
+      "when": ["outlineArtifactContent runs with spec.md"],
+      "then": [
+        "outline entries include a section for Requirements",
+        "AND no filesystem read occurs"
+      ]
+    },
+    {
+      "requirement": "input is content and filename only",
+      "name": "Unknown extension throws",
+      "given": ["filename artifact.bin"],
+      "when": ["outline is requested"],
+      "then": ["ParserNotRegisteredError is thrown"]
+    },
+    {
+      "requirement": "output matches spec outline entry shape",
+      "name": "Hints optional",
+      "given": ["hints: true"],
+      "when": ["outline succeeds"],
+      "then": [
+        "selectorHints is present when parser provides hints",
+        "AND hints: false omits selectorHints"
+      ]
+    },
+    {
+      "requirement": "unknown format throws ParserNotRegisteredError",
+      "name": "unknown format throws ParserNotRegisteredError — primary path",
+      "when": ["When inferFormat(filename) fails or no parser is registered,"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "unknown format throws ParserNotRegisteredError",
+      "name": "unknown format throws ParserNotRegisteredError — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "parse errors propagate",
+      "name": "parse errors propagate — primary path",
+      "when": ["Parser parse failures MUST propagate to callers (HTTP"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "parse errors propagate",
+      "name": "parse errors propagate — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:d0ded5a987729295e26e7622613e0ce02c643e1dd53f80511e02b889fc307f56",
+    "verify.md": "sha256:d34b8afff622b9bcc07f60aa5f4f6dd8afbd99cd42ba9ebc29fadf8c41f517a5"
+  },
+  "generatedBy": "core"
+}

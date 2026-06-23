@@ -21,6 +21,18 @@
       ]
     },
     {
+      "requirement": "Optional ifModifiedSince short-circuit",
+      "rules": [
+        "`GetStatusInput` MAY include **`ifModifiedSince`** (ISO 8601).\n\nWhen provided and it is greater than or equal to the change's current **`updatedAt`**, `execute()` MUST return a result that includes at least `updatedAt` and **`unchanged: true`** without building the full artifact DAG.\n\nWhen the change is newer than `ifModifiedSince`, `unchanged` MUST be false or omitted and the full status payload MUST be returned."
+      ]
+    },
+    {
+      "requirement": "Exposes updatedAt",
+      "rules": [
+        "`GetStatusResult` MUST expose the change's **`updatedAt`** on the change projection so API, CLI, and Studio share one revision clock for tab polling."
+      ]
+    },
+    {
       "requirement": "Returns the change and its artifact statuses",
       "rules": [
         "On success, `execute()` MUST return a `GetStatusResult` containing:\n\n- `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists\n- `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes\n- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change\n- `specDependsOn` — the map of declared spec dependencies from the change manifest\n- `review` — a derived review summary for agents and CLI serializers\n- `blockers` — an array of active blockers preventing progress\n- `nextAction` — a recommended next action to guide the actor\n\nResolution order:\n\n1. `ChangeRepository.get(name)` for active storage\n2. If null, `ChangeRepository.getDraft(name)` for drafted storage\n\nIf both are null, the use case MUST throw `ChangeNotFoundError`.\n\n`GetStatus` MUST NOT call `ChangeRepository.getDiscarded` or load `discarded/` storage. Discarded changes MUST be inspected via `GetDiscarded` (for example `specd discarded show`).\n\nWhen `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).\n\n(rest of requirement content remains unchanged...)"
@@ -469,6 +481,52 @@
       "then": ["the use case resolves the named change from the repository"]
     },
     {
+      "requirement": "Optional ifModifiedSince short-circuit",
+      "name": "Matching revision returns unchanged",
+      "given": ["change foo has updatedAt 2026-05-25T10:00:00.000Z"],
+      "when": ["GetStatus runs with ifModifiedSince equal to that timestamp"],
+      "then": ["result includes unchanged: true", "AND full artifact DAG is not built"]
+    },
+    {
+      "requirement": "Optional ifModifiedSince short-circuit",
+      "name": "Newer change returns full status",
+      "given": ["disk manifest updatedAt is newer than client ifModifiedSince"],
+      "when": ["GetStatus executes"],
+      "then": [
+        "unchanged is false or omitted",
+        "AND full status payload including artifact DAG is returned"
+      ]
+    },
+    {
+      "requirement": "Optional ifModifiedSince short-circuit",
+      "name": "Omitted ifModifiedSince always builds DAG",
+      "when": ["GetStatus runs without ifModifiedSince"],
+      "then": ["full status is computed", "AND unchanged is not set to true"]
+    },
+    {
+      "requirement": "Exposes updatedAt",
+      "name": "Status projection includes updatedAt",
+      "when": ["GetStatus returns a full status payload"],
+      "then": [
+        "change projection includes ISO updatedAt",
+        "AND value matches manifest revision clock"
+      ]
+    },
+    {
+      "requirement": "Exposes updatedAt",
+      "name": "Short-circuit still returns updatedAt",
+      "given": ["ifModifiedSince matches current revision"],
+      "when": ["short-circuit path runs"],
+      "then": ["result still includes updatedAt", "AND client can store it for next poll"]
+    },
+    {
+      "requirement": "Exposes updatedAt",
+      "name": "API presenter forwards updatedAt unchanged",
+      "given": ["kernel status includes updatedAt"],
+      "when": ["API maps to change status DTO"],
+      "then": ["DTO updatedAt equals kernel value", "AND Studio tab poll can compare revisions"]
+    },
+    {
       "requirement": "Constructor dependencies",
       "name": "GetStatus receives LifecycleEngine through construction",
       "given": ["GetStatus is assembled by the kernel"],
@@ -486,22 +544,7 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:get-status",
-        "file": "core:test/application/use-cases/get-status.spec.ts"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
-      }
-    ],
     "symbols": [
-      {
-        "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatusResult"
-      },
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/get-status.ts",
@@ -509,14 +552,19 @@
       },
       {
         "specId": "core:get-status",
-        "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-        "symbol": "execute"
+        "file": "core:src/application/use-cases/get-status.ts",
+        "symbol": "GetStatusInput"
+      },
+      {
+        "specId": "core:get-status",
+        "file": "core:src/application/use-cases/get-status.ts",
+        "symbol": "GetStatusResult"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:be9a8c647ef1cde4542f96089f6e23d26f2480137983336d91675a1b3717ec34",
-    "verify.md": "sha256:9c775aef24fd62966e49cebe1570f01b8a4d0986f0a5db8b7d1b24ab9d4d2bda"
+    "spec.md": "sha256:8e7f5061674dc27b0ffa86de315a97e8d4bf4457bf3120e33155942fe0699732",
+    "verify.md": "sha256:1face47bcedb81e32dfefd36dbd661969ab626e064205519fdd0b11ad8b68d6d"
   },
   "generatedBy": "core"
 }

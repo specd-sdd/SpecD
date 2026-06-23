@@ -20,6 +20,12 @@
       ]
     },
     {
+      "requirement": "updatedAt revision clock",
+      "rules": [
+        "Each manifest MUST include **`updatedAt`** (ISO 8601).\n\n- On **create**, `updatedAt` MUST equal `createdAt`.\n- On **every** manifest persist (`save`), `updatedAt` MUST be set to the save timestamp (validate-only writes, artifact saves, transitions, edit, scaffold sync, draft/discard paths that rewrite the manifest).\n- `createdAt` remains immutable.\n\nLegacy manifests without `updatedAt` MUST be accepted on load; the repository MUST derive an initial value once (for example max of `createdAt` and latest `history[].at`) and persist it on the next save."
+      ]
+    },
+    {
       "requirement": "Archive outcome history events",
       "rules": [
         "The active change manifest history MUST preserve explicit failed-archive traceability.\n\nThe `archive-failed` event is appended when an archive attempt fails after archive execution begins but before a successful archive commit is completed.\n\n`archive-failed` MUST include:\n\n- `step` — the archive phase in which the failure occurred\n- `message` — a human-readable diagnostic summary\n- `commitStarted` — whether staged archive commit had already begun\n\nSuccessful archive completion MUST remain traceable through the archived manifest metadata (`archivedAt`, `archivedBy`, and archive location data) rather than by appending a new active-change history event after the change has ceased to be an active change.\n\nA failed pre-commit archive attempt MUST NOT by itself imply that archive completed or that permanent specs were partially accepted."
@@ -145,6 +151,26 @@
         "AND symbols is omitted for file-level-only links",
         "AND fileLinkExplicit: false is only valid when symbols is present and non-empty"
       ]
+    },
+    {
+      "requirement": "updatedAt revision clock",
+      "name": "Create sets updatedAt equal to createdAt",
+      "when": ["a new change manifest is first persisted"],
+      "then": ["updatedAt equals createdAt", "AND both are ISO 8601 strings"]
+    },
+    {
+      "requirement": "updatedAt revision clock",
+      "name": "Save bumps updatedAt",
+      "given": ["manifest loaded with prior updatedAt"],
+      "when": ["any operation persists the manifest"],
+      "then": ["updatedAt advances to save timestamp", "AND createdAt is unchanged"]
+    },
+    {
+      "requirement": "updatedAt revision clock",
+      "name": "Legacy manifest backfills on load",
+      "given": ["manifest file lacks updatedAt"],
+      "when": ["repository loads the change"],
+      "then": ["derived updatedAt is applied in memory", "AND next save persists the derived value"]
     },
     {
       "requirement": "Archive outcome history events",
@@ -283,39 +309,14 @@
     "symbols": [
       {
         "specId": "core:change-manifest",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "FsChangeRepository"
-      },
-      {
-        "specId": "core:change-manifest",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "changeToManifest"
-      },
-      {
-        "specId": "core:change-manifest",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "deserializeEvent"
-      },
-      {
-        "specId": "core:change-manifest",
         "file": "core:src/infrastructure/fs/manifest.ts",
-        "symbol": "ManifestTrackedImplementationFile"
-      },
-      {
-        "specId": "core:change-manifest",
-        "file": "core:src/infrastructure/fs/manifest.ts",
-        "symbol": "ManifestImplementationLink"
-      },
-      {
-        "specId": "core:change-manifest",
-        "file": "core:src/infrastructure/fs/manifest.ts",
-        "symbol": "ManifestTrackedImplementationFileState"
+        "symbol": "changeManifestSchema"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:39c6c9a8996cf6ee5b626f603d9c7d6902c17461fdc41b7d3a9a2703ffd67e37",
-    "verify.md": "sha256:871e5d631bb0e03c5d741362316746c5ebc60ed86f97226b8beb9453fe359f5b"
+    "spec.md": "sha256:fe60bbf00013d7e1bc8af6d89c49b54ad97c58264ced7eae78708e7a67f5742a",
+    "verify.md": "sha256:beddff3ed2229ea45d9bbc9f04b6fa00ca61fa1c84255079a7f0966cd1870bcb"
   },
   "generatedBy": "core"
 }

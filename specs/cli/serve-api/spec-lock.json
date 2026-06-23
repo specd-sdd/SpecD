@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["api:composition-create-api-server"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/serve/serve-api.ts",
+      "symbols": ["resolveServeAuth", "registerServeApi"]
+    }
+  ]
+}

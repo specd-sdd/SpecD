@@ -1,0 +1,127 @@
+{
+  "title": "Port Changes Read",
+  "description": "TypeScript surface for **Port Changes Read** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC.",
+  "dependsOn": ["default:_global/architecture", "client:specd-data-port"],
+  "context": [
+    "TypeScript surface for **Port Changes Read** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC."
+  ],
+  "rules": [
+    {
+      "requirement": "port exposes Changes Read operations",
+      "rules": [
+        "The interface MUST declare asynchronous methods equivalent to the HTTP routes in the matching `api:routes-*` group:\n\n- `getChange(name)`, `getChangeStatus(name, { ifModifiedSince?, refreshImplementation? })`\n- `listChangeArtifacts(name)`, `getChangeArtifact(name, filename)`\n- `getChangeContext(name, query)`, `previewChange(name, query)`, `previewChangeDraft(name, input)`, `outlineChangeArtifact(name, filename, input?)`, instructions helpers\n- `getImplementationReview(name)` → [`client:dto-implementation-review`](dto-implementation-review/spec.md) (`implementationTracking.links`, `implementationTracking.trackedFiles`, `specIds`)\n\nDrafted and discarded changes are read-only and MUST use dedicated read entry points:\n\n- `getDraft(name)`, `getDraftStatus(name, { ifModifiedSince? })`, `listDraftArtifacts(name)`\n- `getDiscarded(name)`, `getDiscardedStatus(name, { ifModifiedSince? })`, `listDiscardedArtifacts(name)`\n- `getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)` where `readOnlyOrigin` is `draft` | `discarded` | `archived`\n\n`getDraftArtifact` and `getDiscardedArtifact` MAY delegate to `getReadOnlyChangeArtifact` with the matching origin. These methods map to `/drafts/{name}/*` and `/discarded/{name}/*` and MUST NOT call active `/changes/{name}/*` routes.\n\nArtifact list responses consumed through this port MUST preserve task metadata from the API, including `hasTasks` and optional `totalTasks` / `completedTasks`, so Studio can resolve the Tasks tab without relying on a fixed filename such as `tasks.md`."
+      ]
+    },
+    {
+      "requirement": "port exposes read-only artifact by origin",
+      "rules": [
+        "The port MUST expose `getReadOnlyChangeArtifact(name, filename, readOnlyOrigin)` as the canonical artifact reader for drafted, discarded, and archived read-only change views.\n\nAdapters MUST map:\n\n- `draft` → `/drafts/{name}/artifacts/{filename}`\n- `discarded` → `/discarded/{name}/artifacts/{filename}`\n- `archived` → `/archived-changes/{name}/artifacts/{filename}`"
+      ]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "rules": [
+        "Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types."
+      ]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "rules": [
+        "HTTP failures MUST be translated by `adapter-problem-json-errors` into errors the UI hooks can display."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Active artifact save/load MUST use core:save-change-artifact and core:get-change-artifact. Read-only draft/discarded/archived bodies MUST use core:get-read-only-change-artifact via getReadOnlyChangeArtifact — not getChangeArtifact or raw repository access.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "port exposes Changes Read operations",
+      "name": "port exposes Changes Read operations — primary path",
+      "when": ["The interface MUST declare asynchronous methods equivalent to"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "port exposes Changes Read operations",
+      "name": "port exposes Changes Read operations — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "port signatures are identical for HTTP and IP… — primary path",
+      "when": [
+        "Implementations (adapter-remote-specd-data, desktop IPC) MUST implement these methods"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "port signatures are identical for HTTP and IP… — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "port exposes read-only artifact by origin",
+      "name": "getReadOnlyChangeArtifact maps to draft route",
+      "when": ["adapter receives getReadOnlyChangeArtifact(name, filename, 'draft')"],
+      "then": [
+        "HTTP GET /v1/drafts/{name}/artifacts/{filename} is called",
+        "AND GET /v1/changes/{name}/artifacts/{filename} is not called"
+      ]
+    },
+    {
+      "requirement": "port exposes read-only artifact by origin",
+      "name": "getReadOnlyChangeArtifact maps to discarded route",
+      "when": ["adapter receives getReadOnlyChangeArtifact(name, filename, 'discarded')"],
+      "then": ["HTTP GET /v1/discarded/{name}/artifacts/{filename} is called"]
+    },
+    {
+      "requirement": "port exposes read-only artifact by origin",
+      "name": "artifact list preserves task metadata",
+      "when": ["adapter reads change artifact lists from API"],
+      "then": [
+        "entries preserve hasTasks",
+        "AND optional task counters remain available to UI consumers"
+      ]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "port failures surface as typed client errors — primary path",
+      "when": ["HTTP failures MUST be translated by adapter-problem-json-errors into"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "port failures surface as typed client errors — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:port-changes-read",
+        "file": "client:src/port-changes-read.ts",
+        "symbol": "ChangeArtifactListItemDto"
+      },
+      {
+        "specId": "client:port-changes-read",
+        "file": "client:src/port-changes-read.ts",
+        "symbol": "PortChangesRead"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:5583551971a86d0dc56730b2e608026d922139c493e95e4db8ac203ab0e54a5c",
+    "verify.md": "sha256:8a7785d5e26b3c3db8d8ac982b7c528457902b27a2159ac09493b8ed78600c8f"
+  },
+  "generatedBy": "core"
+}

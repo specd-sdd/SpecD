@@ -1,0 +1,113 @@
+{
+  "title": "Bottom Panel Logs",
+  "description": "Studio UI for **Bottom Panel Logs**: recent specd log lines from in-memory readback (`GET /v1/logs` → `kernel.logs.read`). This channel is separate from studio output and MUST NOT mix validation or action result lines here. In the shell bottom strip it is the **third** tab (rightmost in v1 web layout).",
+  "dependsOn": ["client:port-studio-panel", "core:read-log", "api:routes-project-logs"],
+  "context": [
+    "Studio UI for **Bottom Panel Logs**: recent specd log lines from in-memory readback (`GET /v1/logs` → `kernel.logs.read`). This channel is separate from studio output and MUST NOT mix validation or action result lines here. In the shell bottom strip it is the **third** tab (rightmost in v1 web layout)."
+  ],
+  "rules": [
+    {
+      "requirement": "Logs is the trailing bottom tab",
+      "rules": [
+        "The shell MUST render **Logs** as the rightmost of the three web bottom tabs (Output, Problems, Logs)."
+      ]
+    },
+    {
+      "requirement": "Logs polls readProjectLogs",
+      "rules": [
+        "The panel MUST call `readProjectLogs({ limit: 500, prettier: true })` on the global poll tick and render `lines` or formatted entries."
+      ]
+    },
+    {
+      "requirement": "Logs does not duplicate Output",
+      "rules": [
+        "Structural validation messages and save confirmations MUST NOT be written only to Logs; they belong on the studio output stream. Debug traces MUST use action ids in the log message; the same user-facing string MUST NOT appear as both an output line and an identical log line."
+      ]
+    },
+    {
+      "requirement": "empty state copy",
+      "rules": [
+        "When no log lines exist, the panel MUST show: *Recent specd log entries appear here.*"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Logs is the trailing bottom tab",
+      "name": "Logs is rightmost web bottom tab",
+      "when": ["user views the bottom tab strip"],
+      "then": ["Logs is the third tab after Output and Problems"]
+    },
+    {
+      "requirement": "Logs polls readProjectLogs",
+      "name": "Logs panel shows ring entries",
+      "given": ["server received POST /v1/logs from studio"],
+      "when": ["user opens Logs tab"],
+      "then": ["formatted log lines include the posted message"]
+    },
+    {
+      "requirement": "Logs does not duplicate Output",
+      "name": "Trace log uses action id not output body",
+      "given": ["shell appended output with message Saved proposal.md"],
+      "when": ["trace log is written"],
+      "then": [
+        "log message is save-artifact (or equivalent action id)",
+        "AND log line text is not identical to Saved proposal.md"
+      ]
+    },
+    {
+      "requirement": "Logs does not duplicate Output",
+      "name": "Save confirmation is not logs-only",
+      "when": ["user saves an artifact successfully"],
+      "then": [
+        "confirmation appears in studio output",
+        "AND Logs may contain a debug trace but not as the sole user-facing message"
+      ]
+    },
+    {
+      "requirement": "empty state copy",
+      "name": "Empty logs shows specd log placeholder",
+      "when": ["no log lines are returned"],
+      "then": ["placeholder mentions specd log entries"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component uses readProjectLogs hook",
+      "when": ["Logs tab is mounted"],
+      "then": ["data comes from SpecdDataPort.readProjectLogs"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed log fetch shows error",
+      "given": ["GET /v1/logs fails"],
+      "when": ["hook rejects"],
+      "then": ["UI shows a human-readable error"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:bottom-panel-logs",
+        "file": "ui:src/shell/ShellLayout.tsx",
+        "symbol": "ShellLayout"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:cf85c140665feabb2b2513c28100377c7ee15f345440ebd8e67ee01fb7753dcd",
+    "verify.md": "sha256:18ffec90a8e3f86709f4c5619cb2fc5bd608de1d50ac71354d699a2dccb3134d"
+  },
+  "generatedBy": "core"
+}

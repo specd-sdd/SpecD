@@ -1,0 +1,72 @@
+{
+  "title": "Hooks Artifact Outline",
+  "description": "**Hooks Artifact Outline** centralizes inspector and tab outline fetching: change artifacts via `outlineChangeArtifact`, workspace specs via `getSpecOutline` / `outlineSpecDraft`, always passing the current editor buffer when outlining the open file.",
+  "dependsOn": [
+    "client:port-changes-read",
+    "client:port-workspaces-specs",
+    "ui:inspector-metadata-schema"
+  ],
+  "context": [
+    "**Hooks Artifact Outline** centralizes inspector and tab outline fetching: change artifacts via `outlineChangeArtifact`, workspace specs via `getSpecOutline` / `outlineSpecDraft`, always passing the current editor buffer when outlining the open file."
+  ],
+  "rules": [
+    {
+      "requirement": "hook selects port method by context",
+      "rules": [
+        "- Change artifact: `outlineChangeArtifact(changeName, filename, { content })`\n- Workspace spec: `outlineSpecDraft` when buffer provided; else `getSpecOutline` with `filename` query"
+      ]
+    },
+    {
+      "requirement": "hook refetches when buffer length changes on Outline tab",
+      "rules": [
+        "While Outline inspector mode is active, refetch MUST occur when editor content changes so structure tracks unsaved edits (debounce optional; correctness required)."
+      ]
+    },
+    {
+      "requirement": "hook uses SpecdDataPort only",
+      "rules": ["MUST NOT import `@specd/core`."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "hook selects port method by context",
+      "name": "Change artifact calls outlineChangeArtifact",
+      "given": ["open change artifact specs/ui/foo/spec.md"],
+      "when": ["outline hook loads"],
+      "then": ["outlineChangeArtifact is invoked with filename and content buffer"]
+    },
+    {
+      "requirement": "hook selects port method by context",
+      "name": "Workspace spec uses draft POST when content passed",
+      "given": ["workspace spec artifact with buffer"],
+      "when": ["outline hook loads with content"],
+      "then": ["outlineSpecDraft is called with filename and content"]
+    },
+    {
+      "requirement": "hook refetches when buffer length changes on Outline tab",
+      "name": "Typing updates outline request",
+      "given": ["Outline tab active and dirty buffer"],
+      "when": ["user adds a markdown heading"],
+      "then": ["subsequent outline result can include new section"]
+    },
+    {
+      "requirement": "hook uses SpecdDataPort only",
+      "name": "hook uses SpecdDataPort only — primary path",
+      "when": ["MUST NOT import @specd/core."],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "hook uses SpecdDataPort only",
+      "name": "hook uses SpecdDataPort only — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:4e99f0192ffca7bec0fe81165624a50a0ffeaa517405d0581ca11784c984800a",
+    "verify.md": "sha256:ba6a75e3ab63d47cbf9950725ad71291de9acbf922131ca9052d6d1895a38f90"
+  },
+  "generatedBy": "core"
+}

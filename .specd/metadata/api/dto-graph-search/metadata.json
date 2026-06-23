@@ -1,0 +1,160 @@
+{
+  "title": "Dto Graph Search",
+  "description": "Stable JSON wire shape for **Dto Graph Search** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:dto-graph-symbol-ref"
+  ],
+  "context": [
+    "Stable JSON wire shape for **Dto Graph Search** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules."
+  ],
+  "rules": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "rules": [
+        "The **Dto Graph Search** wire shape MUST use camelCase property names stable across Studio releases. OpenAPI generation MUST derive schemas from these names."
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "rules": [
+        "[`api:presenter-graph`](../presenter-graph/spec.md) MUST map kernel or graph results into this DTO and MUST NOT embed lifecycle, validation, or approval logic."
+      ]
+    },
+    {
+      "requirement": "symbol hits use reusable graph symbol refs",
+      "rules": [
+        "`GraphSearchResultDto.symbols[]` MUST include:\n\n- `workspace`\n- `symbol`\n- `score`\n- `snippet`\n- `startLine`\n- `endLine`\n\nThe nested `symbol` object MUST use the reusable shape defined by\n[`api:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) rather than repeating ad hoc symbol\nlocation fields inline."
+      ]
+    },
+    {
+      "requirement": "spec hits expose preview context",
+      "rules": [
+        "`GraphSearchResultDto.specs[]` MUST include preview context from graph search:\n\n- `snippet`\n- `startLine`\n- `endLine`\n\nThose fields MUST reflect the persisted graph-search preview contract rather than being recomputed by the API."
+      ]
+    },
+    {
+      "requirement": "document hits expose file context",
+      "rules": [
+        "`GraphSearchResultDto.documents[]` MUST include hits for non-specification documents from the graph search:\n\n- `workspace`\n- `path`\n- `projectRelativePath`\n- `score`\n- `snippet`\n- `startLine`\n- `endLine`"
+      ]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "rules": [
+        "Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "OpenAPI lists camelCase properties",
+      "when": ["schema is generated for this DTO"],
+      "then": ["property names are camelCase", "AND no snake_case aliases"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Runtime JSON matches schema",
+      "when": ["handler returns success body"],
+      "then": ["JSON keys match schema", "AND clients deserialize without mapping"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Breaking rename fails schema check",
+      "when": ["required field renamed without version bump"],
+      "then": ["OpenAPI diff or test fails", "AND Studio documents migration"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not add business rules to DTO",
+      "given": ["kernel returns a status result with blockers"],
+      "when": ["presenter maps to this DTO"],
+      "then": ["DTO fields reflect kernel data", "AND presenter does not alter lifecycle state"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not embed lifecycle or approval logic",
+      "when": ["presenter maps kernel or graph results"],
+      "then": [
+        "lifecycle state in the DTO matches kernel output",
+        "AND no validation or approval rules are applied in the presenter"
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Identical kernel fixture yields identical JSON",
+      "given": ["a fixed kernel or graph fixture"],
+      "when": ["presenter serializes twice"],
+      "then": ["both JSON bodies are byte-identical"]
+    },
+    {
+      "requirement": "symbol hits use reusable graph symbol refs",
+      "name": "Search hit symbol payload matches graph symbol ref shape",
+      "when": ["graph search returns symbol hits"],
+      "then": [
+        "each hit includes a nested symbol object",
+        "AND that object satisfies [api:dto-graph-symbol-ref](../dto-graph-symbol-ref/spec.md)"
+      ]
+    },
+    {
+      "requirement": "spec hits expose preview context",
+      "name": "Search hits expose preview snippet and line range",
+      "when": ["graph search returns symbol or spec hits"],
+      "then": [
+        "each hit includes snippet, startLine, and endLine",
+        "AND preview context is available without a secondary fetch"
+      ]
+    },
+    {
+      "requirement": "document hits expose file context",
+      "name": "Document hits include workspace and project paths",
+      "when": ["graph search returns document hits"],
+      "then": [
+        "each hit includes workspace, path, and projectRelativePath",
+        "AND exposes snippet, startLine, and endLine for preview"
+      ]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "name": "Optional keys omitted when absent",
+      "when": ["presenter serializes without optional values"],
+      "then": ["JSON omits those properties", "AND keys are not null unless allowed"]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "name": "Present optional values are included",
+      "given": ["kernel provides optional field"],
+      "when": ["DTO is serialized"],
+      "then": ["property appears with correct type", "AND OpenAPI documents optionality"]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "name": "Client parser accepts omitted keys",
+      "when": ["client reads JSON without optional field"],
+      "then": ["typed object treats field as undefined", "AND UI guards optional access"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:dto-graph-search",
+        "file": "api:src/delivery/http/dto/graph-search.ts",
+        "symbol": "GraphSearchResultDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:69df241eb3addd40c919a7000a7a6736dd75444e675bc5821527f56ca05dd2c0",
+    "verify.md": "sha256:3c10695da92a9505a9b1f228400320311c4c7017398ba846a8b9261b10765c62"
+  },
+  "generatedBy": "core"
+}

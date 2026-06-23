@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:port-studio-panel", "core:read-log", "api:routes-project-logs"],
+  "implementation": [
+    {
+      "file": "ui:src/shell/ShellLayout.tsx",
+      "symbols": ["ShellLayout"]
+    }
+  ]
+}

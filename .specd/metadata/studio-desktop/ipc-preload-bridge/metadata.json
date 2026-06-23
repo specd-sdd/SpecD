@@ -1,0 +1,79 @@
+{
+  "title": "Ipc Preload Bridge",
+  "description": "Electron desktop host concern — **Ipc Preload Bridge**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`.",
+  "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope"],
+  "context": [
+    "Electron desktop host concern — **Ipc Preload Bridge**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`."
+  ],
+  "rules": [
+    {
+      "requirement": "preload exposes only whitelisted IPC methods",
+      "rules": [
+        "The preload script MUST NOT enable `nodeIntegration` in the renderer. Exposed methods MUST map 1:1 to `studio-desktop:ipc-handler-registry` channels."
+      ]
+    },
+    {
+      "requirement": "bridge API is typed for TypeScript consumers",
+      "rules": [
+        "The renderer MUST import types for the bridged surface so port adapters remain type-safe."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "preload exposes only whitelisted IPC methods",
+      "name": "contextBridge exposes port surface",
+      "when": ["preload script runs"],
+      "then": ["whitelisted methods are on window", "AND nodeIntegration is off"]
+    },
+    {
+      "requirement": "preload exposes only whitelisted IPC methods",
+      "name": "Unknown channel is rejected",
+      "when": ["renderer calls undeclared IPC channel"],
+      "then": ["call fails safely", "AND no arbitrary main access"]
+    },
+    {
+      "requirement": "preload exposes only whitelisted IPC methods",
+      "name": "Types align with registry",
+      "when": ["TypeScript builds renderer"],
+      "then": ["bridged API matches handler registry", "AND adapters stay type-safe"]
+    },
+    {
+      "requirement": "bridge API is typed for TypeScript consumers",
+      "name": "Renderer imports typed window.specd API",
+      "when": ["UI package compiles against preload types"],
+      "then": ["invoke methods are typed", "AND unknown channel is compile error"]
+    },
+    {
+      "requirement": "bridge API is typed for TypeScript consumers",
+      "name": "Typed methods mirror SpecdDataPort names",
+      "when": ["preload exposes port operations"],
+      "then": ["method names match port interface", "AND arity matches IPC contract"]
+    },
+    {
+      "requirement": "bridge API is typed for TypeScript consumers",
+      "name": "Runtime channel mismatch fails fast",
+      "when": ["preload calls unregistered channel"],
+      "then": ["promise rejects", "AND error names missing handler"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "studio-desktop:ipc-preload-bridge",
+        "file": "studio-desktop:src/preload/bridge.ts",
+        "symbol": "SpecdIpcEnvelope"
+      },
+      {
+        "specId": "studio-desktop:ipc-preload-bridge",
+        "file": "studio-desktop:src/preload/bridge.ts",
+        "symbol": "SpecdIpcResult"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:248fe6598867d8ab83674d8063c5e7f5a4f2148903d70a79e25abef91a7a8e98",
+    "verify.md": "sha256:19b455cfc18dda85697cadddc8cabe8262e8fd450c93d12a9e2700f6bdd21f23"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,90 @@
+{
+  "title": "Preview Artifact Overrides",
+  "description": "Studio must preview and diff **unsaved** delta edits without writing to disk. This extends workspace [`core:preview-spec`](../../../../../../specs/core/preview-spec/spec.md) with optional in-memory overrides keyed by change-directory `filename`.",
+  "dependsOn": ["core:preview-spec", "core:save-change-artifact"],
+  "context": [
+    "Studio must preview and diff **unsaved** delta edits without writing to disk. This extends workspace [`core:preview-spec`](../../../../../../specs/core/preview-spec/spec.md) with optional in-memory overrides keyed by change-directory `filename`."
+  ],
+  "rules": [
+    {
+      "requirement": "PreviewSpec input accepts artifactOverrides",
+      "rules": [
+        "`PreviewSpecInput` MAY include `artifactOverrides?: Readonly<Record<string, string>>` mapping change-relative filename → content string."
+      ]
+    },
+    {
+      "requirement": "override replaces disk read for matching files",
+      "rules": [
+        "When processing an `ArtifactFile` whose `filename` exists in `artifactOverrides`, `PreviewSpec` MUST use the override string as artifact content and MUST NOT call `ChangeRepository.artifact` for that file."
+      ]
+    },
+    {
+      "requirement": "non-overridden files unchanged",
+      "rules": [
+        "Files without an override MUST continue to load from the change repository (or record missing per existing rules)."
+      ]
+    },
+    {
+      "requirement": "overrides do not mutate manifest or disk",
+      "rules": [
+        "Applying overrides MUST be read-only with respect to persistence; no save, no `updatedAt` bump."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "PreviewSpec input accepts artifactOverrides",
+      "name": "PreviewSpec input accepts artifactOverrides — primary path",
+      "when": [
+        "PreviewSpecInput MAY include artifactOverrides?: Readonly<Record<string, string>> mapping change-relative"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "PreviewSpec input accepts artifactOverrides",
+      "name": "PreviewSpec input accepts artifactOverrides — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "override replaces disk read for matching files",
+      "name": "Draft delta changes merged output",
+      "given": ["saved delta on disk would merge to A", "AND override content would merge to B"],
+      "when": ["PreviewSpec runs with override for that delta filename"],
+      "then": ["files[].merged reflects B", "AND disk delta was not read"]
+    },
+    {
+      "requirement": "override replaces disk read for matching files",
+      "name": "Override for new spec path",
+      "given": ["specs/ws/path/spec.md override with markdown body"],
+      "when": ["preview runs for that specId"],
+      "then": ["merged entry uses override as full content", "AND base is null for new spec"]
+    },
+    {
+      "requirement": "non-overridden files unchanged",
+      "name": "non-overridden files unchanged — primary path",
+      "when": ["Files without an override MUST continue to load"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "non-overridden files unchanged",
+      "name": "non-overridden files unchanged — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "overrides do not mutate manifest or disk",
+      "name": "Preview with overrides is read-only",
+      "when": ["preview executes with overrides"],
+      "then": ["change manifest updatedAt is unchanged", "AND artifact files on disk are unchanged"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:ef34c256a003619720aac3a74b9d9c998fdfc618002a584121435dd2c4bbabc5",
+    "verify.md": "sha256:d79b64e2cf4d4fe394667a4699f604bf109b7581509b6300f8ee094b1903837d"
+  },
+  "generatedBy": "core"
+}

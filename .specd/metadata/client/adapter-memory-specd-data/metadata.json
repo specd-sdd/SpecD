@@ -1,0 +1,92 @@
+{
+  "title": "Adapter Memory Specd Data",
+  "description": "SpecD Studio capability **Adapter Memory Specd Data** (`client:adapter-memory-specd-data`). In-memory `SpecdDataPort` for unit tests and Storybook without network I/O. This spec is canonical after archive: implementers rely on the requirements below, not change-only documents.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "SpecD Studio capability **Adapter Memory Specd Data** (`client:adapter-memory-specd-data`). In-memory `SpecdDataPort` for unit tests and Storybook without network I/O. This spec is canonical after archive: implementers rely on the requirements below, not change-only documents."
+  ],
+  "rules": [
+    {
+      "requirement": "memory adapter implements the full SpecdDataPort surface",
+      "rules": [
+        "The adapter MUST implement every method group defined on `client:specd-data-port` with deterministic fixture data."
+      ]
+    },
+    {
+      "requirement": "memory adapter performs no network or disk I/O",
+      "rules": [
+        "Calls MUST NOT open sockets or read the real project filesystem unless explicitly configured in a test harness."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "memory adapter implements the full SpecdDataPort surface",
+      "name": "Memory port implements every SpecdDataPort method",
+      "when": ["UI invokes each port method with valid fixtures"],
+      "then": ["typed results return synchronously", "AND no method throws NotImplemented"]
+    },
+    {
+      "requirement": "memory adapter implements the full SpecdDataPort surface",
+      "name": "Memory adapter performs no HTTP I/O",
+      "when": ["any port method runs"],
+      "then": ["transport layer is not called", "AND fixtures seed the responses"]
+    },
+    {
+      "requirement": "memory adapter implements the full SpecdDataPort surface",
+      "name": "Instances do not share mutable state",
+      "when": ["two tests construct separate adapter instances"],
+      "then": ["writes in one are invisible to the other"]
+    },
+    {
+      "requirement": "memory adapter performs no network or disk I/O",
+      "name": "Memory adapter performs no HTTP requests",
+      "when": ["any SpecdDataPort method is invoked"],
+      "then": ["fetch is never called", "AND responses come from in-memory fixtures"]
+    },
+    {
+      "requirement": "memory adapter performs no network or disk I/O",
+      "name": "Memory adapter writes no project files",
+      "when": ["save or transition port methods run"],
+      "then": [
+        "only seeded structures change",
+        "AND workspace artifact files on disk are untouched"
+      ]
+    },
+    {
+      "requirement": "memory adapter performs no network or disk I/O",
+      "name": "Memory adapter performs no socket I/O",
+      "when": ["adapter serves a full Studio session in tests"],
+      "then": [
+        "no network listeners are opened by the adapter",
+        "AND disk reads are limited to test fixtures"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:adapter-memory-specd-data",
+        "file": "client:src/adapter-memory-specd-data.ts",
+        "symbol": "MemorySpecdDataAdapter"
+      },
+      {
+        "specId": "client:adapter-memory-specd-data",
+        "file": "client:src/adapter-memory-specd-data.ts",
+        "symbol": "createMemorySpecdDataAdapter"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:206a0276dacec402aac4938a50ec07ec8bdf5514a6f763bc111f2043a0ce005e",
+    "verify.md": "sha256:42fcc38f8850d68ee15cb6b88d04e42106e8dfba309b052c9221dfa1c5658f30"
+  },
+  "generatedBy": "core"
+}

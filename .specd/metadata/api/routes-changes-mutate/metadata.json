@@ -1,0 +1,206 @@
+{
+  "title": "Routes Changes Mutate",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Changes Mutate** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Mutating HTTP on a change. v1 does not enforce server Bearer when `api.auth.type` is `disabled`.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Changes Mutate** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Mutating HTTP on a change. v1 does not enforce server Bearer when `api.auth.type` is `disabled`."
+  ],
+  "rules": [
+    {
+      "requirement": "PUT artifact save uses SaveChangeArtifact use case",
+      "rules": [
+        "`PUT /changes/{name}/artifacts/{filename}` MUST accept `{ content, originalHash, force? }` and invoke `SaveChangeArtifact`. Hash conflicts MUST return HTTP 409; approval guard without `force` MUST map to `SaveRequiresForceError`."
+      ]
+    },
+    {
+      "requirement": "POST routes run validate transition and lifecycle actions",
+      "rules": [
+        "`POST .../validate` (single schema step, flat `ValidateResultDto`), `POST .../validate-all` (DAG batch via `kernel.changes.validateBatch`, `ValidateBatchResultDto`), `POST .../transition`, draft, restore, discard, archive, approve-spec, approve-signoff, invalidate, and skip-artifact MUST delegate to the matching kernel use cases without duplicated rules.\n\n`POST .../validate-all` MUST accept optional `{ artifactId }` and MUST NOT loop `specIds` in the handler."
+      ]
+    },
+    {
+      "requirement": "mutating-route inputs are schema-validated",
+      "rules": [
+        "Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.\n\nThis includes at minimum artifact save bodies, validate filters, transition targets and hook-phase selectors, skip-artifact bodies, and implementation-tracking mutations. Invalid input MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`."
+      ]
+    },
+    {
+      "requirement": "draft and restore mutations use change lifecycle actions",
+      "rules": [
+        "Drafted and discarded changes are read-only storage classes, but lifecycle mutations continue to be addressed by change name through the active mutation surface:\n\n- **Draft active change**: `POST /changes/{name}/draft` shelves an active change to drafts.\n- **Restore drafted change**: `POST /changes/{name}/restore` restores a drafted change back to the active list.\n- **Discard active or drafted change**: `POST /changes/{name}/discard` permanently discards a change (whether currently active or drafted).\n\nThere is no restore from discarded; there MUST NOT be `POST /discarded/{name}/restore`."
+      ]
+    },
+    {
+      "requirement": "PATCH routes edit metadata spec deps and implementation tracking",
+      "rules": [
+        "`PATCH /changes/{name}` MUST support safe `description` updates and approval-invalidating `addSpecIds`/`removeSpecIds` plus `invalidationPolicy`. Response MUST be full `ChangeDetailDto` via `toChangeDetailDto`.\n\n`PATCH /changes/{name}/spec-dependencies` MUST accept `{ specId, add?, remove?, set? }`, delegate to `kernel.changes.updateSpecDeps`, and return `{ specId, dependsOn }` (Studio refetches detail after save).\n\n`PATCH /changes/{name}/implementation-tracking` MUST accept `{ action, file, specId?, symbols? }`, delegate to `kernel.changes.updateImplementationTracking`, and return `{ implementationTracking }` with tracked files and confirmed links."
+      ]
+    },
+    {
+      "requirement": "mutating routes pass request actor into kernel",
+      "rules": [
+        "Every mutating handler MUST pass the request-scoped actor from `createApiContext` into kernel use cases for history `by`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "PUT artifact save uses SaveChangeArtifact use case",
+      "name": "Hash conflict returns 409",
+      "given": ["stored hash does not match body originalHash"],
+      "when": ["PUT /v1/changes/foo/artifacts/proposal.md with new content"],
+      "then": [
+        "SaveChangeArtifact throws ArtifactConflictError",
+        "AND HTTP status is 409",
+        "AND response is application/problem+json"
+      ]
+    },
+    {
+      "requirement": "PUT artifact save uses SaveChangeArtifact use case",
+      "name": "Successful save bumps updatedAt",
+      "given": ["matching originalHash and no blocking approval without force"],
+      "when": ["PUT succeeds"],
+      "then": ["manifest updatedAt advances", "AND saved file state becomes in-progress"]
+    },
+    {
+      "requirement": "PUT artifact save uses SaveChangeArtifact use case",
+      "name": "PUT /changes/{name}/artifacts/{filename} returns expected payload",
+      "when": ["client calls PUT /changes/{name}/artifacts/{filename}"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "POST routes run validate transition and lifecycle actions",
+      "name": "POST validate delegates to kernel",
+      "when": ["POST /v1/changes/foo/validate"],
+      "then": ["ValidateArtifacts runs", "AND findings returned as JSON"]
+    },
+    {
+      "requirement": "POST routes run validate transition and lifecycle actions",
+      "name": "POST .../validate returns expected payload",
+      "when": ["client calls POST .../validate"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "POST routes run validate transition and lifecycle actions",
+      "name": "POST .../transition returns expected payload",
+      "when": ["client calls POST .../transition"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "mutating-route inputs are schema-validated",
+      "name": "Transition rejects invalid target state",
+      "when": ["client POSTs { \"to\": \"ship-it\" } to POST /v1/changes/{name}/transition"],
+      "then": [
+        "HTTP 400 is returned",
+        "AND body is application/problem+json",
+        "AND code is INVALID_REQUEST"
+      ]
+    },
+    {
+      "requirement": "mutating-route inputs are schema-validated",
+      "name": "Skip-artifact rejects missing artifactId",
+      "when": ["client POSTs {} to POST /v1/changes/{name}/skip-artifact"],
+      "then": ["HTTP 400 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "draft and restore mutations use change lifecycle actions",
+      "name": "Restore drafted change uses /changes route",
+      "given": ["change foo is drafted"],
+      "when": ["client calls POST /v1/changes/foo/restore"],
+      "then": ["HTTP status is 2xx", "AND response is ChangeDetailDto"]
+    },
+    {
+      "requirement": "draft and restore mutations use change lifecycle actions",
+      "name": "Draft routes do not allow transition",
+      "given": ["change foo is drafted"],
+      "when": ["client calls POST /v1/changes/foo/transition"],
+      "then": ["HTTP 404 problem+json is returned"]
+    },
+    {
+      "requirement": "PATCH routes edit metadata spec deps and implementation tracking",
+      "name": "PATCH description updates without invalidation",
+      "when": ["PATCH /v1/changes/{name} with { \"description\": \"...\" } only"],
+      "then": [
+        "EditChange persists description",
+        "AND response is full ChangeDetailDto",
+        "AND invalidated is false"
+      ]
+    },
+    {
+      "requirement": "PATCH routes edit metadata spec deps and implementation tracking",
+      "name": "PATCH scope add and remove spec ids",
+      "when": ["PATCH /v1/changes/{name} with addSpecIds and/or removeSpecIds"],
+      "then": [
+        "EditChange updates specIds",
+        "AND approvals may be invalidated when the effective set changes"
+      ]
+    },
+    {
+      "requirement": "PATCH routes edit metadata spec deps and implementation tracking",
+      "name": "PATCH spec-dependencies with set",
+      "when": ["PATCH /v1/changes/{name}/spec-dependencies with { specId, set: [...] }"],
+      "then": [
+        "updateSpecDeps persists specDependsOn for that spec",
+        "AND response includes { specId, dependsOn }"
+      ]
+    },
+    {
+      "requirement": "PATCH routes edit metadata spec deps and implementation tracking",
+      "name": "PATCH implementation tracking returns projection DTO",
+      "when": ["PATCH /v1/changes/{name}/implementation-tracking submits a valid mutation body"],
+      "then": ["kernel persists tracking state", "AND response includes { implementationTracking }"]
+    },
+    {
+      "requirement": "PATCH routes edit metadata spec deps and implementation tracking",
+      "name": "PATCH implementation tracking rejects add without specId",
+      "when": ["client PATCHes { \"action\": \"add\", \"file\": \"packages/api/src/index.ts\" }"],
+      "then": [
+        "HTTP 400 is returned",
+        "AND body is application/problem+json",
+        "AND code is INVALID_REQUEST"
+      ]
+    },
+    {
+      "requirement": "mutating routes pass request actor into kernel",
+      "name": "POST create passes resolved actor",
+      "when": ["POST /v1/changes succeeds"],
+      "then": [
+        "history records request actor",
+        "AND adapter supplied identity not fabricated in handler"
+      ]
+    },
+    {
+      "requirement": "mutating routes pass request actor into kernel",
+      "name": "PUT save passes actor to SaveChangeArtifact",
+      "when": ["artifact save succeeds"],
+      "then": ["history by matches resolved actor", "AND same actor as other mutations in request"]
+    },
+    {
+      "requirement": "mutating routes pass request actor into kernel",
+      "name": "POST transition passes actor",
+      "when": ["POST /v1/changes/foo/transition runs"],
+      "then": ["kernel receives actor argument", "AND audit trail consistent with CLI"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-changes-mutate",
+        "file": "api:src/delivery/http/handlers/handler-changes-mutate.ts",
+        "symbol": "registerChangesMutateRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:a0e9a3db05cb868caf71c747f4ceaaea6a8ef17629f29112bd453f3a2bd7e8ca",
+    "verify.md": "sha256:e3b9940d48369cce0b41f8aa3492924ee22d7d569735b32eded96c4c74e7eddc"
+  },
+  "generatedBy": "core"
+}

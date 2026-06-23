@@ -1,0 +1,77 @@
+{
+  "title": "Dto Graph Symbol Ref",
+  "description": "Stable JSON wire shape for a reusable **graph symbol reference** returned by `@specd/api` and\nconsumed by `@specd/client`. Graph endpoints use this DTO to expose symbol identity, source\nlocation, and resolved path context without forcing Studio to parse raw symbol ids.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Stable JSON wire shape for a reusable **graph symbol reference** returned by `@specd/api` and\nconsumed by `@specd/client`. Graph endpoints use this DTO to expose symbol identity, source\nlocation, and resolved path context without forcing Studio to parse raw symbol ids."
+  ],
+  "rules": [
+    {
+      "requirement": "graph symbol refs expose canonical id, source location, and resolved paths",
+      "rules": [
+        "`GraphSymbolRefDto` MUST declare:\n\n- `id` — canonical graph symbol identifier\n- `workspace` — workspace name owning the symbol source file\n- `workspaceRelativePath` — source file path relative to the workspace `codeRoot`\n- `projectRelativePath` — source file path relative to the loaded project root\n- `name` — symbol display name\n- `kind` — symbol kind string from the graph model\n- `line` — 1-based source line\n- `column` — 0-based source column\n\nThe DTO MUST NOT require clients to parse `id` in order to recover workspace or file-navigation\ndata."
+      ]
+    },
+    {
+      "requirement": "graph symbol refs use stable camelCase field names",
+      "rules": [
+        "The **Dto Graph Symbol Ref** wire shape MUST use camelCase property names stable across Studio\nreleases. OpenAPI generation MUST derive schemas from these names."
+      ]
+    },
+    {
+      "requirement": "api computes path context while preserving graph-domain ids",
+      "rules": [
+        "`@specd/api` MUST preserve the canonical graph symbol id exactly as emitted by the graph provider,\nwhile enriching the response with workspace-relative and project-relative path fields in delivery."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only\ndisabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw\nChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "graph symbol refs expose canonical id, source location, and resolved paths",
+      "name": "Symbol ref includes navigation-ready source fields",
+      "when": ["an API graph route returns a symbol reference"],
+      "then": [
+        "the JSON object includes id, workspace, workspaceRelativePath,",
+        "AND Studio can open the symbol location without parsing the symbol id"
+      ]
+    },
+    {
+      "requirement": "graph symbol refs expose canonical id, source location, and resolved paths",
+      "name": "Canonical symbol id remains unchanged",
+      "when": ["a symbol ref is serialized by the API"],
+      "then": [
+        "id matches the canonical graph-provider symbol id exactly",
+        "AND path fields are additive presentation data"
+      ]
+    },
+    {
+      "requirement": "graph symbol refs use stable camelCase field names",
+      "name": "OpenAPI lists camelCase properties",
+      "when": ["schema is generated for this DTO"],
+      "then": ["property names are camelCase", "AND no snake_case aliases are emitted"]
+    },
+    {
+      "requirement": "api computes path context while preserving graph-domain ids",
+      "name": "Presenter adds resolved path context without mutating ids",
+      "given": ["a graph symbol with canonical id and file path"],
+      "when": ["the API presenter serializes it"],
+      "then": [
+        "the presenter derives workspaceRelativePath and projectRelativePath",
+        "AND the underlying symbol id is preserved unchanged"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:a4165171385b4291be79c16178aa5f2cf2fc947f50523d7d9bfa2407d484cbe1",
+    "verify.md": "sha256:f76cd0deaeb1c7ae75e06682743ba8fa4711932b67f3da11916fb9676c68e872"
+  },
+  "generatedBy": "core"
+}

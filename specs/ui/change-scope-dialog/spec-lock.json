@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "ui:hooks-change-scope-patch",
+    "client:port-changes-mutate",
+    "api:routes-changes-mutate",
+    "ui:scope-change-confirm-dialog",
+    "ui:design-system"
+  ],
+  "implementation": []
+}

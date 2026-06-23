@@ -1,0 +1,114 @@
+{
+  "title": "Port Api Token Verifier",
+  "description": "Port abstraction for verifying HTTP credentials before handlers run. Implementations are selected through `api:auth-adapter-registry`.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Port abstraction for verifying HTTP credentials before handlers run. Implementations are selected through `api:auth-adapter-registry`."
+  ],
+  "rules": [
+    {
+      "requirement": "verify accepts optional bearer token",
+      "rules": [
+        "`verify(token: string | undefined)` MUST return a resolved `ApiActor` on success or reject/throw a typed authentication failure when the active auth type requires credentials and verification fails."
+      ]
+    },
+    {
+      "requirement": "port is swappable via registry",
+      "rules": [
+        "Handlers and middleware MUST depend on this port interface only. Concrete verifiers MUST be registered in `api:auth-adapter-registry`; handlers MUST NOT instantiate verifier classes directly."
+      ]
+    },
+    {
+      "requirement": "disabled verifier never requires a token",
+      "rules": [
+        "The `adapter-auth-disabled` implementation MUST satisfy the port contract without requiring an `Authorization` header (see `api:adapter-auth-disabled`)."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "verify accepts optional bearer token",
+      "name": "Missing token allowed when auth disabled",
+      "given": ["effective auth is disabled"],
+      "when": ["verify(undefined) runs"],
+      "then": ["returns success", "AND no Authorization required"]
+    },
+    {
+      "requirement": "verify accepts optional bearer token",
+      "name": "Valid bearer accepted when verifier enabled",
+      "given": ["future enabled verifier with test token"],
+      "when": ["verify(\"Bearer test\") runs"],
+      "then": ["returns success", "AND ApiActor fields populated"]
+    },
+    {
+      "requirement": "verify accepts optional bearer token",
+      "name": "Malformed bearer rejected",
+      "when": ["verify(\"NotBearer x\") runs"],
+      "then": ["returns failure", "AND handler maps to 401 problem+json"]
+    },
+    {
+      "requirement": "port is swappable via registry",
+      "name": "Registry resolves verifier by auth type",
+      "when": ["bootstrap calls resolve(api.auth.type)"],
+      "then": ["concrete verifier instance returned", "AND implements ApiTokenVerifier"]
+    },
+    {
+      "requirement": "port is swappable via registry",
+      "name": "Custom verifier can be registered in tests",
+      "when": ["test harness registers stub verifier"],
+      "then": ["middleware uses stub", "AND production registry unchanged"]
+    },
+    {
+      "requirement": "port is swappable via registry",
+      "name": "Unknown auth type fails at resolve",
+      "when": ["config sets unsupported api.auth.type"],
+      "then": ["startup error before listening", "AND message names supported types"]
+    },
+    {
+      "requirement": "disabled verifier never requires a token",
+      "name": "Mutating route succeeds without Authorization",
+      "given": ["auth disabled"],
+      "when": ["POST /v1/changes without header"],
+      "then": ["HTTP 2xx for valid body", "AND actor resolved via git/config"]
+    },
+    {
+      "requirement": "disabled verifier never requires a token",
+      "name": "Spurious bearer is ignored",
+      "given": ["auth disabled"],
+      "when": ["request includes invalid Bearer token"],
+      "then": ["still succeeds", "AND verifier does not reject token"]
+    },
+    {
+      "requirement": "disabled verifier never requires a token",
+      "name": "Health and project echo disabled auth",
+      "when": ["GET /v1/project runs"],
+      "then": ["auth.type is disabled", "AND no challenge headers required"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:port-api-token-verifier",
+        "file": "api:src/application/ports/api-token-verifier.ts",
+        "symbol": "ApiTokenVerifyResult"
+      },
+      {
+        "specId": "api:port-api-token-verifier",
+        "file": "api:src/application/ports/api-token-verifier.ts",
+        "symbol": "ApiTokenVerifier"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:595a74e1a61c60de39a369e9180ed7e0266034076e764a7d8bc3ca3fe00fbe85",
+    "verify.md": "sha256:89f7ac39adc623e96c528cd8e2f90e2d004a8ec20a0e5c3acdba99651fa9ea70"
+  },
+  "generatedBy": "core"
+}

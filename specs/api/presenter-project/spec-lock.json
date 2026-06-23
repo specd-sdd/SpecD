@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "api:dto-project"],
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/presenters/presenter-project.ts",
+      "symbols": ["toProjectDto", "toProjectStatusDto"]
+    }
+  ]
+}

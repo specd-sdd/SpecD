@@ -1,0 +1,94 @@
+{
+  "title": "Inspector Delta Full Diff",
+  "description": "Studio UI for **Inspector Delta Full Diff**: unified diff of canonical base vs merged result from `PreviewSpec`, honoring **draft** overrides when the editor is dirty.",
+  "dependsOn": ["ui:inspector-delta-preview", "ui:inspector-unsaved-draft"],
+  "context": [
+    "Studio UI for **Inspector Delta Full Diff**: unified diff of canonical base vs merged result from `PreviewSpec`, honoring **draft** overrides when the editor is dirty."
+  ],
+  "rules": [
+    {
+      "requirement": "diff uses same preview source as Preview tab",
+      "rules": [
+        "Diff MUST use `previewHook.data.base` and `previewHook.data.merged` from the same preview load as Preview (including `previewChangeDraft` when dirty)."
+      ]
+    },
+    {
+      "requirement": "diff tab only for change deltas",
+      "rules": [
+        "The Diff tab MUST appear only when `showsInspectorDiffTab(filename)` is true (change-directory paths under `deltas/` with spec-preview merge). It MUST NOT render as a disabled control.\n\nThe Diff tab MUST NOT appear for workspace **spec** artifacts, **archived** change artifacts, change `specs/` (new spec) paths, or non-preview artifacts (e.g. `proposal.md`)."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "diff uses same preview source as Preview tab",
+      "name": "Dirty diff shows base vs draft merge",
+      "given": ["dirty delta artifact and preview hook loaded with overrides"],
+      "when": ["Diff tab is selected"],
+      "then": [
+        "diff compares base to merged from draft preview",
+        "AND not from saved-on-disk merge only"
+      ]
+    },
+    {
+      "requirement": "diff tab only for change deltas",
+      "name": "Proposal has no Diff tab",
+      "given": ["proposal.md selected on an active change"],
+      "when": ["inspector renders mode tabs"],
+      "then": ["Diff tab is not present in the strip"]
+    },
+    {
+      "requirement": "diff tab only for change deltas",
+      "name": "Workspace spec has no Diff tab",
+      "given": ["a canonical workspace spec artifact is open"],
+      "when": ["inspector renders mode tabs"],
+      "then": ["Diff tab is not present"]
+    },
+    {
+      "requirement": "diff tab only for change deltas",
+      "name": "Archived change artifact has no Diff tab",
+      "given": ["an archived change artifact is open"],
+      "when": ["inspector renders mode tabs"],
+      "then": ["Diff tab is not present"]
+    },
+    {
+      "requirement": "diff tab only for change deltas",
+      "name": "New spec under specs/ in change has no Diff tab",
+      "given": ["specs/ui/foo/spec.md on an active change"],
+      "when": ["inspector renders mode tabs"],
+      "then": ["Diff tab is not present", "AND Preview may still use spec-preview merge"]
+    },
+    {
+      "requirement": "diff tab only for change deltas",
+      "name": "Delta artifact shows Diff tab",
+      "given": ["deltas/core/foo/spec.md.delta.yaml on an active change"],
+      "when": ["inspector renders mode tabs"],
+      "then": ["Diff tab is present and selectable"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "view uses SpecdDataPort hooks only — primary path",
+      "when": ["Components MUST consume data through SpecdDataPort hooks and"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "view uses SpecdDataPort hooks only — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:e3e33639d658ee905e74311d9895cf3b51174eb89fcd1a7fea8a5c0ee532d1b9",
+    "verify.md": "sha256:4622c9384c85580be601f746a0336064c958553eb33f8e909912b0e741401f54"
+  },
+  "generatedBy": "core"
+}

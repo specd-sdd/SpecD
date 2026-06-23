@@ -1,0 +1,58 @@
+{
+  "title": "Change Tab Validation",
+  "description": "**Superseded:** workflow and validation status (blockers, next action, lifecycle, artifact checks from `getChangeStatus`) are shown on **Change Tab Overview** (`ui:change-tab-overview`), not as a separate tab.",
+  "dependsOn": ["ui:change-tab-overview", "client:specd-data-port"],
+  "context": [
+    "**Superseded:** workflow and validation status (blockers, next action, lifecycle, artifact checks from `getChangeStatus`) are shown on **Change Tab Overview** (`ui:change-tab-overview`), not as a separate tab."
+  ],
+  "rules": [
+    {
+      "requirement": "no dedicated Validation change tab",
+      "rules": [
+        "The change tab strip MUST NOT include a **Validation** tab. Status and validation workflow data MUST render inside Overview under a workflow section."
+      ]
+    },
+    {
+      "requirement": "overview owns status polling semantics",
+      "rules": [
+        "Overview MUST satisfy the former validation-tab polling rules: while Overview is visible, call `getChangeStatus` with `ifModifiedSince`, respect `unchanged`, pause when hidden, and refetch after save."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "no dedicated Validation change tab",
+      "name": "Change tab strip omits Validation",
+      "given": ["an active change is open in the center panel"],
+      "when": ["the change tab strip renders"],
+      "then": [
+        "tabs are Overview, Artifacts, Tasks, Events, Context, and Coverage only",
+        "AND no Validation tab is shown"
+      ]
+    },
+    {
+      "requirement": "overview owns status polling semantics",
+      "name": "Workflow status visible on Overview",
+      "given": ["Overview is the active change tab"],
+      "when": ["getChangeStatus returns blockers or next action"],
+      "then": [
+        "Overview shows a workflow section with that data",
+        "AND switching to another tab does not require opening Validation"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-tab-validation",
+        "file": "ui:src/change/ChangeStatusPanel.tsx",
+        "symbol": "ChangeStatusPanel"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:4dcd82b96027fd513fd4a3d2c57dc50e58b55db0569bc4b1863a4382cbd2b550",
+    "verify.md": "sha256:1e3915d6f1367da6a26a70618932ecdea0327fabcfe8a4e8751e2acb031fefb8"
+  },
+  "generatedBy": "core"
+}

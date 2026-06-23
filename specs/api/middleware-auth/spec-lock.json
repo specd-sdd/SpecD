@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:port-api-token-verifier",
+    "api:auth-adapter-registry"
+  ],
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/middleware/auth.ts",
+      "symbols": ["registerAuthMiddleware"]
+    }
+  ]
+}

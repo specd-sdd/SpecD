@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:specd-data-port", "ui:bottom-panel-output"],
+  "implementation": [
+    {
+      "file": "ui:src/shell/ShellLayout.tsx",
+      "symbols": ["ShellLayout"]
+    }
+  ]
+}

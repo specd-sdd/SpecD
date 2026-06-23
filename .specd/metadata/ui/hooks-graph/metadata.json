@@ -1,0 +1,86 @@
+{
+  "title": "Hooks Graph",
+  "description": "React data hooks for **Hooks Graph**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports.",
+  "dependsOn": ["client:specd-data-port", "client:port-graph"],
+  "context": [
+    "React data hooks for **Hooks Graph**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports."
+  ],
+  "rules": [
+    {
+      "requirement": "graph hooks expose port-graph operations to views",
+      "rules": [
+        "Consumers MUST receive graph status, search, impact, spec coverage, and linkage data exclusively via `client:port-graph`."
+      ]
+    },
+    {
+      "requirement": "stale graph index shows warning affordances",
+      "rules": [
+        "When `getGraphStatus` reports a stale index, hooks MUST expose a boolean consumed by `ui:sidebar-graph-entry` and graph tabs."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "graph hooks expose port-graph operations to views",
+      "name": "Graph status hook calls port-graph",
+      "when": ["graph sidebar entry mounts"],
+      "then": ["getGraphStatus invoked", "AND freshness shown in UI"]
+    },
+    {
+      "requirement": "graph hooks expose port-graph operations to views",
+      "name": "Search hook delegates to port",
+      "when": ["user runs symbol search in graph view"],
+      "then": ["searchGraph called", "AND results rendered from DTO"]
+    },
+    {
+      "requirement": "graph hooks expose port-graph operations to views",
+      "name": "Index action uses mutate path",
+      "when": ["user clicks rebuild index"],
+      "then": ["indexGraph port method runs", "AND status refetch follows"]
+    },
+    {
+      "requirement": "graph hooks expose port-graph operations to views",
+      "name": "Spec tabs use graph hooks for coverage and impact",
+      "when": ["user opens spec Coverage or Impact"],
+      "then": [
+        "the hooks call getSpecGraphView and getImpact({ spec }) through client:port-graph",
+        "AND the view does not import graph or core logic directly"
+      ]
+    },
+    {
+      "requirement": "stale graph index shows warning affordances",
+      "name": "Stale flag shows warning badge",
+      "given": ["status returns stale: true"],
+      "when": ["graph entry renders"],
+      "then": ["warning affordance visible", "AND copy suggests rebuild"]
+    },
+    {
+      "requirement": "stale graph index shows warning affordances",
+      "name": "Fresh index hides warning",
+      "given": ["status returns stale: false"],
+      "when": ["graph entry renders"],
+      "then": ["no stale banner", "AND last indexed time shown"]
+    },
+    {
+      "requirement": "stale graph index shows warning affordances",
+      "name": "Rebuild clears warning after success",
+      "given": ["index was stale"],
+      "when": ["user completes index rebuild"],
+      "then": ["status refetch shows fresh", "AND warning removed"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:hooks-graph",
+        "file": "ui:src/hooks/use-graph-status.ts",
+        "symbol": "useGraphStatus"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:41d5e8d22dd3c462cce78a8ff146fa92fac8e8d24daec2e62ab1a716f0346649",
+    "verify.md": "sha256:67efb659ac78ca80714b7a182aeeb12f8301f98fb35266b75878c32174827f39"
+  },
+  "generatedBy": "core"
+}

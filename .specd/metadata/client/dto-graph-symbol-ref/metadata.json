@@ -1,0 +1,59 @@
+{
+  "title": "Dto Graph Symbol Ref",
+  "description": "Client-side type for **Dto Graph Symbol Ref**, kept in parity with the matching `api:dto-*` spec so\nremote and embedded Studio render the same JSON the API emits.",
+  "dependsOn": ["default:_global/architecture", "api:dto-graph-symbol-ref"],
+  "context": [
+    "Client-side type for **Dto Graph Symbol Ref**, kept in parity with the matching `api:dto-*` spec so\nremote and embedded Studio render the same JSON the API emits."
+  ],
+  "rules": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "rules": [
+        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The\nclient MUST NOT invent alternate property names."
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "rules": [
+        "DTO types MUST be imported from a shared package or generated from the same schema source used by\nAPI presenters and OpenAPI."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only\ndisabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw\nChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Client type fields match API DTO",
+      "when": ["TypeScript compiles client against paired api:dto-*"],
+      "then": ["property names match", "AND required/optional semantics match"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Client reads source location fields directly",
+      "given": ["API JSON with workspaceRelativePath, projectRelativePath, line, and column"],
+      "when": ["the client deserializes a graph symbol ref"],
+      "then": [
+        "adapters and UI read those fields directly",
+        "AND no local symbol-id parsing is required for navigation"
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Types imported from shared package",
+      "when": ["client and api packages build"],
+      "then": ["DTO definitions have single source", "AND no duplicated interface copies"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:89b8bd7015fa9f03d1c188bd45879f54d82041c44703a5e1f7c4b1b773ab0a88",
+    "verify.md": "sha256:0550f6856b2a4a0fee74f2aa05e17205b9e7bd39ea4901c7f25c7ee3648428aa"
+  },
+  "generatedBy": "core"
+}

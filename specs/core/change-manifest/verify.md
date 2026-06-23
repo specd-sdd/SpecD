@@ -64,6 +64,28 @@
 - **AND** `symbols` is omitted for file-level-only links
 - **AND** `fileLinkExplicit: false` is only valid when `symbols` is present and non-empty
 
+### Requirement: updatedAt revision clock
+
+#### Scenario: Create sets updatedAt equal to createdAt
+
+- **WHEN** a new change manifest is first persisted
+- **THEN** `updatedAt` equals `createdAt`
+- **AND** both are ISO 8601 strings
+
+#### Scenario: Save bumps updatedAt
+
+- **GIVEN** manifest loaded with prior `updatedAt`
+- **WHEN** any operation persists the manifest
+- **THEN** `updatedAt` advances to save timestamp
+- **AND** `createdAt` is unchanged
+
+#### Scenario: Legacy manifest backfills on load
+
+- **GIVEN** manifest file lacks `updatedAt`
+- **WHEN** repository loads the change
+- **THEN** derived `updatedAt` is applied in memory
+- **AND** next save persists the derived value
+
 ### Requirement: Archive outcome history events
 
 #### Scenario: Failed archive attempt appends archive-failed event

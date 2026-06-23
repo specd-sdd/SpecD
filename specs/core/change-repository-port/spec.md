@@ -103,6 +103,18 @@ The invalidation history entry MUST record:
 
 The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) is used as the actor for these automated invalidations.
 
+### Requirement: Shared drift reconciliation hook
+
+`FsChangeRepository` MUST expose a single drift-reconciliation algorithm used by both `get()` (before return) and **`SaveChangeArtifact`** (after a successful artifact write).
+
+The hook MUST:
+
+- Compare on-disk content to `validatedHash` for tracked artifact files
+- Support excluding one or more file keys (the just-saved file during human save)
+- Apply the same invalidation semantics as auto-invalidation on drift (`artifact-drift`, `designing`, file states)
+
+`SaveChangeArtifact` MUST invoke this hook after writing file bytes and before final `save(change)` so agent edits to sibling artifacts are detected in the same pass as load-time drift.
+
 ### Requirement: Idempotent drift reconciliation persistence
 
 Drift reconciliation invoked during `get()` (and any shared hook used by load paths) MUST NOT rewrite the change manifest when `Change.invalidate('artifact-drift', ...)` is a deduped no-op per `core:change`.
@@ -148,6 +160,12 @@ If `change.isDrafted === true`, `save(change)` MUST throw `DraftedChangeReadOnly
 ### Requirement: artifact loads content with originalHash
 
 `artifact(change, filename)` MUST load the content of a single artifact file within a change and return a `SpecArtifact`. The returned artifact's `originalHash` MUST be set to the `sha256` hash of the content read from disk, enabling conflict detection on subsequent saves. If the file does not exist, the method MUST return `null`.
+
+### Requirement: artifactReadOnly loads bytes without returning Change
+
+`artifactReadOnly(readOnlyOrigin, name, filename)` MUST load tracked artifact file content for a {@link ReadOnlyChangeView} storage location (`draft`, `discarded`; `archived` when wired). It MUST use the same confinement and `originalHash` semantics as `artifact(change, filename)` but MUST NOT return a mutable `Change` aggregate to callers.
+
+`readOnlyOrigin` MUST be a {@link ReadOnlyChangeOrigin} value. Implementations MUST resolve the change directory from `drafts/` or `discarded/` only for the matching origin.
 
 ### Requirement: saveArtifact with optimistic concurrency
 

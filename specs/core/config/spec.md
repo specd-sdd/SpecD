@@ -486,6 +486,27 @@ approvals:
 
 Both flags are independent — any combination is valid.
 
+### Requirement: API authentication settings
+
+`specd.yaml` MAY include an optional top-level **`api`** section for HTTP API delivery (`specd serve`, `specd ui serve`). Studio renderer code MUST NOT read this section from disk; it discovers effective auth only via API responses (`GET /v1/project`, `GET /v1/health`).
+
+**`api.auth`** MUST be an object with:
+
+- **`type`** (string, required when `api.auth` is present) — v1 MUST allow only **`disabled`**. Loaders MUST default to `{ type: 'disabled' }` when `api.auth` is omitted.
+- **`config`** (optional object) — reserved for future verifier-specific settings; MUST be ignored when `type` is `disabled`.
+
+**`api.cors`** (optional, separate requirement in `api:middleware-cors`) MAY be documented in the same `api` section in examples; cors behaviour is specified by API specs, not duplicated here.
+
+Startup validation (`Requirement: Startup validation`) MUST reject unknown `api.auth.type` values in v1 with a clear error before the HTTP server listens.
+
+CLI `specd serve` / `specd ui serve` `--auth` MAY override `api.auth.type` for that process only; v1 MUST reject any value other than `disabled`.
+
+### Requirement: UI plugins
+
+`specd.yaml` MAY declare **`plugins.ui`** as an array of `{ name, config? }` entries (same shape as `plugins.agents`). v1 uses the **first** entry as the active Studio UI plugin for `specd ui serve`.
+
+Distribution installs SHOULD use `@specd/plugin-ui-studio` (`hasServer() === false`). Monorepo development MAY use `@specd/studio-web` (`hasServer() === true`).
+
 ### Requirement: Logging configuration
 
 `specd.yaml` MAY declare a `logging` section at the root. This section is OPTIONAL. If omitted, the system SHALL fallback to built-in defaults.

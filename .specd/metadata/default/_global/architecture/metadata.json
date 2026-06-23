@@ -76,6 +76,12 @@
       "rules": [
         "Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `core`. `mcp` → `core`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles."
       ]
+    },
+    {
+      "requirement": "SpecD Studio package graph",
+      "rules": [
+        "SpecD Studio adds owned delivery and presentation packages:\n\n- **`@specd/api`** — HTTP server: handlers, presenters, DTOs, auth registry, composition. MUST delegate to `@specd/core` kernel use cases; MUST NOT duplicate lifecycle rules.\n- **`@specd/client`** — `SpecdDataPort`, transports, and adapters for HTTP and IPC. MUST NOT import `@specd/core`.\n- **`@specd/ui`** — React IDE shell and hooks. MUST consume `@specd/client` only; MUST NOT import `@specd/core`.\n- **`specd-studio-web`** / **`specd-studio-desktop`** — hosts that wire UI to remote HTTP or local IPC/kernel.\n\nDependency direction: `ui` → `client` → (HTTP | IPC) → `api` → `core`. CLI MAY start `api` via `specd serve` / `specd ui serve` but MUST NOT implement HTTP handlers itself."
+      ]
     }
   ],
   "constraints": [
@@ -209,11 +215,37 @@
         "it must validate that data against a formal schema at the boundary",
         "AND no unvalidated external structure may leak into domain or application logic"
       ]
+    },
+    {
+      "requirement": "SpecD Studio package graph",
+      "name": "UI package does not import core",
+      "when": ["@specd/ui dependency graph is inspected"],
+      "then": ["it depends on @specd/client", "AND it does not import @specd/core"]
+    },
+    {
+      "requirement": "SpecD Studio package graph",
+      "name": "Client package does not import core",
+      "when": ["@specd/client is built"],
+      "then": [
+        "adapters call HTTP or IPC transports only",
+        "AND no direct kernel imports exist in client sources"
+      ]
+    },
+    {
+      "requirement": "SpecD Studio package graph",
+      "name": "API handlers delegate to kernel use cases",
+      "when": ["an HTTP handler serves a mutating route"],
+      "then": [
+        "handler invokes kernel use case via composition context",
+        "AND lifecycle rules are not reimplemented in api package"
+      ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:e4b6d93d9ad5dec95baa9994ed0c6c8824868b8ca0d8fc0dbae69830cad64e50",
-    "verify.md": "sha256:bbb109d7836e60284481b7d0eef37bff5b3969ee0323078c0b5314fe36a762dd"
+    "spec.md": "sha256:5512612aac1a240abaef9111c657fa4fd0f093a9329277827478f7dfc18e3a4f",
+    "verify.md": "sha256:bcef5d29accb1554f92aeb6f5d53c97efa61a22e0473fb2b417d8fb94be23f58"
   },
-  "generatedBy": "core"
+  "generatedBy": "core",
+  "dependsOn": []
 }

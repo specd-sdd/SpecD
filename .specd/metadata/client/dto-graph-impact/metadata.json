@@ -1,0 +1,134 @@
+{
+  "title": "Dto Graph Impact",
+  "description": "Client-side type for **Dto Graph Impact**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "api:dto-graph-impact",
+    "client:dto-graph-file-ref",
+    "client:dto-graph-symbol-ref"
+  ],
+  "context": [
+    "Client-side type for **Dto Graph Impact**, kept in parity with the matching `api:dto-*` spec so remote and embedded Studio render the same JSON the API emits."
+  ],
+  "rules": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "rules": [
+        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names."
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "rules": [
+        "DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI."
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "rules": [
+        "The client DTO for graph impact MUST reuse:\n\n- [`client:dto-graph-symbol-ref`](../dto-graph-symbol-ref/spec.md) for `symbols[]`\n- [`client:dto-graph-file-ref`](../dto-graph-file-ref/spec.md) for `files[]`\n\nImpact-specific fields such as `risk` MAY be layered on top of those reusable refs.\n\nThe client DTO MUST also expose `specs[]` as canonical spec ids and preserve that array even when\nit is empty.\n\nThe client DTO MUST also preserve graph impact aggregate fields:\n\n- `riskLevel`\n- `directDepsCount`\n- `indirectDepsCount`\n- `transitiveDepsCount`\n- `affectedFilesCount`\n- `affectedProcesses`\n\nAnd symbol impact rows MUST preserve traversal `depth`.\n\n`files[]` MUST remain present as an array for all graph-impact responses so view code can render a\nstable section order without transport-specific normalization."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Client type fields match API DTO",
+      "when": ["TypeScript compiles client against paired api:dto-*"],
+      "then": ["property names match", "AND required/optional semantics match"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Sample API JSON parses without renaming",
+      "given": ["fixture JSON from API presenter"],
+      "when": ["client deserializes response"],
+      "then": ["no custom field aliases in adapter", "AND hooks read properties directly"]
+    },
+    {
+      "requirement": "client DTO matches API wire shape",
+      "name": "Drift fails client compile or test",
+      "when": ["API DTO adds required field without client update"],
+      "then": ["build or contract test fails", "AND prevents silent UI breakage"]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Client deserializes impact symbol refs through reusable dto",
+      "given": ["API JSON with impacted symbols"],
+      "when": ["the client deserializes the response"],
+      "then": [
+        "each symbol entry satisfies",
+        "AND optional impact-specific fields such as risk remain additive"
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Client deserializes impact file refs through reusable dto",
+      "given": ["API JSON with impacted files"],
+      "when": ["the client deserializes the response"],
+      "then": [
+        "each file entry satisfies [client:dto-graph-file-ref](../dto-graph-file-ref/spec.md)",
+        "AND optional impact-specific fields such as risk remain additive"
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Client preserves aggregate graph-impact metrics",
+      "given": ["API JSON with top-level impact counts and riskLevel"],
+      "when": ["the client deserializes the response"],
+      "then": [
+        "those aggregate fields remain available without adapter rewriting",
+        "AND symbol entries preserve traversal depth"
+      ]
+    },
+    {
+      "requirement": "impact entries use reusable graph refs",
+      "name": "Client preserves affected spec ids and stable arrays",
+      "given": ["API JSON with specs and files"],
+      "when": ["the client deserializes the response"],
+      "then": [
+        "specs remains a string array of canonical spec ids",
+        "AND files remains an array even when empty"
+      ]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Types imported from shared package",
+      "when": ["client and api packages build"],
+      "then": ["DTO definitions have single source", "AND no duplicated interface copies"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "OpenAPI generation feeds both sides",
+      "given": ["OpenAPI schema generated from Zod"],
+      "when": ["client types generated or re-exported"],
+      "then": ["schemas align with api:dto-* spec", "AND Studio release notes document changes"]
+    },
+    {
+      "requirement": "types are shared or generated from API schemas",
+      "name": "Manual duplicate DTO is rejected in review",
+      "when": ["contributor adds parallel interface in client"],
+      "then": ["lint or architectural test fails", "AND must use shared/generated types"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:dto-graph-impact",
+        "file": "client:src/dto/graph-impact.ts",
+        "symbol": "GraphImpactDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:f722d074e8615ac69fc01587c744c08d7875c988187f02297f3cc506809d7324",
+    "verify.md": "sha256:7dcf7677d64cda98d852a2b8cca2af183d9937c9801727199d623763bad44532"
+  },
+  "generatedBy": "core"
+}

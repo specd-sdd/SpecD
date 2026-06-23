@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "ui:change-tab-overview",
+    "ui:change-description-editor",
+    "ui:change-invalidation-policy-editor",
+    "ui:change-specs-readonly-panel",
+    "ui:change-scope-dialog",
+    "client:specd-data-port"
+  ],
+  "implementation": [
+    {
+      "file": "ui:src/tabs/ChangeTabs.tsx",
+      "symbols": ["ChangeTabs"]
+    }
+  ]
+}

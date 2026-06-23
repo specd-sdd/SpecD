@@ -1,0 +1,127 @@
+{
+  "title": "Dto Spec Detail",
+  "description": "Stable JSON wire shape for **Dto Spec Detail** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Stable JSON wire shape for **Dto Spec Detail** returned by `@specd/api` and consumed by `@specd/client`. Field names feed OpenAPI and TypeScript types; presenters map kernel results into this shape without adding business rules."
+  ],
+  "rules": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "rules": [
+        "The **Dto Spec Detail** wire shape MUST use camelCase property names stable across Studio releases. OpenAPI generation MUST derive schemas from these names."
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "rules": [
+        "[`api:presenter-spec`](../presenter-spec/spec.md) MUST map kernel or graph results into this DTO and MUST NOT embed lifecycle, validation, or approval logic."
+      ]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "rules": [
+        "Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`."
+      ]
+    },
+    {
+      "requirement": "linkedChanges uses summary objects",
+      "rules": [
+        "When linked active changes are present, `linkedChanges[]` MUST contain summary objects with:\n\n- `name`\n- optional `description`\n- `state`"
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "OpenAPI lists camelCase properties",
+      "when": ["schema is generated for this DTO"],
+      "then": ["property names are camelCase", "AND no snake_case aliases"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Runtime JSON matches schema",
+      "when": ["handler returns success body"],
+      "then": ["JSON keys match schema", "AND clients deserialize without mapping"]
+    },
+    {
+      "requirement": "response JSON uses stable camelCase field names",
+      "name": "Breaking rename fails schema check",
+      "when": ["required field renamed without version bump"],
+      "then": ["OpenAPI diff or test fails", "AND Studio documents migration"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not add business rules to DTO",
+      "given": ["kernel returns a status result with blockers"],
+      "when": ["presenter maps to this DTO"],
+      "then": ["DTO fields reflect kernel data", "AND presenter does not alter lifecycle state"]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Presenter does not embed lifecycle or approval logic",
+      "when": ["presenter maps kernel or graph results"],
+      "then": [
+        "lifecycle state in the DTO matches kernel output",
+        "AND no validation or approval rules are applied in the presenter"
+      ]
+    },
+    {
+      "requirement": "presenters map domain results without embedding rules",
+      "name": "Identical kernel fixture yields identical JSON",
+      "given": ["a fixed kernel or graph fixture"],
+      "when": ["presenter serializes twice"],
+      "then": ["both JSON bodies are byte-identical"]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "name": "Optional keys omitted when absent",
+      "when": ["presenter serializes without optional values"],
+      "then": ["JSON omits those properties", "AND keys are not null unless allowed"]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "name": "Present optional values are included",
+      "given": ["kernel provides optional field"],
+      "when": ["DTO is serialized"],
+      "then": ["property appears with correct type", "AND OpenAPI documents optionality"]
+    },
+    {
+      "requirement": "optional fields are omitted rather than null",
+      "name": "Client parser accepts omitted keys",
+      "when": ["client reads JSON without optional field"],
+      "then": ["typed object treats field as undefined", "AND UI guards optional access"]
+    },
+    {
+      "requirement": "linkedChanges uses summary objects",
+      "name": "linkedChanges rows include summary fields",
+      "when": ["a spec detail response includes linked active changes"],
+      "then": [
+        "each linkedChanges[] row includes name",
+        "AND may include description",
+        "AND includes state"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:dto-spec-detail",
+        "file": "api:src/delivery/http/dto/spec-detail.ts",
+        "symbol": "SpecDetailDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:409ead0c436cb8f321db2289e96fba25f13291bf83862bb91e2e0b806d39913b",
+    "verify.md": "sha256:058c58c1cb0dbb6d77498ccac65b98af60e2bab7ffd9f695e41d834f800c4757"
+  },
+  "generatedBy": "core"
+}

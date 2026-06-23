@@ -1,0 +1,115 @@
+{
+  "title": "Main Kernel Lifecycle",
+  "description": "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Electron main process owns `createKernel` for locally opened projects.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Electron main process owns `createKernel` for locally opened projects."
+  ],
+  "rules": [
+    {
+      "requirement": "one kernel per open local project",
+      "rules": [
+        "Opening a project directory MUST construct exactly one `Kernel` for that `specd.yaml` root until the project is closed or switched."
+      ]
+    },
+    {
+      "requirement": "project switch tears down kernel and graph state",
+      "rules": [
+        "Switching projects MUST dispose the previous kernel/graph provider before creating a new one to avoid cross-project leakage."
+      ]
+    },
+    {
+      "requirement": "desktop startup prepares the Electron SQLite graph runtime",
+      "rules": [
+        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-electron` for desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the vendored Electron SQLite addon\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from `@specd/code-graph`."
+      ]
+    },
+    {
+      "requirement": "desktop kernel configures plain-text logs",
+      "rules": [
+        "The desktop kernel MUST receive `logFormatter: createLogFormatter({ colorize: false })` so that log readback through local IPC returns plain text without ANSI escape sequences."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "one kernel per open local project",
+      "name": "Opening folder constructs kernel",
+      "when": ["user opens directory with specd.yaml"],
+      "then": ["main process creates one Kernel", "AND IPC serves port methods"]
+    },
+    {
+      "requirement": "one kernel per open local project",
+      "name": "Second open reuses until switch",
+      "given": ["project already open"],
+      "when": ["user triggers refresh"],
+      "then": ["same kernel instance serves requests", "AND no duplicate kernels"]
+    },
+    {
+      "requirement": "one kernel per open local project",
+      "name": "Invalid folder shows error",
+      "when": ["user picks directory without specd.yaml"],
+      "then": ["open is rejected", "AND no kernel is created"]
+    },
+    {
+      "requirement": "project switch tears down kernel and graph state",
+      "name": "Opening new folder disposes old kernel",
+      "given": ["project A is open"],
+      "when": ["user opens project B folder"],
+      "then": ["kernel A disposed", "AND kernel B serves IPC"]
+    },
+    {
+      "requirement": "project switch tears down kernel and graph state",
+      "name": "Graph provider reset on switch",
+      "when": ["project switch completes"],
+      "then": ["in-memory graph cache cleared", "AND status reflects new project paths"]
+    },
+    {
+      "requirement": "project switch tears down kernel and graph state",
+      "name": "In-flight IPC cancelled on switch",
+      "given": ["long IPC call running for project A"],
+      "when": ["switch to B starts"],
+      "then": ["A requests rejected or aborted", "AND B calls do not read A paths"]
+    },
+    {
+      "requirement": "desktop startup prepares the Electron SQLite graph runtime",
+      "name": "Desktop package exposes Electron graph rebuild wiring",
+      "when": ["the desktop package scripts are inspected"],
+      "then": [
+        "rebuild:graph-sqlite-electron rebuilds the vendored Electron SQLite addon",
+        "AND rebuild:graph-electron aliases that rebuild",
+        "AND prestart executes the Electron SQLite rebuild before app startup"
+      ]
+    },
+    {
+      "requirement": "desktop startup prepares the Electron SQLite graph runtime",
+      "name": "Desktop local host depends on the Electron graph package",
+      "when": ["the desktop package dependencies are inspected"],
+      "then": ["@specd/code-graph-electron is present for desktop-local graph execution"]
+    },
+    {
+      "requirement": "desktop startup prepares the Electron SQLite graph runtime",
+      "name": "CLI and API keep the standard graph package",
+      "when": ["CLI and API package dependencies are inspected"],
+      "then": [
+        "they depend on @specd/code-graph",
+        "AND they do not depend on @specd/code-graph-electron"
+      ]
+    },
+    {
+      "requirement": "desktop kernel configures plain-text logs",
+      "name": "Local desktop logs are formatted without colors",
+      "when": ["desktop local kernel is created"],
+      "then": [
+        "logFormatter has colorize set to false",
+        "AND log messages do not contain ANSI escape control codes"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:ef5ef7032409f6a8dad92475d18652c0322d44d35c1b60b1f7cf838558e85c96",
+    "verify.md": "sha256:1a74bb3c05d8872fc5dd2d37fe64f2f8311ce842e70c2293b27268182e8a94a9"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "ui:hooks-changes-mutate",
+    "api:routes-changes-mutate",
+    "ui:change-metadata-editor"
+  ],
+  "implementation": []
+}

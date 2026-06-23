@@ -1,0 +1,76 @@
+{
+  "title": "Get Change Artifact",
+  "description": "Monaco needs file bytes plus the hash for the next save, but HTTP delivery must stay thin. `GetChangeArtifact` wraps repository reads with the same tracked-file confinement as save so handlers never reach into `ChangeRepository` ad hoc.",
+  "dependsOn": ["core:change-repository-port", "core:change"],
+  "context": [
+    "Monaco needs file bytes plus the hash for the next save, but HTTP delivery must stay thin. `GetChangeArtifact` wraps repository reads with the same tracked-file confinement as save so handlers never reach into `ChangeRepository` ad hoc."
+  ],
+  "rules": [
+    {
+      "requirement": "GetChangeArtifact returns content and originalHash",
+      "rules": [
+        "Within `ChangeRepository.mutate`, the use case MUST load the change and call `artifact(change, filename)`, returning `{ content, originalHash }` or a typed not-found error."
+      ]
+    },
+    {
+      "requirement": "GetChangeArtifact enforces tracked-file confinement",
+      "rules": [
+        "The same tracked-file guard as `SaveChangeArtifact` MUST apply: untracked filenames MUST fail before read."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "GetChangeArtifact returns content and originalHash",
+      "name": "Tracked file returns content and hash",
+      "given": ["proposal.md is tracked on change foo"],
+      "when": ["GetChangeArtifact runs"],
+      "then": ["returns UTF-8 content", "AND originalHash has sha256 prefix"]
+    },
+    {
+      "requirement": "GetChangeArtifact returns content and originalHash",
+      "name": "Untracked filename fails",
+      "when": ["filename is not on manifest"],
+      "then": ["typed not-found or validation error", "AND no repository read"]
+    },
+    {
+      "requirement": "GetChangeArtifact returns content and originalHash",
+      "name": "Read uses ChangeRepository.mutate",
+      "when": ["use case executes"],
+      "then": ["runs inside mutate closure", "AND HTTP handler does not call repository directly"]
+    },
+    {
+      "requirement": "GetChangeArtifact enforces tracked-file confinement",
+      "name": "Tracked file returns content and hash",
+      "given": ["proposal.md is tracked on change foo"],
+      "when": ["GetChangeArtifact runs"],
+      "then": ["returns UTF-8 content", "AND originalHash has sha256 prefix"]
+    },
+    {
+      "requirement": "GetChangeArtifact enforces tracked-file confinement",
+      "name": "Untracked filename fails",
+      "when": ["filename is not on manifest"],
+      "then": ["typed not-found or validation error", "AND no repository read"]
+    },
+    {
+      "requirement": "GetChangeArtifact enforces tracked-file confinement",
+      "name": "Read uses ChangeRepository.mutate",
+      "when": ["use case executes"],
+      "then": ["runs inside mutate closure", "AND HTTP handler does not call repository directly"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-change-artifact",
+        "file": "core:src/application/use-cases/get-change-artifact.ts",
+        "symbol": "GetChangeArtifact"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:28ed6a23ee1291b84ce3d02b0b02a97299806e70a3a2fc8e570937cf2e3d4bdf",
+    "verify.md": "sha256:da496e611e2171137b67c2ff3d6f0aa5b7125b339edf6e4b9804eefc6b194b70"
+  },
+  "generatedBy": "core"
+}

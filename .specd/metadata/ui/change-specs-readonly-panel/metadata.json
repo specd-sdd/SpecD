@@ -1,0 +1,60 @@
+{
+  "title": "Change Specs Readonly Panel",
+  "description": "Read-only presentation of a change’s **spec scope** and per-spec **`dependsOn`** on the Overview tab. Editing happens only via [`ui:change-scope-dialog`](../change-scope-dialog/spec.md).",
+  "dependsOn": ["client:dto-change-detail", "ui:design-system", "ui:change-tab-overview"],
+  "context": [
+    "Read-only presentation of a change’s **spec scope** and per-spec **`dependsOn`** on the Overview tab. Editing happens only via [`ui:change-scope-dialog`](../change-scope-dialog/spec.md)."
+  ],
+  "rules": [
+    {
+      "requirement": "panel lists each spec in scope with dependencies",
+      "rules": [
+        "For every `specId` on `ChangeDetailDto`, the panel MUST show the spec ID and its `specDependsOn[specId]` entries (or an explicit empty state). Data MUST come from the loaded detail DTO only. Flat spec and dependency lists MUST follow [`ui:design-system`](../design-system/spec.md) ascending order."
+      ]
+    },
+    {
+      "requirement": "panel is read-only",
+      "rules": [
+        "The component MUST NOT call mutating port methods and MUST NOT render add/remove controls."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "panel lists each spec in scope with dependencies",
+      "name": "Spec with dependencies shows arrows",
+      "given": ["specDependsOn contains core:auth → [default:architecture]"],
+      "when": ["panel renders"],
+      "then": ["studio-change-specs-readonly shows core:auth and → default:architecture"]
+    },
+    {
+      "requirement": "panel lists each spec in scope with dependencies",
+      "name": "Spec without dependencies shows empty copy",
+      "given": ["a spec in specIds with no dependsOn entry"],
+      "when": ["panel renders"],
+      "then": ["panel shows “No declared dependencies” under that spec"]
+    },
+    {
+      "requirement": "panel lists each spec in scope with dependencies",
+      "name": "No specs in scope",
+      "given": ["specIds is empty"],
+      "when": ["panel renders"],
+      "then": ["panel shows “No specs in scope.”"]
+    },
+    {
+      "requirement": "panel is read-only",
+      "name": "No mutate controls",
+      "when": ["panel is rendered on Overview"],
+      "then": [
+        "there are no Add/Remove spec buttons in the panel",
+        "AND no PATCH is triggered from this component"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:3c350c9c7a69a9841799cdc760ab20334b23a2d3487f756744e271829ad19ddb",
+    "verify.md": "sha256:9b6b842eabf4d3a09749db8a7a17ea95ff4e8a5c522b286af7be9363cedef374"
+  },
+  "generatedBy": "core"
+}

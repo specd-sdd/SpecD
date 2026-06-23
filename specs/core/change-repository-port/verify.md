@@ -170,6 +170,29 @@
 - **WHEN** `FsChangeRepository.get()` is called
 - **THEN** no invalidation occurs
 
+### Requirement: Shared drift reconciliation hook
+
+#### Scenario: Save excludes just-written file key
+
+- **GIVEN** `SaveChangeArtifact` wrote `proposal.md`
+- **WHEN** drift reconciliation runs after save
+- **THEN** `proposal.md` is excluded from hash comparison
+- **AND** sibling artifacts are still checked
+
+#### Scenario: Drift on sibling invalidates artifact state
+
+- **GIVEN** another artifact file changed on disk without validatedHash update
+- **WHEN** reconciliation runs after save
+- **THEN** drifted file is marked invalidated
+- **AND** same semantics as load-time auto-invalidation apply
+
+#### Scenario: Get path uses same hook before return
+
+- **GIVEN** on-disk content differs from stored `validatedHash`
+- **WHEN** repository `get()` loads the change
+- **THEN** shared hook runs before returning entity
+- **AND** invalidation matches post-save reconciliation rules
+
 ### Requirement: Idempotent drift reconciliation persistence
 
 Drift reconciliation during `get()` MUST NOT rewrite the manifest when artifact-drift invalidation is deduped per `core:change`.
@@ -271,6 +294,27 @@ Drift reconciliation during `get()` MUST NOT rewrite the manifest when artifact-
 
 - **WHEN** `artifact(change, "nonexistent.md")` is called
 - **THEN** `null` is returned
+
+### Requirement: artifactReadOnly loads bytes without returning Change
+
+#### Scenario: Draft origin reads from drafts directory
+
+- **GIVEN** change `parked` exists only under `drafts/`
+- **WHEN** `artifactReadOnly('draft', 'parked', 'proposal.md')` runs
+- **THEN** returns `SpecArtifact` with content and `originalHash`
+- **AND** caller does not receive a `Change` instance
+
+#### Scenario: Discarded origin reads from discarded directory
+
+- **GIVEN** change `gone` exists only under `discarded/`
+- **WHEN** `artifactReadOnly('discarded', 'gone', 'proposal.md')` runs
+- **THEN** returns `SpecArtifact` with content and `originalHash`
+
+#### Scenario: Missing change returns null
+
+- **GIVEN** no drafted change named `missing`
+- **WHEN** `artifactReadOnly('draft', 'missing', 'proposal.md')` runs
+- **THEN** returns `null`
 
 ### Requirement: artifact only loads tracked change artifact files
 

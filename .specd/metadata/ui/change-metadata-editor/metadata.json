@@ -1,0 +1,97 @@
+{
+  "title": "Change Metadata Editor",
+  "description": "Orchestrates change metadata editing on the **Overview** tab: safe inline fields plus a gated dialog for high-impact scope/dependency changes.",
+  "dependsOn": [
+    "ui:change-tab-overview",
+    "ui:change-description-editor",
+    "ui:change-invalidation-policy-editor",
+    "ui:change-specs-readonly-panel",
+    "ui:change-scope-dialog",
+    "client:specd-data-port"
+  ],
+  "context": [
+    "Orchestrates change metadata editing on the **Overview** tab: safe inline fields plus a gated dialog for high-impact scope/dependency changes."
+  ],
+  "rules": [
+    {
+      "requirement": "overview composes metadata child components",
+      "rules": [
+        "For **active** changes, Overview MUST compose:\n\n- [`ui:change-description-editor`](../change-description-editor/spec.md)\n- [`ui:change-invalidation-policy-editor`](../change-invalidation-policy-editor/spec.md)\n- [`ui:change-specs-readonly-panel`](../change-specs-readonly-panel/spec.md) inside the **Specs & dependencies** card with helper copy **Read-only on Overview — use the dialog to edit scope safely.** and **Edit spec scope…** (`studio-edit-spec-scope`) opening [`ui:change-scope-dialog`](../change-scope-dialog/spec.md)\n\nFor **draft**, **discarded**, and **archived** changes, Overview MUST show read-only description (if any) and the read-only specs panel only. It MUST NOT render description or invalidation editors, MUST NOT render the scope-edit helper line, and MUST NOT render **Edit spec scope…** or open the scope dialog from Overview."
+      ]
+    },
+    {
+      "requirement": "metadata saves append to Output panel",
+      "rules": [
+        "Successful saves from description, policy, or scope dialog MUST append to shell **Output** and select that tab ([`ui:shell-layout`](../shell-layout/spec.md))."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Child components MUST consume `SpecdDataPort` hooks; MUST NOT import `@specd/core`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "overview composes metadata child components",
+      "name": "Active change shows editors and read-only specs",
+      "given": ["active change on Overview"],
+      "when": ["tab renders"],
+      "then": [
+        "studio-change-description-editor is visible",
+        "AND studio-change-invalidation-policy-editor is visible",
+        "AND studio-change-specs-readonly is visible",
+        "AND studio-edit-spec-scope is visible"
+      ]
+    },
+    {
+      "requirement": "overview composes metadata child components",
+      "name": "Shelved and archived changes hide scope edit affordances",
+      "given": ["a change open from draft, discarded, or archived sidebar list"],
+      "when": ["Overview renders the Specs & dependencies card"],
+      "then": [
+        "studio-change-specs-readonly is visible",
+        "AND studio-edit-spec-scope is not visible",
+        "AND copy about using a dialog to edit scope on Overview is not shown"
+      ]
+    },
+    {
+      "requirement": "overview composes metadata child components",
+      "name": "Active change shows scope edit helper and button",
+      "given": ["active change on Overview"],
+      "when": ["the Specs & dependencies card renders"],
+      "then": [
+        "helper copy Read-only on Overview — use the dialog to edit scope safely. is visible",
+        "AND studio-edit-spec-scope is visible"
+      ]
+    },
+    {
+      "requirement": "metadata saves append to Output panel",
+      "name": "Scope dialog save logs to Output",
+      "given": ["user saved scope dialog successfully"],
+      "when": ["shell handles onScopeSaved"],
+      "then": ["Output tab is selected with a success line"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "No core in metadata components",
+      "when": ["@specd/ui change metadata modules are inspected"],
+      "then": ["none import @specd/core"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:change-metadata-editor",
+        "file": "ui:src/tabs/ChangeTabs.tsx",
+        "symbol": "ChangeTabs"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:04f893546091e39a979040af157fd3d00382e7b4da4f2e0eef94d20fb3f25cda",
+    "verify.md": "sha256:9b7ac56ed5fb0d8ddaea078595dfe7181f1f26dc7a2e08bb10f022089104fb70"
+  },
+  "generatedBy": "core"
+}

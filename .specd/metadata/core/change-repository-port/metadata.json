@@ -60,6 +60,12 @@
       ]
     },
     {
+      "requirement": "Shared drift reconciliation hook",
+      "rules": [
+        "`FsChangeRepository` MUST expose a single drift-reconciliation algorithm used by both `get()` (before return) and **`SaveChangeArtifact`** (after a successful artifact write).\n\nThe hook MUST:\n\n- Compare on-disk content to `validatedHash` for tracked artifact files\n- Support excluding one or more file keys (the just-saved file during human save)\n- Apply the same invalidation semantics as auto-invalidation on drift (`artifact-drift`, `designing`, file states)\n\n`SaveChangeArtifact` MUST invoke this hook after writing file bytes and before final `save(change)` so agent edits to sibling artifacts are detected in the same pass as load-time drift."
+      ]
+    },
+    {
       "requirement": "Idempotent drift reconciliation persistence",
       "rules": [
         "Drift reconciliation invoked during `get()` (and any shared hook used by load paths) MUST NOT rewrite the change manifest when `Change.invalidate('artifact-drift', ...)` is a deduped no-op per `core:change`.\n\nThe repository MUST detect whether new history was appended (for example by comparing history length or an explicit signal from the domain invalidation) **before** calling `_writeManifestAtomic` or equivalent direct manifest persistence.\n\nWhen invalidation is deduped:\n\n- The manifest file on disk MUST remain unchanged\n- `reconcileArtifactDrift()` (or the internal helper) MUST return `false`\n\nWhen invalidation appends new history:\n\n- The updated manifest MUST be persisted atomically before the loaded change is returned\n- The helper MUST return `true`\n\nRepeated read-only loads with unchanged drift scope MUST therefore be safe for polling clients: history event count and manifest revision MUST remain stable across consecutive polls."
@@ -99,6 +105,12 @@
       "requirement": "artifact loads content with originalHash",
       "rules": [
         "`artifact(change, filename)` MUST load the content of a single artifact file within a change and return a `SpecArtifact`. The returned artifact's `originalHash` MUST be set to the `sha256` hash of the content read from disk, enabling conflict detection on subsequent saves. If the file does not exist, the method MUST return `null`."
+      ]
+    },
+    {
+      "requirement": "artifactReadOnly loads bytes without returning Change",
+      "rules": [
+        "`artifactReadOnly(readOnlyOrigin, name, filename)` MUST load tracked artifact file content for a {@link ReadOnlyChangeView} storage location (`draft`, `discarded`; `archived` when wired). It MUST use the same confinement and `originalHash` semantics as `artifact(change, filename)` but MUST NOT return a mutable `Change` aggregate to callers.\n\n`readOnlyOrigin` MUST be a {@link ReadOnlyChangeOrigin} value. Implementations MUST resolve the change directory from `drafts/` or `discarded/` only for the matching origin."
       ]
     },
     {
@@ -383,6 +395,36 @@
       "then": ["no invalidation occurs"]
     },
     {
+      "requirement": "Shared drift reconciliation hook",
+      "name": "Save excludes just-written file key",
+      "given": ["SaveChangeArtifact wrote proposal.md"],
+      "when": ["drift reconciliation runs after save"],
+      "then": [
+        "proposal.md is excluded from hash comparison",
+        "AND sibling artifacts are still checked"
+      ]
+    },
+    {
+      "requirement": "Shared drift reconciliation hook",
+      "name": "Drift on sibling invalidates artifact state",
+      "given": ["another artifact file changed on disk without validatedHash update"],
+      "when": ["reconciliation runs after save"],
+      "then": [
+        "drifted file is marked invalidated",
+        "AND same semantics as load-time auto-invalidation apply"
+      ]
+    },
+    {
+      "requirement": "Shared drift reconciliation hook",
+      "name": "Get path uses same hook before return",
+      "given": ["on-disk content differs from stored validatedHash"],
+      "when": ["repository get() loads the change"],
+      "then": [
+        "shared hook runs before returning entity",
+        "AND invalidation matches post-save reconciliation rules"
+      ]
+    },
+    {
       "requirement": "Idempotent drift reconciliation persistence",
       "name": "First drift load persists invalidation",
       "given": [
@@ -498,6 +540,30 @@
       "name": "Artifact does not exist",
       "when": ["artifact(change, \"nonexistent.md\") is called"],
       "then": ["null is returned"]
+    },
+    {
+      "requirement": "artifactReadOnly loads bytes without returning Change",
+      "name": "Draft origin reads from drafts directory",
+      "given": ["change parked exists only under drafts/"],
+      "when": ["artifactReadOnly('draft', 'parked', 'proposal.md') runs"],
+      "then": [
+        "returns SpecArtifact with content and originalHash",
+        "AND caller does not receive a Change instance"
+      ]
+    },
+    {
+      "requirement": "artifactReadOnly loads bytes without returning Change",
+      "name": "Discarded origin reads from discarded directory",
+      "given": ["change gone exists only under discarded/"],
+      "when": ["artifactReadOnly('discarded', 'gone', 'proposal.md') runs"],
+      "then": ["returns SpecArtifact with content and originalHash"]
+    },
+    {
+      "requirement": "artifactReadOnly loads bytes without returning Change",
+      "name": "Missing change returns null",
+      "given": ["no drafted change named missing"],
+      "when": ["artifactReadOnly('draft', 'missing', 'proposal.md') runs"],
+      "then": ["returns null"]
     },
     {
       "requirement": "artifact only loads tracked change artifact files",
@@ -698,20 +764,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:change-repository-port",
-        "file": "core:test/infrastructure/fs/change-repository.spec.ts"
-      },
-      {
-        "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts"
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "FsChangeRepository"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:bea9d27028a17fb6c7920ed590eb8825a46bf355aaeaeb01b946d095b7e95b91",
-    "verify.md": "sha256:af0ac9dbdea3a032f330f3297a33e776be8605cb0ff9fcc6636debce30310d25"
+    "spec.md": "sha256:77a12e62dacf8b4f86dc3d1fbef825e5e8ba175b9d45008366fc529c8f92deea",
+    "verify.md": "sha256:547905ae40fb686ee56e94a93e468ef0c0bde60b933cb6fe46307cea1b0c9ef4"
   },
   "generatedBy": "core"
 }

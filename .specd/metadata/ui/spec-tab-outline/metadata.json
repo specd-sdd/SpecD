@@ -1,0 +1,90 @@
+{
+  "title": "Spec Tab Outline",
+  "description": "Studio UI for **Spec Tab Outline** (tab label **Outline**, not Schema): navigable structure for a workspace canonical spec via `getSpecOutline`.",
+  "dependsOn": ["client:specd-data-port", "core:get-spec-outline-draft"],
+  "context": [
+    "Studio UI for **Spec Tab Outline** (tab label **Outline**, not Schema): navigable structure for a workspace canonical spec via `getSpecOutline`."
+  ],
+  "rules": [
+    {
+      "requirement": "tab label is Outline",
+      "rules": [
+        "The spec center tab strip MUST display **Outline** for this view. Requirements MUST NOT refer to “schema” for navigable artifact structure."
+      ]
+    },
+    {
+      "requirement": "spec tab polls outline while visible",
+      "rules": [
+        "While the Outline tab is visible, the view MUST load outline JSON via `getSpecOutline(workspace, specPath)` on tab-scoped poll ticks."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "tab label is Outline",
+      "name": "Tab strip shows Outline",
+      "given": ["workspace spec is open"],
+      "when": ["center tabs render"],
+      "then": ["tab named Outline is present", "AND tab named Schema is not present"]
+    },
+    {
+      "requirement": "spec tab polls outline while visible",
+      "name": "Outline tab loads outline JSON",
+      "given": ["workspace spec with spec.md"],
+      "when": ["user selects Outline tab"],
+      "then": ["UI calls getSpecOutline", "AND renders JSON outline or error state"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "view uses SpecdDataPort hooks only — primary path",
+      "when": ["Components MUST consume data through SpecdDataPort hooks and"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "view uses SpecdDataPort hooks only — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "view surfaces loading and error states — primary path",
+      "when": ["While requests are in flight or fail, the"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "view surfaces loading and error states — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:spec-tab-outline",
+        "file": "ui:src/spec/SpecMainView.tsx",
+        "symbol": "SpecMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d39066686de54e6ee462374d62b7e0f1b541bd4bf803dfa61282d47da6ad8171",
+    "verify.md": "sha256:28dd75f825cfa51bc6adfc04e8591bd4380d3097a56429cc07b0dd7fa72a710e"
+  },
+  "generatedBy": "core"
+}

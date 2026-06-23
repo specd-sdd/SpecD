@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:logger-port",
+    "core:pino-logger",
+    "core:read-log",
+    "default:_global/architecture"
+  ],
+  "implementation": []
+}

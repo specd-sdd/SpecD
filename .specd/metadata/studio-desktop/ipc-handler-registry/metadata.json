@@ -1,0 +1,97 @@
+{
+  "title": "Ipc Handler Registry",
+  "description": "Electron desktop host concern — **Ipc Handler Registry**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP.",
+  "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope"],
+  "context": [
+    "Electron desktop host concern — **Ipc Handler Registry**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP."
+  ],
+  "rules": [
+    {
+      "requirement": "IPC handlers mirror SpecdDataPort operations",
+      "rules": [
+        "Each handler MUST call the same kernel use cases as the HTTP API would for the equivalent port method (no duplicated business rules in the renderer).\n\nv1 local desktop MUST implement draft-aware port methods `previewChangeDraft`, `outlineChangeArtifact`, and `outlineSpecDraft` via the same kernel use cases as `POST` preview/outline routes."
+      ]
+    },
+    {
+      "requirement": "handlers use ipc-message-envelope",
+      "rules": ["Request/response serialization MUST follow `client:ipc-message-envelope`."]
+    },
+    {
+      "requirement": "graph IPC methods use the Electron graph runtime",
+      "rules": [
+        "Desktop-local graph IPC methods MUST create and use their graph provider from\n`@specd/code-graph-electron`.\n\nThe Electron main process MUST keep graph execution inside the desktop-local host\nruntime, including the SQLite-backed local graph operations exposed through IPC.\nRenderer code MUST continue to call the shared `SpecdDataPort` surface and MUST\nNOT import graph runtime packages directly."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "IPC handlers mirror SpecdDataPort operations",
+      "name": "IPC getChangeStatus calls GetStatus",
+      "when": ["renderer invokes IPC status channel"],
+      "then": ["main runs GetStatus in kernel", "AND response matches HTTP shape"]
+    },
+    {
+      "requirement": "IPC handlers mirror SpecdDataPort operations",
+      "name": "IPC save uses SaveChangeArtifact",
+      "when": ["renderer saves artifact via IPC"],
+      "then": ["main runs save use case", "AND 409 propagates in envelope"]
+    },
+    {
+      "requirement": "IPC handlers mirror SpecdDataPort operations",
+      "name": "Renderer does not embed business rules",
+      "when": ["IPC handler executes"],
+      "then": ["no duplicated transition logic in preload", "AND kernel rules apply"]
+    },
+    {
+      "requirement": "handlers use ipc-message-envelope",
+      "name": "Main handler parses envelope wrapper",
+      "when": ["IPC channel receives invoke"],
+      "then": ["correlation id read from envelope", "AND payload dispatched to kernel"]
+    },
+    {
+      "requirement": "handlers use ipc-message-envelope",
+      "name": "Handler replies with success envelope",
+      "when": ["kernel returns DTO"],
+      "then": ["reply includes correlation id", "AND failure flag false"]
+    },
+    {
+      "requirement": "handlers use ipc-message-envelope",
+      "name": "Thrown errors become failure envelopes",
+      "when": ["kernel throws SpecdError"],
+      "then": ["failure envelope returned to renderer", "AND stack not leaked raw"]
+    },
+    {
+      "requirement": "graph IPC methods use the Electron graph runtime",
+      "name": "Local graph IPC uses the Electron graph provider package",
+      "when": [
+        "the desktop main process serves graph status, search, impact, hotspot, or index IPC requests"
+      ],
+      "then": [
+        "it creates the provider through @specd/code-graph-electron",
+        "AND graph execution stays inside the Electron local host runtime"
+      ]
+    },
+    {
+      "requirement": "graph IPC methods use the Electron graph runtime",
+      "name": "Renderer graph calls stay on the shared data port",
+      "when": ["the renderer requests graph data in desktop-local mode"],
+      "then": [
+        "it invokes the shared SpecdDataPort methods through IPC",
+        "AND the renderer does not import graph runtime packages directly"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "studio-desktop:ipc-handler-registry",
+        "file": "studio-desktop:src/main/index.ts"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:872d364ba1e7bcd3e3a0e753432220ef7ce1ac2ab5a4a1df068dad9515c18321",
+    "verify.md": "sha256:f129d23653ef58a97a7438d0f2834033942a846b7c928f8f1c48be3735c2b6bf"
+  },
+  "generatedBy": "core"
+}

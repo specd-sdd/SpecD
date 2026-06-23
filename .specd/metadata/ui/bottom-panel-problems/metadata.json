@@ -1,0 +1,111 @@
+{
+  "title": "Bottom Panel Problems",
+  "description": "Studio UI for **Bottom Panel Problems**: a read-only view of **warnings and errors** derived from the local Studio output session buffer. Workflow blockers from `getChangeStatus` belong on change **Overview**, not here. In the shell bottom strip it is the **second** tab (after **Output**, before **Logs**).",
+  "dependsOn": ["client:specd-data-port", "ui:bottom-panel-output"],
+  "context": [
+    "Studio UI for **Bottom Panel Problems**: a read-only view of **warnings and errors** derived from the local Studio output session buffer. Workflow blockers from `getChangeStatus` belong on change **Overview**, not here. In the shell bottom strip it is the **second** tab (after **Output**, before **Logs**)."
+  ],
+  "rules": [
+    {
+      "requirement": "Problems is the middle bottom tab",
+      "rules": [
+        "The shell MUST render **Problems** immediately after **Output** in the bottom tab strip."
+      ]
+    },
+    {
+      "requirement": "Problems filters local output by severity",
+      "rules": [
+        "The panel MUST list lines from the local output buffer where `level` is `warn` or `error` only. It MUST NOT maintain a separate duplicate buffer.\n\nValidation failures (`✗ …`) and warnings (`⚠ …`) MUST be appended to the output stream with matching levels so they appear here after validate completes."
+      ]
+    },
+    {
+      "requirement": "empty state copy",
+      "rules": [
+        "When no warn/error lines exist, the panel MUST show: *Warnings and errors from studio actions appear here.*"
+      ]
+    },
+    {
+      "requirement": "view uses local output state only",
+      "rules": [
+        "Components MUST consume Problems data through the same local output session buffer used by **Output**, and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view is independent from remote log fetches",
+      "rules": [
+        "Problems rendering MUST NOT depend on remote `/logs` fetches. Remote log failures MUST NOT prevent warn/error entries already present in the local output buffer from rendering."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Problems is the middle bottom tab",
+      "name": "Problems tab follows Output",
+      "when": ["user views the bottom tab strip"],
+      "then": ["Problems is the second tab after Output", "AND precedes Logs"]
+    },
+    {
+      "requirement": "Problems filters local output by severity",
+      "name": "Warn and error lines appear after validate",
+      "given": ["validation returns a warning line prefixed with ⚠"],
+      "when": ["shell appends local output with level warn"],
+      "then": [
+        "Problems panel lists that message",
+        "AND Output panel lists all validation lines including info"
+      ]
+    },
+    {
+      "requirement": "Problems filters local output by severity",
+      "name": "Info-only lines do not appear in Problems",
+      "given": ["shell appends an info output line"],
+      "when": ["user opens Problems tab"],
+      "then": ["that line is not listed in Problems"]
+    },
+    {
+      "requirement": "Problems filters local output by severity",
+      "name": "Workflow blockers stay on Overview",
+      "given": ["getChangeStatus reports transition blockers"],
+      "when": ["status poll updates"],
+      "then": ["blockers render on Overview only", "AND Problems content is unchanged"]
+    },
+    {
+      "requirement": "empty state copy",
+      "name": "Empty problems shows correct placeholder",
+      "when": ["no warn or error output entries exist"],
+      "then": [
+        "UI shows warnings/errors placeholder text",
+        "AND does not mention validation-only copy"
+      ]
+    },
+    {
+      "requirement": "view uses local output state only",
+      "name": "Problems derives from the same local output buffer as Output",
+      "when": ["Output and Problems are inspected together"],
+      "then": [
+        "Problems filters the local output buffer",
+        "AND no separate remote studio-output fetch is required"
+      ]
+    },
+    {
+      "requirement": "view is independent from remote log fetches",
+      "name": "Remote log failure does not block Problems rendering",
+      "given": ["warn/error entries already exist in the local output buffer"],
+      "when": ["a remote /logs request fails"],
+      "then": ["Problems still renders those local entries"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:bottom-panel-problems",
+        "file": "ui:src/shell/ShellLayout.tsx",
+        "symbol": "ShellLayout"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:16424e5be2d4fd562b05d74fd3c77691985f22b1fe2cf472277146b8955023cd",
+    "verify.md": "sha256:e0d4564f8bec0a5efdd1b1211b34014c9b73b9489eb42095fcf2582f042fed88"
+  },
+  "generatedBy": "core"
+}

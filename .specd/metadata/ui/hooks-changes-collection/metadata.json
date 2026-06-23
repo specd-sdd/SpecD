@@ -1,0 +1,81 @@
+{
+  "title": "Hooks Changes Collection",
+  "description": "React data hooks for **Hooks Changes Collection**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports.",
+  "dependsOn": ["client:specd-data-port", "client:port-changes-collection"],
+  "context": [
+    "React data hooks for **Hooks Changes Collection**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports."
+  ],
+  "rules": [
+    {
+      "requirement": "hooks load change lists through port-changes-collection",
+      "rules": [
+        "The hooks MUST call `listChanges`, `listDrafts`, `listDiscarded`, `listArchived`, and `detectOverlaps` on `client:port-changes-collection`."
+      ]
+    },
+    {
+      "requirement": "hooks refresh change lists on global poll",
+      "rules": [
+        "On each global poll tick, sidebar lists MUST refresh so agent-created, shelved, or discarded changes appear without manual reload."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "hooks load change lists through port-changes-collection",
+      "name": "Sidebar hooks call list methods",
+      "when": ["hooks-changes-collection mounts"],
+      "then": [
+        "listChanges, listDrafts, listDiscarded, listArchived are invoked",
+        "AND results render in sidebar sections"
+      ]
+    },
+    {
+      "requirement": "hooks load change lists through port-changes-collection",
+      "name": "Global poll refreshes lists",
+      "given": ["shell poll is active"],
+      "when": ["poll interval elapses"],
+      "then": ["lists refetch", "AND new agent-created change appears without reload"]
+    },
+    {
+      "requirement": "hooks load change lists through port-changes-collection",
+      "name": "Overlap detection surfaces warnings",
+      "when": ["detectOverlaps returns overlaps"],
+      "then": ["UI shows overlap badge", "AND user can inspect conflicting changes"]
+    },
+    {
+      "requirement": "hooks refresh change lists on global poll",
+      "name": "Global poll triggers list refetch",
+      "given": ["shell global poll active"],
+      "when": ["poll interval elapses"],
+      "then": ["listChanges and related hooks refetch", "AND sidebar rows update"]
+    },
+    {
+      "requirement": "hooks refresh change lists on global poll",
+      "name": "Poll paused when window blurred",
+      "given": ["window not focused"],
+      "when": ["interval would fire"],
+      "then": ["collection hooks do not refetch", "AND last data remains"]
+    },
+    {
+      "requirement": "hooks refresh change lists on global poll",
+      "name": "New change appears after external edit",
+      "given": ["agent creates change on disk"],
+      "when": ["next poll tick runs"],
+      "then": ["in-progress list includes new row", "AND no full page reload"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:hooks-changes-collection",
+        "file": "ui:src/hooks/use-changes-collection.ts",
+        "symbol": "useChangesCollection"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:27bf6642bc63ab4ec26c28ff7f263f34175d38361b75ed4bf6a6c6062d3fdd3a",
+    "verify.md": "sha256:8ff3407a6b2e122a3203ea1209aa5ae4ebc5ca03053c496bff1a8707e40f931b"
+  },
+  "generatedBy": "core"
+}

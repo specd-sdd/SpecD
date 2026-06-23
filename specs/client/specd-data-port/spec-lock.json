@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["client:port-studio-panel", "default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "client:src/specd-data-port.ts",
+      "symbols": ["SpecdDataPort"]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["ui:change-tab-overview", "client:specd-data-port"],
+  "implementation": [
+    {
+      "file": "ui:src/change/ChangeStatusPanel.tsx",
+      "symbols": ["ChangeStatusPanel"]
+    }
+  ]
+}

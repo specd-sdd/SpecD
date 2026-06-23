@@ -1,0 +1,70 @@
+{
+  "title": "Recent Connections",
+  "description": "Electron desktop host concern — **Recent Connections**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Persist most-recently used local project paths and remote API profiles.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Electron desktop host concern — **Recent Connections**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Persist most-recently used local project paths and remote API profiles."
+  ],
+  "rules": [
+    {
+      "requirement": "recents are stored in app user data",
+      "rules": [
+        "The module MUST persist an ordered MRU list on disk under the Electron app user data directory."
+      ]
+    },
+    {
+      "requirement": "tokens are stored with explicit user consent",
+      "rules": [
+        "Remote profile tokens MUST NOT be written to logs; storage policy MUST match connect-panel (local encrypted store or OS secret store in future; v1 MAY use app-local storage with clear UX)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "recents are stored in app user data",
+      "name": "Successful remote connect appends recent",
+      "when": ["user connects to remote URL"],
+      "then": ["entry persisted under app userData", "AND welcome list shows host"]
+    },
+    {
+      "requirement": "recents are stored in app user data",
+      "name": "Recents dedupe by normalized URL",
+      "given": ["recent already contains host"],
+      "when": ["user reconnects same URL"],
+      "then": ["single entry updated", "AND most recent moves to top"]
+    },
+    {
+      "requirement": "recents are stored in app user data",
+      "name": "Clear recents removes file entries",
+      "when": ["user clears recent connections"],
+      "then": ["storage file updated", "AND welcome no longer lists removed hosts"]
+    },
+    {
+      "requirement": "tokens are stored with explicit user consent",
+      "name": "Remember token checkbox gates persistence",
+      "when": ["user connects without remember checked"],
+      "then": ["token kept in memory only", "AND not written to disk"]
+    },
+    {
+      "requirement": "tokens are stored with explicit user consent",
+      "name": "Remember checked stores encrypted or scoped secret",
+      "when": ["user enables remember on connect"],
+      "then": [
+        "token saved in userData vault",
+        "AND next connect prefills host only or token per policy"
+      ]
+    },
+    {
+      "requirement": "tokens are stored with explicit user consent",
+      "name": "Revoke clears stored token",
+      "when": ["user removes recent with stored token"],
+      "then": ["token deleted from storage", "AND subsequent connect requires re-entry"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:832cab29219f4782ec8c29c9b1e536f2809b6ca4d5e90ba70f983683f2e03b6c",
+    "verify.md": "sha256:6d38cc1481975959096e6038b4f88f06c047de2d88ab4f464ce2560cebad4b1a"
+  },
+  "generatedBy": "core"
+}

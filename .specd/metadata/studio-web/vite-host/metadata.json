@@ -1,0 +1,80 @@
+{
+  "title": "Vite Host",
+  "description": "Browser host for standalone Studio — **Vite Host**. Does not load a project kernel; users supply an API base URL and optional token before the shared `@specd/ui` IDE mounts.",
+  "context": [
+    "Browser host for standalone Studio — **Vite Host**. Does not load a project kernel; users supply an API base URL and optional token before the shared `@specd/ui` IDE mounts."
+  ],
+  "rules": [
+    {
+      "requirement": "package exposes standard vite scripts",
+      "rules": [
+        "`@specd/studio-web` MUST provide `dev`, `build`, and `preview` scripts that bundle the renderer importing `@specd/ui`."
+      ]
+    },
+    {
+      "requirement": "host does not bootstrap a Specd kernel",
+      "rules": [
+        "The Vite host MUST NOT load `specd.yaml`, MUST NOT call `createKernel`, and MUST NOT start an API process — the API is started separately (e.g. `specd ui serve`)."
+      ]
+    },
+    {
+      "requirement": "Vite receives API base from ui serve",
+      "rules": [
+        "When `SPECD_API_BASE_URL` is set by `specd ui serve`, Vite MUST expose it to the renderer (e.g. `import.meta.env.VITE_SPECD_API_BASE_URL`) so `SpecdApp` auto-connects to the API origin. CORS for the UI origin is configured by the CLI (see `cli:serve-ui`), not via a dev proxy."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "package exposes standard vite scripts",
+      "name": "dev script starts Vite dev server",
+      "when": ["pnpm dev runs in studio-web package"],
+      "then": ["Vite serves on configured port", "AND HMR enabled"]
+    },
+    {
+      "requirement": "package exposes standard vite scripts",
+      "name": "build script emits static dist",
+      "when": ["pnpm build runs"],
+      "then": ["dist/ contains index.html and assets", "AND ready for ui serve"]
+    },
+    {
+      "requirement": "package exposes standard vite scripts",
+      "name": "preview script serves production build",
+      "when": ["pnpm preview runs after build"],
+      "then": ["static files served locally", "AND no kernel bootstrap in process"]
+    },
+    {
+      "requirement": "host does not bootstrap a Specd kernel",
+      "name": "Vite dev server has no Kernel import",
+      "when": ["studio-web dev server starts"],
+      "then": ["no @specd/core kernel in Node process", "AND API calls go to remote URL"]
+    },
+    {
+      "requirement": "host does not bootstrap a Specd kernel",
+      "name": "Renderer uses SpecdDataPort remote adapter",
+      "when": ["<SpecdApp> mounts after connect"],
+      "then": ["HTTP transport only", "AND no IPC bridge in web build"]
+    },
+    {
+      "requirement": "host does not bootstrap a Specd kernel",
+      "name": "Missing API shows connect error not kernel crash",
+      "given": ["no server at configured URL"],
+      "when": ["health check runs"],
+      "then": ["connect panel shows error", "AND process does not throw kernel init error"]
+    },
+    {
+      "requirement": "Vite receives API base from ui serve",
+      "name": "dev server uses injected API base URL",
+      "given": ["studio-web is launched via specd ui serve"],
+      "when": ["the app boots in the browser"],
+      "then": ["the connect default API URL matches the server-provided base"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:e875086402061d9ec385fa3e546b85772f381585de1efa2e3ec122ad8ead0330",
+    "verify.md": "sha256:ee84317b378f60974d23da68bd0b4fa8d1959f15b924a93a7a9409fa4449d8f4"
+  },
+  "generatedBy": "core",
+  "dependsOn": []
+}

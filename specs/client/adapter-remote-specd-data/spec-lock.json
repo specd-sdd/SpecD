@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "client:port-http-transport",
+    "client:adapter-bearer-auth",
+    "client:adapter-problem-json-errors",
+    "client:specd-data-port"
+  ],
+  "implementation": [
+    {
+      "file": "client:src/adapter-remote-specd-data.ts",
+      "symbols": [
+        "RemoteSpecdDataAdapterOptions",
+        "RemoteSpecdDataAdapter",
+        "createRemoteSpecdDataAdapter",
+        "testRemoteConnection"
+      ]
+    }
+  ]
+}

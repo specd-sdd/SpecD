@@ -1,0 +1,107 @@
+{
+  "title": "Ipc Message Envelope",
+  "description": "Electron renderer code calls main-process kernel operations asynchronously; ad hoc IPC shapes make correlation and errors easy to lose. This spec defines a structured request/response envelope with correlation ids and typed failure propagation between preload, main, and UI hooks.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "Electron renderer code calls main-process kernel operations asynchronously; ad hoc IPC shapes make correlation and errors easy to lose. This spec defines a structured request/response envelope with correlation ids and typed failure propagation between preload, main, and UI hooks."
+  ],
+  "rules": [
+    {
+      "requirement": "requests carry a correlation id",
+      "rules": [
+        "Every IPC request envelope MUST include a unique `id` echoed on the response so the renderer can match async replies."
+      ]
+    },
+    {
+      "requirement": "errors propagate as structured failure envelopes",
+      "rules": [
+        "Failures MUST NOT be silent: the response envelope MUST include an error shape compatible with UI error handling (message + optional code)."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "requests carry a correlation id",
+      "name": "Renderer assigns correlation id per invoke",
+      "when": ["preload invoke sends IPC request"],
+      "then": ["envelope includes correlationId", "AND main logs can trace request"]
+    },
+    {
+      "requirement": "requests carry a correlation id",
+      "name": "Response echoes same correlation id",
+      "when": ["main process replies to invoke"],
+      "then": ["response envelope matches request id", "AND renderer pairs promise resolution"]
+    },
+    {
+      "requirement": "requests carry a correlation id",
+      "name": "Duplicate id rejected in dev builds",
+      "given": ["debug assertions enabled"],
+      "when": ["two in-flight invokes reuse same id"],
+      "then": ["warning or error surfaced", "AND promises do not cross-resolve"]
+    },
+    {
+      "requirement": "errors propagate as structured failure envelopes",
+      "name": "Kernel error maps to failure envelope",
+      "when": ["IPC handler catches SpecdError"],
+      "then": ["reply is failure envelope", "AND code and message fields present"]
+    },
+    {
+      "requirement": "errors propagate as structured failure envelopes",
+      "name": "Renderer rejects promise with typed error",
+      "when": ["failure envelope received"],
+      "then": ["hook error state set", "AND message shown in UI"]
+    },
+    {
+      "requirement": "errors propagate as structured failure envelopes",
+      "name": "Success envelope bypasses error mapper",
+      "when": ["handler returns DTO payload"],
+      "then": ["promise resolves with data", "AND no failure flag set"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:ipc-message-envelope",
+        "file": "client:src/ipc/envelope.ts",
+        "symbol": "IpcErrorEnvelope"
+      },
+      {
+        "specId": "client:ipc-message-envelope",
+        "file": "client:src/ipc/envelope.ts",
+        "symbol": "IpcRequestEnvelope"
+      },
+      {
+        "specId": "client:ipc-message-envelope",
+        "file": "client:src/ipc/envelope.ts",
+        "symbol": "IpcResponseEnvelope"
+      },
+      {
+        "specId": "client:ipc-message-envelope",
+        "file": "client:src/ipc/envelope.ts",
+        "symbol": "createIpcRequest"
+      },
+      {
+        "specId": "client:ipc-message-envelope",
+        "file": "client:src/ipc/envelope.ts",
+        "symbol": "createIpcSuccess"
+      },
+      {
+        "specId": "client:ipc-message-envelope",
+        "file": "client:src/ipc/envelope.ts",
+        "symbol": "createIpcFailure"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:ccd17625f1868a39b0c78abbc427c5881702eaae1013ef1006ff43a3686ffa35",
+    "verify.md": "sha256:0b34c802fafd1738c856f14eecb9ae7b14e0e06001cd7e15ff4d02972ff8ba0d"
+  },
+  "generatedBy": "core"
+}

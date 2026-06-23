@@ -1,0 +1,128 @@
+{
+  "title": "ValidateChangeBatch",
+  "description": "Single orchestration for **change validate --all**: walk the active schema artifact DAG once, delegate each step to `ValidateArtifacts` with exactly one `artifactId`, and aggregate per-step results. CLI, API, and Studio MUST NOT reimplement this loop.",
+  "dependsOn": ["core:validate-artifacts", "core:change"],
+  "context": [
+    "Single orchestration for **change validate --all**: walk the active schema artifact DAG once, delegate each step to `ValidateArtifacts` with exactly one `artifactId`, and aggregate per-step results. CLI, API, and Studio MUST NOT reimplement this loop."
+  ],
+  "rules": [
+    {
+      "requirement": "constructor and dependencies",
+      "rules": [
+        "`ValidateChangeBatch` MUST receive `ChangeRepository`, `SchemaProvider`, and `ValidateArtifacts` at construction time (wired on `kernel.changes.validateBatch`)."
+      ]
+    },
+    {
+      "requirement": "input",
+      "rules": [
+        "`ValidateChangeBatchInput` MUST include:\n\n- `name` — change name (required)\n- `artifactId` — optional; when set, only DAG steps for that artifact id run"
+      ]
+    },
+    {
+      "requirement": "empty scope",
+      "rules": [
+        "When the change has no `specIds`, `execute` MUST return `{ passed: true, total: 0, results: [] }` without calling `ValidateArtifacts`."
+      ]
+    },
+    {
+      "requirement": "DAG walk",
+      "rules": [
+        "`execute` MUST load the change, resolve the active schema, and iterate `schema.artifactDag().topologicalOrder()`.\n\nFor each artifact type in order:\n\n- **`scope: change`** — call `ValidateArtifacts.execute({ name, artifactId })` **without** `specPath` exactly once.\n- **`scope: spec`** — call `ValidateArtifacts.execute({ name, specPath, artifactId })` once per entry in `change.specIds`.\n\nWhen `artifactId` is provided, skip artifact ids that do not match."
+      ]
+    },
+    {
+      "requirement": "aggregated result",
+      "rules": [
+        "`ValidateChangeBatchResult` MUST expose:\n\n- `passed` — `true` only if every step passed\n- `total` — number of scheduled steps\n- `results[]` — each with `spec` (`null` for change-scoped), `artifact`, `passed`, `failures`, `warnings`, `files` (same shapes as `ValidateArtifactsResult`)\n\nThe use case MUST run all scheduled steps even after a failure (no early abort)."
+      ]
+    },
+    {
+      "requirement": "not a substitute for ValidateSpecs",
+      "rules": [
+        "`ValidateChangeBatch` validates **change artifacts** only. Canonical workspace spec validation remains `ValidateSpecs`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "constructor and dependencies",
+      "name": "constructor and dependencies — primary path",
+      "when": [
+        "ValidateChangeBatch MUST receive ChangeRepository, SchemaProvider, and ValidateArtifacts at"
+      ],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "constructor and dependencies",
+      "name": "constructor and dependencies — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "input",
+      "name": "input — primary path",
+      "when": ["ValidateChangeBatchInput MUST include: - name — change name"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "input",
+      "name": "input — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "empty scope",
+      "name": "No specIds skips ValidateArtifacts",
+      "given": ["change feat with specIds: []"],
+      "when": ["validateBatch.execute({ name: 'feat' }) runs"],
+      "then": [
+        "result is { passed: true, total: 0, results: [] }",
+        "AND ValidateArtifacts is not invoked"
+      ]
+    },
+    {
+      "requirement": "DAG walk",
+      "name": "Spec-scoped steps run per specId",
+      "given": ["change with two specIds and schema artifact proposal with scope: change"],
+      "when": ["validateBatch.execute({ name }) runs"],
+      "then": [
+        "ValidateArtifacts is called once for change-scoped proposal without specPath",
+        "AND spec-scoped artifacts run once per specId"
+      ]
+    },
+    {
+      "requirement": "aggregated result",
+      "name": "aggregated result — primary path",
+      "when": ["ValidateChangeBatchResult MUST expose: - passed — true only"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "aggregated result",
+      "name": "aggregated result — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "not a substitute for ValidateSpecs",
+      "name": "not a substitute for ValidateSpecs — primary path",
+      "when": ["ValidateChangeBatch validates change artifacts only. Canonical workspace spec"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "not a substitute for ValidateSpecs",
+      "name": "not a substitute for ValidateSpecs — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:ae41e9457b3caf6d3081aedb08408a78e122d4d9a92c3364158f6b684300adb5",
+    "verify.md": "sha256:b529bdf935c780786de04e26a06940d952c24544c9b2a6adc962da1cdef286ad"
+  },
+  "generatedBy": "core"
+}

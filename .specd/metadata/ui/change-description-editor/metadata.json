@@ -1,0 +1,57 @@
+{
+  "title": "Change Description Editor",
+  "description": "Safe inline editor for change **description** on Overview (`PATCH` with `{ description }` only — does not invalidate approvals).",
+  "dependsOn": [
+    "ui:hooks-changes-mutate",
+    "api:routes-changes-mutate",
+    "ui:change-metadata-editor"
+  ],
+  "context": [
+    "Safe inline editor for change **description** on Overview (`PATCH` with `{ description }` only — does not invalidate approvals)."
+  ],
+  "rules": [
+    {
+      "requirement": "multiline description with save when dirty",
+      "rules": [
+        "MUST render textarea and **Save** (`studio-change-description-save`) disabled when draft equals saved value or while PATCH is in flight."
+      ]
+    },
+    {
+      "requirement": "save calls patchChange description only",
+      "rules": [
+        "MUST invoke `patchChange(name, { description })` via `usePatchChange` without opening scope or validate dialogs."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": ["MUST NOT import `@specd/core`."]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "multiline description with save when dirty",
+      "name": "Save disabled when unchanged",
+      "given": ["draft matches saved description"],
+      "when": ["editor renders"],
+      "then": ["Save is disabled"]
+    },
+    {
+      "requirement": "save calls patchChange description only",
+      "name": "PATCH body is description only",
+      "when": ["user clicks Save"],
+      "then": ["patchChange receives only { description }"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Uses port via hook",
+      "when": ["Save succeeds"],
+      "then": ["call went through SpecdDataPort.patchChange"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:027dcea8a4a43fecddc645bda60f3987562227c3881d31c740eb353ebe55e530",
+    "verify.md": "sha256:5511944a8ce970411345ce357c525cde1b823256c173ff8f248750ee8cd31e2e"
+  },
+  "generatedBy": "core"
+}

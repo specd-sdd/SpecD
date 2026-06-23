@@ -1,0 +1,350 @@
+{
+  "title": "Routes Changes Read",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Changes Read** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Read-only HTTP for one change: detail, conditional status, artifacts, context, preview, instructions. No `/validation` resource.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Changes Read** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. Read-only HTTP for one change: detail, conditional status, artifacts, context, preview, instructions. No `/validation` resource."
+  ],
+  "rules": [
+    {
+      "requirement": "read routes use /v1 prefix and JSON responses",
+      "rules": [
+        "All paths MUST be under `/v1`. Responses MUST use `application/json` unless returning raw artifact text."
+      ]
+    },
+    {
+      "requirement": "/changes read routes resolve active changes only",
+      "rules": [
+        "`/changes/{name}` and all `/changes/{name}/*` read routes MUST treat drafted and discarded names as **not found**. When `name` exists only under `drafts/` or `discarded/`, handlers MUST return HTTP 404 `application/problem+json` rather than serving a read-only view through the active change routes."
+      ]
+    },
+    {
+      "requirement": "GET change detail omits artifact bodies",
+      "rules": [
+        "`GET /changes/{name}` MUST return metadata, `specIds`, schema, append-only `history`, and approval summaries and MUST NOT inline artifact file bodies."
+      ]
+    },
+    {
+      "requirement": "GET status supports ifModifiedSince short-circuit",
+      "rules": [
+        "`GET /changes/{name}/status` MUST accept optional `ifModifiedSince`. When it equals manifest `updatedAt`, the handler MUST return `{ unchanged: true, updatedAt }` without building the full artifact DAG. Otherwise return full status including blockers, `nextAction`, tasks, and implementation projection."
+      ]
+    },
+    {
+      "requirement": "refreshImplementation query runs before GetStatus",
+      "rules": [
+        "When `refreshImplementation=true`, the handler MUST run implementation refresh before `GetStatus`, matching CLI semantics."
+      ]
+    },
+    {
+      "requirement": "artifact list and body routes use dedicated core use cases",
+      "rules": [
+        "`GET /changes/{name}/artifacts` lists tracked filenames and aggregate states from the active change. Each artifact row MUST preserve task-capability metadata (`hasTasks`) and MAY include `totalTasks` / `completedTasks` for that artifact type. `GET /changes/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetChangeArtifact`, not direct repository access.\n\n`GET /drafts/{name}/artifacts` and `GET /discarded/{name}/artifacts` MUST list metadata from `DraftedChangeView` / `DiscardedChangeView` without inline bodies. These read-only list routes MUST preserve the same task-capability metadata so Studio can resolve task tabs without assuming `tasks.md`. `GET /drafts/{name}/artifacts/{filename}` and `GET /discarded/{name}/artifacts/{filename}` MUST return `ArtifactContentDto` via `GetReadOnlyChangeArtifact` with `readOnlyOrigin` `draft` or `discarded`, not `GetChangeArtifact` and not direct `ChangeRepository` calls."
+      ]
+    },
+    {
+      "requirement": "context preview and instruction routes delegate to kernel",
+      "rules": [
+        "`GET .../context`, `GET .../preview`, hook-instructions, artifact-instruction, and implementation-review routes MUST forward query parameters to the matching kernel use cases.\n\n`GET .../context` MUST default `includeChangeSpecs` to **true** (unless `includeChangeSpecs=false`), default `step` to a workflow step derived from the change `state` (not a hard-coded project-only step), and return markdown shaped like CLI `changes context` (project entries plus change spec full content or catalogue).\n\n`GET .../implementation-review` MUST return JSON matching [`api:dto-implementation-review`](../dto-implementation-review/spec.md) (`specIds`, `implementationTracking.links`, `implementationTracking.trackedFiles`)."
+      ]
+    },
+    {
+      "requirement": "POST preview accepts draft artifact overrides",
+      "rules": [
+        "`POST /changes/{name}/preview` MUST accept JSON body `{ specId: string, artifactOverrides?: Record<string, string> }` where keys are change-directory filenames (e.g. `deltas/ui/foo/spec.md.delta.yaml`). The handler MUST call `PreviewSpec` with `artifactOverrides` when present. `GET .../preview?specId=` MUST remain for saved-on-disk preview only."
+      ]
+    },
+    {
+      "requirement": "POST change artifact outline accepts draft content",
+      "rules": [
+        "`POST /changes/{name}/artifacts/{filename}/outline` MUST accept optional JSON body `{ content?: string }`. When `content` is set, the handler MUST call `OutlineChangeArtifact` with draft content; when omitted, outline bytes from the saved change artifact. Response MUST be JSON outline entry shape (filename, outline, optional selectorHints)."
+      ]
+    },
+    {
+      "requirement": "read-route inputs are schema-validated",
+      "rules": [
+        "Every `params`, `query`, and `body` shape accepted by this route group MUST be declared in Fastify route schema and validated before handler logic runs.\n\nMalformed input for routes such as `GET /changes/{name}/status`, `GET /changes/{name}/context`, `GET /changes/{name}/preview`, `POST /changes/{name}/preview`, and `GET /changes/{name}/hook-instructions` MUST return HTTP 400 with `application/problem+json` and code `INVALID_REQUEST`."
+      ]
+    },
+    {
+      "requirement": "unknown change returns 404 problem+json",
+      "rules": [
+        "Requests for a non-existent change name MUST return HTTP 404 with `application/problem+json`. Malformed queries MUST return HTTP 400."
+      ]
+    },
+    {
+      "requirement": "drafted change read routes are separate and read-only",
+      "rules": [
+        "The API MUST expose read-only drafted change routes under `/drafts/{name}`:\n\n- `GET /drafts/{name}` → drafted change detail (read-only) as `ChangeDetailDto` (no mutation fields implied).\n- `GET /drafts/{name}/status` → drafted status via `GetStatus`, returning a `ChangeStatusDto` that supports `unchanged` short-circuit but MUST NOT include lifecycle transitions that require mutation.\n- `GET /drafts/{name}/artifacts` and `GET /drafts/{name}/artifacts/{filename}` → allow reading tracked artifact content for inspection.\n- `GET /drafts/{name}/context`, `GET /drafts/{name}/preview`, instruction routes → identical shapes to the active `/changes/{name}` read routes.\n\nDrafted routes MUST NOT allow artifact writes: there is no `PUT /drafts/{name}/artifacts/{filename}`."
+      ]
+    },
+    {
+      "requirement": "discarded change read routes are separate and read-only",
+      "rules": [
+        "The API MUST expose read-only discarded change routes under `/discarded/{name}`:\n\n- `GET /discarded/{name}` → discarded change detail (read-only) as `ChangeDetailDto`.\n- `GET /discarded/{name}/status` → discarded status via `GetStatus` (read-only view).\n- `GET /discarded/{name}/artifacts` and `GET /discarded/{name}/artifacts/{filename}` → allow reading tracked artifact content for inspection.\n\nDiscarded routes MUST NOT allow any lifecycle mutation or artifact writes."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load for active changes MUST use core:save-change-artifact and core:get-change-artifact. Read-only draft/discarded artifact bodies MUST use core:get-read-only-change-artifact — not raw ChangeRepository methods from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "read routes use /v1 prefix and JSON responses",
+      "name": "GET detail uses /v1/changes/:name",
+      "when": ["GET /v1/changes/foo"],
+      "then": ["JSON response", "AND Content-Type application/json"]
+    },
+    {
+      "requirement": "read routes use /v1 prefix and JSON responses",
+      "name": "GET status uses /v1 prefix",
+      "when": ["GET /v1/changes/foo/status"],
+      "then": ["JSON status DTO returned", "AND unprefixed route not registered"]
+    },
+    {
+      "requirement": "read routes use /v1 prefix and JSON responses",
+      "name": "GET artifact uses /v1 path",
+      "when": ["GET /v1/changes/foo/artifacts/proposal.md"],
+      "then": ["JSON or structured body per contract", "AND 404 problem+json when missing"]
+    },
+    {
+      "requirement": "/changes read routes resolve active changes only",
+      "name": "Drafted name under /changes returns 404",
+      "given": ["a change named foo exists only under drafts"],
+      "when": ["GET /v1/changes/foo"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "GET change detail omits artifact bodies",
+      "name": "Artifact body served via GetChangeArtifact",
+      "given": ["tracked artifact proposal.md exists on change foo"],
+      "when": ["GET /v1/changes/foo/artifacts/proposal.md"],
+      "then": ["GetChangeArtifact is invoked", "AND response includes content and originalHash"]
+    },
+    {
+      "requirement": "GET change detail omits artifact bodies",
+      "name": "Versioned API path",
+      "when": ["client calls the documented route with /v1 prefix"],
+      "then": ["route handler is reached", "AND unprefixed legacy path is not registered"]
+    },
+    {
+      "requirement": "GET change detail omits artifact bodies",
+      "name": "Change detail JSON excludes artifact bodies",
+      "when": ["GET /v1/changes/{name} returns change detail"],
+      "then": [
+        "artifact entries list filenames and hashes only",
+        "AND response does not inline artifact content"
+      ]
+    },
+    {
+      "requirement": "GET status supports ifModifiedSince short-circuit",
+      "name": "Matching revision returns unchanged",
+      "given": ["change foo has updatedAt 2026-05-25T10:00:00.000Z"],
+      "when": ["GET /v1/changes/foo/status?ifModifiedSince=2026-05-25T10:00:00.000Z"],
+      "then": [
+        "response includes unchanged: true",
+        "AND response includes the same updatedAt",
+        "AND full artifact DAG is omitted"
+      ]
+    },
+    {
+      "requirement": "GET status supports ifModifiedSince short-circuit",
+      "name": "GET /changes/{name}/status returns expected payload",
+      "when": ["client calls GET /changes/{name}/status"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "GET status supports ifModifiedSince short-circuit",
+      "name": "Unchanged status skips redundant work",
+      "given": ["client cached manifest updatedAt"],
+      "when": ["status is requested with matching ifModifiedSince"],
+      "then": [
+        "response may include unchanged: true",
+        "AND client avoids refetching unchanged artifacts"
+      ]
+    },
+    {
+      "requirement": "refreshImplementation query runs before GetStatus",
+      "name": "refreshImplementation=true triggers refresh use case",
+      "when": ["GET /v1/changes/foo/status?refreshImplementation=true"],
+      "then": [
+        "implementation refresh runs before GetStatus",
+        "AND status reflects refreshed tracking"
+      ]
+    },
+    {
+      "requirement": "refreshImplementation query runs before GetStatus",
+      "name": "Omitted flag skips refresh",
+      "when": ["GET /v1/changes/foo/status without query"],
+      "then": ["GetStatus only", "AND no filesystem scan for implementation"]
+    },
+    {
+      "requirement": "refreshImplementation query runs before GetStatus",
+      "name": "Refresh failure surfaces in status",
+      "given": ["implementation scan errors"],
+      "when": ["refresh query is true"],
+      "then": ["status includes error or stale flag", "AND HTTP still 200 with diagnostic fields"]
+    },
+    {
+      "requirement": "artifact list and body routes use dedicated core use cases",
+      "name": "Active artifact body via GetChangeArtifact",
+      "given": ["tracked artifact proposal.md exists on active change foo"],
+      "when": ["GET /v1/changes/foo/artifacts/proposal.md"],
+      "then": ["GetChangeArtifact is invoked", "AND response includes content and originalHash"]
+    },
+    {
+      "requirement": "artifact list and body routes use dedicated core use cases",
+      "name": "Draft artifact body via GetReadOnlyChangeArtifact",
+      "given": ["tracked artifact proposal.md on drafted change foo"],
+      "when": ["GET /v1/drafts/foo/artifacts/proposal.md"],
+      "then": [
+        "GetReadOnlyChangeArtifact runs with readOnlyOrigin draft",
+        "AND response includes content and originalHash",
+        "AND GetChangeArtifact is not invoked"
+      ]
+    },
+    {
+      "requirement": "artifact list and body routes use dedicated core use cases",
+      "name": "Discarded artifact body via GetReadOnlyChangeArtifact",
+      "given": ["tracked artifact proposal.md on discarded change foo"],
+      "when": ["GET /v1/discarded/foo/artifacts/proposal.md"],
+      "then": [
+        "GetReadOnlyChangeArtifact runs with readOnlyOrigin discarded",
+        "AND GetChangeArtifact is not invoked"
+      ]
+    },
+    {
+      "requirement": "artifact list and body routes use dedicated core use cases",
+      "name": "GET .../artifacts returns expected payload",
+      "when": ["client calls GET .../artifacts"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "artifact list and body routes use dedicated core use cases",
+      "name": "GET .../artifacts/{filename} returns expected payload",
+      "when": ["client calls GET .../artifacts/{filename}"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "context preview and instruction routes delegate to kernel",
+      "name": "Versioned API path",
+      "when": ["client calls the documented route with /v1 prefix"],
+      "then": ["route handler is reached", "AND unprefixed legacy path is not registered"]
+    },
+    {
+      "requirement": "context preview and instruction routes delegate to kernel",
+      "name": "Undocumented path returns 404",
+      "when": ["client requests a URL outside this routes contract"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "drafted change read routes are separate and read-only",
+      "name": "GET /drafts/:name returns change detail",
+      "given": ["drafted change foo exists"],
+      "when": ["GET /v1/drafts/foo"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches ChangeDetailDto"]
+    },
+    {
+      "requirement": "drafted change read routes are separate and read-only",
+      "name": "Draft routes do not allow artifact writes",
+      "when": ["client calls PUT /v1/drafts/foo/artifacts/proposal.md"],
+      "then": ["HTTP 404 is returned (route not registered) or 405"]
+    },
+    {
+      "requirement": "discarded change read routes are separate and read-only",
+      "name": "GET /discarded/:name returns change detail",
+      "given": ["discarded change foo exists"],
+      "when": ["GET /v1/discarded/foo"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches ChangeDetailDto"]
+    },
+    {
+      "requirement": "discarded change read routes are separate and read-only",
+      "name": "GET .../context returns expected payload",
+      "when": ["client calls GET .../context"],
+      "then": ["HTTP status is 2xx", "AND JSON body matches the documented DTO or envelope"]
+    },
+    {
+      "requirement": "unknown change returns 404 problem+json",
+      "name": "Unknown resource returns 404 problem+json",
+      "when": ["client requests missing change name"],
+      "then": ["HTTP 404", "AND Content-Type is application/problem+json"]
+    },
+    {
+      "requirement": "unknown change returns 404 problem+json",
+      "name": "Kernel errors serialize as problem+json",
+      "when": ["kernel throws a domain error for this route"],
+      "then": ["Content-Type is application/problem+json", "AND body includes status and title"]
+    },
+    {
+      "requirement": "unknown change returns 404 problem+json",
+      "name": "Unknown change name returns 404",
+      "when": ["GET /v1/changes/missing is requested"],
+      "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "POST preview accepts draft artifact overrides",
+      "name": "POST preview with overrides returns merged draft",
+      "given": ["active change and valid specId"],
+      "when": [
+        "POST /v1/changes/{name}/preview with body { specId, artifactOverrides: { \"deltas/.../spec.md.delta.yaml\": \"<draft>\" } }"
+      ],
+      "then": ["HTTP 200", "AND files[].merged reflects draft not on-disk delta"]
+    },
+    {
+      "requirement": "POST preview accepts draft artifact overrides",
+      "name": "GET preview unchanged without body",
+      "when": ["GET /v1/changes/{name}/preview?specId=..."],
+      "then": ["preview uses saved change artifacts only"]
+    },
+    {
+      "requirement": "POST change artifact outline accepts draft content",
+      "name": "POST outline with content for change artifact",
+      "given": ["change artifact path under change directory"],
+      "when": [
+        "POST /v1/changes/{name}/artifacts/{filename}/outline with { content: \"# Title\\n\" }"
+      ],
+      "then": ["HTTP 200", "AND JSON includes outline array"]
+    },
+    {
+      "requirement": "read-route inputs are schema-validated",
+      "name": "GET preview rejects missing specId",
+      "when": ["client calls GET /v1/changes/{name}/preview without specId"],
+      "then": [
+        "HTTP 400 is returned",
+        "AND body is application/problem+json",
+        "AND code is INVALID_REQUEST"
+      ]
+    },
+    {
+      "requirement": "read-route inputs are schema-validated",
+      "name": "hook instructions reject invalid phase",
+      "when": ["client calls GET /v1/changes/{name}/hook-instructions?phase=before"],
+      "then": ["HTTP 400 is returned", "AND body is application/problem+json"]
+    },
+    {
+      "requirement": "read-route inputs are schema-validated",
+      "name": "POST outline without content uses saved file",
+      "given": ["artifact exists on change"],
+      "when": ["POST outline with empty body"],
+      "then": ["outline matches saved bytes"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-changes-read",
+        "file": "api:src/delivery/http/handlers/handler-changes-read.ts",
+        "symbol": "registerChangesReadRoutes"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e842a1b4afe484d7fedd581acb0ea3d6e7a5c8d557dbd44d97582f34bf40b334",
+    "verify.md": "sha256:b7619e53c804bd28e2613600422803dd84084bacf504982884bd7d1f54422596"
+  },
+  "generatedBy": "core"
+}

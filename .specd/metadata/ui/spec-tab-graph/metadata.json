@@ -1,0 +1,144 @@
+{
+  "title": "Spec Tabs Coverage and Impact",
+  "description": "Studio UI for **Spec Tabs Coverage and Impact**: user-visible graph-derived views for a selected\nspec, driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tabs Coverage\nand Impact**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Spec Tabs Coverage and Impact**: user-visible graph-derived views for a selected\nspec, driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Spec Tabs Coverage\nand Impact**."
+  ],
+  "rules": [
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "rules": [
+        "While the Coverage tab is visible, the view MUST load spec-scoped graph coverage via\n`getSpecGraphView(workspace, specPath)` on tab-scoped poll ticks. While the Impact tab is visible,\nthe view MUST load graph impact via `getImpact({ spec })` on tab-scoped poll ticks. New specs in\nthe tree are already discovered by the global workspace poll.\n\nThe visible graph-derived tab labels MUST be `Coverage` and `Impact`. `Graph` MUST NOT be shown as\nthe visible tab title.\n\nThe Coverage panel MUST render the returned coverage using the same visual language as the change\n`Impact` tab rather than raw JSON:\n\n1. spec card header with the current `specId`\n2. `Symbols` subsection listing covered graph symbols with location context\n3. `Files` subsection listing covered graph files\n\nThe Coverage `Files` subsection MUST expand naturally with content and MUST NOT impose an internal\nscroll region for ordinary file lists.\n\nThe Impact panel MUST render graph impact using the same visual language as the change `Impact`\ntab, including aggregate metrics plus ordered subsections:\n\n1. `Specs`\n2. `Symbols`\n3. `Files`\n\nThe Impact summary header MUST expose the same key aggregate counts surfaced by the CLI graph\nimpact command: risk level, direct/indirect/transitive dependency counts, affected file count, and\naffected spec count.\n\nWhen a graph-derived panel has no data, it MUST show an empty-state message instead of a JSON\nblock."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "name": "Visible spec tab refreshes metadata",
+      "given": ["spec tab for core:kernel is active"],
+      "when": ["light poll interval elapses"],
+      "then": ["spec metadata hook refetches", "AND tree discovery still uses global poll"]
+    },
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "name": "Hidden spec tab stops metadata poll",
+      "given": ["user switches away from spec tab"],
+      "when": ["poll would have fired"],
+      "then": ["no metadata request is sent", "AND last data remains rendered"]
+    },
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "name": "New spec appears via workspace tree poll",
+      "given": ["agent adds a spec file on disk"],
+      "when": ["global workspace poll runs"],
+      "then": ["tree shows new node", "AND spec tab poll does not scan filesystem directly"]
+    },
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "name": "Coverage tab loads spec graph coverage",
+      "when": ["user selects Coverage tab"],
+      "then": [
+        "UI calls getSpecGraphView",
+        "AND renders structured symbols/files sections or an empty state"
+      ]
+    },
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "name": "Coverage files section does not trap scroll",
+      "given": ["spec coverage includes many files"],
+      "when": ["Coverage tab renders"],
+      "then": [
+        "the file list grows in normal document flow",
+        "AND the files subsection does not add an inner scroll area for ordinary lists"
+      ]
+    },
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "name": "Impact tab loads spec graph impact",
+      "when": ["user selects Impact tab"],
+      "then": [
+        "UI calls getImpact with the selected spec id",
+        "AND renders ordered Specs, Symbols, and Files sections or an empty state",
+        "AND the summary header shows risk and aggregate affected counts aligned with CLI impact output"
+      ]
+    },
+    {
+      "requirement": "spec coverage and impact tabs poll graph data while visible",
+      "name": "Tab labels are Coverage and Impact",
+      "when": ["spec tabs are rendered"],
+      "then": [
+        "the graph-derived tab labels are Coverage and Impact",
+        "AND Graph is not shown as the visible tab title"
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:spec-tab-graph",
+        "file": "ui:src/spec/SpecMainView.tsx",
+        "symbol": "SpecMainView"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:a9d2c1f02dd8b251f5486de1b27d431dd667a49ee28351c4fe89f974947da78f",
+    "verify.md": "sha256:748fff405fbe9c5542d919b5fbe38334e60054602a3f6aed031363803e116f31"
+  },
+  "generatedBy": "core"
+}

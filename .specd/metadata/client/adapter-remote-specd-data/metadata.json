@@ -1,0 +1,128 @@
+{
+  "title": "Adapter Remote Specd Data",
+  "description": "The React IDE consumes `SpecdDataPort`, not raw `fetch`. The remote adapter implements every port method group over `/v1`, composing transport, optional bearer headers, and problem+json error mapping so UI hooks stay identical between web, desktop remote, and integration tests.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "client:port-http-transport",
+    "client:adapter-bearer-auth",
+    "client:adapter-problem-json-errors",
+    "client:specd-data-port"
+  ],
+  "context": [
+    "The React IDE consumes `SpecdDataPort`, not raw `fetch`. The remote adapter implements every port method group over `/v1`, composing transport, optional bearer headers, and problem+json error mapping so UI hooks stay identical between web, desktop remote, and integration tests."
+  ],
+  "rules": [
+    {
+      "requirement": "remote adapter composes transport bearer and problem-json layers",
+      "rules": [
+        "The adapter MUST wrap `port-http-transport` with `adapter-bearer-auth` (when applicable) and `adapter-problem-json-errors`."
+      ]
+    },
+    {
+      "requirement": "remote adapter normalizes API base URL to /v1",
+      "rules": [
+        "Configured API bases MUST be normalized so port methods target the versioned `/v1` root."
+      ]
+    },
+    {
+      "requirement": "remote adapter implements the full SpecdDataPort surface",
+      "rules": [
+        "Every method on `client:specd-data-port` MUST be implemented against the HTTP routes defined in this change."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "remote adapter composes transport bearer and problem-json layers",
+      "name": "Remote stack wraps transport and parsers",
+      "when": ["adapter issues HTTP call"],
+      "then": ["transport normalizes /v1", "AND problem-json layer wraps fetch"]
+    },
+    {
+      "requirement": "remote adapter composes transport bearer and problem-json layers",
+      "name": "Bearer layer inserted for remote profile",
+      "given": ["profile has token"],
+      "when": ["request is sent"],
+      "then": ["Authorization header present", "AND bearer adapter does not validate token"]
+    },
+    {
+      "requirement": "remote adapter composes transport bearer and problem-json layers",
+      "name": "Embedded profile skips bearer wrapper",
+      "given": ["same-origin embedded profile"],
+      "when": ["request is sent"],
+      "then": ["bearer middleware not active", "AND fetch still uses transport"]
+    },
+    {
+      "requirement": "remote adapter normalizes API base URL to /v1",
+      "name": "Remote port calls use /v1 HTTP",
+      "when": ["port method runs with a remote base URL configured"],
+      "then": ["request targets /v1/...", "AND JSON maps into client DTO types"]
+    },
+    {
+      "requirement": "remote adapter normalizes API base URL to /v1",
+      "name": "Remote adapter parses problem+json errors",
+      "when": ["server returns 4xx/5xx with problem body"],
+      "then": ["hook receives structured error", "AND UI can render status and title"]
+    },
+    {
+      "requirement": "remote adapter normalizes API base URL to /v1",
+      "name": "Transport composes bearer and problem-json layers",
+      "when": ["HTTP stack is built for a remote profile"],
+      "then": ["bearer middleware is in the chain", "AND problem+json decoder is registered"]
+    },
+    {
+      "requirement": "remote adapter implements the full SpecdDataPort surface",
+      "name": "Every port group has HTTP implementation",
+      "when": ["each SpecdDataPort method is invoked in integration test"],
+      "then": ["matching /v1 route is called", "AND no NotImplemented methods"]
+    },
+    {
+      "requirement": "remote adapter implements the full SpecdDataPort surface",
+      "name": "Method signatures match port interfaces",
+      "when": ["TypeScript compiles adapters"],
+      "then": ["remote adapter satisfies SpecdDataPort", "AND desktop local adapter matches shapes"]
+    },
+    {
+      "requirement": "remote adapter implements the full SpecdDataPort surface",
+      "name": "List changes hits collection routes",
+      "when": ["listChanges() runs"],
+      "then": ["GET /v1/changes is requested", "AND DTO parses into sidebar model"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:adapter-remote-specd-data",
+        "file": "client:src/adapter-remote-specd-data.ts",
+        "symbol": "RemoteSpecdDataAdapterOptions"
+      },
+      {
+        "specId": "client:adapter-remote-specd-data",
+        "file": "client:src/adapter-remote-specd-data.ts",
+        "symbol": "RemoteSpecdDataAdapter"
+      },
+      {
+        "specId": "client:adapter-remote-specd-data",
+        "file": "client:src/adapter-remote-specd-data.ts",
+        "symbol": "createRemoteSpecdDataAdapter"
+      },
+      {
+        "specId": "client:adapter-remote-specd-data",
+        "file": "client:src/adapter-remote-specd-data.ts",
+        "symbol": "testRemoteConnection"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:469efa87babe2b0e5749ee01e5f5c1bde9194c3646b8e1929cc0dbb009f4e58d",
+    "verify.md": "sha256:09ad98ab5997279494bac15e202b44647bf3f146924f3247c3b070b239bf1cbb"
+  },
+  "generatedBy": "core"
+}

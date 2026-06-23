@@ -1,0 +1,126 @@
+{
+  "title": "Presenter Change",
+  "description": "Maps kernel or graph results into the matching `dto-*` response for **Presenter Change**. Presenters are pure formatting at the HTTP boundary so handlers do not embed lifecycle or validation logic.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "api:dto-change"],
+  "context": [
+    "Maps kernel or graph results into the matching `dto-*` response for **Presenter Change**. Presenters are pure formatting at the HTTP boundary so handlers do not embed lifecycle or validation logic."
+  ],
+  "rules": [
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "rules": [
+        "Given the same kernel or graph result, the presenter MUST produce the same DTO JSON shape, omitting optional properties when values are absent."
+      ]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "rules": [
+        "The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in `@specd/core` use cases."
+      ]
+    },
+    {
+      "requirement": "historyEventDto maps type-specific ChangeEvent fields",
+      "rules": [
+        "`toChangeDetailDto` MUST map each kernel `ChangeEvent` to `ChangeHistoryEventDto` with ISO `at`, actor `by`, and all variant-specific properties needed by Studio (`ui:change-tab-events`). At minimum: `created` → `specIds`, `schemaName`, `schemaVersion`; `transitioned` → `from`, `to`; `invalidated` → `cause`, `message`, `affectedArtifacts`. Other variants (`spec-approved`, `signed-off`, `artifacts-synced`, etc.) MUST forward their domain fields without dropping them to type-only stubs."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "name": "Presenter output matches paired DTO",
+      "given": ["fixed kernel or graph fixture"],
+      "when": ["presenter serializes to JSON"],
+      "then": ["shape matches api:dto-* spec", "AND OpenAPI schema validates sample"]
+    },
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "name": "Presenter leaves kernel blockers unchanged",
+      "given": ["kernel returns known blockers"],
+      "when": ["presenter maps response"],
+      "then": ["blocker codes equal kernel", "AND no new blockers invented"]
+    },
+    {
+      "requirement": "presenter maps entities to DTO fields deterministically",
+      "name": "Repeated mapping is deterministic",
+      "when": ["presenter called twice on same input"],
+      "then": ["outputs are identical", "AND no time-dependent fields unless documented"]
+    },
+    {
+      "requirement": "historyEventDto maps type-specific ChangeEvent fields",
+      "name": "Invalidated event retains cause and affected artifacts",
+      "given": ["kernel history with invalidated and affectedArtifacts"],
+      "when": ["toChangeDetailDto runs"],
+      "then": [
+        "JSON history entry includes cause, message, and affectedArtifacts",
+        "AND by uses name and email"
+      ]
+    },
+    {
+      "requirement": "historyEventDto maps type-specific ChangeEvent fields",
+      "name": "Spec-approved event retains hashes",
+      "given": ["kernel history with spec-approved"],
+      "when": ["detail DTO is built"],
+      "then": [
+        "history entry includes reason and artifactHashes",
+        "AND is not reduced to type/at/by only"
+      ]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "name": "Presenter output matches paired DTO",
+      "given": ["fixed kernel or graph fixture"],
+      "when": ["presenter serializes to JSON"],
+      "then": ["shape matches api:dto-* spec", "AND OpenAPI schema validates sample"]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "name": "Presenter leaves kernel blockers unchanged",
+      "given": ["kernel returns known blockers"],
+      "when": ["presenter maps response"],
+      "then": ["blocker codes equal kernel", "AND no new blockers invented"]
+    },
+    {
+      "requirement": "presenter does not encode business rules",
+      "name": "Repeated mapping is deterministic",
+      "when": ["presenter called twice on same input"],
+      "then": ["outputs are identical", "AND no time-dependent fields unless documented"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:presenter-change",
+        "file": "api:src/delivery/http/presenters/presenter-change.ts",
+        "symbol": "toChangeSummaryDto"
+      },
+      {
+        "specId": "api:presenter-change",
+        "file": "api:src/delivery/http/presenters/presenter-change.ts",
+        "symbol": "toChangeDetailDto"
+      },
+      {
+        "specId": "api:presenter-change",
+        "file": "api:src/delivery/http/presenters/presenter-change.ts",
+        "symbol": "toChangeStatusDto"
+      },
+      {
+        "specId": "api:presenter-change",
+        "file": "api:src/delivery/http/presenters/presenter-change.ts",
+        "symbol": "toArtifactListDto"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:16ace6a96ba599f6ad55d72b1f78a596b51180cf689c50a8c927ebfcde13e1e0",
+    "verify.md": "sha256:30ded35edfab77b4e03f15ad57dac9560554f760d66b23dc0a09436c686a6ad6"
+  },
+  "generatedBy": "core"
+}

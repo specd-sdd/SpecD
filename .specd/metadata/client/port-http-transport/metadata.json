@@ -1,0 +1,134 @@
+{
+  "title": "Port Http Transport",
+  "description": "TypeScript surface for **Port Http Transport** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC.",
+  "dependsOn": ["default:_global/architecture"],
+  "context": [
+    "TypeScript surface for **Port Http Transport** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC."
+  ],
+  "rules": [
+    {
+      "requirement": "transport normalizes API base URL and /v1 prefix",
+      "rules": [
+        "The transport MUST trim trailing slashes on the configured base URL and MUST prefix relative paths with `/v1` when the deployment uses the versioned API root."
+      ]
+    },
+    {
+      "requirement": "transport sets JSON accept and allows auth injection",
+      "rules": [
+        "Requests MUST send `Accept: application/json`. Adapters MAY inject additional headers (for example `Authorization`) via a hook or wrapper."
+      ]
+    },
+    {
+      "requirement": "transport supports AbortSignal cancellation",
+      "rules": [
+        "Every request MUST accept an optional `AbortSignal` so React hooks can cancel in-flight fetches on unmount or tab close."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "transport normalizes API base URL and /v1 prefix",
+      "name": "Trailing slash is trimmed from base URL",
+      "given": ["profile base http://host/api/"],
+      "when": ["transport builds request URL"],
+      "then": ["request targets http://host/api/v1/...", "AND no double slashes"]
+    },
+    {
+      "requirement": "transport normalizes API base URL and /v1 prefix",
+      "name": "Relative paths gain /v1 prefix",
+      "when": ["port calls getProject()"],
+      "then": ["fetch URL starts with /v1/project", "AND legacy unprefixed paths are not used"]
+    },
+    {
+      "requirement": "transport normalizes API base URL and /v1 prefix",
+      "name": "Absolute paths in tests are rejected",
+      "when": ["caller passes full URL without base merge"],
+      "then": ["transport still applies base rules", "AND validation error is thrown"]
+    },
+    {
+      "requirement": "transport sets JSON accept and allows auth injection",
+      "name": "Accept application/json on every request",
+      "when": ["transport issues fetch"],
+      "then": ["Accept: application/json header set", "AND problem+json responses parse"]
+    },
+    {
+      "requirement": "transport sets JSON accept and allows auth injection",
+      "name": "Auth injector adds Authorization when configured",
+      "given": ["profile stores bearer token"],
+      "when": ["transport wraps fetch"],
+      "then": ["Authorization: Bearer … attached", "AND injector does not validate token"]
+    },
+    {
+      "requirement": "transport sets JSON accept and allows auth injection",
+      "name": "No Authorization when profile has no token",
+      "given": ["embedded same-origin profile"],
+      "when": ["request is sent"],
+      "then": ["Authorization header absent", "AND call still succeeds against disabled auth"]
+    },
+    {
+      "requirement": "transport supports AbortSignal cancellation",
+      "name": "Aborted fetch rejects hook promise",
+      "when": ["hook unmount aborts in-flight request"],
+      "then": ["AbortError propagated", "AND loading state clears"]
+    },
+    {
+      "requirement": "transport supports AbortSignal cancellation",
+      "name": "Completed request ignores late abort",
+      "given": ["response already received"],
+      "when": ["abort signal fires"],
+      "then": ["resolved data kept", "AND no spurious error state"]
+    },
+    {
+      "requirement": "transport supports AbortSignal cancellation",
+      "name": "Global poll passes shared abort controller",
+      "when": ["new poll tick aborts previous fetch"],
+      "then": ["only latest tick updates UI", "AND stale responses discarded"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:port-http-transport",
+        "file": "client:src/port-http-transport.ts",
+        "symbol": "HttpRequestOptions"
+      },
+      {
+        "specId": "client:port-http-transport",
+        "file": "client:src/port-http-transport.ts",
+        "symbol": "HttpTransportError"
+      },
+      {
+        "specId": "client:port-http-transport",
+        "file": "client:src/port-http-transport.ts",
+        "symbol": "HttpTransport"
+      },
+      {
+        "specId": "client:port-http-transport",
+        "file": "client:src/port-http-transport.ts",
+        "symbol": "CreateHttpTransportOptions"
+      },
+      {
+        "specId": "client:port-http-transport",
+        "file": "client:src/port-http-transport.ts",
+        "symbol": "normalizeApiBaseUrl"
+      },
+      {
+        "specId": "client:port-http-transport",
+        "file": "client:src/port-http-transport.ts",
+        "symbol": "createHttpTransport"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:0001f0ec912f4be1528754c0dec2ad02e85e4d8b3fb0eef41b6b6edf1d746f32",
+    "verify.md": "sha256:1ab8c5f5851034b3aa6d6efbd883a9aabc78661b0b045a576f2584c462416720"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,105 @@
+{
+  "title": "Port Project",
+  "description": "TypeScript surface for **Port Project** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC.",
+  "dependsOn": ["default:_global/architecture", "client:specd-data-port"],
+  "context": [
+    "TypeScript surface for **Port Project** on `SpecdDataPort`, mirroring the HTTP routes in the paired `api:routes-*` group. UI hooks call these methods; adapters implement them over HTTP or IPC."
+  ],
+  "rules": [
+    {
+      "requirement": "port exposes Project operations",
+      "rules": [
+        "The interface MUST declare asynchronous methods equivalent to the HTTP routes in the matching `api:routes-*` group:\n\n- `getProject()`, `getProjectStatus()`"
+      ]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "rules": [
+        "Implementations (`adapter-remote-specd-data`, desktop IPC) MUST implement these methods without altering parameter or return types."
+      ]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "rules": [
+        "HTTP failures MUST be translated by `adapter-problem-json-errors` into errors the UI hooks can display."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "port exposes Project operations",
+      "name": "Port methods mirror routes contract",
+      "when": ["adapter implements this port group"],
+      "then": ["each method maps to documented /v1 route", "AND types match DTO specs"]
+    },
+    {
+      "requirement": "port exposes Project operations",
+      "name": "List changes hits collection HTTP route",
+      "when": ["listChanges() is called on remote adapter"],
+      "then": ["GET /v1/changes is requested", "AND response parses to typed rows"]
+    },
+    {
+      "requirement": "port exposes Project operations",
+      "name": "IPC adapter exposes same method names",
+      "when": ["desktop IPC adapter handles port call"],
+      "then": ["method name and arity match interface", "AND return shape matches HTTP path"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "Remote and IPC adapters share types",
+      "when": ["TypeScript compiles both adapters against port interface"],
+      "then": ["parameters match", "AND return types match"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "UI hooks do not branch on transport",
+      "when": ["hook calls getChangeStatus"],
+      "then": ["same method signature for HTTP and IPC", "AND only adapter selection differs"]
+    },
+    {
+      "requirement": "port signatures are identical for HTTP and IPC adapters",
+      "name": "Signature drift fails build",
+      "when": ["port interface adds required field"],
+      "then": ["adapters fail compile until updated"]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "HTTP 404 becomes typed client error",
+      "when": ["remote call returns 404 problem+json"],
+      "then": ["adapter throws parseable error", "AND hook shows message"]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "Network failure is not swallowed",
+      "when": ["fetch throws network error"],
+      "then": ["hook receives error", "AND loading state clears"]
+    },
+    {
+      "requirement": "port failures surface as typed client errors",
+      "name": "Success bypasses error mapper",
+      "when": ["HTTP 200 returns DTO"],
+      "then": ["no error thrown", "AND data returned to hook"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:port-project",
+        "file": "client:src/port-project.ts",
+        "symbol": "PortProject"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:8538aad95210a60e577ff8b432d33d481825ce5825a547e9a83938046d8b5954",
+    "verify.md": "sha256:3aaaa961ddef56b11ae150f901b331ee602247137041ae483fdd172553bf40fb"
+  },
+  "generatedBy": "core"
+}

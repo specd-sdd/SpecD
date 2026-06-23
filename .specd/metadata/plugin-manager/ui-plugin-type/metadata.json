@@ -1,0 +1,158 @@
+{
+  "title": "plugin-manager:ui-plugin-type",
+  "description": "Studio needs a first-class **UI plugin** contract so `specd ui serve` can load either an embedded static bundle or a dev-server shell without treating UI packages as agent plugins. This spec defines `UiPlugin`, shared factories, and the `ui` entry in `PLUGIN_TYPES`.",
+  "dependsOn": ["plugin-manager:specd-plugin-type", "plugin-manager:plugin-loader", "core:config"],
+  "context": [
+    "Studio needs a first-class **UI plugin** contract so `specd ui serve` can load either an embedded static bundle or a dev-server shell without treating UI packages as agent plugins. This spec defines `UiPlugin`, shared factories, and the `ui` entry in `PLUGIN_TYPES`."
+  ],
+  "rules": [
+    {
+      "requirement": "UiPlugin extends SpecdPlugin",
+      "rules": [
+        "`UiPlugin` MUST extend `SpecdPlugin` with `type: 'ui'` and add:\n\n- `hasServer(): boolean` — when `false`, the CLI embeds {@link getStaticRoot} via the API static middleware; when `true`, the plugin owns HTTP for the SPA.\n- `getStaticRoot(): string` — absolute directory that MUST contain `index.html` when `hasServer()` is `false`.\n- `getServerUrl?(): string` — REQUIRED when `hasServer()` is `true`; MUST be an `http(s)` base URL for the plugin-owned UI server.\n- `install?(config, options?)` / `uninstall?(config, options?)` — optional hooks that MUST NOT mutate the project tree (no skill copies).\n\n`init` MUST accept `PluginContext` or `UiServeContext` (extends `PluginContext` with `apiBaseUrl`)."
+      ]
+    },
+    {
+      "requirement": "UiServeContext",
+      "rules": [
+        "```typescript\ninterface UiServeContext extends PluginContext {\n  /** Listening API base including `/v1` (e.g. `http://127.0.0.1:4400/v1`). */\n  readonly apiBaseUrl: string\n}\n```"
+      ]
+    },
+    {
+      "requirement": "UiInstallOptions and UiInstallResult",
+      "rules": [
+        "```typescript\ninterface UiInstallOptions {\n  readonly requireBuiltDist?: boolean // default true for bundle plugins\n}\n\ninterface UiInstallResult {\n  readonly staticRoot: string\n  readonly hasIndexHtml: boolean\n  readonly message: string\n}\n```"
+      ]
+    },
+    {
+      "requirement": "UI plugin manifest (specd-plugin.json)",
+      "rules": [
+        "UI plugin packages MUST ship `specd-plugin.json` validated by `plugin-manager:plugin-loader`. Beyond the shared agent fields (`schemaVersion`, `name`, `version`, `minCoreVersion`, optional `description`), UI plugins introduce:\n\n| Field        | Required | Purpose                                                                                                                                                                                                                                                                                                      |\n| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |\n| `pluginType` | yes      | MUST be `\"ui\"`. Loader rejects unknown values and validates the runtime object with `isUiPlugin`, not `isAgentPlugin`.                                                                                                                                                                                       |\n| `staticDir`  | no       | Relative directory under the package root with the built SPA (`index.html`, assets). Applies only when the plugin does **not** run its own HTTP server (`hasServer() === false`). Factory `create()` SHOULD read it and pass it to `createBundleUiPlugin({ staticDir })`. Defaults to `\"dist\"` when omitted. |\n\nRules:\n\n- **Embedded bundle mode** (`hasServer() === false`): UI is served from the API origin via static middleware. The manifest SHOULD declare `staticDir` (typically `\"dist\"`).\n- **Own-server mode** (`hasServer() === true`): the plugin runs its own HTTP server (e.g. Vite) and exposes `getServerUrl()`. The manifest MUST NOT declare `staticDir` for serving — `staticDir` is irrelevant because assets are not mounted on the API. `specd ui serve` prints the plugin URL instead of embedding `dist/`.\n- The loader MUST accept optional `staticDir` in the Zod manifest schema when `pluginType` is `\"ui\"` but MUST NOT inject it into `create()` — the package factory reads the manifest and maps fields to `createBundleUiPlugin` / `createServerUiPlugin` options.\n- `name` and `version` in the manifest MUST match the npm `package.json` and MUST be passed through to the runtime plugin instance (same rule as `plugin-manager:specd-plugin-type`).\n\nExample (bundle):\n\n```json\n{\n  \"schemaVersion\": 1,\n  \"name\": \"@specd/plugin-ui-studio\",\n  \"version\": \"0.1.0\",\n  \"pluginType\": \"ui\",\n  \"staticDir\": \"dist\",\n  \"minCoreVersion\": \"*\"\n}\n```\n\nExample (own server — no `staticDir`; runtime `hasServer() === true`):\n\n```json\n{\n  \"schemaVersion\": 1,\n  \"name\": \"@specd/studio-web\",\n  \"version\": \"0.0.0\",\n  \"pluginType\": \"ui\",\n  \"minCoreVersion\": \"*\"\n}\n```"
+      ]
+    },
+    {
+      "requirement": "isUiPlugin type guard",
+      "rules": [
+        "The package MUST export `isUiPlugin(value: SpecdPlugin): value is UiPlugin` validating:\n\n1. `value.type === 'ui'`\n2. `hasServer` and `getStaticRoot` are functions\n3. When `hasServer()` is `true`, `getServerUrl` is a function"
+      ]
+    },
+    {
+      "requirement": "Bundle and own-server factories",
+      "rules": [
+        "`@specd/plugin-manager` MUST export:\n\n- `createBundleUiPlugin({ name, version, packageRoot, staticDir? })` — embedded mode: `hasServer() === false`, `getStaticRoot()` under `packageRoot/staticDir` (default `dist`).\n- `createServerUiPlugin({ name, version, packageRoot, serverPort? })` — own-server mode: `hasServer() === true`, starts the package UI HTTP server in `init`, `getServerUrl()` on `http://127.0.0.1:<port>` (default `5174`). Does not use manifest `staticDir` for serving."
+      ]
+    },
+    {
+      "requirement": "PLUGIN_TYPES includes ui",
+      "rules": [
+        "`PLUGIN_TYPES` (from `plugin-manager:specd-plugin-type`) MUST include `'ui'` so manifests with `pluginType: \"ui\"` validate at load time."
+      ]
+    },
+    {
+      "requirement": "InstallUiPlugin use case",
+      "rules": [
+        "The application layer MUST provide `InstallUiPlugin` that loads a package, requires `isUiPlugin`, calls `install` when present, and returns `InstallPluginOutput` without mutating `specd.yaml`.\n\n`InstallPlugin` (agent path) MUST reject UI plugins with `PluginValidationError` directing callers to `InstallUiPlugin`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "UiPlugin extends SpecdPlugin",
+      "name": "Bundle plugin reports no server",
+      "given": ["createBundleUiPlugin with a package root containing dist/index.html"],
+      "when": ["the plugin is created"],
+      "then": ["hasServer() is false", "AND getStaticRoot() ends with dist"]
+    },
+    {
+      "requirement": "UiPlugin extends SpecdPlugin",
+      "name": "Own-server plugin reports server URL",
+      "given": ["createServerUiPlugin with serverPort 5174"],
+      "when": ["the plugin is created"],
+      "then": ["hasServer() is true", "AND getServerUrl() is http://127.0.0.1:5174"]
+    },
+    {
+      "requirement": "UiServeContext",
+      "name": "apiBaseUrl is required for own-server init",
+      "given": ["a UI plugin with hasServer() === true during specd ui serve"],
+      "when": ["init is called"],
+      "then": ["the context includes apiBaseUrl ending with /v1"]
+    },
+    {
+      "requirement": "UiInstallOptions and UiInstallResult",
+      "name": "Install returns staticRoot summary",
+      "given": ["a bundle UI plugin with dist/index.html"],
+      "when": ["InstallUiPlugin.execute completes"],
+      "then": ["data.staticRoot is set", "AND data.hasIndexHtml is true"]
+    },
+    {
+      "requirement": "Bundle and own-server factories",
+      "name": "createServerUiPlugin exposes own-server URL",
+      "when": ["createServerUiPlugin is called with serverPort 5199"],
+      "then": ["getServerUrl() is http://127.0.0.1:5199"]
+    },
+    {
+      "requirement": "UI plugin manifest (specd-plugin.json)",
+      "name": "Loader accepts ui pluginType and optional staticDir",
+      "given": [
+        "a package with specd-plugin.json containing pluginType: \"ui\" and staticDir: \"dist\""
+      ],
+      "when": ["PluginLoader.load runs against a valid create() export"],
+      "then": ["manifest validation passes", "AND the runtime plugin satisfies isUiPlugin"]
+    },
+    {
+      "requirement": "UI plugin manifest (specd-plugin.json)",
+      "name": "Own-server manifest has no staticDir",
+      "given": [
+        "a UI plugin manifest with pluginType: \"ui\", no staticDir, and a runtime plugin with hasServer() === true"
+      ],
+      "when": ["the package is loaded"],
+      "then": ["manifest validation passes", "AND getServerUrl() is defined"]
+    },
+    {
+      "requirement": "UI plugin manifest (specd-plugin.json)",
+      "name": "Bundle factory honors manifest staticDir",
+      "given": ["a bundle UI plugin factory that reads staticDir: \"out\" from its manifest"],
+      "when": ["create() runs"],
+      "then": ["getStaticRoot() ends with out"]
+    },
+    {
+      "requirement": "isUiPlugin type guard",
+      "name": "Bundle factory passes guard",
+      "when": ["createBundleUiPlugin builds a plugin"],
+      "then": ["isUiPlugin(plugin) is true"]
+    },
+    {
+      "requirement": "isUiPlugin type guard",
+      "name": "Agent plugin fails guard",
+      "given": ["a loaded agent plugin instance"],
+      "when": ["isUiPlugin(plugin) runs"],
+      "then": ["the result is false"]
+    },
+    {
+      "requirement": "PLUGIN_TYPES includes ui",
+      "name": "PLUGIN_TYPES lists agent and ui",
+      "when": ["PLUGIN_TYPES is imported from @specd/plugin-manager"],
+      "then": ["it equals ['agent', 'ui']"]
+    },
+    {
+      "requirement": "InstallUiPlugin use case",
+      "name": "Missing dist fails install when required",
+      "given": ["a bundle UI plugin whose dist/index.html is absent"],
+      "when": ["InstallUiPlugin.execute runs with default options"],
+      "then": ["install throws UiPluginBundleMissingError"]
+    },
+    {
+      "requirement": "InstallUiPlugin use case",
+      "name": "InstallPlugin rejects UI plugins",
+      "given": ["a UI plugin loaded by name"],
+      "when": ["InstallPlugin.execute runs"],
+      "then": ["it throws PluginValidationError mentioning InstallUiPlugin"]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:8c3420b3af73b7b0901b0d64966ae29dcfb340e5ad5d935b66ec1111c4d1a970",
+    "verify.md": "sha256:ecb197ee3c7fd2801a58d19961944e6e4160e4c9a65ca1615f5709a0777cfaf8"
+  },
+  "generatedBy": "core"
+}

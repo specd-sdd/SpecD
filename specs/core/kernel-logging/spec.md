@@ -27,6 +27,12 @@ The `createKernel()` function MUST initialize the global `Logger` proxy in `@spe
 
 By default, `createKernel()` SHALL use the `createDefaultLogger()` factory from the infrastructure layer to instantiate the Pino-backed logger.
 
+### Requirement: Shared LogFormatter per kernel
+
+`createKernel()` MUST invoke `createLogFormatter()` once per kernel bootstrap and pass the resulting `LogFormatter` to `createDefaultLogger` and to `ReadLog` when `KernelOptions.logRing` is set.
+
+`KernelOptions` MAY include optional `logFormatter` to override the default (used by CLI to pass a TTY-aware formatter instance).
+
 ### Requirement: Log Directory Guarantee
 
 The `Kernel` (or the default logger factory) SHALL ensure that the `{configPath}/log/` directory exists before the logging implementation attempts to write to the log file.

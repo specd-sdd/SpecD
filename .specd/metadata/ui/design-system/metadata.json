@@ -1,0 +1,623 @@
+{
+  "title": "Design System",
+  "description": "SpecD Studio must look and behave like a premium dark IDE for senior engineers and spec-driven workflows—not a marketing SaaS dashboard. This spec defines the shared visual language (tokens, layout model, typography, motion, and component chrome) that every `@specd/ui` surface MUST consume so shell, sidebars, editors, inspectors, and status chrome stay consistent across web and desktop hosts.",
+  "context": [
+    "SpecD Studio must look and behave like a premium dark IDE for senior engineers and spec-driven workflows—not a marketing SaaS dashboard. This spec defines the shared visual language (tokens, layout model, typography, motion, and component chrome) that every `@specd/ui` surface MUST consume so shell, sidebars, editors, inspectors, and status chrome stay consistent across web and desktop hosts."
+  ],
+  "rules": [
+    {
+      "requirement": "visual identity is serious technical and high-density",
+      "rules": [
+        "The product mood MUST be serious, technical, focused, dense, and professional. The UI MUST NOT use playful startup dashboard aesthetics, cartoon visuals, oversized cards, hero sections, large KPI tiles, or excessive whitespace. Inspiration is IDE-grade tooling (Cursor, VS Code, JetBrains) with GitHub-dark surfaces and Linear-dark polish for refinement only—not Linear’s marketing layout patterns."
+      ]
+    },
+    {
+      "requirement": "layout is panel-based IDE chrome not card dashboards",
+      "rules": [
+        "Structure MUST use editor chrome: split panes, resizable panels, dense side navigation, tool windows, inspectors, compact tabs, and a thin status bar. Shell splits (sidebar, editor, inspector, bottom panel) MUST use **`react-resizable-panels` (via shadcn `Resizable`)**. The UI MUST NOT rely on big rounded SaaS widgets, marketing tiles, or card-dashboard composition as the primary layout model."
+      ]
+    },
+    {
+      "requirement": "color tokens use the Studio dark palette",
+      "rules": [
+        "`@specd/ui` MUST expose theme tokens (CSS custom properties or equivalent) with at least these values:\n\n| Token role             | Hex                    |\n| ---------------------- | ---------------------- |\n| `background.primary`   | `#0D1117`              |\n| `background.secondary` | `#161B22`              |\n| `background.elevated`  | `#1C2128`              |\n| `border.default`       | `#30363D`              |\n| `text.primary`         | `#E6EDF3`              |\n| `text.secondary`       | `#8B949E`              |\n| `text.disabled`        | `#6E7681`              |\n| `accent.selection`     | `#58A6FF`              |\n| `accent.focus`         | `#1F6FEB`              |\n| `semantic.success`     | `#3FB950`              |\n| `semantic.warning`     | `#D29922`              |\n| `semantic.error`       | `#F85149`              |\n| `semantic.lifecycle`   | `#A371F7`              |\n| `semantic.info`        | `#39C5CF`              |\n| `editor.background`    | `#0D1117` or `#111827` |\n\nSurfaces MUST be dark matte. Glassmorphism and neumorphism MUST NOT be used."
+      ]
+    },
+    {
+      "requirement": "spacing is tight and border radius is small",
+      "rules": [
+        "Padding and gaps MUST be tight but readable (IDE density). Border radius on controls, tabs, and panels MUST be between **4px and 8px** maximum. Large soft rounded corners (pill cards, 16px+ marketing radii) MUST NOT be the default."
+      ]
+    },
+    {
+      "requirement": "typography is technical and compact",
+      "rules": [
+        "UI chrome MUST use a sharp sans stack (Inter, Geist, SF Pro, or IBM Plex Sans). Code and artifact editors MUST use a monospace stack (JetBrains Mono preferred). Type hierarchy MUST be clear and compact—not oversized marketing headings."
+      ]
+    },
+    {
+      "requirement": "icons are minimal outline style",
+      "rules": [
+        "Icons MUST use **`lucide-react`** (outline Lucide set). Decorative or filled cartoon icon sets MUST NOT be used for primary navigation."
+      ]
+    },
+    {
+      "requirement": "elevation uses borders and contrast not heavy shadows",
+      "rules": [
+        "Depth MUST come from border color `#30363D` and background elevation steps (`#161B22`, `#1C2128`). Box shadows MUST be very subtle when present; heavy drop shadows MUST NOT define structure."
+      ]
+    },
+    {
+      "requirement": "hover and selection states are subtle IDE-like",
+      "rules": [
+        "Hover MUST lighten panel backgrounds slightly without flashy animation. Selected list/tree items MUST use clear left-border accent and/or elevated background—not neon glow. Focus rings MAY use `accent.focus` (`#1F6FEB`)."
+      ]
+    },
+    {
+      "requirement": "motion is minimal and fast",
+      "rules": [
+        "Transitions MUST be minimal, fast, and IDE-like (**150ms–200ms**). Playful bounce, long easing, or decorative motion MUST NOT be default."
+      ]
+    },
+    {
+      "requirement": "tabs follow compact IDE horizontal chrome",
+      "rules": [
+        "Editor area tabs MUST be compact horizontal IDE tabs (closable when appropriate). Tab chrome MUST use elevated/active background (`#1C2128`) and border separators—not oversized pill tabs."
+      ]
+    },
+    {
+      "requirement": "sidebar follows VS Code Cursor tree patterns",
+      "rules": [
+        "Sidebars MUST implement workspace and change trees using a shared Studio tree composition in `@specd/ui`. The implementation MAY be backed by **`react-arborist`** or by shadcn/Radix-backed collapsible tree rows when a lighter hierarchy is sufficient. In both cases, trees MUST support collapsible nodes, optional status badges, selected-row highlight, and hover/active row chrome consistent with VS Code / Cursor file-tree behaviour."
+      ]
+    },
+    {
+      "requirement": "artifact and inspector surfaces feel like code tooling",
+      "rules": [
+        "Artifact and inspector panes MUST feel like a code editor / inspector: **`@monaco-editor/react`** for raw editing (`#0D1117` / `#111827`), GitHub-dark markdown preview for rendered markdown, and Git-style split diff for delta diff mode. These surfaces MUST NOT look like rich-text blog editors."
+      ]
+    },
+    {
+      "requirement": "bottom panel and status bar are IDE-native",
+      "rules": [
+        "The bottom panel (output, problems, logs, desktop terminal) MUST match IDE tool-window density and borders. Web shell bottom tabs MUST appear left-to-right as **Output**, **Problems**, **Logs**, with **Output** selected by default on mount. A thin status bar MUST show at minimum: workspace, branch (when available), API/server connection status, authentication details (for remote sessions), and active loading/activity status (with a rotating spinner when active)."
+      ]
+    },
+    {
+      "requirement": "semantic colors map to workflow states",
+      "rules": [
+        "Lifecycle and validation states MUST use the semantic palette: success green, warning amber, error red, lifecycle purple, info cyan—never ad hoc rainbow accents outside the token table."
+      ]
+    },
+    {
+      "requirement": "theme is centralized and mandatory for UI package",
+      "rules": [
+        "`packages/ui` MUST define a single theme module (e.g. `theme/tokens.css`, `globals.css`, Tailwind theme extension) imported at the application root (`SpecdApp`). Feature components MUST consume tokens via Tailwind utilities and CSS variables—not ad hoc hex in feature code."
+      ]
+    },
+    {
+      "requirement": "UI stack uses Tailwind Radix shadcn and named libraries",
+      "rules": [
+        "`@specd/ui` MUST build Studio chrome on this **v1 stack** (no alternate component library):\n\n| Concern            | Library                                                          | Usage                                                                                                  |\n| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |\n| Utility CSS        | **Tailwind CSS**                                                 | Layout, spacing, colors mapped to Studio tokens                                                        |\n| Primitives         | **Radix UI** / **Base UI**                                       | Accessible primitives via shadcn components (Dialog, Popover, Combobox, Tabs, etc.)                    |\n| Component kit      | **shadcn/ui**                                                    | Copied into `packages/ui/src/components/ui/`; re-themed to IDE density (not default marketing spacing) |\n| Variants           | **class-variance-authority** (`cva`)                             | Variant props on shared components                                                                     |\n| Class merging      | **tailwind-merge** (+ `clsx` or equivalent)                      | `cn()` helper in `lib/utils.ts`                                                                        |\n| Split layout       | **react-resizable-panels**                                       | Sidebar / editor / inspector / bottom splits                                                           |\n| Selection & Lists  | **cmdk** / **Base UI**                                           | Command palettes and advanced Combobox implementations                                                 |\n| Trees              | **`react-arborist`** or shadcn/Radix-backed tree wrappers        | Changes and workspace sidebars                                                                         |\n| Code editor        | **@monaco-editor/react** + **monaco-editor**                     | `ui:artifact-editor` and read-only inspectors                                                          |\n| Icons              | **lucide-react**                                                 | Navigation and toolbars                                                                                |\n| Terminal (desktop) | **xterm** (+ fit addon as needed) + **node-pty** in main process | `studio-desktop:bottom-panel-terminal` only                                                            |\n\nshadcn components MUST be customized (Tailwind theme + `cva`) to match this spec’s palette, radius, and density. Local names such as `StudioDialog` or sidebar/tree wrappers MUST be thin shadcn/Radix-backed adapters, not reimplemented primitives. Default shadcn “card dashboard” layouts MUST NOT be used for the shell.\n\nHosts (`studio-web`, `studio-desktop`) MUST configure Tailwind to scan `@specd/ui` sources (or consume a prebuilt UI stylesheet) so utilities compile correctly."
+      ]
+    },
+    {
+      "requirement": "confirmation modals use StudioDialog chrome",
+      "rules": [
+        "Blocking confirmations (unsaved edits, validate drift, save conflicts, and similar Studio modals) MUST use the shared **`StudioDialog`** shell in `@specd/ui` (`packages/ui/src/components/StudioDialog.tsx`), not ad hoc card overlays. `StudioDialog` MUST be implemented as a thin shadcn-backed wrapper around the `Dialog` primitive.\n\n- The viewport **backdrop** MUST **dim** the shell underneath with a semi-transparent scrim (e.g. `bg-black/50` or the shadcn `DialogOverlay` default). The scrim MUST NOT be a solid opaque layer that hides the workspace entirely.\n- The **dialog panel** MUST be **fully opaque**: solid `bg-background` (or `background.elevated` token) with `border.default`. The panel MUST NOT use `bg-background/40`, legacy `studio-card` translucency, or glassmorphism—only the panel is solid; the mask stays dimmed.\n- Feature specs (e.g. `ui:validate-confirm-dialog`, `ui:inspector-unsaved-draft`) define copy, buttons, and workflow; **presentation** MUST conform to this split.\n\nRadix/shadcn `Dialog` and `AlertDialog` primitives MUST be the underlying implementation for Studio confirmation flows, with `StudioDialog` enforcing consistent composition and density across the application."
+      ]
+    },
+    {
+      "requirement": "top bar exposes docs, notifications, and theme controls",
+      "rules": [
+        "The `StudioTopBar` component MUST expose three control buttons on the right side:\n\n1. **Docs** (`BookOpenText`): Redirects/opens the native browser to `https://getspecd.dev/docs/guide/getting-started`.\n2. **Notifications** (`Bell`): Shows a popover with project health checks: change overlaps/conflicts, stale graph warnings, and spec validation failures. Displays a red badge when any issues are active.\n3. **Appearance** (`SunMedium` / `Moon`): Toggles between light and dark visual themes. Persists selection in user storage."
+      ]
+    }
+  ],
+  "constraints": [
+    "v1 supports both light and dark theme modes via a toggle in the top bar.",
+    "Theme tokens are presentation-only; they MUST NOT import @specd/core.",
+    "Reference draft specd-studio-api-and-ui.md MAY illustrate layouts; this spec wins on colors, density, and anti-patterns."
+  ],
+  "scenarios": [
+    {
+      "requirement": "visual identity is serious technical and high-density",
+      "name": "Root layout uses panel chrome not marketing cards",
+      "when": ["SpecdApp renders the main workspace"],
+      "then": [
+        "primary structure is sidebar + tab editor + inspector + bottom host",
+        "AND no hero or KPI card grid is the main layout"
+      ]
+    },
+    {
+      "requirement": "visual identity is serious technical and high-density",
+      "name": "Default density is IDE-tight",
+      "when": ["shell sidebars and tab strip are measured in Storybook or screenshot test"],
+      "then": [
+        "vertical rhythm matches compact IDE spacing",
+        "AND whitespace is not marketing-loose"
+      ]
+    },
+    {
+      "requirement": "visual identity is serious technical and high-density",
+      "name": "Playful dashboard motifs are absent",
+      "when": ["UI surfaces are reviewed against design-system anti-patterns"],
+      "then": [
+        "no oversized rounded cards dominate the home view",
+        "AND no cartoon illustration set is used for navigation"
+      ]
+    },
+    {
+      "requirement": "layout is panel-based IDE chrome not card dashboards",
+      "name": "Resizable split regions use react-resizable-panels",
+      "when": ["user adjusts sidebar or inspector width"],
+      "then": [
+        "PanelGroup / PanelResizeHandle from react-resizable-panels (via shadcn Resizable) drives the split",
+        "AND layout remains panel-based"
+      ]
+    },
+    {
+      "requirement": "layout is panel-based IDE chrome not card dashboards",
+      "name": "Bottom panel is a tool window host",
+      "when": ["shell mounts with bottom panel visible"],
+      "then": [
+        "bottom region uses IDE tool-window chrome",
+        "AND default tab is Output",
+        "AND layout is not a floating marketing modal"
+      ]
+    },
+    {
+      "requirement": "layout is panel-based IDE chrome not card dashboards",
+      "name": "Status bar is a thin strip",
+      "when": ["shell is fully mounted"],
+      "then": [
+        "a bottom status bar is visible",
+        "AND height is thin (IDE-style, not a footer section)"
+      ]
+    },
+    {
+      "requirement": "color tokens use the Studio dark palette",
+      "name": "Theme module exports primary background token",
+      "when": ["theme tokens are read from @specd/ui theme module"],
+      "then": [
+        "background.primary resolves to #0D1117",
+        "AND components reference the token not a divergent hex"
+      ]
+    },
+    {
+      "requirement": "color tokens use the Studio dark palette",
+      "name": "Semantic colors match spec table",
+      "when": ["success warning error lifecycle info tokens are inspected"],
+      "then": ["values are #3FB950, #D29922, #F85149, #A371F7, #39C5CF respectively"]
+    },
+    {
+      "requirement": "color tokens use the Studio dark palette",
+      "name": "Glass and neumorphism styles are not applied",
+      "when": ["global styles are scanned"],
+      "then": [
+        "no backdrop-filter glass panels are required for chrome",
+        "AND no inset neumorphic shadows on primary panels"
+      ]
+    },
+    {
+      "requirement": "spacing is tight and border radius is small",
+      "name": "Interactive controls use at most 8px radius",
+      "when": ["buttons tabs and panel corners are inspected"],
+      "then": ["border-radius is between 4px and 8px", "AND no default 16px+ card radius on chrome"]
+    },
+    {
+      "requirement": "spacing is tight and border radius is small",
+      "name": "Padding follows compact scale",
+      "when": ["sidebar row and tab strip padding are measured"],
+      "then": [
+        "values align with documented compact spacing scale",
+        "AND not desktop-marketing loose padding"
+      ]
+    },
+    {
+      "requirement": "spacing is tight and border radius is small",
+      "name": "Adding pill-card radius fails review",
+      "when": ["contributor sets 24px radius on shell panels"],
+      "then": [
+        "visual regression or design review flags the change",
+        "AND tokens must be used instead"
+      ]
+    },
+    {
+      "requirement": "typography is technical and compact",
+      "name": "UI font stack is technical sans",
+      "when": ["shell typography CSS is inspected"],
+      "then": [
+        "sans family is Inter Geist SF Pro or IBM Plex Sans stack",
+        "AND body size is compact not hero-sized"
+      ]
+    },
+    {
+      "requirement": "typography is technical and compact",
+      "name": "Editor surfaces use monospace",
+      "when": ["artifact raw editor mounts"],
+      "then": [
+        "font family includes JetBrains Mono or equivalent",
+        "AND line height suits code density"
+      ]
+    },
+    {
+      "requirement": "typography is technical and compact",
+      "name": "Headings do not dominate viewport",
+      "when": ["change overview tab renders"],
+      "then": [
+        "heading scale stays within compact hierarchy",
+        "AND no marketing H1 dominates the pane"
+      ]
+    },
+    {
+      "requirement": "icons are minimal outline style",
+      "name": "Navigation uses lucide-react icons",
+      "when": ["sidebar and command palette icons render"],
+      "then": ["icons import from lucide-react", "AND not filled cartoon sets"]
+    },
+    {
+      "requirement": "icons are minimal outline style",
+      "name": "Icon size is compact",
+      "when": ["tree rows render icons"],
+      "then": ["icon box matches IDE density (~16px class)", "AND not oversized decorative glyphs"]
+    },
+    {
+      "requirement": "icons are minimal outline style",
+      "name": "Replacing icons with emoji nav fails guideline",
+      "when": ["contributor uses emoji as primary nav icons"],
+      "then": ["change is rejected in review", "AND Lucide equivalents must be used"]
+    },
+    {
+      "requirement": "elevation uses borders and contrast not heavy shadows",
+      "name": "Panels separate with border color",
+      "when": ["sidebar meets editor area"],
+      "then": ["separator uses #30363D border token", "AND not a heavy drop shadow gutter"]
+    },
+    {
+      "requirement": "elevation uses borders and contrast not heavy shadows",
+      "name": "Active pane uses elevated background",
+      "when": ["user focuses editor pane"],
+      "then": ["background may use #1C2128", "AND shadow if any is subtle"]
+    },
+    {
+      "requirement": "elevation uses borders and contrast not heavy shadows",
+      "name": "Heavy shadow cards are not default",
+      "when": ["inspector panel styles are inspected"],
+      "then": [
+        "box-shadow is none or minimal on static chrome",
+        "AND structure does not rely on 24px blur cards"
+      ]
+    },
+    {
+      "requirement": "hover and selection states are subtle IDE-like",
+      "name": "Tree selection uses left accent",
+      "when": ["user selects a change in sidebar"],
+      "then": ["row shows elevated background or left border accent", "AND not neon outer glow"]
+    },
+    {
+      "requirement": "hover and selection states are subtle IDE-like",
+      "name": "Hover lightens panel slightly",
+      "when": ["pointer hovers sidebar row"],
+      "then": ["background shifts one elevation step", "AND no scale-bounce animation"]
+    },
+    {
+      "requirement": "hover and selection states are subtle IDE-like",
+      "name": "Focus ring uses focus blue token",
+      "when": ["keyboard focus moves to a control"],
+      "then": ["focus indicator may use #1F6FEB", "AND remains visible without glow bloom"]
+    },
+    {
+      "requirement": "motion is minimal and fast",
+      "name": "Default transition duration within 150-200ms",
+      "when": ["theme motion tokens are read"],
+      "then": [
+        "standard UI transition is 150ms–200ms",
+        "AND not 500ms+ decorative easing by default"
+      ]
+    },
+    {
+      "requirement": "motion is minimal and fast",
+      "name": "Tab switch does not bounce",
+      "when": ["user changes editor tab"],
+      "then": ["content swap has no bounce animation", "AND optional fade is ≤200ms"]
+    },
+    {
+      "requirement": "motion is minimal and fast",
+      "name": "Long playful motion is opt-out of defaults",
+      "when": ["global animation stylesheet is scanned"],
+      "then": [
+        "no bounce or spring keyframes on shell chrome by default",
+        "AND IDE-fast transitions only"
+      ]
+    },
+    {
+      "requirement": "tabs follow compact IDE horizontal chrome",
+      "name": "Tab strip is horizontal and compact",
+      "when": ["multiple artifacts are open"],
+      "then": [
+        "tabs render in a horizontal strip",
+        "AND height matches IDE tab bar not browser pill tabs"
+      ]
+    },
+    {
+      "requirement": "tabs follow compact IDE horizontal chrome",
+      "name": "Active tab uses elevated background",
+      "when": ["a tab is selected"],
+      "then": [
+        "active tab background uses elevated token",
+        "AND inactive tabs sit on secondary background"
+      ]
+    },
+    {
+      "requirement": "tabs follow compact IDE horizontal chrome",
+      "name": "Closable tabs show close affordance",
+      "when": ["tab is closable per shell rules"],
+      "then": ["close control is compact on the tab row", "AND not a large floating chip"]
+    },
+    {
+      "requirement": "sidebar follows VS Code Cursor tree patterns",
+      "name": "Tree nodes collapse and expand via shared Studio tree composition",
+      "when": ["workspace tree has nested specs"],
+      "then": [
+        "tree renders through the shared Studio tree wrapper",
+        "AND chevron toggles collapse state and children hide when collapsed"
+      ]
+    },
+    {
+      "requirement": "sidebar follows VS Code Cursor tree patterns",
+      "name": "Selected row is clearly highlighted",
+      "when": ["user selects a tree item"],
+      "then": ["highlight matches design-system selection rules", "AND persists while selected"]
+    },
+    {
+      "requirement": "sidebar follows VS Code Cursor tree patterns",
+      "name": "Row actions appear on hover",
+      "when": ["pointer hovers a tree row with actions"],
+      "then": [
+        "secondary actions may reveal",
+        "AND default row stays dense without always-on buttons"
+      ]
+    },
+    {
+      "requirement": "artifact and inspector surfaces feel like code tooling",
+      "name": "Raw editor uses dark code background",
+      "when": ["artifact opens in raw mode"],
+      "then": ["editor background is #0D1117 or #111827", "AND Monaco-like chrome is used"]
+    },
+    {
+      "requirement": "artifact and inspector surfaces feel like code tooling",
+      "name": "Markdown preview uses GitHub dark styling",
+      "when": ["markdown preview renders"],
+      "then": ["prose colors match GitHub dark markdown aesthetic", "AND not a bright blog theme"]
+    },
+    {
+      "requirement": "artifact and inspector surfaces feel like code tooling",
+      "name": "Diff mode uses split diff layout",
+      "when": ["delta full diff is shown"],
+      "then": ["split diff presentation is available", "AND aligns with Git diff visual language"]
+    },
+    {
+      "requirement": "bottom panel and status bar are IDE-native",
+      "name": "Bottom panel tabs match tool window style",
+      "when": ["user inspects the bottom tab strip on mount"],
+      "then": [
+        "tab order is Output, Problems, Logs",
+        "AND Output is selected by default",
+        "AND bottom chrome uses IDE tab strip styling from design tokens"
+      ]
+    },
+    {
+      "requirement": "bottom panel and status bar are IDE-native",
+      "name": "Status bar shows workspace and connection fields",
+      "when": ["project is connected"],
+      "then": ["status bar shows workspace label", "AND API or server status indicator"]
+    },
+    {
+      "requirement": "bottom panel and status bar are IDE-native",
+      "name": "Status bar shows authentication and loading activity",
+      "when": ["project connection requires auth or a background task runs"],
+      "then": [
+        "status bar reflects authentication type for remote sessions",
+        "AND shows active loading status with spinner when loading is active"
+      ]
+    },
+    {
+      "requirement": "semantic colors map to workflow states",
+      "name": "Error state uses error red token",
+      "when": ["validation reports blocking error"],
+      "then": ["UI accent for error is #F85149", "AND not an off-palette pink"]
+    },
+    {
+      "requirement": "semantic colors map to workflow states",
+      "name": "Lifecycle state uses purple accent",
+      "when": ["change state badge renders designing or ready"],
+      "then": ["lifecycle accent may use #A371F7", "AND consistent across sidebars and tabs"]
+    },
+    {
+      "requirement": "semantic colors map to workflow states",
+      "name": "Success toast or badge uses green token",
+      "when": ["save succeeds"],
+      "then": ["success feedback uses #3FB950", "AND not arbitrary teal unless info semantic"]
+    },
+    {
+      "requirement": "theme is centralized and mandatory for UI package",
+      "name": "SpecdApp imports theme at root",
+      "when": ["application bundle loads"],
+      "then": [
+        "theme module is imported once at SpecdApp root",
+        "AND CSS variables apply to document or app root"
+      ]
+    },
+    {
+      "requirement": "theme is centralized and mandatory for UI package",
+      "name": "Feature components use tokens not stray hex",
+      "when": ["a random UI component stylesheet is sampled"],
+      "then": [
+        "colors reference var(--studio-*) or exported token constants",
+        "AND raw hex duplicates are limited to theme definition files"
+      ]
+    },
+    {
+      "requirement": "theme is centralized and mandatory for UI package",
+      "name": "Theme module has no core dependency",
+      "when": ["@specd/ui dependency graph is inspected"],
+      "then": ["theme module does not import @specd/core", "AND remains presentation-only"]
+    },
+    {
+      "requirement": "UI stack uses Tailwind Radix shadcn and named libraries",
+      "name": "package.json declares the v1 UI stack",
+      "when": ["@specd/ui dependencies are inspected"],
+      "then": [
+        "tailwindcss, class-variance-authority, tailwind-merge, lucide-react, react-resizable-panels (via shadcn Resizable), and @monaco-editor/react are present",
+        "AND tree composition is implemented either with react-arborist or shared shadcn/Radix-backed wrappers",
+        "AND Radix packages required by shadcn components are present"
+      ]
+    },
+    {
+      "requirement": "UI stack uses Tailwind Radix shadcn and named libraries",
+      "name": "shadcn components live under components ui",
+      "when": ["repository layout is inspected"],
+      "then": [
+        "shadcn primitives exist under packages/ui/src/components/ui/",
+        "AND lib/utils.ts exports cn() using tailwind-merge"
+      ]
+    },
+    {
+      "requirement": "UI stack uses Tailwind Radix shadcn and named libraries",
+      "name": "shadcn chrome is re-themed to IDE tokens",
+      "when": ["Button Tabs and Dialog samples are rendered"],
+      "then": [
+        "Tailwind classes resolve to Studio dark palette density",
+        "AND default shadcn card-dashboard marketing layout is not used for shell"
+      ]
+    },
+    {
+      "requirement": "confirmation modals use StudioDialog chrome",
+      "name": "StudioDialog backdrop dims but does not fully hide the shell",
+      "when": ["a blocking confirmation modal (unsaved or validate) is open"],
+      "then": [
+        "the scrim uses semi-transparent black (e.g. bg-black/50)",
+        "AND underlying sidebar or editor remains visibly dimmed, not replaced by a solid black sheet"
+      ]
+    },
+    {
+      "requirement": "confirmation modals use StudioDialog chrome",
+      "name": "StudioDialog panel is opaque",
+      "when": ["the confirmation panel renders"],
+      "then": [
+        "panel background is solid bg-background (or elevated token)",
+        "AND not bg-background/40 or other translucent card styling on the panel itself"
+      ]
+    },
+    {
+      "requirement": "confirmation modals use StudioDialog chrome",
+      "name": "Feature modals reuse StudioDialog",
+      "when": ["ValidateConfirmDialog or UnsavedChangesDialog mounts"],
+      "then": [
+        "both compose StudioDialog for chrome",
+        "AND do not implement a separate translucent panel shell"
+      ]
+    },
+    {
+      "requirement": "flat spec id lists sort ascending",
+      "name": "sortSpecIds orders workspace-qualified ids",
+      "when": ["sortSpecIds(['ui:z', 'core:a', 'api:m']) is called"],
+      "then": ["result is ['api:m', 'core:a', 'ui:z']"]
+    },
+    {
+      "requirement": "flat spec id lists sort ascending",
+      "name": "sortSpecIds does not mutate input",
+      "given": ["input array ['b', 'a']"],
+      "when": ["sortSpecIds runs"],
+      "then": ["input remains ['b', 'a'] and output is ['a', 'b']"]
+    },
+    {
+      "requirement": "flat spec id lists sort ascending",
+      "name": "Overview scope list follows design-system order",
+      "given": ["ChangeSpecsReadonlyPanel with specIds ['ui:z', 'core:a']"],
+      "when": ["panel renders"],
+      "then": ["rows appear as core:a then ui:z"]
+    },
+    {
+      "requirement": "flat spec id lists sort ascending",
+      "name": "Scope dialog cards follow design-system order",
+      "given": ["draft scope ['ui:z', 'api:m', 'core:a'] in studio-change-scope-spec-cards"],
+      "when": ["dialog shows the edit step"],
+      "then": ["card headers appear api:m, core:a, ui:z"]
+    },
+    {
+      "requirement": "top bar exposes docs, notifications, and theme controls",
+      "name": "Docs button links to getting-started guide",
+      "when": ["user clicks on Docs button"],
+      "then": [
+        "app redirects or opens default browser to https://getspecd.dev/docs/guide/getting-started"
+      ]
+    },
+    {
+      "requirement": "top bar exposes docs, notifications, and theme controls",
+      "name": "Notifications popover displays health checks and conflicts",
+      "given": ["stale graph index is true or change overlaps are detected"],
+      "when": ["user clicks on Notifications button"],
+      "then": [
+        "popover renders showing active warnings",
+        "AND indicator badge is visible on notifications button"
+      ]
+    },
+    {
+      "requirement": "top bar exposes docs, notifications, and theme controls",
+      "name": "Appearance button toggles theme between light and dark",
+      "when": ["user clicks on Appearance button"],
+      "then": [
+        "visual theme toggles between light and dark modes",
+        "AND preference is persisted in user storage"
+      ]
+    },
+    {
+      "requirement": "top bar exposes docs, notifications, and theme controls",
+      "name": "Stored theme preference is applied synchronously at startup",
+      "given": ["a stored theme preference (e.g. light) in user storage"],
+      "when": ["the host application bootstraps (web or desktop)"],
+      "then": [
+        "the stored theme class (e.g. light) is applied to document.documentElement immediately",
+        "AND UI elements like the loading screen and project dialog render in the correct theme without a flash"
+      ]
+    },
+    {
+      "requirement": "top bar exposes docs, notifications, and theme controls",
+      "name": "Background validation checks are deferred at startup",
+      "given": ["the top bar is rendered during project loading or initial startup"],
+      "when": ["the component mounts"],
+      "then": [
+        "overlaps and closed-spec validations are not invoked immediately",
+        "AND the checks remain disabled until the loading phase completes and a 3-second delay has elapsed"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "ui:design-system",
+        "file": "ui:src/styles/globals.css"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "ui:design-system",
+        "file": "ui:src/shell/StatusBar.tsx",
+        "symbol": "StatusBar"
+      },
+      {
+        "specId": "ui:design-system",
+        "file": "ui:src/shell/StudioTopBar.tsx",
+        "symbol": "StudioTopBar"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:97f9cea033484906d19115fb7cf4d3c6a6b40d2a08e955a62c478278235615e4",
+    "verify.md": "sha256:28e52807c8d54a2410709dca29514c3b764d8a1c6bf2403a6bf54b69b01695ae"
+  },
+  "generatedBy": "core",
+  "dependsOn": []
+}

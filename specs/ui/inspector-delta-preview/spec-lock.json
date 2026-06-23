@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:preview-artifact-overrides",
+    "ui:inspector-unsaved-draft",
+    "client:specd-data-port"
+  ],
+  "implementation": []
+}

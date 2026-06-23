@@ -1,0 +1,100 @@
+{
+  "title": "Hooks Inspector Save",
+  "description": "React data hooks for **Hooks Inspector Save**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports.",
+  "dependsOn": ["client:specd-data-port", "client:port-changes-mutate"],
+  "context": [
+    "React data hooks for **Hooks Inspector Save**: loading state, error propagation, and polling rules for `SpecdDataPort`. Hooks keep components free of transport details and `@specd/core` imports."
+  ],
+  "rules": [
+    {
+      "requirement": "save hook sends content originalHash and optional force",
+      "rules": [
+        "Save MUST call `saveChangeArtifact` with the editor buffer, the last `originalHash` from GET, and `force: true` only after explicit user confirmation when approvals are active."
+      ]
+    },
+    {
+      "requirement": "save hook shows conflict UI on HTTP 409",
+      "rules": [
+        "On `ArtifactConflictError`, the hook MUST stop spinners and present conflict resolution UI without discarding local edits silently."
+      ]
+    },
+    {
+      "requirement": "successful save triggers artifact and status refetch",
+      "rules": [
+        "After success, the hook MUST refetch artifact content and preview and signal `ui:hooks-changes-read` to refresh status immediately."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "save hook sends content originalHash and optional force",
+      "name": "Save sends content and originalHash",
+      "given": ["editor has buffer and last GET hash"],
+      "when": ["user clicks Save"],
+      "then": ["saveChangeArtifact receives content and hash", "AND force is false by default"]
+    },
+    {
+      "requirement": "save hook sends content originalHash and optional force",
+      "name": "Force save only after explicit confirm",
+      "given": ["active approval guard blocks save"],
+      "when": ["user confirms force in dialog"],
+      "then": ["save includes force: true", "AND guard error is not shown again"]
+    },
+    {
+      "requirement": "save hook sends content originalHash and optional force",
+      "name": "Successful save triggers refetch",
+      "when": ["save returns new updatedAt"],
+      "then": ["artifact content refetches", "AND changes-read status refresh is signaled"]
+    },
+    {
+      "requirement": "save hook shows conflict UI on HTTP 409",
+      "name": "409 opens conflict dialog",
+      "when": ["save returns HTTP 409"],
+      "then": ["dialog offers reload or force", "AND buffer not overwritten silently"]
+    },
+    {
+      "requirement": "save hook shows conflict UI on HTTP 409",
+      "name": "Reload discards local buffer",
+      "when": ["user chooses reload server"],
+      "then": ["artifact refetched", "AND editor content replaced"]
+    },
+    {
+      "requirement": "save hook shows conflict UI on HTTP 409",
+      "name": "Force requires explicit confirm",
+      "when": ["user chooses force save"],
+      "then": ["save retried with force: true", "AND guard satisfied"]
+    },
+    {
+      "requirement": "successful save triggers artifact and status refetch",
+      "name": "Save success refetches artifact",
+      "when": ["save returns new revision"],
+      "then": ["getChangeArtifact runs", "AND editor hash updated"]
+    },
+    {
+      "requirement": "successful save triggers artifact and status refetch",
+      "name": "Status hook signaled after save",
+      "when": ["save completes"],
+      "then": ["change status refetch scheduled", "AND tabs see new updatedAt"]
+    },
+    {
+      "requirement": "successful save triggers artifact and status refetch",
+      "name": "Dirty flag cleared on success",
+      "when": ["save succeeds"],
+      "then": ["editor marks clean", "AND close prompt will not block"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:hooks-inspector-save",
+        "file": "ui:src/hooks/use-change-artifact.ts",
+        "symbol": "useChangeArtifact"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:a06ebfc71342db60d654469f73e7eb896c43a18063017eef96d1293e745e15d7",
+    "verify.md": "sha256:0cba103e5b55ad239c27f97049248421b5ab3693510c06823091ee8e5b005b88"
+  },
+  "generatedBy": "core"
+}

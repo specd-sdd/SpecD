@@ -1,0 +1,128 @@
+{
+  "title": "Adapter Api Actor Resolver",
+  "description": "HTTP handlers record `by` on history events through `ActorResolver`, but authenticated deployments will attach an `ApiActor` per request. This adapter is the bridge: with `disabled` it forwards to the kernel resolver; with a future auth type it maps `ApiActor` into `ActorIdentity` deterministically.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "HTTP handlers record `by` on history events through `ActorResolver`, but authenticated deployments will attach an `ApiActor` per request. This adapter is the bridge: with `disabled` it forwards to the kernel resolver; with a future auth type it maps `ApiActor` into `ActorIdentity` deterministically."
+  ],
+  "rules": [
+    {
+      "requirement": "disabled auth delegates to the kernel ActorResolver",
+      "rules": [
+        "When effective `api.auth.type` is `disabled`, the adapter MUST implement `ActorResolver` by forwarding `resolve()` to the `ActorResolver` instance supplied at server bootstrap. It MUST NOT read `Authorization` headers and MUST NOT fabricate identity from HTTP metadata."
+      ]
+    },
+    {
+      "requirement": "authenticated requests map ApiActor to ActorIdentity",
+      "rules": [
+        "When request context carries an `ApiActor` from a registered verifier (future auth types), the adapter MUST map `id`, `name`, `email`, and optional `roles` into the `ActorIdentity` fields used by change history. The mapping MUST be deterministic for a given `ApiActor` payload."
+      ]
+    },
+    {
+      "requirement": "one resolved actor per HTTP request",
+      "rules": [
+        "The adapter MUST resolve actor at most once per request and return the same identity for every mutating kernel call in that request."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "disabled auth delegates to the kernel ActorResolver",
+      "name": "Disabled auth forwards to bootstrap ActorResolver",
+      "given": ["api.auth.type is disabled"],
+      "when": ["HTTP handler resolves actor for a mutating request"],
+      "then": [
+        "adapter resolve() delegates to the kernel ActorResolver",
+        "AND no Authorization header is read"
+      ]
+    },
+    {
+      "requirement": "disabled auth delegates to the kernel ActorResolver",
+      "name": "Git-configured actor is used for history",
+      "given": ["git user.name and user.email are configured"],
+      "when": ["SaveChangeArtifact records history on the request"],
+      "then": ["history by matches git identity", "AND no synthetic API actor is created"]
+    },
+    {
+      "requirement": "disabled auth delegates to the kernel ActorResolver",
+      "name": "Same actor for multiple mutations in one request",
+      "given": ["one HTTP request performs two kernel writes"],
+      "when": ["actor is resolved twice via the adapter"],
+      "then": ["both resolutions return the same identity"]
+    },
+    {
+      "requirement": "authenticated requests map ApiActor to ActorIdentity",
+      "name": "ApiActor maps to history fields",
+      "given": ["request context carries ApiActor { id, name, email }"],
+      "when": ["adapter resolves actor for a mutating call"],
+      "then": [
+        "ActorIdentity uses the same name and email",
+        "AND mapping is stable for identical input"
+      ]
+    },
+    {
+      "requirement": "authenticated requests map ApiActor to ActorIdentity",
+      "name": "Optional roles are preserved when present",
+      "given": ["ApiActor includes roles: [\"admin\"]"],
+      "when": ["adapter maps to ActorIdentity"],
+      "then": [
+        "roles are available to future authorization checks",
+        "AND history still uses name/email"
+      ]
+    },
+    {
+      "requirement": "authenticated requests map ApiActor to ActorIdentity",
+      "name": "Different ApiActor yields different identity",
+      "given": ["two requests with different ApiActor payloads"],
+      "when": ["each request resolves actor independently"],
+      "then": ["history by differs per request", "AND adapter does not cache across requests"]
+    },
+    {
+      "requirement": "one resolved actor per HTTP request",
+      "name": "First resolve is cached for the request",
+      "when": ["adapter resolve() is called twice in the same request scope"],
+      "then": [
+        "both calls return the same object identity or equal fields",
+        "AND kernel sees consistent by"
+      ]
+    },
+    {
+      "requirement": "one resolved actor per HTTP request",
+      "name": "New request gets fresh resolution",
+      "given": ["two sequential HTTP requests"],
+      "when": ["each request resolves actor at handler entry"],
+      "then": ["resolutions are independent", "AND no leakage of actor between requests"]
+    },
+    {
+      "requirement": "one resolved actor per HTTP request",
+      "name": "Concurrent requests do not share actor cache",
+      "given": ["two in-flight HTTP requests"],
+      "when": ["each resolves actor concurrently"],
+      "then": [
+        "each resolution uses its own request context",
+        "AND identities do not cross streams"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:adapter-api-actor-resolver",
+        "file": "api:src/infrastructure/auth/api-actor-resolver.ts",
+        "symbol": "ApiActorResolver"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:6d7e223b3db2b4188e419fc437e8a2e839276fe9be83cc9cdf0100eb7147508c",
+    "verify.md": "sha256:17bfc5a942fb7394418121d25074295f37242db604c32d6c76d093a300b56dc3"
+  },
+  "generatedBy": "core"
+}

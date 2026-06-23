@@ -10,6 +10,18 @@ Users and tooling need a quick way to see where a change stands — both its lif
 
 `GetStatus.execute()` MUST accept a `GetStatusInput` containing a `name` string that identifies the change to look up.
 
+### Requirement: Optional ifModifiedSince short-circuit
+
+`GetStatusInput` MAY include **`ifModifiedSince`** (ISO 8601).
+
+When provided and it is greater than or equal to the change's current **`updatedAt`**, `execute()` MUST return a result that includes at least `updatedAt` and **`unchanged: true`** without building the full artifact DAG.
+
+When the change is newer than `ifModifiedSince`, `unchanged` MUST be false or omitted and the full status payload MUST be returned.
+
+### Requirement: Exposes updatedAt
+
+`GetStatusResult` MUST expose the change's **`updatedAt`** on the change projection so API, CLI, and Studio share one revision clock for tab polling.
+
 ### Requirement: Returns the change and its artifact statuses
 
 On success, `execute()` MUST return a `GetStatusResult` containing:

@@ -1,0 +1,129 @@
+{
+  "title": "Auth Adapter Registry",
+  "description": "Remote Studio may later require real credentials, but v1 ships with auth disabled on loopback. The registry keeps route handlers ignorant of verifier implementations: built-ins and plugins register by `type`, and composition resolves the active adapter from `specd.yaml` before the server accepts traffic.",
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "context": [
+    "Remote Studio may later require real credentials, but v1 ships with auth disabled on loopback. The registry keeps route handlers ignorant of verifier implementations: built-ins and plugins register by `type`, and composition resolves the active adapter from `specd.yaml` before the server accepts traffic."
+  ],
+  "rules": [
+    {
+      "requirement": "registry supports register and resolve by auth type",
+      "rules": [
+        "The module MUST export `register(type: string, factory: AuthAdapterFactory)` and `resolve(type: string, config?: unknown): ApiTokenVerifier`. Each factory receives server bootstrap context including `ActorResolver`."
+      ]
+    },
+    {
+      "requirement": "default registry registers only disabled in v1",
+      "rules": [
+        "`defaultAuthAdapterRegistry()` MUST register exactly one built-in type: `disabled` mapped to `adapter-auth-disabled`. Resolving any other type MUST throw before the HTTP server listens."
+      ]
+    },
+    {
+      "requirement": "createApiServer resolves verifier once at startup",
+      "rules": [
+        "`createApiServer` MUST accept an optional injected registry (tests) or use the default, call `resolve(effectiveAuth.type, effectiveAuth.config)` once, and pass the verifier to `middleware-auth`."
+      ]
+    }
+  ],
+  "constraints": [
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
+  "scenarios": [
+    {
+      "requirement": "registry supports register and resolve by auth type",
+      "name": "Register then resolve returns verifier",
+      "when": ["register(\"disabled\", factory) then resolve(\"disabled\")"],
+      "then": [
+        "factory receives bootstrap context",
+        "AND returned object implements ApiTokenVerifier"
+      ]
+    },
+    {
+      "requirement": "registry supports register and resolve by auth type",
+      "name": "Unknown type throws at resolve",
+      "when": ["resolve(\"jwt\") runs against v1 default registry"],
+      "then": ["error is thrown before listen", "AND message identifies unknown auth type"]
+    },
+    {
+      "requirement": "registry supports register and resolve by auth type",
+      "name": "Injected registry is used in tests",
+      "given": ["test passes custom registry with stub verifier"],
+      "when": ["createApiServer starts"],
+      "then": ["stub verifier is wired to middleware", "AND default registry is not used"]
+    },
+    {
+      "requirement": "default registry registers only disabled in v1",
+      "name": "Default registry lists only disabled",
+      "when": ["defaultAuthAdapterRegistry() is inspected"],
+      "then": ["exactly one built-in type is registered", "AND type key is disabled"]
+    },
+    {
+      "requirement": "default registry registers only disabled in v1",
+      "name": "Resolve disabled returns disabled adapter",
+      "when": ["resolve(\"disabled\") is called at startup"],
+      "then": ["verifier is adapter-auth-disabled implementation", "AND server can start"]
+    },
+    {
+      "requirement": "default registry registers only disabled in v1",
+      "name": "Resolving bearer fails in v1",
+      "when": ["resolve(\"bearer\") is called on default registry"],
+      "then": ["throws before HTTP listens", "AND CLI --auth bearer is already rejected"]
+    },
+    {
+      "requirement": "createApiServer resolves verifier once at startup",
+      "name": "Verifier is fixed for process lifetime",
+      "given": ["server started with api.auth.type: disabled"],
+      "when": ["two requests hit middleware"],
+      "then": ["same verifier instance is used", "AND middleware does not re-resolve per request"]
+    },
+    {
+      "requirement": "createApiServer resolves verifier once at startup",
+      "name": "Effective auth comes from specd.yaml merge",
+      "given": ["specd.yaml sets api.auth.type", "AND CLI passes --auth disabled"],
+      "when": ["createApiServer boots"],
+      "then": ["merged effective type is disabled", "AND resolve uses that type once"]
+    },
+    {
+      "requirement": "createApiServer resolves verifier once at startup",
+      "name": "Verifier passed to middleware-auth",
+      "when": ["HTTP server finishes composition"],
+      "then": [
+        "middleware constructor receives startup verifier",
+        "AND handlers do not construct verifiers"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:auth-adapter-registry",
+        "file": "api:src/application/auth/auth-adapter-registry.ts",
+        "symbol": "AuthAdapterBootstrapContext"
+      },
+      {
+        "specId": "api:auth-adapter-registry",
+        "file": "api:src/application/auth/auth-adapter-registry.ts",
+        "symbol": "AuthAdapterFactory"
+      },
+      {
+        "specId": "api:auth-adapter-registry",
+        "file": "api:src/application/auth/auth-adapter-registry.ts",
+        "symbol": "AuthAdapterRegistry"
+      },
+      {
+        "specId": "api:auth-adapter-registry",
+        "file": "api:src/composition/default-auth-registry.ts",
+        "symbol": "defaultAuthAdapterRegistry"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:f46c6c50502bb57472b99e8799f0b4854fa545dbcb95112162d70e0269f5a40d",
+    "verify.md": "sha256:35d49138f136d4cc52afdbbe8c48d2065215de665b358a18d5f802c8686dda9d"
+  },
+  "generatedBy": "core"
+}

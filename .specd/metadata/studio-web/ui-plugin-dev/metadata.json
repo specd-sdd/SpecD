@@ -1,0 +1,70 @@
+{
+  "title": "studio-web:ui-plugin-dev",
+  "description": "Monorepo contributors need hot-reload Studio without rebuilding `dist/` on every UI change. `@specd/studio-web` is a **own-server** UI plugin (`hasServer() === true`): it runs its own Vite HTTP server during `specd ui serve` while the API stays on the CLI listen port.",
+  "dependsOn": ["plugin-manager:ui-plugin-type", "cli:serve-ui", "studio-web:vite-host"],
+  "context": [
+    "Monorepo contributors need hot-reload Studio without rebuilding `dist/` on every UI change. `@specd/studio-web` is a **own-server** UI plugin (`hasServer() === true`): it runs its own Vite HTTP server during `specd ui serve` while the API stays on the CLI listen port."
+  ],
+  "rules": [
+    {
+      "requirement": "package is a UI plugin",
+      "rules": ["The package MUST ship `specd-plugin.json` with `pluginType: \"ui\"`."]
+    },
+    {
+      "requirement": "create returns own-server UiPlugin",
+      "rules": [
+        "`create()` MUST return `createServerUiPlugin` from `@specd/plugin-manager` with:\n\n- `hasServer() === true` (plugin-owned UI server; manifest MUST NOT declare `staticDir` for serving)\n- `serverPort` default `5174` and `getServerUrl()` `http://127.0.0.1:5174`\n- Manifest `name` / `version` loaded from `specd-plugin.json`"
+      ]
+    },
+    {
+      "requirement": "init starts Vite with API base",
+      "rules": [
+        "After the API is listening, `specd ui serve` MUST call `init` with `UiServeContext.apiBaseUrl` ending in `/v1`.\n\n`init` MUST spawn Vite (`pnpm exec vite --port <port> --strictPort`) in the package root and MUST set `SPECD_API_BASE_URL` in the child environment when `apiBaseUrl` is provided.\n\n`destroy` MUST terminate the Vite child process."
+      ]
+    },
+    {
+      "requirement": "own-server vs embedded bundle selection",
+      "rules": [
+        "Projects MUST choose exactly one active UI plugin via `plugins.ui[0]`:\n\n- Own server (Vite): `@specd/studio-web` (this spec)\n- Embedded bundle (`staticDir` / API origin): `@specd/plugin-ui-studio` (`plugin-ui-studio:bundle-plugin`)\n\nThe CLI MUST NOT expose a `--dev` flag; switching plugins is configuration-only."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "package is a UI plugin",
+      "name": "Manifest declares ui type",
+      "when": ["apps/specd-studio-web/specd-plugin.json is read"],
+      "then": ["pluginType is ui"]
+    },
+    {
+      "requirement": "create returns own-server UiPlugin",
+      "name": "Factory enables own-server mode",
+      "when": ["create() resolves the plugin"],
+      "then": ["hasServer() is true", "AND getServerUrl() matches http://127.0.0.1:5174"]
+    },
+    {
+      "requirement": "init starts Vite with API base",
+      "name": "SPECD_API_BASE_URL is passed to Vite",
+      "given": ["UiServeContext.apiBaseUrl is http://127.0.0.1:4400/v1"],
+      "when": ["init runs"],
+      "then": [
+        "the spawned Vite process environment includes SPECD_API_BASE_URL=http://127.0.0.1:4400/v1"
+      ]
+    },
+    {
+      "requirement": "own-server vs embedded bundle selection",
+      "name": "ui serve help has no dev flag",
+      "when": ["specd ui serve --help runs"],
+      "then": [
+        "output does not list --dev",
+        "AND plugin selection is documented as plugins.ui configuration"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:e82bf27f7e3a289089dd23877ed39773046c328fec506c8aad04f77c61e1eb5e",
+    "verify.md": "sha256:d7233ba02037150493ac0d638bdc12a08d6a609a0bc0f99a4238beca5492f88a"
+  },
+  "generatedBy": "core"
+}

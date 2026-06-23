@@ -1,0 +1,84 @@
+{
+  "title": "plugin-ui-studio:bundle-plugin",
+  "description": "End-user projects and distribution installs need a published npm package that ships a pre-built Studio SPA. `@specd/plugin-ui-studio` is the default `plugins.ui` entry: static assets only, same origin as the API when used with `specd ui serve`.",
+  "dependsOn": ["plugin-manager:ui-plugin-type", "studio-web:vite-host", "core:ui-plugin-errors"],
+  "context": [
+    "End-user projects and distribution installs need a published npm package that ships a pre-built Studio SPA. `@specd/plugin-ui-studio` is the default `plugins.ui` entry: static assets only, same origin as the API when used with `specd ui serve`."
+  ],
+  "rules": [
+    {
+      "requirement": "package is a UI plugin",
+      "rules": [
+        "The package MUST ship `specd-plugin.json` with `pluginType: \"ui\"` and `staticDir: \"dist\"`.\n\nThe factory entrypoint MUST be the package default export or `create()` as defined by `plugin-manager:plugin-loader`."
+      ]
+    },
+    {
+      "requirement": "create returns bundle UiPlugin",
+      "rules": [
+        "`create()` MUST return a `plugin-manager:ui-plugin-type` instance from `createBundleUiPlugin` with:\n\n- `hasServer() === false`\n- `getStaticRoot()` resolving to `<packageRoot>/dist`\n- `name` and `version` read from the manifest (not hardcoded in source)"
+      ]
+    },
+    {
+      "requirement": "install validates dist",
+      "rules": [
+        "`install()` MUST call bundle install validation: when `requireBuiltDist` is not `false`, missing `dist/index.html` MUST throw `core:ui-plugin-errors` `UiPluginBundleMissingError`."
+      ]
+    },
+    {
+      "requirement": "dist is produced from studio-web",
+      "rules": [
+        "The release build pipeline MUST populate `packages/plugin-ui-studio/dist` from `apps/specd-studio-web` build output (copy or equivalent) before publish; the package MUST NOT require consumers to build the monorepo app themselves."
+      ]
+    },
+    {
+      "requirement": "plugins install wiring",
+      "rules": [
+        "`specd plugins install @specd/plugin-ui-studio` MUST use `InstallUiPlugin` and append the package to `plugins.ui` via CLI `ConfigWriter` (not `plugins.agents`)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "package is a UI plugin",
+      "name": "Manifest declares ui type",
+      "when": ["packages/plugin-ui-studio/specd-plugin.json is read"],
+      "then": ["pluginType is ui", "AND staticDir is dist"]
+    },
+    {
+      "requirement": "create returns bundle UiPlugin",
+      "name": "Factory is bundle mode",
+      "given": ["dist/index.html exists under the package root"],
+      "when": ["create() resolves the plugin"],
+      "then": ["hasServer() is false", "AND getStaticRoot() contains dist"]
+    },
+    {
+      "requirement": "install validates dist",
+      "name": "Install without dist throws",
+      "given": ["dist/index.html is absent"],
+      "when": ["install() runs with default options"],
+      "then": ["UiPluginBundleMissingError is thrown"]
+    },
+    {
+      "requirement": "dist is produced from studio-web",
+      "name": "Build script copies studio-web output",
+      "when": ["the package build:studio (or release build) script runs after studio-web build"],
+      "then": ["packages/plugin-ui-studio/dist/index.html exists"]
+    },
+    {
+      "requirement": "plugins install wiring",
+      "name": "Install targets plugins.ui",
+      "given": ["specd plugins install @specd/plugin-ui-studio succeeds"],
+      "when": ["specd.yaml is read"],
+      "then": [
+        "plugins.ui contains an entry with name @specd/plugin-ui-studio",
+        "AND plugins.agents is unchanged by the UI install path"
+      ]
+    }
+  ],
+  "implementation": {},
+  "contentHashes": {
+    "spec.md": "sha256:49e5b3afc01a65b56a42a6f9ec93051f6bedaf50b935062a7770da8732c4c297",
+    "verify.md": "sha256:52b9b67e4562b28fb7a4dac10432ff7965d3f5d96573392a52254de8a2e22439"
+  },
+  "generatedBy": "core"
+}

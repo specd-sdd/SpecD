@@ -13,16 +13,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository", "changeToManifest", "deserializeEvent"]
-    },
-    {
       "file": "core:src/infrastructure/fs/manifest.ts",
-      "symbols": [
-        "ManifestTrackedImplementationFile",
-        "ManifestImplementationLink",
-        "ManifestTrackedImplementationFileState"
-      ]
+      "symbols": ["changeManifestSchema"]
     }
   ]
 }

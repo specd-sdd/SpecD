@@ -1,0 +1,154 @@
+{
+  "title": "Sidebar Changes Archive",
+  "description": "Studio UI for **Sidebar Changes Archive**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes Archive**.",
+  "dependsOn": ["client:specd-data-port"],
+  "context": [
+    "Studio UI for **Sidebar Changes Archive**: user-visible layout and actions driven exclusively through `SpecdDataPort` hooks. Studio UI component: **Sidebar Changes Archive**."
+  ],
+  "rules": [
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "rules": [
+        "The sidebar MUST render lists from global poll hooks (`hooks-changes-collection`, `hooks-workspaces-specs`, etc.). Row actions (open, restore, discard) MUST call the appropriate mutate port methods."
+      ]
+    },
+    {
+      "requirement": "archive row opens archived snapshot not active change",
+      "rules": [
+        "When the user selects a row in the Archive section, Studio MUST call `getArchivedChange(name)` via `port-archived-changes` and MUST NOT call `getChange` or `getChangeStatus` for that name. The shell MUST mark the center context as archived read-only."
+      ]
+    },
+    {
+      "requirement": "archive rows show name only without per-row state or archive action chrome",
+      "rules": [
+        "Rows in the Archive section MUST display the change `name` only. They MUST NOT repeat an `archived` state label on each row (the section heading already identifies the list). They MUST NOT show a hover archive icon or other row action that implies archiving again."
+      ]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "rules": [
+        "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "rules": [
+        "While requests are in flight or fail, the UI MUST show loading indicators and human-readable errors (including HTTP 409 on save conflicts where applicable)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "name": "Sidebar lists refresh on global poll",
+      "given": ["shell global poll is running"],
+      "when": ["poll tick fires"],
+      "then": ["changes/drafts/discarded lists update", "AND row actions stay wired to ports"]
+    },
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "name": "Archive row opens archived snapshot port",
+      "when": ["user clicks a row in the Archive section"],
+      "then": [
+        "shell calls getArchivedChange(name) on port-archived-changes",
+        "AND does not call getChange for that name"
+      ]
+    },
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "name": "In Progress row opens active change read port",
+      "when": ["user clicks a row in In Progress"],
+      "then": [
+        "shell calls port-changes-read (getChange / status)",
+        "AND center context is not marked archived"
+      ]
+    },
+    {
+      "requirement": "sidebar renders global poll data and wires actions",
+      "name": "Discard calls mutate port",
+      "when": ["user discards a draft from sidebar"],
+      "then": ["port-changes-mutate discard runs", "AND list refreshes on success"]
+    },
+    {
+      "requirement": "archive row opens archived snapshot not active change",
+      "name": "archive row opens archived snapshot not activ… — primary path",
+      "when": ["When the user selects a row in the"],
+      "then": ["behaviour matches the spec requirement", "AND no forbidden side effects occur"]
+    },
+    {
+      "requirement": "archive row opens archived snapshot not active change",
+      "name": "archive row opens archived snapshot not activ… — guard path",
+      "given": ["inputs that stress the requirement boundary"],
+      "when": ["the same capability runs"],
+      "then": ["errors or skips are explicit and documented"]
+    },
+    {
+      "requirement": "archive rows show name only without per-row state or archive action chrome",
+      "name": "Archive row shows name without archived badge",
+      "given": ["Archive section lists changes"],
+      "when": ["sidebar renders each row"],
+      "then": ["row shows change name only", "AND does not show per-row archived state text"]
+    },
+    {
+      "requirement": "archive rows show name only without per-row state or archive action chrome",
+      "name": "Archive row has no hover archive icon",
+      "when": ["user hovers an Archive row"],
+      "then": ["no archive action icon appears", "AND row remains a single open action"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Component consumes SpecdDataPort hooks only",
+      "when": ["UI package dependency graph is inspected"],
+      "then": ["@specd/ui does not import @specd/core", "AND components call client:port-* hooks"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Hook delegates to configured adapter",
+      "when": ["component mounts and requests change data"],
+      "then": ["calls go through SpecdDataPort", "AND no direct repository or kernel import"]
+    },
+    {
+      "requirement": "view uses SpecdDataPort hooks only",
+      "name": "Adding a core import fails the boundary",
+      "when": ["author introduces import from @specd/core under @specd/ui"],
+      "then": ["lint or build fails", "AND data must flow through the port surface"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Hook exposes loading while port call is in flight",
+      "when": ["port method is invoked from the component"],
+      "then": ["consumers observe loading state until the promise settles"]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Failed fetch shows human-readable error",
+      "given": ["port returns a network or HTTP error"],
+      "when": ["hook promise rejects"],
+      "then": [
+        "consumers receive an error object",
+        "AND UI renders the message instead of stale data"
+      ]
+    },
+    {
+      "requirement": "view surfaces loading and error states",
+      "name": "Save conflict shows HTTP 409 to the user",
+      "given": ["save returns 409 problem+json"],
+      "when": ["inspector save hook completes with error"],
+      "then": ["UI shows the conflict message", "AND editor buffer is not silently replaced"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:sidebar-changes-archive",
+        "file": "ui:src/sidebar/ChangesSidebar.tsx",
+        "symbol": "ChangesSidebar"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:ed6adb4f2363d69cc9bab3528f136660a8d5a4746af51f40214656b38feb57f9",
+    "verify.md": "sha256:4959ed422025503309d767c4d3fc2007534d6f717a815ddcd9cf3818b320c6e4"
+  },
+  "generatedBy": "core"
+}
