@@ -155,6 +155,20 @@ If `artifact.originalHash` is set, the implementation MUST compare it against th
 
 `changePath(change)` MUST continue to resolve paths under `changes/` for active changes only.
 
+### Requirement: internalPaths returns absolute storage paths
+
+`internalPaths()` MUST return an array of absolute filesystem paths to internal specd management directories owned by the repository, or `undefined` when the concept does not apply.
+
+Returning `undefined` signals that internal-path exclusion is not applicable (e.g. remote backends that do not manage local filesystem directories). Implementations MUST NOT return an empty array to signal inapplicability; an empty array means "no paths to exclude".
+
+For `FsChangeRepository`, this MUST include:
+
+- the absolute path to `changes/`
+- the absolute path to `drafts/`
+- the absolute path to `discarded/`
+
+These paths are used by implementation discovery to avoid tracking specd's own metadata.
+
 ### Requirement: scaffold creates artifact directories
 
 `scaffold(change, specExists)` MUST create the directory structure needed for the change's

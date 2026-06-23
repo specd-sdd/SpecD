@@ -237,6 +237,21 @@ export abstract class ChangeRepository extends Repository {
    * @param specIds - The spec IDs whose directories to remove
    */
   abstract unscaffold(change: Change, specIds: readonly string[]): Promise<void>
+
+  /**
+   * Returns the absolute filesystem paths to specd-managed internal directories
+   * (e.g. `changes/`, `drafts/`, `discarded/`).
+   *
+   * Used by implementation discovery to exclude internal specd directories
+   * from detection results. Returns absolute paths in stable order.
+   *
+   * Implementations that do not manage local filesystem directories
+   * (e.g. remote backends) MUST return `undefined` instead of an empty array
+   * to signal that internal-path exclusion does not apply.
+   *
+   * @returns Absolute filesystem paths to internal storage roots, or `undefined`
+   */
+  abstract internalPaths(): readonly string[] | undefined
 }
 
 export type { ArtifactConflictError }

@@ -286,10 +286,17 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       ),
       detectOverlap: new DetectOverlap(i.changes),
       preview: previewSpec,
-      updateImplementationTracking: new UpdateImplementationTracking(i.changes),
+      updateImplementationTracking: new UpdateImplementationTracking(
+        i.changes,
+        i.files,
+        config.projectRoot,
+      ),
       refreshImplementationTracking: new RefreshImplementationTracking(
         i.changes,
+        i.archive,
         implementationDetector,
+        i.files,
+        config.projectRoot,
       ),
       getImplementationReview: new GetImplementationReview(i.changes),
       getArtifactInstruction: new GetArtifactInstruction(

@@ -13,7 +13,7 @@
 
 #### Scenario: List shows tracked files by review state
 
-- **GIVEN** a change with tracked implementation files in `open`, `resolved`, and `ignored` state
+- **GIVEN** a change with tracked implementation files in `open`, `resolved`, `ignored`, and `removed` state
 - **WHEN** `specd changes implementation list <name>` is run
 - **THEN** the output distinguishes those tracked-file review states
 
@@ -32,6 +32,15 @@
 - **WHEN** `specd changes implementation list <name>` is run
 - **THEN** the CLI uses the same-file fallback on the rightmost member segment
 - **AND** the symbol is not reported as stale
+
+#### Scenario: List keeps composed member links stale when fallback kind does not match
+
+- **GIVEN** a symbol-level link stores `X::render`
+- **AND** the graph does not expose that exact stored string
+- **AND** the same file contains one graph symbol named `render` with a different kind than the stored link
+- **WHEN** `specd changes implementation list <name>` is run
+- **THEN** the CLI leaves the symbol marked stale
+- **AND** it does not treat the wrong-kind same-file symbol as a match
 
 #### Scenario: List keeps composed member links stale when fallback is ambiguous
 
@@ -81,6 +90,46 @@
 - **THEN** the command fails with `ImplementationFileNotFoundError`
 - **AND** no tracked-file states are updated
 
+#### Scenario: Resolving an untracked file fails
+
+- **GIVEN** `packages/core/src/untracked.ts` exists on disk
+- **AND** it is not currently tracked by the change
+- **WHEN** `specd changes implementation resolve <name> --file packages/core/src/untracked.ts` is run
+- **THEN** the command fails
+- **AND** it does not create a new tracked entry
+
+#### Scenario: Resolving a removed file fails
+
+- **GIVEN** `packages/core/src/missing.ts` is tracked as `removed`
+- **WHEN** `specd changes implementation resolve <name> --file packages/core/src/missing.ts` is run
+- **THEN** the command fails with `ImplementationFileNotFoundError`
+- **AND** the state remains `removed`
+
+### Requirement: Unresolve subcommand
+
+#### Scenario: Unresolving an existing file reopens review
+
+- **GIVEN** `packages/core/src/example.ts` is tracked as `resolved`
+- **AND** it exists on disk
+- **WHEN** `specd changes implementation unresolve <name> --file packages/core/src/example.ts` is run
+- **THEN** the file state moves to `open`
+
+#### Scenario: Unresolving an untracked file fails
+
+- **GIVEN** `packages/core/src/untracked.ts` exists on disk
+- **AND** it is not currently tracked by the change
+- **WHEN** `specd changes implementation unresolve <name> --file packages/core/src/untracked.ts` is run
+- **THEN** the command fails
+- **AND** it does not create a new tracked entry
+
+#### Scenario: Unresolving a removed file fails
+
+- **GIVEN** `packages/core/src/missing.ts` is tracked as `removed`
+- **AND** it does not exist on disk
+- **WHEN** `specd changes implementation unresolve <name> --file packages/core/src/missing.ts` is run
+- **THEN** the command fails with `ImplementationFileNotFoundError`
+- **AND** the state remains `removed`
+
 ### Requirement: Ignore subcommand
 
 #### Scenario: Ignore marks multiple files as ignored via comma-separated list
@@ -90,12 +139,28 @@
 - **WHEN** `specd changes implementation ignore <name> --file f3.ts,f4.ts` is run
 - **THEN** both tracked files move to `ignored`
 
-#### Scenario: Ignoring a missing file fails
+#### Scenario: Ignoring a new missing file fails
 
-- **GIVEN** the file `missing.ts` does not exist on disk
-- **WHEN** `specd changes implementation ignore <name> --file missing.ts` is run
+- **GIVEN** the file `new-missing.ts` is NOT currently tracked
+- **AND** it does not exist on disk
+- **WHEN** `specd changes implementation ignore <name> --file new-missing.ts` is run
 - **THEN** the command fails with `ImplementationFileNotFoundError`
 - **AND** no tracked-file states are updated
+
+#### Scenario: Ignoring a missing-but-tracked file succeeds
+
+- **GIVEN** `packages/core/src/deleted.ts` is tracked as `removed`
+- **AND** it does not exist on disk
+- **WHEN** `specd changes implementation ignore <name> --file packages/core/src/deleted.ts` is run
+- **THEN** the file state moves to `ignored`
+
+#### Scenario: Ignoring a linked tracked file preserves confirmed links
+
+- **GIVEN** `packages/core/src/example.ts` is already tracked by the change
+- **AND** a confirmed implementation link exists for that file
+- **WHEN** `specd changes implementation ignore <name> --file packages/core/src/example.ts` is run
+- **THEN** the file state moves to `ignored`
+- **AND** the confirmed implementation link remains present
 
 ### Requirement: Remove subcommand
 

@@ -344,7 +344,11 @@ Available subcommands:
 
 Tracked file states: `open`, `resolved`, `ignored`, `removed`. The `removed` state is assigned automatically by `refresh` when a tracked file no longer exists on disk; it cannot be set manually. Files in the `removed` state are excluded from `unresolve` — only a subsequent `refresh` can restore them to `open` if they reappear.
 
-File existence validation is performed by the core use case, not the CLI. The CLI delegates all validation and rejects operations with appropriate errors (`ImplementationFileNotFoundError`) when the target file does not exist on disk. The `ignore` action is an exception: files that are already tracked (including those missing from disk) may be ignored without an existence check. Untracked files must exist on disk before they can be ignored.
+File existence validation is performed by the core use case, not the CLI. The CLI delegates all validation and rejects operations with appropriate errors (`ImplementationFileNotFoundError`) when the target file does not exist on disk.
+
+`resolve` and `unresolve` operate on tracked-file review state only. They do not create new tracked entries, and `resolve` cannot be used to promote an untracked file directly to `resolved`.
+
+The `ignore` action is an exception: files that are already tracked (including those missing from disk) may be ignored without an existence check. Untracked files must exist on disk before they can be ignored.
 
 Examples:
 
@@ -353,6 +357,7 @@ specd changes implementation list my-change
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts --symbol Change.transition
 specd changes implementation resolve my-change --file packages/core/src/domain/entities/change.ts
+specd changes implementation unresolve my-change --file packages/core/src/domain/entities/change.ts
 ```
 
 ### change artifacts

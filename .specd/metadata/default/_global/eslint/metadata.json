@@ -121,5 +121,7 @@
     "spec.md": "sha256:cbf52148d3d70d89911d05a46cf3c51adb27fd6860b86e578800ec58fa8de5b1",
     "verify.md": "sha256:e5a6830ee9ea6fa665c8cef868242888f1af151606625cecf0f254da7284a799"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "ESLint contract: enforce core TS conventions and layer boundaries with type-aware rules across monorepo.",
+  "optimizedContext": "# ESLint Rules\n\n## Rules\n\n- ESLint MUST reject explicit `any` type annotations. Use `unknown` at boundaries, then narrow with type guards.\n- ESLint MUST reject default exports in all source files.\n- Exported functions and class methods MUST have explicit return type annotations. Internal functions may rely on inference when type is obvious.\n- All source files under `src/` MUST use `kebab-case` filenames.\n- All functions, methods, classes, type aliases, and interfaces in source files MUST have JSDoc. JSDoc includes description, `@param`, `@returns` when non-`void`, and `@throws`.\n- ESLint MUST enforce architecture import boundaries with `no-restricted-imports`. `domain/` must not import `application/`, `infrastructure/`, or `composition/`. `application/` must not import `infrastructure/` or `composition/`. `infrastructure/` must not import `composition/`.\n\n## Constraints\n\n- Type-aware lint rules are enabled for all `.ts` files\n- Lint errors must be fixed before commit\n- `test/**/*.spec.ts` files are exempt from JSDoc requirements\n- `dist/` and `node_modules/` are excluded from lint rules"
 }

@@ -117,6 +117,9 @@ function makeArchiveRepo(): ArchiveRepository {
     override archivePath(archivedChange: ArchivedChange) {
       return `/archive/${archivedChange.archivedName}`
     }
+    override internalPaths(): readonly string[] {
+      return ['/archive']
+    }
   })()
 }
 

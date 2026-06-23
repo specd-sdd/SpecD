@@ -208,7 +208,7 @@ export interface ChangeProps {
 }
 
 /** Explicit review states for tracked implementation files. */
-export type TrackedImplementationFileState = 'open' | 'resolved' | 'ignored'
+export type TrackedImplementationFileState = 'open' | 'resolved' | 'ignored' | 'removed'
 
 /** One tracked implementation file under review for a change. */
 export interface TrackedImplementationFile {

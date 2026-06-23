@@ -273,6 +273,14 @@ Ensures artifact directories exist for all files tracked by the change. For `sco
 
 Removes the scaffolded spec directories for the given spec IDs from the change directory. For each spec ID, removes both `specs/<workspace>/<capability-path>/` and `deltas/<workspace>/<capability-path>/`. The operation is idempotent — missing directories are silently skipped.
 
+#### `internalPaths(): readonly string[] | undefined`
+
+Returns the absolute filesystem paths to internal specd management directories owned by this repository, or `undefined` when the concept does not apply (e.g. remote backends). Used by implementation discovery to exclude specd's own metadata from candidate detection.
+
+Returning `undefined` signals that internal-path exclusion is not applicable. An empty array means "no paths to exclude" — implementations MUST NOT use an empty array to signal inapplicability.
+
+For `FsChangeRepository`, this returns the absolute paths to the `changes/`, `drafts/`, and `discarded/` directories.
+
 ---
 
 ## ArchiveRepository
@@ -312,6 +320,48 @@ Rebuilds `index.jsonl` by scanning the archive directory for all `manifest.json`
 #### `archivePath(archivedChange: ArchivedChange): string`
 
 Returns the absolute filesystem path to an archived change's directory. Mirrors `ChangeRepository.changePath()` for archived changes.
+
+#### `internalPaths(): readonly string[] | undefined`
+
+Returns the absolute filesystem paths to internal specd management directories owned by this repository, or `undefined` when the concept does not apply (e.g. remote backends). Used by implementation discovery to exclude specd's own metadata from candidate detection.
+
+Returning `undefined` signals that internal-path exclusion is not applicable. An empty array means "no paths to exclude" — implementations MUST NOT use an empty array to signal inapplicability.
+
+For `FsArchiveRepository`, this returns the absolute path to the archive root directory.
+
+---
+
+## ImplementationDetector
+
+Port for discovering modified implementation files for a change. The detector owns baseline resolution and VCS interaction details. Callers provide the `Change` context and receive raw project-relative file paths.
+
+Unlike the repository ports, `ImplementationDetector` is a plain interface — no abstract base class.
+
+```typescript
+import { type ImplementationDetector, type ImplementationDetectorOptions } from '@specd/core'
+```
+
+### Methods
+
+#### `detectModifiedFiles(change: Change, options?: ImplementationDetectorOptions): Promise<readonly string[]>`
+
+Returns project-relative file paths representing files changed for the supplied change context. The detector itself owns baseline-resolution policy for that change context. Callers provide the change; they do not compute or pass a raw VCS baseline reference themselves.
+
+The returned paths are candidate inputs for tracked implementation review. The detector does not itself classify files as linked, resolved, ignored, or removed.
+
+When `options.excludePaths` is provided, the detector excludes any returned path that falls under one of those project-relative portable directory prefixes.
+
+### ImplementationDetectorOptions
+
+```typescript
+interface ImplementationDetectorOptions {
+  readonly excludePaths?: readonly string[]
+}
+```
+
+| Field          | Type                | Description                                              |
+| -------------- | ------------------- | -------------------------------------------------------- |
+| `excludePaths` | `readonly string[]` | Project-relative portable directory prefixes to exclude. |
 
 ---
 

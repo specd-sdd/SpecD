@@ -1,0 +1,9 @@
+releases:
+  core:refresh-implementation-tracking: minor
+  core:change-manifest: patch
+  cli:change-implementation: minor
+  core:change-repository-port: minor
+  core:archive-repository-port: minor
+  core:implementation-detector-port: minor
+  core:change: patch
+  core:repository-port: patch

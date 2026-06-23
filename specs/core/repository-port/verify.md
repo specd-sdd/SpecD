@@ -19,18 +19,19 @@
 
 #### Scenario: Accessors return construction-time values
 
-- **GIVEN** a `Repository` subclass constructed with `{ workspace: "billing", ownership: "shared", isExternal: true }`
+- **GIVEN** a `Repository` subclass constructed with `{ workspace: "billing", ownership: "shared", isExternal: true, configPath: "/project/.specd/config" }`
 - **THEN** `workspace()` returns `"billing"`
 - **AND** `ownership()` returns `"shared"`
 - **AND** `isExternal()` returns `true`
+- **AND** `configPath()` returns `"/project/.specd/config"`
 
 ### Requirement: Subclass contract
 
 #### Scenario: Subclass inherits accessors without redeclaring them
 
-- **GIVEN** a `ChangeRepository` subclass that does not override `workspace()`, `ownership()`, or `isExternal()`
-- **WHEN** the subclass is constructed with `{ workspace: "default", ownership: "owned", isExternal: false }`
-- **THEN** all three accessors return the values from `RepositoryConfig`
+- **GIVEN** a `ChangeRepository` subclass that does not override `workspace()`, `ownership()`, `isExternal()`, or `configPath()`
+- **WHEN** the subclass is constructed with `{ workspace: "default", ownership: "owned", isExternal: false, configPath: "/project/.specd/config" }`
+- **THEN** all four accessors return the values from `RepositoryConfig`
 
 ### Requirement: ReadOnlyWorkspaceError
 
@@ -53,3 +54,9 @@
 - **GIVEN** a repository constructed with `{ workspace: "default", ownership: "owned", isExternal: false, configPath: "/project/.specd/config" }`
 - **WHEN** the repository is instantiated
 - **THEN** construction succeeds without error
+
+#### Scenario: RepositoryConfig requires configPath for runtime-owned storage
+
+- **GIVEN** a repository implementation derives change locks or graph persistence paths
+- **WHEN** it is constructed from `RepositoryConfig`
+- **THEN** `configPath` is available as the absolute config-directory root for those derived paths

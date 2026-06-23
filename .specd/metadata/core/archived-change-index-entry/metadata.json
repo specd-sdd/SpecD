@@ -71,5 +71,7 @@
     "spec.md": "sha256:183aaed774bbebc2563645f2a481056464e6af42a65baf5340e474b473e644ef",
     "verify.md": "sha256:82e91c31ac52aa38809fb4c410464e5979f1da105c3ca4aebcfeff7a9e44c48b"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Lightweight archive listing record: name, path, derived workspaces, no manifest-only data load.",
+  "optimizedContext": "# ArchivedChangeIndexEntry\n\n## Rules\n- Index entry fields: `ArchivedChangeIndexEntry` MUST include following fields: `name` (string) — original change name (lookup key) `archivedName` (string) — archive directory name `archivedAt` (Date) — archive timestamp `archivedBy` (ActorIdentity, optional) — actor identity when recorded `artifacts` (string\\[]) — artifact type IDs present at archive time `specIds` (string\\[]) — spec IDs associated with change at archive time `schemaName` (string) and `schemaVersion` (number) — governing schema identity\n- No manifest-only data: `ArchivedChangeIndexEntry` MUST NOT require access to `manifest.json`-only fields are not reliably present in `index.jsonl` entries (for example detailed artifact state maps or full change history).\n- Derived workspaces: `ArchivedChangeIndexEntry` SHOULD provide `workspaces` derived from `specIds` (workspace prefixes before `:`) for display and filtering.\n\n## Constraints\n- ArchivedChangeIndexEntry is read-only data model with no mutating operations.\n- It is intentionally incomplete; full archived change inspection is provided by ArchivedChange loaded from archive manifest.\n"
 }

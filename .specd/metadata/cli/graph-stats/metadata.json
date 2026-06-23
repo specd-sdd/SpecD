@@ -169,5 +169,7 @@
     "spec.md": "sha256:1e48b811cb58c8f4a35a688d81af0d16142ee4c1e365d06ca88a7741263bb9c0",
     "verify.md": "sha256:617950380819cbbef91a4cd934602c82d69413c957563eba6527c0c9bf5481ad"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "`specd graph stats` reports graph counts and freshness while guarding against concurrent indexing.",
+  "optimizedContext": "# Graph Stats\n\n## Rules\n- Command: `specd graph stats [--config <path> | --path <path>] [--format text|json|toon]`. `--config` and `--path` mutually exclusive.\n- Flow: resolve graph context, load workspaces in configured mode, compute effective fingerprint, open provider, get statistics, compare `lastIndexedRef` with current VCS ref, output, close provider, exit.\n- Before opening provider, check shared graph-index lock. If indexing active, fail fast with retry-later message.\n- Text output shows file/document/symbol/spec counts, languages, non-zero relation counts, `Last indexed`.\n- If graph stale and `lastIndexedRef` exists, append `⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)`.\n- `json`/`toon` output returns full `GraphStatistics` plus `stale`, `currentRef`, `fingerprintMismatch`.\n- Infrastructure/provider failure or active lock exits code 3.\n\n## Constraints\n- CLI delegates stats computation to `@specd/code-graph`; no local recomputation.\n- Close provider before exit; command explicitly `process.exit(0)`.\n- Omit zero-value relation counts in text mode.\n- Shared graph CLI context model, not command-local path semantics.\n- Lock guard must run before provider open."
 }

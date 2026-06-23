@@ -59,7 +59,7 @@ export interface ManifestArtifact {
 }
 
 /** Allowed review states for tracked implementation files. */
-export type ManifestTrackedImplementationFileState = 'open' | 'resolved' | 'ignored'
+export type ManifestTrackedImplementationFileState = 'open' | 'resolved' | 'ignored' | 'removed'
 
 /** A tracked implementation file entry persisted in `manifest.json`. */
 export interface ManifestTrackedImplementationFile {
@@ -317,7 +317,7 @@ export const manifestArtifactSchema = z.object({
 
 export const manifestTrackedImplementationFileSchema = z.object({
   file: z.string(),
-  state: z.enum(['open', 'resolved', 'ignored']),
+  state: z.enum(['open', 'resolved', 'ignored', 'removed']),
 })
 
 export const manifestImplementationLinkSchema = z

@@ -126,6 +126,12 @@
       ]
     },
     {
+      "requirement": "internalPaths returns absolute storage paths",
+      "rules": [
+        "`internalPaths()` MUST return an array of absolute filesystem paths to internal specd management directories owned by the repository, or `undefined` when the concept does not apply.\n\nReturning `undefined` signals that internal-path exclusion is not applicable (e.g. remote backends that do not manage local filesystem directories). Implementations MUST NOT return an empty array to signal inapplicability; an empty array means \"no paths to exclude\".\n\nFor `FsChangeRepository`, this MUST include:\n\n- the absolute path to `changes/`\n- the absolute path to `drafts/`\n- the absolute path to `discarded/`\n\nThese paths are used by implementation discovery to avoid tracking specd's own metadata."
+      ]
+    },
+    {
       "requirement": "scaffold creates artifact directories",
       "rules": [
         "`scaffold(change, specExists)` MUST create the directory structure needed for the change's\nartifacts. For `scope: spec` artifacts, it creates `specs/<ws>/<capPath>/` or\n`deltas/<ws>/<capPath>/` directories under the change directory. For `scope: change`\nartifacts, the root directory already exists. The `specExists` callback is an async function\nthat returns whether a spec already exists in the repository, used to determine whether\nto create spec-scoped or delta-scoped directories."
@@ -646,6 +652,20 @@
       "then": ["callers use draftChangePath(view) rather than changePath with an active Change"]
     },
     {
+      "requirement": "internalPaths returns absolute storage paths",
+      "name": "FsChangeRepository returns storage paths",
+      "given": ["FsChangeRepository is configured with changes/, drafts/, and discarded/"],
+      "when": ["internalPaths() is called"],
+      "then": ["it returns an array containing the absolute paths to those three directories"]
+    },
+    {
+      "requirement": "internalPaths returns absolute storage paths",
+      "name": "Non-filesystem implementation returns undefined",
+      "given": ["a ChangeRepository implementation that does not manage local directories"],
+      "when": ["internalPaths() is called"],
+      "then": ["it returns undefined"]
+    },
+    {
       "requirement": "scaffold creates artifact directories",
       "name": "Scaffold creates spec directories",
       "given": ["a change with specIds including core:edit-change"],
@@ -670,14 +690,22 @@
         "specId": "core:change-repository-port",
         "file": "core:src/infrastructure/fs/change-repository.ts",
         "symbol": "FsChangeRepository"
+      },
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "saveArtifact"
+      },
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "artifactExists"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0e4cd726e40c61afd562c14c9456d4e1bb89bc41542806841a94eb2166083592",
-    "verify.md": "sha256:00b95e59b0567d46f1b3d83f4f2c4cc789a20015aeec63690501e5f55394be5a"
+    "spec.md": "sha256:cbea628a335bb4e17986b1c5fe1e4043187a2219ae4472beb8ca3a04bf4b2aa7",
+    "verify.md": "sha256:d047a4f0064d4c8a1fd0c6f7f61c6c4134a80171a406d89e4d1182362997af8f"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`ChangeRepository` defines global change storage contract: scoped reads, serialized mutations, atomic manifest writes, guarded artifact I/O, drift invalidation.",
-  "optimizedContext": "# ChangeRepository Port\n## Rules\n- `ChangeRepository` abstract class extends `Repository`; inherited `workspace()`, `ownership()`, `isExternal()` exist with default/unused values.\n- Global storage only: active=`changes/`, drafted=`drafts/`, discarded=`discarded/`.\n- `get(name)`: active only; drafted-only/discarded-only => `null`; load persisted artifact/file state; missing `state` defaults to `missing`; snapshot read only, not serialized mutation primitive.\n- `getDraft(name)`: drafted only => `DraftedChangeView`/`null`; no auto-invalidation or persist.\n- `getDiscarded(name)`: discarded only => `DiscardedChangeView` via `toDiscardedChangeView`/`null`; no auto-invalidation or persist.\n- `mutate(name, fn)`: active only; drafted-only => `ChangeNotFoundError`; per-name exclusive window covers fresh reload, callback, persist, release; same-name serialized, different names may run concurrently; callback throw => no partial persist.\n- `mutateDraft(name, fn)`: drafted only; active-only => `ChangeNotFoundError`; callback gets fresh mutable `Change` with `isDrafted === true`; success persists and may move `drafts/<->changes/` or `drafts/->discarded/`; callback throw => no partial persist.\n- `FsChangeRepository.get()` drift handling: compare cleaned content hash vs `validatedHash`; collect all drifted keys by artifact; mark drifted files `drifted-pending-review`; recompute artifact state; invalidate change to `designing`; downgrade remaining previously validated files to `pending-review`; persist before return; history records `cause: \"artifact-drift\"`, message, full `affectedArtifacts`; actor=`SYSTEM_ACTOR`.\n- `list()`, `listDrafts()`, `listDiscarded()`: oldest first; derived artifact state only, never artifact content; drafts/discarded return view types, not mutable `Change`.\n- `save(change)`: manifest only, atomic; never writes artifact content; drafted save outside matching `mutateDraft` => `DraftedChangeReadOnlyError`; concurrency-safe active updates use `mutate()`, not stale `save()`.\n- `delete(change)`: remove entire change directory.\n- `artifact(change, filename)`: tracked artifact files only; strict confinement to change dir; return content + `originalHash`=`sha256` of disk content; missing file => `null`.\n- `saveArtifact(change, artifact, options?)`: drafted outside `mutateDraft` => `DraftedChangeReadOnlyError`; `originalHash` mismatch => `ArtifactConflictError`; `options.force === true` bypasses check; success resets matching `ChangeArtifact` state to `in-progress`; caller must `save(change)`.\n- `artifactExists(change, filename)`: tracked file presence check only; no content load.\n- `deltaExists(change, specId, filename)`: check delta file presence under spec subdirectory.\n- `changePath(change)`: absolute active change dir path. `draftChangePath(view)`: absolute drafted dir path.\n- `scaffold(change, specExists)`: create `specs/<ws>/<capPath>/` or `deltas/<ws>/<capPath>/` for spec-scope artifacts; change-scope root already exists.\n- `unscaffold(change, specIds)`: remove matching `specs/...` and `deltas/...`; idempotent; recursive.\n- Implementations SHOULD emit debug logs for tracked resolution, untracked filename rejection, path-confinement rejection.\n## Constraints\n- Changes stored globally, not per-workspace; inherited workspace context unused.\n- `get()` in `FsChangeRepository` may auto-invalidate and persist before return when validated files drift.\n- All list methods omit artifact content.\n- `save()` writes manifest only; `saveArtifact()` writes file content only.\n- `ArtifactConflictError` is sole concurrent-modification error.\n- `saveArtifact({ force: true })` bypasses conflict detection.\n- Loaded artifact `originalHash` MUST be `sha256` of disk content.\n- Manifest writes MUST be atomic."
+  "generatedBy": "core"
 }

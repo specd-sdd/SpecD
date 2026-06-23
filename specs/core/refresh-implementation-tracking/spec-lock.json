@@ -3,20 +3,32 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:implementation-detector-port", "core:storage"],
+  "dependsOn": [
+    "core:change",
+    "core:implementation-detector-port",
+    "core:storage",
+    "core:archive-repository-port"
+  ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-      "symbols": ["RefreshImplementationTracking", "RefreshImplementationTracking.execute"]
+      "symbols": [
+        "RefreshImplementationTracking",
+        "RefreshImplementationTrackingInput",
+        "RefreshImplementationTrackingResult"
+      ]
     },
     {
-      "file": "core:src/composition/kernel.ts"
+      "file": "core:src/application/ports/implementation-detector.ts",
+      "symbols": ["ImplementationDetectorOptions", "ImplementationDetector"]
     },
     {
-      "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
+      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "symbols": ["VcsImplementationDetector"]
     },
     {
-      "file": "core:src/application/use-cases/index.ts"
+      "file": "core:src/application/use-cases/update-implementation-tracking.ts",
+      "symbols": ["UpdateImplementationTracking", "UpdateImplementationTrackingAction"]
     }
   ]
 }

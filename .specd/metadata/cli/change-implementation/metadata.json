@@ -15,7 +15,7 @@
     {
       "requirement": "List subcommand",
       "rules": [
-        "`specd changes implementation list <name>` MUST return the current implementation-tracking state of the change.\n\nIts output MUST include:\n\n- tracked implementation files grouped by review state (`open`, `resolved`, `ignored`)\n- confirmed implementation links grouped by `specId` and file\n- symbol-level refinements when a link has `symbols`\n- stale-link diagnostics for symbol-level links whose target symbol no longer exists in the graph database\n\nWhen a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.\n\nThis fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous."
+        "`specd changes implementation list <name>` MUST return the current implementation-tracking state of the change.\n\nIts output MUST include:\n\n- tracked implementation files grouped by review state (`open`, `resolved`, `ignored`, `removed`)\n- confirmed implementation links grouped by `specId` and file\n- symbol-level refinements when a link has `symbols`\n- stale-link diagnostics for symbol-level links whose target symbol no longer exists in the graph database\n\nWhen a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.\n\nThis fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous."
       ]
     },
     {
@@ -27,13 +27,19 @@
     {
       "requirement": "Resolve subcommand",
       "rules": [
-        "`specd changes implementation resolve <name> --file <paths...>` SHALL mark one or more tracked implementation files as fully reviewed for the current change.\n\nThe command MUST:\n\n- support a comma-separated list of paths for the `--file` option\n- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation\n\nResolving a file means:\n\n- all relevant spec/file/symbol links for that file have been captured for this change\n- there is no remaining implementation classification work for that tracked file\n\n`resolve` MUST update tracked-file review state only. It MUST NOT add, remove, or rewrite implementation links."
+        "`specd changes implementation resolve <name> --file <paths...>` SHALL mark one or more tracked implementation files as fully reviewed for the current change.\n\nThe command MUST:\n\n- support a comma-separated list of paths for the `--file` option\n- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation\n- accept only files that are already tracked by the change; it MUST NOT create a new tracked entry or move an untracked file directly to `resolved`\n\nResolving a file means:\n\n- all relevant spec/file/symbol links for that file have been captured for this change\n- there is no remaining implementation classification work for that tracked file\n\n`resolve` MUST update tracked-file review state only. It MUST NOT add, remove, or rewrite implementation links.\n\nFiles in the `removed` state MUST NOT be resolved unless they are first resurrected to `open` via a refresh that confirms their physical existence."
+      ]
+    },
+    {
+      "requirement": "Unresolve subcommand",
+      "rules": [
+        "`specd changes implementation unresolve <name> --file <paths...>` SHALL move one or more tracked implementation files back to `open`.\n\nThe command MUST:\n\n- support a comma-separated list of paths for the `--file` option\n- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation\n- accept only files that are already tracked by the change\n- accept tracked files currently in `resolved` or `ignored` state\n- reject files currently in `removed` state until a refresh confirms their physical existence and returns them to `open`\n- update tracked-file review state only; it MUST NOT add, remove, or rewrite implementation links\n\nUnresolving a file means the implementation review for that file is reopened explicitly by the operator or agent, provided the file still exists on disk."
       ]
     },
     {
       "requirement": "Ignore subcommand",
       "rules": [
-        "`specd changes implementation ignore <name> --file <paths...>` SHALL mark one or more tracked implementation files as `ignored`.\n\nThe command MUST:\n\n- support a comma-separated list of paths for the `--file` option\n- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation\n\nIgnoring a file means that file remains part of tracked review history for the change but is excluded from unresolved tracked-file review. `ignore` MUST operate on tracked-file state, not by deleting the tracked entry outright."
+        "`specd changes implementation ignore <name> --file <paths...>` SHALL mark one or more tracked implementation files as `ignored`.\n\nThe command MUST:\n\n- support a comma-separated list of paths for the `--file` option\n- permit ignoring a file even if it is physically missing from disk, provided the file is already tracked by the change (including those in the `removed` state)\n- for files NOT currently tracked, the command MUST validate their physical existence on disk before adding them as `ignored`; if a new file is missing, throw `ImplementationFileNotFoundError`\n- preserve confirmed implementation links for the file; the command MUST NOT reject the state transition solely because links still exist\n\nIgnoring a file means that file remains part of tracked review history for the change but is excluded from unresolved tracked-file review. `ignore` MUST operate on tracked-file state, not by deleting the tracked entry outright."
       ]
     },
     {
@@ -65,7 +71,9 @@
     {
       "requirement": "List subcommand",
       "name": "List shows tracked files by review state",
-      "given": ["a change with tracked implementation files in open, resolved, and ignored state"],
+      "given": [
+        "a change with tracked implementation files in open, resolved, ignored, and removed state"
+      ],
       "when": ["specd changes implementation list <name> is run"],
       "then": ["the output distinguishes those tracked-file review states"]
     },
@@ -91,6 +99,20 @@
       "then": [
         "the CLI uses the same-file fallback on the rightmost member segment",
         "AND the symbol is not reported as stale"
+      ]
+    },
+    {
+      "requirement": "List subcommand",
+      "name": "List keeps composed member links stale when fallback kind does not match",
+      "given": [
+        "a symbol-level link stores X::render",
+        "AND the graph does not expose that exact stored string",
+        "AND the same file contains one graph symbol named render with a different kind than the stored link"
+      ],
+      "when": ["specd changes implementation list <name> is run"],
+      "then": [
+        "the CLI leaves the symbol marked stale",
+        "AND it does not treat the wrong-kind same-file symbol as a match"
       ]
     },
     {
@@ -166,6 +188,66 @@
       ]
     },
     {
+      "requirement": "Resolve subcommand",
+      "name": "Resolving an untracked file fails",
+      "given": [
+        "packages/core/src/untracked.ts exists on disk",
+        "AND it is not currently tracked by the change"
+      ],
+      "when": [
+        "specd changes implementation resolve <name> --file packages/core/src/untracked.ts is run"
+      ],
+      "then": ["the command fails", "AND it does not create a new tracked entry"]
+    },
+    {
+      "requirement": "Resolve subcommand",
+      "name": "Resolving a removed file fails",
+      "given": ["packages/core/src/missing.ts is tracked as removed"],
+      "when": [
+        "specd changes implementation resolve <name> --file packages/core/src/missing.ts is run"
+      ],
+      "then": [
+        "the command fails with ImplementationFileNotFoundError",
+        "AND the state remains removed"
+      ]
+    },
+    {
+      "requirement": "Unresolve subcommand",
+      "name": "Unresolving an existing file reopens review",
+      "given": ["packages/core/src/example.ts is tracked as resolved", "AND it exists on disk"],
+      "when": [
+        "specd changes implementation unresolve <name> --file packages/core/src/example.ts is run"
+      ],
+      "then": ["the file state moves to open"]
+    },
+    {
+      "requirement": "Unresolve subcommand",
+      "name": "Unresolving an untracked file fails",
+      "given": [
+        "packages/core/src/untracked.ts exists on disk",
+        "AND it is not currently tracked by the change"
+      ],
+      "when": [
+        "specd changes implementation unresolve <name> --file packages/core/src/untracked.ts is run"
+      ],
+      "then": ["the command fails", "AND it does not create a new tracked entry"]
+    },
+    {
+      "requirement": "Unresolve subcommand",
+      "name": "Unresolving a removed file fails",
+      "given": [
+        "packages/core/src/missing.ts is tracked as removed",
+        "AND it does not exist on disk"
+      ],
+      "when": [
+        "specd changes implementation unresolve <name> --file packages/core/src/missing.ts is run"
+      ],
+      "then": [
+        "the command fails with ImplementationFileNotFoundError",
+        "AND the state remains removed"
+      ]
+    },
+    {
       "requirement": "Ignore subcommand",
       "name": "Ignore marks multiple files as ignored via comma-separated list",
       "given": [
@@ -177,12 +259,42 @@
     },
     {
       "requirement": "Ignore subcommand",
-      "name": "Ignoring a missing file fails",
-      "given": ["the file missing.ts does not exist on disk"],
-      "when": ["specd changes implementation ignore <name> --file missing.ts is run"],
+      "name": "Ignoring a new missing file fails",
+      "given": [
+        "the file new-missing.ts is NOT currently tracked",
+        "AND it does not exist on disk"
+      ],
+      "when": ["specd changes implementation ignore <name> --file new-missing.ts is run"],
       "then": [
         "the command fails with ImplementationFileNotFoundError",
         "AND no tracked-file states are updated"
+      ]
+    },
+    {
+      "requirement": "Ignore subcommand",
+      "name": "Ignoring a missing-but-tracked file succeeds",
+      "given": [
+        "packages/core/src/deleted.ts is tracked as removed",
+        "AND it does not exist on disk"
+      ],
+      "when": [
+        "specd changes implementation ignore <name> --file packages/core/src/deleted.ts is run"
+      ],
+      "then": ["the file state moves to ignored"]
+    },
+    {
+      "requirement": "Ignore subcommand",
+      "name": "Ignoring a linked tracked file preserves confirmed links",
+      "given": [
+        "packages/core/src/example.ts is already tracked by the change",
+        "AND a confirmed implementation link exists for that file"
+      ],
+      "when": [
+        "specd changes implementation ignore <name> --file packages/core/src/example.ts is run"
+      ],
+      "then": [
+        "the file state moves to ignored",
+        "AND the confirmed implementation link remains present"
       ]
     },
     {
@@ -246,28 +358,7 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "cli:change-implementation",
-        "file": "cli:src/index.ts"
-      }
-    ],
     "symbols": [
-      {
-        "specId": "cli:change-implementation",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "enrichImplementationTracking"
-      },
-      {
-        "specId": "cli:change-implementation",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "extractRightmostMemberSegment"
-      },
-      {
-        "specId": "cli:change-implementation",
-        "file": "cli:src/commands/change/implementation.ts",
-        "symbol": "registerChangeImplementation"
-      },
       {
         "specId": "cli:change-implementation",
         "file": "cli:src/commands/change/implementation.ts",
@@ -275,16 +366,14 @@
       },
       {
         "specId": "cli:change-implementation",
-        "file": "cli:src/commands/change/implementation.ts",
-        "symbol": "mutateImplementationTracking"
+        "file": "cli:src/commands/change/_implementation-tracking.ts",
+        "symbol": "enrichImplementationTracking"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e06f257a9541e5f59f808d008153954136e32417dcf837be26e632d0805abf9c",
-    "verify.md": "sha256:9d8be3d60d223bca0f7aec97f6972879a3414a5c85756d273f033643cf5c485a"
+    "spec.md": "sha256:58d2224a6f1491fb2bd5ed39dd3bab549cd4ada32220f867d7539acfbbe02b3f",
+    "verify.md": "sha256:10ebc11764fe0698390681b50f2be9d951b1e556cbbb5d9b8b39046f42abeba5"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`specd changes implementation` manages active-change implementation links, tracked files, review states, stale-symbol diagnostics.",
-  "optimizedContext": "# cli:change-implementation\n\n## Rules\n- Surface all implementation tracking under `specd changes implementation`.\n- `list <name>`: show tracked files by state `open|resolved|ignored`; show confirmed links grouped by `specId` + file; show symbol refinements; show stale symbol diagnostics.\n- For stored symbols `X.Y`, `X#Y`, `X::Y` missing from graph, retry same-file match with rightmost member + graph symbol kind. Best-effort only: never rewrite stored symbol, never mutate change or sidecars, keep stale if multiple same-file matches.\n- `add <name> --spec <specId> --file <path> [--symbol <name> ...]`: use raw project-relative path after normalization; file must exist or throw `ImplementationFileNotFoundError` with no manifest change; create/confirm file-level `spec + file` link; add symbol refinements when provided; ensure `trackedImplementationFiles` contains file, creating state `open` if absent; preserve distinction between explicit file-level link vs symbol-container-only presence.\n- `resolve <name> --file <paths...>`: accept comma-separated paths; every file must exist or throw `ImplementationFileNotFoundError` and abort; mark tracked files fully reviewed; update tracked-file state only; never add/remove/rewrite links.\n- `ignore <name> --file <paths...>`: accept comma-separated paths; every file must exist or throw `ImplementationFileNotFoundError` and abort; mark tracked files `ignored`; keep tracked history; exclude from unresolved review; never delete tracked entry.\n- `remove <name> --spec <specId> --file <path> [--symbol <name> ...]`: with `--symbol`, remove only those symbol links for same `spec + file`; without `--symbol`, remove whole `spec + file` set incl refinements; if last symbol removed from non-explicit file-level set, whole set may be removed; explicit file-level link must remain.\n- `review <name>`: review tracked files + confirmed links; report stale symbol links missing from graph; distinguish stale-symbol issues from archive materialization failures and workspace-boundary validation failures; surface sidecar updates required outside current spec scope; apply same composed-member fallback as `list`/`change status` for `.`, `#`, `::` using same-file matching only, no stored-link mutation.\n- Manual management and autodetection share raw project-relative path semantics during active change. Never require canonical `workspace:path` during authoring; archive-time handles normalization.\n\n## Constraints\n- Missing file on `add`, `resolve`, `ignore`: throw `ImplementationFileNotFoundError`; no partial mutation.\n- Fallback resolution restricted to same file, rightmost member segment, graph-reported kind.\n- Review-state commands mutate tracked-file state only.\n- Authoring keeps raw project-relative paths; canonical workspace identity deferred to archive."
+  "generatedBy": "core"
 }

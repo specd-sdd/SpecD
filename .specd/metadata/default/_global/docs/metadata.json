@@ -161,9 +161,19 @@
       "then": ["the linter must not report an error"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "default:_global/docs",
+        "file": "default:docs/adr/0022-split-archive-index-and-detail-models.md"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:cf5977216e846311dd37f49660e134fa67ed1d85583b857289c86fb90da7cf2a",
     "verify.md": "sha256:d231692473762a2bb54913270bda6814b425486c45f931f59009b0c1cfac8173"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Docs policy: centralize docs under `docs/`, require MADR ADRs, and keep CLI/MCP/core docs aligned with changes.",
+  "optimizedContext": "# Documentation Conventions\n\n## Rules\n\n- All project documentation MUST live under `docs/`. Only `README.md`, `AGENTS.md`, and `CLAUDE.md` may live outside.\n- `docs/` uses scoped subdirs: `adr/`, `cli/`, `mcp/`, `core/`, `schemas/`.\n- Every significant architectural or design decision MUST have an ADR. Significant = affects multiple packages, constrains future work, or chooses between real alternatives.\n- ADRs use MADR format with YAML frontmatter. MUST include `## Context and Problem Statement`, `## Decision Outcome`, `### Confirmation`, and `## More Information` with `### Spec`.\n- ADR optional sections: `## Decision Drivers`, `## Considered Options`, `## Pros and Cons of the Options`, extra prose in `## More Information` when no value. `### Spec` still required.\n- ADR numbering starts at `0001`, filenames are `NNNN-kebab-case-title.md`, and numbers are never reused. Superseded or deprecated ADRs keep original number.\n- Every `specd` command MUST have matching docs in `docs/cli/` covering purpose, flags, examples, exit codes, and any output or caching semantics. Contract changes update docs in same change.\n- Every MCP tool and resource exposed by `@specd/mcp` MUST have matching docs in `docs/mcp/` with input schema, output schema, and example usage.\n- Public types, ports, and use cases in `@specd/core` MUST have matching docs in `docs/core/` with purpose, contract, and usage examples.\n- All functions, methods, classes, type aliases, and interfaces in all packages MUST have JSDoc. JSDoc includes description, `@param`, `@returns` when non-`void`, and `@throws`.\n\n## Constraints\n\n- All documentation files use Markdown\n- ADR filenames must match `NNNN-kebab-case-title.md`\n- ADR numbers are sequential and never reused\n- Specs may depend only on specs via `## Spec Dependencies`, never directly on ADRs\n- If ADR decision must become enforceable constraint, first capture it in a spec\n- Specs with associated ADRs use `## ADRs` for provenance only, not dependency declaration"
 }

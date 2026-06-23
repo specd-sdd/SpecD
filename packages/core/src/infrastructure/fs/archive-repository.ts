@@ -991,6 +991,15 @@ export class FsArchiveRepository extends ArchiveRepository {
       await this._collectManifests(fullPath, results)
     }
   }
+
+  /**
+   * Returns the absolute filesystem path to the archive root.
+   *
+   * @returns Single-element array containing the archive root path
+   */
+  override internalPaths(): readonly string[] {
+    return [this._archivePath]
+  }
 }
 
 /**

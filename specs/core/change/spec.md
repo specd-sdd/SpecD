@@ -102,7 +102,9 @@ This state MUST distinguish:
 - `trackedImplementationFiles` — tracked raw project-relative files under review for the change
 - `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols
 
-Each tracked implementation file MUST carry an explicit review state of `open`, `resolved`, or `ignored`.
+Each tracked implementation file MUST carry an explicit review state of `open`, `resolved`, `ignored`, or `removed`.
+
+`removed` means the file remains part of the change's tracked review history, but refresh has confirmed that the file is no longer present on disk. A `removed` file is not implicitly untracked and is not manually reopened through `resolve`; it returns to `open` only when refresh confirms the file exists again.
 
 `implementationLinks` MUST support both:
 

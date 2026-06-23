@@ -22,7 +22,7 @@
     },
     {
       "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository"]
+      "symbols": ["FsChangeRepository", "saveArtifact", "artifactExists"]
     }
   ]
 }

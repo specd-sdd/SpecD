@@ -13,16 +13,19 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository", "changeToManifest", "deserializeEvent"]
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": ["TrackedImplementationFileState"]
     },
     {
       "file": "core:src/infrastructure/fs/manifest.ts",
       "symbols": [
-        "ManifestTrackedImplementationFile",
-        "ManifestImplementationLink",
+        "manifestTrackedImplementationFileSchema",
         "ManifestTrackedImplementationFileState"
       ]
+    },
+    {
+      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "symbols": ["saveArtifact", "artifactExists"]
     }
   ]
 }

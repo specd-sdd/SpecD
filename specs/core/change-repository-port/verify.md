@@ -414,6 +414,20 @@
 - **WHEN** resolving filesystem location for inspection tooling
 - **THEN** callers use `draftChangePath(view)` rather than `changePath` with an active `Change`
 
+### Requirement: internalPaths returns absolute storage paths
+
+#### Scenario: FsChangeRepository returns storage paths
+
+- **GIVEN** `FsChangeRepository` is configured with `changes/`, `drafts/`, and `discarded/`
+- **WHEN** `internalPaths()` is called
+- **THEN** it returns an array containing the absolute paths to those three directories
+
+#### Scenario: Non-filesystem implementation returns undefined
+
+- **GIVEN** a `ChangeRepository` implementation that does not manage local directories
+- **WHEN** `internalPaths()` is called
+- **THEN** it returns `undefined`
+
 ### Requirement: scaffold creates artifact directories
 
 #### Scenario: Scaffold creates spec directories

@@ -89,11 +89,18 @@ export async function enrichImplementationTracking(
             continue
           }
 
+          const expectedKind = extractExpectedSymbolKind(symbol)
+          if (expectedKind === null) {
+            staleSymbols.push(symbol)
+            continue
+          }
+
           const fallbackMatches = await provider.findSymbols({
             name: fallbackName,
             filePath: canonicalFile,
           })
-          if (fallbackMatches.length !== 1) {
+          const sameKindMatches = fallbackMatches.filter((match) => match.kind === expectedKind)
+          if (sameKindMatches.length !== 1) {
             staleSymbols.push(symbol)
           }
         }
@@ -198,4 +205,30 @@ function extractRightmostMemberSegment(symbol: string): string | null {
   if (rightmostIndex < 0) return null
   const segment = symbol.slice(rightmostIndex + separatorLength).trim()
   return segment.length > 0 ? segment : null
+}
+
+/**
+ * Infers the expected graph symbol kind from a stored implementation symbol.
+ *
+ * @param symbol - Stored symbol identifier
+ * @returns Expected symbol kind, or `null` when the symbol does not encode one
+ */
+function extractExpectedSymbolKind(symbol: string): string | null {
+  const methodPattern = /[#:]/
+  if (methodPattern.test(symbol) || symbol.includes('::')) {
+    return 'method'
+  }
+
+  const segments = symbol
+    .split('.')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+  if (segments.length < 2) {
+    return null
+  }
+
+  const rightmost = segments[segments.length - 1]
+  if (rightmost === undefined) return null
+
+  return /^[A-Z]/.test(rightmost) ? 'class' : 'property'
 }

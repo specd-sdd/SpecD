@@ -16,7 +16,7 @@ Implementation tracking features SHALL be exposed under the `specd changes imple
 
 Its output MUST include:
 
-- tracked implementation files grouped by review state (`open`, `resolved`, `ignored`)
+- tracked implementation files grouped by review state (`open`, `resolved`, `ignored`, `removed`)
 - confirmed implementation links grouped by `specId` and file
 - symbol-level refinements when a link has `symbols`
 - stale-link diagnostics for symbol-level links whose target symbol no longer exists in the graph database
@@ -46,6 +46,7 @@ The command MUST:
 
 - support a comma-separated list of paths for the `--file` option
 - validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation
+- accept only files that are already tracked by the change; it MUST NOT create a new tracked entry or move an untracked file directly to `resolved`
 
 Resolving a file means:
 
@@ -54,6 +55,23 @@ Resolving a file means:
 
 `resolve` MUST update tracked-file review state only. It MUST NOT add, remove, or rewrite implementation links.
 
+Files in the `removed` state MUST NOT be resolved unless they are first resurrected to `open` via a refresh that confirms their physical existence.
+
+### Requirement: Unresolve subcommand
+
+`specd changes implementation unresolve <name> --file <paths...>` SHALL move one or more tracked implementation files back to `open`.
+
+The command MUST:
+
+- support a comma-separated list of paths for the `--file` option
+- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation
+- accept only files that are already tracked by the change
+- accept tracked files currently in `resolved` or `ignored` state
+- reject files currently in `removed` state until a refresh confirms their physical existence and returns them to `open`
+- update tracked-file review state only; it MUST NOT add, remove, or rewrite implementation links
+
+Unresolving a file means the implementation review for that file is reopened explicitly by the operator or agent, provided the file still exists on disk.
+
 ### Requirement: Ignore subcommand
 
 `specd changes implementation ignore <name> --file <paths...>` SHALL mark one or more tracked implementation files as `ignored`.
@@ -61,7 +79,9 @@ Resolving a file means:
 The command MUST:
 
 - support a comma-separated list of paths for the `--file` option
-- validate that EVERY file exists on disk; throw `ImplementationFileNotFoundError` if any file is missing and abort the operation
+- permit ignoring a file even if it is physically missing from disk, provided the file is already tracked by the change (including those in the `removed` state)
+- for files NOT currently tracked, the command MUST validate their physical existence on disk before adding them as `ignored`; if a new file is missing, throw `ImplementationFileNotFoundError`
+- preserve confirmed implementation links for the file; the command MUST NOT reject the state transition solely because links still exist
 
 Ignoring a file means that file remains part of tracked review history for the change but is excluded from unresolved tracked-file review. `ignore` MUST operate on tracked-file state, not by deleting the tracked entry outright.
 

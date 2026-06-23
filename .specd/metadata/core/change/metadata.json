@@ -48,7 +48,7 @@
     {
       "requirement": "Implementation tracking state",
       "rules": [
-        "A `Change` SHALL persist implementation-tracking state separately from artifact state.\n\nThis state MUST distinguish:\n\n- `trackedImplementationFiles` — tracked raw project-relative files under review for the change\n- `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols\n\nEach tracked implementation file MUST carry an explicit review state of `open`, `resolved`, or `ignored`.\n\n`implementationLinks` MUST support both:\n\n- file-level links (`spec -> file`)\n- symbol-level refinements (`spec -> file -> symbols`)\n\nA confirmed link's raw file path remains project-relative while the change is active. Canonical `workspace:path` normalization happens later during archive-time materialization."
+        "A `Change` SHALL persist implementation-tracking state separately from artifact state.\n\nThis state MUST distinguish:\n\n- `trackedImplementationFiles` — tracked raw project-relative files under review for the change\n- `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols\n\nEach tracked implementation file MUST carry an explicit review state of `open`, `resolved`, `ignored`, or `removed`.\n\n`removed` means the file remains part of the change's tracked review history, but refresh has confirmed that the file is no longer present on disk. A `removed` file is not implicitly untracked and is not manually reopened through `resolve`; it returns to `open` only when refresh confirms the file exists again.\n\n`implementationLinks` MUST support both:\n\n- file-level links (`spec -> file`)\n- symbol-level refinements (`spec -> file -> symbols`)\n\nA confirmed link's raw file path remains project-relative while the change is active. Canonical `workspace:path` normalization happens later during archive-time materialization."
       ]
     },
     {
@@ -570,6 +570,35 @@
     },
     {
       "requirement": "Implementation tracking state",
+      "name": "Change persists removed tracked files explicitly",
+      "given": ["a change tracks packages/core/src/deleted.ts with state removed"],
+      "when": ["the change is persisted and reloaded"],
+      "then": [
+        "that tracked file still exists in trackedImplementationFiles",
+        "AND its state remains removed"
+      ]
+    },
+    {
+      "requirement": "Implementation tracking state",
+      "name": "Removed file does not return to resolved directly",
+      "given": ["a tracked implementation file is in removed state"],
+      "when": [
+        "review state changes are requested without a refresh proving the file exists again"
+      ],
+      "then": ["the file does not move directly to resolved"]
+    },
+    {
+      "requirement": "Implementation tracking state",
+      "name": "Refresh-driven resurrection returns removed file to open",
+      "given": [
+        "a tracked implementation file is in removed state",
+        "AND refresh later confirms the file exists again"
+      ],
+      "when": ["implementation tracking is updated from that refresh result"],
+      "then": ["the file state returns to open"]
+    },
+    {
+      "requirement": "Implementation tracking state",
       "name": "Symbol-level refinement does not create a duplicate file-level peer",
       "given": ["a confirmed spec + file implementation link already exists"],
       "when": ["a symbol is added to refine that link"],
@@ -853,10 +882,8 @@
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:8408c138837916615ff7a7cd949fe42b18c47ad7b8ec3ca0d2919ae09a75ddbd",
-    "verify.md": "sha256:23a5826641e1b9dff53a9a5e6540c223cc42e9ec61c2b27871f4171fd32d693f"
+    "spec.md": "sha256:5b7c9a605cb6756ed8efff4c57b0263c14974bf14976a9f8ba698afcce2cbd62",
+    "verify.md": "sha256:b4bd0657eb06ca54d13381487efdedb83e3519e1305ce10ced11a3d4040907a3"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Central domain entity owning spec work lifecycle, approval gates, artifact tracking, and event-sourced history.",
-  "optimizedContext": "# Change\n## Rules\n**Identity** — Unique slug name + createdAt. Both immutable. ActorIdentity: name, email, provider?, providerId?, metadata?\n**Workspaces & Specs** — specIds mutable, empty allowed. workspaces = computed getter via parseSpecId(), not persisted. specDependsOn: per-spec deps map, no invalidation on update. specIds mutation → invalidated. Orphaned specDependsOn keys auto-removed on updateSpecIds().\n**Lifecycle** — drafting→designing→ready→[pending-spec-approval→spec-approved]→implementing⇄verifying→done→[pending-signoff→signed-off]→archivable→archiving. Gates: approvals.spec + approvals.signoff (default false). archiving escapes: →archivable or →designing only. designing→designing: no invalidation/downgrade. Loop: implementation-failure→implementing; artifact-review-required→designing.\n**Approval Gates** — spec:true → ready blocked until approved. signoff:true → done always blocked for signoff. Both default false.\n**Artifacts** — ChangeArtifact: type, optional, requires, state, files Map<string, ArtifactFile>. Scope change→1 file keyed by type; spec→1 file per specId. ArtifactFile: key, filename, state, validatedHash, hasDrift. States: missing|in-progress|complete|skipped|pending-review|drifted-pending-review. skipped only for optional:true. markComplete(key,hash) only from ValidateArtifacts. markSkipped() all files, only from skip use case. Return to designing: files→pending-review (drifted stays drifted-pending-review). Only complete|skipped satisfy requires.\n**Artifact Sync** — syncArtifacts(artifactTypes) reconcile map vs schema. Add/remove types+files per specIds. Returns bool. ArtifactsSyncedEvent (SYSTEM_ACTOR).\n**History & Event Sourcing** — Append-only history. State = last transitioned `to` (default drafting). Draft/active = most recent drafted/restored. Active approval = most recent spec-approved/signed-off not superseded by invalidated. Events: created, transitioned, spec-approved, signed-off, invalidated, drafted, restored, artifact-skipped, artifacts-synced, description-updated, discarded. invalidated.cause: spec-change|artifact-drift|artifact-review-required|spec-overlap-conflict. affectedArtifacts: [{type, files}].\n**Archive Outcome** — archive-failed event: step, message, commitStarted. Pre-commit fail→stay archivable. Commit-phase fail→batch restore: success→archivable, fail→archiving. Post-archive: no rollback, no active success event.\n**Historical Implementation** — Scan history for transitioned→implementing. True once reached, persists across state changes.\n**Schema Version** — created records schemaName+schemaVersion. Name mismatch→SchemaMismatchError. Version mismatch→warning only. Archive allowed with mismatch.\n**Drafting & Discarding** — Draft: changes/→drafts/, appends drafted. Fails if ever implemented (default). Requires by, at. Restore: drafts/→changes/ via mutateDraft. Discard: changes/|drafts/→discarded/, appends discarded. Irreversible. Requires reason, by. Fails if ever implemented (default). supersededBy?.\n**Drafted Read-Only** — isDrafted=true → no transitions, validation, scope edits, approvals. Allowed: Restore (mutateDraft), Discard (mutateDraft). Inspection via getDraft→DraftedChangeView. Active APIs→ChangeNotFoundError; low-level→DraftedChangeReadOnlyError.\n**Lifecycle Authority** — Change entity: persisted facts only. Schema-aware DAG/blocker/gate interpretation: LifecycleEngine.\n**Policy-Aware Invalidation** — Change.invalidate(cause, msg, affectedArtifacts, policyOverride?, artifactDag). Effective policy: override || persisted. Always appends invalidated + returns to designing. Policies: none|surgical|downstream|global. Deduplicate. ArtifactDag for downstream expansion.\n**Per-File Drift** — hasDrift bool per file. true = content changed or absent. invalidate(artifact-drift) materializes hasDrift on supplied files. artifact-review-required does NOT set hasDrift. complete+hasDrift → \"complete-with-drift\". missing stays missing even with hasDrift.\n## Constraints\n- name+createdAt immutable - workspaces = computed getter via parseSpecId(), not persisted - specIds may be empty - State derived from history (last transitioned). No snapshot. - specIds/artifact mutation → invalidated + transitioned to designing - designing→designing: no invalidation/downgrade - ChangeArtifact.files = Map; state aggregated from files - ArtifactFile state never inferred from validatedHash alone - validatedHash: last validated baseline only, not current state proof - hasDrift persisted per file - skipped: optional artifacts only - skipped satisfies requires chains - Invalidation reopening: policy-driven, not always global - verifying→implementing: only implements.requires artifacts reset - markComplete only from ValidateArtifacts - markSkipped marks ALL files, only from skip use case - syncArtifacts uses SYSTEM_ACTOR - Archive only from archivable; else InvalidStateTransitionError - Approval gates default false; opt-in via specd.yaml - approvals.spec:true → required before implementing - approvals.signoff:true → always required before archivable - Task gating: workflow model (taskCompletionCheck) - verifying→implementing: no approval invalidation - History never modified/deleted - Historical impl detection: scan for transitioned→implementing - Draft/discard after implementation needs force override - Discard irreversible - LifecycleEngine (not Change) handles DAG/blocker/gate interpretation"
+  "generatedBy": "core"
 }

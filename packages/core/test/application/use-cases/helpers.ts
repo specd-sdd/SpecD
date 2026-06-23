@@ -161,6 +161,10 @@ export class StubChangeRepository extends ChangeRepository {
     return result
   }
 
+  override internalPaths(): readonly string[] {
+    return ['/test/changes', '/test/drafts', '/test/discarded']
+  }
+
   async mutateDraft<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<T> {
     const change = this.store.get(name)
     if (!change) throw new ChangeNotFoundError(name)
@@ -489,6 +493,9 @@ export function makeArchiveRepository(initial: ArchivedChange[] = []): ArchiveRe
       return `/test/archive/${entry.archivedName}`
     },
     async reindex(): Promise<void> {},
+    internalPaths(): readonly string[] {
+      return ['/test/archive']
+    },
   } as unknown as ArchiveRepository
 }
 

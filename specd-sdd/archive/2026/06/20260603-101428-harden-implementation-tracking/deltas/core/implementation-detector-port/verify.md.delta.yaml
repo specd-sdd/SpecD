@@ -1,0 +1,43 @@
+- op: modified
+  description: 'Cover exclusion options on detector calls.'
+  selector:
+    type: section
+    matches: '^Requirement: Detector interface$'
+  content: |
+    #### Scenario: Detector returns normalized project-relative candidates
+
+    - **WHEN** `detectModifiedFiles(change, options?)` is called
+    - **THEN** every returned path is relative to the project root
+    - **AND** path separators are normalized to forward slashes
+
+    #### Scenario: Detector excludes configured internal paths
+
+    - **GIVEN** `options.excludePaths` contains project-relative internal directory prefixes
+    - **WHEN** `detectModifiedFiles(change, options?)` returns candidate files
+    - **THEN** no returned path falls under the excluded prefixes
+
+    #### Scenario: Callers provide change context instead of raw baseline refs
+
+    - **GIVEN** `RefreshImplementationTracking` needs candidate paths
+    - **WHEN** it calls the detector port
+    - **THEN** it passes the change context itself
+    - **AND** it does not compute or pass a raw VCS baseline reference
+- op: modified
+  description: 'Require refresh to pass exclusions when invoking the detector.'
+  selector:
+    type: section
+    matches: '^Requirement: Targeted lifecycle use$'
+  content: |
+    #### Scenario: Refresh use case invokes detector instead of Change entity
+
+    - **GIVEN** `RefreshImplementationTracking` runs with the historical implementing guard satisfied
+    - **WHEN** modified files are requested
+    - **THEN** `RefreshImplementationTracking` calls the detector port
+    - **AND** the call includes any internal-path exclusions needed for the active project
+    - **AND** the `Change` entity itself does not perform detection
+
+    #### Scenario: Read and transition use cases do not invoke detector
+
+    - **GIVEN** `GetStatus`, `TransitionChange`, or `CompileContext` executes
+    - **WHEN** implementation tracking is needed
+    - **THEN** those use cases do not call `ImplementationDetector` directly

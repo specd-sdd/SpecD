@@ -693,6 +693,40 @@ describe('FsChangeRepository', () => {
       expect(written).toBe('# New content\n')
     })
 
+    it('given a tracked artifact file marked complete, when saveArtifact is called, then the in-memory artifact resets to in-progress', async () => {
+      const content = '# Original\n'
+      const hash = sha256(content)
+      const change = makeChange('save-artifact-status')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          optional: false,
+          requires: [],
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: hash,
+              }),
+            ],
+          ]),
+        }),
+      )
+      await ctx.repo.save(change)
+      const dir = path.join(ctx.changesPath, '20240115-100000-save-artifact-status')
+      await fs.writeFile(path.join(dir, 'proposal.md'), content, 'utf8')
+
+      const loaded = await ctx.repo.artifact(change, 'proposal.md')
+      const updated = new SpecArtifact('proposal.md', '# Updated\n', loaded?.originalHash)
+      await ctx.repo.saveArtifact(change, updated)
+
+      expect(change.getArtifact('proposal')?.status).toBe('in-progress')
+      expect(change.getArtifact('proposal')?.getFile('proposal')?.status).toBe('in-progress')
+    })
+
     it('given no change directory exists, when saveArtifact is called, then an error is thrown', async () => {
       const change = makeChange('ghost')
       const artifact = new SpecArtifact('proposal.md', '# Content\n')
@@ -754,6 +788,23 @@ describe('FsChangeRepository', () => {
     it('given no change directory, returns false', async () => {
       const change = makeChange('nonexistent')
       expect(await ctx.repo.artifactExists(change, 'spec.md')).toBe(false)
+    })
+
+    it('given an untracked artifact filename, when artifactExists is called, then the repository contract error is preserved', async () => {
+      const change = makeChange('tracked-only-artifacts')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          optional: false,
+          requires: [],
+          files: new Map([
+            ['proposal', new ArtifactFile({ key: 'proposal', filename: 'proposal.md' })],
+          ]),
+        }),
+      )
+      await ctx.repo.save(change)
+
+      await expect(ctx.repo.artifactExists(change, 'spec.md')).rejects.toThrow()
     })
   })
 

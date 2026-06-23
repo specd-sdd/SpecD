@@ -132,4 +132,19 @@ export abstract class ArchiveRepository extends Repository {
    * @returns The absolute path to the archived change's directory
    */
   abstract archivePath(entry: ArchivePathEntry): string
+
+  /**
+   * Returns the absolute filesystem paths to specd-managed internal directories
+   * (e.g. the archive root).
+   *
+   * Used by implementation discovery to exclude internal specd directories
+   * from detection results. Returns absolute paths in stable order.
+   *
+   * Implementations that do not manage local filesystem directories
+   * (e.g. remote backends) MUST return `undefined` instead of an empty array
+   * to signal that internal-path exclusion does not apply.
+   *
+   * @returns Absolute filesystem paths to internal storage roots, or `undefined`
+   */
+  abstract internalPaths(): readonly string[] | undefined
 }

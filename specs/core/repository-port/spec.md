@@ -2,7 +2,7 @@
 
 ## Purpose
 
-All repository ports share three construction-time invariants — workspace, ownership, and locality — that determine how use cases interact with stored data. Without a shared base, each port would duplicate these fields, their accessors, and their semantics. `Repository` is the abstract base class that encapsulates these invariants once, so that subclasses only need to declare their storage-specific operations.
+All repository ports share construction-time invariants that determine how use cases interact with stored data: workspace, ownership, locality, and the config-root path used to derive repository-owned runtime files. Without a shared base, each port would duplicate these fields, their accessors, and their semantics. `Repository` is the abstract base class that encapsulates these invariants once, so that subclasses only need to declare their storage-specific operations.
 
 ## Requirements
 
@@ -15,6 +15,7 @@ interface RepositoryConfig {
   readonly workspace: string
   readonly ownership: 'owned' | 'shared' | 'readOnly'
   readonly isExternal: boolean
+  readonly configPath: string
 }
 ```
 
@@ -24,18 +25,20 @@ interface RepositoryConfig {
   - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`
   - `readOnly` — no writes allowed; data may only be read
 - `isExternal` — whether this repository points to data outside the current git repository. External repositories may not be accessible to agents restricted to the git root.
+- `configPath` — absolute path to the config directory. Repository implementations use it to derive runtime-owned paths such as change locks, graph persistence, and other repository-local support files.
 
 ### Requirement: Abstract class, not interface
 
-`Repository` MUST be an `abstract class`. It sets the three invariant fields in its constructor from `RepositoryConfig` and exposes them as methods. This follows the architecture spec requirement that ports with shared construction are abstract classes — the TypeScript compiler enforces both the construction contract and the method contract.
+`Repository` MUST be an `abstract class`. It sets the four invariant fields in its constructor from `RepositoryConfig` and exposes them as methods. This follows the architecture spec requirement that ports with shared construction are abstract classes — the TypeScript compiler enforces both the construction contract and the method contract.
 
 ### Requirement: Immutable accessors
 
-`Repository` MUST expose three methods that return the values set at construction time:
+`Repository` MUST expose four methods that return the values set at construction time:
 
 - `workspace(): string` — the workspace name
 - `ownership(): 'owned' | 'shared' | 'readOnly'` — the ownership level
 - `isExternal(): boolean` — whether the repository is external
+- `configPath(): string` — the absolute config directory path
 
 These values MUST NOT change during the lifetime of the instance. The backing fields are private — subclasses access them only through the methods.
 

@@ -163,6 +163,20 @@
 - **WHEN** `archivePath(archivedChange)` is called with the same `ArchivedChange`
 - **THEN** the returned path matches the `archiveDirPath` that was returned by `archive()`
 
+### Requirement: internalPaths returns absolute storage paths
+
+#### Scenario: FsArchiveRepository returns archive root
+
+- **GIVEN** `FsArchiveRepository` is configured with an archive root path
+- **WHEN** `internalPaths()` is called
+- **THEN** it returns an array containing the absolute path to the archive root
+
+#### Scenario: Non-filesystem implementation returns undefined
+
+- **GIVEN** an `ArchiveRepository` implementation that does not manage local directories
+- **WHEN** `internalPaths()` is called
+- **THEN** it returns `undefined`
+
 ### Requirement: reindex rebuilds the archive index
 
 #### Scenario: Corrupted index is rebuilt

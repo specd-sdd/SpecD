@@ -1,0 +1,20 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: draftChangePath returns the drafted directory path'
+  content: |
+    ### Requirement: internalPaths returns absolute storage paths
+
+    #### Scenario: FsChangeRepository returns storage paths
+    - **GIVEN** `FsChangeRepository` is configured with `changes/`, `drafts/`, and `discarded/`
+    - **WHEN** `internalPaths()` is called
+    - **THEN** it returns an array containing the absolute paths to those three directories
+
+    #### Scenario: Non-filesystem implementation returns undefined
+    - **GIVEN** a `ChangeRepository` implementation that does not manage local directories
+    - **WHEN** `internalPaths()` is called
+    - **THEN** it returns `undefined`

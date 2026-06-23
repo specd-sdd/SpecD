@@ -103,6 +103,10 @@ class StubArchiveRepository extends ArchiveRepository {
   override archivePath(archivedChange: ArchivedChange): string {
     return `/archive/${archivedChange.archivedName}`
   }
+
+  override internalPaths(): readonly string[] {
+    return ['/archive']
+  }
 }
 
 function makeArchiveRepository(override?: (change: Change) => ArchivedChange): ArchiveRepository {

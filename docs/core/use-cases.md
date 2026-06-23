@@ -1357,3 +1357,92 @@ Records that a set of skills was installed for an agent by merging the skill nam
 | `skillNames` | `readonly string[]` | yes      | The skill names to record.                   |
 
 **Returns:** `Promise<void>`
+
+---
+
+## Implementation tracking
+
+### RefreshImplementationTracking
+
+Runs targeted VCS-backed implementation autodetection, merges new paths, sweeps for deleted files, and performs automatic link cleanup for a change. Executes inside one serialized `ChangeRepository.mutate(...)` call.
+
+The refresh algorithm has four phases:
+
+1. **Collect exclusions** — internal specd storage roots from `ChangeRepository.internalPaths()` and `ArchiveRepository.internalPaths()` are converted into portable project-relative prefixes.
+2. **Detect candidates** — the detector is invoked with exclusion prefixes; newly detected files are merged as `open`, and previously `removed` files that reappear in detection are revived to `open`.
+3. **Existence sweep** — every non-ignored tracked file is probed for on-disk existence via `FileReader.read(...)`.
+4. **Transition and cleanup** — missing files become `removed` with their implementation links cleared; re-appeared `removed` files are resurrected to `open`.
+
+**Constructor:**
+
+```typescript
+new RefreshImplementationTracking(
+  changes: ChangeRepository,
+  archives: ArchiveRepository,
+  implementationDetector: ImplementationDetector,
+  files: FileReader,
+  projectRoot: string,
+)
+```
+
+**Input:**
+
+| Field  | Type     | Required | Description                 |
+| ------ | -------- | -------- | --------------------------- |
+| `name` | `string` | yes      | The change name to refresh. |
+
+**Returns:** `Promise<RefreshImplementationTrackingResult>`
+
+```typescript
+interface RefreshImplementationTrackingResult {
+  implementationTracking: ImplementationTrackingProjection
+}
+```
+
+**Throws:**
+
+| Error                 | Condition                             |
+| --------------------- | ------------------------------------- |
+| `ChangeNotFoundError` | No change with the given name exists. |
+
+---
+
+### UpdateImplementationTracking
+
+Applies one implementation-tracking mutation to a change: `add`, `remove`, `ignore`, `resolve`, or `unresolve`.
+
+File-existence validation is enforced in the core use case, not in the CLI layer:
+
+- `add` requires the target file to exist on disk.
+- `resolve` requires the target file to exist on disk.
+- `unresolve` requires the target file to exist on disk and refuses to reopen files in the `removed` state (only refresh-driven resurrection can restore those).
+- `ignore` allows missing files only when they are already tracked; untracked missing files are rejected.
+- `remove` does not require the file to exist on disk.
+
+**Constructor:** `new UpdateImplementationTracking(changes: ChangeRepository, files: FileReader, projectRoot: string)`
+
+**Input:**
+
+| Field     | Type                                                        | Required | Description                                 |
+| --------- | ----------------------------------------------------------- | -------- | ------------------------------------------- |
+| `name`    | `string`                                                    | yes      | The change to mutate.                       |
+| `action`  | `'add' \| 'remove' \| 'ignore' \| 'resolve' \| 'unresolve'` | yes      | Mutation kind.                              |
+| `file`    | `string`                                                    | yes      | Raw project-relative file path.             |
+| `specId`  | `string`                                                    | no       | Canonical spec ID for link mutations.       |
+| `symbols` | `readonly string[]`                                         | no       | Optional symbol refinements for add/remove. |
+
+**Returns:** `Promise<UpdateImplementationTrackingResult>`
+
+```typescript
+interface UpdateImplementationTrackingResult {
+  implementationTracking: ImplementationTrackingProjection
+}
+```
+
+**Throws:**
+
+| Error                             | Condition                                                          |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `ChangeNotFoundError`             | No change with the given name exists.                              |
+| `ImplementationFileNotFoundError` | A file-required action targets a file that does not exist on disk. |
+| `ImplementationLinksExistError`   | `ignore` targets a file that still has live implementation links.  |

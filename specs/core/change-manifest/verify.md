@@ -55,7 +55,7 @@
 
 - **WHEN** a change manifest is written
 - **THEN** tracked implementation files are persisted with raw project-relative `file` values
-- **AND** each tracked entry includes an explicit `state`
+- **AND** each tracked entry includes an explicit `state` (one of `open`, `resolved`, `ignored`, or `removed`)
 
 #### Scenario: Manifest stores confirmed links with fileLinkExplicit semantics
 
@@ -143,12 +143,13 @@
 #### Scenario: Schema name changed
 
 - **WHEN** a change is loaded and the active schema name differs from the one recorded in the manifest
-- **THEN** specd emits a warning indicating the change was created under a different schema
+- **THEN** loading fails with `SchemaMismatchError`
 
-#### Scenario: Archiving with schema mismatch
+#### Scenario: Archiving with schema version mismatch remains allowed
 
-- **WHEN** `specd archive` is run on a change with a schema version mismatch
-- **THEN** the warning is shown and the user is asked to confirm before proceeding; archiving is not blocked
+- **WHEN** archive is attempted on a change with a schema version mismatch
+- **THEN** the mismatch warning is surfaced
+- **AND** archiving is not blocked solely because of that version mismatch
 
 ### Requirement: Atomic writes
 

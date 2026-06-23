@@ -1,6 +1,9 @@
 import * as path from 'node:path'
 import { type Change } from '../../domain/entities/change.js'
-import { type ImplementationDetector } from '../../application/ports/implementation-detector.js'
+import {
+  type ImplementationDetector,
+  type ImplementationDetectorOptions,
+} from '../../application/ports/implementation-detector.js'
 import { type VcsAdapter } from '../../application/ports/vcs-adapter.js'
 import { Logger } from '../../application/logger.js'
 
@@ -30,9 +33,14 @@ export class VcsImplementationDetector implements ImplementationDetector {
    * Detects modified implementation files for one change.
    *
    * @param change - The change whose historical implementing timestamp defines the baseline
+   * @param options - Optional detection parameters
+   * @param options.excludePaths - Project-relative portable path prefixes to exclude
    * @returns Raw project-relative modified file paths
    */
-  async detectModifiedFiles(change: Change): Promise<readonly string[]> {
+  async detectModifiedFiles(
+    change: Change,
+    options?: ImplementationDetectorOptions,
+  ): Promise<readonly string[]> {
     const historicalAt = change.getHistoricalImplementationAt()
     if (historicalAt === null) {
       Logger.debug('Skipping implementation detection without historical implementing state', {
@@ -59,14 +67,21 @@ export class VcsImplementationDetector implements ImplementationDetector {
     const repoFiles = await vcs.modifiedFiles(baseRef)
     const projectFiles = await this._normalizeToProjectRelativePaths(vcs, repoFiles)
 
+    const excludePaths = options?.excludePaths
+    const filtered =
+      excludePaths !== undefined && excludePaths.length > 0
+        ? projectFiles.filter((file) => !isExcludedByPrefix(file, excludePaths))
+        : projectFiles
+
     Logger.debug('Completed VCS-backed implementation detection', {
       change: change.name,
       baseRef,
       detectedFiles: repoFiles.length,
       normalizedFiles: projectFiles.length,
+      excludedFiles: projectFiles.length - filtered.length,
     })
 
-    return projectFiles
+    return filtered
   }
 
   /**
@@ -131,4 +146,21 @@ export class VcsImplementationDetector implements ImplementationDetector {
  */
 function toPortablePath(filePath: string): string {
   return filePath.split(path.sep).join('/')
+}
+
+/**
+ * Tests whether a project-relative candidate path is excluded by any prefix.
+ *
+ * A candidate is excluded when it exactly matches a prefix or when it falls
+ * under a prefix directory (`candidate.startsWith(prefix + '/')`).
+ *
+ * @param candidate - Portable project-relative candidate path
+ * @param excludePaths - Portable project-relative exclusion prefixes
+ * @returns `true` when the candidate should be filtered out
+ */
+function isExcludedByPrefix(candidate: string, excludePaths: readonly string[]): boolean {
+  for (const prefix of excludePaths) {
+    if (candidate === prefix || candidate.startsWith(`${prefix}/`)) return true
+  }
+  return false
 }
