@@ -72,6 +72,18 @@
       ]
     },
     {
+      "requirement": "titlebar respects platform window-control safe zones",
+      "rules": [
+        "Studio titlebar chrome MUST expose CSS custom properties (or equivalent Tailwind\nutilities) for non-client safe areas:\n\n| Host platform | `--studio-safe-left` | `--studio-safe-right` |\n| ------------- | -------------------- | --------------------- |\n| macOS (`darwin`) | ~96px (traffic lights + gap before toggle) | ~12px |\n| Windows / Linux | ~12px | ~138px (minimize/maximize/close) |\n| Web | ~12px | ~12px |\n\nInteractive controls MUST NOT render inside the right safe zone on Windows/Linux.\nOn **macOS desktop**, the titlebar MUST reserve the left safe zone via a dedicated traffic-light slot; **`SidebarTrigger`** MUST be the first interactive control after that slot.\n\nThe titlebar MUST apply `padding-inline-start` and `padding-inline-end` from these\ntokens on hosts that do not use an explicit traffic slot (non-darwin or web).\n\nDesktop hosts MUST set a root `data-platform` attribute (`darwin`, `win32`, `linux`,\nor `web`) so token values apply without feature-level platform branching in every\ncomponent."
+      ]
+    },
+    {
+      "requirement": "activity rail and titlebar use IDE-native density",
+      "rules": [
+        "Primary navigation chrome MUST use the shadcn **`Sidebar`** primitive with\n`collapsible=\"icon\"`. The collapsed icon rail MUST be **48px** wide\n(`--sidebar-width-icon: 3rem`) with vertically stacked **`SidebarMenu`** icon buttons,\nsubtle selected-state chrome, and compact badges (change counts, stale graph dot).\n\nThe unified **titlebar** MUST be **~44px** tall (`--studio-titlebar-height`), use\npanel-header background tokens, and rely on shadcn sidebar width transitions when the\nsidebar expands or collapses.\n\nStudio hosts MUST map `--sidebar-*` CSS variables to the same palette as `--panel`,\n`--accent`, and `--border` in `globals.css` so sidebar chrome matches titlebar and\npanels in both dark and light themes. shadcn default `.dark` sidebar zinc overrides\nMUST NOT diverge from Studio tokens.\n\nTooltip and popover surfaces MUST define `--popover` and `--popover-foreground` in\n`globals.css` **and** map `popover` / `popover-foreground` colors in `tailwind.config.ts`\nso `bg-popover` utilities render opaque on Studio backgrounds. Sidebar rail tooltips\nSHOULD use explicit `bg-panel` classes for consistency."
+      ]
+    },
+    {
       "requirement": "artifact and inspector surfaces feel like code tooling",
       "rules": [
         "Artifact and inspector panes MUST feel like a code editor / inspector: **`@monaco-editor/react`** for raw editing (`#0D1117` / `#111827`), GitHub-dark markdown preview for rendered markdown, and Git-style split diff for delta diff mode. These surfaces MUST NOT look like rich-text blog editors."
@@ -380,6 +392,42 @@
       ]
     },
     {
+      "requirement": "titlebar respects platform window-control safe zones",
+      "name": "Windows applies right safe zone padding",
+      "given": ["root data-platform=\"win32\""],
+      "when": ["titlebar layout is measured"],
+      "then": [
+        "right padding reserves ~138px for window controls",
+        "AND interactive controls sit left of that zone"
+      ]
+    },
+    {
+      "requirement": "titlebar respects platform window-control safe zones",
+      "name": "macOS applies left traffic-light inset",
+      "given": ["root data-platform=\"darwin\""],
+      "when": ["titlebar layout is measured"],
+      "then": ["left traffic slot reserves ~96px for traffic lights and gap before toggle"]
+    },
+    {
+      "requirement": "titlebar respects platform window-control safe zones",
+      "name": "Sidebar background matches panel tokens",
+      "when": ["sidebar renders in dark or light theme"],
+      "then": ["--sidebar-background resolves to the same palette as --panel"]
+    },
+    {
+      "requirement": "activity rail and titlebar use IDE-native density",
+      "name": "Collapsed shadcn sidebar icon rail is 48px wide",
+      "when": ["sidebar is collapsed (collapsible=\"icon\")"],
+      "then": ["--sidebar-width-icon resolves to 48px"]
+    },
+    {
+      "requirement": "activity rail and titlebar use IDE-native density",
+      "name": "Sidebar rail tooltips are opaque",
+      "given": ["sidebar collapsed"],
+      "when": ["user hovers a rail icon with tooltip"],
+      "then": ["tooltip background is opaque (uses popover or panel tokens)"]
+    },
+    {
       "requirement": "artifact and inspector surfaces feel like code tooling",
       "name": "Raw editor uses dark code background",
       "when": ["artifact opens in raw mode"],
@@ -599,24 +647,24 @@
       {
         "specId": "ui:design-system",
         "file": "ui:src/styles/globals.css"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "ui:design-system",
-        "file": "ui:src/shell/StatusBar.tsx",
-        "symbol": "StatusBar"
       },
       {
         "specId": "ui:design-system",
-        "file": "ui:src/shell/StudioTopBar.tsx",
-        "symbol": "StudioTopBar"
+        "file": "ui:src/SpecdApp.tsx"
+      },
+      {
+        "specId": "ui:design-system",
+        "file": "ui:tailwind.config.ts"
+      },
+      {
+        "specId": "ui:design-system",
+        "file": "ui:test/use-async-resource.spec.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:97f9cea033484906d19115fb7cf4d3c6a6b40d2a08e955a62c478278235615e4",
-    "verify.md": "sha256:28e52807c8d54a2410709dca29514c3b764d8a1c6bf2403a6bf54b69b01695ae"
+    "spec.md": "sha256:12179790025f1fe655d8e81ba0fc8d8161fa516602bd0c08a7bb9e71e70afd1c",
+    "verify.md": "sha256:4e3e36710bc63b6bd724738f906e4a60fddfd0654148eaa8c221c83a6332cf2d"
   },
   "generatedBy": "core",
   "dependsOn": []

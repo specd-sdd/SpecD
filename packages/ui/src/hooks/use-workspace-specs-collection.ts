@@ -16,7 +16,9 @@ export type WorkspaceSpecsEntry = {
 export function useWorkspaceSpecsCollection(
   workspaces: readonly WorkspaceSummaryDto[],
   refreshKey = 0,
+  options?: { readonly enabled?: boolean },
 ): ReturnType<typeof useAsyncResource<readonly WorkspaceSpecsEntry[]>> {
+  const enabled = options?.enabled ?? true
   const port = useSpecdDataPort()
   const namesKey = React.useMemo(
     () => workspaces.map((workspace) => workspace.name).join(','),
@@ -43,7 +45,7 @@ export function useWorkspaceSpecsCollection(
   }, [port, workspaces])
 
   return useAsyncResource(`workspace-specs-collection:${namesKey}`, load, {
-    enabled: workspaces.length > 0,
+    enabled: enabled && workspaces.length > 0,
     refreshKey,
   })
 }

@@ -1,0 +1,19 @@
+- op: added
+  description: Tree mounts only when Workspaces section is active and sidebar expanded
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: sidebar renders global poll data and wires actions$'
+  content: |
+    ### Requirement: workspace tree renders in stacked Workspaces panel when sidebar expanded
+
+    The workspace spec tree MUST render in the stacked **Workspaces – Specs** sidebar
+    block whenever the primary sidebar is expanded (alongside the Changes block), regardless
+    of which activity-rail section is selected in the center.
+
+    Poll-driven tree hooks MUST be disabled when the sidebar is collapsed unless the center
+    is **workspaces-hub** or an open **spec** (delegated to shell visibility flags per
+    [`ui:hooks-workspaces-specs`](../hooks-workspaces-specs/spec.md)).

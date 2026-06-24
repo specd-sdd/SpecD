@@ -4,11 +4,42 @@
 
 ### Requirement: shell provides sidebar tabs inspector and bottom panel regions
 
-#### Scenario: Layout renders sidebar tabs and inspector regions
+#### Scenario: Layout renders titlebar sidebar and inspector regions
 
 - **WHEN** `<SpecdApp>` mounts
-- **THEN** left sidebar visible
+- **THEN** unified titlebar is visible
+- **AND** left shadcn primary sidebar with icon menu is visible
 - **AND** central tabs and right inspector hosts exist
+
+#### Scenario: macOS desktop titlebar spans full shell width
+
+- **GIVEN** `data-platform="darwin"`
+- **WHEN** shell mounts
+- **THEN** titlebar spans sidebar and main columns
+- **AND** sidebar body starts below titlebar height
+
+#### Scenario: Non-darwin sidebar is full height with titlebar over main column
+
+- **GIVEN** `data-platform` is `web`, `win32`, or `linux`
+- **WHEN** shell mounts
+- **THEN** sidebar extends to the top of the shell
+- **AND** titlebar renders above the main content column only
+- **AND** `SidebarTrigger` is not in the titlebar
+
+#### Scenario: Expanded sidebar shows stacked Changes and Workspaces blocks
+
+- **GIVEN** sidebar is expanded
+- **WHEN** user inspects sidebar body
+- **THEN** Changes compact list is visible
+- **AND** Workspaces tree block is visible below Changes
+- **AND** no Graph sidebar body panel is present
+
+#### Scenario: Collapsed sidebar shows 48px icon rail
+
+- **WHEN** user toggles sidebar collapsed via SidebarTrigger or ⌘B
+- **THEN** shadcn sidebar icon width is 48px
+- **AND** Changes, Workspaces, and Graph menu icons are visible
+- **AND** SpecD Studio branding header is hidden
 
 #### Scenario: Bottom panel host is available
 
@@ -27,6 +58,100 @@
 - **WHEN** user switches change tabs
 - **THEN** chrome persists
 - **AND** only tab content swaps
+
+### Requirement: shell provides unified titlebar for global actions
+
+#### Scenario: Titlebar shows search and New Change without branding
+
+- **WHEN** shell mounts
+- **THEN** titlebar contains command-palette search entry
+- **AND** New Change action is visible
+- **AND** SpecD Studio branding is not in the titlebar
+
+#### Scenario: Desktop titlebar shows inline secondary icons
+
+- **GIVEN** host mode is desktop
+- **WHEN** titlebar renders on a wide viewport
+- **THEN** Documentation, Notifications, and Appearance render as inline icon buttons
+- **AND** no default overflow (⋯) menu hides those actions
+
+#### Scenario: macOS desktop places sidebar toggle after traffic-light slot
+
+- **GIVEN** host mode is desktop and `data-platform="darwin"`
+- **WHEN** titlebar renders
+- **THEN** a traffic-light slot precedes `SidebarTrigger`
+- **AND** sidebar header does not sit under native window controls
+
+#### Scenario: Non-darwin embeds sidebar toggle in sidebar chrome
+
+- **GIVEN** `data-platform` is `web`, `win32`, or `linux`
+- **WHEN** sidebar is expanded
+- **THEN** `SidebarTrigger` appears in the sidebar header
+- **WHEN** sidebar is collapsed
+- **THEN** `SidebarTrigger` is the first rail icon with a divider before other rail icons
+
+### Requirement: shell provides center domain hubs for changes and workspaces
+
+#### Scenario: Changes rail opens changes hub with full names
+
+- **WHEN** user clicks Changes on the sidebar rail
+- **THEN** center shows changes hub
+- **AND** at least one change name is shown without sidebar truncation
+
+#### Scenario: Workspaces rail opens workspaces hub
+
+- **WHEN** user clicks Workspaces on the sidebar rail
+- **THEN** center shows workspaces hub with full spec paths
+
+#### Scenario: Graph rail opens graph center view
+
+- **WHEN** user clicks Graph on the sidebar rail
+- **THEN** center shows graph main view
+- **AND** sidebar does not show a graph body panel
+
+### Requirement: sidebar collapse state is keyboard-toggleable and persisted
+
+#### Scenario: Cmd B toggles sidebar collapsed state
+
+- **GIVEN** sidebar expanded
+- **WHEN** user presses ⌘B (or Ctrl+B on non-Mac)
+- **THEN** sidebar collapses to activity rail
+- **WHEN** user presses the shortcut again
+- **THEN** sidebar expands to previous width
+
+#### Scenario: Sidebar state restores from storage
+
+- **GIVEN** user collapsed sidebar in a prior session
+- **WHEN** Studio reloads
+- **THEN** sidebar restores collapsed state
+
+### Requirement: workspace tree poll skips when Workspaces section is not visible
+
+#### Scenario: Workspaces hub enables workspace tree poll while sidebar collapsed
+
+- **GIVEN** sidebar collapsed and center is workspaces-hub
+- **WHEN** global poll fires
+- **THEN** workspace tree hook refetches
+
+#### Scenario: Collapsed sidebar without hub skips workspace tree poll
+
+- **GIVEN** sidebar collapsed to activity rail
+- **WHEN** global poll fires
+- **THEN** workspace tree hook does not refetch
+- **AND** cached tree data is retained
+
+#### Scenario: Re-expanding sidebar shows cached specs without loading flash
+
+- **GIVEN** sidebar was collapsed with cached workspace tree data
+- **WHEN** user expands the sidebar
+- **THEN** Workspaces tree renders immediately from cache
+- **AND** no empty loading state is shown while cache is present
+
+#### Scenario: Non-Workspaces hub with collapsed sidebar skips poll
+
+- **GIVEN** sidebar collapsed and center is changes-hub
+- **WHEN** global poll fires
+- **THEN** workspace tree hook does not refetch
 
 ### Requirement: shell orchestrates global polling while focused
 

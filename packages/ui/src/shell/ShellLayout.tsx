@@ -13,6 +13,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '../components/ui/resizable.js'
+import { SidebarInset, SidebarProvider } from '../components/ui/sidebar.js'
 import {
   ChangeLifecycleConfirmDialog,
   type LifecycleConfirmKind,
@@ -25,6 +26,8 @@ import type { ChangeView } from '../tabs/ChangeTabs.js'
 import { useChangeArtifact } from '../hooks/use-change-artifact.js'
 import { useChangesRead } from '../hooks/use-changes-read.js'
 import { useGraphStatus } from '../hooks/use-graph-status.js'
+import { useClosedSpecsValidation } from '../hooks/use-closed-specs-validation.js'
+import { useDocumentPlatform } from '../hooks/use-document-platform.js'
 import { useWorkspaceSpecsCollection } from '../hooks/use-workspace-specs-collection.js'
 import { useSpecRead } from '../hooks/use-spec-read.js'
 import { useArchivedChange } from '../hooks/use-archived-change.js'
@@ -55,22 +58,30 @@ import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert.js'
 import { Button } from '../components/ui/button.js'
 import { Card, CardContent } from '../components/ui/card.js'
 import type { ValidateConfirmScope } from '../hooks/use-change-validate.js'
-import { AlertTriangle, Circle, GitPullRequest, Layers, Network, X } from 'lucide-react'
-import { ChangesSidebar } from '../sidebar/ChangesSidebar.js'
-import { GraphSidebarEntry, WorkspacesSidebar } from '../sidebar/WorkspacesSidebar.js'
+import { AlertTriangle, Circle, X } from 'lucide-react'
 import { GraphMainView } from './GraphMainView.js'
 import {
   CommandPalette,
   defaultCommandPaletteActions,
 } from './CommandPalette.js'
-import { StudioTopBar } from './StudioTopBar.js'
+import { StudioTitlebar } from './StudioTitlebar.js'
+import { ChangesHubView } from './hubs/ChangesHubView.js'
+import { WorkspacesHubView } from './hubs/WorkspacesHubView.js'
+import {
+  StudioShellSidebar,
+  type SidebarSection,
+} from './studio-sidebar/StudioShellSidebar.js'
+import { isWorkspacesPollEnabled } from './workspaces-poll-enabled.js'
 import { StatusBar } from './StatusBar.js'
 import { ArtifactEditor } from '../editor/ArtifactEditor.js'
 import { ArtifactDiffView } from '../editor/ArtifactDiffView.js'
 import { ArtifactMarkdownPreview } from '../editor/ArtifactMarkdownPreview.js'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs.js'
 
+import type { SpecdAppMode } from '../SpecdApp.js'
+
 export type ShellLayoutProps = {
+  hostMode?: SpecdAppMode
   project: ProjectDto | undefined
   projectStatus: ProjectStatusDto | undefined
   connectionLabel: string
@@ -92,6 +103,8 @@ export type ShellLayoutProps = {
 type CenterContext =
   | { kind: 'change'; name: string; archived?: boolean }
   | { kind: 'spec'; workspace: string; specPath: string }
+  | { kind: 'changes-hub' }
+  | { kind: 'workspaces-hub' }
   | { kind: 'graph' }
   | { kind: 'empty' }
 
@@ -100,6 +113,7 @@ type SelectedArtifact =
   | { kind: 'spec'; workspace: string; specPath: string; filename: string }
 
 export function ShellLayout({
+  hostMode = 'standalone',
   project,
   projectStatus,
   connectionLabel,
@@ -115,6 +129,20 @@ export function ShellLayout({
   const [theme, setTheme] = React.useState<'light' | 'dark'>(() => {
     return storage.get<'light' | 'dark'>('theme') || 'dark'
   })
+
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => {
+    return storage.get<boolean>('sidebarCollapsed') ?? false
+  })
+  const [activeSection, setActiveSection] = React.useState<SidebarSection>('changes')
+  const userPickedSectionRef = React.useRef(false)
+
+  React.useEffect(() => {
+    storage.set('sidebarCollapsed', sidebarCollapsed)
+  }, [sidebarCollapsed, storage])
+
+  const handleSidebarOpenChange = React.useCallback((open: boolean) => {
+    setSidebarCollapsed(!open)
+  }, [])
 
   React.useEffect(() => {
     if (theme === 'light') {
@@ -146,6 +174,53 @@ export function ShellLayout({
   const outputEntries = studioOutput
   const [validating, setValidating] = React.useState(false)
   const [selectedArtifact, setSelectedArtifact] = React.useState<SelectedArtifact | undefined>()
+
+  React.useEffect(() => {
+    if (userPickedSectionRef.current) {
+      return
+    }
+    if (centerCtx.kind === 'change' || centerCtx.kind === 'changes-hub') {
+      setActiveSection('changes')
+    } else if (centerCtx.kind === 'spec' || centerCtx.kind === 'workspaces-hub') {
+      setActiveSection('workspaces')
+    } else if (centerCtx.kind === 'graph') {
+      setActiveSection('graph')
+    }
+  }, [centerCtx.kind])
+
+  const railActiveSection = React.useMemo((): SidebarSection => {
+    if (centerCtx.kind === 'graph') {
+      return 'graph'
+    }
+    if (centerCtx.kind === 'changes-hub' || centerCtx.kind === 'change') {
+      return 'changes'
+    }
+    if (centerCtx.kind === 'workspaces-hub' || centerCtx.kind === 'spec') {
+      return 'workspaces'
+    }
+    return activeSection
+  }, [activeSection, centerCtx.kind])
+
+  const handleSelectSidebarSection = React.useCallback((section: SidebarSection) => {
+    userPickedSectionRef.current = true
+    setActiveSection(section)
+    if (section === 'graph') {
+      setCenterCtx({ kind: 'graph' })
+      setSelectedArtifact(undefined)
+    } else if (section === 'changes') {
+      setCenterCtx({ kind: 'changes-hub' })
+      setSelectedArtifact(undefined)
+    } else if (section === 'workspaces') {
+      setCenterCtx({ kind: 'workspaces-hub' })
+      setSelectedArtifact(undefined)
+    }
+  }, [])
+
+  const workspacesPollEnabled = isWorkspacesPollEnabled(
+    sidebarCollapsed,
+    centerCtx.kind,
+  )
+
   const [inspectorMode, setInspectorMode] = React.useState<
     'raw' | 'preview' | 'diff' | 'metadata' | 'outline'
   >('raw')
@@ -190,7 +265,15 @@ export function ShellLayout({
   const specPath = centerCtx.kind === 'spec' ? centerCtx.specPath : undefined
   const openSpecKey = specWorkspace && specPath ? `${specWorkspace}:${specPath}` : undefined
 
-  const workspaceSpecs = useWorkspaceSpecsCollection(project?.workspaces ?? [], refreshKey)
+  const workspaceSpecs = useWorkspaceSpecsCollection(project?.workspaces ?? [], refreshKey, {
+    enabled: workspacesPollEnabled,
+  })
+  const closedSpecsValidation = useClosedSpecsValidation(
+    project?.workspaces ?? [],
+    changes.active,
+    refreshKey,
+    { enabled: workspacesPollEnabled },
+  )
   const isOpenActiveChange =
     !isArchivedChange && centerCtx.kind === 'change' && changeListSection === 'active'
   const pollChangeDetail = isOpenActiveChange && (changeView === 'Overview' || changeView === 'Events')
@@ -680,100 +763,96 @@ export function ShellLayout({
     setLifecycleConfirm('archive')
   }, [changeName])
 
+  const platform = useDocumentPlatform()
+  const isDarwinChrome = platform === 'darwin'
+
+  const sidebarProps = {
+    activeSection: railActiveSection,
+    projectLabel: project?.name,
+    activeChangeCount: changes.active.length,
+    graphStale: graphStatus.data?.stale === true,
+    onSelectSection: handleSelectSidebarSection,
+    embeddedSidebarToggle: !isDarwinChrome,
+    panels: {
+      changes: {
+        active: changes.active,
+        drafts: changes.drafts,
+        archived: changes.archived,
+        discarded: changes.discarded,
+        error: changes.error,
+        selected: changeName,
+        onSelect: handleSelectChange,
+        onSelectArchived: handleSelectArchivedChange,
+      },
+      workspaces: {
+        entries: workspaceSpecs.data ?? [],
+        loading: workspaceSpecs.isLoading,
+        selectedWorkspace: specWorkspace,
+        selectedSpecPath: specPath,
+        onSelectSpec: handleSelectSpec,
+      },
+    },
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background" data-testid="studio-shell">
-      <StudioTopBar
-        onOpenCommandPalette={() => setCommandOpen(true)}
-        onNewChange={() => setCreateChangeOpen(true)}
-        project={project}
-        projectStatus={projectStatus}
-        activeChanges={changes.active}
-        refreshKey={refreshKey}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-        loadingActive={loading.active}
-      />
+    <SidebarProvider
+      open={!sidebarCollapsed}
+      onOpenChange={handleSidebarOpenChange}
+      className="flex h-full min-h-0 w-full flex-col"
+    >
+      {isDarwinChrome ? (
+        <StudioTitlebar
+          hostMode={hostMode}
+          onOpenCommandPalette={() => setCommandOpen(true)}
+          onNewChange={() => setCreateChangeOpen(true)}
+          project={project}
+          projectStatus={projectStatus}
+          activeChanges={changes.active}
+          refreshKey={refreshKey}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
+          loadingActive={loading.active}
+          showSidebarTrigger
+        />
+      ) : null}
 
-      <CommandPalette
-        open={commandOpen}
-        onClose={() => setCommandOpen(false)}
-        actions={paletteActions}
-        onSelectSpec={handleSelectSpec}
-        onSelectSymbol={(workspace, file, line) => {
-          void pushOutput(`Selected symbol in ${workspace}:${file} at line ${line}`, 'select-symbol')
-          // Redirection logic for source files can be added here
-        }}
-        onSelectDocument={(workspace, path) => {
-          void pushOutput(`Selected document ${workspace}:${path}`, 'select-document')
-          // Redirection logic for generic docs can be added here
-        }}
-      />
+      <div className="flex min-h-0 flex-1">
+        <StudioShellSidebar {...sidebarProps} />
 
-      <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">
-        {/* ── Sidebar ── */}
-        <ResizablePanel defaultSize={18} minSize={16} maxSize={30} className="studio-panel border-r border-border">
-          <div className="studio-sidebar-stack min-w-0">
-            <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
-              <ResizablePanel defaultSize={40} minSize={20} className="studio-sidebar-pane min-h-0 min-w-0">
-                <div className="studio-panel-header flex items-center gap-2">
-                  <GitPullRequest className="h-3 w-3 text-studio-success" />
-                  <span>Changes</span>
-                </div>
-                <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
-                  <ChangesSidebar
-                    active={changes.active}
-                    drafts={changes.drafts}
-                    archived={changes.archived}
-                    discarded={changes.discarded}
-                    error={changes.error}
-                    selected={changeName}
-                    onSelect={handleSelectChange}
-                    onSelectArchived={handleSelectArchivedChange}
-                  />
-                </div>
-              </ResizablePanel>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {!isDarwinChrome ? (
+            <StudioTitlebar
+              hostMode={hostMode}
+              onOpenCommandPalette={() => setCommandOpen(true)}
+              onNewChange={() => setCreateChangeOpen(true)}
+              project={project}
+              projectStatus={projectStatus}
+              activeChanges={changes.active}
+              refreshKey={refreshKey}
+              theme={theme}
+              onToggleTheme={handleToggleTheme}
+              loadingActive={loading.active}
+              showSidebarTrigger={false}
+            />
+          ) : null}
 
-              <ResizableHandle className="h-2 w-full bg-transparent after:h-2 data-[panel-group-direction=vertical]:h-2 data-[panel-group-direction=vertical]:bg-transparent" />
+          <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex h-full min-h-0 flex-col bg-background" data-testid="studio-shell">
+          <CommandPalette
+            open={commandOpen}
+            onClose={() => setCommandOpen(false)}
+            actions={paletteActions}
+            onSelectSpec={handleSelectSpec}
+            onSelectSymbol={(workspace, file, line) => {
+              void pushOutput(`Selected symbol in ${workspace}:${file} at line ${line}`, 'select-symbol')
+            }}
+            onSelectDocument={(workspace, path) => {
+              void pushOutput(`Selected document ${workspace}:${path}`, 'select-document')
+            }}
+          />
 
-              <ResizablePanel defaultSize={60} minSize={20} className="studio-sidebar-pane min-h-0 min-w-0">
-                <div className="studio-panel-header flex items-center gap-2">
-                  <Layers className="h-3 w-3 text-studio-info" />
-                  <span>Workspaces - Specs</span>
-                </div>
-                <div className="studio-scrollbar flex-1 min-h-0 overflow-y-auto">
-                  <WorkspacesSidebar
-                    entries={workspaceSpecs.data ?? []}
-                    loading={workspaceSpecs.isLoading}
-                    selectedWorkspace={specWorkspace}
-                    selectedSpecPath={specPath}
-                    onSelectSpec={handleSelectSpec}
-                  />
-                </div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
-
-            <section className="studio-sidebar-pane">
-              <div className="studio-panel-header flex items-center gap-2">
-                <Network className="h-3 w-3 text-studio-warning" />
-                <span>Graph</span>
-              </div>
-              <div className="p-2">
-                <GraphSidebarEntry
-                  graphStatus={graphStatus.data}
-                  onOpenGraph={() => {
-                    setCenterCtx({ kind: 'graph' })
-                    setSelectedArtifact(undefined)
-                  }}
-                />
-              </div>
-            </section>
-          </div>
-        </ResizablePanel>
-
-        <ResizableHandle className="studio-resize-handle w-px" />
-
-        {/* ── Center + right ── */}
-        <ResizablePanel minSize={40} className="flex min-w-0 flex-col">
+          <ResizablePanelGroup direction="horizontal" className="min-h-0 flex-1">
+            <ResizablePanel minSize={40} className="flex min-w-0 flex-col">
           <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
             {/* main content row */}
             <ResizablePanel defaultSize={78} minSize={30} className="flex min-h-0 flex-col">
@@ -855,6 +934,23 @@ export function ShellLayout({
                     />
                   ) : centerCtx.kind === 'graph' ? (
                     <GraphMainView refreshKey={refreshKey} />
+                  ) : centerCtx.kind === 'changes-hub' ? (
+                    <ChangesHubView
+                      active={changes.active}
+                      drafts={changes.drafts}
+                      archived={changes.archived}
+                      discarded={changes.discarded}
+                      error={changes.error}
+                      onSelect={handleSelectChange}
+                      onSelectArchived={handleSelectArchivedChange}
+                    />
+                  ) : centerCtx.kind === 'workspaces-hub' ? (
+                    <WorkspacesHubView
+                      entries={workspaceSpecs.data ?? []}
+                      loading={workspaceSpecs.isLoading}
+                      failedClosedSpecs={closedSpecsValidation.data ?? []}
+                      onSelectSpec={handleSelectSpec}
+                    />
                   ) : (
                     <EmptyCenter />
                   )}
@@ -1211,7 +1307,11 @@ export function ShellLayout({
           }}
         />
       ) : null}
-    </div>
+        </div>
+          </SidebarInset>
+        </div>
+      </div>
+    </SidebarProvider>
   )
 }
 

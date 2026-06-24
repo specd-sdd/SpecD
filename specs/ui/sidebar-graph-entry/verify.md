@@ -23,6 +23,21 @@
 - **THEN** `port-changes-mutate` discard runs
 - **AND** list refreshes on success
 
+### Requirement: graph activity rail icon reflects stale index state
+
+#### Scenario: Stale graph shows indicator on collapsed rail icon
+
+- **GIVEN** sidebar collapsed and graph status reports stale
+- **WHEN** activity rail renders
+- **THEN** Graph icon shows stale indicator
+
+#### Scenario: Graph rail icon opens Graph Main View
+
+- **GIVEN** sidebar collapsed
+- **WHEN** user clicks Graph activity-rail icon
+- **THEN** sidebar collapse state is unchanged
+- **AND** central workspace switches to Graph Main View
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 #### Scenario: Component consumes SpecdDataPort hooks only

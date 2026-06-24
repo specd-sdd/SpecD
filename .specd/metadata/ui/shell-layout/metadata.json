@@ -1,7 +1,15 @@
 {
   "title": "Shell Layout",
   "description": "SpecD Studio is a spec-work IDE: sidebars for changes and workspaces, a tabbed editor area, inspector for artifacts, and a bottom panel (Output, Problems, Logs). The shell also orchestrates global polling so agent activity off-screen (new changes, specs on disk) appears without keeping every change tab on a heavy refresh loop.",
-  "dependsOn": ["ui:design-system", "client:specd-data-port"],
+  "dependsOn": [
+    "ui:design-system",
+    "client:specd-data-port",
+    "ui:hooks-workspaces-specs",
+    "ui:sidebar-changes-in-progress",
+    "ui:sidebar-workspaces-tree",
+    "ui:sidebar-graph-entry",
+    "studio-desktop:main-window-manager"
+  ],
   "context": [
     "SpecD Studio is a spec-work IDE: sidebars for changes and workspaces, a tabbed editor area, inspector for artifacts, and a bottom panel (Output, Problems, Logs). The shell also orchestrates global polling so agent activity off-screen (new changes, specs on disk) appears without keeping every change tab on a heavy refresh loop."
   ],
@@ -9,7 +17,31 @@
     {
       "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
       "rules": [
-        "The layout MUST render a left sidebar (changes, workspaces, graph entry), a central tab workspace, a right-hand inspector host, and a bottom panel host with three tabs in order **Output**, **Problems**, **Logs** (full studio output stream; warn/error filter; specd in-memory log readback). The default selected bottom tab MUST be **Output**.\n\nThe left sidebar sections for **Changes** and **Workspaces - Specs** MUST be vertically resizable. The shell MUST implement this using shadcn **`Resizable`** panel group components, allowing the user to adjust the proportion of the sidebar allocated to each section."
+        "The layout MUST render a unified **titlebar**, a left **primary sidebar** built on\nshadcn **`Sidebar`** / **`SidebarProvider`**, a central workspace inside\n**`SidebarInset`**, a right-hand inspector host, and a bottom panel host with three\ntabs in order **Output**, **Problems**, **Logs**. The default selected bottom tab MUST\nbe **Output**.\n\nThe unified **titlebar** MUST span the full shell width (above both sidebar and main\ncontent) on **macOS desktop** (`data-platform=\"darwin\"`). On hosts without integrated\ntraffic lights (web, Windows, Linux), the titlebar MUST render only above the main\ncontent column; the primary sidebar MUST extend to the top of the shell.\n\nThe primary sidebar MUST use shadcn **`Sidebar`** with `collapsible=\"icon\"` and support\ntwo states:\n\n- **Expanded** (~16rem): **`SidebarHeader`** with **SpecD Studio** branding, a\n  **`SidebarMenu`** rail (Changes / Workspaces / Graph icons with badges), then **two\n  stacked blocks** — **Changes** and **Workspaces – Specs** — both visible (compact\n  lists). There MUST NOT be a third Graph block in the sidebar body.\n- **Collapsed** (48px icon rail): icon buttons with corner badges and tooltips.\n\n**Graph** on the rail MUST open the center graph view only; it MUST NOT render a\nsidebar body panel.\n\nOn **macOS desktop**, the fixed sidebar MUST start below the titlebar (`top` offset\nmatching `--studio-titlebar-height`) so native window controls do not overlap the\nsidebar header. On other hosts, the sidebar MUST use full viewport height (`top: 0`).\n\nClicking **Changes** or **Workspaces** on the rail MUST set the center to the matching\n**domain hub** and MUST NOT auto-expand the sidebar. Clicking **Graph** MUST open the\ngraph center view.\n\nOn **macOS desktop**, the titlebar MUST include shadcn **`SidebarTrigger`** after the\ntraffic-light slot. On **web / Windows / Linux**, `SidebarTrigger` MUST be embedded in\nthe sidebar (header top-right when expanded; first collapsed rail item with a divider\nbefore other rail icons) and MUST NOT appear in the titlebar.\n\nThe titlebar MUST include **inline** Documentation, Notifications, and Appearance\ncontrols on all hosts (desktop included), with safe-zone padding so controls do not\noverlap native window buttons."
+      ]
+    },
+    {
+      "requirement": "shell provides unified titlebar for global actions",
+      "rules": [
+        "The shell MUST render a lean titlebar (~44px on desktop) containing:\n\n- on **macOS desktop**: a non-interactive **traffic-light slot** (`--studio-safe-left`)\n  followed immediately by shadcn **`SidebarTrigger`**, with the titlebar row spanning\n  the full shell width above sidebar and main content\n- on **web / Windows / Linux**: no `SidebarTrigger` in the titlebar; titlebar row above\n  the main content column only (sidebar is full height alongside it)\n- command-palette search entry (⌘K / Ctrl+K)\n- **New Change** action (visible on all hosts)\n- on **all** hosts including desktop: Documentation, Notifications, and Appearance as\n  **inline icon buttons** (not hidden behind a default overflow menu). The search field\n  MUST shrink before secondary actions are hidden.\n\nOn **web / Windows / Linux**, the shell MUST render an embedded **`SidebarTrigger`** in\nthe primary sidebar: top-right of the expanded header, or the first collapsed rail\nicon separated by a divider from Changes / Workspaces / Graph.\n\nThe titlebar MUST NOT display **SpecD Studio** branding — that belongs in the\nexpanded sidebar header only.\n\nSecondary titlebar controls MUST respect platform safe zones defined in\n[`ui:design-system`](../design-system/spec.md) so they do not overlap native window\ncontrols."
+      ]
+    },
+    {
+      "requirement": "sidebar collapse state is keyboard-toggleable and persisted",
+      "rules": [
+        "The shell MUST toggle sidebar expanded ↔ collapsed on **⌘B** (macOS) / **Ctrl+B**\n(Windows/Linux/web).\n\nCollapsed state (`SidebarProvider` `open`) MUST persist through `IUserStorage` and\nrestore on the next Studio session."
+      ]
+    },
+    {
+      "requirement": "workspace tree poll skips when Workspaces section is not visible",
+      "rules": [
+        "The shell MUST pass an `enabled` or equivalent visibility flag to\n[`ui:hooks-workspaces-specs`](../hooks-workspaces-specs/spec.md) so workspace tree\nmetadata does NOT refetch on global poll when:\n\n- the sidebar is collapsed to the icon rail **and** the center is not\n  **workspaces-hub**, OR\n- neither the Workspaces sidebar block nor the workspaces hub is relevant\n\nPoll MUST run when the sidebar is expanded (stacked Workspaces block visible) OR when\n`centerCtx` is **workspaces-hub** or an open **spec**.\n\nWhen poll is paused, cached workspace tree data MUST remain available so re-expanding\nthe sidebar does not flash an empty loading state; a catch-up refetch MAY run when poll\nresumes."
+      ]
+    },
+    {
+      "requirement": "shell provides center domain hubs for changes and workspaces",
+      "rules": [
+        "The center workspace MUST support `changes-hub` and `workspaces-hub` contexts in\naddition to change, spec, graph, and empty views.\n\n**Changes hub** MUST show change counts by lifecycle section and a list with **full\nchange names** (not truncated). Selecting a row MUST open that change in the center.\n\n**Workspaces hub** MUST list workspaces and specs with **full paths** and surface spec\nvalidation / drift status where available. Selecting a row MUST open that spec.\n\nCompact sidebar lists MAY truncate; hubs are the readable inventory views.\n\nDomain hub UI MUST live in dedicated modules under `packages/ui/src/shell/hubs/`\nimported by `ShellLayout` — not inlined as a monolithic shell file."
       ]
     },
     {
@@ -112,9 +144,55 @@
   "scenarios": [
     {
       "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
-      "name": "Layout renders sidebar tabs and inspector regions",
+      "name": "Layout renders titlebar sidebar and inspector regions",
       "when": ["<SpecdApp> mounts"],
-      "then": ["left sidebar visible", "AND central tabs and right inspector hosts exist"]
+      "then": [
+        "unified titlebar is visible",
+        "AND left shadcn primary sidebar with icon menu is visible",
+        "AND central tabs and right inspector hosts exist"
+      ]
+    },
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "macOS desktop titlebar spans full shell width",
+      "given": ["data-platform=\"darwin\""],
+      "when": ["shell mounts"],
+      "then": [
+        "titlebar spans sidebar and main columns",
+        "AND sidebar body starts below titlebar height"
+      ]
+    },
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "Non-darwin sidebar is full height with titlebar over main column",
+      "given": ["data-platform is web, win32, or linux"],
+      "when": ["shell mounts"],
+      "then": [
+        "sidebar extends to the top of the shell",
+        "AND titlebar renders above the main content column only",
+        "AND SidebarTrigger is not in the titlebar"
+      ]
+    },
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "Expanded sidebar shows stacked Changes and Workspaces blocks",
+      "given": ["sidebar is expanded"],
+      "when": ["user inspects sidebar body"],
+      "then": [
+        "Changes compact list is visible",
+        "AND Workspaces tree block is visible below Changes",
+        "AND no Graph sidebar body panel is present"
+      ]
+    },
+    {
+      "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
+      "name": "Collapsed sidebar shows 48px icon rail",
+      "when": ["user toggles sidebar collapsed via SidebarTrigger or ⌘B"],
+      "then": [
+        "shadcn sidebar icon width is 48px",
+        "AND Changes, Workspaces, and Graph menu icons are visible",
+        "AND SpecD Studio branding header is hidden"
+      ]
     },
     {
       "requirement": "shell provides sidebar tabs inspector and bottom panel regions",
@@ -136,6 +214,112 @@
       "name": "Regions survive route navigation",
       "when": ["user switches change tabs"],
       "then": ["chrome persists", "AND only tab content swaps"]
+    },
+    {
+      "requirement": "shell provides unified titlebar for global actions",
+      "name": "Titlebar shows search and New Change without branding",
+      "when": ["shell mounts"],
+      "then": [
+        "titlebar contains command-palette search entry",
+        "AND New Change action is visible",
+        "AND SpecD Studio branding is not in the titlebar"
+      ]
+    },
+    {
+      "requirement": "shell provides unified titlebar for global actions",
+      "name": "Desktop titlebar shows inline secondary icons",
+      "given": ["host mode is desktop"],
+      "when": ["titlebar renders on a wide viewport"],
+      "then": [
+        "Documentation, Notifications, and Appearance render as inline icon buttons",
+        "AND no default overflow (⋯) menu hides those actions"
+      ]
+    },
+    {
+      "requirement": "shell provides unified titlebar for global actions",
+      "name": "macOS desktop places sidebar toggle after traffic-light slot",
+      "given": ["host mode is desktop and data-platform=\"darwin\""],
+      "when": ["titlebar renders"],
+      "then": [
+        "a traffic-light slot precedes SidebarTrigger",
+        "AND sidebar header does not sit under native window controls"
+      ]
+    },
+    {
+      "requirement": "shell provides unified titlebar for global actions",
+      "name": "Non-darwin embeds sidebar toggle in sidebar chrome",
+      "given": ["data-platform is web, win32, or linux"],
+      "when": ["sidebar is expanded", "sidebar is collapsed"],
+      "then": [
+        "SidebarTrigger appears in the sidebar header",
+        "SidebarTrigger is the first rail icon with a divider before other rail icons"
+      ]
+    },
+    {
+      "requirement": "shell provides center domain hubs for changes and workspaces",
+      "name": "Changes rail opens changes hub with full names",
+      "when": ["user clicks Changes on the sidebar rail"],
+      "then": [
+        "center shows changes hub",
+        "AND at least one change name is shown without sidebar truncation"
+      ]
+    },
+    {
+      "requirement": "shell provides center domain hubs for changes and workspaces",
+      "name": "Workspaces rail opens workspaces hub",
+      "when": ["user clicks Workspaces on the sidebar rail"],
+      "then": ["center shows workspaces hub with full spec paths"]
+    },
+    {
+      "requirement": "shell provides center domain hubs for changes and workspaces",
+      "name": "Graph rail opens graph center view",
+      "when": ["user clicks Graph on the sidebar rail"],
+      "then": ["center shows graph main view", "AND sidebar does not show a graph body panel"]
+    },
+    {
+      "requirement": "sidebar collapse state is keyboard-toggleable and persisted",
+      "name": "Cmd B toggles sidebar collapsed state",
+      "given": ["sidebar expanded"],
+      "when": ["user presses ⌘B (or Ctrl+B on non-Mac)", "user presses the shortcut again"],
+      "then": ["sidebar collapses to activity rail", "sidebar expands to previous width"]
+    },
+    {
+      "requirement": "sidebar collapse state is keyboard-toggleable and persisted",
+      "name": "Sidebar state restores from storage",
+      "given": ["user collapsed sidebar in a prior session"],
+      "when": ["Studio reloads"],
+      "then": ["sidebar restores collapsed state"]
+    },
+    {
+      "requirement": "workspace tree poll skips when Workspaces section is not visible",
+      "name": "Workspaces hub enables workspace tree poll while sidebar collapsed",
+      "given": ["sidebar collapsed and center is workspaces-hub"],
+      "when": ["global poll fires"],
+      "then": ["workspace tree hook refetches"]
+    },
+    {
+      "requirement": "workspace tree poll skips when Workspaces section is not visible",
+      "name": "Collapsed sidebar without hub skips workspace tree poll",
+      "given": ["sidebar collapsed to activity rail"],
+      "when": ["global poll fires"],
+      "then": ["workspace tree hook does not refetch", "AND cached tree data is retained"]
+    },
+    {
+      "requirement": "workspace tree poll skips when Workspaces section is not visible",
+      "name": "Re-expanding sidebar shows cached specs without loading flash",
+      "given": ["sidebar was collapsed with cached workspace tree data"],
+      "when": ["user expands the sidebar"],
+      "then": [
+        "Workspaces tree renders immediately from cache",
+        "AND no empty loading state is shown while cache is present"
+      ]
+    },
+    {
+      "requirement": "workspace tree poll skips when Workspaces section is not visible",
+      "name": "Non-Workspaces hub with collapsed sidebar skips poll",
+      "given": ["sidebar collapsed and center is changes-hub"],
+      "when": ["global poll fires"],
+      "then": ["workspace tree hook does not refetch"]
     },
     {
       "requirement": "shell orchestrates global polling while focused",
@@ -402,24 +586,44 @@
     "symbols": [
       {
         "specId": "ui:shell-layout",
-        "file": "ui:src/SpecdApp.tsx",
-        "symbol": "StudioShell"
-      },
-      {
-        "specId": "ui:shell-layout",
-        "file": "ui:src/SpecdApp.tsx",
-        "symbol": "SpecdApp"
-      },
-      {
-        "specId": "ui:shell-layout",
         "file": "ui:src/shell/ShellLayout.tsx",
         "symbol": "ShellLayout"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/shell/StudioTitlebar.tsx",
+        "symbol": "StudioTitlebar"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/shell/hubs/WorkspacesHubView.tsx",
+        "symbol": "WorkspacesHubView"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/shell/studio-sidebar/StudioShellSidebar.tsx",
+        "symbol": "StudioShellSidebar"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/components/ui/sidebar.tsx",
+        "symbol": "SidebarProvider"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/hooks/use-document-platform.ts",
+        "symbol": "useDocumentPlatform"
+      },
+      {
+        "specId": "ui:shell-layout",
+        "file": "ui:src/shell/workspaces-poll-enabled.ts",
+        "symbol": "isWorkspacesPollEnabled"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0a5c8bd7a3268f426504bdf9720546ff893678a841f451828942a5469146aafa",
-    "verify.md": "sha256:7ca533a97dbb4e3ae07e361e46bd196cd74130b02b0508c9c5af80c98c3bdf09"
+    "spec.md": "sha256:647bbeeef77c4b9950868886549a097bfc4fa07039ab6303ade48301106cf1a2",
+    "verify.md": "sha256:02ae13ef0a462c7d4e033ce698e1617fad4099ff107e0a9130022f444e141889"
   },
   "generatedBy": "core"
 }

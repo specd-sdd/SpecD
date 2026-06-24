@@ -14,7 +14,19 @@ When a spec detail view is active, the spec hooks MUST also load structured spec
 
 ### Requirement: workspace tree refreshes on global poll
 
-Tree metadata MUST refresh on the global poll interval; per-spec detail loads when a spec tab becomes visible.
+Tree metadata MUST refresh on the global poll interval when:
+
+- the sidebar is expanded (stacked Workspaces block visible), OR
+- the center context is **workspaces-hub**.
+
+When the sidebar is collapsed **and** the center is not workspaces-hub or an open spec,
+tree hooks MUST NOT refetch on poll ticks; cached metadata MUST be retained until
+Workspaces becomes visible again or the workspaces hub opens.
+
+Pausing poll via `enabled: false` MUST NOT discard in-memory tree data; re-enabling
+MUST show cached data immediately and MAY catch up when `refreshKey` has advanced.
+
+Per-spec detail loads when a spec tab becomes visible — unchanged.
 
 ## Spec Dependencies
 

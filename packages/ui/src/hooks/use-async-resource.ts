@@ -65,7 +65,11 @@ export function useAsyncResource<T>(
   React.useEffect(() => {
     if (!enabled) {
       failedKeyRef.current = null
-      setState({ data: undefined, error: undefined, isLoading: false })
+      setState((prev) => ({
+        data: prev.data,
+        error: prev.error,
+        isLoading: false,
+      }))
       return
     }
 

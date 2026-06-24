@@ -1,0 +1,33 @@
+- op: modified
+  description: Align hidden sidebar scenario with activity-rail collapse model
+  selector:
+    type: section
+    matches: '^Requirement: workspace tree refreshes on global poll$'
+  content: |
+    #### Scenario: Tree refetches on global poll tick when Workspaces visible
+
+    - **GIVEN** sidebar expanded and Workspaces section active
+    - **WHEN** global poll runs
+    - **THEN** tree metadata hook refetches
+    - **AND** new spec file appears as node
+
+    #### Scenario: Collapsed sidebar skips tree poll
+
+    - **GIVEN** sidebar collapsed to activity rail
+    - **WHEN** poll fires
+    - **THEN** no tree refetch
+    - **AND** cache retained until Workspaces section shown expanded
+
+    #### Scenario: Re-expanding sidebar retains cached tree
+
+    - **GIVEN** sidebar collapsed after tree loaded
+    - **WHEN** user expands sidebar before next poll tick
+    - **THEN** cached tree data is still available
+    - **AND** Workspaces list renders without a loading flash
+
+    #### Scenario: Selection preserved across refresh
+
+    - **GIVEN** spec `core:foo` selected
+    - **WHEN** tree poll completes without structural change
+    - **THEN** selection remains on `core:foo`
+    - **AND** scroll position stable

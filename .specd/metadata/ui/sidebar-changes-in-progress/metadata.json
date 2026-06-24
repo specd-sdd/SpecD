@@ -101,8 +101,8 @@
     "symbols": [
       {
         "specId": "ui:sidebar-changes-in-progress",
-        "file": "ui:src/sidebar/ChangesSidebar.tsx",
-        "symbol": "ChangesSidebar"
+        "file": "ui:src/shell/hubs/ChangesHubView.tsx",
+        "symbol": "ChangesHubView"
       }
     ]
   },

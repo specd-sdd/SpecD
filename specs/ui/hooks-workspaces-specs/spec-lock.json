@@ -6,8 +6,12 @@
   "dependsOn": ["client:specd-data-port", "client:port-workspaces-specs"],
   "implementation": [
     {
-      "file": "ui:src/hooks/use-workspace-specs.ts",
-      "symbols": ["useWorkspaceSpecs"]
+      "file": "ui:src/hooks/use-workspace-specs-collection.ts",
+      "symbols": ["useWorkspaceSpecsCollection"]
+    },
+    {
+      "file": "ui:src/hooks/use-async-resource.ts",
+      "symbols": ["useAsyncResource"]
     }
   ]
 }

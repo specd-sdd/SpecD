@@ -150,6 +150,12 @@ function DesktopBootstrap(): ReactElement {
     }
   }, [storage])
 
+  useEffect(() => {
+    if (window.specd?.platform) {
+      document.documentElement.dataset.platform = window.specd.platform
+    }
+  }, [])
+
   /**
    * Opens the shared project chooser dialog.
    *

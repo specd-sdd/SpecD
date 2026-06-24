@@ -17,6 +17,12 @@
       "rules": [
         "If the artifact editor has unsaved buffers, closing the window MUST prompt the user before discarding (delegate to UI state)."
       ]
+    },
+    {
+      "requirement": "main window uses integrated custom titlebar on desktop",
+      "rules": [
+        "The primary `BrowserWindow` MUST use platform-appropriate custom titlebar settings:\n\n- **macOS**: `titleBarStyle: 'hiddenInset'` with `trafficLightPosition` vertically\n  centered in the ~44px titlebar and horizontally leaving room for the renderer\n  traffic-light slot and sidebar-toggle control after the semaphores.\n- **Windows**: `titleBarOverlay` with height matching Studio titlebar (**44px**) so\n  native minimize/maximize/close render in the right safe zone.\n\nThe main process MUST expose the host `platform` (`darwin`, `win32`, `linux`) to the\nrenderer (preload bridge) so `@specd/ui` can apply safe-area CSS without Node APIs in\nthe renderer.\n\nThe renderer titlebar region MUST use `-webkit-app-region: drag` for the draggable\narea; interactive controls MUST use `-webkit-app-region: no-drag`."
+      ]
     }
   ],
   "scenarios": [
@@ -59,19 +65,54 @@
       "name": "Save-all option in close dialog",
       "when": ["user chooses save all on close prompt"],
       "then": ["pending saves run", "AND window closes only after success"]
+    },
+    {
+      "requirement": "main window uses integrated custom titlebar on desktop",
+      "name": "macOS window uses hiddenInset titlebar",
+      "given": ["platform is darwin"],
+      "when": ["main window is created"],
+      "then": [
+        "titleBarStyle is hiddenInset",
+        "AND trafficLightPosition is set for a ~44px titlebar",
+        "AND traffic light position leaves room for traffic slot and sidebar toggle"
+      ]
+    },
+    {
+      "requirement": "main window uses integrated custom titlebar on desktop",
+      "name": "Windows window uses titleBarOverlay",
+      "given": ["platform is win32"],
+      "when": ["main window is created"],
+      "then": ["titleBarOverlay is configured with Studio titlebar height of 44px"]
+    },
+    {
+      "requirement": "main window uses integrated custom titlebar on desktop",
+      "name": "Preload exposes platform to renderer",
+      "when": ["renderer reads host metadata from preload"],
+      "then": ["platform is darwin, win32, or linux", "AND document root receives data-platform"]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "studio-desktop:main-window-manager",
-        "file": "studio-desktop:src/main/index.ts"
+        "file": "studio-desktop:src/preload/bridge.ts"
+      },
+      {
+        "specId": "studio-desktop:main-window-manager",
+        "file": "studio-desktop:src/renderer/main.tsx"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "studio-desktop:main-window-manager",
+        "file": "studio-desktop:src/main/index.ts",
+        "symbol": "createWindow"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:dcd5013aedfcf7a1ca9ea0044d6252f0a0af35895e9643a2a4ae10b00c157363",
-    "verify.md": "sha256:e3e9d4f7b260269191b5f11cd84e2f4fa5407ac761d89fce78653baf2b15524d"
+    "spec.md": "sha256:b39dddae61d1cd316f163a3818937dca1c77aad53950935e55a638c97803353f",
+    "verify.md": "sha256:91282630a1c2b1033bec9cdd928b2d041d0c3f7ba78ca9d193658bc663377e69"
   },
   "generatedBy": "core"
 }

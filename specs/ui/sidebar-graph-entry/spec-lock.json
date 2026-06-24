@@ -6,8 +6,8 @@
   "dependsOn": ["client:specd-data-port"],
   "implementation": [
     {
-      "file": "ui:src/sidebar/WorkspacesSidebar.tsx",
-      "symbols": ["WorkspacesSidebar"]
+      "file": "ui:src/shell/studio-sidebar/StudioSidebarRail.tsx",
+      "symbols": ["StudioSidebarRail"]
     }
   ]
 }

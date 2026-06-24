@@ -70,6 +70,7 @@ function subscribeToSignal(channel: string, callback: () => void): () => void {
 }
 
 contextBridge.exposeInMainWorld('specd', {
+  platform: process.platform,
   invoke,
   ping: () => invoke('ping'),
   draftAwareMethods: DRAFT_AWARE_IPC_METHODS,

@@ -167,12 +167,29 @@ async function rebuildMenu(): Promise<void> {
  *
  */
 function createWindow(): void {
+  const titleBarOptions =
+    process.platform === 'darwin'
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 12, y: 16 },
+        }
+      : process.platform === 'win32'
+        ? {
+            titleBarOverlay: {
+              color: '#0d1117',
+              symbolColor: '#e6edf3',
+              height: 44,
+            },
+          }
+        : {}
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#0d1117',
+    ...titleBarOptions,
     webPreferences: {
       preload: resolvePreload(),
       contextIsolation: true,

@@ -26,6 +26,10 @@
     --studio-radius-sm: 4px;
     --studio-radius-md: 8px;
     --studio-motion-fast: 150ms;
+    --studio-titlebar-height: 2.75rem;
+    --studio-activity-rail-width: 3rem;
+    --studio-safe-left: 0.75rem;
+    --studio-safe-right: 0.75rem;
 
     --background: 220 13% 9%;
     --foreground: 210 17% 100%;
@@ -43,6 +47,16 @@
     --panel: 220 13% 11%;
     --panel-header: 220 12% 13%;
     --editor: 220 15% 7%;
+    --popover: 220 13% 11%;
+    --popover-foreground: 210 17% 82%;
+    --sidebar-background: var(--panel);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: var(--accent);
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
   }
 
   .light {
@@ -78,6 +92,16 @@
     --panel: 0 0% 100%;
     --panel-header: 210 20% 98%;
     --editor: 210 20% 99%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 24% 16%;
+    --sidebar-background: var(--panel);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: var(--accent);
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
   }
 
   * {
@@ -92,6 +116,17 @@
 
   body {
     @apply bg-background text-foreground font-sans text-base antialiased;
+  }
+
+  html[data-platform='darwin'] {
+    --studio-safe-left: 6rem;
+    --studio-safe-right: 0.75rem;
+  }
+
+  html[data-platform='win32'],
+  html[data-platform='linux'] {
+    --studio-safe-left: 0.75rem;
+    --studio-safe-right: 8.625rem;
   }
 }
 
@@ -158,6 +193,53 @@
 
   .studio-sidebar-row-active {
     @apply bg-accent text-accent-foreground hover:bg-accent/90 hover:text-accent-foreground;
+  }
+
+  .studio-titlebar {
+    @apply flex h-10 shrink-0 items-center gap-2 border-b border-border bg-panel-header;
+    height: var(--studio-titlebar-height);
+    padding-inline-start: var(--studio-safe-left);
+    padding-inline-end: var(--studio-safe-right);
+    padding-top: 0.05rem;
+    -webkit-app-region: drag;
+  }
+
+  html[data-platform='darwin'] .studio-titlebar-darwin {
+    padding-inline-start: 0;
+  }
+
+  .studio-titlebar-traffic-slot {
+    width: var(--studio-safe-left);
+    flex-shrink: 0;
+    align-self: stretch;
+    -webkit-app-region: drag;
+  }
+
+  .studio-titlebar-no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  .studio-primary-sidebar {
+    @apply flex min-h-0 min-w-0 flex-1;
+    transition: width var(--studio-motion-fast) ease;
+  }
+
+  .studio-activity-rail {
+    @apply flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-panel-header py-2;
+    width: var(--studio-activity-rail-width);
+  }
+
+  .studio-activity-rail-button {
+    @apply relative flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors duration-150;
+    @apply hover:bg-accent/80 hover:text-foreground;
+  }
+
+  .studio-activity-rail-button-active {
+    @apply border-border bg-accent text-accent-foreground;
+  }
+
+  .studio-sidebar-brand-header {
+    @apply shrink-0 px-3 py-2;
   }
 
   .studio-card {

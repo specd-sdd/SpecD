@@ -23,6 +23,22 @@
 - **THEN** `port-changes-mutate` discard runs
 - **AND** list refreshes on success
 
+### Requirement: workspace tree renders in stacked Workspaces panel when sidebar expanded
+
+#### Scenario: Stacked panels show Workspaces tree when Changes section active
+
+- **GIVEN** sidebar expanded with Changes activity-rail section selected
+- **WHEN** user inspects sidebar body
+- **THEN** Workspaces tree block is visible and mounted
+- **AND** workspace tree poll hook is enabled
+
+#### Scenario: Collapsed sidebar disables tree poll unless hub or spec open
+
+- **GIVEN** sidebar collapsed and center is changes-hub
+- **WHEN** global poll fires
+- **THEN** tree poll hook is disabled
+- **AND** cached tree data is retained
+
 ### Requirement: rows must truncate long spec paths
 
 #### Scenario: Long spec paths truncate

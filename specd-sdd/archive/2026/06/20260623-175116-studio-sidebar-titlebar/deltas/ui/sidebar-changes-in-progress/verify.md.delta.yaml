@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing list scenarios remain valid under new shell host

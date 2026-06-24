@@ -1,0 +1,2 @@
+- op: no-op
+  description: List rendering unchanged — shell-layout owns new section host and activity rail

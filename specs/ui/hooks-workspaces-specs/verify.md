@@ -31,19 +31,26 @@
 
 ### Requirement: workspace tree refreshes on global poll
 
-#### Scenario: Tree refetches on global poll tick
+#### Scenario: Tree refetches on global poll tick when Workspaces visible
 
-- **GIVEN** workspace sidebar visible
+- **GIVEN** sidebar expanded and Workspaces section active
 - **WHEN** global poll runs
 - **THEN** tree metadata hook refetches
 - **AND** new spec file appears as node
 
-#### Scenario: Hidden sidebar skips tree poll
+#### Scenario: Collapsed sidebar skips tree poll
 
-- **GIVEN** user collapsed workspace panel
+- **GIVEN** sidebar collapsed to activity rail
 - **WHEN** poll fires
 - **THEN** no tree refetch
-- **AND** cache retained until panel shown
+- **AND** cache retained until Workspaces section shown expanded
+
+#### Scenario: Re-expanding sidebar retains cached tree
+
+- **GIVEN** sidebar collapsed after tree loaded
+- **WHEN** user expands sidebar before next poll tick
+- **THEN** cached tree data is still available
+- **AND** Workspaces list renders without a loading flash
 
 #### Scenario: Selection preserved across refresh
 

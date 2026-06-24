@@ -243,9 +243,8 @@
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:5512612aac1a240abaef9111c657fa4fd0f093a9329277827478f7dfc18e3a4f",
+    "spec.md": "sha256:df93de8c83e5ce76e52b30ac301b32b9842f28b45a8c3625633f3f705310ba99",
     "verify.md": "sha256:bcef5d29accb1554f92aeb6f5d53c97efa61a22e0473fb2b417d8fb94be23f58"
   },
-  "generatedBy": "core",
-  "dependsOn": []
+  "generatedBy": "core"
 }

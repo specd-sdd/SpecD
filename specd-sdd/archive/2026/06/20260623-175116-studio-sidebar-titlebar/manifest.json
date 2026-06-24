@@ -1,0 +1,2266 @@
+{
+  "name": "studio-sidebar-titlebar",
+  "createdAt": "2026-06-23T17:51:16.407Z",
+  "updatedAt": "2026-06-24T19:23:43.720Z",
+  "description": "Collapsible activity-rail sidebar, unified titlebar with platform-safe window chrome, and SpecD Studio branding moved into the sidebar header.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "ui:shell-layout",
+    "ui:design-system",
+    "ui:hooks-workspaces-specs",
+    "ui:sidebar-changes-in-progress",
+    "ui:sidebar-changes-drafts",
+    "ui:sidebar-changes-archive",
+    "ui:sidebar-changes-discarded",
+    "ui:sidebar-graph-entry",
+    "ui:sidebar-workspaces-tree",
+    "studio-desktop:main-window-manager"
+  ],
+  "specDependsOn": {
+    "ui:shell-layout": [
+      "ui:design-system",
+      "client:specd-data-port",
+      "ui:hooks-workspaces-specs",
+      "ui:sidebar-changes-in-progress",
+      "ui:sidebar-workspaces-tree",
+      "ui:sidebar-graph-entry",
+      "studio-desktop:main-window-manager"
+    ],
+    "ui:design-system": [],
+    "ui:hooks-workspaces-specs": ["client:specd-data-port", "client:port-workspaces-specs"],
+    "ui:sidebar-changes-in-progress": ["client:specd-data-port"],
+    "ui:sidebar-changes-drafts": ["client:specd-data-port"],
+    "ui:sidebar-changes-archive": ["client:specd-data-port"],
+    "ui:sidebar-changes-discarded": ["client:specd-data-port"],
+    "ui:sidebar-graph-entry": ["client:specd-data-port"],
+    "ui:sidebar-workspaces-tree": ["client:specd-data-port"],
+    "studio-desktop:main-window-manager": ["client:specd-data-port"]
+  },
+  "invalidationPolicy": "none",
+  "trackedImplementationFiles": [
+    {
+      "file": ".gitignore",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/outline-artifact-content/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/specd-plugin-type/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/studio/packages.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/rebuild-vendored-sqlite-electron.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/sync-vendored-sqlite.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-electron/test/runtime/vendored-sqlite.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-workspace-specs-collection.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/ShellLayout.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/styles/globals.css",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/electron-build-metadata.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/StudioTitlebar.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/.specd-exploration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/studio-desktop/main-window-manager/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/studio-desktop/main-window-manager/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/design-system/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/design-system/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/hooks-workspaces-specs/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/hooks-workspaces-specs/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/shell-layout/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/shell-layout/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-archive/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-archive/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-discarded/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-discarded/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-drafts/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-drafts/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-in-progress/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-in-progress/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-graph-entry/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-graph-entry/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-workspaces-tree/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-workspaces-tree/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/design.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/manifest.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/proposal.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/tasks.md",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/preload/bridge.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/renderer/main.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/renderer/specd-window.d.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-web/tests/e2e/studio.ui.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/SpecdApp.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/tailwind.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/vitest.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/components/ui/sheet.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/components/ui/sidebar.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-mobile.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/setup.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/shell/studio-shell-sidebar.spec.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/use-workspace-specs-collection.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/hubs/ChangesHubView.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/hubs/WorkspacesHubView.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/StudioShellSidebar.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/StudioSidebarPanels.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/StudioSidebarRail.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/studio-sidebar-types.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph-electron/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/studio-desktop/main-kernel-lifecycle/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/.specd-index-meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/deltas/code-graph-electron/composition/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/deltas/code-graph-electron/composition/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/deltas/studio-desktop/main-kernel-lifecycle/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/deltas/studio-desktop/main-kernel-lifecycle/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph-electron/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph-electron/composition/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph-electron/composition/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/studio-desktop/main-kernel-lifecycle/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/studio-desktop/main-kernel-lifecycle/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-document-platform.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/StudioBrandMark.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260624-local-vendored-sqlite-runtime-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260624-local-vendored-sqlite-runtime.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-async-resource.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260623-173423-local-vendored-sqlite-runtime/.changeset-release.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/test/use-async-resource.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/workspaces-poll-enabled.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/shell/changes-hub-view.spec.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/shell/sidebar-collapsed-storage.spec.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/shell/studio-titlebar.spec.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/shell/workspaces-poll-enabled.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/reports/20260624-211358/specs-compliance-change-studio-sidebar-titlebar-20260624-211358.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "ui:shell-layout",
+      "file": "packages/ui/src/shell/ShellLayout.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["ShellLayout"]
+    },
+    {
+      "specId": "ui:shell-layout",
+      "file": "packages/ui/src/shell/StudioTitlebar.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["StudioTitlebar"]
+    },
+    {
+      "specId": "ui:design-system",
+      "file": "packages/ui/src/styles/globals.css",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "ui:design-system",
+      "file": "packages/ui/src/SpecdApp.tsx",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "ui:hooks-workspaces-specs",
+      "file": "packages/ui/src/hooks/use-workspace-specs-collection.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["useWorkspaceSpecsCollection"]
+    },
+    {
+      "specId": "ui:sidebar-workspaces-tree",
+      "file": "packages/ui/src/shell/studio-sidebar/StudioSidebarPanels.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["StudioSidebarPanels"]
+    },
+    {
+      "specId": "ui:sidebar-graph-entry",
+      "file": "packages/ui/src/shell/studio-sidebar/StudioSidebarRail.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["StudioSidebarRail"]
+    },
+    {
+      "specId": "ui:sidebar-changes-in-progress",
+      "file": "packages/ui/src/shell/hubs/ChangesHubView.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangesHubView"]
+    },
+    {
+      "specId": "ui:sidebar-changes-drafts",
+      "file": "packages/ui/src/shell/hubs/ChangesHubView.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangesHubView"]
+    },
+    {
+      "specId": "ui:sidebar-changes-archive",
+      "file": "packages/ui/src/shell/hubs/ChangesHubView.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangesHubView"]
+    },
+    {
+      "specId": "ui:sidebar-changes-discarded",
+      "file": "packages/ui/src/shell/hubs/ChangesHubView.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangesHubView"]
+    },
+    {
+      "specId": "ui:shell-layout",
+      "file": "packages/ui/src/shell/hubs/WorkspacesHubView.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["WorkspacesHubView"]
+    },
+    {
+      "specId": "ui:sidebar-workspaces-tree",
+      "file": "packages/ui/src/shell/hubs/WorkspacesHubView.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["WorkspacesHubView"]
+    },
+    {
+      "specId": "ui:shell-layout",
+      "file": "packages/ui/src/shell/studio-sidebar/StudioShellSidebar.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["StudioShellSidebar"]
+    },
+    {
+      "specId": "ui:shell-layout",
+      "file": "packages/ui/src/components/ui/sidebar.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["SidebarProvider"]
+    },
+    {
+      "specId": "studio-desktop:main-window-manager",
+      "file": "apps/specd-studio-desktop/src/main/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createWindow"]
+    },
+    {
+      "specId": "studio-desktop:main-window-manager",
+      "file": "apps/specd-studio-desktop/src/preload/bridge.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:main-window-manager",
+      "file": "apps/specd-studio-desktop/src/renderer/main.tsx",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "ui:hooks-workspaces-specs",
+      "file": "packages/ui/src/hooks/use-async-resource.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["useAsyncResource"]
+    },
+    {
+      "specId": "ui:shell-layout",
+      "file": "packages/ui/src/hooks/use-document-platform.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["useDocumentPlatform"]
+    },
+    {
+      "specId": "ui:design-system",
+      "file": "packages/ui/tailwind.config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "ui:design-system",
+      "file": "packages/ui/test/use-async-resource.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "ui:shell-layout",
+      "file": "packages/ui/src/shell/workspaces-poll-enabled.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["isWorkspacesPollEnabled"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6ea52a72c4e1b553325362adf5e01e043d9967b5c87e1a77903e063d2de86d46"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "ui:shell-layout",
+          "filename": "deltas/ui/shell-layout/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:66c84df9e18f3bc636fc5b7e794933ffa5f2349e0658549b05dee7200b0e89ff"
+        },
+        {
+          "key": "ui:design-system",
+          "filename": "deltas/ui/design-system/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3e474fe4de80703c4516915a739d7e5e797b3796766eee688a90a755b7d4fefc"
+        },
+        {
+          "key": "ui:hooks-workspaces-specs",
+          "filename": "deltas/ui/hooks-workspaces-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:824f5a773a4018adf3641ebd4739e5ba402ff1b5387f0cc4893db0c91e348f21"
+        },
+        {
+          "key": "ui:sidebar-changes-in-progress",
+          "filename": "deltas/ui/sidebar-changes-in-progress/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0823ecac155902081184067d783887385587993c6fdc78e705afeed5fac4ce72"
+        },
+        {
+          "key": "ui:sidebar-changes-drafts",
+          "filename": "deltas/ui/sidebar-changes-drafts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0823ecac155902081184067d783887385587993c6fdc78e705afeed5fac4ce72"
+        },
+        {
+          "key": "ui:sidebar-changes-archive",
+          "filename": "deltas/ui/sidebar-changes-archive/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0823ecac155902081184067d783887385587993c6fdc78e705afeed5fac4ce72"
+        },
+        {
+          "key": "ui:sidebar-changes-discarded",
+          "filename": "deltas/ui/sidebar-changes-discarded/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0823ecac155902081184067d783887385587993c6fdc78e705afeed5fac4ce72"
+        },
+        {
+          "key": "ui:sidebar-graph-entry",
+          "filename": "deltas/ui/sidebar-graph-entry/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:deeddc23b315caaa0e9f6aed41419d5f1f955c430d19c08625e6a6121ba7be70"
+        },
+        {
+          "key": "ui:sidebar-workspaces-tree",
+          "filename": "deltas/ui/sidebar-workspaces-tree/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5b8b394116d3f441427d2733dcd64e68856bbed8cc927f778de521cfa951e759"
+        },
+        {
+          "key": "studio-desktop:main-window-manager",
+          "filename": "deltas/studio-desktop/main-window-manager/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d824f50fcee6adf4684bd4195bf1688d1eb31894626eb171acd3fddb2daff347"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "ui:shell-layout",
+          "filename": "deltas/ui/shell-layout/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a65d24c1ca9178d4716ce1b1d6d6f6bf13f69fa1b3a5439f4b3eea2d88e1a44f"
+        },
+        {
+          "key": "ui:design-system",
+          "filename": "deltas/ui/design-system/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:77a8ce1798dbb9058746db04a56e728f41fad23a2d325dec0b746d4a58ad1a6e"
+        },
+        {
+          "key": "ui:hooks-workspaces-specs",
+          "filename": "deltas/ui/hooks-workspaces-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6fa37d01182dc227ebc7f6d8892d685f9e4082bf9b08700fcead29ffea56cd24"
+        },
+        {
+          "key": "ui:sidebar-changes-in-progress",
+          "filename": "deltas/ui/sidebar-changes-in-progress/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5e0c2e2b1e8e269201e5c835172affb35b93cac91a42cdc20feb429d2b541d6e"
+        },
+        {
+          "key": "ui:sidebar-changes-drafts",
+          "filename": "deltas/ui/sidebar-changes-drafts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5e0c2e2b1e8e269201e5c835172affb35b93cac91a42cdc20feb429d2b541d6e"
+        },
+        {
+          "key": "ui:sidebar-changes-archive",
+          "filename": "deltas/ui/sidebar-changes-archive/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5e0c2e2b1e8e269201e5c835172affb35b93cac91a42cdc20feb429d2b541d6e"
+        },
+        {
+          "key": "ui:sidebar-changes-discarded",
+          "filename": "deltas/ui/sidebar-changes-discarded/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5e0c2e2b1e8e269201e5c835172affb35b93cac91a42cdc20feb429d2b541d6e"
+        },
+        {
+          "key": "ui:sidebar-graph-entry",
+          "filename": "deltas/ui/sidebar-graph-entry/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4a549a65526a95092f5b454e098a0998f92a7872c86314e6dffae332855791fc"
+        },
+        {
+          "key": "ui:sidebar-workspaces-tree",
+          "filename": "deltas/ui/sidebar-workspaces-tree/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b75335a2870e5ede3b4da9a6eb6e887828a3111c59a42fbc3b88dd051d4770a6"
+        },
+        {
+          "key": "studio-desktop:main-window-manager",
+          "filename": "deltas/studio-desktop/main-window-manager/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7466f4137dddf7465d4834b773785b1e3f9ce236571048ce1ca7368042f32696"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:abd9f37debaa8cfb57201c0d45e02e8c8f3a65311948f6e949b7832ceafa3627"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:ec48ed1fb1e74edfa1c5b6ff7fc56505a85777c5c5ff06ea09f2ce6b925ee146"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-23T17:51:16.407Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "ui:shell-layout",
+        "ui:design-system",
+        "ui:hooks-workspaces-specs",
+        "ui:sidebar-changes-in-progress",
+        "ui:sidebar-changes-drafts",
+        "ui:sidebar-changes-archive",
+        "ui:sidebar-changes-discarded",
+        "ui:sidebar-graph-entry",
+        "ui:sidebar-workspaces-tree",
+        "studio-desktop:main-window-manager"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-23T17:51:16.433Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "ui:shell-layout"
+        },
+        {
+          "type": "specs",
+          "key": "ui:design-system"
+        },
+        {
+          "type": "specs",
+          "key": "ui:hooks-workspaces-specs"
+        },
+        {
+          "type": "specs",
+          "key": "ui:sidebar-changes-in-progress"
+        },
+        {
+          "type": "specs",
+          "key": "ui:sidebar-changes-drafts"
+        },
+        {
+          "type": "specs",
+          "key": "ui:sidebar-changes-archive"
+        },
+        {
+          "type": "specs",
+          "key": "ui:sidebar-changes-discarded"
+        },
+        {
+          "type": "specs",
+          "key": "ui:sidebar-graph-entry"
+        },
+        {
+          "type": "specs",
+          "key": "ui:sidebar-workspaces-tree"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:main-window-manager"
+        },
+        {
+          "type": "verify",
+          "key": "ui:shell-layout"
+        },
+        {
+          "type": "verify",
+          "key": "ui:design-system"
+        },
+        {
+          "type": "verify",
+          "key": "ui:hooks-workspaces-specs"
+        },
+        {
+          "type": "verify",
+          "key": "ui:sidebar-changes-in-progress"
+        },
+        {
+          "type": "verify",
+          "key": "ui:sidebar-changes-drafts"
+        },
+        {
+          "type": "verify",
+          "key": "ui:sidebar-changes-archive"
+        },
+        {
+          "type": "verify",
+          "key": "ui:sidebar-changes-discarded"
+        },
+        {
+          "type": "verify",
+          "key": "ui:sidebar-graph-entry"
+        },
+        {
+          "type": "verify",
+          "key": "ui:sidebar-workspaces-tree"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:main-window-manager"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:53:22.106Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T18:00:29.236Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T02:17:28.622Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:22:41.913Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "ui:shell-layout",
+            "ui:design-system",
+            "ui:hooks-workspaces-specs",
+            "ui:sidebar-changes-in-progress",
+            "ui:sidebar-changes-drafts",
+            "ui:sidebar-changes-archive",
+            "ui:sidebar-changes-discarded",
+            "ui:sidebar-graph-entry",
+            "ui:sidebar-workspaces-tree",
+            "studio-desktop:main-window-manager"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "ui:shell-layout",
+            "ui:design-system",
+            "ui:hooks-workspaces-specs",
+            "ui:sidebar-changes-in-progress",
+            "ui:sidebar-changes-drafts",
+            "ui:sidebar-changes-archive",
+            "ui:sidebar-changes-discarded",
+            "ui:sidebar-graph-entry",
+            "ui:sidebar-workspaces-tree",
+            "studio-desktop:main-window-manager"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T02:22:41.913Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:24:49.604Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:design-system, ui:shell-layout]; verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:24:49.834Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:design-system]; verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:design-system"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:24:49.934Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:24:50.376Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:design-system]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:design-system"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:24:50.460Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:24:50.851Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T02:24:55.668Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T02:24:57.507Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:31:32.801Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "ui:shell-layout",
+            "ui:design-system",
+            "ui:hooks-workspaces-specs",
+            "ui:sidebar-changes-in-progress",
+            "ui:sidebar-changes-drafts",
+            "ui:sidebar-changes-archive",
+            "ui:sidebar-changes-discarded",
+            "ui:sidebar-graph-entry",
+            "ui:sidebar-workspaces-tree",
+            "studio-desktop:main-window-manager"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "ui:shell-layout",
+            "ui:design-system",
+            "ui:hooks-workspaces-specs",
+            "ui:sidebar-changes-in-progress",
+            "ui:sidebar-changes-drafts",
+            "ui:sidebar-changes-archive",
+            "ui:sidebar-changes-discarded",
+            "ui:sidebar-graph-entry",
+            "ui:sidebar-workspaces-tree",
+            "studio-desktop:main-window-manager"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T11:31:32.801Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T11:31:41.394Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:33:19.656Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:design-system, ui:hooks-workspaces-specs, ui:shell-layout, ui:sidebar-graph-entry]; verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "ui:design-system",
+            "ui:hooks-workspaces-specs",
+            "ui:shell-layout",
+            "ui:sidebar-graph-entry"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:34:10.020Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:design-system, ui:hooks-workspaces-specs, ui:sidebar-graph-entry]; verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:design-system", "ui:hooks-workspaces-specs", "ui:sidebar-graph-entry"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:34:10.106Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:hooks-workspaces-specs, ui:sidebar-graph-entry]; verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:hooks-workspaces-specs", "ui:sidebar-graph-entry"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:34:10.155Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:sidebar-graph-entry]; verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:sidebar-graph-entry"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:34:10.351Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:34:10.517Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:design-system]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:design-system"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:34:10.609Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T11:34:10.940Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T12:21:55.758Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T12:21:57.427Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:45.563Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [studio-desktop:main-window-manager, ui:design-system, ui:shell-layout]; verify [studio-desktop:main-window-manager, ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T14:31:45.563Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:45.622Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [studio-desktop:main-window-manager, ui:design-system, ui:shell-layout]; verify [studio-desktop:main-window-manager, ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:45.752Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [studio-desktop:main-window-manager, ui:design-system]; verify [studio-desktop:main-window-manager, ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system"]
+        },
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:58.337Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [studio-desktop:main-window-manager]; verify [studio-desktop:main-window-manager, ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["studio-desktop:main-window-manager"]
+        },
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:58.628Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [studio-desktop:main-window-manager, ui:design-system, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:58.716Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [studio-desktop:main-window-manager, ui:design-system]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-window-manager", "ui:design-system"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:58.787Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [studio-desktop:main-window-manager]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-window-manager"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:59.057Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T14:31:59.147Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T17:51:58.750Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T17:52:32.383Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T18:30:03.180Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:design-system, ui:hooks-workspaces-specs, ui:shell-layout]; verify [ui:hooks-workspaces-specs, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:design-system", "ui:hooks-workspaces-specs", "ui:shell-layout"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:hooks-workspaces-specs", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T18:30:03.180Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T18:30:03.357Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:design-system, ui:hooks-workspaces-specs]; verify [ui:hooks-workspaces-specs, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:design-system", "ui:hooks-workspaces-specs"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:hooks-workspaces-specs", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T18:30:03.454Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:hooks-workspaces-specs]; verify [ui:hooks-workspaces-specs, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:hooks-workspaces-specs"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:hooks-workspaces-specs", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T18:30:03.504Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:hooks-workspaces-specs, ui:shell-layout]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:hooks-workspaces-specs", "ui:shell-layout"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T18:30:03.856Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:hooks-workspaces-specs]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:hooks-workspaces-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T18:30:04.007Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T18:30:04.309Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:09:41.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:09:45.939Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:09:47.536Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T19:10:27.248Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:hooks-workspaces-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:hooks-workspaces-specs"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:10:27.248Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:10:55.102Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:10:56.555Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:10:57.905Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:10:59.374Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:11:00.896Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T19:19:00.748Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:sidebar-workspaces-tree]; verify [ui:sidebar-graph-entry, ui:sidebar-workspaces-tree]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:sidebar-workspaces-tree"]
+        },
+        {
+          "type": "verify",
+          "files": ["ui:sidebar-graph-entry", "ui:sidebar-workspaces-tree"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:19:00.748Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T19:19:01.488Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:sidebar-graph-entry, ui:sidebar-workspaces-tree]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:sidebar-graph-entry", "ui:sidebar-workspaces-tree"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T19:19:01.890Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [ui:sidebar-workspaces-tree]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["ui:sidebar-workspaces-tree"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T19:19:01.944Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:19:15.465Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:19:17.087Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:19:18.737Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:19:20.348Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:19:21.961Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-24T19:22:31.374Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'ui:shell-layout': extracted dependencies [ui:design-system, client:specd-data-port] do not match persisted dependencies [ui:design-system, client:specd-data-port, ui:hooks-workspaces-specs, ui:sidebar-changes-in-progress, ui:sidebar-workspaces-tree, ui:sidebar-graph-entry, studio-desktop:main-window-manager]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T19:23:04.876Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [ui:shell-layout]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["ui:shell-layout"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:23:04.876Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:23:35.765Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:23:37.501Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:23:39.067Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:23:40.675Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:23:42.295Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T19:23:43.720Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-24T19:23:43.838Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

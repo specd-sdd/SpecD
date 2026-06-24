@@ -6,6 +6,7 @@ export {}
 declare global {
   interface Window {
     specd?: {
+      platform: string
       ping: () => Promise<unknown>
       invoke: (method: string, payload?: unknown) => Promise<unknown>
       draftAwareMethods: readonly DraftAwareIpcMethod[]

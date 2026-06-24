@@ -70,6 +70,48 @@ Editor area tabs MUST be compact horizontal IDE tabs (closable when appropriate)
 
 Sidebars MUST implement workspace and change trees using a shared Studio tree composition in `@specd/ui`. The implementation MAY be backed by **`react-arborist`** or by shadcn/Radix-backed collapsible tree rows when a lighter hierarchy is sufficient. In both cases, trees MUST support collapsible nodes, optional status badges, selected-row highlight, and hover/active row chrome consistent with VS Code / Cursor file-tree behaviour.
 
+### Requirement: titlebar respects platform window-control safe zones
+
+Studio titlebar chrome MUST expose CSS custom properties (or equivalent Tailwind
+utilities) for non-client safe areas:
+
+| Host platform    | `--studio-safe-left`                       | `--studio-safe-right`            |
+| ---------------- | ------------------------------------------ | -------------------------------- |
+| macOS (`darwin`) | ~96px (traffic lights + gap before toggle) | ~12px                            |
+| Windows / Linux  | ~12px                                      | ~138px (minimize/maximize/close) |
+| Web              | ~12px                                      | ~12px                            |
+
+Interactive controls MUST NOT render inside the right safe zone on Windows/Linux.
+On **macOS desktop**, the titlebar MUST reserve the left safe zone via a dedicated traffic-light slot; **`SidebarTrigger`** MUST be the first interactive control after that slot.
+
+The titlebar MUST apply `padding-inline-start` and `padding-inline-end` from these
+tokens on hosts that do not use an explicit traffic slot (non-darwin or web).
+
+Desktop hosts MUST set a root `data-platform` attribute (`darwin`, `win32`, `linux`,
+or `web`) so token values apply without feature-level platform branching in every
+component.
+
+### Requirement: activity rail and titlebar use IDE-native density
+
+Primary navigation chrome MUST use the shadcn **`Sidebar`** primitive with
+`collapsible="icon"`. The collapsed icon rail MUST be **48px** wide
+(`--sidebar-width-icon: 3rem`) with vertically stacked **`SidebarMenu`** icon buttons,
+subtle selected-state chrome, and compact badges (change counts, stale graph dot).
+
+The unified **titlebar** MUST be **~44px** tall (`--studio-titlebar-height`), use
+panel-header background tokens, and rely on shadcn sidebar width transitions when the
+sidebar expands or collapses.
+
+Studio hosts MUST map `--sidebar-*` CSS variables to the same palette as `--panel`,
+`--accent`, and `--border` in `globals.css` so sidebar chrome matches titlebar and
+panels in both dark and light themes. shadcn default `.dark` sidebar zinc overrides
+MUST NOT diverge from Studio tokens.
+
+Tooltip and popover surfaces MUST define `--popover` and `--popover-foreground` in
+`globals.css` **and** map `popover` / `popover-foreground` colors in `tailwind.config.ts`
+so `bg-popover` utilities render opaque on Studio backgrounds. Sidebar rail tooltips
+SHOULD use explicit `bg-panel` classes for consistency.
+
 ### Requirement: artifact and inspector surfaces feel like code tooling
 
 Artifact and inspector panes MUST feel like a code editor / inspector: **`@monaco-editor/react`** for raw editing (`#0D1117` / `#111827`), GitHub-dark markdown preview for rendered markdown, and Git-style split diff for delta diff mode. These surfaces MUST NOT look like rich-text blog editors.

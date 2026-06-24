@@ -1,0 +1,24 @@
+- op: added
+  description: Activity rail graph icon scenarios
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: sidebar renders global poll data and wires actions$'
+  content: |
+    ### Requirement: graph activity rail icon reflects stale index state
+
+    #### Scenario: Stale graph shows indicator on collapsed rail icon
+
+    - **GIVEN** sidebar collapsed and graph status reports stale
+    - **WHEN** activity rail renders
+    - **THEN** Graph icon shows stale indicator
+
+    #### Scenario: Graph rail icon opens Graph Main View
+
+    - **GIVEN** sidebar collapsed
+    - **WHEN** user clicks Graph activity-rail icon
+    - **THEN** sidebar collapse state is unchanged
+    - **AND** central workspace switches to Graph Main View

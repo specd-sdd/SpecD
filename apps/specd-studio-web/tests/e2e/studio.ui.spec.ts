@@ -54,7 +54,13 @@ test.describe('SpecD Studio UI', () => {
   test('user can open the studio shell', async ({ page }) => {
     await openStudioShell(page)
     await expect(page.getByTestId('studio-shell')).toBeVisible()
+    await expect(page.getByTestId('studio-titlebar')).toBeVisible()
+    await expect(page.getByTestId('studio-primary-sidebar')).toBeVisible()
+    await expect(page.getByTestId('studio-activity-rail-changes')).toBeVisible()
     await expect(page.locator('.studio-panel-header', { hasText: /^Changes$/ })).toBeVisible()
+
+    await page.getByTestId('studio-activity-rail-workspaces').click()
+    await expect(page.getByTestId('studio-workspaces-hub')).toBeVisible()
     await expect(page.locator('.studio-panel-header', { hasText: /^Workspaces/ })).toBeVisible()
   })
 

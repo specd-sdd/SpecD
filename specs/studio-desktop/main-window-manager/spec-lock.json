@@ -6,7 +6,14 @@
   "dependsOn": ["client:specd-data-port"],
   "implementation": [
     {
-      "file": "studio-desktop:src/main/index.ts"
+      "file": "studio-desktop:src/main/index.ts",
+      "symbols": ["createWindow"]
+    },
+    {
+      "file": "studio-desktop:src/preload/bridge.ts"
+    },
+    {
+      "file": "studio-desktop:src/renderer/main.tsx"
     }
   ]
 }

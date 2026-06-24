@@ -15,7 +15,7 @@
     {
       "requirement": "workspace tree refreshes on global poll",
       "rules": [
-        "Tree metadata MUST refresh on the global poll interval; per-spec detail loads when a spec tab becomes visible."
+        "Tree metadata MUST refresh on the global poll interval when:\n\n- the sidebar is expanded (stacked Workspaces block visible), OR\n- the center context is **workspaces-hub**.\n\nWhen the sidebar is collapsed **and** the center is not workspaces-hub or an open spec,\ntree hooks MUST NOT refetch on poll ticks; cached metadata MUST be retained until\nWorkspaces becomes visible again or the workspaces hub opens.\n\nPausing poll via `enabled: false` MUST NOT discard in-memory tree data; re-enabling\nMUST show cached data immediately and MAY catch up when `refreshKey` has advanced.\n\nPer-spec detail loads when a spec tab becomes visible — unchanged."
       ]
     }
   ],
@@ -50,17 +50,27 @@
     },
     {
       "requirement": "workspace tree refreshes on global poll",
-      "name": "Tree refetches on global poll tick",
-      "given": ["workspace sidebar visible"],
+      "name": "Tree refetches on global poll tick when Workspaces visible",
+      "given": ["sidebar expanded and Workspaces section active"],
       "when": ["global poll runs"],
       "then": ["tree metadata hook refetches", "AND new spec file appears as node"]
     },
     {
       "requirement": "workspace tree refreshes on global poll",
-      "name": "Hidden sidebar skips tree poll",
-      "given": ["user collapsed workspace panel"],
+      "name": "Collapsed sidebar skips tree poll",
+      "given": ["sidebar collapsed to activity rail"],
       "when": ["poll fires"],
-      "then": ["no tree refetch", "AND cache retained until panel shown"]
+      "then": ["no tree refetch", "AND cache retained until Workspaces section shown expanded"]
+    },
+    {
+      "requirement": "workspace tree refreshes on global poll",
+      "name": "Re-expanding sidebar retains cached tree",
+      "given": ["sidebar collapsed after tree loaded"],
+      "when": ["user expands sidebar before next poll tick"],
+      "then": [
+        "cached tree data is still available",
+        "AND Workspaces list renders without a loading flash"
+      ]
     },
     {
       "requirement": "workspace tree refreshes on global poll",
@@ -74,14 +84,19 @@
     "symbols": [
       {
         "specId": "ui:hooks-workspaces-specs",
-        "file": "ui:src/hooks/use-workspace-specs.ts",
-        "symbol": "useWorkspaceSpecs"
+        "file": "ui:src/hooks/use-workspace-specs-collection.ts",
+        "symbol": "useWorkspaceSpecsCollection"
+      },
+      {
+        "specId": "ui:hooks-workspaces-specs",
+        "file": "ui:src/hooks/use-async-resource.ts",
+        "symbol": "useAsyncResource"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4978a658037e2d801a04ecd915d7f5d5ec5e89a868024a92065a5aa4ed20bbaf",
-    "verify.md": "sha256:f76514340304b67a75096ff4b9e34e77d196f92cdbff2eb6a30805414b13e917"
+    "spec.md": "sha256:68dea07a2cd95408f1902108c55f5a01072d48724d0f0631339ccc9ee6b597c0",
+    "verify.md": "sha256:1b47f04a91cda428c33458818d283e20d3ffbf3741c6a97c0642fdb8bc6cfc7c"
   },
   "generatedBy": "core"
 }

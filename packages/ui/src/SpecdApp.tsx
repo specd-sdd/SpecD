@@ -39,6 +39,13 @@ function StudioShell({
   const { project, status, refreshKey } = useProjectPoll({ poll: true })
   const collections = useChangesCollection(refreshKey)
 
+  const hostMode: SpecdAppMode =
+    mode === 'embedded' &&
+    typeof window !== 'undefined' &&
+    (window as Window & { specd?: unknown }).specd
+      ? 'desktop'
+      : mode
+
   const loadingActive =
     project.isLoading ||
     collections.active.isLoading ||
@@ -52,6 +59,7 @@ function StudioShell({
 
   return (
     <ShellLayout
+      hostMode={hostMode}
       storage={storage}
       project={project.data}
       projectStatus={status.data}
@@ -187,6 +195,14 @@ export function SpecdApp({
       document.documentElement.classList.remove('light')
     }
   }, [storage])
+
+  React.useEffect(() => {
+    const bridgedPlatform = (
+      window as Window & { specd?: { platform?: string } }
+    ).specd?.platform
+    document.documentElement.dataset.platform =
+      bridgedPlatform ?? (mode === 'desktop' ? 'win32' : 'web')
+  }, [mode])
 
   if (skipConnect && portProp) {
     return (

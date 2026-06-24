@@ -13,6 +13,12 @@
       ]
     },
     {
+      "requirement": "workspace tree renders in stacked Workspaces panel when sidebar expanded",
+      "rules": [
+        "The workspace spec tree MUST render in the stacked **Workspaces – Specs** sidebar\nblock whenever the primary sidebar is expanded (alongside the Changes block), regardless\nof which activity-rail section is selected in the center.\n\nPoll-driven tree hooks MUST be disabled when the sidebar is collapsed unless the center\nis **workspaces-hub** or an open **spec** (delegated to shell visibility flags per\n[`ui:hooks-workspaces-specs`](../hooks-workspaces-specs/spec.md))."
+      ]
+    },
+    {
       "requirement": "rows must truncate long spec paths",
       "rules": [
         "Each workspace and spec row MUST support text truncation (\"...\") when the sidebar width is constrained, using flexbox-based `min-w-0` and `truncate` rules applied to the button and its children."
@@ -50,6 +56,23 @@
       "name": "Discard calls mutate port",
       "when": ["user discards a draft from sidebar"],
       "then": ["port-changes-mutate discard runs", "AND list refreshes on success"]
+    },
+    {
+      "requirement": "workspace tree renders in stacked Workspaces panel when sidebar expanded",
+      "name": "Stacked panels show Workspaces tree when Changes section active",
+      "given": ["sidebar expanded with Changes activity-rail section selected"],
+      "when": ["user inspects sidebar body"],
+      "then": [
+        "Workspaces tree block is visible and mounted",
+        "AND workspace tree poll hook is enabled"
+      ]
+    },
+    {
+      "requirement": "workspace tree renders in stacked Workspaces panel when sidebar expanded",
+      "name": "Collapsed sidebar disables tree poll unless hub or spec open",
+      "given": ["sidebar collapsed and center is changes-hub"],
+      "when": ["global poll fires"],
+      "then": ["tree poll hook is disabled", "AND cached tree data is retained"]
     },
     {
       "requirement": "rows must truncate long spec paths",
@@ -107,14 +130,19 @@
     "symbols": [
       {
         "specId": "ui:sidebar-workspaces-tree",
-        "file": "ui:src/sidebar/WorkspacesSidebar.tsx",
-        "symbol": "WorkspacesSidebar"
+        "file": "ui:src/shell/studio-sidebar/StudioSidebarPanels.tsx",
+        "symbol": "StudioSidebarPanels"
+      },
+      {
+        "specId": "ui:sidebar-workspaces-tree",
+        "file": "ui:src/shell/hubs/WorkspacesHubView.tsx",
+        "symbol": "WorkspacesHubView"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c5948083b432853e25f93884dfd9dbaa97af7a478d45b4dd71d1f07c44d72017",
-    "verify.md": "sha256:f3cdb32e3c87c8f767e70c3c402aa94fdc9848dbe02a95eeb7c60f029bb3b6e2"
+    "spec.md": "sha256:9f30f9be5187c59bc3b72da3566e0b0fa05441f17a9825a291ba3008a7404c5a",
+    "verify.md": "sha256:6423ccb495f735980ada54f7b6f807f7e89a31e08ae205580615b995f8f32f85"
   },
   "generatedBy": "core"
 }

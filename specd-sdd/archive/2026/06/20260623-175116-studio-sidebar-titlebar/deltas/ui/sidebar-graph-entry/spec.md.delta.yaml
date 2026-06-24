@@ -1,0 +1,20 @@
+- op: added
+  description: Activity rail icon exposes graph stale badge when sidebar collapsed
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: sidebar renders global poll data and wires actions$'
+  content: |
+    ### Requirement: graph activity rail icon reflects stale index state
+
+    When the sidebar is collapsed to the activity rail, the Graph icon MUST show a stale
+    indicator (amber dot or equivalent badge) when `getGraphStatus` reports a stale index.
+
+    Clicking the Graph activity-rail icon MUST switch the central workspace to **Graph
+    Main View**. It MUST NOT open a Graph sidebar body panel.
+
+    Stale state MUST use a corner badge on the rail icon (not inline text overlapping the
+    icon).

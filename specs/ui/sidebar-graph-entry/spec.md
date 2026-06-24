@@ -10,6 +10,17 @@ Studio UI for **Sidebar Graph Entry**: user-visible layout and actions driven ex
 
 The sidebar MUST render lists from global poll hooks (`hooks-changes-collection`, `hooks-workspaces-specs`, etc.). The Graph entry MUST be implemented using a shadcn **`Button`** (variant ghost) and a shadcn **`Badge`** to indicate status (ready, stale, etc.). Row actions (open, restore, discard) MUST call the appropriate mutate port methods.
 
+### Requirement: graph activity rail icon reflects stale index state
+
+When the sidebar is collapsed to the activity rail, the Graph icon MUST show a stale
+indicator (amber dot or equivalent badge) when `getGraphStatus` reports a stale index.
+
+Clicking the Graph activity-rail icon MUST switch the central workspace to **Graph
+Main View**. It MUST NOT open a Graph sidebar body panel.
+
+Stale state MUST use a corner badge on the rail icon (not inline text overlapping the
+icon).
+
 ### Requirement: view uses SpecdDataPort hooks only
 
 Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`.

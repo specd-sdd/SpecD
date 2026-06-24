@@ -222,6 +222,39 @@
 - **THEN** secondary actions may reveal
 - **AND** default row stays dense without always-on buttons
 
+### Requirement: titlebar respects platform window-control safe zones
+
+#### Scenario: Windows applies right safe zone padding
+
+- **GIVEN** root `data-platform="win32"`
+- **WHEN** titlebar layout is measured
+- **THEN** right padding reserves ~138px for window controls
+- **AND** interactive controls sit left of that zone
+
+#### Scenario: macOS applies left traffic-light inset
+
+- **GIVEN** root `data-platform="darwin"`
+- **WHEN** titlebar layout is measured
+- **THEN** left traffic slot reserves ~96px for traffic lights and gap before toggle
+
+#### Scenario: Sidebar background matches panel tokens
+
+- **WHEN** sidebar renders in dark or light theme
+- **THEN** `--sidebar-background` resolves to the same palette as `--panel`
+
+### Requirement: activity rail and titlebar use IDE-native density
+
+#### Scenario: Collapsed shadcn sidebar icon rail is 48px wide
+
+- **WHEN** sidebar is collapsed (`collapsible="icon"`)
+- **THEN** `--sidebar-width-icon` resolves to 48px
+
+#### Scenario: Sidebar rail tooltips are opaque
+
+- **GIVEN** sidebar collapsed
+- **WHEN** user hovers a rail icon with tooltip
+- **THEN** tooltip background is opaque (uses popover or panel tokens)
+
 ### Requirement: artifact and inspector surfaces feel like code tooling
 
 #### Scenario: Raw editor uses dark code background

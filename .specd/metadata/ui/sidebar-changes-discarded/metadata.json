@@ -102,8 +102,8 @@
     "symbols": [
       {
         "specId": "ui:sidebar-changes-discarded",
-        "file": "ui:src/sidebar/ChangesSidebar.tsx",
-        "symbol": "ChangesSidebar"
+        "file": "ui:src/shell/hubs/ChangesHubView.tsx",
+        "symbol": "ChangesHubView"
       }
     ]
   },

@@ -9,12 +9,13 @@
       "file": "ui:src/styles/globals.css"
     },
     {
-      "file": "ui:src/shell/StatusBar.tsx",
-      "symbols": ["StatusBar"]
+      "file": "ui:src/SpecdApp.tsx"
     },
     {
-      "file": "ui:src/shell/StudioTopBar.tsx",
-      "symbols": ["StudioTopBar"]
+      "file": "ui:tailwind.config.ts"
+    },
+    {
+      "file": "ui:test/use-async-resource.spec.ts"
     }
   ]
 }

@@ -8,9 +8,112 @@ SpecD Studio is a spec-work IDE: sidebars for changes and workspaces, a tabbed e
 
 ### Requirement: shell provides sidebar tabs inspector and bottom panel regions
 
-The layout MUST render a left sidebar (changes, workspaces, graph entry), a central tab workspace, a right-hand inspector host, and a bottom panel host with three tabs in order **Output**, **Problems**, **Logs** (full studio output stream; warn/error filter; specd in-memory log readback). The default selected bottom tab MUST be **Output**.
+The layout MUST render a unified **titlebar**, a left **primary sidebar** built on
+shadcn **`Sidebar`** / **`SidebarProvider`**, a central workspace inside
+**`SidebarInset`**, a right-hand inspector host, and a bottom panel host with three
+tabs in order **Output**, **Problems**, **Logs**. The default selected bottom tab MUST
+be **Output**.
 
-The left sidebar sections for **Changes** and **Workspaces - Specs** MUST be vertically resizable. The shell MUST implement this using shadcn **`Resizable`** panel group components, allowing the user to adjust the proportion of the sidebar allocated to each section.
+The unified **titlebar** MUST span the full shell width (above both sidebar and main
+content) on **macOS desktop** (`data-platform="darwin"`). On hosts without integrated
+traffic lights (web, Windows, Linux), the titlebar MUST render only above the main
+content column; the primary sidebar MUST extend to the top of the shell.
+
+The primary sidebar MUST use shadcn **`Sidebar`** with `collapsible="icon"` and support
+two states:
+
+- **Expanded** (~16rem): **`SidebarHeader`** with **SpecD Studio** branding, a
+  **`SidebarMenu`** rail (Changes / Workspaces / Graph icons with badges), then **two
+  stacked blocks** — **Changes** and **Workspaces – Specs** — both visible (compact
+  lists). There MUST NOT be a third Graph block in the sidebar body.
+- **Collapsed** (48px icon rail): icon buttons with corner badges and tooltips.
+
+**Graph** on the rail MUST open the center graph view only; it MUST NOT render a
+sidebar body panel.
+
+On **macOS desktop**, the fixed sidebar MUST start below the titlebar (`top` offset
+matching `--studio-titlebar-height`) so native window controls do not overlap the
+sidebar header. On other hosts, the sidebar MUST use full viewport height (`top: 0`).
+
+Clicking **Changes** or **Workspaces** on the rail MUST set the center to the matching
+**domain hub** and MUST NOT auto-expand the sidebar. Clicking **Graph** MUST open the
+graph center view.
+
+On **macOS desktop**, the titlebar MUST include shadcn **`SidebarTrigger`** after the
+traffic-light slot. On **web / Windows / Linux**, `SidebarTrigger` MUST be embedded in
+the sidebar (header top-right when expanded; first collapsed rail item with a divider
+before other rail icons) and MUST NOT appear in the titlebar.
+
+The titlebar MUST include **inline** Documentation, Notifications, and Appearance
+controls on all hosts (desktop included), with safe-zone padding so controls do not
+overlap native window buttons.
+
+### Requirement: shell provides unified titlebar for global actions
+
+The shell MUST render a lean titlebar (~44px on desktop) containing:
+
+- on **macOS desktop**: a non-interactive **traffic-light slot** (`--studio-safe-left`)
+  followed immediately by shadcn **`SidebarTrigger`**, with the titlebar row spanning
+  the full shell width above sidebar and main content
+- on **web / Windows / Linux**: no `SidebarTrigger` in the titlebar; titlebar row above
+  the main content column only (sidebar is full height alongside it)
+- command-palette search entry (⌘K / Ctrl+K)
+- **New Change** action (visible on all hosts)
+- on **all** hosts including desktop: Documentation, Notifications, and Appearance as
+  **inline icon buttons** (not hidden behind a default overflow menu). The search field
+  MUST shrink before secondary actions are hidden.
+
+On **web / Windows / Linux**, the shell MUST render an embedded **`SidebarTrigger`** in
+the primary sidebar: top-right of the expanded header, or the first collapsed rail
+icon separated by a divider from Changes / Workspaces / Graph.
+
+The titlebar MUST NOT display **SpecD Studio** branding — that belongs in the
+expanded sidebar header only.
+
+Secondary titlebar controls MUST respect platform safe zones defined in
+[`ui:design-system`](../design-system/spec.md) so they do not overlap native window
+controls.
+
+### Requirement: sidebar collapse state is keyboard-toggleable and persisted
+
+The shell MUST toggle sidebar expanded ↔ collapsed on **⌘B** (macOS) / **Ctrl+B**
+(Windows/Linux/web).
+
+Collapsed state (`SidebarProvider` `open`) MUST persist through `IUserStorage` and
+restore on the next Studio session.
+
+### Requirement: workspace tree poll skips when Workspaces section is not visible
+
+The shell MUST pass an `enabled` or equivalent visibility flag to
+[`ui:hooks-workspaces-specs`](../hooks-workspaces-specs/spec.md) so workspace tree
+metadata does NOT refetch on global poll when:
+
+- the sidebar is collapsed to the icon rail **and** the center is not
+  **workspaces-hub**, OR
+- neither the Workspaces sidebar block nor the workspaces hub is relevant
+
+Poll MUST run when the sidebar is expanded (stacked Workspaces block visible) OR when
+`centerCtx` is **workspaces-hub** or an open **spec**.
+
+When poll is paused, cached workspace tree data MUST remain available so re-expanding
+the sidebar does not flash an empty loading state; a catch-up refetch MAY run when poll
+resumes.
+
+### Requirement: shell provides center domain hubs for changes and workspaces
+
+The center workspace MUST support `changes-hub` and `workspaces-hub` contexts in
+addition to change, spec, graph, and empty views.
+
+**Changes hub** MUST show change counts by lifecycle section and a list with **full
+change names** (not truncated). Selecting a row MUST open that change in the center.
+
+**Workspaces hub** MUST list workspaces and specs with **full paths** and surface spec
+validation / drift status where available. Selecting a row MUST open that spec.
+
+Compact sidebar lists MAY truncate; hubs are the readable inventory views.
+
+Domain hub UI MUST live in dedicated modules under `packages/ui/src/shell/hubs/`
+imported by `ShellLayout` — not inlined as a monolithic shell file.
 
 ### Requirement: shell orchestrates global polling while focused
 
@@ -91,3 +194,8 @@ The shell MUST host a global **Command Palette** (⌘K) and orchestrate navigati
 
 - [`ui:design-system`](../design-system/spec.md) — visual tokens, IDE layout chrome, motion
 - [`client:specd-data-port`](../../client/specd-data-port/spec.md) — data access
+- [`ui:hooks-workspaces-specs`](../hooks-workspaces-specs/spec.md) — workspace tree poll gating
+- [`ui:sidebar-changes-in-progress`](../sidebar-changes-in-progress/spec.md) — compact Changes sidebar block
+- [`ui:sidebar-workspaces-tree`](../sidebar-workspaces-tree/spec.md) — compact Workspaces tree block
+- [`ui:sidebar-graph-entry`](../sidebar-graph-entry/spec.md) — graph activity-rail entry
+- [`studio-desktop:main-window-manager`](../../studio-desktop/main-window-manager/spec.md) — desktop titlebar chrome

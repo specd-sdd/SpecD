@@ -13,6 +13,12 @@
       ]
     },
     {
+      "requirement": "graph activity rail icon reflects stale index state",
+      "rules": [
+        "When the sidebar is collapsed to the activity rail, the Graph icon MUST show a stale\nindicator (amber dot or equivalent badge) when `getGraphStatus` reports a stale index.\n\nClicking the Graph activity-rail icon MUST switch the central workspace to **Graph\nMain View**. It MUST NOT open a Graph sidebar body panel.\n\nStale state MUST use a corner badge on the rail icon (not inline text overlapping the\nicon)."
+      ]
+    },
+    {
       "requirement": "view uses SpecdDataPort hooks only",
       "rules": [
         "Components MUST consume data through `SpecdDataPort` hooks and MUST NOT import `@specd/core`."
@@ -44,6 +50,23 @@
       "name": "Discard calls mutate port",
       "when": ["user discards a draft from sidebar"],
       "then": ["port-changes-mutate discard runs", "AND list refreshes on success"]
+    },
+    {
+      "requirement": "graph activity rail icon reflects stale index state",
+      "name": "Stale graph shows indicator on collapsed rail icon",
+      "given": ["sidebar collapsed and graph status reports stale"],
+      "when": ["activity rail renders"],
+      "then": ["Graph icon shows stale indicator"]
+    },
+    {
+      "requirement": "graph activity rail icon reflects stale index state",
+      "name": "Graph rail icon opens Graph Main View",
+      "given": ["sidebar collapsed"],
+      "when": ["user clicks Graph activity-rail icon"],
+      "then": [
+        "sidebar collapse state is unchanged",
+        "AND central workspace switches to Graph Main View"
+      ]
     },
     {
       "requirement": "view uses SpecdDataPort hooks only",
@@ -91,14 +114,14 @@
     "symbols": [
       {
         "specId": "ui:sidebar-graph-entry",
-        "file": "ui:src/sidebar/WorkspacesSidebar.tsx",
-        "symbol": "WorkspacesSidebar"
+        "file": "ui:src/shell/studio-sidebar/StudioSidebarRail.tsx",
+        "symbol": "StudioSidebarRail"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5795e9077ad603bfddea053150a2a475c12d7d15a174bb6fc3ef37be0ee00844",
-    "verify.md": "sha256:cf4fda00623102fd8e92266f9d84160f5b8e94984b06d42966a7b47608a9f9ca"
+    "spec.md": "sha256:56f1e41f0982021b10f6638bf9429fd676164fd7c6376294bea7d7d99fecf00a",
+    "verify.md": "sha256:ee99c94ed183b00f9f655c6787a5c113fb9cfc126961ccb7f4456cd6bda1936d"
   },
   "generatedBy": "core"
 }
