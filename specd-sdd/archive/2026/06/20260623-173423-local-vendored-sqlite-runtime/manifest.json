@@ -1,0 +1,618 @@
+{
+  "name": "local-vendored-sqlite-runtime",
+  "createdAt": "2026-06-23T17:34:23.755Z",
+  "updatedAt": "2026-06-24T17:48:06.583Z",
+  "description": "Generate code-graph-electron vendor tree locally instead of committing it to git",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["code-graph-electron:composition", "studio-desktop:main-kernel-lifecycle"],
+  "specDependsOn": {
+    "code-graph-electron:composition": [
+      "code-graph:composition",
+      "code-graph:sqlite-graph-store",
+      "default:_global/architecture"
+    ],
+    "studio-desktop:main-kernel-lifecycle": ["client:specd-data-port"]
+  },
+  "invalidationPolicy": "none",
+  "trackedImplementationFiles": [
+    {
+      "file": ".gitignore",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/electron-build-metadata.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/rebuild-vendored-sqlite-electron.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/scripts/sync-vendored-sqlite.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/test/runtime/vendored-sqlite.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/studio/packages.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/outline-artifact-content/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/specd-plugin-type/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/.specd-exploration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/deltas/code-graph-electron/composition/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/deltas/code-graph-electron/composition/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/deltas/studio-desktop/main-kernel-lifecycle/spec.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/deltas/studio-desktop/main-kernel-lifecycle/verify.md.delta.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/design.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/manifest.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/proposal.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-173423-local-vendored-sqlite-runtime/tasks.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/preload/bridge.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/renderer/main.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/renderer/specd-window.d.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-web/tests/e2e/studio.ui.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/SpecdApp.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-workspace-specs-collection.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/ShellLayout.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/styles/globals.css",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/tailwind.config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/vitest.config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/components/ui/sheet.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/components/ui/sidebar.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-document-platform.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-mobile.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/StudioBrandMark.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/StudioTitlebar.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/hubs/ChangesHubView.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/hubs/WorkspacesHubView.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/StudioShellSidebar.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/StudioSidebarPanels.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/StudioSidebarRail.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/src/shell/studio-sidebar/studio-sidebar-types.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/test/setup.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/test/shell/studio-shell-sidebar.spec.tsx",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/ui/test/use-workspace-specs-collection.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/studio-desktop/main-window-manager/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/studio-desktop/main-window-manager/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/design-system/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/design-system/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/hooks-workspaces-specs/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/hooks-workspaces-specs/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/shell-layout/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/shell-layout/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-archive/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-archive/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-discarded/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-discarded/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-drafts/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-drafts/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-in-progress/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-changes-in-progress/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-graph-entry/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-graph-entry/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-workspaces-tree/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/deltas/ui/sidebar-workspaces-tree/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260623-175116-studio-sidebar-titlebar/tasks.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/scripts/electron-build-metadata.mjs",
+      "fileLinkExplicit": true,
+      "symbols": [
+        "isPortableElectronBuildMetadata",
+        "electronBuildMatchesCurrent",
+        "createPortableElectronBuildMetadata",
+        "parsePortableElectronBuildMetadata"
+      ]
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/scripts/rebuild-vendored-sqlite-electron.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/scripts/sync-vendored-sqlite.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/test/runtime/vendored-sqlite.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/README.md",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:153dd8f460fe18b93b8962fa0fa9a1c6ad0aa35d9c4acb99f8796016b8235702"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph-electron:composition",
+          "filename": "deltas/code-graph-electron/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a237bce00b1f6ebbff98c3658df86cf676d0c38d732a464e0e2bddec9ae2afa1"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9cd6e65aace1fe6e8ad87e3ae52c37fe6001fda6f6f09c77273ed32d6f7ba6b7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph-electron:composition",
+          "filename": "deltas/code-graph-electron/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eb30657e151d4b57c6debd2fcba7807281b96a73c535053f4f2b150a473ed34e"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e497d9bec6d4c8c1cda2e6405fb60d54f994a894b3a4c72feb041cfe2dcb7761"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:3ee4799bc09c900ce1f963d2a0c8e89b2d51301b384f96cf791d8ed509bc2093"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:db8a7fe3c10554927c156a66496a31c45fe7121c93456ffc7484c7fa0576e7af"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-23T17:34:23.755Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["code-graph-electron:composition", "studio-desktop:main-kernel-lifecycle"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-23T17:34:23.779Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph-electron:composition"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph-electron:composition"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:38:46.230Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:40:30.429Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:42:35.453Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:50:48.335Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:53:55.604Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:54:08.594Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-24T17:46:11.420Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"local-vendored-sqlite-runtime\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-24T17:47:21.628Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph-electron:composition\" points outside workspace \"code-graph-electron\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-24T17:47:37.389Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"studio-desktop:main-kernel-lifecycle\" points outside workspace \"studio-desktop\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-24T17:47:42.318Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'studio-desktop:main-kernel-lifecycle': extracted dependencies [client:specd-data-port] do not match persisted dependencies [client:specd-data-port, code-graph-electron:composition]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T17:48:06.583Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-24T17:48:06.626Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

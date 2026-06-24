@@ -24,6 +24,10 @@ Without this package, the same effective addon path can work for Node and still 
 3. That runtime wrapper points at `vendor/better-sqlite3/lib/index.js`.
 4. The native addon lives at `vendor/better-sqlite3/build/Release/better_sqlite3.node`.
 
+The `vendor/better-sqlite3/` tree is generated locally by package scripts and is
+gitignored. It is not committed to the repository. After `pnpm install`, run
+`build` or the desktop rebuild scripts to populate it on disk.
+
 The package keeps shared graph behavior aligned with `@specd/code-graph`; only packaging and native runtime resolution differ.
 
 ## Scripts
@@ -42,6 +46,8 @@ The package keeps shared graph behavior aligned with `@specd/code-graph`; only p
 
 ## Maintenance Rules
 
+- `vendor/` is generated locally and ignored by git. Do not commit vendored sqlite sources or `.node` binaries.
+- First-time desktop development may compile the Electron addon via `studio-desktop` `prestart` or `rebuild:graph-electron`. Ensure native build tooling (node-gyp, Python, C++ compiler) is available when working on desktop.
 - Do not replace the vendored runtime with a package alias. `pnpm` aliases were proven to collapse back into the shared store path.
 - Do not make this package public.
 - Keep `@specd/code-graph` as the source of truth for graph behavior.

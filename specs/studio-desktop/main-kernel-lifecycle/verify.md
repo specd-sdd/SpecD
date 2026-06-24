@@ -50,9 +50,18 @@
 #### Scenario: Desktop package exposes Electron graph rebuild wiring
 
 - **WHEN** the desktop package scripts are inspected
-- **THEN** `rebuild:graph-sqlite-electron` rebuilds the vendored Electron SQLite addon
+- **THEN** `rebuild:graph-sqlite-electron` rebuilds the locally generated vendored
+  Electron SQLite addon
 - **AND** `rebuild:graph-electron` aliases that rebuild
 - **AND** `prestart` executes the Electron SQLite rebuild before app startup
+
+#### Scenario: Desktop startup does not require git-tracked vendor artifacts
+
+- **GIVEN** a fresh clone without committed vendored sqlite artifacts
+- **WHEN** desktop startup preparation runs
+- **THEN** it triggers the Electron sqlite rebuild workflow
+- **AND** desktop local graph startup does not depend on vendored sqlite files being
+  present in git
 
 #### Scenario: Desktop local host depends on the Electron graph package
 

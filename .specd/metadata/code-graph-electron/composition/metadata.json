@@ -29,6 +29,18 @@
       ]
     },
     {
+      "requirement": "Locally generated vendored sqlite tree",
+      "rules": [
+        "`@specd/code-graph-electron` SHALL treat `vendor/better-sqlite3/` as a locally\ngenerated runtime artifact rather than a git-tracked package tree.\n\nThe package MUST:\n\n- ignore `packages/code-graph-electron/vendor/` from version control\n- populate the vendored tree through its owned sync script before build or rebuild\n  workflows need it\n- preserve the physically separate module root required for Electron runtime\n  isolation from the standard `@specd/code-graph` sqlite path\n\nThe repository MUST NOT depend on committed copies of vendored sqlite sources or\nplatform-specific `better_sqlite3.node` binaries to satisfy desktop graph runtime\nbehaviour."
+      ]
+    },
+    {
+      "requirement": "Platform-aware vendored sqlite rebuild cache",
+      "rules": [
+        "The Electron-specific sqlite rebuild flow owned by `@specd/code-graph-electron` SHALL\nuse rebuild cache metadata that is portable across machines.\n\nRebuild cache metadata MUST record at least:\n\n- the target Electron version used by `studio-desktop`\n- the host `platform`\n- the host `arch`\n\nThe rebuild flow MUST skip recompilation when the vendored\n`build/Release/better_sqlite3.node` already exists and the cache metadata matches\nthe current Electron version, platform, and architecture.\n\nRebuild cache metadata MUST NOT rely on machine-specific absolute filesystem paths as\nthe primary cache key."
+      ]
+    },
+    {
       "requirement": "Shared source model without behavioural fork",
       "rules": [
         "`@specd/code-graph-electron` SHALL reuse the shared code-graph source model instead of introducing an independent behavioural fork.\n\nThe package MUST preserve the same graph semantics as `@specd/code-graph` for:\n\n- backend selection and provider lifecycle\n- graph indexing and search behaviour\n- graph traversal, impact, hotspots, and stats operations\n- SQLite-backed graph-store behaviour as observed by desktop consumers\n\nDesktop-specific composition MAY differ in packaging, dependency resolution, or runtime-targeted native rebuilds, but it MUST NOT intentionally diverge from the functional graph behaviour defined by the shared code-graph specs."
@@ -57,12 +69,8 @@
     {
       "requirement": "Electron-specific graph package",
       "name": "Desktop local graph imports the Electron package",
-      "given": [
-        "studio-desktop provides local graph operations from Electron main"
-      ],
-      "when": [
-        "the desktop graph composition is inspected"
-      ],
+      "given": ["studio-desktop provides local graph operations from Electron main"],
+      "when": ["the desktop graph composition is inspected"],
       "then": [
         "local graph wiring resolves through @specd/code-graph-electron",
         "AND it does not import the standard @specd/code-graph build output directly for desktop local graph operations"
@@ -71,9 +79,7 @@
     {
       "requirement": "Electron-specific graph package",
       "name": "CLI and API remain on the standard package",
-      "when": [
-        "CLI and API graph consumers are inspected"
-      ],
+      "when": ["CLI and API graph consumers are inspected"],
       "then": [
         "they continue to resolve graph composition through @specd/code-graph",
         "AND they do not require the Electron-specific package to run"
@@ -85,9 +91,7 @@
       "given": [
         "desktop local graph callers already expect createCodeGraphProvider(...) and the shared graph types"
       ],
-      "when": [
-        "studio-desktop is switched to @specd/code-graph-electron"
-      ],
+      "when": ["studio-desktop is switched to @specd/code-graph-electron"],
       "then": [
         "desktop graph wiring still compiles against the expected provider contract",
         "AND no desktop-only graph API fork is required"
@@ -96,12 +100,8 @@
     {
       "requirement": "Isolated native runtime path",
       "name": "Electron resolves its own native SQLite path",
-      "given": [
-        "Electron main opens the desktop-local graph provider"
-      ],
-      "when": [
-        "the provider initializes SQLite-backed graph storage"
-      ],
+      "given": ["Electron main opens the desktop-local graph provider"],
+      "when": ["the provider initializes SQLite-backed graph storage"],
       "then": [
         "the effective native module path used for SQLite belongs to @specd/code-graph-electron",
         "AND it is not satisfied by the standard @specd/code-graph native runtime path"
@@ -113,13 +113,49 @@
       "given": [
         "the Electron package requires a runtime-specific native rebuild or compatibility adjustment"
       ],
-      "when": [
-        "desktop packaging or development rebuilds the graph package for Electron"
-      ],
+      "when": ["desktop packaging or development rebuilds the graph package for Electron"],
       "then": [
         "CLI and API continue using their existing standard-package runtime path",
         "AND they are not forced onto the Electron-targeted native build"
       ]
+    },
+    {
+      "requirement": "Locally generated vendored sqlite tree",
+      "name": "Vendor directory is ignored by git",
+      "when": ["repository ignore rules are inspected"],
+      "then": [
+        "packages/code-graph-electron/vendor/ is excluded from version control",
+        "AND no vendored sqlite sources or better_sqlite3.node binaries are required to\nbe tracked in git"
+      ]
+    },
+    {
+      "requirement": "Locally generated vendored sqlite tree",
+      "name": "Sync populates the vendored tree on demand",
+      "given": ["a fresh workspace install without a local vendored sqlite tree"],
+      "when": ["@specd/code-graph-electron runs its vendored sqlite sync workflow"],
+      "then": [
+        "vendor/better-sqlite3/ is created under the Electron package",
+        "AND the vendored package version matches the canonical workspace\nbetter-sqlite3 dependency"
+      ]
+    },
+    {
+      "requirement": "Platform-aware vendored sqlite rebuild cache",
+      "name": "Rebuild metadata is portable",
+      "when": ["the vendored sqlite Electron rebuild cache is inspected"],
+      "then": [
+        "it records the target Electron version, host platform, and host architecture",
+        "AND it does not use a machine-specific absolute filesystem path as the primary\ncache key"
+      ]
+    },
+    {
+      "requirement": "Platform-aware vendored sqlite rebuild cache",
+      "name": "Matching cache metadata skips rebuild",
+      "given": [
+        "a vendored build/Release/better_sqlite3.node exists",
+        "AND rebuild cache metadata matches the current Electron version, platform, and\narchitecture"
+      ],
+      "when": ["the Electron sqlite rebuild workflow runs"],
+      "then": ["it skips recompilation", "AND it preserves the existing vendored addon"]
     },
     {
       "requirement": "Shared source model without behavioural fork",
@@ -127,9 +163,7 @@
       "given": [
         "equivalent graph operations are invoked through @specd/code-graph and @specd/code-graph-electron"
       ],
-      "when": [
-        "both packages run against the same compatible graph inputs"
-      ],
+      "when": ["both packages run against the same compatible graph inputs"],
       "then": [
         "indexing, search, traversal, impact, hotspots, and stats follow the same observable graph semantics",
         "AND any differences are limited to packaging or runtime-specific native resolution"
@@ -138,9 +172,7 @@
     {
       "requirement": "Internal-only distribution role",
       "name": "Electron package remains an internal workspace package",
-      "when": [
-        "the Electron package metadata and distribution role are reviewed"
-      ],
+      "when": ["the Electron package metadata and distribution role are reviewed"],
       "then": [
         "it is marked for internal workspace usage rather than public standalone npm publication",
         "AND its primary consumer is the packaged or locally developed studio-desktop application"
@@ -149,12 +181,8 @@
     {
       "requirement": "Desktop runtime compatibility track",
       "name": "Desktop may upgrade Electron without retargeting Node consumers",
-      "given": [
-        "studio-desktop moves from Electron 36.x to a newer supported Electron line"
-      ],
-      "when": [
-        "the Electron-specific graph package is rebuilt or repackaged for that line"
-      ],
+      "given": ["studio-desktop moves from Electron 36.x to a newer supported Electron line"],
+      "when": ["the Electron-specific graph package is rebuilt or repackaged for that line"],
       "then": [
         "the compatibility adjustment remains scoped to desktop runtime packaging",
         "AND CLI and API do not inherit the same Electron runtime target"
@@ -165,11 +193,7 @@
     "files": [
       {
         "specId": "code-graph-electron:composition",
-        "file": "code-graph-electron:test/composition/code-graph-electron.spec.ts"
-      },
-      {
-        "specId": "code-graph-electron:composition",
-        "file": "code-graph-electron:package.json"
+        "file": "code-graph-electron:scripts/rebuild-vendored-sqlite-electron.mjs"
       },
       {
         "specId": "code-graph-electron:composition",
@@ -177,37 +201,39 @@
       },
       {
         "specId": "code-graph-electron:composition",
-        "file": "code-graph-electron:tsup.config.ts"
-      },
-      {
-        "specId": "code-graph-electron:composition",
-        "file": "code-graph-electron:src/index.ts"
-      },
-      {
-        "specId": "code-graph-electron:composition",
         "file": "code-graph-electron:test/runtime/vendored-sqlite.spec.ts"
       },
       {
         "specId": "code-graph-electron:composition",
-        "file": "code-graph-electron:src/runtime/vendored-better-sqlite3.ts"
-      },
-      {
-        "specId": "code-graph-electron:composition",
         "file": "code-graph-electron:README.md"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:scripts/electron-build-metadata.mjs",
+        "symbol": "isPortableElectronBuildMetadata"
       },
       {
         "specId": "code-graph-electron:composition",
-        "file": "code-graph-electron:scripts/rebuild-vendored-sqlite-electron.mjs"
+        "file": "code-graph-electron:scripts/electron-build-metadata.mjs",
+        "symbol": "electronBuildMatchesCurrent"
       },
       {
         "specId": "code-graph-electron:composition",
-        "file": "code-graph-electron:tsconfig.json"
+        "file": "code-graph-electron:scripts/electron-build-metadata.mjs",
+        "symbol": "createPortableElectronBuildMetadata"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:scripts/electron-build-metadata.mjs",
+        "symbol": "parsePortableElectronBuildMetadata"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b2721587f91d26e466348d30cd8db0e25d78c9d39d67e227bc4556fc105102a0",
-    "verify.md": "sha256:b611e408a22d5de8a9f54733bc7b0ce8d24f4eb4c8b7fac150e45ed367703c2d"
+    "spec.md": "sha256:0a94eb05de50196e7c4569025b4a1b7ed26cb0e9a4c6a6d5e0c82efe96397f1a",
+    "verify.md": "sha256:21b58476f6dddea1369c599b5d2f300cdc29ad527b05418d2dbb5b5e1f97dc13"
   },
   "generatedBy": "core"
 }

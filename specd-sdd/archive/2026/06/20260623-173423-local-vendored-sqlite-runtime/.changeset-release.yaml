@@ -1,0 +1,3 @@
+releases:
+  code-graph-electron:composition: patch
+  studio-desktop:main-kernel-lifecycle: patch

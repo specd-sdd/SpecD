@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
+import { parsePortableElectronBuildMetadata } from './electron-build-metadata.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
@@ -50,9 +51,14 @@ function readPreservedElectronBuild() {
     return undefined
   }
 
+  const metadata = parsePortableElectronBuildMetadata(readFileSync(vendorMetadataPath, 'utf8'))
+  if (metadata === undefined) {
+    return undefined
+  }
+
   return {
     binary: readFileSync(vendorBinaryPath),
-    metadata: readFileSync(vendorMetadataPath, 'utf8'),
+    metadata: `${JSON.stringify(metadata, null, 2)}\n`,
   }
 }
 

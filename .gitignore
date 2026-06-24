@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Generated Electron vendored sqlite tree (code-graph-electron)
+packages/code-graph-electron/vendor/
+
 # Playwright (studio-web e2e)
 apps/specd-studio-web/test-results/
 apps/specd-studio-web/playwright-report/

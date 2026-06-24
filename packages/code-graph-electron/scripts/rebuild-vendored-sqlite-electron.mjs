@@ -3,6 +3,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
+import {
+  createPortableElectronBuildMetadata,
+  electronBuildMatchesCurrent,
+  parsePortableElectronBuildMetadata,
+} from './electron-build-metadata.mjs'
 
 const require = createRequire(import.meta.url)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
@@ -16,6 +21,11 @@ const electronPackageJsonPath = require.resolve('electron/package.json', {
   paths: [desktopDir],
 })
 const { version: electronVersion } = require(electronPackageJsonPath)
+const currentBuildTarget = {
+  electronVersion,
+  platform: process.platform,
+  arch: process.arch,
+}
 const nodeExecutable = process.execPath
 const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const syncResult = spawnSync(nodeExecutable, [syncScriptPath], {
@@ -27,13 +37,9 @@ if (syncResult.status !== 0) {
   process.exit(syncResult.status ?? 1)
 }
 
-if (existsSync(metadataPath)) {
-  const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'))
-  if (
-    metadata.electronVersion === electronVersion
-    && metadata.binaryPath === vendorBinaryPath
-    && existsSync(vendorBinaryPath)
-  ) {
+if (existsSync(metadataPath) && existsSync(vendorBinaryPath)) {
+  const metadata = parsePortableElectronBuildMetadata(readFileSync(metadataPath, 'utf8'))
+  if (metadata !== undefined && electronBuildMatchesCurrent(metadata, currentBuildTarget)) {
     process.exit(0)
   }
 }
@@ -56,13 +62,6 @@ if (result.status !== 0) {
 
 writeFileSync(
   metadataPath,
-  `${JSON.stringify(
-    {
-      electronVersion,
-      binaryPath: vendorBinaryPath,
-    },
-    null,
-    2,
-  )}\n`,
+  `${JSON.stringify(createPortableElectronBuildMetadata(currentBuildTarget), null, 2)}\n`,
   'utf8',
 )

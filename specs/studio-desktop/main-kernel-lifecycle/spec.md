@@ -22,9 +22,15 @@ app starts local graph work.
 The desktop package MUST:
 
 - depend on `@specd/code-graph-electron` for desktop-local graph execution
-- expose `rebuild:graph-sqlite-electron` for rebuilding the vendored Electron SQLite addon
+- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated
+  vendored Electron SQLite addon
 - expose `rebuild:graph-electron` as an alias of that rebuild
 - run the Electron SQLite rebuild from `prestart`
+
+Desktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted
+native addon are present in git. The first successful desktop start on a fresh clone
+MAY require a local native rebuild when the generated addon is missing or stale for
+the current Electron version, platform, or architecture.
 
 This wiring isolates the native SQLite runtime required by the Electron desktop
 host without retargeting CLI or API away from `@specd/code-graph`.

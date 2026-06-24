@@ -34,6 +34,41 @@ The desktop package MUST ensure that when Electron loads the local graph provide
 
 This isolation MUST allow desktop packaging and rebuild workflows to target Electron's supported runtime line without changing the native runtime expectations of CLI or API.
 
+### Requirement: Locally generated vendored sqlite tree
+
+`@specd/code-graph-electron` SHALL treat `vendor/better-sqlite3/` as a locally
+generated runtime artifact rather than a git-tracked package tree.
+
+The package MUST:
+
+- ignore `packages/code-graph-electron/vendor/` from version control
+- populate the vendored tree through its owned sync script before build or rebuild
+  workflows need it
+- preserve the physically separate module root required for Electron runtime
+  isolation from the standard `@specd/code-graph` sqlite path
+
+The repository MUST NOT depend on committed copies of vendored sqlite sources or
+platform-specific `better_sqlite3.node` binaries to satisfy desktop graph runtime
+behaviour.
+
+### Requirement: Platform-aware vendored sqlite rebuild cache
+
+The Electron-specific sqlite rebuild flow owned by `@specd/code-graph-electron` SHALL
+use rebuild cache metadata that is portable across machines.
+
+Rebuild cache metadata MUST record at least:
+
+- the target Electron version used by `studio-desktop`
+- the host `platform`
+- the host `arch`
+
+The rebuild flow MUST skip recompilation when the vendored
+`build/Release/better_sqlite3.node` already exists and the cache metadata matches
+the current Electron version, platform, and architecture.
+
+Rebuild cache metadata MUST NOT rely on machine-specific absolute filesystem paths as
+the primary cache key.
+
 ### Requirement: Shared source model without behavioural fork
 
 `@specd/code-graph-electron` SHALL reuse the shared code-graph source model instead of introducing an independent behavioural fork.

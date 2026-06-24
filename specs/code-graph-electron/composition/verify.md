@@ -42,6 +42,41 @@
 - **THEN** CLI and API continue using their existing standard-package runtime path
 - **AND** they are not forced onto the Electron-targeted native build
 
+### Requirement: Locally generated vendored sqlite tree
+
+#### Scenario: Vendor directory is ignored by git
+
+- **WHEN** repository ignore rules are inspected
+- **THEN** `packages/code-graph-electron/vendor/` is excluded from version control
+- **AND** no vendored sqlite sources or `better_sqlite3.node` binaries are required to
+  be tracked in git
+
+#### Scenario: Sync populates the vendored tree on demand
+
+- **GIVEN** a fresh workspace install without a local vendored sqlite tree
+- **WHEN** `@specd/code-graph-electron` runs its vendored sqlite sync workflow
+- **THEN** `vendor/better-sqlite3/` is created under the Electron package
+- **AND** the vendored package version matches the canonical workspace
+  `better-sqlite3` dependency
+
+### Requirement: Platform-aware vendored sqlite rebuild cache
+
+#### Scenario: Rebuild metadata is portable
+
+- **WHEN** the vendored sqlite Electron rebuild cache is inspected
+- **THEN** it records the target Electron version, host platform, and host architecture
+- **AND** it does not use a machine-specific absolute filesystem path as the primary
+  cache key
+
+#### Scenario: Matching cache metadata skips rebuild
+
+- **GIVEN** a vendored `build/Release/better_sqlite3.node` exists
+- **AND** rebuild cache metadata matches the current Electron version, platform, and
+  architecture
+- **WHEN** the Electron sqlite rebuild workflow runs
+- **THEN** it skips recompilation
+- **AND** it preserves the existing vendored addon
+
 ### Requirement: Shared source model without behavioural fork
 
 #### Scenario: Desktop and standard packages expose the same graph behaviour

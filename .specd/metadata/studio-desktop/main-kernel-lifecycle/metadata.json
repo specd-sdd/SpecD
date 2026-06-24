@@ -21,7 +21,7 @@
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
       "rules": [
-        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-electron` for desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the vendored Electron SQLite addon\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from `@specd/code-graph`."
+        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-electron` for desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated\n  vendored Electron SQLite addon\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nDesktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted\nnative addon are present in git. The first successful desktop start on a fresh clone\nMAY require a local native rebuild when the generated addon is missing or stale for\nthe current Electron version, platform, or architecture.\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from `@specd/code-graph`."
       ]
     },
     {
@@ -76,9 +76,19 @@
       "name": "Desktop package exposes Electron graph rebuild wiring",
       "when": ["the desktop package scripts are inspected"],
       "then": [
-        "rebuild:graph-sqlite-electron rebuilds the vendored Electron SQLite addon",
+        "rebuild:graph-sqlite-electron rebuilds the locally generated vendored",
         "AND rebuild:graph-electron aliases that rebuild",
         "AND prestart executes the Electron SQLite rebuild before app startup"
+      ]
+    },
+    {
+      "requirement": "desktop startup prepares the Electron SQLite graph runtime",
+      "name": "Desktop startup does not require git-tracked vendor artifacts",
+      "given": ["a fresh clone without committed vendored sqlite artifacts"],
+      "when": ["desktop startup preparation runs"],
+      "then": [
+        "it triggers the Electron sqlite rebuild workflow",
+        "AND desktop local graph startup does not depend on vendored sqlite files being\npresent in git"
       ]
     },
     {
@@ -108,8 +118,8 @@
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:ef5ef7032409f6a8dad92475d18652c0322d44d35c1b60b1f7cf838558e85c96",
-    "verify.md": "sha256:1a74bb3c05d8872fc5dd2d37fe64f2f8311ce842e70c2293b27268182e8a94a9"
+    "spec.md": "sha256:dfb16207948972f256b47e01078ec81d2e6814f251b96a2869daf2fc3b406942",
+    "verify.md": "sha256:ec2b308cbbeb1e5d40137217e9386011abc44b7729bafd14952716ce8eb8d8a1"
   },
   "generatedBy": "core"
 }
