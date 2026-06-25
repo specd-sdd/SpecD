@@ -1,7 +1,7 @@
 import { createVcsAdapter, type Kernel, type SpecdConfig } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { resolveConfigPath } from '../../load-config.js'
-import { createBootstrapGraphConfig } from './bootstrap-graph-config.js'
+import { createBootstrapGraphConfig } from '@specd/code-graph'
 
 /**
  * Resolved execution context for graph commands.

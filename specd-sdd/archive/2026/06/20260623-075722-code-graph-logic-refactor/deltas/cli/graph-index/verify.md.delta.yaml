@@ -1,0 +1,41 @@
+- op: modified
+  description: Keep delegation scenarios and document worker bypass for tests
+  selector:
+    type: section
+    matches: 'Requirement: Indexing behaviour'
+  content: |
+    #### Scenario: Command passes progress callback in text mode
+
+    - **WHEN** `specd graph index` is run in text mode
+    - **THEN** the command passes an `onProgress` callback to the provider
+    - **AND** when the callback is invoked, it prints the progress percentage and phase to stdout
+
+    #### Scenario: Command delegates configuration and locking
+
+    - **WHEN** `specd graph index` is executed
+    - **THEN** it delegates bootstrap config fallback, effective project config merging, lock acquisition, and index execution to the provider
+
+    #### Scenario: Worker subprocess performs indexing in isolation
+
+    - **GIVEN** `SPECD_GRAPH_INDEX_NO_WORKER` is not set
+    - **WHEN** `specd graph index` is run
+    - **THEN** the parent process spawns a child worker with `SPECD_GRAPH_INDEX_WORKER=true`
+    - **AND** the parent forwards `SIGINT` and `SIGTERM` to the worker
+    - **AND** the parent releases the indexing lock when the worker exits
+
+- op: added
+  description: Lock acquisition failure exits with code 3
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Error cases'
+    after:
+      type: section
+      matches: 'Scenario: Infrastructure error exits with code 3'
+  content: |
+    #### Scenario: Lock acquisition failure exits with code 3
+
+    - **GIVEN** another process currently holds the shared graph indexing lock
+    - **WHEN** `specd graph index` is run
+    - **THEN** stderr contains a retry-later message
+    - **AND** the process exits with code 3

@@ -1168,6 +1168,20 @@ Exact identifier matches are ranked ahead of fuzzy matches:
 
 Text output renders file-bearing results using paths relative to `projectRoot`.
 
+#### Examples
+
+Search for references to "SpecRepository" (symbols only, including snippets):
+
+```
+specd graph search "SpecRepository" --symbols --snippet
+```
+
+Search for "archive" across specs:
+
+```
+specd graph search "archive" --specs
+```
+
 ---
 
 ### graph hotspots
@@ -1201,6 +1215,20 @@ By default, `graph hotspots` shows only `class`, `interface`, `method`, and `fun
 
 Overriding `--min-risk`, `--limit`, or `--min-score` does not disable the other defaults. Use `--include-importer-only` when you explicitly want importer-only symbols to appear.
 
+#### Examples
+
+List top 10 hotspots with HIGH or CRITICAL risk:
+
+```
+specd graph hotspots --limit 10 --min-risk HIGH
+```
+
+List class or method hotspots inside the `core` workspace:
+
+```
+specd graph hotspots --kind class,method --workspace core
+```
+
 ---
 
 ### graph stats
@@ -1218,6 +1246,14 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--config <path>`           | Config file path. Mutually exclusive with `--path`.            |
 | `--path <path>`             | Repository root bootstrap path. Ignores any discovered config. |
 | `--format text\|json\|toon` | Output format.                                                 |
+
+#### Examples
+
+Print graph stats in TOON format:
+
+```
+specd graph stats --format toon
+```
 
 ---
 

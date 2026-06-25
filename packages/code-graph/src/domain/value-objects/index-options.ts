@@ -1,4 +1,4 @@
-import { type ProjectWorkspace } from '@specd/core'
+import { type ProjectWorkspace, type SpecMetadata } from '@specd/core'
 
 /**
  * Progress callback invoked during indexing to report completion percentage and phase.
@@ -104,4 +104,20 @@ export interface IndexOptions {
    * Used to detect when a full re-index is required due to logic changes.
    */
   readonly codeGraphVersion?: string
+}
+
+/**
+ * Target workspace to be indexed.
+ */
+export type WorkspaceIndexTarget = ProjectWorkspace
+
+/**
+ * A specification discovered during indexing.
+ */
+export interface DiscoveredSpec {
+  readonly specId: string
+  readonly workspace: string
+  readonly title: string
+  readonly description: string
+  readonly metadata: SpecMetadata
 }

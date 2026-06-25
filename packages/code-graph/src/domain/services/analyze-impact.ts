@@ -23,10 +23,10 @@ export async function analyzeImpact(
   // CALLS-based traversal (symbol-level)
   const results = []
   if (direction === 'upstream' || direction === 'both') {
-    results.push(await getUpstream(store, target, { maxDepth }))
+    results.push(await getUpstream(store, target, { maxDepth, includeFiles: false }))
   }
   if (direction === 'downstream' || direction === 'both') {
-    results.push(await getDownstream(store, target, { maxDepth }))
+    results.push(await getDownstream(store, target, { maxDepth, includeFiles: false }))
   }
 
   const affectedFileSet = new Set<string>()

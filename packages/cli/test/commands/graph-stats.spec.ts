@@ -6,6 +6,7 @@ import {
   makeMockKernel,
   makeProgram,
   mockProcessExit,
+  ExitSentinel,
 } from './helpers.js'
 
 vi.mock('../../src/commands/graph/resolve-graph-cli-context.js', () => ({
@@ -16,9 +17,13 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
-vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
-  assertGraphIndexUnlocked: vi.fn(),
-}))
+vi.mock('@specd/code-graph', async () => {
+  const actual = await vi.importActual<typeof import('@specd/code-graph')>('@specd/code-graph')
+  return {
+    ...actual,
+    assertGraphIndexUnlocked: vi.fn(),
+  }
+})
 
 vi.mock('@specd/core', async () => {
   const actual = await vi.importActual<typeof import('@specd/core')>('@specd/core')
@@ -33,8 +38,12 @@ vi.mock('@specd/core', async () => {
 import { createVcsAdapter } from '@specd/core'
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
-import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
-import { buildProjectGraphConfig } from '../../src/commands/graph/build-project-graph-config.js'
+import {
+  parseFingerprintMap,
+  detectFingerprintMismatch,
+  assertGraphIndexUnlocked,
+  buildProjectGraphConfig,
+} from '@specd/code-graph'
 import { codeGraphVersion } from '../../src/commands/graph/code-graph-version.js'
 import { registerGraphStats } from '../../src/commands/graph/stats.js'
 
@@ -370,5 +379,35 @@ describe('graph stats — staleness detection', () => {
 
     const parsed = JSON.parse(getStdout())
     expect(parsed.fingerprintMismatch).toBe(false)
+  })
+
+  it('prints derivation fingerprint mismatch warning to stderr in text mode', async () => {
+    const { getStderr, getStdout } = setup(
+      'configured',
+      { graphFingerprint: '{"core":"deadbeef"}' },
+      { withKernel: true },
+    )
+
+    await makeStatsProgram().parseAsync(['node', 'specd', 'graph', 'stats'])
+
+    expect(getStderr()).toContain(
+      '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index',
+    )
+    expect(getStdout()).not.toContain('Derivation fingerprint mismatch')
+  })
+
+  it('exits with code 3 when lock check fails', async () => {
+    setup('configured')
+    vi.mocked(assertGraphIndexUnlocked).mockImplementationOnce(() => {
+      throw new Error('graph is locked')
+    })
+    mockProcessExit()
+
+    const program = makeStatsProgram()
+    await expect(program.parseAsync(['node', 'specd', 'graph', 'stats'])).rejects.toThrow(
+      ExitSentinel,
+    )
+
+    expect(process.exit).toHaveBeenCalledWith(3)
   })
 })

@@ -59,6 +59,12 @@
 - **WHEN** `graph stats` is run in text mode
 - **THEN** no staleness line SHALL be shown
 
+#### Scenario: Text output with derivation fingerprint mismatch
+
+- **GIVEN** the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration
+- **WHEN** `graph stats` is run in text mode
+- **THEN** stderr contains `⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index`
+
 #### Scenario: Text output includes document counts
 
 - **GIVEN** the graph contains 459 files, 18 documents, 1497 symbols, and 122 specs

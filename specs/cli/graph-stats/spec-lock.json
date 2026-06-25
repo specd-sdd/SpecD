@@ -15,7 +15,14 @@
       "file": "cli:src/commands/graph/stats.ts"
     },
     {
-      "file": "cli:test/commands/graph-stats.spec.ts"
+      "file": "cli:src/commands/graph/search.ts"
+    },
+    {
+      "file": "cli:src/commands/project/status.ts"
+    },
+    {
+      "file": "cli:src/commands/graph/warn-graph-staleness.ts",
+      "symbols": ["warnGraphStale"]
     }
   ]
 }

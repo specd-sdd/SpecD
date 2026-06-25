@@ -882,7 +882,7 @@
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:5b7c9a605cb6756ed8efff4c57b0263c14974bf14976a9f8ba698afcce2cbd62",
+    "spec.md": "sha256:bdd3ac56325be9013d1db8ce1ce1d8654e004b6d373a6d47fdbd587399c6a978",
     "verify.md": "sha256:b4bd0657eb06ca54d13381487efdedb83e3519e1305ce10ced11a3d4040907a3"
   },
   "generatedBy": "core"

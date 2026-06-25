@@ -12,17 +12,11 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/build-project-graph-config.ts"
-    },
-    {
       "file": "cli:src/commands/graph/index-graph.ts",
       "symbols": ["registerGraphIndex"]
     },
     {
-      "file": "cli:test/commands/graph-index.spec.ts"
-    },
-    {
-      "file": "cli:test/commands/build-project-graph-config.spec.ts"
+      "file": "cli:src/commands/graph/resolve-graph-cli-context.ts"
     }
   ]
 }

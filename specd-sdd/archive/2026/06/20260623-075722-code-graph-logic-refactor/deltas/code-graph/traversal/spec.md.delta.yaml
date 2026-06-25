@@ -1,0 +1,59 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: File impact'
+  content: |
+    `analyzeFileImpact(store: GraphStore, filePath: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>` SHALL compute aggregate impact for all symbols defined in the given file. The optional `maxDepth` parameter (default: 3) is passed through to each per-symbol `analyzeImpact` call and limits the file-level IMPORTS BFS.
+
+    It:
+
+    1. Retrieves all symbols in the file via `findSymbols({ filePath })`
+    2. Runs `analyzeImpact` for each symbol with the given `maxDepth`
+    3. Merges results: deduplicates affected symbols (keeping the shallowest depth), takes the maximum risk level, unions affected files
+
+    `FileImpactResult` extends `ImpactResult` with:
+
+    - **`symbols`** — array of per-symbol `ImpactResult` entries
+    - **`riskLevel`** — the maximum risk level across all symbols in the file
+
+    When symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result.
+
+    The provider also SHALL support multi-file impact analysis via `analyzeFilesImpact(store: GraphStore, filePaths: string[], direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>`. When given multiple file paths, it aggregates the individual file impact results:
+    - Combines the lists of affected files and symbols.
+    - Sums direct, indirect, and transitive dependents counts.
+    - Computes the overall risk level as the maximum risk level among all analyzed files.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Spec impact'
+  content: |
+    `analyzeSpecImpact(store: GraphStore, specId: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<SpecImpactResult>` SHALL compute requirement-aware impact for one spec.
+
+    It MUST treat the following relation families as first-class blast-radius inputs:
+
+    - `DEPENDS_ON` for `Spec -> Spec`
+    - `COVERS_FILE` for `Spec -> File`
+    - `COVERS_SYMBOL` for `Spec -> Symbol`
+
+    In upstream/dependents mode, spec impact reports:
+
+    - specs that depend on the target spec
+    - files covered by the target spec and all transitively affected dependent specs
+    - symbols covered by the target spec and all transitively affected dependent specs
+
+    In downstream/dependencies mode, spec impact reports:
+
+    - specs the target spec depends on
+    - files and symbols reached through those downstream spec relationships where the traversal depth includes them
+
+    The result shape remains `SpecImpactResult` (which extends `ImpactResult`), but the affected file and affected symbol sets are allowed to originate from requirement-aware relations rather than only code-structure traversal.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Change detection'
+  content: |
+    `detectChanges(store: GraphStore, changedFiles: string[], maxDepth?: number): Promise<ChangeDetectionResult>` SHALL identify the impact of a set of changed files on the code graph. The optional `maxDepth` parameter (default: 3) is passed through to the upstream traversal for each changed symbol. It:
+
+    1. For each changed file, finds all symbols defined in it
+    2. Runs upstream traversal on each symbol with the given `maxDepth`
+    3. Aggregates affected symbols, files, and computes the risk level and summary

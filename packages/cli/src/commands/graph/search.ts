@@ -1,12 +1,13 @@
 import { Command, Option } from 'commander'
-import { type SearchOptions } from '@specd/code-graph'
+import { type SearchOptions, assertGraphIndexUnlocked } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { assertGraphIndexUnlocked } from './graph-index-lock.js'
 import { normalizeSnippet } from './normalize-snippet.js'
+
+import { warnGraphStale } from './warn-graph-staleness.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -163,7 +164,7 @@ Exclude examples:
             cliError(err instanceof Error ? err.message : 'invalid --kind value', opts.format, 1)
           }
         })()
-        const { config } = await resolveGraphCliContext({
+        const { config, kernel } = await resolveGraphCliContext({
           configPath: opts.config,
           repoPath: opts.path,
         }).catch((err: unknown) =>
@@ -176,6 +177,7 @@ Exclude examples:
         assertGraphIndexUnlocked(config)
 
         await withProvider(config, opts.format, async (provider) => {
+          await warnGraphStale(provider, config, kernel)
           const searchOptions: SearchOptions = {
             query,
             limit,

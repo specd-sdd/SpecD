@@ -52,6 +52,13 @@
 - **THEN** stderr contains a `fatal:` prefixed error message
 - **AND** the process exits with code 3
 
+#### Scenario: Lock acquisition failure exits with code 3
+
+- **GIVEN** another process currently holds the shared graph indexing lock
+- **WHEN** `specd graph index` is run
+- **THEN** stderr contains a retry-later message
+- **AND** the process exits with code 3
+
 #### Scenario: Per-file errors do not cause non-zero exit
 
 - **GIVEN** indexing encounters parse failures in some files
@@ -75,15 +82,21 @@
 
 ### Requirement: Indexing behaviour
 
-#### Scenario: Command obtains orchestrated project structure
+#### Scenario: Command passes progress callback in text mode
 
-- **WHEN** `specd graph index` is executed in configured mode
-- **THEN** it calls `ListWorkspaces` to obtain the rich workspace list
-- **AND** it injects the resulting `ProjectWorkspace` entities into the indexer options
+- **WHEN** `specd graph index` is run in text mode
+- **THEN** the command passes an `onProgress` callback to the provider
+- **AND** when the callback is invoked, it prints the progress percentage and phase to stdout
 
-#### Scenario: Command builds effective graph discovery config
+#### Scenario: Command delegates configuration and locking
 
-- **GIVEN** configured global graph includes and excludes
-- **AND** one or more filesystem-backed spec repositories
 - **WHEN** `specd graph index` is executed
-- **THEN** the command passes an effective graph config to the indexer that includes synthetic spec-root exclusions
+- **THEN** it delegates bootstrap config fallback, effective project config merging, lock acquisition, and index execution to the provider
+
+#### Scenario: Worker subprocess performs indexing in isolation
+
+- **GIVEN** `SPECD_GRAPH_INDEX_NO_WORKER` is not set
+- **WHEN** `specd graph index` is run
+- **THEN** the parent process spawns a child worker with `SPECD_GRAPH_INDEX_WORKER=true`
+- **AND** the parent forwards `SIGINT` and `SIGTERM` to the worker
+- **AND** the parent releases the indexing lock when the worker exits

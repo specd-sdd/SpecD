@@ -16,8 +16,38 @@
   ],
   "implementation": [
     {
+      "file": "code-graph:src/application/services/bootstrap-graph-config.ts",
+      "symbols": ["createBootstrapGraphConfig"]
+    },
+    {
+      "file": "code-graph:src/application/services/build-project-graph-config.ts",
+      "symbols": ["buildProjectGraphConfig"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/index-lock.ts",
+      "symbols": ["acquireGraphIndexLock", "assertGraphIndexUnlocked", "getGraphIndexLockPath"]
+    },
+    {
       "file": "code-graph:src/composition/code-graph-provider.ts",
       "symbols": ["CodeGraphProvider"]
+    },
+    {
+      "file": "code-graph:src/index.ts"
+    },
+    {
+      "file": "code-graph:test/composition/code-graph-provider.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-options.ts",
+      "symbols": ["WorkspaceIndexTarget", "DiscoveredSpec"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/spec-not-found-error.ts",
+      "symbols": ["SpecNotFoundError"]
+    },
+    {
+      "file": "code-graph:src/application/services/resolve-graph-selector.ts",
+      "symbols": ["normalizeFileSelectorPath"]
     }
   ]
 }

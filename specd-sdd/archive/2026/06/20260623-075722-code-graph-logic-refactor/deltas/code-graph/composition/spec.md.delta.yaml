@@ -1,0 +1,39 @@
+- op: modified
+  description: Extend CodeGraphProvider facade with delegation methods
+  selector:
+    type: section
+    matches: 'Requirement: CodeGraphProvider facade'
+  content: |
+    `CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality. It exposes:
+
+    - **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
+    - **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getDocument(path)`, `findFilesByConfigRelativePath(configRelativePath)`, `findDocumentsByConfigRelativePath(configRelativePath)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`
+    - **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`
+    - **Maintenance**: `clear(): Promise<void>`, `recreate(): Promise<void>` — removes all data or recreates store
+    - **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
+    - **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeFilesImpact(filePaths, direction, maxDepth)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)`, `getHotspots(options?)` — delegates to impact/traversal functions
+    - **Selector Normalization**: `resolveFileSelector(selector: string): Promise<ResolvedFileSelector[]>`, `resolveSymbolSelector(selector: string): Promise<ResolvedSymbolSelector[]>` — resolves project-relative or absolute paths to canonical graph identities
+    - **Lock Management**: `assertGraphIndexUnlocked()`, `acquireGraphIndexLock()` — checks or holds the indexing process mutex lock
+    - **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection
+
+    `getSpec(specId)` returns `undefined` when the spec is not indexed. Callers that require a spec to exist (for example CLI spec impact) SHALL throw `SpecNotFoundError` after checking the result.
+
+- op: modified
+  description: Export SpecNotFoundError with other domain errors
+  selector:
+    type: section
+    matches: 'Requirement: Package exports'
+  content: |
+    The `@specd/code-graph` package SHALL export only:
+
+    - **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`
+    - **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
+    - **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
+    - **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
+    - **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`
+    - **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`
+    - **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`
+    - **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`
+    - **Language Adapter**: `LanguageAdapter`
+    - **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`
+    - **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)

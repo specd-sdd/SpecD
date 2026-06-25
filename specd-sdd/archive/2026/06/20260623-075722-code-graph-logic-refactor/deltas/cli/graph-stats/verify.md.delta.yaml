@@ -1,0 +1,15 @@
+- op: added
+  description: Text mode fingerprint mismatch warning
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+    after:
+      type: section
+      matches: 'Scenario: Text output with null ref'
+  content: |
+    #### Scenario: Text output with derivation fingerprint mismatch
+
+    - **GIVEN** the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration
+    - **WHEN** `graph stats` is run in text mode
+    - **THEN** stderr contains `⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index`

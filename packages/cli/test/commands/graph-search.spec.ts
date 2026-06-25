@@ -15,14 +15,18 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
-vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
-  assertGraphIndexUnlocked: vi.fn(),
-}))
+vi.mock('@specd/code-graph', async () => {
+  const actual = await vi.importActual<typeof import('@specd/code-graph')>('@specd/code-graph')
+  return {
+    ...actual,
+    assertGraphIndexUnlocked: vi.fn(),
+  }
+})
 
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
-import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
 import { registerGraphSearch } from '../../src/commands/graph/search.js'
+import { assertGraphIndexUnlocked } from '@specd/code-graph'
 
 function setup() {
   const config = makeMockConfig()

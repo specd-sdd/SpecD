@@ -16,7 +16,13 @@ vi.mock('@specd/core', async (importOriginal) => {
   }
 })
 
-import { makeMockConfig, makeMockKernel, makeProgram, mockProcessExit } from './helpers.js'
+import {
+  makeMockConfig,
+  makeMockKernel,
+  makeProgram,
+  mockProcessExit,
+  ExitSentinel,
+} from './helpers.js'
 import * as resolveCtx from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
@@ -26,10 +32,14 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
-vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
-  acquireGraphIndexLock: vi.fn(() => vi.fn()),
-  assertGraphIndexUnlocked: vi.fn(),
-}))
+vi.mock('@specd/code-graph', async () => {
+  const actual = await vi.importActual<typeof import('@specd/code-graph')>('@specd/code-graph')
+  return {
+    ...actual,
+    acquireGraphIndexLock: vi.fn(() => vi.fn()),
+    assertGraphIndexUnlocked: vi.fn(),
+  }
+})
 
 function setup(mode: 'configured' | 'bootstrap') {
   const config = makeMockConfig()
@@ -133,7 +143,7 @@ describe('graph index', () => {
     expect(indexCommand?.options.some((option) => option.long === '--workspace')).toBe(false)
   })
 
-  it.skip('builds a synthetic default workspace in bootstrap mode', async () => {
+  it('builds a synthetic default workspace in bootstrap mode', async () => {
     const { mockProvider } = setup('bootstrap')
     process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
@@ -147,21 +157,20 @@ describe('graph index', () => {
     )
   })
 
-  it.skip('uses no-config fallback path by passing no overrides', async () => {
-    const spy = vi.spyOn(resolveCtx, 'resolveGraphCliContext')
+  it('uses no-config fallback path by passing no overrides', async () => {
     setup('bootstrap')
     process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'index'])
 
-    expect(spy).toHaveBeenCalledWith({
+    expect(resolveCtx.resolveGraphCliContext).toHaveBeenCalledWith({
       configPath: undefined,
       repoPath: undefined,
     })
   })
 
-  it.skip('populates graphConfig with exclude-path from CLI', async () => {
+  it('populates graphConfig with exclude-path from CLI', async () => {
     const { mockProvider } = setup('configured')
     process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
@@ -177,8 +186,8 @@ describe('graph index', () => {
     )
 
     const call = mockProvider.index.mock.calls[0]![0]
-    const wsConfig = call.graphConfig.workspaces.get('default')
-    expect(wsConfig.excludePaths).toEqual(['foo', 'bar'])
+    expect(call.graphConfig.excludePaths).toContain('foo')
+    expect(call.graphConfig.excludePaths).toContain('bar')
   })
 
   it('delegates --force recreation to the provider before indexing', async () => {
@@ -211,14 +220,30 @@ describe('graph index', () => {
     expect(stdout).toContain('3 documents')
   })
 
-  it.skip('acquires the shared graph index lock before indexing', async () => {
+  it('acquires the shared graph index lock before indexing', async () => {
     const { config } = setup('configured')
     process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'index'])
 
-    const { acquireGraphIndexLock } = await import('../../src/commands/graph/graph-index-lock.js')
+    const { acquireGraphIndexLock } = await import('@specd/code-graph')
     expect(acquireGraphIndexLock).toHaveBeenCalledWith(config)
+  })
+
+  it('exits with code 3 when lock acquisition throws', async () => {
+    setup('configured')
+    const { acquireGraphIndexLock } = await import('@specd/code-graph')
+    vi.mocked(acquireGraphIndexLock).mockImplementationOnce(() => {
+      throw new Error('lock failed')
+    })
+    mockProcessExit()
+
+    const program = makeIndexProgram()
+    await expect(program.parseAsync(['node', 'specd', 'graph', 'index'])).rejects.toThrow(
+      ExitSentinel,
+    )
+
+    expect(process.exit).toHaveBeenCalledWith(3)
   })
 })

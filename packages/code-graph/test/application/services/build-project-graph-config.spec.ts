@@ -1,7 +1,39 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_EXCLUDE_PATHS } from '@specd/code-graph'
-import { makeMockConfig } from './helpers.js'
-import { buildProjectGraphConfig } from '../../src/commands/graph/build-project-graph-config.js'
+import { type SpecdConfig } from '@specd/core'
+import { DEFAULT_EXCLUDE_PATHS } from '../../../src/application/use-cases/discover-files.js'
+import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
+
+function makeMockConfig(overrides: Partial<SpecdConfig> = {}): SpecdConfig {
+  return {
+    projectRoot: '/project',
+    configPath: '/project/.specd/config',
+    schemaRef: '@specd/schema-std',
+    workspaces: [
+      {
+        name: 'default',
+        specsPath: '/project/specs',
+        specsAdapter: { adapter: 'fs', config: { path: '/project/specs' } },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: '/project',
+        ownership: 'owned' as const,
+        isExternal: false,
+      },
+    ],
+    storage: {
+      changesPath: '/project/.specd/changes',
+      changesAdapter: { adapter: 'fs', config: { path: '/project/.specd/changes' } },
+      draftsPath: '/project/.specd/drafts',
+      draftsAdapter: { adapter: 'fs', config: { path: '/project/.specd/drafts' } },
+      discardedPath: '/project/.specd/discarded',
+      discardedAdapter: { adapter: 'fs', config: { path: '/project/.specd/discarded' } },
+      archivePath: '/project/.specd/archive',
+      archiveAdapter: { adapter: 'fs', config: { path: '/project/.specd/archive' } },
+    },
+    approvals: { spec: false, signoff: false },
+    ...overrides,
+  }
+}
 
 describe('buildProjectGraphConfig', () => {
   it('uses the same default exclusion semantics for workspaces without explicit graph config', () => {

@@ -38,25 +38,16 @@ User-facing documentation for this command MUST prefer the concrete aliases `dep
 
 ### Requirement: File impact analysis
 
-When `--file` is provided:
-
-1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
-2. Creates a `CodeGraphProvider` from the resolved graph context
-3. Opens the provider
-4. Resolves each requested file path to canonical graph files through the provider's selector normalization service. It MUST support absolute paths, project-relative paths, and workspace-prefixed paths.
-5. For a single resolved file, calls `analyzeFileImpact(file, direction)` and outputs the `FileImpactResult`
-6. For multiple resolved files, computes per-file file impact with the same semantics as single-file analysis, then aggregates changed symbols, affected symbols, affected files, and overall risk across the requested files
-7. Outputs the aggregated result including changed-symbol detail and per-file impact breakdown
-8. Closes the provider and exits
+Single-file and multi-file impact analyses resolve selectors and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `@specd/code-graph` provider.
 
 ### Requirement: Symbol impact analysis
 
 When `--symbol` is provided:
 
 1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
-2. Searches for symbols matching the name via `findSymbols({ name })`
-3. If no symbol is found, outputs `No symbol found matching "<name>".`
-4. If one symbol is found, calls `analyzeImpact(symbolId, direction)` and outputs the result
+2. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)
+3. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0
+4. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result
 5. If multiple symbols match, analyzes each one and outputs all results
 
 ### Requirement: Spec impact analysis
@@ -66,9 +57,12 @@ When `--spec` is provided:
 1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
 2. Creates a `CodeGraphProvider` from the resolved graph context
 3. Opens the provider
-4. Calls `analyzeSpecImpact(specId, direction)`
-5. Outputs the resulting `ImpactResult`
-6. Closes the provider and exits
+4. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id
+5. Calls `analyzeSpecImpact(specId, direction)`
+6. Outputs the resulting `ImpactResult`
+7. Closes the provider and exits
+
+The CLI SHALL let `SpecNotFoundError` propagate to the global error handler so the command fails with exit code 1 and a machine-readable `SPEC_NOT_FOUND` error code.
 
 Spec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:
 
@@ -78,11 +72,7 @@ Spec impact MUST reflect requirement-aware graph relations, not just code-struct
 
 ### Requirement: Concurrent indexing guard
 
-Before attempting to open the provider or execute graph-backed analysis, `graph impact` SHALL check the shared graph indexing lock used by `graph index`.
-
-If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.
-
-This guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph.
+Before attempting to open the provider, the command SHALL query the lock status from the provider. If indexing is currently in progress, it SHALL fail fast with a short user-facing retry-later message.
 
 ### Requirement: Output format
 
@@ -177,14 +167,9 @@ If the provider cannot be opened, the command exits with code 3.
 
 ## Constraints
 
-- The CLI does not contain impact analysis logic — it delegates entirely to `@specd/code-graph`
+- The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates entirely to `@specd/code-graph`
 - `process.exit(0)` is called explicitly after closing the provider
-- Canonical graph file identities are workspace-prefixed, but user-facing `--file` inputs MAY be workspace-prefixed, config-relative, or absolute
-- `--direction` applies to `--file`, `--symbol`, and `--spec`
-- `--depth` applies to all selectors
-- `--depth` must be a positive integer; invalid values exit with code 1
-- Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
-- The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
+- Output path formatting and console text/JSON formatting are managed by the CLI
 
 ## Examples
 

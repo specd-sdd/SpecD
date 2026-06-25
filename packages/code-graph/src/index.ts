@@ -39,6 +39,8 @@ export {
   type IndexOptions,
   type IndexProgressCallback,
   type ProjectGraphConfig,
+  type WorkspaceIndexTarget,
+  type DiscoveredSpec,
 } from './domain/value-objects/index-options.js'
 export {
   type IndexResult,
@@ -77,6 +79,9 @@ export {
 // Domain services
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 export { expandSearchQuery, expandSearchToken } from './domain/services/expand-search-query.js'
+export { isGraphStale } from './domain/services/is-graph-stale.js'
+export { analyzeFilesImpact } from './domain/services/analyze-files-impact.js'
+export { normalizeFileSelectorPath } from './application/services/resolve-graph-selector.js'
 export {
   computeGraphFingerprint,
   computeRootFingerprint,
@@ -87,9 +92,20 @@ export {
   type GraphFingerprintInput,
 } from './application/use-cases/_shared/compute-graph-fingerprint.js'
 
+// Infrastructure
+export { acquireGraphIndexLock, assertGraphIndexUnlocked } from './infrastructure/index-lock.js'
+
+// Application services
+export { createBootstrapGraphConfig } from './application/services/bootstrap-graph-config.js'
+export {
+  buildProjectGraphConfig,
+  type GraphConfigOverrides,
+} from './application/services/build-project-graph-config.js'
+
 // Errors
 export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'
 export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
+export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'

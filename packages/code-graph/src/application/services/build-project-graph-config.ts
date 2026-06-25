@@ -1,8 +1,9 @@
 import { type SpecdConfig } from '@specd/core'
-import { type ProjectGraphConfig, DEFAULT_EXCLUDE_PATHS } from '@specd/code-graph'
+import { type ProjectGraphConfig } from '../../domain/value-objects/index-options.js'
+import { DEFAULT_EXCLUDE_PATHS } from '../use-cases/discover-files.js'
 
 /**
- * Optional CLI-level overrides for graph configuration assembly.
+ * Optional overrides for graph configuration assembly.
  */
 export interface GraphConfigOverrides {
   readonly includePaths?: readonly string[]
@@ -13,7 +14,7 @@ export interface GraphConfigOverrides {
  * Builds the effective project graph configuration used by graph commands.
  *
  * @param config - The loaded project configuration.
- * @param overrides - Optional CLI overrides for include/exclude paths.
+ * @param overrides - Optional overrides for include/exclude paths.
  * @returns The effective graph configuration.
  */
 export function buildProjectGraphConfig(

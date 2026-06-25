@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { type SpecRepository, type Spec } from '@specd/core'
 import { createCodeGraphProvider } from '../../src/composition/create-code-graph-provider.js'
+import { createBootstrapGraphConfig } from '../../src/application/services/bootstrap-graph-config.js'
 import { type GraphStoreFactory } from '../../src/composition/graph-store-factory.js'
 import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
@@ -151,5 +152,31 @@ describe('CodeGraphProvider', () => {
     expect(result.filesIndexed).toBe(0)
 
     await provider.close()
+  })
+
+  it('can be instantiated from SpecdConfig', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-specd-config-'))
+    const config = createBootstrapGraphConfig({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+    })
+    const provider = createCodeGraphProvider(config)
+    await provider.open()
+
+    const stats = await provider.getStatistics()
+    expect(stats.fileCount).toBe(0)
+
+    await provider.close()
+  })
+
+  it('close is idempotent and can be safely called multiple times', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-idempotent-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+    })
+    await provider.open()
+    await provider.close()
+    await expect(provider.close()).resolves.not.toThrow()
   })
 })

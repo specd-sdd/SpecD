@@ -4,13 +4,13 @@ import {
   detectFingerprintMismatch,
   type GraphStatistics,
   type HotspotResult,
+  buildProjectGraphConfig,
 } from '@specd/code-graph'
 import { createVcsAdapter, type SpecdConfig } from '@specd/core'
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
-import { buildProjectGraphConfig } from '../graph/build-project-graph-config.js'
 import { codeGraphVersion } from '../graph/code-graph-version.js'
 
 /** Parsed options accepted by the `project status` command. */

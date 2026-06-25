@@ -1,11 +1,16 @@
 import { Command, Option } from 'commander'
-import { DEFAULT_HOTSPOT_KINDS, type HotspotOptions, type RiskLevel } from '@specd/code-graph'
+import {
+  DEFAULT_HOTSPOT_KINDS,
+  type HotspotOptions,
+  type RiskLevel,
+  assertGraphIndexUnlocked,
+} from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { assertGraphIndexUnlocked } from './graph-index-lock.js'
+import { warnGraphStale } from './warn-graph-staleness.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -128,7 +133,7 @@ Exclude examples:
             cliError(err instanceof Error ? err.message : 'invalid --kind value', opts.format, 1)
           }
         })()
-        const { config } = await resolveGraphCliContext({
+        const { config, kernel } = await resolveGraphCliContext({
           configPath: opts.config,
           repoPath: opts.path,
         }).catch((err: unknown) =>
@@ -141,6 +146,7 @@ Exclude examples:
         assertGraphIndexUnlocked(config)
 
         await withProvider(config, opts.format, async (provider) => {
+          await warnGraphStale(provider, config, kernel)
           const options: HotspotOptions = {
             ...(opts.workspace ? { workspace: opts.workspace } : undefined),
             ...(kinds !== undefined ? { kinds } : undefined),

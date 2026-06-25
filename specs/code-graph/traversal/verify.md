@@ -68,6 +68,21 @@
 - **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
 - **THEN** `riskLevel` is `CRITICAL`
 
+#### Scenario: Risk thresholds map dependent counts to levels
+
+- **GIVEN** a symbol with 0 total dependents
+- **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+- **THEN** `riskLevel` is `LOW`
+- **GIVEN** a symbol with 4 direct callers and 0 indirect callers
+- **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+- **THEN** `riskLevel` is `MEDIUM`
+- **GIVEN** a symbol with 8 direct callers
+- **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+- **THEN** `riskLevel` is `HIGH`
+- **GIVEN** a symbol with 25 total dependents across all depths
+- **WHEN** `analyzeImpact(store, symbol.id, 'upstream')` is called
+- **THEN** `riskLevel` is `CRITICAL`
+
 #### Scenario: affectedFiles deduplication
 
 - **GIVEN** symbols A and B are both in `src/utils.ts` and both are callers of target

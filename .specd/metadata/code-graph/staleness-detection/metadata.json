@@ -47,13 +47,31 @@
       "rules": [
         "**Text output**:\n\n- After `Last indexed`, when stale, append: `⚠ Graph is stale (indexed at <7-char-ref>, current: <7-char-ref>)`\n- When `lastIndexedRef` is `null`, no staleness line SHALL be shown\n- When a derivation fingerprint mismatch is detected, append: `⚠ Derivation fingerprint mismatch — graph built with different code-graph version or workspace configuration`\n\n**JSON/TOON output**:\n\n- `stale` (`boolean | null`) — `true` if stale, `false` if fresh, `null` if unknown\n- `currentRef` (`string | null`) — the current VCS ref, or `null` if unavailable\n- `fingerprintMismatch` (`boolean | null`) — `true` if derivation fingerprint differs, `false` if it matches, `null` if no stored fingerprint exists"
       ]
+    },
+    {
+      "requirement": "Centralized index lock control",
+      "rules": [
+        "The `@specd/code-graph` package (or its providers) SHALL manage a centralized, filesystem-based indexing lock.\n\n- Exposes mechanisms to acquire, release, and assert lock status (`assertGraphIndexUnlocked`).\n- The lock file location is standardized inside the project's config directory (e.g. `.specd/config/graph/index.lock`).\n- Any client of the provider (CLI, MCP, etc.) can verify or assert lock availability to prevent concurrent indexing operations."
+      ]
+    },
+    {
+      "requirement": "Effective configuration building",
+      "rules": [
+        "The `@specd/code-graph` package SHALL provide functions to merge workspace-specific configuration options (`allowedPaths`, `excludePaths`, `respectGitignore`) and global project parameters with custom runtime/CLI overrides (such as `--include-path` and `--exclude-path`). It returns a unified, effective `ProjectGraphConfig`."
+      ]
+    },
+    {
+      "requirement": "Bootstrap fallback configuration",
+      "rules": [
+        "When running in a directory without a discovered `specd.yaml` configuration file, `@specd/code-graph` (or `@specd/core`) SHALL support creating a synthetic, fallback `SpecdConfig`. This fallback config maps the resolved repository root to a synthetic single `default` workspace to allow graph commands (index, stats, search) to execute."
+      ]
     }
   ],
   "constraints": [
-    "Staleness detection is VCS-agnostic — it uses VcsAdapter from @specd/core, not git-specific APIs",
-    "The VCS ref is stored as an opaque string — no parsing, validation, or truncation at storage time",
+    "Staleness detection is VCS-agnostic — it uses VcsAdapter from @specd/core",
+    "The VCS ref is stored as an opaque string",
     "No auto-refresh: detecting staleness never triggers re-indexing",
-    "The current VCS ref is resolved by the CLI layer (not by @specd/code-graph) and passed as a parameter"
+    "Lock files, bootstrap configs, config merging, and staleness calculations are encapsulated inside the @specd/code-graph package (or @specd/core) rather than being implemented as CLI-level helpers"
   ],
   "scenarios": [
     {
@@ -185,13 +203,89 @@
       "then": [
         "the output SHALL include stale (boolean or null) and currentRef (string or null) fields"
       ]
+    },
+    {
+      "requirement": "Centralized index lock control",
+      "name": "Assert unlocked passes when no lock file exists",
+      "given": ["no index.lock file exists in .specd/config/graph/"],
+      "when": ["assertGraphIndexUnlocked() is called"],
+      "then": ["it completes without throwing"]
+    },
+    {
+      "requirement": "Centralized index lock control",
+      "name": "Assert unlocked throws when lock file exists",
+      "given": ["an index.lock file exists in .specd/config/graph/"],
+      "when": ["assertGraphIndexUnlocked() is called"],
+      "then": ["it throws an error indicating the graph is being indexed"]
+    },
+    {
+      "requirement": "Centralized index lock control",
+      "name": "Lock acquisition and release lifecycle",
+      "given": ["no lock file exists"],
+      "when": ["acquireGraphIndexLock() is called"],
+      "then": [
+        "the lock file is created containing the current process PID",
+        "AND calling the returned release callback removes the lock file"
+      ]
+    },
+    {
+      "requirement": "Effective configuration building",
+      "name": "Effective configuration merges overrides",
+      "given": ["project config with excludePaths: [\"foo\"]"],
+      "when": ["buildProjectGraphConfig is called with overrides excludePaths: [\"bar\"]"],
+      "then": [
+        "the returned effective configuration's excludePaths contains both \"foo\" and \"bar\""
+      ]
+    },
+    {
+      "requirement": "Bootstrap fallback configuration",
+      "name": "Bootstrap fallback config has synthetic single default workspace",
+      "given": ["a directory with no specd.yaml config file"],
+      "when": ["bootstrap configuration is requested for /tmp/project"],
+      "then": [
+        "it returns a SpecdConfig where workspaces contains exactly one workspace named \"default\"",
+        "AND workspaces[0].codeRoot is /tmp/project"
+      ]
+    },
+    {
+      "requirement": "Bootstrap fallback configuration",
+      "name": "createBootstrapGraphConfig is unit tested",
+      "given": [
+        "createBootstrapGraphConfig is called with { projectRoot: '/tmp/project', vcsRoot: '/tmp/project' }"
+      ],
+      "when": ["the returned config is inspected"],
+      "then": [
+        "workspaces contains exactly one workspace named default",
+        "AND workspaces[0].codeRoot is /tmp/project"
+      ]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:99f94ca7b393e21553aa89372d548397dbd1095bebc528bb34a46de8d66bf9ef",
-    "verify.md": "sha256:776f4e56a85e0430fbaf8bac9ea307943ffb45c8a21d2dc1e251523395b8647f"
+  "implementation": {
+    "files": [
+      {
+        "specId": "code-graph:staleness-detection",
+        "file": "code-graph:test/application/use-cases/compute-graph-fingerprint.spec.ts"
+      },
+      {
+        "specId": "code-graph:staleness-detection",
+        "file": "code-graph:test/domain/services/is-graph-stale.spec.ts"
+      },
+      {
+        "specId": "code-graph:staleness-detection",
+        "file": "code-graph:test/application/services/bootstrap-graph-config.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "code-graph:staleness-detection",
+        "file": "code-graph:src/domain/services/is-graph-stale.ts",
+        "symbol": "isGraphStale"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Detect graph staleness via VCS ref comparison with warn-not-block policy and derivation fingerprint mismatch detection.",
-  "optimizedContext": "# Staleness Detection\n\n## Rules\n\n- Indexer SHALL accept optional `vcsRef: string` in `IndexOptions`. When provided, persists ref as `lastIndexedRef` meta key after successful indexing.\n- When `vcsRef` not provided (no VCS), `lastIndexedRef` remains `null` — staleness detection unavailable.\n- Graph **stale**: `lastIndexedRef` not null AND current VCS ref differs from `lastIndexedRef`.\n- Graph **fresh**: `lastIndexedRef` not null AND current VCS ref equals `lastIndexedRef`.\n- When `lastIndexedRef` is null, staleness state is **unknown** — NOT treated as stale.\n- Graph freshness SHALL distinguish VCS freshness from derivation freshness. Derivation mismatch when persisted graph fingerprint differs from current runtime fingerprint.\n- Fingerprint derived from: `@specd/code-graph` package version + canonical hash of resolved workspace objects from active `specd.yaml`.\n- Derivation mismatch surfaced explicitly in diagnostics, distinct from VCS staleness.\n- Read commands (`graph stats|search|impact|hotspots`) SHALL warn when stale but NOT block. Always return results.\n- Read commands SHALL surface derivation-mismatch metadata when known. SHALL NOT silently reinterpret mismatched graph as fresh.\n- `graph index` is repair path for derivation mismatch. On detection, SHALL either recreate + full rebuild with visible reason, or fail with message requiring force re-index.\n- `GraphStatistics` SHALL include `lastIndexedRef: string | null` alongside `lastIndexedAt`.\n- Text output: when stale, append `⚠ Graph is stale (indexed at <7-char-ref>, current: <7-char-ref>)`. When `lastIndexedRef` null, no staleness line. Derivation mismatch: `⚠ Derivation fingerprint mismatch — graph built with different code-graph version or workspace configuration`.\n- JSON/TOON output: `stale` (boolean|null), `currentRef` (string|null), `fingerprintMismatch` (boolean|null).\n\n## Constraints\n\n- Staleness detection is VCS-agnostic — uses `VcsAdapter` from `@specd/core`\n- VCS ref stored as opaque string — no parsing, validation, or truncation at storage\n- No auto-refresh — detecting staleness never triggers re-index\n- Current VCS ref resolved by CLI layer, not `@specd/code-graph`"
+  "contentHashes": {
+    "spec.md": "sha256:97295aab4b5a9978af2fb3630376430e4d71343a7a859a1581872922e091a476",
+    "verify.md": "sha256:7b134b5389cded4e6728c67ab4e4d7efa5b06433b2a42f8fa86f899e577fc952"
+  },
+  "generatedBy": "core"
 }

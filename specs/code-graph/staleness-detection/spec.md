@@ -72,12 +72,28 @@ This policy is independent of VCS freshness. A graph MAY be VCS-fresh and still 
 - `currentRef` (`string | null`) — the current VCS ref, or `null` if unavailable
 - `fingerprintMismatch` (`boolean | null`) — `true` if derivation fingerprint differs, `false` if it matches, `null` if no stored fingerprint exists
 
+### Requirement: Centralized index lock control
+
+The `@specd/code-graph` package (or its providers) SHALL manage a centralized, filesystem-based indexing lock.
+
+- Exposes mechanisms to acquire, release, and assert lock status (`assertGraphIndexUnlocked`).
+- The lock file location is standardized inside the project's config directory (e.g. `.specd/config/graph/index.lock`).
+- Any client of the provider (CLI, MCP, etc.) can verify or assert lock availability to prevent concurrent indexing operations.
+
+### Requirement: Effective configuration building
+
+The `@specd/code-graph` package SHALL provide functions to merge workspace-specific configuration options (`allowedPaths`, `excludePaths`, `respectGitignore`) and global project parameters with custom runtime/CLI overrides (such as `--include-path` and `--exclude-path`). It returns a unified, effective `ProjectGraphConfig`.
+
+### Requirement: Bootstrap fallback configuration
+
+When running in a directory without a discovered `specd.yaml` configuration file, `@specd/code-graph` (or `@specd/core`) SHALL support creating a synthetic, fallback `SpecdConfig`. This fallback config maps the resolved repository root to a synthetic single `default` workspace to allow graph commands (index, stats, search) to execute.
+
 ## Constraints
 
-- Staleness detection is VCS-agnostic — it uses `VcsAdapter` from `@specd/core`, not git-specific APIs
-- The VCS ref is stored as an opaque string — no parsing, validation, or truncation at storage time
+- Staleness detection is VCS-agnostic — it uses `VcsAdapter` from `@specd/core`
+- The VCS ref is stored as an opaque string
 - No auto-refresh: detecting staleness never triggers re-indexing
-- The current VCS ref is resolved by the CLI layer (not by `@specd/code-graph`) and passed as a parameter
+- Lock files, bootstrap configs, config merging, and staleness calculations are encapsulated inside the `@specd/code-graph` package (or `@specd/core`) rather than being implemented as CLI-level helpers
 
 ## Spec Dependencies
 

@@ -1,0 +1,1320 @@
+{
+  "name": "code-graph-logic-refactor",
+  "createdAt": "2026-06-23T07:57:22.032Z",
+  "description": "Refactor code-graph business logic from cli to code-graph package for reuse across adapters.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:graph-index",
+    "cli:graph-stats",
+    "cli:graph-impact",
+    "code-graph:traversal",
+    "code-graph:staleness-detection",
+    "code-graph:composition"
+  ],
+  "specDependsOn": {
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:graph-store",
+      "core:list-workspaces"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:staleness-detection",
+      "core:list-workspaces"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:traversal": ["code-graph:symbol-model", "code-graph:graph-store"],
+    "code-graph:staleness-detection": [
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "cli:graph-stats"
+    ],
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:ladybug-graph-store",
+      "code-graph:sqlite-graph-store",
+      "code-graph:language-adapter",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:document-model"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "approval-system-notes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "parallel-indexing-design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/bootstrap-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/build-project-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/index-lock.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-files-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/is-graph-stale.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/services.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/build-project-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/index-lock.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/get-upstream.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/get-downstream.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/is-graph-stale.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/warn-graph-staleness.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/spec-not-found-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/bootstrap-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/application/services/bootstrap-graph-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createBootstrapGraphConfig"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/application/services/build-project-graph-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildProjectGraphConfig"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/index-lock.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["acquireGraphIndexLock", "assertGraphIndexUnlocked", "getGraphIndexLockPath"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-files-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["analyzeFilesImpact"]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/domain/services/is-graph-stale.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["isGraphStale"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphProvider"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["registerGraphImpact", "handleFilesImpact", "handleSpecImpact"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["registerGraphIndex"]
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/get-upstream.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getUpstream"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/get-downstream.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getDownstream"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["WorkspaceIndexTarget", "DiscoveredSpec"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["analyzeImpact"]
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/warn-graph-staleness.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["warnGraphStale"]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/domain/services/is-graph-stale.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/domain/errors/spec-not-found-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecNotFoundError"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["normalizeFileSelectorPath"]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/application/services/bootstrap-graph-config.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:c6f8d3124d71fc253ddf7839bfd09bbb266203a906ff4485f7750b1b9bc8f51b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5e97b54fad3c7e2bbe3807cef5bad5d060151552d0353abd3b69e3803f2e3327"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2854871b32c35cff3819b8862b67c0b975d6aa4ee4b03ecf1200f9944491f0e8"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f4300b3a51511e88c2bb737edc70fb0fc5eb2906ff11b7ded5c721fd55b7d71b"
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6d76723290785c3c46a68e400b0115732cda9aeaba7c613d65647ad155c359eb"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b0d685fe07d74f88e0c2f904577d5bcf7b05f47db21ef72e9a5235dd5e83c35d"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eccbd52cc114423148d3fb581c3adcbb1b11186745500f689aa45c1e30ed4806"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f84c10db7215b0d2092e02a1d3f7f30cc66527513f9acce3f0ff323f4427ceb1"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:286ffa3e5357379914e4653cf3a27268446f2e212e7741cadf967b55c64df6e2"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d5720c778ce3b4a9deb670aecd1abe6c6f5b54e1f81dcbf345c80daf0cd0100f"
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:db86b05173808cde0a2231adb6e87358d7f4b7e70ed1ab6ffdf1b21c33982826"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:122bddb56f7c42cee12c307242ed63e8fa899950ec05d0585b8c4f150a4a984b"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6480dd5a3b775fde1bb16c8c9735970f34e3c8feb7c8cf911c8b0cf803e29731"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:7392b856366afa8fd5018a793219d9b48fffbf492be52645557bd0ec5e7a0d43"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:1f6a33796d962d7943d69a421d9f1dd894c250a1bf64be737054d1019565f8db"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-23T07:57:22.032Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "cli:graph-index",
+        "cli:graph-stats",
+        "cli:graph-impact",
+        "code-graph:traversal",
+        "code-graph:staleness-detection"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-23T07:57:22.049Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T07:59:43.586Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T08:10:41.228Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-23T08:10:41.231Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T08:15:48.470Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-index]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-index"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T08:18:19.580Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T08:23:37.976Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:25:00.604Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:25:07.065Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T08:27:39.482Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:27:39.482Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T08:28:11.918Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:28:19.403Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:28:22.671Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T08:32:01.060Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:traversal]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:traversal"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:32:01.060Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:38:38.582Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T08:38:42.892Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T16:22:00.940Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T16:50:54.237Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T16:50:54.237Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-23T16:54:12.121Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T16:54:25.931Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:15:03.194Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-23T17:50:15.933Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-24T02:16:54.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-24T02:16:54.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T06:31:59.731Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T06:37:25.695Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T06:53:11.190Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-25T07:59:40.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:graph-index",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "code-graph:traversal",
+            "code-graph:staleness-detection",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T07:59:40.061Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T08:03:23.024Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T08:49:34.188Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:03:57.503Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:11:31.065Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:11:42.292Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-25T09:22:45.453Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:composition\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-25T09:23:05.530Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:graph-index\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:23:13.155Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-25T09:23:13.201Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

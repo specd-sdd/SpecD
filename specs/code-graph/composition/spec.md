@@ -11,17 +11,16 @@ Consumers of `@specd/code-graph` should not need to know how the store, indexer,
 `CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality. It exposes:
 
 - **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
-- **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`
+- **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getDocument(path)`, `findFilesByConfigRelativePath(configRelativePath)`, `findDocumentsByConfigRelativePath(configRelativePath)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`
 - **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`
-- **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)
+- **Maintenance**: `clear(): Promise<void>`, `recreate(): Promise<void>` — removes all data or recreates store
 - **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
-- **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)` — delegates to impact functions
-- **Selector Normalization**: `resolveFileSelector(selector: string): Promise<string | string[]>`, `resolveSymbolSelector(selector: string): Promise<string | string[]>` — resolves project-relative or absolute paths to canonical graph identities
+- **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeFilesImpact(filePaths, direction, maxDepth)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)`, `getHotspots(options?)` — delegates to impact/traversal functions
+- **Selector Normalization**: `resolveFileSelector(selector: string): Promise<ResolvedFileSelector[]>`, `resolveSymbolSelector(selector: string): Promise<ResolvedSymbolSelector[]>` — resolves project-relative or absolute paths to canonical graph identities
+- **Lock Management**: `assertGraphIndexUnlocked()`, `acquireGraphIndexLock()` — checks or holds the indexing process mutex lock
 - **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection
 
-The provider SHALL provide a unified entry point for normalization so that CLI commands and other adapters do not need to implement path resolution logic.
-
-`CodeGraphProvider` is a thin orchestration layer — it holds no domain logic. All methods delegate to the appropriate domain service or use case.
+`getSpec(specId)` returns `undefined` when the spec is not indexed. Callers that require a spec to exist (for example CLI spec impact) SHALL throw `SpecNotFoundError` after checking the result.
 
 ### Requirement: Factory function
 
@@ -68,19 +67,17 @@ Callers MUST NOT construct `CodeGraphProvider` directly — the constructor is n
 
 The `@specd/code-graph` package SHALL export only:
 
-- `createCodeGraphProvider` — factory function
-- `CodeGraphProvider` — type only (for type annotations, not construction)
-- `CodeGraphOptions` — options type for the legacy factory overload
-- `CodeGraphFactoryOptions` — options type for the `SpecdConfig` overload, including additive graph-store registrations and optional `graphStoreId`
-- `GraphStoreFactory` — factory contract used by additive graph-store registrations
-- `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).
-- `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types
-- `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types
-- `SymbolQuery`, `GraphStatistics` — query types
-- `LanguageAdapter` — interface for custom adapters
-- `CodeGraphError` and subclasses — error types
-
-Internal components (`LadybugGraphStore`, `SQLiteGraphStore`, `AdapterRegistry`, built-in language adapters, `IndexCodeGraph`, traversal functions) MUST NOT be exported from the package entry point.
+- **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`
+- **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
+- **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
+- **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
+- **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`
+- **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`
+- **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`
+- **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`
+- **Language Adapter**: `LanguageAdapter`
+- **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`
+- **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)
 
 ### Requirement: Lifecycle management
 

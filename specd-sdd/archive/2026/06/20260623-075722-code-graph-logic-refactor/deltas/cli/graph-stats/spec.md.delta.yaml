@@ -1,0 +1,73 @@
+- op: modified
+  description: Delegate stats retrieval to code-graph provider
+  selector:
+    type: section
+    matches: 'Requirement: Statistics retrieval'
+  content: |
+    The command resolves the graph context and delegates project fingerprint comparison, VCS ref resolution, and staleness calculation entirely to the `@specd/code-graph` provider. It outputs the returned statistics, closes the provider, and exits.
+
+- op: modified
+  description: Delegate lock check to provider
+  selector:
+    type: section
+    matches: 'Requirement: Concurrent indexing guard'
+  content: |
+    Before attempting to open the provider, `graph stats` SHALL query the lock status from the provider. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message.
+
+- op: modified
+  description: Document derivation fingerprint mismatch warning in text mode
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default), the output is a labelled summary:
+
+    ```text
+    Files:     459
+    Documents: 18
+    Symbols:   1497
+    Specs:     122
+    Languages: javascript, typescript
+    Relations:
+      IMPORTS: 1227
+      DEFINES: 1497
+    Last indexed: 2026-03-14T10:38:30.178Z
+    ```
+
+    - `Files`, `Documents`, `Symbols`, `Specs` show `fileCount`, `documentCount`, `symbolCount`, `specCount`
+    - `Languages` shows the `languages` array joined by `, `
+    - `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line
+    - `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp
+
+    If the graph is stale, a warning line SHALL be appended after `Last indexed`:
+
+    ```text
+    ⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)
+    ```
+
+    Where `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.
+
+    If the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration, a warning line SHALL be appended to stderr in text mode:
+
+    ```text
+    ⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index
+    ```
+
+    This warning is independent from the VCS staleness line. Both MAY appear when the graph is stale by ref and mismatched by derivation fingerprint.
+
+    In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with three additional fields:
+
+    - `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown
+    - `currentRef: string | null` — the current VCS ref, or `null` if unavailable
+    - `fingerprintMismatch: boolean | null` — `true` when the stored derivation fingerprint differs from the current effective graph configuration, `false` when it matches, `null` when the comparison cannot be computed
+
+- op: modified
+  description: Constraints after delegation refactor
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The CLI does not compute statistics, manage locks, or calculate staleness — it delegates entirely to `@specd/code-graph`
+    - `process.exit(0)` is called explicitly after closing the provider
+    - Zero-value relation counts are omitted from text output for readability
+    - Context resolution SHALL use the shared graph CLI model

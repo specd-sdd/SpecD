@@ -1,13 +1,17 @@
 import { Command, Option } from 'commander'
-import { type IndexOptions, type IndexResult } from '@specd/code-graph'
+import {
+  type IndexOptions,
+  type IndexResult,
+  acquireGraphIndexLock,
+  buildProjectGraphConfig,
+} from '@specd/code-graph'
 import { spawn } from 'node:child_process'
+import { join } from 'node:path'
 import * as core from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
-import { buildProjectGraphConfig } from './build-project-graph-config.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { acquireGraphIndexLock } from './graph-index-lock.js'
 import { codeGraphVersion } from './code-graph-version.js'
 
 const GRAPH_INDEX_WORKER_ENV = 'SPECD_GRAPH_INDEX_WORKER'
@@ -24,13 +28,6 @@ export function registerGraphIndex(parent: Command): void {
     .allowExcessArguments(false)
     .description('Build or update the code graph index for the project.')
     .option('--force', 'rebuild the entire index from scratch', false)
-    .option('--concurrency <n>', 'max concurrent indexing tasks', '4')
-    .addOption(
-      new Option(
-        '--include-path <glob...>',
-        'one or more global paths to include in the index',
-      ).argParser((val, prev: string[]) => (prev ?? []).concat(val.split(','))),
-    )
     .addOption(
       new Option(
         '--exclude-path <glob...>',
@@ -43,8 +40,6 @@ export function registerGraphIndex(parent: Command): void {
     .action(
       async (opts: {
         force: boolean
-        concurrency: string
-        includePath?: string[]
         excludePath?: string[]
         config?: string
         path?: string
@@ -76,8 +71,17 @@ export function registerGraphIndex(parent: Command): void {
 
         const { config, kernel } = context
 
-        // Only the main process acquires the lock.
-        const lockRelease = !isWorker && !lockHeld ? acquireGraphIndexLock(config) : null
+        let lockRelease: (() => void) | null = null
+        try {
+          lockRelease = !isWorker && !lockHeld ? acquireGraphIndexLock(config) : null
+        } catch (err: unknown) {
+          cliError(
+            err instanceof Error ? err.message : 'failed to acquire indexing lock',
+            opts.format,
+            3,
+          )
+          return
+        }
 
         try {
           if (!isWorker && !noWorker) {
@@ -110,16 +114,44 @@ export function registerGraphIndex(parent: Command): void {
               process.exit(0)
             })
           } else {
-            if (kernel === null) {
-              cliError('Kernel not available in worker', opts.format, 1)
-              return
-            }
-
             await withProvider(
               config,
               opts.format,
               async (provider) => {
-                const workspaces = await kernel.project.listWorkspaces.execute()
+                const workspaces =
+                  kernel !== null
+                    ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
+                        name: ws.name,
+                        prefix: ws.prefix,
+                        codeRoot: ws.codeRoot,
+                        specRepo: ws.specRepo,
+                        ownership: ws.ownership,
+                        isExternal: ws.isExternal,
+                      }))
+                    : config.workspaces.map((ws) => {
+                        const specsPath = ws.specsPath ?? join(config.projectRoot, 'specs')
+                        const specRepo = core.createSpecRepository(
+                          'fs',
+                          {
+                            workspace: ws.name,
+                            ownership: ws.ownership,
+                            isExternal: ws.isExternal,
+                            configPath: config.configPath,
+                          },
+                          {
+                            specsPath,
+                            metadataPath: join(specsPath, '..', '.specd', 'metadata'),
+                          },
+                        )
+                        return {
+                          name: ws.name,
+                          prefix: null,
+                          codeRoot: ws.codeRoot,
+                          specRepo,
+                          ownership: ws.ownership,
+                          isExternal: ws.isExternal,
+                        }
+                      })
                 const projectRoot = config.projectRoot
 
                 const vcs = await Promise.resolve(core.createVcsAdapter(projectRoot)).catch(
@@ -128,20 +160,12 @@ export function registerGraphIndex(parent: Command): void {
                 const vcsRef = (await vcs?.ref()) ?? undefined
 
                 const graphConfig = buildProjectGraphConfig(config, {
-                  ...(opts.includePath !== undefined ? { includePaths: opts.includePath } : {}),
                   ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
                 })
 
                 const indexOptions: IndexOptions = {
                   projectRoot,
-                  workspaces: workspaces.map((ws) => ({
-                    name: ws.name,
-                    prefix: ws.prefix,
-                    codeRoot: ws.codeRoot,
-                    specRepo: ws.specRepo,
-                    ownership: ws.ownership,
-                    isExternal: ws.isExternal,
-                  })),
+                  workspaces,
                   graphConfig,
                   codeGraphVersion,
                   ...(vcsRef !== undefined ? { vcsRef } : {}),
