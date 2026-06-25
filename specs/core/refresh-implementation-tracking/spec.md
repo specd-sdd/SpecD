@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without coupling that side effect to read-only or transition use cases. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result. Callers that need fresh tracking invoke this use case explicitly; use cases such as `GetStatus`, `TransitionChange`, and `CompileContext` project persisted state only.
+Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without duplicating detection merge logic across hosts. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result.
+
+`GetStatus` and `TransitionChange` invoke this use case by default for active changes. Hosts MAY still call `RefreshImplementationTracking` explicitly when they need a standalone refresh. Other read-only use cases such as `CompileContext` project persisted state only unless a future change adds orchestration there.
 
 ## Requirements
 
@@ -11,6 +13,12 @@ Delivery adapters need a single application-layer operation to refresh a change'
 `RefreshImplementationTracking.execute` MUST accept:
 
 - `name` — the change name to refresh
+
+### Requirement: Default orchestration by host use cases
+
+`GetStatus` and `TransitionChange` MUST delegate pre-read and pre-transition refresh to `RefreshImplementationTracking` rather than invoking `ImplementationDetector` directly.
+
+`RefreshImplementationTracking` remains the standalone primitive for explicit refresh operations (for example `specd change implementation refresh`).
 
 ### Requirement: Historical implementing guard
 

@@ -3,12 +3,7 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": [
-    "cli:entrypoint",
-    "core:change",
-    "core:get-status",
-    "core:refresh-implementation-tracking"
-  ],
+  "dependsOn": ["cli:entrypoint", "core:change", "core:get-status"],
   "implementation": [
     {
       "file": "cli:src/commands/change/status.ts",

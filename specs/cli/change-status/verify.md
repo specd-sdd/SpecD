@@ -192,18 +192,14 @@
 - **THEN** the review section shows `reason: spec-overlap-conflict`
 - **AND** an `overlap:` subsection lists both entries as bullets
 
-### Requirement: Implementation tracking refresh before status load
+### Requirement: Delegates refresh policy to GetStatus
 
-#### Scenario: Status command refreshes before GetStatus
+#### Scenario: Status command does not call refresh directly
 
-- **GIVEN** `specd change status <name>` is executed
+- **GIVEN** `specd change status <name>` is executed for an active change
 - **WHEN** the command handler runs
-- **THEN** it calls `RefreshImplementationTracking` before `GetStatus`
-
-#### Scenario: Status command does not call detector directly
-
-- **WHEN** `specd change status <name>` runs
-- **THEN** the CLI does not invoke `ImplementationDetector` outside `RefreshImplementationTracking`
+- **THEN** it calls `GetStatus` without invoking `RefreshImplementationTracking` directly
+- **AND** it does not invoke `ImplementationDetector` directly
 
 ### Requirement: Implementation section
 

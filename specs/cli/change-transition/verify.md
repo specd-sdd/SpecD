@@ -58,19 +58,26 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message explaining that archiving is not a lifecycle transition
 
-### Requirement: Implementation tracking refresh before transition
+### Requirement: Delegates refresh policy to TransitionChange
 
-#### Scenario: Transition command refreshes before TransitionChange
+#### Scenario: Transition command does not call refresh directly
 
-- **GIVEN** `specd change transition <name> <step>` is executed
+- **GIVEN** `specd change transition <name> <step>` is executed for an active change
 - **WHEN** the command handler runs
-- **THEN** it calls `RefreshImplementationTracking` before `TransitionChange`
+- **THEN** it does not invoke `RefreshImplementationTracking` directly
+- **AND** it does not invoke `ImplementationDetector` directly
+
+#### Scenario: Pre-transition GetStatus skips refresh
+
+- **GIVEN** an active change transition is starting
+- **WHEN** the command reads the current state before `TransitionChange`
+- **THEN** it calls `GetStatus` with `refreshImplementationTracking: false`
 
 #### Scenario: Repair guide GetStatus does not double-refresh
 
-- **GIVEN** a transition attempt failed after refresh already ran
-- **WHEN** the command fetches `GetStatus` for the repair guide
-- **THEN** it does not call `RefreshImplementationTracking` again solely for diagnostics
+- **GIVEN** a transition attempt failed after `TransitionChange` already refreshed
+- **WHEN** the command fetches status for the repair guide
+- **THEN** it calls `GetStatus` with `refreshImplementationTracking: false`
 
 ### Requirement: Approval-gate routing
 

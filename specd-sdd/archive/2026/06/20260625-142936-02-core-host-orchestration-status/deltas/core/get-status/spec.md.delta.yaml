@@ -1,0 +1,59 @@
+- op: modified
+  description: Extend GetStatusInput with optional refresh flag
+  selector:
+    type: section
+    matches: 'Requirement: Accepts a change name as input'
+  content: |
+    `GetStatus.execute()` MUST accept a `GetStatusInput` containing:
+
+    - `name` (string, required) — the change name to look up
+    - `refreshImplementationTracking` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before loading status for **active** changes only; when `false`, skip refresh
+
+- op: modified
+  description: Bake optional pre-read refresh into GetStatus
+  selector:
+    type: section
+    matches: 'Requirement: Read-only implementation tracking'
+  rename: 'Requirement: Optional pre-read implementation tracking refresh'
+  content: |
+    When `refreshImplementationTracking` is not `false` (default `true`) and `ChangeRepository.get(name)` returns a non-null active change, `GetStatus` MUST invoke `RefreshImplementationTracking.execute({ name })` before loading status.
+
+    When the change resolves only via `ChangeRepository.getDraft(name)`, or when `refreshImplementationTracking` is `false`, `GetStatus` MUST NOT invoke `RefreshImplementationTracking`.
+
+    `GetStatus` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.
+
+    After any refresh, `GetStatus` MUST project implementation-tracking data from the persisted change state loaded by `ChangeRepository`.
+
+- op: modified
+  description: Inject RefreshImplementationTracking into GetStatus constructor
+  selector:
+    type: section
+    matches: 'Requirement: Constructor dependencies'
+  content: |
+    `GetStatus` MUST accept the following constructor arguments:
+
+    - `changes: ChangeRepository` — for loading changes by name
+    - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
+    - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
+    - `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh
+
+    It MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.
+
+    `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
+
+    `GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly.
+
+- op: modified
+  description: Clarify refresh-implementation-tracking dependency role
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — change entity and artifact state model
+    - [`core:kernel`](../kernel/spec.md) — kernel wiring for `GetStatus`
+    - [`core:transition-change`](../transition-change/spec.md) — lifecycle gating and transition rules
+    - [`core:schema-format`](../schema-format/spec.md) — `SchemaProvider`, workflow, and artifact definitions
+    - [`core:config`](../config/spec.md) — project approval configuration
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative schema-aware lifecycle interpretation reused by status, validation, and transition flows
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — primitive invoked by default before active-change status loads

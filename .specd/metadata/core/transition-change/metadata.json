@@ -17,7 +17,7 @@
     {
       "requirement": "Input contract",
       "rules": [
-        "`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:\n\n- `name` (string, required) — the change to transition\n- `to` (ChangeState, required) — the requested target state\n- `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled\n- `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled\n- `skipHookPhases` (ReadonlySet\\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.\n\nThe `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly."
+        "`TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:\n\n- `name` (string, required) — the change to transition\n- `to` (ChangeState, required) — the requested target state\n- `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled\n- `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled\n- `skipHookPhases` (ReadonlySet\\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.\n- `refreshImplementationTrackingBefore` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before transition for **active** changes only; when `false`, skip refresh\n\nThe `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly."
       ]
     },
     {
@@ -27,9 +27,9 @@
       ]
     },
     {
-      "requirement": "Caller-owned implementation tracking refresh",
+      "requirement": "Optional pre-transition implementation tracking refresh",
       "rules": [
-        "`TransitionChange` MUST evaluate lifecycle rules against the tracked implementation state already persisted on the change.\n\nIt MUST NOT invoke `ImplementationDetector` or merge detected files during transition execution. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `TransitionChange`."
+        "When `refreshImplementationTrackingBefore` is not `false` (default `true`) and the change exists in active storage, `TransitionChange` MUST invoke `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation, hook execution, and mutation.\n\nWhen `refreshImplementationTrackingBefore` is `false`, `TransitionChange` MUST NOT invoke `RefreshImplementationTracking`.\n\n`TransitionChange` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.\n\nLifecycle rules MUST be evaluated against tracked implementation state after any refresh."
       ]
     },
     {
@@ -131,7 +131,7 @@
     {
       "requirement": "Dependencies",
       "rules": [
-        "`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`.\n\n`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection."
+        "`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`.\n\n`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly."
       ]
     }
   ],
@@ -157,14 +157,34 @@
       "then": ["a ChangeNotFoundError is thrown"]
     },
     {
-      "requirement": "Caller-owned implementation tracking refresh",
-      "name": "TransitionChange does not invoke detector",
+      "requirement": "Optional pre-transition implementation tracking refresh",
+      "name": "TransitionChange does not invoke detector directly",
       "given": ["a change has entered implementing at least once"],
       "when": ["TransitionChange.execute() runs"],
       "then": [
-        "it does not invoke ImplementationDetector",
-        "AND it does not merge detected files during the transition mutate"
+        "it does not invoke ImplementationDetector directly",
+        "AND it does not duplicate refresh merge logic"
       ]
+    },
+    {
+      "requirement": "Optional pre-transition implementation tracking refresh",
+      "name": "Active change refreshes by default",
+      "given": ["an active change exists in changes/ storage"],
+      "when": [
+        "TransitionChange.execute({ name, to, approvalsSpec, approvalsSignoff }) is called without refreshImplementationTrackingBefore"
+      ],
+      "then": [
+        "it invokes RefreshImplementationTracking.execute({ name }) before lifecycle evaluation"
+      ]
+    },
+    {
+      "requirement": "Optional pre-transition implementation tracking refresh",
+      "name": "Explicit opt-out skips refresh",
+      "given": ["an active change exists in changes/ storage"],
+      "when": [
+        "TransitionChange.execute({ name, to, approvalsSpec, approvalsSignoff, refreshImplementationTrackingBefore: false }) is called"
+      ],
+      "then": ["it does not invoke RefreshImplementationTracking"]
     },
     {
       "requirement": "Approval-gate routing for spec approval",
@@ -586,7 +606,7 @@
       "name": "TransitionChange depends on LifecycleEngine and RunStepHooks",
       "when": ["TransitionChange is assembled"],
       "then": [
-        "it receives ChangeRepository, ActorResolver, SchemaProvider, LifecycleEngine, and RunStepHooks"
+        "it receives ChangeRepository, ActorResolver, SchemaProvider, LifecycleEngine, RunStepHooks, and RefreshImplementationTracking"
       ]
     }
   ],
@@ -596,12 +616,22 @@
         "specId": "core:transition-change",
         "file": "core:src/application/use-cases/transition-change.ts",
         "symbol": "TransitionChange"
+      },
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/application/use-cases/transition-change.ts",
+        "symbol": "TransitionChangeInput"
+      },
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/composition/use-cases/transition-change.ts",
+        "symbol": "createTransitionChange"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ffa80b8cbdc9cd10a924d9ca06937d6b1161d9ac476144a209b096a7110bff5b",
-    "verify.md": "sha256:782a1a13599f470cf13fdbc1399ff1dd5829d6a017987ed6ea9d7d60181a0869"
+    "spec.md": "sha256:2776f8f025695067c2d4c0cae05920093363775d74a157097f7b54877ebcd84b",
+    "verify.md": "sha256:3b044744a75e711441826d09bf3000773e98907fa803d608b4fe35361977b6b3"
   },
   "generatedBy": "core"
 }

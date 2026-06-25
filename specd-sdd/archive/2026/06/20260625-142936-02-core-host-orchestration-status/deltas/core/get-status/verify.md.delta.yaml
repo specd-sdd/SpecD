@@ -1,0 +1,67 @@
+- op: modified
+  description: Update scenarios for baked pre-read refresh
+  selector:
+    type: section
+    matches: 'Requirement: Read-only implementation tracking'
+  rename: 'Requirement: Optional pre-read implementation tracking refresh'
+  content: |
+    #### Scenario: GetStatus does not invoke detector directly
+
+    - **GIVEN** a change has entered `implementing` at least once
+    - **WHEN** `GetStatus.execute()` is called
+    - **THEN** it does not invoke `ImplementationDetector` directly
+    - **AND** it does not duplicate refresh merge logic
+
+    #### Scenario: Active change refreshes by default
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **WHEN** `GetStatus.execute({ name })` is called without `refreshImplementationTracking`
+    - **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before loading status
+
+    #### Scenario: Draft-only read skips refresh
+
+    - **GIVEN** a change exists only under `drafts/` storage
+    - **WHEN** `GetStatus.execute({ name })` is called
+    - **THEN** it does not invoke `RefreshImplementationTracking`
+
+    #### Scenario: Explicit opt-out skips refresh
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **WHEN** `GetStatus.execute({ name, refreshImplementationTracking: false })` is called
+    - **THEN** it does not invoke `RefreshImplementationTracking`
+
+- op: modified
+  description: Add default refresh input scenario
+  selector:
+    type: section
+    matches: 'Requirement: Accepts a change name as input'
+  content: |
+    #### Scenario: Input accepts a named change identifier
+
+    - **WHEN** `GetStatus.execute({ name: 'add-login' })` is called
+    - **THEN** the use case resolves the named change from the repository
+
+    #### Scenario: refreshImplementationTracking defaults to enabled
+
+    - **GIVEN** an active change exists
+    - **WHEN** `GetStatus.execute({ name })` is called without `refreshImplementationTracking`
+    - **THEN** refresh runs before status projection
+
+- op: removed
+  description: Replace constructor dependency scenario with refresh-aware version
+  selector:
+    type: section
+    matches: 'Scenario: GetStatus receives LifecycleEngine through construction'
+
+- op: added
+  description: Verify RefreshImplementationTracking constructor dependency
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Constructor dependencies'
+  content: |
+    #### Scenario: GetStatus receives LifecycleEngine through construction
+
+    - **GIVEN** `GetStatus` is assembled by the kernel
+    - **WHEN** the use case is constructed
+    - **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, `LifecycleEngine`, and `RefreshImplementationTracking`

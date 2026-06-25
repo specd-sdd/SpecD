@@ -15,7 +15,11 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange"]
+      "symbols": ["TransitionChange", "TransitionChangeInput"]
+    },
+    {
+      "file": "core:src/composition/use-cases/transition-change.ts",
+      "symbols": ["createTransitionChange"]
     }
   ]
 }

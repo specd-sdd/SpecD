@@ -8,7 +8,10 @@ Users and tooling need a quick way to see where a change stands — both its lif
 
 ### Requirement: Accepts a change name as input
 
-`GetStatus.execute()` MUST accept a `GetStatusInput` containing a `name` string that identifies the change to look up.
+`GetStatus.execute()` MUST accept a `GetStatusInput` containing:
+
+- `name` (string, required) — the change name to look up
+- `refreshImplementationTracking` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before loading status for **active** changes only; when `false`, skip refresh
 
 ### Requirement: Returns the change and its artifact statuses
 
@@ -52,11 +55,15 @@ That projection MUST include:
 - tracked implementation files with review state
 - confirmed implementation links, including file-level links and symbol-level refinements
 
-### Requirement: Read-only implementation tracking
+### Requirement: Optional pre-read implementation tracking refresh
 
-`GetStatus` MUST project implementation-tracking data from the change loaded by `ChangeRepository` without mutating tracked implementation files or invoking `ImplementationDetector`.
+When `refreshImplementationTracking` is not `false` (default `true`) and `ChangeRepository.get(name)` returns a non-null active change, `GetStatus` MUST invoke `RefreshImplementationTracking.execute({ name })` before loading status.
 
-Callers that require refreshed tracked files MUST invoke `RefreshImplementationTracking` before `GetStatus`.
+When the change resolves only via `ChangeRepository.getDraft(name)`, or when `refreshImplementationTracking` is `false`, `GetStatus` MUST NOT invoke `RefreshImplementationTracking`.
+
+`GetStatus` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.
+
+After any refresh, `GetStatus` MUST project implementation-tracking data from the persisted change state loaded by `ChangeRepository`.
 
 ### Requirement: Drift-aware display status
 
@@ -101,12 +108,13 @@ If no change with the given name exists in the repository, `execute()` MUST thro
 - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
 - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
+- `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh
 
 It MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.
 
 `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
 
-`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection.
+`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly.
 
 ### Requirement: Reports effective status for every artifact
 
@@ -183,4 +191,4 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 - [`core:schema-format`](../schema-format/spec.md) — `SchemaProvider`, workflow, and artifact definitions
 - [`core:config`](../config/spec.md) — project approval configuration
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative schema-aware lifecycle interpretation reused by status, validation, and transition flows
-- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before status load; not invoked by `GetStatus` itself
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — primitive invoked by default before active-change status loads

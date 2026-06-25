@@ -8,11 +8,12 @@
     "core:change",
     "core:transition-change",
     "core:hook-execution-model",
-    "core:refresh-implementation-tracking"
+    "core:get-status"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/transition.ts"
+      "file": "cli:src/commands/change/transition.ts",
+      "symbols": ["registerChangeTransition"]
     }
   ]
 }

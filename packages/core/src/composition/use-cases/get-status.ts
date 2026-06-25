@@ -1,8 +1,10 @@
 import * as path from 'node:path'
 import { GetStatus } from '../../application/use-cases/get-status.js'
+import { RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
+import { createArchiveRepository } from '../archive-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { type SchemaRepository } from '../../application/ports/schema-repository.js'
 import { createSchemaRepository } from '../schema-repository.js'
@@ -10,6 +12,9 @@ import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { Logger } from '../../application/logger.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
+import { GitVcsAdapter } from '../../infrastructure/git/vcs-adapter.js'
+import { VcsImplementationDetector } from '../../infrastructure/vcs/vcs-implementation-detector.js'
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
  */
@@ -33,6 +38,10 @@ export interface FsGetStatusOptions {
   readonly draftsPath: string
   /** Absolute path to the `discarded/` directory. */
   readonly discardedPath: string
+  /** Absolute path to the archive root directory. */
+  readonly archivePath: string
+  /** Optional archive directory pattern (e.g. `'{{year}}/{{change.archivedName}}'`). */
+  readonly archivePattern?: string
   /** Additional `node_modules` directories for schema resolution. */
   readonly nodeModulesPaths: readonly string[]
   /** Project root directory for resolving relative schema paths. */
@@ -43,6 +52,8 @@ export interface FsGetStatusOptions {
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Whether approval gates are active. */
   readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+  /** Absolute path to the project root. */
+  readonly projectRoot: string
 }
 
 /**
@@ -108,6 +119,10 @@ export function createGetStatus(
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
         discardedPath: config.storage.discardedPath,
+        archivePath: config.storage.archivePath,
+        ...(config.storage.archivePattern !== undefined
+          ? { archivePattern: config.storage.archivePattern }
+          : {}),
         nodeModulesPaths: [
           path.join(config.projectRoot, 'node_modules'),
           ...(kernelOpts?.extraNodeModulesPaths ?? []),
@@ -116,6 +131,7 @@ export function createGetStatus(
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
         approvals: config.approvals,
+        projectRoot: config.projectRoot,
       },
     )
   }
@@ -125,6 +141,24 @@ export function createGetStatus(
     draftsPath: opts.draftsPath,
     discardedPath: opts.discardedPath,
   })
+  const archiveRepo = createArchiveRepository('fs', configOrContext, {
+    changesPath: opts.changesPath,
+    draftsPath: opts.draftsPath,
+    archivePath: opts.archivePath,
+    ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
+  })
+  const files = new FsFileReader()
+  const implementationDetector = new VcsImplementationDetector(
+    opts.projectRoot,
+    new GitVcsAdapter(opts.projectRoot),
+  )
+  const refreshImplementationTracking = new RefreshImplementationTracking(
+    changeRepo,
+    archiveRepo,
+    implementationDetector,
+    files,
+    opts.projectRoot,
+  )
   const schemas = createSchemaRegistry('fs', {
     nodeModulesPaths: opts.nodeModulesPaths,
     configDir: opts.configDir,
@@ -136,6 +170,7 @@ export function createGetStatus(
     changeRepo,
     schemaProvider,
     opts.approvals,
+    refreshImplementationTracking,
     new LifecycleEngine(Logger.debug.bind(Logger)),
   )
 }

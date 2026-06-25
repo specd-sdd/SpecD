@@ -17,7 +17,7 @@
     {
       "requirement": "Accepts a change name as input",
       "rules": [
-        "`GetStatus.execute()` MUST accept a `GetStatusInput` containing a `name` string that identifies the change to look up."
+        "`GetStatus.execute()` MUST accept a `GetStatusInput` containing:\n\n- `name` (string, required) — the change name to look up\n- `refreshImplementationTracking` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before loading status for **active** changes only; when `false`, skip refresh"
       ]
     },
     {
@@ -39,9 +39,9 @@
       ]
     },
     {
-      "requirement": "Read-only implementation tracking",
+      "requirement": "Optional pre-read implementation tracking refresh",
       "rules": [
-        "`GetStatus` MUST project implementation-tracking data from the change loaded by `ChangeRepository` without mutating tracked implementation files or invoking `ImplementationDetector`.\n\nCallers that require refreshed tracked files MUST invoke `RefreshImplementationTracking` before `GetStatus`."
+        "When `refreshImplementationTracking` is not `false` (default `true`) and `ChangeRepository.get(name)` returns a non-null active change, `GetStatus` MUST invoke `RefreshImplementationTracking.execute({ name })` before loading status.\n\nWhen the change resolves only via `ChangeRepository.getDraft(name)`, or when `refreshImplementationTracking` is `false`, `GetStatus` MUST NOT invoke `RefreshImplementationTracking`.\n\n`GetStatus` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.\n\nAfter any refresh, `GetStatus` MUST project implementation-tracking data from the persisted change state loaded by `ChangeRepository`."
       ]
     },
     {
@@ -65,7 +65,7 @@
     {
       "requirement": "Constructor dependencies",
       "rules": [
-        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n\nIt MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.\n\n`SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.\n\n`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection."
+        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n- `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh\n\nIt MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.\n\n`SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.\n\n`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly."
       ]
     },
     {
@@ -221,14 +221,35 @@
       ]
     },
     {
-      "requirement": "Read-only implementation tracking",
-      "name": "GetStatus does not invoke detector",
+      "requirement": "Optional pre-read implementation tracking refresh",
+      "name": "GetStatus does not invoke detector directly",
       "given": ["a change has entered implementing at least once"],
       "when": ["GetStatus.execute() is called"],
       "then": [
-        "it does not invoke ImplementationDetector",
-        "AND it does not mutate tracked implementation files"
+        "it does not invoke ImplementationDetector directly",
+        "AND it does not duplicate refresh merge logic"
       ]
+    },
+    {
+      "requirement": "Optional pre-read implementation tracking refresh",
+      "name": "Active change refreshes by default",
+      "given": ["an active change exists in changes/ storage"],
+      "when": ["GetStatus.execute({ name }) is called without refreshImplementationTracking"],
+      "then": ["it invokes RefreshImplementationTracking.execute({ name }) before loading status"]
+    },
+    {
+      "requirement": "Optional pre-read implementation tracking refresh",
+      "name": "Draft-only read skips refresh",
+      "given": ["a change exists only under drafts/ storage"],
+      "when": ["GetStatus.execute({ name }) is called"],
+      "then": ["it does not invoke RefreshImplementationTracking"]
+    },
+    {
+      "requirement": "Optional pre-read implementation tracking refresh",
+      "name": "Explicit opt-out skips refresh",
+      "given": ["an active change exists in changes/ storage"],
+      "when": ["GetStatus.execute({ name, refreshImplementationTracking: false }) is called"],
+      "then": ["it does not invoke RefreshImplementationTracking"]
     },
     {
       "requirement": "Drift-aware display status",
@@ -450,11 +471,20 @@
       "then": ["the use case resolves the named change from the repository"]
     },
     {
+      "requirement": "Accepts a change name as input",
+      "name": "refreshImplementationTracking defaults to enabled",
+      "given": ["an active change exists"],
+      "when": ["GetStatus.execute({ name }) is called without refreshImplementationTracking"],
+      "then": ["refresh runs before status projection"]
+    },
+    {
       "requirement": "Constructor dependencies",
       "name": "GetStatus receives LifecycleEngine through construction",
       "given": ["GetStatus is assembled by the kernel"],
       "when": ["the use case is constructed"],
-      "then": ["it receives ChangeRepository, SchemaProvider, approval config, and LifecycleEngine"]
+      "then": [
+        "it receives ChangeRepository, SchemaProvider, approval config, LifecycleEngine, and RefreshImplementationTracking"
+      ]
     },
     {
       "requirement": "Identifies blockers",
@@ -471,18 +501,23 @@
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatusResult"
+        "symbol": "GetStatus"
       },
       {
         "specId": "core:get-status",
         "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatus"
+        "symbol": "GetStatusInput"
+      },
+      {
+        "specId": "core:get-status",
+        "file": "core:src/composition/use-cases/get-status.ts",
+        "symbol": "createGetStatus"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:18e7fdd244e26587ef86d441e9e397d7493f50cc7de9542cc402f397ebb7d7b5",
-    "verify.md": "sha256:6d9425a1558ebeda2fbd1926ac33da1d40a897e8f07aa42c4d24edad770d4602"
+    "spec.md": "sha256:6f2522e0669d14a0be1f71b1a1bdc3c389d31f85f42bf5a7cbee0a7b549639db",
+    "verify.md": "sha256:8cf6ebd0d4a20cef69b67daefbd76bf703487c4eea5b3764b9670809146966de"
   },
   "generatedBy": "core"
 }

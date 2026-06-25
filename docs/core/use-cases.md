@@ -68,15 +68,16 @@ interface CreateChangeResult {
 
 ### GetStatus
 
-Loads a change and reports its current lifecycle state, artifact statuses, and pre-computed lifecycle context including available transitions and blockers.
+Loads a change and reports its current lifecycle state, artifact statuses, and pre-computed lifecycle context including available transitions and blockers. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before loading status.
 
-**Constructor:** `new GetStatus(changes: ChangeRepository, schemaProvider: SchemaProvider, approvals: { spec: boolean; signoff: boolean })`
+**Constructor:** `new GetStatus(changes: ChangeRepository, schemaProvider: SchemaProvider, approvals: { spec: boolean; signoff: boolean }, refreshImplementationTracking: RefreshImplementationTracking)`
 
 **Input:**
 
-| Field  | Type     | Required | Description                 |
-| ------ | -------- | -------- | --------------------------- |
-| `name` | `string` | yes      | The change name to look up. |
+| Field                           | Type      | Required | Description                                                                             |
+| ------------------------------- | --------- | -------- | --------------------------------------------------------------------------------------- |
+| `name`                          | `string`  | yes      | The change name to look up.                                                             |
+| `refreshImplementationTracking` | `boolean` | no       | When omitted or `true`, refresh active changes before load. When `false`, skip refresh. |
 
 **Returns:** `Promise<GetStatusResult>`
 
@@ -126,7 +127,7 @@ interface TransitionBlocker {
 
 ### TransitionChange
 
-Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating (via `requiresTaskCompletion`), and executes `run:` hooks at step boundaries.
+Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating (via `requiresTaskCompletion`), and executes `run:` hooks at step boundaries. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before lifecycle evaluation.
 
 The final persisted lifecycle update is applied through `ChangeRepository.mutate(...)` so hook execution and routing stay outside the lock while the manifest mutation runs against fresh state.
 
@@ -145,17 +146,18 @@ not attempt to synthesize a forward transition. Instead, it throws
 This keeps redesign available while giving adapters enough context to explain why
 normal progression is blocked.
 
-**Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, runStepHooks: RunStepHooks)`
+**Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, runStepHooks: RunStepHooks, refreshImplementationTracking: RefreshImplementationTracking)`
 
 **Input:**
 
-| Field              | Type                             | Required | Description                                                                                                   |
-| ------------------ | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
-| `name`             | `string`                         | yes      | The change to transition.                                                                                     |
-| `to`               | `ChangeState`                    | yes      | The requested target state.                                                                                   |
-| `approvalsSpec`    | `boolean`                        | yes      | Whether the spec approval gate is enabled.                                                                    |
-| `approvalsSignoff` | `boolean`                        | yes      | Whether the signoff gate is enabled.                                                                          |
-| `skipHookPhases`   | `ReadonlySet<HookPhaseSelector>` | no       | Hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. |
+| Field                                 | Type                             | Required | Description                                                                                                   |
+| ------------------------------------- | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `name`                                | `string`                         | yes      | The change to transition.                                                                                     |
+| `to`                                  | `ChangeState`                    | yes      | The requested target state.                                                                                   |
+| `approvalsSpec`                       | `boolean`                        | yes      | Whether the spec approval gate is enabled.                                                                    |
+| `approvalsSignoff`                    | `boolean`                        | yes      | Whether the signoff gate is enabled.                                                                          |
+| `skipHookPhases`                      | `ReadonlySet<HookPhaseSelector>` | no       | Hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. |
+| `refreshImplementationTrackingBefore` | `boolean`                        | no       | When omitted or `true`, refresh active changes before transition. When `false`, skip refresh.                 |
 
 **Returns:** `Promise<TransitionChangeResult>`
 

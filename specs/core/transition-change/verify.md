@@ -9,14 +9,26 @@
 - **WHEN** `TransitionChange.execute` is called with a name that does not exist in the repository
 - **THEN** a `ChangeNotFoundError` is thrown
 
-### Requirement: Caller-owned implementation tracking refresh
+### Requirement: Optional pre-transition implementation tracking refresh
 
-#### Scenario: TransitionChange does not invoke detector
+#### Scenario: TransitionChange does not invoke detector directly
 
 - **GIVEN** a change has entered `implementing` at least once
 - **WHEN** `TransitionChange.execute()` runs
-- **THEN** it does not invoke `ImplementationDetector`
-- **AND** it does not merge detected files during the transition mutate
+- **THEN** it does not invoke `ImplementationDetector` directly
+- **AND** it does not duplicate refresh merge logic
+
+#### Scenario: Active change refreshes by default
+
+- **GIVEN** an active change exists in `changes/` storage
+- **WHEN** `TransitionChange.execute({ name, to, approvalsSpec, approvalsSignoff })` is called without `refreshImplementationTrackingBefore`
+- **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation
+
+#### Scenario: Explicit opt-out skips refresh
+
+- **GIVEN** an active change exists in `changes/` storage
+- **WHEN** `TransitionChange.execute({ name, to, approvalsSpec, approvalsSignoff, refreshImplementationTrackingBefore: false })` is called
+- **THEN** it does not invoke `RefreshImplementationTracking`
 
 ### Requirement: Approval-gate routing for spec approval
 
@@ -357,4 +369,4 @@
 #### Scenario: TransitionChange depends on LifecycleEngine and RunStepHooks
 
 - **WHEN** `TransitionChange` is assembled
-- **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`
+- **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`

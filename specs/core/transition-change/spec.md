@@ -15,6 +15,7 @@ Changes must advance through a strict lifecycle, and the rules for doing so — 
 - `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
 - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
 - `skipHookPhases` (ReadonlySet\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.
+- `refreshImplementationTrackingBefore` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before transition for **active** changes only; when `false`, skip refresh
 
 The `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly.
 
@@ -22,11 +23,15 @@ The `implementingTaskChecks` and `implementingRequires` fields are removed. Task
 
 The use case MUST load the change from the `ChangeRepository` by name. If no change exists with the given name, it MUST throw `ChangeNotFoundError`.
 
-### Requirement: Caller-owned implementation tracking refresh
+### Requirement: Optional pre-transition implementation tracking refresh
 
-`TransitionChange` MUST evaluate lifecycle rules against the tracked implementation state already persisted on the change.
+When `refreshImplementationTrackingBefore` is not `false` (default `true`) and the change exists in active storage, `TransitionChange` MUST invoke `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation, hook execution, and mutation.
 
-It MUST NOT invoke `ImplementationDetector` or merge detected files during transition execution. Callers that require fresh tracked files MUST invoke `RefreshImplementationTracking` before `TransitionChange`.
+When `refreshImplementationTrackingBefore` is `false`, `TransitionChange` MUST NOT invoke `RefreshImplementationTracking`.
+
+`TransitionChange` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.
+
+Lifecycle rules MUST be evaluated against tracked implementation state after any refresh.
 
 ### Requirement: Approval-gate routing for spec approval
 
@@ -178,9 +183,9 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ### Requirement: Dependencies
 
-`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, and `RunStepHooks`.
+`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`.
 
-`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection.
+`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly.
 
 ## Constraints
 
@@ -203,4 +208,4 @@ The previous `postHookFailures` field is removed because both hook phases are no
 - [`core:workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative lifecycle routing and dependency interpretation used before hook execution and persistence
-- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before transition; not invoked by `TransitionChange` itself
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — primitive invoked by default before active-change transitions

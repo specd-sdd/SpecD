@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { TransitionChange } from '../../../src/application/use-cases/transition-change.js'
 import { type TransitionProgressEvent } from '../../../src/application/use-cases/transition-change.js'
+import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
@@ -30,19 +31,33 @@ function makeChangeInState(name: string, events: ChangeEvent[]): Change {
 
 const actor = testActor
 
+function makeRefreshImplementationTracking(
+  execute: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
+): RefreshImplementationTracking {
+  return { execute } as unknown as RefreshImplementationTracking
+}
+
 /** Creates a TransitionChange with all required deps (schema + hooks are no-ops by default). */
 function makeUseCase(
   repo: ReturnType<typeof makeChangeRepository>,
   overrides?: {
     schema?: ReturnType<typeof makeSchema> | null
     runStepHooks?: ReturnType<typeof makeRunStepHooks>
+    refresh?: RefreshImplementationTracking
+    refreshExecute?: ReturnType<typeof vi.fn>
   },
 ): TransitionChange {
+  const refresh =
+    overrides?.refresh ??
+    makeRefreshImplementationTracking(
+      overrides?.refreshExecute ?? vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
+    )
   return new TransitionChange(
     repo,
     makeActorResolver(),
     makeSchemaProvider(overrides?.schema !== undefined ? overrides.schema : makeSchema()),
     overrides?.runStepHooks ?? makeRunStepHooks(),
+    refresh,
   )
 }
 
@@ -86,6 +101,39 @@ describe('TransitionChange', () => {
           approvalsSignoff: false,
         }),
       ).rejects.toThrow(ChangeNotFoundError)
+    })
+  })
+
+  describe('implementation tracking refresh', () => {
+    it('refreshes active changes by default', async () => {
+      const change = makeChangeInState('my-change', [])
+      const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
+      const uc = makeUseCase(makeChangeRepository([change]), { refreshExecute })
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+      })
+
+      expect(refreshExecute).toHaveBeenCalledWith({ name: 'my-change' })
+    })
+
+    it('skips refresh when explicitly disabled', async () => {
+      const change = makeChangeInState('my-change', [])
+      const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
+      const uc = makeUseCase(makeChangeRepository([change]), { refreshExecute })
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        approvalsSpec: false,
+        approvalsSignoff: false,
+        refreshImplementationTrackingBefore: false,
+      })
+
+      expect(refreshExecute).not.toHaveBeenCalled()
     })
   })
 

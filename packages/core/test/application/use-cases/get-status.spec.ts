@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
+import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -30,18 +31,37 @@ function makeStdSchema(): Schema {
   ])
 }
 
+function makeRefreshImplementationTracking(
+  execute: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
+): RefreshImplementationTracking {
+  return { execute } as unknown as RefreshImplementationTracking
+}
+
 function makeGetStatus(
   changes: ReturnType<typeof makeChangeRepository>,
   opts: {
     schema?: Schema | null
     approvals?: { spec: boolean; signoff: boolean }
     failSchema?: boolean
+    refresh?: RefreshImplementationTracking
+    refreshExecute?: ReturnType<typeof vi.fn>
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
   const schemaProvider = makeSchemaProvider(schema)
   const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
-  return new GetStatus(changes, schemaProvider, opts.approvals ?? defaultApprovals, lifecycle)
+  const refresh =
+    opts.refresh ??
+    makeRefreshImplementationTracking(
+      opts.refreshExecute ?? vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
+    )
+  return new GetStatus(
+    changes,
+    schemaProvider,
+    opts.approvals ?? defaultApprovals,
+    refresh,
+    lifecycle,
+  )
 }
 
 describe('GetStatus', () => {
@@ -192,6 +212,44 @@ describe('GetStatus', () => {
       expect(result.specDependsOn).toEqual({
         'core:a': ['core:b'],
       })
+    })
+  })
+
+  describe('implementation tracking refresh', () => {
+    it('refreshes active changes by default', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
+      const uc = makeGetStatus(makeChangeRepository([change]), { refreshExecute })
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(refreshExecute).toHaveBeenCalledWith({ name: 'my-change' })
+    })
+
+    it('skips refresh when explicitly disabled', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
+      const uc = makeGetStatus(makeChangeRepository([change]), { refreshExecute })
+
+      await uc.execute({ name: 'my-change', refreshImplementationTracking: false })
+
+      expect(refreshExecute).not.toHaveBeenCalled()
+    })
+
+    it('skips refresh for draft-only reads', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      change.draft(testActor)
+      const repo = makeChangeRepository()
+      repo.store.set(change.name, change)
+      const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
+      const uc = makeGetStatus(repo, { refreshExecute })
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(refreshExecute).not.toHaveBeenCalled()
     })
   })
 

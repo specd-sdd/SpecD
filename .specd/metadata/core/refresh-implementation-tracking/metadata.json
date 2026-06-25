@@ -1,6 +1,6 @@
 {
   "title": "RefreshImplementationTracking",
-  "description": "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without coupling that side effect to read-only or transition use cases. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result. Callers that need fresh tracking invoke this use case explicitly; use cases such as `GetStatus`, `TransitionChange`, and `CompileContext` project persisted state only.",
+  "description": "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without duplicating detection merge logic across hosts. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result.\n\n`GetStatus` and `TransitionChange` invoke this use case by default for active changes. Hosts MAY still call `RefreshImplementationTracking` explicitly when they need a standalone refresh. Other read-only use cases such as `CompileContext` project persisted state only unless a future change adds orchestration there.",
   "dependsOn": [
     "core:change",
     "core:implementation-detector-port",
@@ -8,13 +8,19 @@
     "core:archive-repository-port"
   ],
   "context": [
-    "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without coupling that side effect to read-only or transition use cases. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result. Callers that need fresh tracking invoke this use case explicitly; use cases such as `GetStatus`, `TransitionChange`, and `CompileContext` project persisted state only."
+    "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without duplicating detection merge logic across hosts. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result.\n\n`GetStatus` and `TransitionChange` invoke this use case by default for active changes. Hosts MAY still call `RefreshImplementationTracking` explicitly when they need a standalone refresh. Other read-only use cases such as `CompileContext` project persisted state only unless a future change adds orchestration there."
   ],
   "rules": [
     {
       "requirement": "Input contract",
       "rules": [
         "`RefreshImplementationTracking.execute` MUST accept:\n\n- `name` — the change name to refresh"
+      ]
+    },
+    {
+      "requirement": "Default orchestration by host use cases",
+      "rules": [
+        "`GetStatus` and `TransitionChange` MUST delegate pre-read and pre-transition refresh to `RefreshImplementationTracking` rather than invoking `ImplementationDetector` directly.\n\n`RefreshImplementationTracking` remains the standalone primitive for explicit refresh operations (for example `specd change implementation refresh`)."
       ]
     },
     {
@@ -89,6 +95,24 @@
       "name": "Execute accepts change name",
       "when": ["RefreshImplementationTracking.execute({ name }) is called with an existing change"],
       "then": ["the use case loads that change by name"]
+    },
+    {
+      "requirement": "Default orchestration by host use cases",
+      "name": "GetStatus delegates to RefreshImplementationTracking",
+      "given": ["GetStatus is configured with a RefreshImplementationTracking collaborator"],
+      "when": ["GetStatus performs a default active-change status load"],
+      "then": [
+        "it calls RefreshImplementationTracking.execute({ name }) rather than ImplementationDetector directly"
+      ]
+    },
+    {
+      "requirement": "Default orchestration by host use cases",
+      "name": "TransitionChange delegates to RefreshImplementationTracking",
+      "given": ["TransitionChange is configured with a RefreshImplementationTracking collaborator"],
+      "when": ["TransitionChange performs a default active-change transition"],
+      "then": [
+        "it calls RefreshImplementationTracking.execute({ name }) rather than ImplementationDetector directly"
+      ]
     },
     {
       "requirement": "Historical implementing guard",
@@ -211,49 +235,14 @@
     "symbols": [
       {
         "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-        "symbol": "RefreshImplementationTracking"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-        "symbol": "RefreshImplementationTrackingInput"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-        "symbol": "RefreshImplementationTrackingResult"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/ports/implementation-detector.ts",
-        "symbol": "ImplementationDetectorOptions"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/ports/implementation-detector.ts",
-        "symbol": "ImplementationDetector"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
-        "symbol": "VcsImplementationDetector"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-        "symbol": "UpdateImplementationTracking"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-        "symbol": "UpdateImplementationTrackingAction"
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2d858e8a432d50805eaa9f540873b42255faebbf6d6c9a080ce02484ae7ecf03",
-    "verify.md": "sha256:014a6e61b96d0e9588b62fbf5096ac111f04cce2643784d50809dc6fab8017c5"
+    "spec.md": "sha256:cf52142a918f3e30f83c4dd960532345ee8e5ea9f0fedfc7e4ae984f5597a8bb",
+    "verify.md": "sha256:921fb6ddff3a9b05581fbf5926dadbda6d9eff3d663a68a2045a73a1a644f358"
   },
   "generatedBy": "core"
 }

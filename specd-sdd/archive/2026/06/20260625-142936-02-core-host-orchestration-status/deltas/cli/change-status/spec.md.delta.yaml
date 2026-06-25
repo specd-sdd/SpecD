@@ -1,0 +1,31 @@
+- op: removed
+  description: Remove CLI-owned refresh prelude; GetStatus owns refresh policy
+  selector:
+    type: section
+    matches: 'Requirement: Implementation tracking refresh before status load'
+
+- op: added
+  description: Status command delegates refresh to GetStatus
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    before:
+      type: section
+      matches: 'Requirement: Implementation section'
+  content: |
+    ### Requirement: Delegates refresh policy to GetStatus
+
+    The command MUST invoke `GetStatus` directly and MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector` itself.
+
+    Default `GetStatus` refresh behaviour applies unless a future CLI flag explicitly opts out.
+
+- op: modified
+  description: Remove direct refresh use-case dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`core:change`](../../core/change/spec.md) — change and artifact state model
+    - [`core:get-status`](../../core/get-status/spec.md) — status payload and default refresh orchestration

@@ -96,10 +96,6 @@ JSON/TOON output schema:
       async (name: string, opts: { format: string; implementation?: boolean; config?: string }) => {
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const active = await kernel.changes.repo.get(name)
-          if (active !== null) {
-            await kernel.changes.refreshImplementationTracking.execute({ name })
-          }
           const statusResult = await kernel.changes.status.execute({
             name,
           })

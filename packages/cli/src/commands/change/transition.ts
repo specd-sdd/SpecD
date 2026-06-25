@@ -217,11 +217,10 @@ JSON/TOON output schema:
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
 
-          const active = await kernel.changes.repo.get(name)
-          if (active !== null) {
-            await kernel.changes.refreshImplementationTracking.execute({ name })
-          }
-          const statusResult = await kernel.changes.status.execute({ name })
+          const statusResult = await kernel.changes.status.execute({
+            name,
+            refreshImplementationTracking: false,
+          })
           const statusBefore = statusResult.change
           if (statusBefore === undefined) {
             cliError(`change '${name}' is drafted; restore it before transitioning`, opts.format)
@@ -263,7 +262,10 @@ JSON/TOON output schema:
             }
           } catch (err) {
             if (err instanceof InvalidStateTransitionError) {
-              const status = await kernel.changes.status.execute({ name })
+              const status = await kernel.changes.status.execute({
+                name,
+                refreshImplementationTracking: false,
+              })
 
               if (fmt === 'text') {
                 process.stderr.write(`error: ${err.message}\n`)

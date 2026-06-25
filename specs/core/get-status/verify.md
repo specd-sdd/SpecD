@@ -102,14 +102,32 @@
 - **THEN** the result includes tracked implementation files with review state
 - **AND** confirmed implementation links including file-level links and symbol-level refinements
 
-### Requirement: Read-only implementation tracking
+### Requirement: Optional pre-read implementation tracking refresh
 
-#### Scenario: GetStatus does not invoke detector
+#### Scenario: GetStatus does not invoke detector directly
 
 - **GIVEN** a change has entered `implementing` at least once
 - **WHEN** `GetStatus.execute()` is called
-- **THEN** it does not invoke `ImplementationDetector`
-- **AND** it does not mutate tracked implementation files
+- **THEN** it does not invoke `ImplementationDetector` directly
+- **AND** it does not duplicate refresh merge logic
+
+#### Scenario: Active change refreshes by default
+
+- **GIVEN** an active change exists in `changes/` storage
+- **WHEN** `GetStatus.execute({ name })` is called without `refreshImplementationTracking`
+- **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before loading status
+
+#### Scenario: Draft-only read skips refresh
+
+- **GIVEN** a change exists only under `drafts/` storage
+- **WHEN** `GetStatus.execute({ name })` is called
+- **THEN** it does not invoke `RefreshImplementationTracking`
+
+#### Scenario: Explicit opt-out skips refresh
+
+- **GIVEN** an active change exists in `changes/` storage
+- **WHEN** `GetStatus.execute({ name, refreshImplementationTracking: false })` is called
+- **THEN** it does not invoke `RefreshImplementationTracking`
 
 ### Requirement: Drift-aware display status
 
@@ -279,13 +297,19 @@
 - **WHEN** `GetStatus.execute({ name: 'add-login' })` is called
 - **THEN** the use case resolves the named change from the repository
 
+#### Scenario: refreshImplementationTracking defaults to enabled
+
+- **GIVEN** an active change exists
+- **WHEN** `GetStatus.execute({ name })` is called without `refreshImplementationTracking`
+- **THEN** refresh runs before status projection
+
 ### Requirement: Constructor dependencies
 
 #### Scenario: GetStatus receives LifecycleEngine through construction
 
 - **GIVEN** `GetStatus` is assembled by the kernel
 - **WHEN** the use case is constructed
-- **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, and `LifecycleEngine`
+- **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, `LifecycleEngine`, and `RefreshImplementationTracking`
 
 ### Requirement: Identifies blockers
 

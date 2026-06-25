@@ -11,24 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-      "symbols": [
-        "RefreshImplementationTracking",
-        "RefreshImplementationTrackingInput",
-        "RefreshImplementationTrackingResult"
-      ]
-    },
-    {
-      "file": "core:src/application/ports/implementation-detector.ts",
-      "symbols": ["ImplementationDetectorOptions", "ImplementationDetector"]
-    },
-    {
-      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
-      "symbols": ["VcsImplementationDetector"]
-    },
-    {
-      "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-      "symbols": ["UpdateImplementationTracking", "UpdateImplementationTrackingAction"]
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
     }
   ]
 }

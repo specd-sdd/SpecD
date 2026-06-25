@@ -9,6 +9,7 @@ import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { safeRegex } from '../../domain/services/safe-regex.js'
 import { type RunStepHooks, type OnHookProgress } from './run-step-hooks.js'
+import { RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 import { Logger } from '../logger.js'
 
 /** Selectors for granular hook phase skipping during transitions. */
@@ -53,6 +54,11 @@ export interface TransitionChangeInput {
    * skipped hooks separately via `RunStepHooks`.
    */
   readonly skipHookPhases?: ReadonlySet<HookPhaseSelector>
+  /**
+   * When omitted or `true`, refresh tracked implementation files before
+   * transition for active changes only. When `false`, skip refresh.
+   */
+  readonly refreshImplementationTrackingBefore?: boolean
 }
 
 /** Progress event emitted during a transition. */
@@ -100,6 +106,7 @@ export class TransitionChange {
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
   private readonly _runStepHooks: RunStepHooks
+  private readonly _refresh: RefreshImplementationTracking
   private readonly _lifecycle: LifecycleEngine
 
   /**
@@ -109,6 +116,7 @@ export class TransitionChange {
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param runStepHooks - Use case for executing workflow hooks
+   * @param refreshImplementationTracking - Primitive for optional pre-transition refresh
    * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
@@ -116,17 +124,22 @@ export class TransitionChange {
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
     runStepHooks: RunStepHooks,
+    refreshImplementationTracking: RefreshImplementationTracking,
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
     this._runStepHooks = runStepHooks
+    this._refresh = refreshImplementationTracking
     this._lifecycle = lifecycle
   }
 
   /**
    * Executes the use case.
+   *
+   * When `refreshImplementationTrackingBefore` is not `false`, active changes
+   * are refreshed before lifecycle evaluation and mutation.
    *
    * @param input - Transition parameters
    * @param onProgress - Optional callback for progress events
@@ -142,6 +155,10 @@ export class TransitionChange {
     const change = await this._changes.get(input.name)
     if (change === null) {
       throw new ChangeNotFoundError(input.name)
+    }
+
+    if (input.refreshImplementationTrackingBefore !== false) {
+      await this._refresh.execute({ name: input.name })
     }
 
     const actor = await this._actor.identity()

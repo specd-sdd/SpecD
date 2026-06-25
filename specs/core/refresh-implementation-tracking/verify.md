@@ -9,6 +9,20 @@
 - **WHEN** `RefreshImplementationTracking.execute({ name })` is called with an existing change
 - **THEN** the use case loads that change by name
 
+### Requirement: Default orchestration by host use cases
+
+#### Scenario: GetStatus delegates to RefreshImplementationTracking
+
+- **GIVEN** `GetStatus` is configured with a `RefreshImplementationTracking` collaborator
+- **WHEN** `GetStatus` performs a default active-change status load
+- **THEN** it calls `RefreshImplementationTracking.execute({ name })` rather than `ImplementationDetector` directly
+
+#### Scenario: TransitionChange delegates to RefreshImplementationTracking
+
+- **GIVEN** `TransitionChange` is configured with a `RefreshImplementationTracking` collaborator
+- **WHEN** `TransitionChange` performs a default active-change transition
+- **THEN** it calls `RefreshImplementationTracking.execute({ name })` rather than `ImplementationDetector` directly
+
 ### Requirement: Historical implementing guard
 
 #### Scenario: Guard satisfied triggers detector

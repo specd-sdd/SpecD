@@ -190,6 +190,13 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
   const implementationDetector = new VcsImplementationDetector(config.projectRoot, i.vcs)
   const listWorkspaces = new ListWorkspaces(config, i.specs)
+  const refreshImplementationTracking = new RefreshImplementationTracking(
+    i.changes,
+    i.archive,
+    implementationDetector,
+    i.files,
+    config.projectRoot,
+  )
 
   const generateMetadata = new GenerateSpecMetadata(
     listWorkspaces,
@@ -225,9 +232,17 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
           spec: config.approvals.spec,
           signoff: config.approvals.signoff,
         },
+        refreshImplementationTracking,
         lifecycle,
       ),
-      transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
+      transition: new TransitionChange(
+        i.changes,
+        i.actor,
+        schemaProvider,
+        runStepHooks,
+        refreshImplementationTracking,
+        lifecycle,
+      ),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
       discard: new DiscardChange(i.changes, i.actor),
@@ -293,13 +308,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.files,
         config.projectRoot,
       ),
-      refreshImplementationTracking: new RefreshImplementationTracking(
-        i.changes,
-        i.archive,
-        implementationDetector,
-        i.files,
-        config.projectRoot,
-      ),
+      refreshImplementationTracking,
       getImplementationReview: new GetImplementationReview(i.changes),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,

@@ -6,7 +6,7 @@
     "core:change",
     "core:transition-change",
     "core:hook-execution-model",
-    "core:refresh-implementation-tracking"
+    "core:get-status"
   ],
   "context": [
     "Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default."
@@ -25,9 +25,9 @@
       ]
     },
     {
-      "requirement": "Implementation tracking refresh before transition",
+      "requirement": "Delegates refresh policy to TransitionChange",
       "rules": [
-        "Before invoking `TransitionChange`, the command MUST call `RefreshImplementationTracking` for the same change name.\n\nThe CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.\n\nWhen the command fetches `GetStatus` after a failed transition to render a repair guide, it MUST NOT call `RefreshImplementationTracking` again solely for that diagnostic read unless the repair flow explicitly requires a second refresh."
+        "The command MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector` directly.\n\nPre-transition status reads MUST call `GetStatus` with `refreshImplementationTracking: false` because `TransitionChange` performs the refresh.\n\n`TransitionChange` MUST be invoked with default `refreshImplementationTrackingBefore` behaviour unless a future CLI flag explicitly opts out.\n\nWhen rendering a repair guide after a failed transition, the command MUST call `GetStatus` with `refreshImplementationTracking: false` and MUST NOT trigger a second refresh solely for diagnostics."
       ]
     },
     {
@@ -157,18 +157,28 @@
       ]
     },
     {
-      "requirement": "Implementation tracking refresh before transition",
-      "name": "Transition command refreshes before TransitionChange",
-      "given": ["specd change transition <name> <step> is executed"],
+      "requirement": "Delegates refresh policy to TransitionChange",
+      "name": "Transition command does not call refresh directly",
+      "given": ["specd change transition <name> <step> is executed for an active change"],
       "when": ["the command handler runs"],
-      "then": ["it calls RefreshImplementationTracking before TransitionChange"]
+      "then": [
+        "it does not invoke RefreshImplementationTracking directly",
+        "AND it does not invoke ImplementationDetector directly"
+      ]
     },
     {
-      "requirement": "Implementation tracking refresh before transition",
+      "requirement": "Delegates refresh policy to TransitionChange",
+      "name": "Pre-transition GetStatus skips refresh",
+      "given": ["an active change transition is starting"],
+      "when": ["the command reads the current state before TransitionChange"],
+      "then": ["it calls GetStatus with refreshImplementationTracking: false"]
+    },
+    {
+      "requirement": "Delegates refresh policy to TransitionChange",
       "name": "Repair guide GetStatus does not double-refresh",
-      "given": ["a transition attempt failed after refresh already ran"],
-      "when": ["the command fetches GetStatus for the repair guide"],
-      "then": ["it does not call RefreshImplementationTracking again solely for diagnostics"]
+      "given": ["a transition attempt failed after TransitionChange already refreshed"],
+      "when": ["the command fetches status for the repair guide"],
+      "then": ["it calls GetStatus with refreshImplementationTracking: false"]
     },
     {
       "requirement": "Approval-gate routing",
@@ -320,16 +330,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:change-transition",
-        "file": "cli:src/commands/change/transition.ts"
+        "file": "cli:src/commands/change/transition.ts",
+        "symbol": "registerChangeTransition"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4eaefe5a84081fd97aefafbb974646a0ccc18e5511f4bc9930b9525144b5c9f6",
-    "verify.md": "sha256:ca375fc8701b01ba72315a6e4c4e291340836c0d4b6123001d29b0f5c20c1935"
+    "spec.md": "sha256:d75c51dd6934e91fcdb2705ec8b076ede44d366f43d5bf308c6dd4fe7046a7b9",
+    "verify.md": "sha256:8033e6408ccb35756e075ce42f9ea77b17b7e5228db861e5704c14530c7ac69b"
   },
   "generatedBy": "core"
 }
