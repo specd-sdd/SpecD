@@ -1,0 +1,76 @@
+- op: modified
+  description: Add getConfig to the project domain-area summary
+  selector:
+    type: section
+    matches: 'Requirement: Kernel interface groups use cases by domain area'
+  content: |
+    The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
+
+    - `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
+    - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
+    - `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot)
+
+    Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
+
+- op: modified
+  description: Add project.getConfig row to kernel entry mapping table
+  selector:
+    type: section
+    matches: 'kernel.project'
+    parent:
+      type: section
+      matches: 'Requirement: Kernel entry mapping'
+  content: |
+    | Kernel path                  | Use case class       | Spec                                                         | Description                                                  |
+    | ---------------------------- | -------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+    | `project.init`               | `InitProject`        | [core:init-project](../init-project/spec.md)                 | Initialises a new specd project                              |
+    | `project.recordSkillInstall` | `RecordSkillInstall` | [core:record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent              |
+    | `project.getSkillsManifest`  | `GetSkillsManifest`  | [core:get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest                          |
+    | `project.getProjectContext`  | `GetProjectContext`  | [core:get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block                     |
+    | `project.getConfig`          | `GetConfig`          | [core:get-config](../get-config/spec.md)                     | Returns the readonly construction-time `SpecdConfig` snapshot |
+
+- op: modified
+  description: Register core:get-config as a kernel spec dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:composition`](../composition/spec.md)
+    - [`core:create-change`](../create-change/spec.md)
+    - [`core:get-status`](../get-status/spec.md)
+    - [`core:transition-change`](../transition-change/spec.md)
+    - [`core:draft-change`](../draft-change/spec.md)
+    - [`core:restore-change`](../restore-change/spec.md)
+    - [`core:discard-change`](../discard-change/spec.md)
+    - [`core:archive-change`](../archive-change/spec.md)
+    - [`core:validate-artifacts`](../validate-artifacts/spec.md)
+    - [`core:compile-context`](../compile-context/spec.md)
+    - [`core:list-changes`](../list-changes/spec.md)
+    - [`core:list-drafts`](../list-drafts/spec.md)
+    - [`core:list-discarded`](../list-discarded/spec.md)
+    - [`core:edit-change`](../edit-change/spec.md)
+    - [`core:skip-artifact`](../skip-artifact/spec.md)
+    - [`core:update-spec-deps`](../update-spec-deps/spec.md)
+    - [`core:list-archived`](../list-archived/spec.md)
+    - [`core:get-archived-change`](../get-archived-change/spec.md)
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md)
+    - [`core:get-hook-instructions`](../get-hook-instructions/spec.md)
+    - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md)
+    - [`core:approve-spec`](../approve-spec/spec.md)
+    - [`core:approve-signoff`](../approve-signoff/spec.md)
+    - [`core:list-specs`](../list-specs/spec.md)
+    - [`core:get-spec`](../get-spec/spec.md)
+    - [`core:save-spec-metadata`](../save-spec-metadata/spec.md)
+    - [`core:invalidate-spec-metadata`](../invalidate-spec-metadata/spec.md)
+    - [`core:get-active-schema`](../get-active-schema/spec.md)
+    - [`core:validate-specs`](../validate-specs/spec.md)
+    - [`core:generate-metadata`](../generate-metadata/spec.md)
+    - [`core:get-spec-context`](../get-spec-context/spec.md)
+    - [`core:init-project`](../init-project/spec.md)
+    - [`core:record-skill-install`](../record-skill-install/spec.md)
+    - [`core:get-skills-manifest`](../get-skills-manifest/spec.md)
+    - [`core:get-project-context`](../get-project-context/spec.md)
+    - [`core:get-config`](../get-config/spec.md)
+    - [`core:resolve-schema`](../resolve-schema/spec.md)
+    - [`core:spec-overlap`](../spec-overlap/spec.md)

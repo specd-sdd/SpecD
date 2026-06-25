@@ -34,6 +34,7 @@ import { AddPlugin } from '../application/use-cases/add-plugin.js'
 import { RemovePlugin } from '../application/use-cases/remove-plugin.js'
 import { ListPlugins } from '../application/use-cases/list-plugins.js'
 import { GetProjectContext } from '../application/use-cases/get-project-context.js'
+import { GetConfig } from '../application/use-cases/get-config.js'
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { GenerateSpecMetadata } from '../application/use-cases/generate-spec-metadata.js'
@@ -131,6 +132,7 @@ export interface Kernel {
     listPlugins: ListPlugins
     listWorkspaces: ListWorkspaces
     getProjectContext: GetProjectContext
+    getConfig: GetConfig
     getMetadata: GetProjectMetadata
     updateMetadata: UpdateProjectMetadata
   }
@@ -340,6 +342,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.registry.extractorTransforms,
         workspaceRoutes,
       ),
+      getConfig: new GetConfig(config),
       getMetadata: getProjectMetadata,
       updateMetadata: updateProjectMetadata,
     },

@@ -48,6 +48,7 @@ export { createAddPlugin, type FsAddPluginOptions } from './add-plugin.js'
 export { createRemovePlugin, type FsRemovePluginOptions } from './remove-plugin.js'
 export { createListPlugins, type FsListPluginsOptions } from './list-plugins.js'
 export { createGetProjectContext, type FsGetProjectContextOptions } from './get-project-context.js'
+export { createGetConfig, type GetConfigOptions } from './get-config.js'
 export {
   createCreateChange,
   type CreateChangeContext,

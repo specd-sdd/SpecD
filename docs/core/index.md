@@ -14,5 +14,6 @@ Reference material for the `@specd/core` package:
 - [Use Cases](./use-cases.md)
 - [Errors](./errors.md)
 - [Core Config](./config.md)
+- [GetConfig](./get-config.md)
 - [ConfigWriter](./config-writer.md)
 - [Implementing a Port](./examples/implementing-a-port.md)

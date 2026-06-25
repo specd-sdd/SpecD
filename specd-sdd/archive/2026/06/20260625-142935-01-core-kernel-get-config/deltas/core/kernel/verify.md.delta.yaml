@@ -1,0 +1,57 @@
+- op: modified
+  description: Add getConfig to project group scenario
+  selector:
+    type: section
+    matches: 'Requirement: Kernel interface groups use cases by domain area'
+  content: |
+    #### Scenario: Use cases are nested under domain groups
+
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** the returned object has exactly three top-level keys: `changes`, `specs`, `project`
+    - **AND** each key contains an object with use case entries — not use cases at the root level
+
+    #### Scenario: Changes group contains all change use cases
+
+    - **WHEN** `kernel.changes` is inspected
+    - **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
+    - **AND** it contains `repo` as the underlying `ChangeRepository`
+
+    #### Scenario: Specs group contains all spec use cases
+
+    - **WHEN** `kernel.specs` is inspected
+    - **THEN** it contains entries for: `approveSpec`, `approveSignoff`, `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+    - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
+
+    #### Scenario: Project group contains all project use cases
+
+    - **WHEN** `kernel.project` is inspected
+    - **THEN** it contains entries for: `init`, `recordSkillInstall`, `getSkillsManifest`, `getProjectContext`, `getConfig`
+
+- op: modified
+  description: getConfig entry resolves to GetConfig instance
+  selector:
+    type: section
+    matches: 'Requirement: Kernel entry mapping'
+  content: |
+    #### Scenario: Every mapped entry exists at the documented path
+
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** every kernel path listed in the entry mapping table resolves to a non-undefined value
+    - **AND** each value is an instance of the use case class documented in the table
+
+    #### Scenario: No undocumented entries in the kernel
+
+    - **WHEN** the keys of `kernel.changes`, `kernel.specs`, and `kernel.project` are enumerated
+    - **THEN** every key appears in the entry mapping table — there are no undocumented entries
+
+    #### Scenario: Entry added to kernel without updating the mapping table
+
+    - **GIVEN** a new use case is wired into `createKernel` under `kernel.changes.newUseCase`
+    - **WHEN** the kernel spec is reviewed
+    - **THEN** the entry mapping table must include the new path — omitting it is a spec violation
+
+    #### Scenario: getConfig is wired as GetConfig
+
+    - **WHEN** `kernel.project.getConfig` is inspected after `createKernel(config)`
+    - **THEN** it is an instance of `GetConfig`
+    - **AND** `kernel.project.getConfig.execute()` returns a `Readonly<SpecdConfig>`

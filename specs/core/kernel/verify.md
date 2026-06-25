@@ -25,7 +25,7 @@
 #### Scenario: Project group contains all project use cases
 
 - **WHEN** `kernel.project` is inspected
-- **THEN** it contains entries for: `init`, `recordSkillInstall`, `getSkillsManifest`, `getProjectContext`
+- **THEN** it contains entries for: `init`, `recordSkillInstall`, `getSkillsManifest`, `getProjectContext`, `getConfig`
 
 ### Requirement: Every exported use case must have a kernel entry
 
@@ -59,6 +59,12 @@
 - **GIVEN** a new use case is wired into `createKernel` under `kernel.changes.newUseCase`
 - **WHEN** the kernel spec is reviewed
 - **THEN** the entry mapping table must include the new path — omitting it is a spec violation
+
+#### Scenario: getConfig is wired as GetConfig
+
+- **WHEN** `kernel.project.getConfig` is inspected after `createKernel(config)`
+- **THEN** it is an instance of `GetConfig`
+- **AND** `kernel.project.getConfig.execute()` returns a `Readonly<SpecdConfig>`
 
 ### Requirement: Kernel entries must match use case types
 

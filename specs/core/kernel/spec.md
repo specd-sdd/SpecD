@@ -12,7 +12,7 @@ The `Kernel` interface organises use cases into three groups that mirror the dom
 
 - `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
 - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
-- `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context)
+- `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot)
 
 Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
 
@@ -154,14 +154,13 @@ The following table is the exhaustive mapping between kernel paths and use case 
 
 #### kernel.project
 
-| Kernel path                  | Use case class       | Spec                                                         | Description                                     |
-| ---------------------------- | -------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| `project.init`               | `InitProject`        | [core:init-project](../init-project/spec.md)                 | Initialises a new specd project                 |
-| `project.recordSkillInstall` | `RecordSkillInstall` | [core:record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent |
-| `project.getSkillsManifest`  | `GetSkillsManifest`  | [core:get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest             |
-| `project.getProjectContext`  | `GetProjectContext`  | [core:get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block        |
-
-Adding, removing, or renaming an entry in this table is a contract change and must be reflected in both the `Kernel` interface and `createKernel`.
+| Kernel path                  | Use case class       | Spec                                                         | Description                                                   |
+| ---------------------------- | -------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
+| `project.init`               | `InitProject`        | [core:init-project](../init-project/spec.md)                 | Initialises a new specd project                               |
+| `project.recordSkillInstall` | `RecordSkillInstall` | [core:record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent               |
+| `project.getSkillsManifest`  | `GetSkillsManifest`  | [core:get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest                           |
+| `project.getProjectContext`  | `GetProjectContext`  | [core:get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block                      |
+| `project.getConfig`          | `GetConfig`          | [core:get-config](../get-config/spec.md)                     | Returns the readonly construction-time `SpecdConfig` snapshot |
 
 ## Examples
 
@@ -253,5 +252,6 @@ await kernel.project.init.execute({
 - [`core:record-skill-install`](../record-skill-install/spec.md)
 - [`core:get-skills-manifest`](../get-skills-manifest/spec.md)
 - [`core:get-project-context`](../get-project-context/spec.md)
+- [`core:get-config`](../get-config/spec.md)
 - [`core:resolve-schema`](../resolve-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)
