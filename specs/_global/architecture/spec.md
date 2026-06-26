@@ -45,7 +45,7 @@ Dependencies are wired manually at the application entry point of each package. 
 Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:
 
 - **Use-case factories** — one per domain use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
-- **Kernel** — `createKernel(config: SpecdConfig)` calls domain use-case factories and returns grouped use cases. It is a convenience, not a mandatory entry point. Config mutation is not wired into the kernel.
+- **Kernel** — `createKernel(config: SpecdConfig)` calls domain use-case factories and returns grouped use cases. It is a convenience, not a mandatory entry point. Config mutation is not wired into the kernel. Values from the resolved `SpecdConfig` (including `approvals` and `plugins`) are injected at construction time; delivery mechanisms MUST NOT re-pass those values on per-call `execute()` inputs. Hosts read config via `kernel.project.getConfig` when needed.
 - **Config loader port** — `createConfigLoader()` returns a `ConfigLoader` that resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
 - **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml` (`initProject`, `addPlugin`, `removePlugin`). Implementations live in `infrastructure/`. Delivery mechanisms call port methods on the returned instance.
 

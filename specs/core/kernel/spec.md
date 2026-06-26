@@ -176,6 +176,42 @@ Operations that create or mutate `specd.yaml` (`initProject`, `addPlugin`, `remo
 
 `InitProject`, `AddPlugin`, and `RemovePlugin` application use case classes are not part of the public `@specd/core` surface after this change.
 
+### Requirement: Skills manifest use cases are not a kernel use case
+
+The pre-plugin-era skills manifest flow (`RecordSkillInstall`, `GetSkillsManifest`) is obsolete. Plugin declarations are tracked via `specd.yaml` `plugins.*` and `createConfigWriter().addPlugin()`.
+
+`kernel.project` MUST NOT expose `recordSkillInstall`, `getSkillsManifest`, or any equivalent skills-manifest use case. Those application use case classes are not part of the public kernel surface and MUST NOT appear in the kernel entry mapping table.
+
+`@specd/core` MUST NOT export `RecordSkillInstall`, `GetSkillsManifest`, `createRecordSkillInstall`, or `createGetSkillsManifest`.
+
+### Requirement: Kernel use case execute inputs must not re-pass construction-time config
+
+Every use case exposed on the `Kernel` interface receives construction-time dependencies (including `SpecdConfig`, approval gate settings, and `KernelOptions`) via its constructor when `createKernel` wires the kernel. Callers MUST NOT supply those same values again in the use case `execute()` input.
+
+A field in `*Input` violates this rule when its value is derivable solely from `SpecdConfig`, `KernelOptions`, or other data fixed at `createKernel` time and identical for every call until the kernel is recreated.
+
+Delivery mechanisms that need readonly config MUST call `kernel.project.getConfig.execute()` (or use the `SpecdConfig` they already passed to `createKernel`) — not pass `config` or config-derived subtrees into other use case inputs.
+
+Known violations owned by other active changes MUST be recorded in the change design audit matrix until resolved; this requirement applies once those changes archive.
+
+### Requirement: Allowed runtime override inputs
+
+Optional `execute()` fields that select per-call behaviour (not config re-reads) are permitted when documented below. Fields not listed remain subject to the construction-time rule.
+
+| Use case            | Allowed override fields                                                                                      | Rationale                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `CompileContext`    | `contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint` | Per-step context compilation controls chosen by the caller at invocation time |
+| `GetProjectContext` | `contextMode`, `llmOptimizedContext`, `followDeps`, `depth`, `sections`                                      | Per-call project context shaping                                              |
+| `GetSpecContext`    | `followDeps`, `depth`, `contextMode`, `sections`, `llmOptimizedContext`                                      | Per-call spec context shaping                                                 |
+| `TransitionChange`  | `skipHookPhases`, `refreshImplementationTrackingBefore`                                                      | Caller-controlled transition options for the specific invocation              |
+| `ArchiveChange`     | `skipHookPhases`, `allowOverlap`, `allowOutOfScope`                                                          | Caller-controlled archive options for the specific invocation                 |
+| `RunStepHooks`      | `only`                                                                                                       | Caller scopes hook execution to one hook id                                   |
+| `GetStatus`         | `refreshImplementationTracking`                                                                              | Caller chooses whether to refresh tracking on this status read                |
+| `CreateChange`      | `includeOverlapCheck`                                                                                        | Caller opts into overlap detection for this create                            |
+| `ValidateArtifacts` | `specPath`, `artifactId`                                                                                     | Caller scopes validation to one spec or artifact                              |
+
+Use cases whose `execute()` accepts no input (`GetConfig`, `ListWorkspaces`, `ListSpecs`, `ListChanges`, etc.) are conformant by definition.
+
 ### Requirement: Kernel is a plain object, not a class
 
 `createKernel` returns a plain object literal conforming to the `Kernel` interface. The kernel has no internal state, no lifecycle methods, and no event system. It is a one-shot wiring of use cases — once created, it is immutable.

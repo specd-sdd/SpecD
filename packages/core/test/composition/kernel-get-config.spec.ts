@@ -94,6 +94,16 @@ describe('createKernel project.getConfig', () => {
       expect(kernel.project).not.toHaveProperty('removePlugin')
     })
 
+    it('does not expose skills manifest entries on kernel.project', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.project).not.toHaveProperty('recordSkillInstall')
+      expect(kernel.project).not.toHaveProperty('getSkillsManifest')
+      expect('recordSkillInstall' in kernel.project).toBe(false)
+      expect('getSkillsManifest' in kernel.project).toBe(false)
+    })
+
     it('does not expose configWriter on the kernel object', async () => {
       const config = await makeConfig()
       const kernel = await createKernel(config)

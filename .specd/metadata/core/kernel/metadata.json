@@ -132,6 +132,24 @@
       ]
     },
     {
+      "requirement": "Skills manifest use cases are not a kernel use case",
+      "rules": [
+        "The pre-plugin-era skills manifest flow (`RecordSkillInstall`, `GetSkillsManifest`) is obsolete. Plugin declarations are tracked via `specd.yaml` `plugins.*` and `createConfigWriter().addPlugin()`.\n\n`kernel.project` MUST NOT expose `recordSkillInstall`, `getSkillsManifest`, or any equivalent skills-manifest use case. Those application use case classes are not part of the public kernel surface and MUST NOT appear in the kernel entry mapping table.\n\n`@specd/core` MUST NOT export `RecordSkillInstall`, `GetSkillsManifest`, `createRecordSkillInstall`, or `createGetSkillsManifest`."
+      ]
+    },
+    {
+      "requirement": "Kernel use case execute inputs must not re-pass construction-time config",
+      "rules": [
+        "Every use case exposed on the `Kernel` interface receives construction-time dependencies (including `SpecdConfig`, approval gate settings, and `KernelOptions`) via its constructor when `createKernel` wires the kernel. Callers MUST NOT supply those same values again in the use case `execute()` input.\n\nA field in `*Input` violates this rule when its value is derivable solely from `SpecdConfig`, `KernelOptions`, or other data fixed at `createKernel` time and identical for every call until the kernel is recreated.\n\nDelivery mechanisms that need readonly config MUST call `kernel.project.getConfig.execute()` (or use the `SpecdConfig` they already passed to `createKernel`) — not pass `config` or config-derived subtrees into other use case inputs.\n\nKnown violations owned by other active changes MUST be recorded in the change design audit matrix until resolved; this requirement applies once those changes archive."
+      ]
+    },
+    {
+      "requirement": "Allowed runtime override inputs",
+      "rules": [
+        "Optional `execute()` fields that select per-call behaviour (not config re-reads) are permitted when documented below. Fields not listed remain subject to the construction-time rule.\n\n| Use case | Allowed override fields | Rationale |\n| --- | --- | --- |\n| `CompileContext` | `contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint` | Per-step context compilation controls chosen by the caller at invocation time |\n| `GetProjectContext` | `contextMode`, `llmOptimizedContext`, `followDeps`, `depth`, `sections` | Per-call project context shaping |\n| `GetSpecContext` | `followDeps`, `depth`, `contextMode`, `sections`, `llmOptimizedContext` | Per-call spec context shaping |\n| `TransitionChange` | `skipHookPhases`, `refreshImplementationTrackingBefore` | Caller-controlled transition options for the specific invocation |\n| `ArchiveChange` | `skipHookPhases`, `allowOverlap`, `allowOutOfScope` | Caller-controlled archive options for the specific invocation |\n| `RunStepHooks` | `only` | Caller scopes hook execution to one hook id |\n| `GetStatus` | `refreshImplementationTracking` | Caller chooses whether to refresh tracking on this status read |\n| `CreateChange` | `includeOverlapCheck` | Caller opts into overlap detection for this create |\n| `ValidateArtifacts` | `specPath`, `artifactId` | Caller scopes validation to one spec or artifact |\n\nUse cases whose `execute()` accepts no input (`GetConfig`, `ListWorkspaces`, `ListSpecs`, `ListChanges`, etc.) are conformant by definition."
+      ]
+    },
+    {
       "requirement": "Kernel is a plain object, not a class",
       "rules": [
         "`createKernel` returns a plain object literal conforming to the `Kernel` interface. The kernel has no internal state, no lifecycle methods, and no event system. It is a one-shot wiring of use cases — once created, it is immutable."
@@ -180,7 +198,7 @@
       "when": ["kernel.project is inspected"],
       "then": [
         "it contains entries for: listWorkspaces, getProjectContext, getConfig, getMetadata, updateMetadata",
-        "AND it does not contain init, addPlugin, removePlugin, or listPlugins"
+        "AND it does not contain init, addPlugin, removePlugin, listPlugins, recordSkillInstall, or getSkillsManifest"
       ]
     },
     {
@@ -271,6 +289,53 @@
       "then": [
         "InitProject, AddPlugin, RemovePlugin, createInitProject, createAddPlugin, and createRemovePlugin are not among them",
         "AND createConfigWriter is exported"
+      ]
+    },
+    {
+      "requirement": "Skills manifest use cases are not a kernel use case",
+      "name": "kernel.project does not expose skills manifest entries",
+      "when": ["kernel.project is inspected after createKernel(config)"],
+      "then": [
+        "it does not contain recordSkillInstall or getSkillsManifest",
+        "AND 'recordSkillInstall' in kernel.project and 'getSkillsManifest' in kernel.project are both false"
+      ]
+    },
+    {
+      "requirement": "Skills manifest use cases are not a kernel use case",
+      "name": "Skills manifest use cases are not exported",
+      "when": ["@specd/core public exports are inspected"],
+      "then": [
+        "RecordSkillInstall, GetSkillsManifest, createRecordSkillInstall, and createGetSkillsManifest are not among them"
+      ]
+    },
+    {
+      "requirement": "Kernel use case execute inputs must not re-pass construction-time config",
+      "name": "CompileContext input has no config field",
+      "when": ["CompileContextInput is inspected"],
+      "then": ["it does not declare a config property"]
+    },
+    {
+      "requirement": "Kernel use case execute inputs must not re-pass construction-time config",
+      "name": "GetProjectContext input has no config field",
+      "when": ["GetProjectContextInput is inspected"],
+      "then": ["it does not declare a config property"]
+    },
+    {
+      "requirement": "Kernel use case execute inputs must not re-pass construction-time config",
+      "name": "GetConfig returns construction-time snapshot without input",
+      "when": ["kernel.project.getConfig.execute() is called"],
+      "then": [
+        "it requires no execute input",
+        "AND it returns the SpecdConfig baked at createKernel time"
+      ]
+    },
+    {
+      "requirement": "Allowed runtime override inputs",
+      "name": "CompileContext permits documented override fields only",
+      "when": ["CompileContextInput is inspected"],
+      "then": [
+        "its optional fields are limited to the documented override set (contextMode, llmOptimizedContext, includeChangeSpecs, followDeps, depth, sections, fingerprint) plus required per-call identifiers (name, step)",
+        "AND it does not declare config or approval gate fields"
       ]
     },
     {
@@ -498,21 +563,21 @@
     "files": [
       {
         "specId": "core:kernel",
-        "file": "core:src/composition/kernel.ts"
-      },
-      {
-        "specId": "core:kernel",
-        "file": "core:src/composition/kernel-internals.ts"
-      },
-      {
-        "specId": "core:kernel",
         "file": "core:test/composition/kernel-get-config.spec.ts"
+      },
+      {
+        "specId": "core:kernel",
+        "file": "core:test/composition/config-mutation-exports.spec.ts"
+      },
+      {
+        "specId": "core:kernel",
+        "file": "core:test/application/use-cases/kernel-input-boundary.spec.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5e65f9476e1db1c4d6643ad53f623bc2416c0e673529ab4a035cf2775f9c2108",
-    "verify.md": "sha256:f607fa14ac2bd90daca00f5a6b6e4ed183da0c95ee9cbee92dfca3de074c799a"
+    "spec.md": "sha256:0badfdffad8c25a6442c772b312da684e64146ea200c2cefd7121dfa0b84656a",
+    "verify.md": "sha256:378f94f15a711c9ac75f1acd2ac6ea5f283b22bc3605492d76ea5d2c9e30337e"
   },
   "generatedBy": "core"
 }

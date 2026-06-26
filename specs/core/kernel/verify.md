@@ -26,7 +26,7 @@
 
 - **WHEN** `kernel.project` is inspected
 - **THEN** it contains entries for: `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
-- **AND** it does not contain `init`, `addPlugin`, `removePlugin`, or `listPlugins`
+- **AND** it does not contain `init`, `addPlugin`, `removePlugin`, `listPlugins`, `recordSkillInstall`, or `getSkillsManifest`
 
 ### Requirement: Every exported use case must have a kernel entry
 
@@ -95,6 +95,45 @@
 - **WHEN** `@specd/core` public exports are inspected
 - **THEN** `InitProject`, `AddPlugin`, `RemovePlugin`, `createInitProject`, `createAddPlugin`, and `createRemovePlugin` are not among them
 - **AND** `createConfigWriter` is exported
+
+### Requirement: Skills manifest use cases are not a kernel use case
+
+#### Scenario: kernel.project does not expose skills manifest entries
+
+- **WHEN** `kernel.project` is inspected after `createKernel(config)`
+- **THEN** it does not contain `recordSkillInstall` or `getSkillsManifest`
+- **AND** `'recordSkillInstall' in kernel.project` and `'getSkillsManifest' in kernel.project` are both false
+
+#### Scenario: Skills manifest use cases are not exported
+
+- **WHEN** `@specd/core` public exports are inspected
+- **THEN** `RecordSkillInstall`, `GetSkillsManifest`, `createRecordSkillInstall`, and `createGetSkillsManifest` are not among them
+
+### Requirement: Kernel use case execute inputs must not re-pass construction-time config
+
+#### Scenario: CompileContext input has no config field
+
+- **WHEN** `CompileContextInput` is inspected
+- **THEN** it does not declare a `config` property
+
+#### Scenario: GetProjectContext input has no config field
+
+- **WHEN** `GetProjectContextInput` is inspected
+- **THEN** it does not declare a `config` property
+
+#### Scenario: GetConfig returns construction-time snapshot without input
+
+- **WHEN** `kernel.project.getConfig.execute()` is called
+- **THEN** it requires no execute input
+- **AND** it returns the `SpecdConfig` baked at `createKernel` time
+
+### Requirement: Allowed runtime override inputs
+
+#### Scenario: CompileContext permits documented override fields only
+
+- **WHEN** `CompileContextInput` is inspected
+- **THEN** its optional fields are limited to the documented override set (`contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint`) plus required per-call identifiers (`name`, `step`)
+- **AND** it does not declare `config` or approval gate fields
 
 ### Requirement: Kernel entries must match use case types
 

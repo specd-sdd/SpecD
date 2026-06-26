@@ -198,8 +198,6 @@ Everything exported is a domain type (entity, value object, error, service), an 
 | `RunStepHooks`           | type | Executes built-in `run:` hooks and explicit `external:` hooks for a workflow step and phase. |
 | `GetHookInstructions`    | type | Returns `instruction:` hook text for a workflow step and phase.                              |
 | `GetArtifactInstruction` | type | Returns artifact-specific instructions, rules, and delta guidance.                           |
-| `RecordSkillInstall`     | type | Records that a skill set was installed for an agent.                                         |
-| `GetSkillsManifest`      | type | Reads the installed skills manifest from `specd.yaml`.                                       |
 | `GetProjectContext`      | type | Compiles project-level context without a specific change or step.                            |
 
 **From the application layer — config types:**

@@ -1336,42 +1336,6 @@ See [config-writer.md](./config-writer.md) for method contracts and error condit
 
 ---
 
-## Skills
-
-### GetSkillsManifest
-
-Reads the installed skills manifest from `specd.yaml`.
-
-**Constructor:** `new GetSkillsManifest(writer: ConfigWriter)`
-
-**Input:**
-
-| Field        | Type     | Required | Description                                |
-| ------------ | -------- | -------- | ------------------------------------------ |
-| `configPath` | `string` | yes      | Absolute path to the `specd.yaml` to read. |
-
-**Returns:** `Promise<Record<string, string[]>>` — a map of agent name to installed skill names.
-
----
-
-### RecordSkillInstall
-
-Records that a set of skills was installed for an agent by merging the skill names into the `skills` key of `specd.yaml`.
-
-**Constructor:** `new RecordSkillInstall(writer: ConfigWriter)`
-
-**Input:**
-
-| Field        | Type                | Required | Description                                  |
-| ------------ | ------------------- | -------- | -------------------------------------------- |
-| `configPath` | `string`            | yes      | Absolute path to the `specd.yaml` to update. |
-| `agent`      | `string`            | yes      | The agent name (e.g. `'claude'`).            |
-| `skillNames` | `readonly string[]` | yes      | The skill names to record.                   |
-
-**Returns:** `Promise<void>`
-
----
-
 ## Implementation tracking
 
 ### RefreshImplementationTracking

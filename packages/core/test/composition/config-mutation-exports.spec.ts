@@ -9,6 +9,10 @@ const REMOVED_EXPORTS = [
   'createAddPlugin',
   'createRemovePlugin',
   'FsConfigWriter',
+  'RecordSkillInstall',
+  'GetSkillsManifest',
+  'createRecordSkillInstall',
+  'createGetSkillsManifest',
 ] as const
 
 describe('@specd/core config mutation exports', () => {

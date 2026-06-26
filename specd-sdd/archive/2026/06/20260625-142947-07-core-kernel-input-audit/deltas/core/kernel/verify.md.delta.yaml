@@ -1,0 +1,78 @@
+- op: added
+  description: Verify skills-manifest use cases are absent from kernel
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Config mutation is not a kernel use case'
+  content: |
+    ### Requirement: Skills manifest use cases are not a kernel use case
+
+    #### Scenario: kernel.project does not expose skills manifest entries
+
+    - **WHEN** `kernel.project` is inspected after `createKernel(config)`
+    - **THEN** it does not contain `recordSkillInstall` or `getSkillsManifest`
+    - **AND** `'recordSkillInstall' in kernel.project` and `'getSkillsManifest' in kernel.project` are both false
+
+    #### Scenario: Skills manifest use cases are not exported
+
+    - **WHEN** `@specd/core` public exports are inspected
+    - **THEN** `RecordSkillInstall`, `GetSkillsManifest`, `createRecordSkillInstall`, and `createGetSkillsManifest` are not among them
+
+- op: added
+  description: Verify execute inputs do not carry config snapshots
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Skills manifest use cases are not a kernel use case'
+  content: |
+    ### Requirement: Kernel use case execute inputs must not re-pass construction-time config
+
+    #### Scenario: CompileContext input has no config field
+
+    - **WHEN** `CompileContextInput` is inspected
+    - **THEN** it does not declare a `config` property
+
+    #### Scenario: GetProjectContext input has no config field
+
+    - **WHEN** `GetProjectContextInput` is inspected
+    - **THEN** it does not declare a `config` property
+
+    #### Scenario: GetConfig returns construction-time snapshot without input
+
+    - **WHEN** `kernel.project.getConfig.execute()` is called
+    - **THEN** it requires no execute input
+    - **AND** it returns the `SpecdConfig` baked at `createKernel` time
+
+- op: added
+  description: Verify runtime override whitelist for context use cases
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Kernel use case execute inputs must not re-pass construction-time config'
+  content: |
+    ### Requirement: Allowed runtime override inputs
+
+    #### Scenario: CompileContext permits documented override fields only
+
+    - **WHEN** `CompileContextInput` is inspected
+    - **THEN** its optional fields are limited to the documented override set (`contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint`) plus required per-call identifiers (`name`, `step`)
+    - **AND** it does not declare `config` or approval gate fields
+
+- op: modified
+  description: Extend project group scenario to exclude skills-manifest entries
+  selector:
+    type: section
+    matches: 'Scenario: Project group contains query use cases only'
+  content: |
+    - **WHEN** `kernel.project` is inspected
+    - **THEN** it contains entries for: `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
+    - **AND** it does not contain `init`, `addPlugin`, `removePlugin`, `listPlugins`, `recordSkillInstall`, or `getSkillsManifest`

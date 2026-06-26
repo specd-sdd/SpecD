@@ -107,6 +107,13 @@
 - **THEN** it obtains a `ConfigWriter` via `createConfigWriter()` from `@specd/core`
 - **AND** it does not import `FsConfigWriter` or construct use cases `InitProject`, `AddPlugin`, or `RemovePlugin`
 
+#### Scenario: Kernel use cases receive config at construction
+
+- **GIVEN** a delivery mechanism has called `createKernel(config)` with a resolved `SpecdConfig`
+- **WHEN** it invokes a kernel use case other than `getConfig`
+- **THEN** it does not pass `config` or config-derived approval/plugin subtrees in the `execute()` input
+- **AND** it reads config from `kernel.project.getConfig.execute()` when a fresh snapshot is needed
+
 ### Requirement: YAML inputs validated at the infrastructure boundary
 
 #### Scenario: External data is validated before use
