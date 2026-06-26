@@ -48,6 +48,8 @@ import { UpdateSpecMetadata } from '../application/use-cases/update-spec-metadat
 import { UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
 import { GetProjectMetadata } from '../application/use-cases/get-project-metadata.js'
 import { ListWorkspaces } from '../application/use-cases/list-workspaces.js'
+import { GetProjectSummary } from '../application/use-cases/get-project-summary.js'
+import { createGetProjectSummary } from './use-cases/get-project-summary.js'
 import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
@@ -124,6 +126,7 @@ export interface Kernel {
   }
   project: {
     listWorkspaces: ListWorkspaces
+    getProjectSummary: GetProjectSummary
     getProjectContext: GetProjectContext
     getConfig: GetConfig
     getMetadata: GetProjectMetadata
@@ -341,6 +344,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     },
     project: {
       listWorkspaces,
+      getProjectSummary: createGetProjectSummary(config),
       getProjectContext: new GetProjectContext(
         listWorkspaces,
         schemaProvider,

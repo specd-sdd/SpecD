@@ -1,0 +1,202 @@
+{
+  "title": "GetProjectSummary",
+  "description": "Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals.",
+  "dependsOn": [
+    "core:list-workspaces",
+    "core:list-changes",
+    "core:list-drafts",
+    "core:list-discarded",
+    "core:list-archived",
+    "core:kernel"
+  ],
+  "context": [
+    "Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals."
+  ],
+  "rules": [
+    {
+      "requirement": "Returns count-only project summary",
+      "rules": [
+        "`GetProjectSummary.execute()` MUST return a `GetProjectSummaryResult` with:\n\n- `activeCount` — number of active (non-drafted, non-discarded) changes\n- `draftCount` — number of drafted changes\n- `discardedCount` — number of discarded changes\n- `archivedCount` — number of archived changes\n- `specsByWorkspace` — map of workspace name to spec count\n- `workspaceCount` — number of configured workspaces\n\nThe result MUST NOT include change entities, spec metadata, graph data, or context payloads."
+      ]
+    },
+    {
+      "requirement": "Orchestrates existing list use cases",
+      "rules": [
+        "`GetProjectSummary` MUST obtain change counts by delegating to:\n\n- `ListChanges.execute()` for `activeCount`\n- `ListDrafts.execute()` for `draftCount`\n- `ListDiscarded.execute()` for `discardedCount`\n- `ListArchived.execute()` for `archivedCount`\n\nChange counts from `ListChanges`, `ListDrafts`, and `ListDiscarded` MUST be the `.length` of the corresponding result arrays.\n\n`archivedCount` MUST be `meta.total` from the `ArchiveListResult` returned by `ListArchived.execute()` (not `items.length`, because listing may be paginated)."
+      ]
+    },
+    {
+      "requirement": "Orchestrates workspace spec counting",
+      "rules": [
+        "`GetProjectSummary` MUST obtain spec counts by delegating to `ListWorkspaces.execute()` and calling `SpecRepository.count()` on each returned workspace's `specRepo`. Results MUST be assembled into `specsByWorkspace` keyed by workspace `name`, preserving declaration order from configuration when iterated.\n\n`workspaceCount` MUST equal the number of workspaces returned by `ListWorkspaces`."
+      ]
+    },
+    {
+      "requirement": "Parallelizes independent queries",
+      "rules": [
+        "`GetProjectSummary.execute()` MUST run independent list and count operations concurrently (for example via `Promise.all`) so summary assembly does not serialize unrelated I/O."
+      ]
+    },
+    {
+      "requirement": "Constructor accepts orchestration dependencies",
+      "rules": [
+        "`GetProjectSummary` MUST accept the five list use cases and `ListWorkspaces` as constructor dependencies. It MUST NOT construct repositories or read `specd.yaml` directly."
+      ]
+    },
+    {
+      "requirement": "Factory wires from SpecdConfig",
+      "rules": [
+        "`createGetProjectSummary(config)` in composition MUST construct and wire all dependencies from a resolved `SpecdConfig`, following the same pattern as other `createList*` factories."
+      ]
+    },
+    {
+      "requirement": "Kernel exposes use case",
+      "rules": [
+        "`createKernel()` MUST wire `GetProjectSummary` on `kernel.project.getProjectSummary`."
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT invoke code-graph providers or context compilation.",
+    "The use case MUST NOT load spec metadata or change artifact content.",
+    "The use case MUST NOT mutate configuration, repositories, or stored changes."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Returns count-only project summary",
+      "name": "Result contains all count fields without entities",
+      "given": [
+        "a configured project with active changes, drafts, discarded changes, archived changes, and specs across multiple workspaces"
+      ],
+      "when": ["GetProjectSummary.execute() is called"],
+      "then": [
+        "the result includes activeCount, draftCount, discardedCount, archivedCount, specsByWorkspace, and workspaceCount",
+        "AND the result does not include change entities, spec metadata, graph data, or context payloads"
+      ]
+    },
+    {
+      "requirement": "Orchestrates existing list use cases",
+      "name": "Active count matches ListChanges length",
+      "given": ["ListChanges.execute() returns three active changes"],
+      "when": ["GetProjectSummary.execute() is called"],
+      "then": ["activeCount is 3"]
+    },
+    {
+      "requirement": "Orchestrates existing list use cases",
+      "name": "Draft count matches ListDrafts length",
+      "given": ["ListDrafts.execute() returns two drafts"],
+      "when": ["GetProjectSummary.execute() is called"],
+      "then": ["draftCount is 2"]
+    },
+    {
+      "requirement": "Orchestrates existing list use cases",
+      "name": "Discarded count matches ListDiscarded length",
+      "given": ["ListDiscarded.execute() returns one discarded change"],
+      "when": ["GetProjectSummary.execute() is called"],
+      "then": ["discardedCount is 1"]
+    },
+    {
+      "requirement": "Orchestrates existing list use cases",
+      "name": "Archived count uses ArchiveListResult meta total",
+      "given": [
+        "ListArchived.execute() returns { items: [...], meta: { total: 5, count: 5, limit: 100 } }"
+      ],
+      "when": ["GetProjectSummary.execute() is called"],
+      "then": [
+        "archivedCount is 5",
+        "AND archivedCount is not derived from items.length when pagination limits returned items"
+      ]
+    },
+    {
+      "requirement": "Orchestrates workspace spec counting",
+      "name": "Spec counts keyed by workspace name",
+      "given": [
+        "ListWorkspaces.execute() returns workspaces default (3 specs) and core (10 specs)"
+      ],
+      "when": ["GetProjectSummary.execute() is called"],
+      "then": ["specsByWorkspace is { default: 3, core: 10 }", "AND workspaceCount is 2"]
+    },
+    {
+      "requirement": "Parallelizes independent queries",
+      "name": "Independent list operations run concurrently",
+      "when": ["GetProjectSummary.execute() runs"],
+      "then": [
+        "list use case calls and per-workspace count() operations are not serialized behind unrelated awaits"
+      ]
+    },
+    {
+      "requirement": "Constructor accepts orchestration dependencies",
+      "name": "Constructor requires injected list use cases",
+      "when": ["GetProjectSummary is instantiated"],
+      "then": [
+        "it requires ListChanges, ListDrafts, ListDiscarded, ListArchived, and ListWorkspaces as constructor dependencies",
+        "AND it does not construct repositories or read configuration directly"
+      ]
+    },
+    {
+      "requirement": "Factory wires from SpecdConfig",
+      "name": "createGetProjectSummary returns wired instance",
+      "given": ["a resolved SpecdConfig"],
+      "when": ["createGetProjectSummary(config) is called"],
+      "then": ["it returns a GetProjectSummary instance with all dependencies wired from config"]
+    },
+    {
+      "requirement": "Kernel exposes use case",
+      "name": "Kernel project namespace includes getProjectSummary",
+      "given": ["createKernel(config) is called"],
+      "when": ["the returned kernel is inspected"],
+      "then": ["kernel.project.getProjectSummary is a GetProjectSummary instance"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:test/application/use-cases/get-project-summary.spec.ts"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:test/composition/get-project-summary.spec.ts"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/application/index.ts"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/composition/use-cases/index.ts"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:test/composition/kernel-get-config.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/application/use-cases/get-project-summary.ts",
+        "symbol": "GetProjectSummary"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/application/use-cases/get-project-summary.ts",
+        "symbol": "GetProjectSummaryResult"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/composition/use-cases/get-project-summary.ts",
+        "symbol": "createGetProjectSummary"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:bcef4984bc20801dc585500440aef3759bc09b5a30f906dd525268ec98fca0f3",
+    "verify.md": "sha256:7b6ccca7f31e676a015af57bfbe59b526edcb97cc027bf5a1e31443e94d530d9"
+  },
+  "generatedBy": "core"
+}

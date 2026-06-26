@@ -14,6 +14,21 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerProjectStatus } from '../../src/commands/project/status.js'
+import { type MockKernel } from './helpers.js'
+
+const emptySummary = {
+  activeCount: 0,
+  draftCount: 0,
+  discardedCount: 0,
+  archivedCount: 0,
+  specsByWorkspace: {} as Record<string, number>,
+  workspaceCount: 0,
+}
+
+function stubProjectStatusKernel(kernel: MockKernel, summary = emptySummary) {
+  kernel.project.listWorkspaces.execute.mockResolvedValue([])
+  kernel.project.getProjectSummary.execute.mockResolvedValue(summary)
+}
 
 function setup() {
   const config = makeMockConfig()
@@ -30,10 +45,7 @@ afterEach(() => vi.restoreAllMocks())
 describe('project status', () => {
   it('command name is status', async () => {
     const { kernel } = setup()
-    kernel.project.listWorkspaces.execute.mockResolvedValue([])
-    kernel.changes.list.execute.mockResolvedValue([])
-    kernel.changes.listDrafts.execute.mockResolvedValue([])
-    kernel.changes.listDiscarded.execute.mockResolvedValue([])
+    stubProjectStatusKernel(kernel)
 
     const program = makeProgram()
     const projectCmd = program.command('project')
@@ -43,16 +55,84 @@ describe('project status', () => {
     expect(statusCmd).toBeDefined()
   })
 
+  it('obtains change and spec counts via getProjectSummary', async () => {
+    const { kernel, stdout } = setup()
+    stubProjectStatusKernel(kernel, {
+      activeCount: 2,
+      draftCount: 1,
+      discardedCount: 3,
+      archivedCount: 4,
+      specsByWorkspace: { default: 5, core: 7 },
+      workspaceCount: 2,
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status'])
+
+    expect(kernel.project.getProjectSummary.execute).toHaveBeenCalledOnce()
+    expect(kernel.changes.list.execute).not.toHaveBeenCalled()
+    expect(kernel.changes.listDrafts.execute).not.toHaveBeenCalled()
+    expect(kernel.changes.listDiscarded.execute).not.toHaveBeenCalled()
+
+    const out = stdout()
+    expect(out).toContain('changes: 2 active, 1 drafts, 3 discarded, 4 archived')
+    expect(out).toContain('specs: 12 total')
+    expect(out).toContain('default: 5')
+    expect(out).toContain('core: 7')
+  })
+
+  it('includes archived count in JSON output', async () => {
+    const { kernel, stdout } = setup()
+    stubProjectStatusKernel(kernel, {
+      activeCount: 1,
+      draftCount: 2,
+      discardedCount: 3,
+      archivedCount: 4,
+      specsByWorkspace: { default: 5 },
+      workspaceCount: 1,
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout()) as {
+      changes: { active: number; drafts: number; discarded: number; archived: number }
+    }
+    expect(parsed.changes).toEqual({
+      active: 1,
+      drafts: 2,
+      discarded: 3,
+      archived: 4,
+    })
+  })
+
+  it('includes archived count in TOON output', async () => {
+    const { kernel, stdout } = setup()
+    stubProjectStatusKernel(kernel, {
+      activeCount: 0,
+      draftCount: 0,
+      discardedCount: 0,
+      archivedCount: 9,
+      specsByWorkspace: { default: 0 },
+      workspaceCount: 1,
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--format', 'toon'])
+
+    expect(stdout()).toContain('archived: 9')
+  })
+
   describe('--context', () => {
     it('prefers optimized project context when fresh', async () => {
       const { config, kernel, stdout } = setup()
       Object.assign(config, {
         llmOptimizedContext: true,
       })
-      kernel.project.listWorkspaces.execute.mockResolvedValue([])
-      kernel.changes.list.execute.mockResolvedValue([])
-      kernel.changes.listDrafts.execute.mockResolvedValue([])
-      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      stubProjectStatusKernel(kernel)
 
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: ['**Optimized Context**'],
@@ -74,10 +154,7 @@ describe('project status', () => {
       Object.assign(config, {
         llmOptimizedContext: true,
       })
-      kernel.project.listWorkspaces.execute.mockResolvedValue([])
-      kernel.changes.list.execute.mockResolvedValue([])
-      kernel.changes.listDrafts.execute.mockResolvedValue([])
-      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      stubProjectStatusKernel(kernel)
 
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: ['Raw instructions'],
@@ -100,11 +177,8 @@ describe('project status', () => {
     })
 
     it('displays full context in text mode', async () => {
-      const { config, kernel, stdout } = setup()
-      kernel.project.listWorkspaces.execute.mockResolvedValue([])
-      kernel.changes.list.execute.mockResolvedValue([])
-      kernel.changes.listDrafts.execute.mockResolvedValue([])
-      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      const { kernel, stdout } = setup()
+      stubProjectStatusKernel(kernel)
 
       const longContext = 'Line 1\nLine 2\nLine 3\nLine 4'
       kernel.project.getProjectContext.execute.mockResolvedValue({
@@ -126,10 +200,7 @@ describe('project status', () => {
 
     it('does not pass inline CompileContextConfig on getProjectContext.execute', async () => {
       const { kernel } = setup()
-      kernel.project.listWorkspaces.execute.mockResolvedValue([])
-      kernel.changes.list.execute.mockResolvedValue([])
-      kernel.changes.listDrafts.execute.mockResolvedValue([])
-      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      stubProjectStatusKernel(kernel)
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: [],
         specs: [],
@@ -147,10 +218,7 @@ describe('project status', () => {
 
     it('calls getProjectContext.execute({}) for primary context assembly', async () => {
       const { kernel } = setup()
-      kernel.project.listWorkspaces.execute.mockResolvedValue([])
-      kernel.changes.list.execute.mockResolvedValue([])
-      kernel.changes.listDrafts.execute.mockResolvedValue([])
-      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      stubProjectStatusKernel(kernel)
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: ['Raw'],
         specs: [
@@ -175,10 +243,7 @@ describe('project status', () => {
     it('calls getProjectContext.execute({ llmOptimizedContext: false }) for raw spec catalogue when optimized context is fresh', async () => {
       const { config, kernel } = setup()
       Object.assign(config, { llmOptimizedContext: true })
-      kernel.project.listWorkspaces.execute.mockResolvedValue([])
-      kernel.changes.list.execute.mockResolvedValue([])
-      kernel.changes.listDrafts.execute.mockResolvedValue([])
-      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      stubProjectStatusKernel(kernel)
 
       kernel.project.getProjectContext.execute
         .mockResolvedValueOnce({

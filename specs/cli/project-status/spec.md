@@ -20,20 +20,24 @@ The command output MUST include rich workspace information obtained via the `Lis
 
 ### Requirement: includes spec counts
 
-The command output MUST include spec counts obtained efficiently through the `SpecRepository.count()` method for each orchestrated workspace:
+The command output MUST include spec counts obtained via `kernel.project.getProjectSummary.execute()`:
 
-- Total spec count across all workspaces
-- Spec count per workspace
+- Total spec count across all workspaces (sum of `specsByWorkspace` values)
+- Spec count per workspace (`specsByWorkspace` map)
 
 The command SHALL NOT load full spec metadata or artifacts to perform this count.
+The command MUST NOT call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting.
 
 ### Requirement: includes change counts
 
-The command output MUST include:
+The command output MUST obtain change counts via `kernel.project.getProjectSummary.execute()`:
 
-- Number of active changes
-- Number of drafts
-- Number of discarded changes
+- Number of active changes (`activeCount`)
+- Number of drafts (`draftCount`)
+- Number of discarded changes (`discardedCount`)
+- Number of archived changes (`archivedCount`)
+
+The command MUST NOT call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting.
 
 ### Requirement: includes approval gates
 
@@ -118,7 +122,6 @@ When `--format toon` is provided, output MUST be TOON-formatted.
 
 ## Spec Dependencies
 
-- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure and repositories
-- [`core:list-drafts`](../../core/list-drafts/spec.md) — existing draft counting behavior remains part of project status
-- [`core:list-changes`](../../core/list-changes/spec.md) — existing active-change counting behavior remains part of project status
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure in workspace output
+- [`core:get-project-summary`](../../core/get-project-summary/spec.md) — consolidated change and spec counts
 - [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly

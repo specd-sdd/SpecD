@@ -199,6 +199,7 @@ Everything exported is a domain type (entity, value object, error, service), an 
 | `GetHookInstructions`    | type | Returns `instruction:` hook text for a workflow step and phase.                              |
 | `GetArtifactInstruction` | type | Returns artifact-specific instructions, rules, and delta guidance.                           |
 | `GetProjectContext`      | type | Compiles project-level context without a specific change or step.                            |
+| `GetProjectSummary`      | type | Returns consolidated project-level change and spec counts without loading entities.          |
 
 **From the application layer — config types:**
 
@@ -304,6 +305,7 @@ These functions wire a single use case to the filesystem, creating a self-contai
 | `createGetSpecContext`         | Wires `GetSpecContext` to the fs.                    |
 | `createConfigWriter`           | Filesystem-backed `ConfigWriter` for yaml mutations. |
 | `createGetProjectContext`      | Wires `GetProjectContext` to the fs.                 |
+| `createGetProjectSummary`      | Wires `GetProjectSummary` to the fs.                 |
 
 ## Where to go next
 

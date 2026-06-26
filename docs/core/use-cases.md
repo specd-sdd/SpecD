@@ -1107,6 +1107,45 @@ interface AvailableStep {
 
 ---
 
+### GetProjectSummary
+
+Returns consolidated project-level counts (active/draft/discarded/archived changes and specs per workspace) without loading change entities, spec metadata, graph statistics, or compiled context.
+
+**Constructor:**
+
+```typescript
+new GetProjectSummary(
+  listChanges: ListChanges,
+  listDrafts: ListDrafts,
+  listDiscarded: ListDiscarded,
+  listArchived: ListArchived,
+  listWorkspaces: ListWorkspaces,
+)
+```
+
+**Input:** none — `execute()` accepts no parameters.
+
+**Returns:** `Promise<GetProjectSummaryResult>`
+
+```typescript
+interface GetProjectSummaryResult {
+  activeCount: number
+  draftCount: number
+  discardedCount: number
+  archivedCount: number
+  specsByWorkspace: Readonly<Record<string, number>>
+  workspaceCount: number
+}
+```
+
+Change counts derive from `ListChanges`, `ListDrafts`, and `ListDiscarded` result lengths. `archivedCount` uses `ListArchived.execute().meta.total` (not `items.length`, because archive listing may paginate). Spec counts call `SpecRepository.count()` on each workspace from `ListWorkspaces`.
+
+**Composition factory:** `createGetProjectSummary(config: SpecdConfig)` wires the five list use cases from a resolved project configuration.
+
+**Kernel:** `kernel.project.getProjectSummary`
+
+---
+
 ### GetProjectContext
 
 Compiles the project-level context block without a specific change or lifecycle step. Performs steps 1–4 of the context pipeline (project `context:` entries, project-level and workspace-level include/exclude patterns) with all configured workspaces treated as active. Step 5 (dependsOn traversal from a change's `specIds`) is not performed.

@@ -227,9 +227,22 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
         },
       ]),
     },
+    getProjectSummary: {
+      execute: vi.fn().mockResolvedValue({
+        activeCount: 0,
+        draftCount: 0,
+        discardedCount: 0,
+        archivedCount: 0,
+        specsByWorkspace: { default: 0 },
+        workspaceCount: 1,
+      }),
+    },
     getProjectContext: {
       execute: vi.fn().mockResolvedValue({ contextEntries: [], specs: [], warnings: [] }),
     },
+    getConfig: { execute: vi.fn() },
+    getMetadata: { execute: vi.fn() },
+    updateMetadata: { execute: vi.fn() },
   }
 
   const schemas = {

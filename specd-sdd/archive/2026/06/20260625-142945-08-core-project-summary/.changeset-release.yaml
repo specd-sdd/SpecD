@@ -1,0 +1,3 @@
+releases:
+  core:get-project-summary: minor
+  cli:project-status: minor

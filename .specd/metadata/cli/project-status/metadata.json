@@ -1,12 +1,7 @@
 {
   "title": "project status command",
   "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.",
-  "dependsOn": [
-    "core:list-workspaces",
-    "core:list-drafts",
-    "core:list-changes",
-    "core:get-project-context"
-  ],
+  "dependsOn": ["core:list-workspaces", "core:get-project-summary", "core:get-project-context"],
   "context": [
     "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information."
   ],
@@ -26,13 +21,13 @@
     {
       "requirement": "includes spec counts",
       "rules": [
-        "The command output MUST include spec counts obtained efficiently through the `SpecRepository.count()` method for each orchestrated workspace:\n\n- Total spec count across all workspaces\n- Spec count per workspace\n\nThe command SHALL NOT load full spec metadata or artifacts to perform this count."
+        "The command output MUST include spec counts obtained via `kernel.project.getProjectSummary.execute()`:\n\n- Total spec count across all workspaces (sum of `specsByWorkspace` values)\n- Spec count per workspace (`specsByWorkspace` map)\n\nThe command SHALL NOT load full spec metadata or artifacts to perform this count.\nThe command MUST NOT call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting."
       ]
     },
     {
       "requirement": "includes change counts",
       "rules": [
-        "The command output MUST include:\n\n- Number of active changes\n- Number of drafts\n- Number of discarded changes"
+        "The command output MUST obtain change counts via `kernel.project.getProjectSummary.execute()`:\n\n- Number of active changes (`activeCount`)\n- Number of drafts (`draftCount`)\n- Number of discarded changes (`discardedCount`)\n- Number of archived changes (`archivedCount`)\n\nThe command MUST NOT call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting."
       ]
     },
     {
@@ -107,19 +102,31 @@
     },
     {
       "requirement": "includes spec counts",
-      "name": "Spec counts use efficient repository counting",
+      "name": "Spec counts use GetProjectSummary",
       "when": ["specd project status calculates spec counts"],
       "then": [
-        "it calls SpecRepository.count() for each workspace",
+        "it calls kernel.project.getProjectSummary.execute()",
+        "AND it does not call SpecRepository.count() directly or orchestrate ListWorkspaces for counting",
         "AND it does not perform full metadata extraction"
       ]
     },
     {
       "requirement": "includes change counts",
-      "name": "Output includes active changes, drafts, and discarded counts",
-      "given": ["a project with changes, drafts, and discarded changes"],
+      "name": "Output includes active changes, drafts, discarded, and archived counts",
+      "given": ["a project with changes, drafts, discarded changes, and archived changes"],
       "when": ["specd project status is run"],
-      "then": ["output includes counts for each category"]
+      "then": [
+        "output includes counts for active changes, drafts, discarded changes, and archived changes"
+      ]
+    },
+    {
+      "requirement": "includes change counts",
+      "name": "Counts obtained via GetProjectSummary",
+      "when": ["specd project status calculates change counts"],
+      "then": [
+        "it calls kernel.project.getProjectSummary.execute()",
+        "AND it does not call kernel.changes.list, listDrafts, or listDiscarded directly for counting"
+      ]
     },
     {
       "requirement": "includes approval gates",
@@ -226,6 +233,10 @@
       {
         "specId": "cli:project-status",
         "file": "cli:test/commands/project-status.spec.ts"
+      },
+      {
+        "specId": "cli:project-status",
+        "file": "cli:test/commands/helpers.ts"
       }
     ],
     "symbols": [
@@ -237,8 +248,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f4c793b42b6256d5665a48bdddab8be6aaf17579967641c0f01e4b93f397ea07",
-    "verify.md": "sha256:0cfa114c63a953d5801000282f1c04ef8ba31479dabb4f29da33118ac8bb474b"
+    "spec.md": "sha256:9450418255c41bf40ca4b596c409e498b5a0a79335e61bc9781fd3d2a266e562",
+    "verify.md": "sha256:a2f4eddf4cbcd77ee3ae4a3881c729e138837d73a9f59e172fe020d1c18f4b4d"
   },
   "generatedBy": "core"
 }

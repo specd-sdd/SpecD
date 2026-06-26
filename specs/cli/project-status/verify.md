@@ -20,19 +20,26 @@
 
 ### Requirement: includes spec counts
 
-#### Scenario: Spec counts use efficient repository counting
+#### Scenario: Spec counts use GetProjectSummary
 
 - **WHEN** `specd project status` calculates spec counts
-- **THEN** it calls `SpecRepository.count()` for each workspace
+- **THEN** it calls `kernel.project.getProjectSummary.execute()`
+- **AND** it does not call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting
 - **AND** it does not perform full metadata extraction
 
 ### Requirement: includes change counts
 
-#### Scenario: Output includes active changes, drafts, and discarded counts
+#### Scenario: Output includes active changes, drafts, discarded, and archived counts
 
-- **GIVEN** a project with changes, drafts, and discarded changes
+- **GIVEN** a project with changes, drafts, discarded changes, and archived changes
 - **WHEN** `specd project status` is run
-- **THEN** output includes counts for each category
+- **THEN** output includes counts for active changes, drafts, discarded changes, and archived changes
+
+#### Scenario: Counts obtained via GetProjectSummary
+
+- **WHEN** `specd project status` calculates change counts
+- **THEN** it calls `kernel.project.getProjectSummary.execute()`
+- **AND** it does not call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting
 
 ### Requirement: includes approval gates
 

@@ -48,23 +48,19 @@ export function registerProjectStatus(parent: Command): void {
           configPath: opts.config,
         })
 
-        const [workspaces, activeChanges, drafts, discarded, graphData] = await Promise.all([
+        const [workspaces, summary, graphData] = await Promise.all([
           kernel.project.listWorkspaces.execute(),
-          kernel.changes.list.execute(),
-          kernel.changes.listDrafts.execute(),
-          kernel.changes.listDiscarded.execute(),
+          kernel.project.getProjectSummary.execute(),
           loadGraphData(config, opts.graph ?? false),
         ])
         const graphStats = graphData.stats
         const hotspots = graphData.hotspots
 
-        const specCounts = await Promise.all(
-          workspaces.map(async (ws) => ({
-            name: ws.name,
-            count: await ws.specRepo.count(),
-          })),
-        )
-        const totalSpecs = specCounts.reduce((acc, c) => acc + c.count, 0)
+        const specCounts = Object.entries(summary.specsByWorkspace).map(([name, count]) => ({
+          name,
+          count,
+        }))
+        const totalSpecs = Object.values(summary.specsByWorkspace).reduce((acc, c) => acc + c, 0)
 
         const graphFreshness = graphStats?.lastIndexedAt ?? null
         let graphStale: boolean | null = null
@@ -175,9 +171,10 @@ export function registerProjectStatus(parent: Command): void {
                 byWorkspace: Object.fromEntries(specCounts.map((c) => [c.name, c.count])),
               },
               changes: {
-                active: activeChanges.length,
-                drafts: drafts.length,
-                discarded: discarded.length,
+                active: summary.activeCount,
+                drafts: summary.draftCount,
+                discarded: summary.discardedCount,
+                archived: summary.archivedCount,
               },
               graph: {
                 freshness: graphFreshness,
@@ -225,7 +222,7 @@ export function registerProjectStatus(parent: Command): void {
           ),
           `specs: ${String(totalSpecs)} total`,
           ...specCounts.map((c) => `  ${c.name}: ${String(c.count)}`),
-          `changes: ${activeChanges.length} active, ${drafts.length} drafts, ${discarded.length} discarded`,
+          `changes: ${summary.activeCount} active, ${summary.draftCount} drafts, ${summary.discardedCount} discarded, ${summary.archivedCount} archived`,
           `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale ? 'stale' : 'fresh'})`,
           ...(fingerprintMismatch === true
             ? ['graph.derivation: ⚠ fingerprint mismatch — reindex recommended']
