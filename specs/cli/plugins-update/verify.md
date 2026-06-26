@@ -14,6 +14,22 @@
 - **WHEN** `specd plugins update @specd/plugin-agent-claude` is invoked
 - **THEN** only the specified plugin is updated
 
+### Requirement: Declaration source
+
+#### Scenario: Update-all uses config.plugins.agents
+
+- **GIVEN** multiple plugins are declared under `plugins.agents` in the loaded config
+- **WHEN** `specd plugins update` is invoked with no arguments
+- **THEN** all plugins from `config.plugins.agents` are selected for update
+- **AND** the command does not call `kernel.project.listPlugins`
+
+#### Scenario: Declaration read does not use ConfigWriter.listPlugins
+
+- **GIVEN** a loaded `SpecdConfig` snapshot is available
+- **WHEN** `specd plugins update` resolves the declared plugin set
+- **THEN** it reads `config.plugins` in memory
+- **AND** it does not call `ConfigWriter.listPlugins`
+
 ### Requirement: Exit code
 
 #### Scenario: Update failure

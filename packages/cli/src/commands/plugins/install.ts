@@ -3,6 +3,7 @@ import type { Kernel, SpecdConfig } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { getDeclaredPlugins } from './get-declared-plugins.js'
 import {
   InstallPlugin,
   LoadPlugin,
@@ -51,10 +52,7 @@ export async function installPluginsWithKernel(input: {
   const loader = createPluginLoader({ config: input.config })
   const install = new InstallPlugin(loader)
   const load = new LoadPlugin(loader)
-  const declared = await input.kernel.project.listPlugins.execute({
-    configPath: input.configPath,
-    type: 'agents',
-  })
+  const declared = getDeclaredPlugins(input.config, 'agents')
   const declaredSet = new Set(declared.map((entry) => entry.name))
 
   const plugins: PluginInstallEntry[] = []

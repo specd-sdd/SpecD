@@ -1,9 +1,10 @@
 import { type Command } from 'commander'
-import type { Kernel, SpecdConfig } from '@specd/core'
+import type { SpecdConfig } from '@specd/core'
 import { UpdatePlugin, createPluginLoader } from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { getDeclaredPlugins } from './get-declared-plugins.js'
 
 /**
  * One plugin-update command result entry.
@@ -31,22 +32,17 @@ export interface PluginUpdateBatchResult {
  * Updates declared plugins with optional name filtering.
  *
  * @param input - Update input.
- * @param input.kernel - CLI kernel.
  * @param input.config - Fully-resolved project configuration.
  * @param input.configPath - Absolute path to `specd.yaml`.
  * @param input.pluginNames - Optional plugin-name filter.
  * @returns Batch update results.
  */
 export async function updatePluginsWithKernel(input: {
-  readonly kernel: Kernel
   readonly config: SpecdConfig
   readonly configPath: string
   readonly pluginNames?: readonly string[]
 }): Promise<PluginUpdateBatchResult> {
-  const declared = await input.kernel.project.listPlugins.execute({
-    configPath: input.configPath,
-    type: 'agents',
-  })
+  const declared = getDeclaredPlugins(input.config, 'agents')
   const declaredMap = new Map(declared.map((plugin) => [plugin.name, plugin]))
 
   const selectedNames =
@@ -109,12 +105,11 @@ export function registerPluginsUpdate(parent: Command): void {
     .action(async (pluginNames: string[], opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath, kernel } = await resolveCliContext({
+        const { config, configFilePath } = await resolveCliContext({
           configPath: opts.config,
         })
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await updatePluginsWithKernel({
-          kernel,
           config,
           configPath,
           ...(pluginNames.length > 0 ? { pluginNames } : {}),

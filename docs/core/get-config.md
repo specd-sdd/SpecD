@@ -18,6 +18,7 @@ const kernel = await createKernel(config)
 
 const snapshot = kernel.project.getConfig.execute()
 // snapshot.projectRoot, snapshot.workspaces, snapshot.approvals, ...
+// snapshot.plugins?.agents — declared plugin entries (no separate list use case)
 ```
 
 Standalone construction (tests or narrow tooling):
@@ -32,6 +33,7 @@ const snapshot = getConfig.execute()
 ## Contract
 
 - **Read-only host view** — `execute()` returns a `Readonly<SpecdConfig>` clone captured at construction. It is not the live object used by internal kernel wiring (`ListWorkspaces`, etc.).
+- **Plugin declarations** — read `execute().plugins` (or an already-loaded `SpecdConfig`). There is no `kernel.project.listPlugins` use case.
 - **No disk I/O** — does not re-read `specd.yaml`. If the yaml changes on disk, recreate the kernel.
 - **Not for yaml edits** — persist configuration through `ConfigWriter` composition factories (`createInitProject`, `createAddPlugin`, `createRemovePlugin`). See [ConfigWriter](./config-writer.md).
 

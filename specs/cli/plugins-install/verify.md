@@ -14,6 +14,22 @@
 - **WHEN** `specd plugins install @specd/plugin-agent-claude @specd/plugin-agent-copilot` is invoked
 - **THEN** the command attempts to install both plugins
 
+### Requirement: Declaration source
+
+#### Scenario: Already-installed check uses config.plugins
+
+- **GIVEN** `@specd/plugin-agent-claude` is declared under `plugins.agents` in the loaded config
+- **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked
+- **THEN** the command detects the plugin as already installed from `config.plugins`
+- **AND** it does not call `kernel.project.listPlugins`
+
+#### Scenario: Declaration read does not re-read disk via ConfigWriter
+
+- **GIVEN** a loaded `SpecdConfig` snapshot is available
+- **WHEN** the install workflow checks declared plugins
+- **THEN** it reads `config.plugins` in memory
+- **AND** it does not call `ConfigWriter.listPlugins`
+
 ### Requirement: Already-installed handling
 
 #### Scenario: Plugin already installed

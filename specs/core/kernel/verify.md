@@ -25,7 +25,9 @@
 #### Scenario: Project group contains all project use cases
 
 - **WHEN** `kernel.project` is inspected
-- **THEN** it contains entries for: `init`, `recordSkillInstall`, `getSkillsManifest`, `getProjectContext`, `getConfig`
+- **THEN** it contains entries for: `init`, `addPlugin`, `removePlugin`, `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
+- **AND** it does not contain `listPlugins`
+- **AND** it does not contain `recordSkillInstall` or `getSkillsManifest`
 
 ### Requirement: Every exported use case must have a kernel entry
 
@@ -65,6 +67,21 @@
 - **WHEN** `kernel.project.getConfig` is inspected after `createKernel(config)`
 - **THEN** it is an instance of `GetConfig`
 - **AND** `kernel.project.getConfig.execute()` returns a `Readonly<SpecdConfig>`
+
+### Requirement: Plugin declarations are not a kernel use case
+
+#### Scenario: kernel.project does not expose listPlugins
+
+- **WHEN** `kernel.project` is inspected after `createKernel(config)`
+- **THEN** it does not contain a `listPlugins` entry
+- **AND** `'listPlugins' in kernel.project` is false
+
+#### Scenario: Plugin declarations available on getConfig snapshot
+
+- **GIVEN** `specd.yaml` declares plugins under `plugins.agents`
+- **WHEN** `kernel.project.getConfig.execute()` is called
+- **THEN** the returned `SpecdConfig` includes a `plugins` field with the declared agent plugins
+- **AND** no additional disk read through `ConfigWriter.listPlugins` is required to obtain those declarations
 
 ### Requirement: Kernel entries must match use case types
 

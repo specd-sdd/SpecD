@@ -1,7 +1,7 @@
 {
   "title": "cli:plugins-list",
   "description": "Defines the CLI contract for listing installed plugins. The command reads the plugin configuration and reports on each declared plugin's status.",
-  "dependsOn": ["plugin-manager:load-plugin-use-case", "core:config-writer-port"],
+  "dependsOn": ["plugin-manager:load-plugin-use-case", "core:get-config"],
   "context": [
     "Defines the CLI contract for listing installed plugins. The command reads the plugin configuration and reports on each declared plugin's status."
   ],
@@ -10,6 +10,12 @@
       "requirement": "Command signature",
       "rules": [
         "The command MUST accept an optional `--type` flag to filter by plugin type:\n\n```bash\nspecd plugins list [--type <type>]\n```"
+      ]
+    },
+    {
+      "requirement": "Declaration source",
+      "rules": [
+        "The command MUST enumerate declared plugins from the loaded `SpecdConfig.plugins` field (via `loadConfig` or an equivalent config snapshot). It MUST NOT call `kernel.project.listPlugins` or re-read `specd.yaml` through `ConfigWriter.listPlugins` when a config snapshot is already available.\n\nWhen `--type` is omitted, the command MUST default to type `agents`. When `--type <type>` is provided, the command MUST read only `config.plugins.<type>` (or an empty list when that type is absent)."
       ]
     },
     {
@@ -38,6 +44,31 @@
       "name": "Filter by type",
       "when": ["specd plugins list --type agents is invoked"],
       "then": ["only plugins of type \"agents\" are listed"]
+    },
+    {
+      "requirement": "Declaration source",
+      "name": "Declarations read from loaded config snapshot",
+      "given": ["plugins are declared in specd.yaml under plugins.agents"],
+      "when": ["specd plugins list is invoked"],
+      "then": [
+        "the command enumerates plugins from the loaded SpecdConfig.plugins field",
+        "AND it does not call kernel.project.listPlugins",
+        "AND it does not call ConfigWriter.listPlugins"
+      ]
+    },
+    {
+      "requirement": "Declaration source",
+      "name": "Default type is agents when --type omitted",
+      "given": ["plugins.agents and plugins.other are both declared"],
+      "when": ["specd plugins list is invoked without --type"],
+      "then": ["only plugins under plugins.agents are considered"]
+    },
+    {
+      "requirement": "Declaration source",
+      "name": "Unknown type yields empty declaration list",
+      "given": ["specd.yaml has no plugins.missing entries"],
+      "when": ["specd plugins list --type missing is invoked"],
+      "then": ["no plugins are enumerated for that type", "AND the command completes without error"]
     },
     {
       "requirement": "Plugin status detection",
@@ -73,9 +104,28 @@
       "then": ["output is machine-parseable JSON"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:plugins-list",
+        "file": "cli:src/commands/plugins/get-declared-plugins.ts",
+        "symbol": "getDeclaredPlugins"
+      },
+      {
+        "specId": "cli:plugins-list",
+        "file": "cli:src/commands/plugins/get-declared-plugins.ts",
+        "symbol": "DeclaredPluginEntry"
+      },
+      {
+        "specId": "cli:plugins-list",
+        "file": "cli:src/commands/plugins/list.ts",
+        "symbol": "registerPluginsList"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:882b871e3a31f0e37668c82866a2d941c9aac800822724374d95e65441fb1b7c",
-    "verify.md": "sha256:2346a17c554a2e317412db63c1f7785e78e411bfeb52b662c9708d0bfba82a1d"
+    "spec.md": "sha256:86684fd0adf04cbe4deaad445f8328807f7291fad46fdc7907752034935044bb",
+    "verify.md": "sha256:b2fd1f7b17687f334899f67d84cf508dbce0150ac11c5f4e6010c817f81729f1"
   },
   "generatedBy": "core"
 }

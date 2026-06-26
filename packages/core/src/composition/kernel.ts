@@ -32,7 +32,6 @@ import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
 import { InitProject } from '../application/use-cases/init-project.js'
 import { AddPlugin } from '../application/use-cases/add-plugin.js'
 import { RemovePlugin } from '../application/use-cases/remove-plugin.js'
-import { ListPlugins } from '../application/use-cases/list-plugins.js'
 import { GetProjectContext } from '../application/use-cases/get-project-context.js'
 import { GetConfig } from '../application/use-cases/get-config.js'
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
@@ -130,7 +129,6 @@ export interface Kernel {
     init: InitProject
     addPlugin: AddPlugin
     removePlugin: RemovePlugin
-    listPlugins: ListPlugins
     listWorkspaces: ListWorkspaces
     getProjectContext: GetProjectContext
     getConfig: GetConfig
@@ -351,7 +349,6 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       init: new InitProject(i.configWriter),
       addPlugin: new AddPlugin(i.configWriter),
       removePlugin: new RemovePlugin(i.configWriter),
-      listPlugins: new ListPlugins(i.configWriter),
       listWorkspaces,
       getProjectContext: new GetProjectContext(
         listWorkspaces,

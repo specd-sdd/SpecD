@@ -14,6 +14,29 @@
 - **WHEN** `specd plugins list --type agents` is invoked
 - **THEN** only plugins of type "agents" are listed
 
+### Requirement: Declaration source
+
+#### Scenario: Declarations read from loaded config snapshot
+
+- **GIVEN** plugins are declared in `specd.yaml` under `plugins.agents`
+- **WHEN** `specd plugins list` is invoked
+- **THEN** the command enumerates plugins from the loaded `SpecdConfig.plugins` field
+- **AND** it does not call `kernel.project.listPlugins`
+- **AND** it does not call `ConfigWriter.listPlugins`
+
+#### Scenario: Default type is agents when --type omitted
+
+- **GIVEN** `plugins.agents` and `plugins.other` are both declared
+- **WHEN** `specd plugins list` is invoked without `--type`
+- **THEN** only plugins under `plugins.agents` are considered
+
+#### Scenario: Unknown type yields empty declaration list
+
+- **GIVEN** `specd.yaml` has no `plugins.missing` entries
+- **WHEN** `specd plugins list --type missing` is invoked
+- **THEN** no plugins are enumerated for that type
+- **AND** the command completes without error
+
 ### Requirement: Plugin status detection
 
 #### Scenario: Plugin installed and loadable

@@ -58,10 +58,9 @@ import { registerPluginsList } from '../../src/commands/plugins/list.js'
 import { registerPluginsShow } from '../../src/commands/plugins/show.js'
 import { registerPluginsUninstall } from '../../src/commands/plugins/uninstall.js'
 
-function setup() {
+function setup(configOverrides: Parameters<typeof makeMockConfig>[0] = {}) {
   const kernel = makeMockKernel()
-  const config = makeMockConfig()
-  kernel.project.listPlugins.execute.mockResolvedValue([])
+  const config = makeMockConfig(configOverrides)
   vi.mocked(resolveCliContext).mockResolvedValue({
     config,
     configFilePath: '/project/specd.yaml',
@@ -98,8 +97,11 @@ describe('plugins install', () => {
   })
 
   it('skips already-installed plugin with warning', async () => {
-    const { kernel, stderr } = setup()
-    kernel.project.listPlugins.execute.mockResolvedValue([{ name: '@specd/plugin-agent-claude' }])
+    const { stderr } = setup({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      },
+    })
 
     const program = makeProgram()
     registerPluginsInstall(program.command('plugins'))
@@ -112,8 +114,11 @@ describe('plugins install', () => {
 
 describe('plugins list/show/uninstall', () => {
   it('lists declared plugins with status', async () => {
-    const { kernel, stdout } = setup()
-    kernel.project.listPlugins.execute.mockResolvedValue([{ name: '@specd/plugin-agent-claude' }])
+    const { stdout } = setup({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      },
+    })
 
     const program = makeProgram()
     registerPluginsList(program.command('plugins'))
@@ -121,6 +126,29 @@ describe('plugins list/show/uninstall', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed.plugins[0].status).toBe('installed')
+  })
+
+  it('returns empty output for unknown plugin type', async () => {
+    const { stdout } = setup({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      },
+    })
+
+    const program = makeProgram()
+    registerPluginsList(program.command('plugins'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'plugins',
+      'list',
+      '--type',
+      'missing',
+      '--format',
+      'json',
+    ])
+
+    expect(JSON.parse(stdout())).toEqual({ plugins: [] })
   })
 
   it('shows plugin metadata', async () => {

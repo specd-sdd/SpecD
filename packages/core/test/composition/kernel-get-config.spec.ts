@@ -78,6 +78,28 @@ describe('createKernel project.getConfig', () => {
       expect(snapshot).not.toBe(config)
     })
 
+    it('does not expose listPlugins on kernel.project', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect('listPlugins' in kernel.project).toBe(false)
+    })
+
+    it('includes plugins on the getConfig snapshot', async () => {
+      const config = await makeConfig()
+      const configWithPlugins: SpecdConfig = {
+        ...config,
+        plugins: {
+          agents: [{ name: '@specd/plugin-agent-claude' }],
+        },
+      }
+      const kernel = await createKernel(configWithPlugins)
+
+      expect(kernel.project.getConfig.execute().plugins).toEqual({
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      })
+    })
+
     it('keeps listWorkspaces stable when the host mutates the returned snapshot', async () => {
       const config = await makeConfig()
       const kernel = await createKernel(config)

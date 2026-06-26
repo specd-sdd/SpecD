@@ -219,7 +219,6 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     init: { execute: vi.fn() },
     addPlugin: { execute: vi.fn() },
     removePlugin: { execute: vi.fn() },
-    listPlugins: { execute: vi.fn().mockResolvedValue([]) },
     listWorkspaces: {
       execute: vi.fn().mockResolvedValue([
         {

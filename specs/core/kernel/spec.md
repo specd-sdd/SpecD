@@ -12,7 +12,9 @@ The `Kernel` interface organises use cases into three groups that mirror the dom
 
 - `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
 - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
-- `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot)
+- `project` — use cases that operate on the project configuration (init, add plugin, remove plugin, list workspaces, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot including `plugins`, get metadata, update metadata)
+
+Plugin declaration listing is not a kernel use case — declarations are config data on the `getConfig` snapshot.
 
 Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
 
@@ -154,13 +156,22 @@ The following table is the exhaustive mapping between kernel paths and use case 
 
 #### kernel.project
 
-| Kernel path                  | Use case class       | Spec                                                         | Description                                                   |
-| ---------------------------- | -------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
-| `project.init`               | `InitProject`        | [core:init-project](../init-project/spec.md)                 | Initialises a new specd project                               |
-| `project.recordSkillInstall` | `RecordSkillInstall` | [core:record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent               |
-| `project.getSkillsManifest`  | `GetSkillsManifest`  | [core:get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest                           |
-| `project.getProjectContext`  | `GetProjectContext`  | [core:get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block                      |
-| `project.getConfig`          | `GetConfig`          | [core:get-config](../get-config/spec.md)                     | Returns the readonly construction-time `SpecdConfig` snapshot |
+| Kernel path                 | Use case class          | Spec                                                               | Description                                                   |
+| --------------------------- | ----------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `project.init`              | `InitProject`           | [core:init-project](../init-project/spec.md)                       | Initialises a new specd project                               |
+| `project.addPlugin`         | `AddPlugin`             | [core:config-writer-port](../config-writer-port/spec.md)           | Adds or updates a plugin declaration in `specd.yaml`          |
+| `project.removePlugin`      | `RemovePlugin`          | [core:config-writer-port](../config-writer-port/spec.md)           | Removes a plugin declaration from `specd.yaml`                |
+| `project.listWorkspaces`    | `ListWorkspaces`        | [core:list-workspaces](../list-workspaces/spec.md)                 | Lists configured workspace IDs                                |
+| `project.getProjectContext` | `GetProjectContext`     | [core:get-project-context](../get-project-context/spec.md)         | Compiles the project-level context block                      |
+| `project.getConfig`         | `GetConfig`             | [core:get-config](../get-config/spec.md)                           | Returns the readonly construction-time `SpecdConfig` snapshot |
+| `project.getMetadata`       | `GetProjectMetadata`    | [core:project-metadata](../project-metadata/spec.md)               | Reads cached project metadata                                 |
+| `project.updateMetadata`    | `UpdateProjectMetadata` | [core:update-project-metadata](../update-project-metadata/spec.md) | Writes cached project metadata                                |
+
+### Requirement: Plugin declarations are not a kernel use case
+
+Declared plugins are part of the readonly `SpecdConfig` snapshot exposed by `kernel.project.getConfig`. Hosts and delivery mechanisms that need plugin declarations MUST read them from `getConfig().plugins` or from an already-loaded `SpecdConfig` — not via a dedicated kernel use case and not via a redundant disk read through `ConfigWriter`.
+
+`kernel.project` MUST NOT expose `listPlugins` or any equivalent listing use case for plugin declarations. The `ListPlugins` application use case is not part of the public kernel surface.
 
 ## Examples
 
@@ -249,9 +260,11 @@ await kernel.project.init.execute({
 - [`core:generate-metadata`](../generate-metadata/spec.md)
 - [`core:get-spec-context`](../get-spec-context/spec.md)
 - [`core:init-project`](../init-project/spec.md)
-- [`core:record-skill-install`](../record-skill-install/spec.md)
-- [`core:get-skills-manifest`](../get-skills-manifest/spec.md)
+- [`core:config-writer-port`](../config-writer-port/spec.md)
+- [`core:list-workspaces`](../list-workspaces/spec.md)
 - [`core:get-project-context`](../get-project-context/spec.md)
 - [`core:get-config`](../get-config/spec.md)
+- [`core:project-metadata`](../project-metadata/spec.md)
+- [`core:update-project-metadata`](../update-project-metadata/spec.md)
 - [`core:resolve-schema`](../resolve-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)
