@@ -56,6 +56,10 @@ import {
 } from '../../../src/application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
 import { type PreviewSpec } from '../../../src/application/use-cases/preview-spec.js'
+import { type GetActiveSchema } from '../../../src/application/use-cases/get-active-schema.js'
+import { type DetectOverlap } from '../../../src/application/use-cases/detect-overlap.js'
+import { CreateChange } from '../../../src/application/use-cases/create-change.js'
+import { OverlapReport } from '../../../src/domain/value-objects/overlap-report.js'
 import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
 import { type CrossArtifactValidationRule } from '../../../src/domain/value-objects/cross-artifact-validation.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
@@ -788,4 +792,56 @@ export function makeGenerateMetadata(): any {
 
 export function makeSaveMetadata(): any {
   return { execute: async () => ({ spec: 'test' }) }
+}
+
+/**
+ * Creates a mock `GetActiveSchema` use case.
+ *
+ * @param schema - Schema returned from project-mode resolution
+ * @returns A stub `GetActiveSchema` instance
+ */
+export function makeGetActiveSchema(
+  schema: Schema = makeSchema({ name: 'specd-std' }),
+): GetActiveSchema {
+  return {
+    execute: async () => ({ raw: false as const, schema }),
+  } as unknown as GetActiveSchema
+}
+
+/**
+ * Creates a mock `DetectOverlap` use case.
+ *
+ * @param report - Overlap report returned from execute
+ * @returns A stub `DetectOverlap` instance
+ */
+export function makeDetectOverlap(report: OverlapReport = new OverlapReport([])): DetectOverlap {
+  return {
+    execute: async () => report,
+  } as unknown as DetectOverlap
+}
+
+/**
+ * Creates a `CreateChange` use case with default test doubles for orchestration deps.
+ *
+ * @param changes - Change repository
+ * @param listWorkspaces - Workspace orchestrator
+ * @param opts - Optional overrides for injected dependencies
+ * @returns Wired `CreateChange` instance
+ */
+export function makeCreateChange(
+  changes: ChangeRepository,
+  listWorkspaces: ListWorkspaces,
+  opts: {
+    actor?: ActorResolver
+    getActiveSchema?: GetActiveSchema
+    detectOverlap?: DetectOverlap
+  } = {},
+): CreateChange {
+  return new CreateChange(
+    changes,
+    listWorkspaces,
+    opts.actor ?? makeActorResolver(),
+    opts.getActiveSchema ?? makeGetActiveSchema(),
+    opts.detectOverlap ?? makeDetectOverlap(),
+  )
 }

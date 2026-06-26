@@ -1,5 +1,6 @@
 export { ChangeNotFoundError } from './change-not-found-error.js'
 export { ChangeAlreadyExistsError } from './change-already-exists-error.js'
+export { InvalidCreateChangeInputError } from './invalid-create-change-input-error.js'
 export { ApprovalGateDisabledError } from './approval-gate-disabled-error.js'
 export { SchemaNotFoundError } from './schema-not-found-error.js'
 export { AlreadyInitialisedError } from './already-initialised-error.js'

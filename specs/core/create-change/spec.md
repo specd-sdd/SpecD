@@ -13,8 +13,36 @@ Every spec workflow begins with a named change, so the system needs a single ent
 - `name` (string, required) — unique slug name for the change (kebab-case)
 - `description` (string, optional) — free-text description of the change's purpose
 - `specIds` (readonly string\[], required) — spec paths being created or modified
-- `schemaName` (string, required) — the active schema name from configuration
-- `schemaVersion` (number, required) — the active schema version from configuration
+- `schemaName` (string, optional) — explicit schema name override
+- `schemaVersion` (number, optional) — explicit schema version override
+- `invalidationPolicy` (optional) — initial invalidation policy for the new change
+- `includeOverlapCheck` (boolean, optional) — when `true` and `specIds` is non-empty, run overlap detection after persistence and include the report on the result
+
+When `schemaName` and `schemaVersion` are both absent, the use case MUST resolve the project's active schema via `GetActiveSchema.execute()` (project mode) and derive `schemaName` and `schemaVersion` from the returned `Schema`.
+
+When both `schemaName` and `schemaVersion` are provided, the use case MUST use them directly without calling `GetActiveSchema`.
+
+Providing only one of `schemaName` or `schemaVersion` MUST be rejected before persistence (the use case throws a validation error).
+
+### Requirement: Active schema resolution
+
+When `CreateChange.execute` is called without explicit `schemaName` and `schemaVersion`, the use case MUST call `GetActiveSchema.execute()` with no arguments.
+
+The use case MUST extract `schemaName` from `schema.name()` and `schemaVersion` from `schema.version()` on the resolved `Schema` entity.
+
+The use case MUST NOT implement schema resolution logic itself — it delegates entirely to `GetActiveSchema` for project-mode resolution.
+
+Schema resolution errors from `GetActiveSchema` (for example `SchemaNotFoundError`, `SchemaValidationError`) MUST propagate to the caller unchanged.
+
+### Requirement: Optional overlap check
+
+When `includeOverlapCheck` is `true` and `specIds` contains at least one entry, `CreateChange` MUST invoke `DetectOverlap.execute({ name: input.name })` after the change is persisted and scaffolded.
+
+When overlap detection succeeds, the returned `OverlapReport` MUST be included on `CreateChangeResult` as `overlapReport`.
+
+When overlap detection throws, creation MUST still succeed and `overlapReport` MUST be omitted.
+
+When `includeOverlapCheck` is absent or `false`, or when `specIds` is empty, the use case MUST NOT call `DetectOverlap`.
 
 ### Requirement: Initial invalidation policy
 
@@ -45,8 +73,8 @@ The newly constructed `Change` MUST have a history containing exactly one event 
 - `at`: the current timestamp
 - `by`: the resolved actor identity
 - `specIds`: the input spec paths
-- `schemaName`: the input schema name
-- `schemaVersion`: the input schema version
+- `schemaName`: the effective schema name (from input override or active schema resolution)
+- `schemaVersion`: the effective schema version (from input override or active schema resolution)
 
 ### Requirement: Change construction
 
@@ -67,17 +95,23 @@ This ensures a change created against existing specs starts from the current per
 
 ### Requirement: Persistence and scaffolding
 
-After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns an object containing the newly created `Change` instance and the `changePath` (obtained via `ChangeRepository.changePath(change)`).
+After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks workspace spec repositories via `ListWorkspaces`.
 
-The return type is `{ change: Change; changePath: string }`.
+When `includeOverlapCheck` is `true` and `specIds` is non-empty, after scaffolding the use case MUST call `DetectOverlap.execute({ name: input.name })` and include the returned `OverlapReport` on the result. When overlap detection throws, the use case MUST NOT fail creation — it omits `overlapReport` from the result.
+
+Finally, the use case returns an object containing the newly created `Change` instance, the `changePath` (obtained via `ChangeRepository.changePath(change)`), and optionally `overlapReport`.
+
+The return type is `{ change: Change; changePath: string; overlapReport?: OverlapReport }`.
 
 ### Requirement: Dependencies
 
-`CreateChange` depends on the following ports injected via constructor:
+`CreateChange` depends on the following ports and use cases injected via constructor:
 
 - `ChangeRepository` — for existence checks, persistence, and scaffolding
+- `ListWorkspaces` — orchestrated workspace map for spec existence checks and persisted dependency seeding
 - `ActorResolver` — for resolving the current actor identity
-- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`
+- `GetActiveSchema` — for resolving the project's active schema when `schemaName` / `schemaVersion` are not provided on input
+- `DetectOverlap` — for optional post-create overlap detection when `includeOverlapCheck` is `true`
 
 ## Constraints
 
@@ -88,4 +122,6 @@ The return type is `{ change: Change; changePath: string }`.
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
+- [`core:get-active-schema`](../get-active-schema/spec.md) — project-mode active schema resolution
+- [`core:spec-overlap`](../spec-overlap/spec.md) — overlap report structure and detection semantics
 - [`default:_global/architecture`](../../_global/architecture/spec.md)

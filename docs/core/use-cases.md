@@ -16,12 +16,16 @@ import {
   type SchemaProvider,
 } from '@specd/core'
 
-const createChange = new CreateChange(changeRepo, specs, actor)
+const createChange = new CreateChange(
+  changeRepo,
+  listWorkspaces,
+  actor,
+  getActiveSchema,
+  detectOverlap,
+)
 const result = await createChange.execute({
   name: 'add-oauth-login',
   specIds: ['default:auth/oauth'],
-  schemaName: 'specd-std',
-  schemaVersion: 1,
 })
 // result.change — the Change entity
 // result.changePath — absolute path to the change directory
@@ -37,17 +41,20 @@ Use cases are stateless between calls. Constructing one instance and reusing it 
 
 Creates a new change and persists it to the repository. Scaffolds the change directory with any relevant spec artifacts. The initial history contains a single `created` event.
 
-**Constructor:** `new CreateChange(changes: ChangeRepository, specs: ReadonlyMap<string, SpecRepository>, actor: ActorResolver)`
+When `schemaName` and `schemaVersion` are omitted, the use case resolves the project's active schema internally via `GetActiveSchema`. Hosts such as the CLI do not need to resolve schema identity before calling `execute`.
+
+**Constructor:** `new CreateChange(changes: ChangeRepository, listWorkspaces: ListWorkspaces, actor: ActorResolver, getActiveSchema: GetActiveSchema, detectOverlap: DetectOverlap)`
 
 **Input:**
 
-| Field           | Type                | Required | Description                                   |
-| --------------- | ------------------- | -------- | --------------------------------------------- |
-| `name`          | `string`            | yes      | Unique slug name (e.g. `'add-oauth-login'`).  |
-| `description`   | `string`            | no       | Optional free-text description of the change. |
-| `specIds`       | `readonly string[]` | yes      | Spec paths being created or modified.         |
-| `schemaName`    | `string`            | yes      | Schema name from the active config.           |
-| `schemaVersion` | `number`            | yes      | Schema version number from the active config. |
+| Field                 | Type                | Required | Description                                                                  |
+| --------------------- | ------------------- | -------- | ---------------------------------------------------------------------------- |
+| `name`                | `string`            | yes      | Unique slug name (e.g. `'add-oauth-login'`).                                 |
+| `description`         | `string`            | no       | Optional free-text description of the change.                                |
+| `specIds`             | `readonly string[]` | yes      | Spec paths being created or modified.                                        |
+| `schemaName`          | `string`            | no       | Explicit schema name override. When omitted, resolved from active schema.    |
+| `schemaVersion`       | `number`            | no       | Explicit schema version override. When omitted, resolved from active schema. |
+| `includeOverlapCheck` | `boolean`           | no       | When `true` and `specIds` is non-empty, include overlap report on result.    |
 
 **Returns:** `Promise<CreateChangeResult>`
 
@@ -55,14 +62,16 @@ Creates a new change and persists it to the repository. Scaffolds the change dir
 interface CreateChangeResult {
   change: Change // the newly created change entity
   changePath: string // absolute filesystem path to the change directory
+  overlapReport?: OverlapReport // present when includeOverlapCheck was requested and detection succeeded
 }
 ```
 
 **Throws:**
 
-| Error                      | Condition                                    |
-| -------------------------- | -------------------------------------------- |
-| `ChangeAlreadyExistsError` | A change with the given name already exists. |
+| Error                           | Condition                                                 |
+| ------------------------------- | --------------------------------------------------------- |
+| `ChangeAlreadyExistsError`      | A change with the given name already exists.              |
+| `InvalidCreateChangeInputError` | Only one of `schemaName` or `schemaVersion` was provided. |
 
 ---
 

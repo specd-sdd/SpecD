@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'GetActiveSchema API unchanged — CreateChange becomes an internal caller in project mode; no requirement changes needed'

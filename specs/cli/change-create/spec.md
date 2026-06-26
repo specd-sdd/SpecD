@@ -35,7 +35,26 @@ This check MUST occur before invoking the `CreateChange` use case. If multiple s
 
 ### Requirement: Schema name and version
 
-`schemaName` and `schemaVersion` are resolved from the active `SpecdConfig` at command time and passed to the `CreateChange` use case. The user does not specify these values.
+The CLI MUST NOT call `getActiveSchema` before `CreateChange`. Schema name and version are resolved inside the `CreateChange` use case from the project's active configuration.
+
+The CLI MUST invoke `kernel.changes.create.execute` without `schemaName` or `schemaVersion` unless a future flag explicitly requests an override (none in this change).
+
+The created change's manifest MUST still record the effective `schemaName` and `schemaVersion` from the `created` event produced by `CreateChange`.
+
+### Requirement: Overlap warning delegation
+
+When `specIds` is non-empty, the CLI MUST pass `includeOverlapCheck: true` to `CreateChange.execute`.
+
+When `result.overlapReport?.hasOverlap` is `true`, the CLI MUST format and write the same stderr warning as today:
+
+```text
+warning: spec overlap detected:
+  <specId> — also targeted by: <change-name> (<state>), ...
+```
+
+The CLI MUST NOT call `kernel.changes.detectOverlap` directly in the create command handler.
+
+Overlap warning emission MUST NOT cause a non-zero exit code.
 
 ### Requirement: Output on success
 
@@ -66,10 +85,11 @@ If a change with the given name already exists (`ChangeAlreadyExistsError`), the
 
 ## Constraints
 
-- \--spec is optional; when omitted, the change is created with an empty specIds list
+- `--spec` is optional; when omitted, the change is created with an empty specIds list
 - The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case
 - The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag
 - Specs targeting readOnly workspaces are rejected before the use case is invoked
+- The CLI does not resolve or pass schema identity — `CreateChange` owns active schema resolution
 
 ## Examples
 

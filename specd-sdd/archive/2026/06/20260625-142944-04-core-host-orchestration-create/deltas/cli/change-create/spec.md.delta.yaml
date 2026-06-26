@@ -1,0 +1,48 @@
+- op: modified
+  description: Schema resolved by CreateChange, not CLI
+  selector:
+    type: section
+    matches: 'Requirement: Schema name and version'
+  content: |
+    The CLI MUST NOT call `getActiveSchema` before `CreateChange`. Schema name and version are resolved inside the `CreateChange` use case from the project's active configuration.
+
+    The CLI MUST invoke `kernel.changes.create.execute` without `schemaName` or `schemaVersion` unless a future flag explicitly requests an override (none in this change).
+
+    The created change's manifest MUST still record the effective `schemaName` and `schemaVersion` from the `created` event produced by `CreateChange`.
+
+- op: added
+  description: Delegate overlap detection to CreateChange
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Schema name and version'
+  content: |
+    ### Requirement: Overlap warning delegation
+
+    When `specIds` is non-empty, the CLI MUST pass `includeOverlapCheck: true` to `CreateChange.execute`.
+
+    When `result.overlapReport?.hasOverlap` is `true`, the CLI MUST format and write the same stderr warning as today:
+
+    ```text
+    warning: spec overlap detected:
+      <specId> — also targeted by: <change-name> (<state>), ...
+    ```
+
+    The CLI MUST NOT call `kernel.changes.detectOverlap` directly in the create command handler.
+
+    Overlap warning emission MUST NOT cause a non-zero exit code.
+
+- op: modified
+  description: Note CLI no longer resolves schema at command time
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - `--spec` is optional; when omitted, the change is created with an empty specIds list
+    - The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case
+    - The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag
+    - Specs targeting readOnly workspaces are rejected before the use case is invoked
+    - The CLI does not resolve or pass schema identity — `CreateChange` owns active schema resolution

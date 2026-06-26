@@ -221,12 +221,20 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   )
   const getProjectMetadata = new GetProjectMetadata(config, i.files)
 
+  const getActiveSchema = new GetActiveSchema(
+    resolveSchema,
+    i.schemas,
+    buildSchema,
+    config.schemaRef,
+  )
+  const detectOverlap = new DetectOverlap(i.changes)
+
   return {
     registry,
     schemas: i.schemas,
     changes: {
       repo: i.changes,
-      create: new CreateChange(i.changes, listWorkspaces, i.actor),
+      create: new CreateChange(i.changes, listWorkspaces, i.actor, getActiveSchema, detectOverlap),
       status: new GetStatus(
         i.changes,
         schemaProvider,
@@ -304,7 +312,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         schemaProvider,
         i.expander,
       ),
-      detectOverlap: new DetectOverlap(i.changes),
+      detectOverlap,
       preview: previewSpec,
       updateImplementationTracking: new UpdateImplementationTracking(
         i.changes,
@@ -332,7 +340,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       getOutline: new GetSpecOutline(i.specs, schemaProvider, i.parsers),
       saveMetadata,
       invalidateMetadata: new InvalidateSpecMetadata(i.specs),
-      getActiveSchema: new GetActiveSchema(resolveSchema, i.schemas, buildSchema, config.schemaRef),
+      getActiveSchema,
       validateSchema: new ValidateSchema(i.schemas, config.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
       generateMetadata,
