@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "cli:plugins-install",
+    "core:composition",
+    "core:config-writer-port"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/project/init.ts",
+      "symbols": ["registerProjectInit"]
+    },
+    {
+      "file": "cli:test/commands/project-init.spec.ts"
+    }
+  ]
+}

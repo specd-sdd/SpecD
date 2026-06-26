@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   captureStderr,
   captureStdout,
+  ExitSentinel,
   makeMockConfig,
   makeMockKernel,
   makeProgram,
@@ -9,6 +10,21 @@ import {
 } from './helpers.js'
 
 const mockInstall = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
+const mockAddPlugin = vi.fn().mockResolvedValue(undefined)
+const mockRemovePlugin = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('@specd/core', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@specd/core')>()
+  return {
+    ...original,
+    createConfigWriter: vi.fn(() => ({
+      initProject: vi.fn(),
+      addPlugin: mockAddPlugin,
+      removePlugin: mockRemovePlugin,
+      listPlugins: vi.fn(),
+    })),
+  }
+})
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
@@ -76,7 +92,7 @@ afterEach(() => vi.clearAllMocks())
 
 describe('plugins install', () => {
   it('installs plugin and persists declaration', async () => {
-    const { kernel, config } = setup()
+    const { config } = setup()
     const program = makeProgram()
     registerPluginsInstall(program.command('plugins'))
 
@@ -88,11 +104,10 @@ describe('plugins install', () => {
         config,
       }),
     )
-    expect(kernel.project.addPlugin.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'agents',
-        name: '@specd/plugin-agent-claude',
-      }),
+    expect(mockAddPlugin).toHaveBeenCalledWith(
+      '/project/specd.yaml',
+      'agents',
+      '@specd/plugin-agent-claude',
     )
   })
 
@@ -109,6 +124,44 @@ describe('plugins install', () => {
 
     expect(stderr()).toContain('already installed')
     expect(stderr()).toContain('update')
+  })
+
+  it('outputs machine-parseable JSON on install', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerPluginsInstall(program.command('plugins'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'plugins',
+      'install',
+      '@specd/plugin-agent-claude',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.plugins).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '@specd/plugin-agent-claude',
+          status: 'installed',
+        }),
+      ]),
+    )
+  })
+
+  it('exits 1 when any plugin install fails', async () => {
+    setup()
+    mockInstall.mockRejectedValueOnce(new Error('install failed'))
+
+    const program = makeProgram()
+    registerPluginsInstall(program.command('plugins'))
+
+    await expect(
+      program.parseAsync(['node', 'specd', 'plugins', 'install', '@specd/plugin-agent-claude']),
+    ).rejects.toThrow(ExitSentinel)
   })
 })
 
@@ -171,7 +224,7 @@ describe('plugins list/show/uninstall', () => {
   })
 
   it('uninstalls plugin and removes declaration', async () => {
-    const { kernel } = setup()
+    setup()
     const program = makeProgram()
     registerPluginsUninstall(program.command('plugins'))
     await program.parseAsync([
@@ -182,11 +235,36 @@ describe('plugins list/show/uninstall', () => {
       '@specd/plugin-agent-claude',
     ])
 
-    expect(kernel.project.removePlugin.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'agents',
-        name: '@specd/plugin-agent-claude',
-      }),
+    expect(mockRemovePlugin).toHaveBeenCalledWith(
+      '/project/specd.yaml',
+      'agents',
+      '@specd/plugin-agent-claude',
+    )
+  })
+
+  it('outputs machine-parseable JSON on uninstall', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerPluginsUninstall(program.command('plugins'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'plugins',
+      'uninstall',
+      '@specd/plugin-agent-claude',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.plugins).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '@specd/plugin-agent-claude',
+          status: 'uninstalled',
+        }),
+      ]),
     )
   })
 })

@@ -2,59 +2,16 @@
 
 ## Requirements
 
-### Requirement: Accepts InitProjectOptions as input
+### Requirement: InitProject use case removed
 
-#### Scenario: All required fields provided
+#### Scenario: InitProject class is not exported
 
-- **WHEN** `execute` is called with `projectRoot`, `schemaRef`, `workspaceId`, and `specsPath`
-- **THEN** the call succeeds and the options are forwarded to `ConfigWriter.initProject`
+- **WHEN** `@specd/core` public exports are inspected
+- **THEN** `InitProject`, `AddPlugin`, `RemovePlugin`, `createInitProject`, `createAddPlugin`, and `createRemovePlugin` are not among them
+- **AND** `createConfigWriter` is exported
 
-### Requirement: Returns InitProjectResult on success
+#### Scenario: Project init uses createConfigWriter instead
 
-#### Scenario: Successful initialisation returns result
-
-- **WHEN** `execute` is called with valid options and no existing config
-- **THEN** the returned object contains `configPath`, `schemaRef`, and `workspaces`
-- **AND** `configPath` is an absolute path ending in `specd.yaml`
-- **AND** `workspaces` includes the provided `workspaceId`
-
-### Requirement: Delegates entirely to ConfigWriter
-
-#### Scenario: Port receives the input verbatim
-
-- **WHEN** `execute` is called with an `InitProjectOptions` object
-- **THEN** `ConfigWriter.initProject` is called exactly once with the same options object
-- **AND** the use case performs no other I/O
-
-### Requirement: Throws AlreadyInitialisedError when config exists
-
-#### Scenario: Config already exists without force flag
-
-- **GIVEN** `specd.yaml` already exists at `projectRoot`
-- **WHEN** `execute` is called with `force` absent or `false`
-- **THEN** an `AlreadyInitialisedError` is thrown
-
-#### Scenario: Config already exists with force flag
-
-- **GIVEN** `specd.yaml` already exists at `projectRoot`
-- **WHEN** `execute` is called with `force: true`
-- **THEN** the existing config is overwritten and a successful result is returned
-
-#### Scenario: Already initialised project propagates port error
-
-- **GIVEN** the port throws `AlreadyInitialisedError` when checking existence
-- **WHEN** `execute` is called
-- **THEN** `execute` propagates `AlreadyInitialisedError` from the port
-
-### Requirement: Side effects performed by the port
-
-#### Scenario: Storage directories created
-
-- **WHEN** `execute` completes successfully
-- **THEN** the `changes/`, `drafts/`, `discarded/`, and `archive/` directories exist under the storage path
-
-#### Scenario: Gitignore entries added
-
-- **WHEN** `execute` completes successfully
-- **THEN** `specd.local.yaml` is listed in the project's `.gitignore`
-- **AND** the `specd.local.*.yaml` local-variant pattern is also listed
+- **WHEN** delivery code needs to initialise a project
+- **THEN** it calls `createConfigWriter().initProject(options)`
+- **AND** it does not construct `InitProject` directly

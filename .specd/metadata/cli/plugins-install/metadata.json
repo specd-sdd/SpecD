@@ -4,6 +4,7 @@
   "dependsOn": [
     "plugin-manager:install-plugin-use-case",
     "plugin-manager:load-plugin-use-case",
+    "core:composition",
     "core:config-writer-port",
     "core:get-config"
   ],
@@ -38,7 +39,7 @@
     {
       "requirement": "Installation workflow",
       "rules": [
-        "For each plugin name that is not already installed:\n\n1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.\n2. On success, the command MUST call `ConfigWriter.addPlugin()` to record the plugin in `specd.yaml`.\n3. On failure, the command MUST emit the error message and continue with the remaining plugins."
+        "For each plugin name that is not already installed:\n\n1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.\n2. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` to record the plugin in `specd.yaml`.\n3. On failure, the command MUST emit the error message and continue with the remaining plugins.\n\nThe command MUST NOT call `kernel.project.addPlugin`. It SHOULD construct a kernel only when subsequent domain operations require one."
       ]
     },
     {
@@ -114,7 +115,8 @@
       ],
       "then": [
         "InstallPlugin use case is called",
-        "AND ConfigWriter.addPlugin() is called to record the plugin in specd.yaml"
+        "AND createConfigWriter().addPlugin is called to record the plugin in specd.yaml",
+        "AND kernel.project.addPlugin is not called"
       ]
     },
     {
@@ -131,27 +133,23 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:plugins-install",
-        "file": "cli:src/commands/plugins/get-declared-plugins.ts",
-        "symbol": "getDeclaredPlugins"
-      },
+        "file": "cli:test/commands/plugins.spec.ts"
+      }
+    ],
+    "symbols": [
       {
         "specId": "cli:plugins-install",
         "file": "cli:src/commands/plugins/install.ts",
         "symbol": "installPluginsWithKernel"
-      },
-      {
-        "specId": "cli:plugins-install",
-        "file": "cli:src/commands/plugins/install.ts",
-        "symbol": "registerPluginsInstall"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4b483f11253c6502163b963ff2f568419a36aa49b96d7147d70d06a4e108f751",
-    "verify.md": "sha256:02338dafd24c88b1fcf5dcd6eafef25dee691a8138d35bd704542a66067e9f04"
+    "spec.md": "sha256:406ac03b97e41133c07ba7676391f825c5872b1e24c38837f9c41baa1561113d",
+    "verify.md": "sha256:0ff07e0858fc69cf8775c4d81f265576ffbe99e8c468b9da6f0c9482c630e877"
   },
   "generatedBy": "core"
 }

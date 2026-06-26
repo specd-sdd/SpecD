@@ -6,14 +6,19 @@
 
 #### Scenario: Use case constructed via factory
 
-- **WHEN** a caller imports `createArchiveChange` from `@specd/core`
-- **THEN** calling it returns an `ArchiveChange` instance ready to execute
-- **AND** no port constructor (`FsChangeRepository`, `NodeHookRunner`, etc.) is imported by the caller
+- **WHEN** `createArchiveChange(config)` is called
+- **THEN** it returns a pre-wired `ArchiveChange` instance with all ports constructed internally
 
 #### Scenario: Use case constructors not exported
 
-- **WHEN** a caller attempts to import `ArchiveChange` class constructor from `@specd/core`
-- **THEN** the import is not available — `ArchiveChange` is not a named export of `index.ts`
+- **WHEN** `@specd/core` public exports are inspected
+- **THEN** use case class constructors are not among them — only factory functions
+
+#### Scenario: Config I/O factories return ports directly
+
+- **WHEN** `createConfigLoader()` or `createConfigWriter()` is called
+- **THEN** each returns a port instance (`ConfigLoader` or `ConfigWriter`)
+- **AND** neither wraps the port in a pass-through use-case class
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
@@ -91,6 +96,27 @@
 
 - **WHEN** both `specd.yaml` and `specd.local.yaml` are present
 - **THEN** values in `specd.local.yaml` take precedence over values in `specd.yaml`
+
+### Requirement: ConfigWriter is an application port
+
+#### Scenario: createConfigWriter returns FsConfigWriter by default
+
+- **WHEN** `createConfigWriter()` is called without options
+- **THEN** it returns a `ConfigWriter` instance that can call `initProject`, `addPlugin`, and `removePlugin`
+
+#### Scenario: createConfigWriter accepts injected writer for tests
+
+- **GIVEN** a mock `ConfigWriter` passed via options
+- **WHEN** `createConfigWriter({ configWriter: mock })` is called
+- **THEN** the returned instance is the mock
+
+### Requirement: Config mutation is not wired into createKernel
+
+#### Scenario: Kernel does not expose config writer
+
+- **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+- **THEN** the returned kernel has no `configWriter` property
+- **AND** `kernel.project` has no `init`, `addPlugin`, or `removePlugin` entries
 
 ### Requirement: SpecdConfig is a plain typed object
 

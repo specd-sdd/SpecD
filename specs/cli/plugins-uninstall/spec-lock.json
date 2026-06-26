@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "plugin-manager:uninstall-plugin-use-case",
+    "plugin-manager:load-plugin-use-case",
+    "core:composition",
+    "core:config-writer-port"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/plugins/uninstall.ts",
+      "symbols": ["registerPluginsUninstall"]
+    },
+    {
+      "file": "cli:test/commands/plugins.spec.ts"
+    }
+  ]
+}

@@ -42,13 +42,14 @@ Dependencies are wired manually at the application entry point of each package. 
 
 ### Requirement: Composition layer for use-case wiring
 
-Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory:
+Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:
 
-- **Use-case factories** — one per use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
-- **Kernel** — `createKernel(config: SpecdConfig)` calls every use-case factory and returns all use cases grouped by domain area. It is a convenience, not a mandatory entry point.
-- **Config loader port** — `ConfigLoader` is defined in `application/ports/` and resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
+- **Use-case factories** — one per domain use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
+- **Kernel** — `createKernel(config: SpecdConfig)` calls domain use-case factories and returns grouped use cases. It is a convenience, not a mandatory entry point. Config mutation is not wired into the kernel.
+- **Config loader port** — `createConfigLoader()` returns a `ConfigLoader` that resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
+- **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml` (`initProject`, `addPlugin`, `removePlugin`). Implementations live in `infrastructure/`. Delivery mechanisms call port methods on the returned instance.
 
-Concrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors.
+Concrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import use-case factories, `createConfigLoader`, `createConfigWriter`, and the kernel — never infrastructure classes or use case constructors.
 
 ### Requirement: YAML inputs validated at the infrastructure boundary
 
@@ -68,7 +69,7 @@ Package dependency direction is strictly one-way: `plugin-*` → `skills` → `c
 - In any package with business logic, `application/` must not import from `infrastructure/` or `composition/`
 - In any package with business logic, `infrastructure/` must not import from `composition/`
 - Only `composition/` may import from `infrastructure/`; concrete adapter classes and repository-level factories must not be exported from `index.ts`
-- Delivery mechanisms import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors
+- Delivery mechanisms import use-case factories, the kernel, `createConfigLoader`, and `createConfigWriter` — they MAY call methods on the returned `ConfigLoader` and `ConfigWriter` port instances but MUST NOT import infrastructure adapters or construct use cases directly
 - Use cases receive all dependencies via constructor — no module-level singletons, in any package
 - Domain entities must throw typed errors (subclasses of `SpecdError`) for invalid operations
 - Stateless domain operations must be plain functions, not classes

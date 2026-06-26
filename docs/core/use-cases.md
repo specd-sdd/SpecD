@@ -1316,39 +1316,23 @@ interface GetHookInstructionsResult {
 
 ---
 
-## Project initialisation
+## Project configuration writes
 
-### InitProject
-
-Initialises a new specd project by writing `specd.yaml`, creating storage directories, and updating `.gitignore`. Delegates all filesystem operations to the `ConfigWriter` port.
-
-**Constructor:** `new InitProject(writer: ConfigWriter)`
-
-**Input:**
-
-| Field         | Type      | Required | Description                                                    |
-| ------------- | --------- | -------- | -------------------------------------------------------------- |
-| `projectRoot` | `string`  | yes      | The directory to initialise (absolute path).                   |
-| `schemaRef`   | `string`  | yes      | Schema reference string (e.g. `'@specd/schema-std'`).          |
-| `workspaceId` | `string`  | yes      | The default workspace name (e.g. `'default'`).                 |
-| `specsPath`   | `string`  | yes      | Relative path for the specs directory (e.g. `'specs/'`).       |
-| `force`       | `boolean` | no       | When `true`, overwrite an existing `specd.yaml` without error. |
-
-**Returns:** `Promise<InitProjectResult>`
+Config mutation (`initProject`, `addPlugin`, `removePlugin`) is delivered through the `ConfigWriter` port via `createConfigWriter()` — not through kernel use cases.
 
 ```typescript
-interface InitProjectResult {
-  configPath: string // absolute path to the created specd.yaml
-  schemaRef: string
-  workspaces: readonly string[]
-}
+import { createConfigWriter } from '@specd/core'
+
+const writer = createConfigWriter()
+await writer.initProject({
+  projectRoot: '/abs/project',
+  schemaRef: '@specd/schema-std',
+  workspaceId: 'default',
+  specsPath: 'specs/',
+})
 ```
 
-**Throws:**
-
-| Error                     | Condition                                           |
-| ------------------------- | --------------------------------------------------- |
-| `AlreadyInitialisedError` | `specd.yaml` already exists and `force` is not set. |
+See [config-writer.md](./config-writer.md) for method contracts and error conditions.
 
 ---
 

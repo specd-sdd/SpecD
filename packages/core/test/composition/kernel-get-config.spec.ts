@@ -85,6 +85,22 @@ describe('createKernel project.getConfig', () => {
       expect('listPlugins' in kernel.project).toBe(false)
     })
 
+    it('does not expose config mutation entries on kernel.project', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.project).not.toHaveProperty('init')
+      expect(kernel.project).not.toHaveProperty('addPlugin')
+      expect(kernel.project).not.toHaveProperty('removePlugin')
+    })
+
+    it('does not expose configWriter on the kernel object', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel).not.toHaveProperty('configWriter')
+    })
+
     it('includes plugins on the getConfig snapshot', async () => {
       const config = await makeConfig()
       const configWithPlugins: SpecdConfig = {

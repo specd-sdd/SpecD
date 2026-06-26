@@ -1,0 +1,52 @@
+- op: added
+  description: Verify createConfigWriter factory
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: ConfigLoader is an application port'
+  content: |
+    ### Requirement: ConfigWriter is an application port
+
+    #### Scenario: createConfigWriter returns FsConfigWriter by default
+
+    - **WHEN** `createConfigWriter()` is called without options
+    - **THEN** it returns a `ConfigWriter` instance that can call `initProject`, `addPlugin`, and `removePlugin`
+
+    #### Scenario: createConfigWriter accepts injected writer for tests
+
+    - **GIVEN** a mock `ConfigWriter` passed via options
+    - **WHEN** `createConfigWriter({ configWriter: mock })` is called
+    - **THEN** the returned instance is the mock
+
+    ### Requirement: Config mutation is not wired into createKernel
+
+    #### Scenario: Kernel does not expose config writer
+
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** the returned kernel has no `configWriter` property
+    - **AND** `kernel.project` has no `init`, `addPlugin`, or `removePlugin` entries
+
+- op: modified
+  description: Config I/O factories are not use-case wrappers
+  selector:
+    type: section
+    matches: 'Requirement: Use-case factories are the unit of composition'
+  content: |
+    #### Scenario: Use case constructed via factory
+
+    - **WHEN** `createArchiveChange(config)` is called
+    - **THEN** it returns a pre-wired `ArchiveChange` instance with all ports constructed internally
+
+    #### Scenario: Use case constructors not exported
+
+    - **WHEN** `@specd/core` public exports are inspected
+    - **THEN** use case class constructors are not among them — only factory functions
+
+    #### Scenario: Config I/O factories return ports directly
+
+    - **WHEN** `createConfigLoader()` or `createConfigWriter()` is called
+    - **THEN** each returns a port instance (`ConfigLoader` or `ConfigWriter`)
+    - **AND** neither wraps the port in a pass-through use-case class

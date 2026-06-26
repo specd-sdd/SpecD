@@ -4,6 +4,7 @@
   "dependsOn": [
     "plugin-manager:uninstall-plugin-use-case",
     "plugin-manager:load-plugin-use-case",
+    "core:composition",
     "core:config-writer-port"
   ],
   "context": [
@@ -19,7 +20,7 @@
     {
       "requirement": "Uninstall workflow",
       "rules": [
-        "For each plugin name:\n\n1. The command MUST load the plugin via `LoadPlugin` use case.\n2. The command MUST call the plugin's `uninstall()` method.\n3. The command MUST call `ConfigWriter.removePlugin()` to remove from `specd.yaml`."
+        "For each plugin name:\n\n1. The command MUST load the plugin via `LoadPlugin` use case.\n2. The command MUST call the plugin's `uninstall()` method.\n3. The command MUST call `createConfigWriter().removePlugin(configPath, type, name)` to remove from `specd.yaml`.\n\nThe command MUST NOT call `kernel.project.removePlugin`."
       ]
     },
     {
@@ -61,7 +62,8 @@
       "then": [
         "the plugin is loaded via LoadPlugin use case",
         "AND the plugin's uninstall() method is called",
-        "AND ConfigWriter.removePlugin() removes the plugin from specd.yaml"
+        "AND createConfigWriter().removePlugin is called to remove the plugin from specd.yaml",
+        "AND kernel.project.removePlugin is not called"
       ]
     },
     {
@@ -71,9 +73,24 @@
       "then": ["output is machine-parseable JSON with plugin name and status"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:plugins-uninstall",
+        "file": "cli:test/commands/plugins.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:plugins-uninstall",
+        "file": "cli:src/commands/plugins/uninstall.ts",
+        "symbol": "registerPluginsUninstall"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:80b90772f4f078bfa29be2e3f86467636555710c4176ee84e6b6a4510a08a7fb",
-    "verify.md": "sha256:af358d33d9cb4d61fbea684f23c8dd1887954b4f08be5f60d9eb47c1b97d5e75"
+    "spec.md": "sha256:2c0cda8891c1da7f55bcf6daba0f4faeb87b495c362c1d538bff46ac1ed35878",
+    "verify.md": "sha256:a8f01c91c4a04fe2f45b2f5a00c3951dd533adede5cf47907466ca9a2c8693e3"
   },
   "generatedBy": "core"
 }

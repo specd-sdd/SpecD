@@ -40,6 +40,12 @@
 - **WHEN** the plugin selection options are rendered
 - **THEN** `@specd/plugin-agent-opencode` is listed as a selectable plugin option
 
+#### Scenario: Wizard includes standard agent plugin
+
+- **GIVEN** interactive mode is active
+- **WHEN** the plugin selection options are rendered
+- **THEN** `@specd/plugin-agent-standard` is listed as a selectable plugin option
+
 ### Requirement: Non-interactive mode
 
 #### Scenario: Default values produce a valid minimal config
@@ -48,10 +54,11 @@
 - **THEN** `specd.yaml` is written with `schema: '@specd/schema-std'`, workspace `default` at `specs/`
 - **AND** the process exits with code 0
 
-#### Scenario: JSON output contains all fields including skillsInstalled
+#### Scenario: JSON output contains plugins install results
 
-- **WHEN** `specd project init --format json --agent claude` is run
-- **THEN** stdout is valid JSON with `result`, `configPath`, `schema`, `workspaces`, and `skillsInstalled` fields
+- **WHEN** `specd project init --format json --plugin @specd/plugin-agent-claude` is run
+- **THEN** stdout is valid JSON with `result`, `configPath`, `schema`, `workspaces`, and `plugins` fields
+- **AND** `plugins` is an array of per-plugin install entries
 
 ### Requirement: Config file placement
 
@@ -67,7 +74,7 @@
 - **WHEN** `specd project init --workspace default` is run
 - **THEN** `specd.yaml` is written in the current working directory
 
-### Requirement: Delegation to InitProject
+### Requirement: Delegation to ConfigWriter
 
 #### Scenario: Standard directories are created
 
@@ -80,6 +87,12 @@
 - **GIVEN** no `.gitignore` exists in the project root
 - **WHEN** `specd project init --workspace default` completes successfully
 - **THEN** a `.gitignore` is created containing `specd.local.yaml`
+
+#### Scenario: Init uses createConfigWriter not InitProject use case
+
+- **WHEN** `specd project init` runs the init step
+- **THEN** it calls `createConfigWriter().initProject(...)`
+- **AND** it does not call `createInitProject`, `InitProject.execute`, or `kernel.project.init`
 
 ### Requirement: Skills installation after init
 

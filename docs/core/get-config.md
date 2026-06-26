@@ -35,7 +35,7 @@ const snapshot = getConfig.execute()
 - **Read-only host view** — `execute()` returns a `Readonly<SpecdConfig>` clone captured at construction. It is not the live object used by internal kernel wiring (`ListWorkspaces`, etc.).
 - **Plugin declarations** — read `execute().plugins` (or an already-loaded `SpecdConfig`). There is no `kernel.project.listPlugins` use case.
 - **No disk I/O** — does not re-read `specd.yaml`. If the yaml changes on disk, recreate the kernel.
-- **Not for yaml edits** — persist configuration through `ConfigWriter` composition factories (`createInitProject`, `createAddPlugin`, `createRemovePlugin`). See [ConfigWriter](./config-writer.md).
+- **Not for yaml edits** — persist configuration through `createConfigWriter()` from `@specd/core`. See [ConfigWriter](./config-writer.md).
 
 Mutating the returned snapshot does not reconfigure the kernel and does not write to disk.
 

@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "core:resolve-schema", "core:config-writer-port"],
+  "implementation": [
+    {
+      "file": "core:src/composition/config-writer.ts",
+      "symbols": ["createConfigWriter"]
+    },
+    {
+      "file": "core:src/composition/index.ts",
+      "symbols": ["createConfigWriter"]
+    },
+    {
+      "file": "core:test/composition/config-writer.spec.ts",
+      "symbols": ["createConfigWriter"]
+    },
+    {
+      "file": "core:test/composition/config-mutation-exports.spec.ts"
+    }
+  ]
+}

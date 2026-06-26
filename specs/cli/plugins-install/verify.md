@@ -52,7 +52,8 @@
 
 - **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked with plugin not installed
 - **THEN** `InstallPlugin` use case is called
-- **AND** `ConfigWriter.addPlugin()` is called to record the plugin in `specd.yaml`
+- **AND** `createConfigWriter().addPlugin` is called to record the plugin in `specd.yaml`
+- **AND** `kernel.project.addPlugin` is not called
 
 ### Requirement: Exit code
 

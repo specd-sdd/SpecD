@@ -1,4 +1,5 @@
 import { type Command } from 'commander'
+import { createConfigWriter } from '@specd/core'
 import { LoadPlugin, UninstallPlugin, createPluginLoader } from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
@@ -31,10 +32,11 @@ export function registerPluginsUninstall(parent: Command): void {
     .action(async (pluginNames: string[], opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath, kernel } = await resolveCliContext({
+        const { config, configFilePath } = await resolveCliContext({
           configPath: opts.config,
         })
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
+        const writer = createConfigWriter()
         const loader = createPluginLoader({ config })
         const load = new LoadPlugin(loader)
         const uninstall = new UninstallPlugin(loader)
@@ -47,11 +49,7 @@ export function registerPluginsUninstall(parent: Command): void {
             await load.execute({ pluginName })
             const type = 'agents'
             await uninstall.execute({ pluginName, config })
-            await kernel.project.removePlugin.execute({
-              configPath,
-              type,
-              name: pluginName,
-            })
+            await writer.removePlugin(configPath, type, pluginName)
             plugins.push({
               name: pluginName,
               status: 'uninstalled',

@@ -1,0 +1,54 @@
+- op: modified
+  description: Mark spec retired in favour of ConfigWriter port
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Retired.** The `InitProject` application use case is removed. Project initialisation requirements now live in [`core:config-writer-port`](../config-writer-port/spec.md) (`initProject` operation) and [`core:composition`](../composition/spec.md) (`createConfigWriter()` factory). Delivery mechanisms call `createConfigWriter().initProject(...)`.
+
+- op: removed
+  description: Retire use-case input requirement
+  selector:
+    type: section
+    matches: 'Requirement: Accepts InitProjectOptions as input'
+
+- op: removed
+  description: Retire use-case result requirement
+  selector:
+    type: section
+    matches: 'Requirement: Returns InitProjectResult on success'
+
+- op: removed
+  description: Retire delegation requirement
+  selector:
+    type: section
+    matches: 'Requirement: Delegates entirely to ConfigWriter'
+
+- op: removed
+  description: Retire error propagation requirement
+  selector:
+    type: section
+    matches: 'Requirement: Throws AlreadyInitialisedError when config exists'
+
+- op: removed
+  description: Retire side-effects requirement
+  selector:
+    type: section
+    matches: 'Requirement: Side effects performed by the port'
+
+- op: added
+  description: Document retirement invariant
+  position:
+    parent:
+      type: section
+      matches: Requirements
+  content: |
+    ### Requirement: InitProject use case removed
+
+    The `InitProject` application use case class MUST NOT be exported from `@specd/core`. Callers that previously used `createInitProject()` or `kernel.project.init` MUST migrate to `createConfigWriter().initProject(...)`.
+
+- op: removed
+  description: Remove stale use-case Constraints
+  selector:
+    type: section
+    matches: Constraints

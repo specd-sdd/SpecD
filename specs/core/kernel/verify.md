@@ -22,12 +22,11 @@
 - **THEN** it contains entries for: `approveSpec`, `approveSignoff`, `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
 - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
 
-#### Scenario: Project group contains all project use cases
+#### Scenario: Project group contains query use cases only
 
 - **WHEN** `kernel.project` is inspected
-- **THEN** it contains entries for: `init`, `addPlugin`, `removePlugin`, `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
-- **AND** it does not contain `listPlugins`
-- **AND** it does not contain `recordSkillInstall` or `getSkillsManifest`
+- **THEN** it contains entries for: `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
+- **AND** it does not contain `init`, `addPlugin`, `removePlugin`, or `listPlugins`
 
 ### Requirement: Every exported use case must have a kernel entry
 
@@ -82,6 +81,20 @@
 - **WHEN** `kernel.project.getConfig.execute()` is called
 - **THEN** the returned `SpecdConfig` includes a `plugins` field with the declared agent plugins
 - **AND** no additional disk read through `ConfigWriter.listPlugins` is required to obtain those declarations
+
+### Requirement: Config mutation is not a kernel use case
+
+#### Scenario: kernel.project does not expose config mutation entries
+
+- **WHEN** `kernel.project` is inspected after `createKernel(config)`
+- **THEN** it does not contain `init`, `addPlugin`, or `removePlugin`
+- **AND** `'init' in kernel.project`, `'addPlugin' in kernel.project`, and `'removePlugin' in kernel.project` are all false
+
+#### Scenario: InitProject use case is not exported
+
+- **WHEN** `@specd/core` public exports are inspected
+- **THEN** `InitProject`, `AddPlugin`, `RemovePlugin`, `createInitProject`, `createAddPlugin`, and `createRemovePlugin` are not among them
+- **AND** `createConfigWriter` is exported
 
 ### Requirement: Kernel entries must match use case types
 

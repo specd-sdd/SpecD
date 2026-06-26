@@ -39,8 +39,10 @@ When a plugin name is already declared in `specd.yaml` under the appropriate typ
 For each plugin name that is not already installed:
 
 1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.
-2. On success, the command MUST call `ConfigWriter.addPlugin()` to record the plugin in `specd.yaml`.
+2. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` to record the plugin in `specd.yaml`.
 3. On failure, the command MUST emit the error message and continue with the remaining plugins.
+
+The command MUST NOT call `kernel.project.addPlugin`. It SHOULD construct a kernel only when subsequent domain operations require one.
 
 ### Requirement: Exit code
 
@@ -65,5 +67,6 @@ The format MUST be machine-parseable when invoked with `--format json`.
 
 - [`plugin-manager:install-plugin-use-case`](../../plugin-manager/install-plugin-use-case/spec.md) — orchestrates plugin installation
 - [`plugin-manager:load-plugin-use-case`](../../plugin-manager/load-plugin-use-case/spec.md) — validates plugin before installation
+- [`core:composition`](../../core/composition/spec.md) — `createConfigWriter()` factory
 - [`core:config-writer-port`](../../core/config-writer-port/spec.md) — persists plugin declarations via `addPlugin`
 - [`core:get-config`](../../core/get-config/spec.md) — readonly `SpecdConfig` snapshot for declaration reads

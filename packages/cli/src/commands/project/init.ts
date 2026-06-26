@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { createInitProject, createVcsAdapter } from '@specd/core'
+import { createConfigWriter, createVcsAdapter } from '@specd/core'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { renderBanner } from '../../banner.js'
@@ -79,8 +79,8 @@ export function registerProjectInit(parent: Command): void {
 
           const projectRoot = await resolveProjectRoot()
           const schemaRef = opts.schema ?? '@specd/schema-std'
-          const init = createInitProject()
-          const initResult = await init.execute({
+          const writer = createConfigWriter()
+          const initResult = await writer.initProject({
             projectRoot,
             schemaRef,
             workspaceId: opts.workspace,
@@ -136,9 +136,8 @@ async function installSelectedPlugins(input: {
   if (input.pluginNames.length === 0) {
     return { plugins: [], hasErrors: false }
   }
-  const { config, kernel } = await resolveCliContext({ configPath: input.configPath })
+  const { config } = await resolveCliContext({ configPath: input.configPath })
   return installPluginsWithKernel({
-    kernel,
     config,
     configPath: input.configPath,
     pluginNames: input.pluginNames,
@@ -218,8 +217,8 @@ async function runInteractiveInit(options: {
     force = true
   }
 
-  const init = createInitProject()
-  const initResult = await init.execute({
+  const writer = createConfigWriter()
+  const initResult = await writer.initProject({
     projectRoot,
     schemaRef: String(schema),
     workspaceId: String(workspace),

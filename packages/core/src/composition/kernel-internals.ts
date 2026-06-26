@@ -13,7 +13,6 @@ import { type FileWriter } from '../application/ports/file-writer.js'
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
 import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
 import { type HookRunner } from '../application/ports/hook-runner.js'
-import { type ConfigWriter } from '../application/ports/config-writer.js'
 import { type YamlSerializer } from '../application/ports/yaml-serializer.js'
 import { TemplateExpander } from '../application/template-expander.js'
 import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
@@ -22,7 +21,6 @@ import { NodeYamlSerializer } from '../infrastructure/node/yaml-serializer.js'
 import { FsFileReader } from '../infrastructure/fs/file-reader.js'
 import { FsFileWriter } from '../infrastructure/fs/file-writer.js'
 import { createArtifactParserRegistry } from '../infrastructure/artifact-parser/registry.js'
-import { FsConfigWriter } from '../infrastructure/fs/config-writer.js'
 import { createChangeRepository } from './change-repository.js'
 import { createArchiveRepository } from './archive-repository.js'
 import { createSpecRepository } from './spec-repository.js'
@@ -306,8 +304,6 @@ export interface KernelInternals {
   readonly vcs: VcsAdapter
   /** Hook runner for lifecycle hooks. */
   readonly hooks: HookRunner
-  /** Config writer for project init and skill recording. */
-  readonly configWriter: ConfigWriter
   /** Template expander for hook commands and instruction text. */
   readonly expander: TemplateExpander
   /** YAML serializer for metadata operations. */
@@ -495,7 +491,6 @@ export async function createKernelInternals(
     actor: config.privacy ? new PrivacyActorResolver(baseActor, config.privacy) : baseActor,
     vcs: await createVcsAdapter(config.projectRoot, registry.vcsProviders),
     hooks: new NodeHookRunner(expander),
-    configWriter: new FsConfigWriter(),
     yaml: new NodeYamlSerializer(),
     expander,
     schemaRef: config.schemaRef,

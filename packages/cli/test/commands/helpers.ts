@@ -216,9 +216,6 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
   }
 
   const project = {
-    init: { execute: vi.fn() },
-    addPlugin: { execute: vi.fn() },
-    removePlugin: { execute: vi.fn() },
     listWorkspaces: {
       execute: vi.fn().mockResolvedValue([
         {

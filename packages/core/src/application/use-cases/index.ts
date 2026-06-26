@@ -42,9 +42,6 @@ export {
   type ValidateSchemaInput,
   type ValidateSchemaResult,
 } from './validate-schema.js'
-export { type InitProject } from './init-project.js'
-export { type AddPlugin, type AddPluginInput } from './add-plugin.js'
-export { type RemovePlugin, type RemovePluginInput } from './remove-plugin.js'
 export { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 export {
   type GetProjectContext,

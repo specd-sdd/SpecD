@@ -1,0 +1,22 @@
+- op: removed
+  description: Replace install workflow scenario
+  selector:
+    type: section
+    matches: 'Scenario: Calls InstallPlugin use case and records in config'
+    parent:
+      type: section
+      matches: 'Requirement: Installation workflow'
+
+- op: added
+  description: Install persists via createConfigWriter
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Installation workflow'
+  content: |
+    #### Scenario: Calls InstallPlugin use case and records in config
+
+    - **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked with plugin not installed
+    - **THEN** `InstallPlugin` use case is called
+    - **AND** `createConfigWriter().addPlugin` is called to record the plugin in `specd.yaml`
+    - **AND** `kernel.project.addPlugin` is not called

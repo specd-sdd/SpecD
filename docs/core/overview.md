@@ -198,7 +198,6 @@ Everything exported is a domain type (entity, value object, error, service), an 
 | `RunStepHooks`           | type | Executes built-in `run:` hooks and explicit `external:` hooks for a workflow step and phase. |
 | `GetHookInstructions`    | type | Returns `instruction:` hook text for a workflow step and phase.                              |
 | `GetArtifactInstruction` | type | Returns artifact-specific instructions, rules, and delta guidance.                           |
-| `InitProject`            | type | Initialises a new specd project.                                                             |
 | `RecordSkillInstall`     | type | Records that a skill set was installed for an agent.                                         |
 | `GetSkillsManifest`      | type | Reads the installed skills manifest from `specd.yaml`.                                       |
 | `GetProjectContext`      | type | Compiles project-level context without a specific change or step.                            |
@@ -278,37 +277,35 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 These functions wire a single use case to the filesystem, creating a self-contained async function. Each accepts an options object with the relevant paths and config flags, and returns a callable function. Use them when you need only one or two use cases without constructing a full `Kernel`.
 
-| Export                         | Description                               |
-| ------------------------------ | ----------------------------------------- |
-| `createCreateChange`           | Wires `CreateChange` to the fs.           |
-| `createGetStatus`              | Wires `GetStatus` to the fs.              |
-| `createTransitionChange`       | Wires `TransitionChange` to the fs.       |
-| `createDraftChange`            | Wires `DraftChange` to the fs.            |
-| `createRestoreChange`          | Wires `RestoreChange` to the fs.          |
-| `createDiscardChange`          | Wires `DiscardChange` to the fs.          |
-| `createApproveSpec`            | Wires `ApproveSpec` to the fs.            |
-| `createApproveSignoff`         | Wires `ApproveSignoff` to the fs.         |
-| `createArchiveChange`          | Wires `ArchiveChange` to the fs.          |
-| `createValidateArtifacts`      | Wires `ValidateArtifacts` to the fs.      |
-| `createCompileContext`         | Wires `CompileContext` to the fs.         |
-| `createListChanges`            | Wires `ListChanges` to the fs.            |
-| `createListDrafts`             | Wires `ListDrafts` to the fs.             |
-| `createListDiscarded`          | Wires `ListDiscarded` to the fs.          |
-| `createListArchived`           | Wires `ListArchived` to the fs.           |
-| `createGetArchivedChange`      | Wires `GetArchivedChange` to the fs.      |
-| `createEditChange`             | Wires `EditChange` to the fs.             |
-| `createSkipArtifact`           | Wires `SkipArtifact` to the fs.           |
-| `createListSpecs`              | Wires `ListSpecs` to the fs.              |
-| `createGetSpec`                | Wires `GetSpec` to the fs.                |
-| `createSaveSpecMetadata`       | Wires `SaveSpecMetadata` to the fs.       |
-| `createInvalidateSpecMetadata` | Wires `InvalidateSpecMetadata` to the fs. |
-| `createGetActiveSchema`        | Wires `GetActiveSchema` to the fs.        |
-| `createValidateSpecs`          | Wires `ValidateSpecs` to the fs.          |
-| `createGetSpecContext`         | Wires `GetSpecContext` to the fs.         |
-| `createInitProject`            | Wires `InitProject` to the fs.            |
-| `createRecordSkillInstall`     | Wires `RecordSkillInstall` to the fs.     |
-| `createGetSkillsManifest`      | Wires `GetSkillsManifest` to the fs.      |
-| `createGetProjectContext`      | Wires `GetProjectContext` to the fs.      |
+| Export                         | Description                                          |
+| ------------------------------ | ---------------------------------------------------- |
+| `createCreateChange`           | Wires `CreateChange` to the fs.                      |
+| `createGetStatus`              | Wires `GetStatus` to the fs.                         |
+| `createTransitionChange`       | Wires `TransitionChange` to the fs.                  |
+| `createDraftChange`            | Wires `DraftChange` to the fs.                       |
+| `createRestoreChange`          | Wires `RestoreChange` to the fs.                     |
+| `createDiscardChange`          | Wires `DiscardChange` to the fs.                     |
+| `createApproveSpec`            | Wires `ApproveSpec` to the fs.                       |
+| `createApproveSignoff`         | Wires `ApproveSignoff` to the fs.                    |
+| `createArchiveChange`          | Wires `ArchiveChange` to the fs.                     |
+| `createValidateArtifacts`      | Wires `ValidateArtifacts` to the fs.                 |
+| `createCompileContext`         | Wires `CompileContext` to the fs.                    |
+| `createListChanges`            | Wires `ListChanges` to the fs.                       |
+| `createListDrafts`             | Wires `ListDrafts` to the fs.                        |
+| `createListDiscarded`          | Wires `ListDiscarded` to the fs.                     |
+| `createListArchived`           | Wires `ListArchived` to the fs.                      |
+| `createGetArchivedChange`      | Wires `GetArchivedChange` to the fs.                 |
+| `createEditChange`             | Wires `EditChange` to the fs.                        |
+| `createSkipArtifact`           | Wires `SkipArtifact` to the fs.                      |
+| `createListSpecs`              | Wires `ListSpecs` to the fs.                         |
+| `createGetSpec`                | Wires `GetSpec` to the fs.                           |
+| `createSaveSpecMetadata`       | Wires `SaveSpecMetadata` to the fs.                  |
+| `createInvalidateSpecMetadata` | Wires `InvalidateSpecMetadata` to the fs.            |
+| `createGetActiveSchema`        | Wires `GetActiveSchema` to the fs.                   |
+| `createValidateSpecs`          | Wires `ValidateSpecs` to the fs.                     |
+| `createGetSpecContext`         | Wires `GetSpecContext` to the fs.                    |
+| `createConfigWriter`           | Filesystem-backed `ConfigWriter` for yaml mutations. |
+| `createGetProjectContext`      | Wires `GetProjectContext` to the fs.                 |
 
 ## Where to go next
 

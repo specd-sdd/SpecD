@@ -1,5 +1,6 @@
 import { type Command } from 'commander'
-import type { Kernel, SpecdConfig } from '@specd/core'
+import type { SpecdConfig } from '@specd/core'
+import { createConfigWriter } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
@@ -37,14 +38,12 @@ export interface PluginInstallBatchResult {
  * Orchestrates plugin installation and config persistence.
  *
  * @param input - Installation input.
- * @param input.kernel - CLI kernel.
  * @param input.config - Fully-resolved project configuration.
  * @param input.configPath - Absolute path to `specd.yaml`.
  * @param input.pluginNames - Plugin package names to process.
  * @returns Batch result entries and aggregate error state.
  */
 export async function installPluginsWithKernel(input: {
-  readonly kernel: Kernel
   readonly config: SpecdConfig
   readonly configPath: string
   readonly pluginNames: readonly string[]
@@ -52,6 +51,7 @@ export async function installPluginsWithKernel(input: {
   const loader = createPluginLoader({ config: input.config })
   const install = new InstallPlugin(loader)
   const load = new LoadPlugin(loader)
+  const writer = createConfigWriter()
   const declared = getDeclaredPlugins(input.config, 'agents')
   const declaredSet = new Set(declared.map((entry) => entry.name))
 
@@ -87,11 +87,7 @@ export async function installPluginsWithKernel(input: {
         config: input.config,
       })
       const pluginBucket = toPluginBucket(loaded.plugin.type)
-      await input.kernel.project.addPlugin.execute({
-        configPath: input.configPath,
-        type: pluginBucket,
-        name: pluginName,
-      })
+      await writer.addPlugin(input.configPath, pluginBucket, pluginName)
       declaredSet.add(pluginName)
       plugins.push({
         name: pluginName,
@@ -126,12 +122,11 @@ export function registerPluginsInstall(parent: Command): void {
     .action(async (pluginNames: string[], opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath, kernel } = await resolveCliContext({
+        const { config, configFilePath } = await resolveCliContext({
           configPath: opts.config,
         })
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await installPluginsWithKernel({
-          kernel,
           config,
           configPath,
           pluginNames,

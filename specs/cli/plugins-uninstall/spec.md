@@ -20,7 +20,9 @@ For each plugin name:
 
 1. The command MUST load the plugin via `LoadPlugin` use case.
 2. The command MUST call the plugin's `uninstall()` method.
-3. The command MUST call `ConfigWriter.removePlugin()` to remove from `specd.yaml`.
+3. The command MUST call `createConfigWriter().removePlugin(configPath, type, name)` to remove from `specd.yaml`.
+
+The command MUST NOT call `kernel.project.removePlugin`.
 
 ### Requirement: Exit code
 
@@ -44,4 +46,5 @@ The format MUST be machine-parseable when invoked with `--format json`.
 
 - [`plugin-manager:uninstall-plugin-use-case`](../plugin-manager/uninstall-plugin-use-case/spec.md) — orchestrates plugin removal
 - [`plugin-manager:load-plugin-use-case`](../plugin-manager/load-plugin-use-case/spec.md) — loads plugin before uninstall
+- [`core:composition`](../core/composition/spec.md) — `createConfigWriter()` factory
 - [`core:config-writer-port`](../core/config-writer-port/spec.md) — removes plugin declaration

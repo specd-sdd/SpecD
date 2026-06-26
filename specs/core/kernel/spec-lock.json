@@ -36,20 +36,24 @@
     "core:validate-specs",
     "core:generate-metadata",
     "core:get-spec-context",
-    "core:init-project",
-    "core:get-project-context",
-    "core:resolve-schema",
-    "core:spec-overlap",
-    "core:get-config",
     "core:config-writer-port",
     "core:list-workspaces",
+    "core:get-project-context",
+    "core:get-config",
     "core:project-metadata",
-    "core:update-project-metadata"
+    "core:update-project-metadata",
+    "core:resolve-schema",
+    "core:spec-overlap"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["Kernel", "createKernel"]
+      "file": "core:src/composition/kernel.ts"
+    },
+    {
+      "file": "core:src/composition/kernel-internals.ts"
+    },
+    {
+      "file": "core:test/composition/kernel-get-config.spec.ts"
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Project initialisation and skill installation must create and mutate `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — initialising a project, recording skill installations, and reading the skills manifest — complementing the read-only `ConfigLoader`.
+Project initialisation and plugin declaration mutation must create and update `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — `initProject`, `addPlugin`, and `removePlugin` — complementing the read-only `ConfigLoader`. Delivery mechanisms obtain a wired instance via `createConfigWriter()` from the composition layer.
 
 ## Requirements
 
@@ -58,6 +58,22 @@ The `addPlugin` method accepts four parameters:
 4. `config?: Record<string, unknown>` — optional plugin configuration (e.g. `{ commandsDir: '.claude/commands' }`)
 
 It MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it. When `config` is provided, it MUST be written alongside the `name` in the plugin entry.
+
+### Requirement: RemovePlugin
+
+The `removePlugin` method accepts three parameters:
+
+1. `configPath: string` — absolute path to the `specd.yaml` to update
+2. `type: string` — the plugin type (e.g. `"agents"`)
+3. `name: string` — the plugin package name
+
+It MUST return `Promise<void>`. The method MUST remove the named plugin from `plugins.<type>` in `specd.yaml`.
+
+### Requirement: Delivery access via createConfigWriter
+
+Delivery mechanisms (CLI, MCP, plugins) MUST obtain a `ConfigWriter` instance through `createConfigWriter()` exported from `@specd/core`. They MAY call `initProject`, `addPlugin`, and `removePlugin` on that instance. They MUST NOT import `FsConfigWriter` or construct port implementations directly.
+
+`listPlugins` on the port remains for infrastructure compatibility but delivery MUST NOT use it for declaration reads when a `SpecdConfig` snapshot is already available.
 
 ## Constraints
 

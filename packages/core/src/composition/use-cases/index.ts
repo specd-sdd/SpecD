@@ -43,9 +43,6 @@ export {
   type FsInvalidateSpecMetadataOptions,
 } from './invalidate-spec-metadata.js'
 export { createGetActiveSchema, type FsGetActiveSchemaOptions } from './get-active-schema.js'
-export { createInitProject, type FsInitProjectOptions } from './init-project.js'
-export { createAddPlugin, type FsAddPluginOptions } from './add-plugin.js'
-export { createRemovePlugin, type FsRemovePluginOptions } from './remove-plugin.js'
 export { createGetProjectContext, type FsGetProjectContextOptions } from './get-project-context.js'
 export { createGetConfig, type GetConfigOptions } from './get-config.js'
 export {

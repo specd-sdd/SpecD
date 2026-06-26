@@ -3,5 +3,6 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:config", "default:_global/architecture"]
+  "dependsOn": ["core:config", "default:_global/architecture"],
+  "implementation": []
 }

@@ -1,0 +1,50 @@
+- op: removed
+  description: Retire input requirement scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Accepts InitProjectOptions as input'
+
+- op: removed
+  description: Retire result requirement scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Returns InitProjectResult on success'
+
+- op: removed
+  description: Retire delegation requirement scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Delegates entirely to ConfigWriter'
+
+- op: removed
+  description: Retire error requirement scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Throws AlreadyInitialisedError when config exists'
+
+- op: removed
+  description: Retire side-effects requirement scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Side effects performed by the port'
+
+- op: added
+  description: Verify use case removal
+  position:
+    parent:
+      type: section
+      matches: Requirements
+  content: |
+    ### Requirement: InitProject use case removed
+
+    #### Scenario: InitProject class is not exported
+
+    - **WHEN** `@specd/core` public exports are inspected
+    - **THEN** `InitProject`, `AddPlugin`, `RemovePlugin`, `createInitProject`, `createAddPlugin`, and `createRemovePlugin` are not among them
+    - **AND** `createConfigWriter` is exported
+
+    #### Scenario: Project init uses createConfigWriter instead
+
+    - **WHEN** delivery code needs to initialise a project
+    - **THEN** it calls `createConfigWriter().initProject(options)`
+    - **AND** it does not construct `InitProject` directly

@@ -1,0 +1,9 @@
+releases:
+  core:composition: minor
+  core:kernel: major
+  core:init-project: major
+  core:config-writer-port: patch
+  cli:plugins-install: patch
+  cli:plugins-uninstall: patch
+  cli:project-init: patch
+  default:_global/architecture: patch

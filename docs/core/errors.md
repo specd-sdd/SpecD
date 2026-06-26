@@ -121,7 +121,7 @@ import { SchemaNotFoundError } from '@specd/core'
 
 **Code:** `'ALREADY_INITIALISED'`
 
-Thrown when `InitProject` is called but a `specd.yaml` already exists at the target path and `force` is not set.
+Thrown when `ConfigWriter.initProject` is called but a `specd.yaml` already exists at the target path and `force` is not set.
 
 ```typescript
 import { AlreadyInitialisedError } from '@specd/core'
@@ -129,7 +129,7 @@ import { AlreadyInitialisedError } from '@specd/core'
 // Message: "Project already initialised at '<configPath>'"
 ```
 
-**Thrown by:** `InitProject`.
+**Thrown by:** `ConfigWriter.initProject` (`FsConfigWriter`).
 
 ---
 

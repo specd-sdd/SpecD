@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Consumers of `@specd/core` need a single, stable entry point that exposes every use case without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface, which defines the contract between `@specd/core` and its consumers.
+Consumers of `@specd/core` need a single, stable entry point that exposes domain use cases without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles lifecycle, spec, and project-query use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Config mutation (`initProject`, `addPlugin`, `removePlugin`) is outside the kernel — delivery mechanisms use `createConfigWriter()` instead.
 
 ## Requirements
 
@@ -12,9 +12,9 @@ The `Kernel` interface organises use cases into three groups that mirror the dom
 
 - `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
 - `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
-- `project` — use cases that operate on the project configuration (init, add plugin, remove plugin, list workspaces, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot including `plugins`, get metadata, update metadata)
+- `project` — use cases that query project configuration (list workspaces, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot including `plugins`, get metadata, update metadata)
 
-Plugin declaration listing is not a kernel use case — declarations are config data on the `getConfig` snapshot.
+Plugin declaration listing is not a kernel use case — declarations are config data on the `getConfig` snapshot. Config file mutation is not a kernel use case — delivery uses `createConfigWriter()`.
 
 Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
 
@@ -158,9 +158,6 @@ The following table is the exhaustive mapping between kernel paths and use case 
 
 | Kernel path                 | Use case class          | Spec                                                               | Description                                                   |
 | --------------------------- | ----------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------- |
-| `project.init`              | `InitProject`           | [core:init-project](../init-project/spec.md)                       | Initialises a new specd project                               |
-| `project.addPlugin`         | `AddPlugin`             | [core:config-writer-port](../config-writer-port/spec.md)           | Adds or updates a plugin declaration in `specd.yaml`          |
-| `project.removePlugin`      | `RemovePlugin`          | [core:config-writer-port](../config-writer-port/spec.md)           | Removes a plugin declaration from `specd.yaml`                |
 | `project.listWorkspaces`    | `ListWorkspaces`        | [core:list-workspaces](../list-workspaces/spec.md)                 | Lists configured workspace IDs                                |
 | `project.getProjectContext` | `GetProjectContext`     | [core:get-project-context](../get-project-context/spec.md)         | Compiles the project-level context block                      |
 | `project.getConfig`         | `GetConfig`             | [core:get-config](../get-config/spec.md)                           | Returns the readonly construction-time `SpecdConfig` snapshot |
@@ -173,10 +170,20 @@ Declared plugins are part of the readonly `SpecdConfig` snapshot exposed by `ker
 
 `kernel.project` MUST NOT expose `listPlugins` or any equivalent listing use case for plugin declarations. The `ListPlugins` application use case is not part of the public kernel surface.
 
+### Requirement: Config mutation is not a kernel use case
+
+Operations that create or mutate `specd.yaml` (`initProject`, `addPlugin`, `removePlugin`) MUST NOT appear on `kernel.project` or anywhere on the `Kernel` interface. Delivery mechanisms and hosts that need to write config MUST call `createConfigWriter()` from the composition layer and invoke the corresponding port methods.
+
+`InitProject`, `AddPlugin`, and `RemovePlugin` application use case classes are not part of the public `@specd/core` surface after this change.
+
+### Requirement: Kernel is a plain object, not a class
+
+`createKernel` returns a plain object literal conforming to the `Kernel` interface. The kernel has no internal state, no lifecycle methods, and no event system. It is a one-shot wiring of use cases — once created, it is immutable.
+
 ## Examples
 
 ```typescript
-import { createKernel, createConfigLoader } from '@specd/core'
+import { createKernel, createConfigLoader, createConfigWriter } from '@specd/core'
 
 const config = await createConfigLoader({ projectRoot: process.cwd() }).load()
 const kernel = createKernel(config)
@@ -190,36 +197,23 @@ const change = await kernel.changes.create.execute({
 // Check its status
 const status = await kernel.changes.status.execute({ name: 'add-oauth-login' })
 
-// Transition through the lifecycle
-await kernel.changes.transition.execute({ name: 'add-oauth-login', to: 'specifying' })
-
-// List all active changes
-const active = await kernel.changes.list.execute()
-
 // List all specs across workspaces
 const specs = await kernel.specs.list.execute()
 
-// Get structured context for a spec with transitive dependencies
-const ctx = await kernel.specs.getContext.execute({
-  specId: 'core:change',
-  depth: 2,
-})
-
-// Initialise a new project
-await kernel.project.init.execute({
+// Initialise a new project (config mutation — not via kernel)
+const writer = createConfigWriter()
+await writer.initProject({
   projectRoot: '/path/to/project',
   schemaRef: '@specd/schema-std',
+  workspaceId: 'default',
+  specsPath: 'specs/',
 })
 ```
 
-### Requirement: Kernel is a plain object, not a class
-
-`createKernel` returns a plain object literal conforming to the `Kernel` interface. The kernel has no internal state, no lifecycle methods, and no event system. It is a one-shot wiring of use cases — once created, it is immutable.
-
 ## Constraints
 
-- The `Kernel` interface is the only way delivery mechanisms should access use cases — direct use case construction is reserved for tests and the composition layer's own factories
-- Adding a use case to `application/use-cases/` without adding it to the `Kernel` interface is a spec violation
+- The `Kernel` interface is the mandatory entry point for domain use cases exposed on the kernel — config mutation uses `createConfigWriter()` instead
+- Adding a domain use case to `application/use-cases/` without adding it to the `Kernel` interface is a spec violation unless it is a config I/O operation covered by `ConfigWriter`
 - Removing a use case from the `Kernel` interface is a breaking change and must follow the breaking change commit convention
 - The kernel must not contain business logic — it is purely a wiring and grouping mechanism
 - `createKernelInternals` is not exported from `@specd/core` — it is internal to the composition layer
@@ -259,7 +253,6 @@ await kernel.project.init.execute({
 - [`core:validate-specs`](../validate-specs/spec.md)
 - [`core:generate-metadata`](../generate-metadata/spec.md)
 - [`core:get-spec-context`](../get-spec-context/spec.md)
-- [`core:init-project`](../init-project/spec.md)
 - [`core:config-writer-port`](../config-writer-port/spec.md)
 - [`core:list-workspaces`](../list-workspaces/spec.md)
 - [`core:get-project-context`](../get-project-context/spec.md)

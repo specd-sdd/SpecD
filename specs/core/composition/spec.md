@@ -2,13 +2,15 @@
 
 ## Purpose
 
-Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. CLI, MCP, and plugin adapters interact exclusively with this layer.
+Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.
 
 ## Requirements
 
 ### Requirement: Use-case factories are the unit of composition
 
-The composition layer exposes one factory function per use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.
+The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.
+
+Config I/O is an exception: `createConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes.
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
@@ -62,6 +64,21 @@ The builder is part of the public composition surface. It MUST NOT introduce a s
 
 `ConfigLoader` is defined in `application/ports/config-loader.ts` as an interface. It has a single method `load(): Promise<SpecdConfig>`. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`, with local values taking precedence. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer.
 
+### Requirement: ConfigWriter is an application port
+
+`ConfigWriter` is defined in `application/ports/config-writer.ts` as an interface. It exposes `initProject`, `addPlugin`, and `removePlugin` for mutating `specd.yaml`. The `FsConfigWriter` implementation performs filesystem and YAML I/O. Delivery mechanisms obtain a wired instance via `createConfigWriter()` — they MUST NOT construct `FsConfigWriter` directly.
+
+`createConfigWriter()` MUST support:
+
+- `createConfigWriter()` — constructs the default filesystem-backed writer
+- `createConfigWriter(options)` — accepts a pre-built `ConfigWriter` for tests
+
+Both signatures are public exports from `@specd/core`.
+
+### Requirement: Config mutation is not wired into createKernel
+
+`createKernel` MUST NOT instantiate `ConfigWriter`, `InitProject`, `AddPlugin`, or `RemovePlugin`. Config mutation operations are reached only through `createConfigWriter()`. The kernel groups domain use cases — not yaml editing.
+
 ### Requirement: SpecdConfig is a plain typed object
 
 `SpecdConfig` is a plain TypeScript interface with no methods. It represents the fully resolved configuration for a project. The kernel and use-case factories accept it but do not know how it was produced. `SpecdConfig` is defined in `domain/` or `application/` — not in `infrastructure/` or `composition/`.
@@ -90,8 +107,8 @@ The fields `artifactRules` and `workflow` (project-level hook additions) are no 
 - `composition/` is the only directory in `@specd/core` permitted to import from `infrastructure/`
 - Concrete adapter classes (`FsSpecRepository`, `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`, `FsSchemaRegistry`, etc.) must not appear in `src/index.ts` or any re-export chain
 - Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) must not appear in `src/index.ts`
-- Use-case factories and the kernel are the only composition exports in `src/index.ts`
-- `ConfigLoader` implementations live in `infrastructure/`; the port interface lives in `application/ports/`
+- Use-case factories, `createConfigLoader`, `createConfigWriter`, and the kernel are the composition exports in `src/index.ts`
+- `ConfigLoader` and `ConfigWriter` implementations live in `infrastructure/`; the port interfaces live in `application/ports/`
 - The kernel groups use cases under domain-area namespaces — use cases are not properties at the top level of the kernel object
 - Both call signatures of every use-case factory must be public exports
 
@@ -99,6 +116,7 @@ The fields `artifactRules` and `workflow` (project-level hook additions) are no 
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
 - [`core:resolve-schema`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
+- [`core:config-writer-port`](../config-writer-port/spec.md) — `createConfigWriter` factory surface
 
 ## ADRs
 

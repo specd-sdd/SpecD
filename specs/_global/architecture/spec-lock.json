@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "default:docs/core/config-writer.md"
+    },
+    {
+      "file": "default:docs/core/get-config.md"
+    },
+    {
+      "file": "default:docs/core/overview.md"
+    },
+    {
+      "file": "default:docs/core/use-cases.md"
+    },
+    {
+      "file": "default:docs/core/errors.md"
+    }
+  ]
+}

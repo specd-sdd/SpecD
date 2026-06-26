@@ -51,6 +51,27 @@
 - **WHEN** `addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
 - **THEN** the existing entry is updated
 
+### Requirement: RemovePlugin
+
+#### Scenario: Removes plugin from agents array
+
+- **GIVEN** `specd.yaml` with `plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }`
+- **WHEN** `removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')` is called
+- **THEN** the plugin is removed from `plugins.agents`
+
+### Requirement: Delivery access via createConfigWriter
+
+#### Scenario: Delivery obtains writer via composition factory
+
+- **WHEN** a CLI command needs to mutate `specd.yaml`
+- **THEN** it calls `createConfigWriter()` from `@specd/core`
+- **AND** it invokes `initProject`, `addPlugin`, or `removePlugin` on the returned instance
+
+#### Scenario: Delivery does not construct FsConfigWriter directly
+
+- **WHEN** `@specd/cli` imports from `@specd/core` for config mutation
+- **THEN** it imports `createConfigWriter` — not `FsConfigWriter`
+
 ### Requirement: InitProject method signature
 
 #### Scenario: initProject accepts InitProjectOptions

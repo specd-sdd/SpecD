@@ -29,9 +29,6 @@ import { SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js
 import { InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
 import { GetActiveSchema } from '../application/use-cases/get-active-schema.js'
 import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
-import { InitProject } from '../application/use-cases/init-project.js'
-import { AddPlugin } from '../application/use-cases/add-plugin.js'
-import { RemovePlugin } from '../application/use-cases/remove-plugin.js'
 import { GetProjectContext } from '../application/use-cases/get-project-context.js'
 import { GetConfig } from '../application/use-cases/get-config.js'
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
@@ -126,9 +123,6 @@ export interface Kernel {
     getContext: GetSpecContext
   }
   project: {
-    init: InitProject
-    addPlugin: AddPlugin
-    removePlugin: RemovePlugin
     listWorkspaces: ListWorkspaces
     getProjectContext: GetProjectContext
     getConfig: GetConfig
@@ -346,9 +340,6 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       getContext: new GetSpecContext(listWorkspaces, i.hasher),
     },
     project: {
-      init: new InitProject(i.configWriter),
-      addPlugin: new AddPlugin(i.configWriter),
-      removePlugin: new RemovePlugin(i.configWriter),
       listWorkspaces,
       getProjectContext: new GetProjectContext(
         listWorkspaces,

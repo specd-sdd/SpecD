@@ -15,6 +15,7 @@ export {
 export { createSchemaRegistry } from './schema-registry.js'
 export { createSchemaRepository } from './schema-repository.js'
 export { createConfigLoader, type FsConfigLoaderOptions } from './config-loader.js'
+export { createConfigWriter, type FsConfigWriterOptions } from './config-writer.js'
 export { createVcsAdapter } from './vcs-adapter.js'
 export { GitVcsAdapter } from '../infrastructure/git/vcs-adapter.js'
 export { HgVcsAdapter } from '../infrastructure/hg/vcs-adapter.js'
