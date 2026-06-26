@@ -8,7 +8,7 @@ AI agents entering a lifecycle step need relevant spec content and project conte
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
+`CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `LifecycleEngine`, and a yaml-derived `CompileContextConfig` default snapshot.
 
 ```typescript
 class CompileContext {
@@ -21,9 +21,12 @@ class CompileContext {
     hasher: ContentHasher,
     previewSpec: PreviewSpec,
     lifecycle: LifecycleEngine,
+    defaultConfig: CompileContextConfig,
   )
 }
 ```
+
+The `defaultConfig` value MUST be produced from the resolved `SpecdConfig` at kernel composition time (via the internal composition helper). It MUST include project-level `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace context patterns, `projectRoot`, and `configPath`. It MUST NOT include per-call runtime overrides such as `contextMode` or `llmOptimizedContext` unless those are the yaml defaults.
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
@@ -37,12 +40,25 @@ class CompileContext {
 
 - `name` — the change name to compile context for
 - `step` — the lifecycle step name being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`)
-- `config` — the resolved project configuration containing `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace `contextIncludeSpecs` / `contextExcludeSpecs`, and `contextMode`
+- `contextMode` (optional) — runtime override for display mode (`'list'`, `'summary'`, `'full'`, `'hybrid'`). When absent, the baked default from construction is used.
+- `llmOptimizedContext` (optional) — runtime override for whether optimized context is preferred. When absent, the baked default from construction is used.
 - `includeChangeSpecs` (optional, default `false`) — when `true`, directly seeds `change.specIds` into the collected set. When `false`, direct seeding is skipped; the same specs may still be included through include patterns, `change.specDependsOn`, or `dependsOn` traversal.
 - `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1-4 are included.
 - `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct dependencies only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
 - `sections` (optional) — when present, restricts the metadata-derived content rendered for each full-mode spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, full-mode specs are rendered from their artifact files rather than from metadata sections. `sections` applies only to full-mode spec content — it does not affect list-mode specs, summary-mode specs, project context entries, or available steps.
 - `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint.
+
+`CompileContext.execute` MUST NOT accept a `config` field. Yaml-derived configuration is read from the construction-time default snapshot only.
+
+### Requirement: Baked default configuration merge
+
+At the start of `execute`, `CompileContext` MUST build the effective `CompileContextConfig` by shallow-merging the construction-time default snapshot with any runtime overrides present on the input:
+
+- `contextMode` from input overrides the baked default when provided
+- `llmOptimizedContext` from input overrides the baked default when provided
+- all other `CompileContextConfig` fields (`context`, include/exclude patterns, per-workspace patterns, `projectRoot`, `configPath`) MUST come from the baked default unless a future change explicitly adds additional runtime override fields
+
+Hosts MUST NOT pass yaml-derived configuration on each call. They pass runtime overrides only.
 
 ### Requirement: Caller-owned implementation tracking refresh
 

@@ -1001,27 +1001,37 @@ Artifact instructions and hook instructions are separate concerns handled by `Ge
 
 **Constructor:**
 
+Yaml-derived defaults are baked at construction time via `defaultConfig: CompileContextConfig`
+(produced by the composition-internal `buildCompileContextConfig` helper from `SpecdConfig`).
+Hosts pass only runtime overrides on `execute`.
+
 ```typescript
 new CompileContext(
   changes: ChangeRepository,
-  specs: ReadonlyMap<string, SpecRepository>,
+  listWorkspaces: ListWorkspaces,
   schemaProvider: SchemaProvider,
   files: FileReader,
   parsers: ArtifactParserRegistry,
   hasher: ContentHasher,
+  previewSpec: PreviewSpec,
+  extractorTransforms: ExtractorTransformRegistry,
+  workspaceRoutes: readonly WorkspaceRoute[],
+  lifecycleEngine: LifecycleEngine,
+  defaultConfig: CompileContextConfig,
 )
 ```
 
 **Input:**
 
-| Field        | Type                         | Required | Description                                                                                         |
-| ------------ | ---------------------------- | -------- | --------------------------------------------------------------------------------------------------- |
-| `name`       | `string`                     | yes      | The change name to compile context for.                                                             |
-| `step`       | `string`                     | yes      | The lifecycle step being entered (e.g. `'designing'`, `'implementing'`).                            |
-| `config`     | `CompileContextConfig`       | yes      | Resolved project configuration subset.                                                              |
-| `followDeps` | `boolean`                    | no       | When `true`, performs the `dependsOn` transitive traversal (step 5).                                |
-| `depth`      | `number`                     | no       | Limits `dependsOn` traversal depth. Only meaningful with `followDeps`.                              |
-| `sections`   | `ReadonlyArray<SpecSection>` | no       | Restricts metadata sections rendered per full-mode spec: `'rules'`, `'constraints'`, `'scenarios'`. |
+| Field                 | Type                                        | Required | Description                                                                                         |
+| --------------------- | ------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `name`                | `string`                                    | yes      | The change name to compile context for.                                                             |
+| `step`                | `string`                                    | yes      | The lifecycle step being entered (e.g. `'designing'`, `'implementing'`).                            |
+| `contextMode`         | `'list' \| 'summary' \| 'full' \| 'hybrid'` | no       | Runtime override for display mode; falls back to construction-time default.                         |
+| `llmOptimizedContext` | `boolean`                                   | no       | Runtime override for optimized-context preference; falls back to construction-time default.         |
+| `followDeps`          | `boolean`                                   | no       | When `true`, performs the `dependsOn` transitive traversal (step 5).                                |
+| `depth`               | `number`                                    | no       | Limits `dependsOn` traversal depth. Only meaningful with `followDeps`.                              |
+| `sections`            | `ReadonlyArray<SpecSection>`                | no       | Restricts metadata sections rendered per full-mode spec: `'rules'`, `'constraints'`, `'scenarios'`. |
 
 **`CompileContextConfig`:**
 
@@ -1030,7 +1040,8 @@ interface CompileContextConfig {
   context?: Array<{ instruction: string } | { file: string }>
   contextIncludeSpecs?: string[]
   contextExcludeSpecs?: string[]
-  contextMode?: 'full' | 'lazy' // default: 'lazy'
+  contextMode?: 'list' | 'summary' | 'full' | 'hybrid' // default: 'summary'
+  llmOptimizedContext?: boolean
   workspaces?: Record<
     string,
     {
@@ -1041,7 +1052,7 @@ interface CompileContextConfig {
 }
 ```
 
-In `'lazy'` mode, specs from `specIds` and `specDependsOn` are rendered in full; all other matched specs are rendered as summaries (title and description only). In `'full'` mode, all specs are rendered with full content.
+In `'summary'` mode, specs from `specIds` and `specDependsOn` are rendered in full when `contextMode` is `'hybrid'`; all other matched specs are rendered as summaries (title and description only). In `'full'` mode, all specs are rendered with full content.
 
 **Returns:** `Promise<CompileContextResult>`
 
@@ -1093,24 +1104,30 @@ Compiles the project-level context block without a specific change or lifecycle 
 
 **Constructor:**
 
+Yaml-derived defaults are baked at construction time via `defaultConfig: CompileContextConfig`.
+
 ```typescript
 new GetProjectContext(
-  specs: ReadonlyMap<string, SpecRepository>,
+  listWorkspaces: ListWorkspaces,
   schemaProvider: SchemaProvider,
   files: FileReader,
   parsers: ArtifactParserRegistry,
   hasher: ContentHasher,
+  extractorTransforms: ExtractorTransformRegistry,
+  workspaceRoutes: readonly WorkspaceRoute[],
+  defaultConfig: CompileContextConfig,
 )
 ```
 
 **Input:**
 
-| Field        | Type                         | Required | Description                                                            |
-| ------------ | ---------------------------- | -------- | ---------------------------------------------------------------------- |
-| `config`     | `CompileContextConfig`       | yes      | Resolved project configuration.                                        |
-| `followDeps` | `boolean`                    | no       | Follows `dependsOn` links from included specs. Default: `false`.       |
-| `depth`      | `number`                     | no       | Limits traversal depth. Only meaningful with `followDeps`.             |
-| `sections`   | `ReadonlyArray<SpecSection>` | no       | Restricts sections rendered per spec. Same values as `CompileContext`. |
+| Field                 | Type                                        | Required | Description                                                                 |
+| --------------------- | ------------------------------------------- | -------- | --------------------------------------------------------------------------- |
+| `contextMode`         | `'list' \| 'summary' \| 'full' \| 'hybrid'` | no       | Runtime override for display mode; falls back to construction-time default. |
+| `llmOptimizedContext` | `boolean`                                   | no       | Runtime override for optimized-context preference.                          |
+| `followDeps`          | `boolean`                                   | no       | Follows `dependsOn` links from included specs. Default: `false`.            |
+| `depth`               | `number`                                    | no       | Limits traversal depth. Only meaningful with `followDeps`.                  |
+| `sections`            | `ReadonlyArray<SpecSection>`                | no       | Restricts sections rendered per spec. Same values as `CompileContext`.      |
 
 **Returns:** `Promise<GetProjectContextResult>`
 

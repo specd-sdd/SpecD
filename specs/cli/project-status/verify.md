@@ -73,6 +73,24 @@
 - **WHEN** `specd project status --context` is run
 - **THEN** it displays the optimized context content
 
+#### Scenario: CLI does not build CompileContextConfig inline for --context
+
+- **WHEN** `specd project status --context` is run
+- **THEN** the command does not construct a `CompileContextConfig` object from `SpecdConfig`
+- **AND** it invokes `GetProjectContext.execute` with runtime overrides only
+
+#### Scenario: Primary context call uses baked defaults
+
+- **GIVEN** `specd project status --context` is executed
+- **WHEN** the handler loads project context
+- **THEN** it calls `GetProjectContext.execute({})` first
+
+#### Scenario: Raw spec catalogue uses llmOptimizedContext override when optimized context is fresh
+
+- **GIVEN** `llmOptimizedContext` is enabled and optimized project context is fresh
+- **WHEN** `specd project status --context` is executed
+- **THEN** it calls `GetProjectContext.execute({ llmOptimizedContext: false })` to obtain the raw spec id list
+
 ### Requirement: Optimization warning signal
 
 #### Scenario: Displays warning when project cache is stale

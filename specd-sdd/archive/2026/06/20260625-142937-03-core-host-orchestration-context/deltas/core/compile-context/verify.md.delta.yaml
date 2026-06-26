@@ -1,0 +1,59 @@
+- op: removed
+  description: Replace constructor scenario with default-config version
+  selector:
+    type: section
+    matches: 'Scenario: CompileContext is constructed with LifecycleEngine'
+
+- op: added
+  description: Verify defaultConfig is accepted at construction
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Ports and constructor'
+  content: |
+    #### Scenario: CompileContext is constructed with LifecycleEngine and default config
+
+    - **WHEN** `CompileContext` is assembled from a resolved `SpecdConfig`
+    - **THEN** it receives `PreviewSpec`, `LifecycleEngine`, and a yaml-derived `CompileContextConfig` default snapshot alongside its existing repositories and utilities
+
+- op: modified
+  description: Update input scenarios for runtime overrides only
+  selector:
+    type: section
+    matches: 'Requirement: Input'
+  content: |
+    #### Scenario: Input accepts runtime overrides without config
+
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** it accepts the change name, target step, and optional runtime overrides such as `contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+    - **AND** it does not accept a `config` field
+
+    #### Scenario: Runtime contextMode overrides baked default
+
+    - **GIVEN** `CompileContext` was constructed with `contextMode: 'summary'` in its default snapshot
+    - **WHEN** `execute` is called with `contextMode: 'full'`
+    - **THEN** specs are rendered using full mode
+
+- op: added
+  description: Verify baked default merge semantics
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input'
+  content: |
+    ### Requirement: Baked default configuration merge
+
+    #### Scenario: Yaml-derived fields come from construction default
+
+    - **GIVEN** `CompileContext` was constructed with project-level include patterns in its default snapshot
+    - **WHEN** `execute` is called without `contextMode` or `llmOptimizedContext` overrides
+    - **THEN** context collection uses the baked include/exclude patterns and yaml `contextMode`
+
+    #### Scenario: llmOptimizedContext runtime override wins over baked default
+
+    - **GIVEN** the baked default has `llmOptimizedContext: false`
+    - **WHEN** `execute` is called with `llmOptimizedContext: true`
+    - **THEN** optimized context is preferred when available

@@ -1,0 +1,695 @@
+{
+  "name": "03-core-host-orchestration-context",
+  "createdAt": "2026-06-25T14:29:37.113Z",
+  "description": "P1a: bake CompileContextConfig defaults in kernel; hosts pass runtime overrides only",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:compile-context",
+    "core:get-project-context",
+    "cli:change-context",
+    "cli:project-context",
+    "cli:project-status"
+  ],
+  "specDependsOn": {
+    "core:compile-context": [
+      "core:change",
+      "core:config",
+      "core:spec-metadata",
+      "core:schema-format",
+      "core:delta-format",
+      "core:selector-model",
+      "core:spec-id-format",
+      "core:workspace",
+      "core:get-artifact-instruction",
+      "core:get-hook-instructions",
+      "core:preview-spec",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:core/project-metadata"
+    ],
+    "core:get-project-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:core/project-metadata"
+    ],
+    "cli:change-context": [
+      "cli:entrypoint",
+      "cli:change-spec-preview",
+      "core:compile-context",
+      "core:config",
+      "core:get-artifact-instruction",
+      "core:get-hook-instructions",
+      "core:refresh-implementation-tracking"
+    ],
+    "cli:project-context": [
+      "cli:entrypoint",
+      "core:get-project-context",
+      "core:compile-context",
+      "core:config"
+    ],
+    "cli:project-status": [
+      "core:list-workspaces",
+      "core:list-drafts",
+      "core:list-changes",
+      "core:get-project-context"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/composition/build-compile-context-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/merge-compile-context-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/build-compile-context-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/merge-compile-context-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/traversal/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "approval-system-notes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/project-status.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/composition/build-compile-context-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildCompileContextConfig"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/_shared/merge-compile-context-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["mergeCompileContextRuntimeOverrides"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CompileContext", "CompileContextInput"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/composition/use-cases/compile-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createCompileContext"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createKernel"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetProjectContext", "GetProjectContextInput"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/composition/use-cases/get-project-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetProjectContext"]
+    },
+    {
+      "specId": "cli:change-context",
+      "file": "packages/cli/src/commands/change/context.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-context",
+      "file": "packages/cli/src/commands/project/context.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/test/composition/build-compile-context-config.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/test/application/use-cases/_shared/merge-compile-context-config.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-context",
+      "file": "packages/cli/test/commands/change-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-context",
+      "file": "packages/cli/test/commands/project-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectStatus"]
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/test/commands/project-status.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:2cd9c833b942fbbee9582c368527072316e444ab98e531bb1a2610512eead0db"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eba12eccd5c46d9a750994647b0fb1e4abecb66a9a3f576948a38e9ada71e1a9"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b861ea8849adef92f803c3ee930085d285ad3501aefd0b37e895a6b1f27b70a4"
+        },
+        {
+          "key": "cli:change-context",
+          "filename": "deltas/cli/change-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60741cddecd096908dd0ec55c8dc575a0f00e99d44517ba67fba4197d316a121"
+        },
+        {
+          "key": "cli:project-context",
+          "filename": "deltas/cli/project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:65fc60c5bd674c4d7135f0e13ea8b3ccfba6b9ae73f468f2e3436927b809733d"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:baaa179a349f6d2f7e6b951bb0f80fcaeaeacf1a0b6843535329e9b7a307258f"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:42416c6aa7bb4f6d61281e234d6cc3c69cc109efe14a98d4b4813029c3b9bded"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:058b31f99ed9d52dd5dc05f607bbe38f1a4b78fc5e734b0177d91f6dba160869"
+        },
+        {
+          "key": "cli:change-context",
+          "filename": "deltas/cli/change-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3273016d18d276cf9e1b6bfe3b7bc0f5476004112da04a308956c3cfa440fca6"
+        },
+        {
+          "key": "cli:project-context",
+          "filename": "deltas/cli/project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e58435ce54268bb4b5975cc431a36104eb86ba1f4dd8b436096d3daf0e87ae46"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a6b083eba7a483a6d4edbe9ac0d109eda18ae9aeecb494cc6bfa2425f3a1ede9"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:d453f72c1f542e7adefa25e896d1866baed51e79570508aa99b758327f7193f2"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:bb12d348bf60d67ce219bb35855ecade76bf1695da47717218cc7de0cf805d2d"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-25T14:29:37.113Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:compile-context",
+        "core:get-project-context",
+        "cli:change-context",
+        "cli:project-context"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-25T14:29:37.194Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-context"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T16:28:05.261Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T16:34:20.234Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T21:48:29.464Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T21:58:20.467Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T06:35:31.783Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:change-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:change-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:35:31.783Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T06:35:43.142Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:change-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:change-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-26T06:35:43.145Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:38:38.795Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:39:15.896Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:42:54.888Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:48:08.009Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:48:15.590Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-26T06:50:01.871Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:compile-context\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-26T06:50:16.517Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:project-status': extracted dependencies [core:list-workspaces, core:list-drafts, core:list-changes, core:get-project-context] do not match persisted dependencies [core:list-workspaces, core:list-drafts, core:list-changes]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:51:01.765Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-26T06:51:01.829Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

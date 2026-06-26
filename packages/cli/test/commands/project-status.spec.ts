@@ -123,5 +123,91 @@ describe('project status', () => {
       expect(out).toContain('Line 3')
       expect(out).toContain('Line 4')
     })
+
+    it('does not pass inline CompileContextConfig on getProjectContext.execute', async () => {
+      const { kernel } = setup()
+      kernel.project.listWorkspaces.execute.mockResolvedValue([])
+      kernel.changes.list.execute.mockResolvedValue([])
+      kernel.changes.listDrafts.execute.mockResolvedValue([])
+      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      kernel.project.getProjectContext.execute.mockResolvedValue({
+        contextEntries: [],
+        specs: [],
+        warnings: [],
+      })
+
+      const program = makeProgram()
+      registerProjectStatus(program.command('project'))
+      await program.parseAsync(['node', 'specd', 'project', 'status', '--context'])
+
+      for (const call of kernel.project.getProjectContext.execute.mock.calls) {
+        expect(call[0]).not.toHaveProperty('config')
+      }
+    })
+
+    it('calls getProjectContext.execute({}) for primary context assembly', async () => {
+      const { kernel } = setup()
+      kernel.project.listWorkspaces.execute.mockResolvedValue([])
+      kernel.changes.list.execute.mockResolvedValue([])
+      kernel.changes.listDrafts.execute.mockResolvedValue([])
+      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+      kernel.project.getProjectContext.execute.mockResolvedValue({
+        contextEntries: ['Raw'],
+        specs: [
+          {
+            specId: 'default:a',
+            title: 'A',
+            description: '',
+            source: 'includePattern',
+            mode: 'summary',
+          },
+        ],
+        warnings: [],
+      })
+
+      const program = makeProgram()
+      registerProjectStatus(program.command('project'))
+      await program.parseAsync(['node', 'specd', 'project', 'status', '--context'])
+
+      expect(kernel.project.getProjectContext.execute.mock.calls[0]![0]).toEqual({})
+    })
+
+    it('calls getProjectContext.execute({ llmOptimizedContext: false }) for raw spec catalogue when optimized context is fresh', async () => {
+      const { config, kernel } = setup()
+      Object.assign(config, { llmOptimizedContext: true })
+      kernel.project.listWorkspaces.execute.mockResolvedValue([])
+      kernel.changes.list.execute.mockResolvedValue([])
+      kernel.changes.listDrafts.execute.mockResolvedValue([])
+      kernel.changes.listDiscarded.execute.mockResolvedValue([])
+
+      kernel.project.getProjectContext.execute
+        .mockResolvedValueOnce({
+          contextEntries: ['**Optimized**'],
+          specs: [],
+          warnings: [],
+        })
+        .mockResolvedValueOnce({
+          contextEntries: [],
+          specs: [
+            {
+              specId: 'default:auth/login',
+              title: 'Login',
+              description: '',
+              source: 'includePattern' as const,
+              mode: 'summary' as const,
+            },
+          ],
+          warnings: [],
+        })
+
+      const program = makeProgram()
+      registerProjectStatus(program.command('project'))
+      await program.parseAsync(['node', 'specd', 'project', 'status', '--context'])
+
+      expect(kernel.project.getProjectContext.execute).toHaveBeenCalledTimes(2)
+      expect(kernel.project.getProjectContext.execute.mock.calls[1]![0]).toEqual({
+        llmOptimizedContext: false,
+      })
+    })
   })
 })

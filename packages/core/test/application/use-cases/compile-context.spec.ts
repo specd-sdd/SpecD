@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   CompileContext,
   type CompileContextConfig,
+  type CompileContextInput,
   type CompileContextResult,
 } from '../../../src/application/use-cases/compile-context.js'
 import { type PreviewSpec } from '../../../src/application/use-cases/preview-spec.js'
@@ -31,6 +32,7 @@ import {
 import { type ExtractorTransformRegistry } from '../../../src/domain/services/content-extraction.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
+import { LifecycleEngine } from '../../../src/domain/services/lifecycle-engine.js'
 import {
   makeChangeRepository,
   makeListWorkspaces,
@@ -188,6 +190,56 @@ const noOp: CompileContextConfig = {
   contextExcludeSpecs: [],
 }
 
+/** Test-only execute input retaining legacy per-call `config` for gradual migration. */
+type LegacyCompileContextInput = CompileContextInput & { config?: CompileContextConfig }
+
+/**
+ * Allows unit tests to keep passing inline `config` until callsites move to constructor defaults.
+ *
+ * @param sut - Use case under test
+ * @param rebuild - Factory that clones the use case with a different default config
+ */
+function patchLegacyConfigExecute(
+  sut: CompileContext,
+  rebuild: (config: CompileContextConfig) => CompileContext,
+): void {
+  const base = sut.execute.bind(sut)
+  sut.execute = ((input: LegacyCompileContextInput) => {
+    const { config, ...rest } = input
+    if (config !== undefined) {
+      return rebuild(config).execute(rest)
+    }
+    return base(rest)
+  }) as CompileContext['execute']
+}
+
+function createCompileContextForTest(
+  changeRepo: ChangeRepository,
+  listWorkspaces: ReturnType<typeof makeListWorkspaces>,
+  schemaProvider: SchemaProvider,
+  fileReader: FileReader,
+  parsers: ArtifactParserRegistry,
+  hasher: ReturnType<typeof makeContentHasher>,
+  previewSpec: PreviewSpec,
+  extractorTransforms: ExtractorTransformRegistry,
+  workspaceRoutes: readonly { workspace: string; prefixSegments: readonly string[] }[],
+  defaultConfig: CompileContextConfig,
+): CompileContext {
+  return new CompileContext(
+    changeRepo,
+    listWorkspaces,
+    schemaProvider,
+    fileReader,
+    parsers,
+    hasher,
+    previewSpec,
+    extractorTransforms,
+    workspaceRoutes,
+    new LifecycleEngine(() => undefined),
+    defaultConfig,
+  )
+}
+
 const defaultExtraction: import('../../../src/domain/value-objects/metadata-extraction.js').MetadataExtraction =
   {
     description: {
@@ -269,7 +321,9 @@ function makeSut(opts: {
     prefixSegments: readonly string[]
   }[]
 }): {
-  sut: CompileContext
+  sut: CompileContext & {
+    execute: (input: LegacyCompileContextInput) => Promise<CompileContextResult>
+  }
   changeRepo: ChangeRepository
   schemaProvider: SchemaProvider
 } {
@@ -284,21 +338,46 @@ function makeSut(opts: {
 
   const changeRepo = makeStubChangeRepo(change)
   const schemaProvider = makeStubSchemaProvider(schema ?? null)
+  const listWorkspaces = makeListWorkspaces(
+    (specRepos ?? new Map()) as unknown as Map<string, SpecRepository>,
+  )
+  const fileReaderImpl = fileReader ?? makeStubFileReader()
+  const previewSpecImpl = previewSpec ?? makeStubPreviewSpec()
+  const extractorTransformsImpl = extractorTransforms ?? new Map()
+  const workspaceRoutesImpl = workspaceRoutes ?? []
 
-  const sut = new CompileContext(
+  const sut = createCompileContextForTest(
     changeRepo,
-    makeListWorkspaces((specRepos ?? new Map()) as unknown as Map<string, SpecRepository>),
+    listWorkspaces,
     schemaProvider,
-    fileReader ?? makeStubFileReader(),
+    fileReaderImpl,
     parsers,
     makeContentHasher(),
-    previewSpec ?? makeStubPreviewSpec(),
-    extractorTransforms ?? new Map(),
-    workspaceRoutes ?? [],
+    previewSpecImpl,
+    extractorTransformsImpl,
+    workspaceRoutesImpl,
+    noOp,
+  ) as CompileContext & {
+    execute: (input: LegacyCompileContextInput) => Promise<CompileContextResult>
+  }
+
+  patchLegacyConfigExecute(sut, (cfg) =>
+    createCompileContextForTest(
+      changeRepo,
+      listWorkspaces,
+      schemaProvider,
+      fileReaderImpl,
+      parsers,
+      makeContentHasher(),
+      previewSpecImpl,
+      extractorTransformsImpl,
+      workspaceRoutesImpl,
+      cfg,
+    ),
   )
 
   const execute = sut.execute.bind(sut)
-  sut.execute = ((input) =>
+  sut.execute = ((input: LegacyCompileContextInput) =>
     execute({
       includeChangeSpecs: true,
       ...input,
@@ -339,24 +418,26 @@ function makeStubPreviewSpec(): PreviewSpec {
 describe('CompileContext', () => {
   describe('Requirement: Ports and constructor', () => {
     it('constructs without error', () => {
-      expect(
-        () =>
-          new CompileContext(
-            makeStubChangeRepo(),
-            makeListWorkspaces(new Map()),
-            makeStubSchemaProvider(null),
-            makeStubFileReader(),
-            new Map() as ArtifactParserRegistry,
-            makeContentHasher(),
-            makeStubPreviewSpec(),
-          ),
+      expect(() =>
+        createCompileContextForTest(
+          makeStubChangeRepo(),
+          makeListWorkspaces(new Map()),
+          makeStubSchemaProvider(null),
+          makeStubFileReader(),
+          new Map() as ArtifactParserRegistry,
+          makeContentHasher(),
+          makeStubPreviewSpec(),
+          new Map(),
+          [],
+          noOp,
+        ),
       ).not.toThrow()
     })
   })
 
   describe('Requirement: Input — error handling', () => {
     it('throws ChangeNotFoundError when change is not found', async () => {
-      const sut = new CompileContext(
+      const sut = createCompileContextForTest(
         makeStubChangeRepo(),
         makeListWorkspaces(new Map()),
         makeStubSchemaProvider(makeSchema()),
@@ -364,20 +445,35 @@ describe('CompileContext', () => {
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
         makeStubPreviewSpec(),
+        new Map(),
+        [],
+        noOp,
+      )
+      patchLegacyConfigExecute(sut, (cfg) =>
+        createCompileContextForTest(
+          makeStubChangeRepo(),
+          makeListWorkspaces(new Map()),
+          makeStubSchemaProvider(makeSchema()),
+          makeStubFileReader(),
+          new Map() as ArtifactParserRegistry,
+          makeContentHasher(),
+          makeStubPreviewSpec(),
+          new Map(),
+          [],
+          cfg,
+        ),
       )
       await expect(
         sut.execute({
           name: 'no-such-change',
           step: 'designing',
-
-          config: noOp,
         }),
       ).rejects.toThrow(ChangeNotFoundError)
     })
 
     it('throws SchemaNotFoundError when schema cannot be resolved', async () => {
       const change = makeChange('my-change')
-      const sut = new CompileContext(
+      const sut = createCompileContextForTest(
         makeStubChangeRepo(change),
         makeListWorkspaces(new Map()),
         makeStubSchemaProvider(null),
@@ -385,13 +481,28 @@ describe('CompileContext', () => {
         new Map() as ArtifactParserRegistry,
         makeContentHasher(),
         makeStubPreviewSpec(),
+        new Map(),
+        [],
+        noOp,
+      )
+      patchLegacyConfigExecute(sut, (cfg) =>
+        createCompileContextForTest(
+          makeStubChangeRepo(change),
+          makeListWorkspaces(new Map()),
+          makeStubSchemaProvider(null),
+          makeStubFileReader(),
+          new Map() as ArtifactParserRegistry,
+          makeContentHasher(),
+          makeStubPreviewSpec(),
+          new Map(),
+          [],
+          cfg,
+        ),
       )
       await expect(
         sut.execute({
           name: 'my-change',
           step: 'designing',
-
-          config: noOp,
         }),
       ).rejects.toThrow(SchemaNotFoundError)
     })
@@ -3395,6 +3506,51 @@ describe('CompileContext', () => {
 
       expect(result.specs[0]!.content).toContain('Optimized context rules and constraints')
       expect(result.specs[0]!.content).toContain('Scenario: Login success')
+    })
+  })
+
+  describe('Requirement: Baked default configuration merge', () => {
+    it('runtime contextMode overrides baked default without per-call config', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginContent = '# Login\n\nBody.'
+      const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
+
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
+        'auth/login/spec.md': loginContent,
+      })
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+
+      const changeRepo = makeStubChangeRepo(change)
+      const schemaProvider = makeStubSchemaProvider(schema)
+      const listWorkspaces = makeListWorkspaces(new Map([['default', specRepo]]))
+
+      const sut = createCompileContextForTest(
+        changeRepo,
+        listWorkspaces,
+        schemaProvider,
+        makeStubFileReader(),
+        new Map() as ArtifactParserRegistry,
+        makeContentHasher(),
+        makeStubPreviewSpec(),
+        new Map(),
+        [],
+        {
+          contextIncludeSpecs: ['default:auth/login'],
+          contextMode: 'summary',
+        },
+      )
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        contextMode: 'full',
+      })
+
+      expect(result.specs.every((entry) => entry.mode === 'full')).toBe(true)
+      expect(result.specs[0]!.content).toContain('Login')
     })
   })
 })

@@ -1,0 +1,29 @@
+- op: modified
+  description: CLI passes runtime overrides only; delegate section optimization to core
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.
+
+    The CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `GetProjectContext` instance at composition time.
+
+    The CLI MUST pass only runtime overrides to `GetProjectContext.execute`:
+
+    - `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `full` when yaml default is not `full`/`hybrid`)
+    - `llmOptimizedContext` only when `--optimized` or `--no-optimized` resolves a value that differs from the yaml default
+    - `followDeps`, `depth`, and `sections` from the corresponding CLI flags
+
+    Concretely, the use case:
+
+    1. Renders project `context:` entries from the baked default configuration (instruction text verbatim, file entries read from disk)
+    2. Applies project-level `contextIncludeSpecs` patterns across all workspaces (defaults to `['default:*']` when not declared in yaml)
+    3. Applies project-level `contextExcludeSpecs` patterns to remove specs from the set
+    4. Applies optional `dependsOn` traversal only when `--follow-deps` is present
+    5. Renders the collected specs according to the effective `contextMode`
+
+    When `llmOptimizedContext` is enabled in the baked default, `GetProjectContext` prefers optimized project-level content when fresh.
+
+    Optimization bypass for partial section requests is enforced by `GetProjectContext` from the forwarded `sections` input. The CLI MUST NOT recompute `llmOptimizedContext` based on section flags except via explicit `--optimized` / `--no-optimized`.
+
+    The command MUST suppress `stale-optimization` warnings when optimization is effectively bypassed (for example via `--no-optimized` or partial section requests handled in the use case).

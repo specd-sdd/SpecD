@@ -460,7 +460,8 @@ describe('change context', () => {
     ])
 
     const call = kernel.changes.compile.execute.mock.calls[0]![0]
-    expect(call.config.llmOptimizedContext).toBe(true)
+    expect(call).not.toHaveProperty('config')
+    expect(call).not.toHaveProperty('llmOptimizedContext')
   })
 
   it('passes llmOptimizedContext as false when --no-optimized is provided', async () => {
@@ -480,6 +481,28 @@ describe('change context', () => {
     ])
 
     const call = kernel.changes.compile.execute.mock.calls[0]![0]
-    expect(call.config.llmOptimizedContext).toBe(false)
+    expect(call).not.toHaveProperty('config')
+    expect(call.llmOptimizedContext).toBe(false)
+  })
+
+  it('passes llmOptimizedContext true when --optimized overrides yaml false', async () => {
+    const { kernel, config } = setup()
+    ;(config as { llmOptimizedContext?: boolean }).llmOptimizedContext = false
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--optimized',
+    ])
+
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
+    expect(call).not.toHaveProperty('config')
+    expect(call.llmOptimizedContext).toBe(true)
   })
 })

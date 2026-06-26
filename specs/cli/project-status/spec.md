@@ -87,6 +87,15 @@ In `json`/`toon` mode, the output MUST include:
 - Spec entries (which specs should be read without content)
 - `optimizedContext` (optional string, included if fresh and enabled)
 
+When assembling context references for `--context`, the command MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. It MUST invoke the kernel-wired `GetProjectContext` use case, which carries yaml-derived defaults from composition time.
+
+The command MUST call `GetProjectContext.execute` with runtime overrides only:
+
+- `execute({})` for the primary context assembly (baked yaml defaults)
+- `execute({ llmOptimizedContext: false })` when it needs the raw spec catalogue alongside fresh optimized project context (for example to populate spec reference lists without optimized spec bodies)
+
+Section-filtered optimization bypass behaviour is enforced by `GetProjectContext` / `CompileContext` from forwarded `sections` when applicable; this command does not recompute `llmOptimizedContext` from section flags.
+
 ### Requirement: Optimization warning signal
 
 The command MUST emit a `stale-optimization` warning to stderr when `llmOptimizedContext` is enabled but optimized project context is missing or stale.
@@ -112,3 +121,4 @@ When `--format toon` is provided, output MUST be TOON-formatted.
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure and repositories
 - [`core:list-drafts`](../../core/list-drafts/spec.md) — existing draft counting behavior remains part of project status
 - [`core:list-changes`](../../core/list-changes/spec.md) — existing active-change counting behavior remains part of project status
+- [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly

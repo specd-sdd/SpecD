@@ -16,7 +16,7 @@
     {
       "requirement": "Accepts GetProjectContextInput as input",
       "rules": [
-        "`execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:\n\n- `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.\n- `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.\n- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`\"rules\"`, `\"constraints\"`, `\"scenarios\"`). It has no effect for list-mode or summary-mode entries."
+        "`execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:\n\n- `contextMode` (`'list' | 'summary' | 'full' | 'hybrid'`, optional) — runtime override for display mode. When absent, the baked default from construction is used.\n- `llmOptimizedContext` (boolean, optional) — runtime override for whether optimized context is preferred. When absent, the baked default from construction is used.\n- `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.\n- `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.\n- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`\"rules\"`, `\"constraints\"`, `\"scenarios\"`). It has no effect for list-mode or summary-mode entries.\n\n`GetProjectContextInput` MUST NOT include a `config` field."
       ]
     },
     {
@@ -70,7 +70,7 @@
     {
       "requirement": "Construction dependencies",
       "rules": [
-        "`GetProjectContext` depends on the following ports/services injected via constructor:\n\n- `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces\n- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema\n- `files` (`FileReader`) — for reading context entry files from disk\n- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale\n- `hasher` (`ContentHasher`) — for comparing content hashes against metadata\n\nAll dependencies are injected at construction time. The schema is resolved lazily on first access."
+        "`GetProjectContext` depends on the following ports/services injected via constructor:\n\n- `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces\n- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema\n- `files` (`FileReader`) — for reading context entry files from disk\n- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale\n- `hasher` (`ContentHasher`) — for comparing content hashes against metadata\n- `defaultConfig` (`CompileContextConfig`) — yaml-derived project context configuration snapshot baked at kernel composition time\n\nAll dependencies are injected at construction time. The schema is resolved lazily on first access.\n\nAt the start of `execute`, `GetProjectContext` MUST build the effective `CompileContextConfig` by shallow-merging `defaultConfig` with any runtime overrides (`contextMode`, `llmOptimizedContext`) present on the input. Hosts MUST NOT pass yaml-derived configuration on each call."
       ]
     },
     {
@@ -92,17 +92,21 @@
   "scenarios": [
     {
       "requirement": "Accepts GetProjectContextInput as input",
-      "name": "Minimal input with config only",
-      "when": ["execute is called with { config: { context: [], contextIncludeSpecs: [] } }"],
-      "then": [
-        "the call succeeds and returns a result with empty contextEntries, specs, and warnings"
-      ]
+      "name": "Minimal input with no overrides",
+      "given": ["GetProjectContext was constructed with a baked default configuration"],
+      "when": ["execute is called with {}"],
+      "then": ["the call succeeds using the baked default snapshot"]
     },
     {
       "requirement": "Accepts GetProjectContextInput as input",
       "name": "Full optional input supported",
-      "when": ["execute is called with followDeps: true, depth: 2, and sections: [\"rules\"]"],
-      "then": ["the call succeeds and respects all optional parameters"]
+      "when": [
+        "execute is called with followDeps: true, depth: 2, sections: [\"rules\"], and contextMode: \"full\""
+      ],
+      "then": [
+        "the call succeeds and respects all optional parameters",
+        "AND no config field is required"
+      ]
     },
     {
       "requirement": "Accepts GetProjectContextInput as input",
@@ -319,10 +323,10 @@
     },
     {
       "requirement": "Construction dependencies",
-      "name": "Constructor accepts all required ports",
-      "when": ["GetProjectContext is instantiated"],
+      "name": "Constructor accepts all required ports and default config",
+      "when": ["GetProjectContext is instantiated from a resolved SpecdConfig"],
       "then": [
-        "it requires specs (ReadonlyMap<string, SpecRepository>), schemaProvider (SchemaProvider), files (FileReader), parsers (ArtifactParserRegistry), and hasher (ContentHasher) in its constructor"
+        "it requires listWorkspaces, schemaProvider, files, parsers, hasher, and a yaml-derived CompileContextConfig default snapshot in its constructor"
       ]
     },
     {
@@ -354,13 +358,30 @@
     "files": [
       {
         "specId": "core:get-project-context",
-        "file": "core:src/application/use-cases/_shared/project-metadata-freshness.ts"
+        "file": "core:test/application/use-cases/get-project-context.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:get-project-context",
+        "file": "core:src/application/use-cases/get-project-context.ts",
+        "symbol": "GetProjectContext"
+      },
+      {
+        "specId": "core:get-project-context",
+        "file": "core:src/application/use-cases/get-project-context.ts",
+        "symbol": "GetProjectContextInput"
+      },
+      {
+        "specId": "core:get-project-context",
+        "file": "core:src/composition/use-cases/get-project-context.ts",
+        "symbol": "createGetProjectContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:344499ff7e1c5c3f4a9b809f94461fe175e863df58c6f0552edb5eb1acfa0e7f",
-    "verify.md": "sha256:6f7b19f7e0ca932d87d80691f546dfb253eff1ea9bf227e7146f02eb00944394"
+    "spec.md": "sha256:30e3433270c6a1c799b28275537282e606b38df57b11f146f687cd20c8c3aa05",
+    "verify.md": "sha256:b57b051832b12b55098fad0f71e6379225b95c7735f3189627194294b4484cef"
   },
   "generatedBy": "core"
 }

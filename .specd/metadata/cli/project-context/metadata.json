@@ -26,7 +26,7 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.\n\nConcretely:\n\n1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)\n2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)\n3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set\n4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present\n5. The collected specs are rendered according to the configured `contextMode`\n\nBy default, if `llmOptimizedContext` is enabled in config, the command MUST prefer optimized project-level and spec-level content from fresh metadata.\n\nThe effective `llmOptimizedContext` value is overridden to `false` if `--no-optimized` is passed, or if section flags are provided that exclude either rules or constraints (e.g. only `--rules` or only `--constraints` is passed).\n\nWhen optimization is effectively enabled (including when both rules and constraints are requested or defaulted), it prefers optimized project-level and spec-level content from fresh metadata.\n\nThe command MUST suppress `stale-optimization` warnings when the effective `llmOptimizedContext` is `false` (such as when `--no-optimized` is passed, or when section flags bypass optimization)."
+        "The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.\n\nThe CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `GetProjectContext` instance at composition time.\n\nThe CLI MUST pass only runtime overrides to `GetProjectContext.execute`:\n\n- `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `full` when yaml default is not `full`/`hybrid`)\n- `llmOptimizedContext` only when `--optimized` or `--no-optimized` resolves a value that differs from the yaml default\n- `followDeps`, `depth`, and `sections` from the corresponding CLI flags\n\nConcretely, the use case:\n\n1. Renders project `context:` entries from the baked default configuration (instruction text verbatim, file entries read from disk)\n2. Applies project-level `contextIncludeSpecs` patterns across all workspaces (defaults to `['default:*']` when not declared in yaml)\n3. Applies project-level `contextExcludeSpecs` patterns to remove specs from the set\n4. Applies optional `dependsOn` traversal only when `--follow-deps` is present\n5. Renders the collected specs according to the effective `contextMode`\n\nWhen `llmOptimizedContext` is enabled in the baked default, `GetProjectContext` prefers optimized project-level content when fresh.\n\nOptimization bypass for partial section requests is enforced by `GetProjectContext` from the forwarded `sections` input. The CLI MUST NOT recompute `llmOptimizedContext` based on section flags except via explicit `--optimized` / `--no-optimized`.\n\nThe command MUST suppress `stale-optimization` warnings when optimization is effectively bypassed (for example via `--no-optimized` or partial section requests handled in the use case)."
       ]
     },
     {
@@ -74,6 +74,15 @@
       "name": "--depth without --follow-deps",
       "when": ["specd project context --depth 2 is run without --follow-deps"],
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "CLI does not build CompileContextConfig inline",
+      "when": ["specd project context is run"],
+      "then": [
+        "the command does not construct a CompileContextConfig object from SpecdConfig",
+        "AND it invokes GetProjectContext.execute with runtime overrides only"
+      ]
     },
     {
       "requirement": "Behaviour",
@@ -144,6 +153,20 @@
       "given": ["llmOptimizedContext is enabled in config"],
       "when": ["specd project context --no-optimized is run"],
       "then": ["it displays the raw project instructions", "AND it emits no optimization warnings"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "--no-optimized passed as runtime override",
+      "given": ["llmOptimizedContext: true in configuration"],
+      "when": ["specd project context --no-optimized is executed"],
+      "then": ["the CLI passes llmOptimizedContext: false on GetProjectContext.execute"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "--mode passed as runtime override",
+      "given": ["yaml contextMode: 'summary'"],
+      "when": ["specd project context --mode full is executed"],
+      "then": ["the CLI passes contextMode: 'full' on GetProjectContext.execute"]
     },
     {
       "requirement": "Behaviour",
@@ -259,17 +282,20 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:project-context",
-        "file": "cli:src/commands/project/context.ts",
-        "symbol": "registerProjectContext"
+        "file": "cli:src/commands/project/context.ts"
+      },
+      {
+        "specId": "cli:project-context",
+        "file": "cli:test/commands/project-context.spec.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:6cbd7d1cea9f6aab33c3b04d39140258e59893981bb48d751c3ac58218444a92",
-    "verify.md": "sha256:f7e36f82c08fe419b64a79dbbf249554548ea9833ee5a6fe3262a45a8e954276"
+    "spec.md": "sha256:cb14cbc467e9710517e70aeda72bd5c5576aa5e2e08dc1a3dc62fe86167fa733",
+    "verify.md": "sha256:f3edefc65ec268b32cb12d93a1cc48169f25481a70d7b2ef88ff02b4e18e6ee6"
   },
   "generatedBy": "core"
 }

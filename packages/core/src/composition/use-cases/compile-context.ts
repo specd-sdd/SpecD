@@ -1,5 +1,8 @@
 import * as path from 'node:path'
-import { CompileContext } from '../../application/use-cases/compile-context.js'
+import {
+  CompileContext,
+  type CompileContextConfig,
+} from '../../application/use-cases/compile-context.js'
 import { PreviewSpec } from '../../application/use-cases/preview-spec.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
@@ -19,6 +22,7 @@ import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { buildCompileContextConfig } from '../build-compile-context-config.js'
 
 /**
  * Domain context for the primary (default) workspace used by `CompileContext`.
@@ -56,6 +60,8 @@ export interface FsCompileContextOptions {
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Workspace routing metadata for cross-workspace spec reference resolution. */
   readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
+  /** Yaml-derived context defaults for {@link CompileContext}. */
+  readonly defaultConfig: CompileContextConfig
 }
 
 /**
@@ -132,6 +138,7 @@ export function createCompileContext(
           ),
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
+    const defaultConfig = buildCompileContextConfig(config)
     return createCompileContext(
       {
         workspace: defaultWs.name,
@@ -152,6 +159,7 @@ export function createCompileContext(
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
         workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
+        defaultConfig,
       },
     )
   }
@@ -188,5 +196,6 @@ export function createCompileContext(
     createBuiltinExtractorTransforms(),
     opts.workspaceRoutes ?? [],
     new LifecycleEngine(Logger.debug.bind(Logger)),
+    opts.defaultConfig,
   )
 }

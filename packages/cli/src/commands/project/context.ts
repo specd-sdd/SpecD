@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { type CompileContextConfig, type SpecSection } from '@specd/core'
+import { type SpecSection } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -80,28 +80,11 @@ JSON/TOON output schema:
             return config.llmOptimizedContext ?? false
           })()
 
-          const compileConfig: CompileContextConfig = {
-            projectRoot: config.projectRoot,
-            configPath: config.configPath,
-            llmOptimizedContext,
-            ...(config.context !== undefined
-              ? {
-                  context: config.context.map((e) =>
-                    'file' in e ? { file: e.file } : { instruction: e.instruction },
-                  ),
-                }
-              : {}),
-            ...(config.contextIncludeSpecs !== undefined
-              ? { contextIncludeSpecs: [...config.contextIncludeSpecs] }
-              : {}),
-            ...(config.contextExcludeSpecs !== undefined
-              ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
-              : {}),
-            ...(effectiveMode !== undefined ? { contextMode: effectiveMode } : {}),
-          }
-
           const result = await kernel.project.getProjectContext.execute({
-            config: compileConfig,
+            ...(effectiveMode !== undefined ? { contextMode: effectiveMode } : {}),
+            ...(llmOptimizedContext !== (config.llmOptimizedContext ?? false)
+              ? { llmOptimizedContext }
+              : {}),
             ...(opts.followDeps ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: opts.depth } : {}),
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),

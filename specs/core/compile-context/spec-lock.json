@@ -21,7 +21,33 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/compile-context.ts"
+      "file": "core:src/composition/build-compile-context-config.ts",
+      "symbols": ["buildCompileContextConfig"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/merge-compile-context-config.ts",
+      "symbols": ["mergeCompileContextRuntimeOverrides"]
+    },
+    {
+      "file": "core:src/application/use-cases/compile-context.ts",
+      "symbols": ["CompileContext", "CompileContextInput"]
+    },
+    {
+      "file": "core:src/composition/use-cases/compile-context.ts",
+      "symbols": ["createCompileContext"]
+    },
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
+    },
+    {
+      "file": "core:test/composition/build-compile-context-config.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/_shared/merge-compile-context-config.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/compile-context.spec.ts"
     }
   ]
 }

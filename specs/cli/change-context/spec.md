@@ -51,18 +51,24 @@ When `--fingerprint` short-circuits the command with an unchanged context respon
 
 ### Requirement: Behaviour
 
-The command invokes the `CompileContext` use case. The `CompileContextConfig`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.
+The command invokes the `CompileContext` use case.
 
-When `llmOptimizedContext` is active in project config, the CLI prefers optimized context by default, unless `--no-optimized` is passed, or section flags are explicitly provided that exclude either rules or constraints.
+The CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `CompileContext` instance at composition time.
 
-The effective `llmOptimizedContext` value is determined as follows:
+The CLI MUST pass only runtime overrides to `CompileContext.execute`:
+
+- `name` and `step` from positional arguments
+- `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `hybrid` when yaml default is not `full`/`hybrid`)
+- `llmOptimizedContext` only when explicitly resolved via `--optimized` or `--no-optimized` and the resolved value differs from the yaml default (omit the field when it matches the baked default)
+- `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` from the corresponding CLI flags
+
+The effective `llmOptimizedContext` value for explicit CLI overrides is determined as follows:
 
 - If `--no-optimized` is passed, it is `false`.
-- If `--optimized` is passed, it is `true` (subject to section flag constraints).
-- If section flags are passed:
-  - If both rules and constraints are included in the requested sections (either because both `--rules` and `--constraints` are explicitly passed, or because no section flags are passed and the defaults apply), the effective value is `true` if configured or forced via `--optimized`.
-  - If only one of rules or constraints is explicitly requested (e.g. `--rules` without `--constraints`, or `--constraints` without `--rules`), the effective value is `false` (optimization is bypassed).
-- Otherwise, it falls back to the `llmOptimizedContext` value from the resolved project configuration (defaulting to `false`).
+- If `--optimized` is passed, it is `true`.
+- Otherwise, the CLI does not pass `llmOptimizedContext` on `execute` — the baked yaml default applies.
+
+Optimization bypass when only a subset of sections is requested (for example `--rules` without `--constraints`) is enforced by `CompileContext` from the forwarded `sections` input and the baked `llmOptimizedContext` default. The CLI MUST NOT recompute or override `llmOptimizedContext` based on section flags.
 
 When `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.
 

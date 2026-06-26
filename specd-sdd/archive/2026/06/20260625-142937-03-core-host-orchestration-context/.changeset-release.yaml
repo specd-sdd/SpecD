@@ -1,0 +1,6 @@
+releases:
+  core:compile-context: minor
+  core:get-project-context: minor
+  cli:change-context: patch
+  cli:project-context: patch
+  cli:project-status: patch

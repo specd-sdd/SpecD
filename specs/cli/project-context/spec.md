@@ -38,21 +38,27 @@ For structured formats, the warning SHALL be included in the response.
 
 The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.
 
-Concretely:
+The CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `GetProjectContext` instance at composition time.
 
-1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)
-2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)
-3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
-4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present
-5. The collected specs are rendered according to the configured `contextMode`
+The CLI MUST pass only runtime overrides to `GetProjectContext.execute`:
 
-By default, if `llmOptimizedContext` is enabled in config, the command MUST prefer optimized project-level and spec-level content from fresh metadata.
+- `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `full` when yaml default is not `full`/`hybrid`)
+- `llmOptimizedContext` only when `--optimized` or `--no-optimized` resolves a value that differs from the yaml default
+- `followDeps`, `depth`, and `sections` from the corresponding CLI flags
 
-The effective `llmOptimizedContext` value is overridden to `false` if `--no-optimized` is passed, or if section flags are provided that exclude either rules or constraints (e.g. only `--rules` or only `--constraints` is passed).
+Concretely, the use case:
 
-When optimization is effectively enabled (including when both rules and constraints are requested or defaulted), it prefers optimized project-level and spec-level content from fresh metadata.
+1. Renders project `context:` entries from the baked default configuration (instruction text verbatim, file entries read from disk)
+2. Applies project-level `contextIncludeSpecs` patterns across all workspaces (defaults to `['default:*']` when not declared in yaml)
+3. Applies project-level `contextExcludeSpecs` patterns to remove specs from the set
+4. Applies optional `dependsOn` traversal only when `--follow-deps` is present
+5. Renders the collected specs according to the effective `contextMode`
 
-The command MUST suppress `stale-optimization` warnings when the effective `llmOptimizedContext` is `false` (such as when `--no-optimized` is passed, or when section flags bypass optimization).
+When `llmOptimizedContext` is enabled in the baked default, `GetProjectContext` prefers optimized project-level content when fresh.
+
+Optimization bypass for partial section requests is enforced by `GetProjectContext` from the forwarded `sections` input. The CLI MUST NOT recompute `llmOptimizedContext` based on section flags except via explicit `--optimized` / `--no-optimized`.
+
+The command MUST suppress `stale-optimization` warnings when optimization is effectively bypassed (for example via `--no-optimized` or partial section requests handled in the use case).
 
 ### Requirement: Output
 

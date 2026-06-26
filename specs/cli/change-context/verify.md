@@ -152,34 +152,36 @@
 
 ### Requirement: Behaviour
 
+#### Scenario: CLI does not build CompileContextConfig inline
+
+- **WHEN** `specd change context` is run
+- **THEN** the command does not construct a `CompileContextConfig` object from `SpecdConfig`
+- **AND** it invokes `CompileContext.execute` with runtime overrides only
+
 #### Scenario: CLI forwards traversal and fingerprint options to CompileContext
 
 - **WHEN** `specd change context` is run with flags such as `--include-change-specs`, `--follow-deps`, `--depth`, or `--fingerprint`
-- **THEN** the command forwards those options into the `CompileContext` request
+- **THEN** the command forwards those options into the `CompileContext.execute` input
 
 #### Scenario: --no-optimized suppresses preference for optimized context
 
 - **GIVEN** `llmOptimizedContext: true` in configuration
 - **WHEN** `specd change context my-change designing --no-optimized` is executed
-- **THEN** the CLI passes `llmOptimizedContext: false` into the `CompileContext` configuration request
+- **THEN** the CLI passes `llmOptimizedContext: false` as a runtime override on `CompileContext.execute`
 
 #### Scenario: --optimized forces preference for optimized context
 
 - **GIVEN** `llmOptimizedContext: false` in configuration
 - **WHEN** `specd change context my-change designing --optimized` is executed
-- **THEN** the CLI passes `llmOptimizedContext: true` into the `CompileContext` configuration request
+- **THEN** the CLI passes `llmOptimizedContext: true` as a runtime override on `CompileContext.execute`
 
-#### Scenario: Section flags do not override llmOptimizedContext when both rules and constraints are requested
-
-- **GIVEN** `llmOptimizedContext: true` in configuration
-- **WHEN** `specd change context my-change designing --rules --constraints` is executed
-- **THEN** the CLI passes `llmOptimizedContext: true` into the `CompileContext` configuration request
-
-#### Scenario: Section flags override llmOptimizedContext to false when only rules are requested
+#### Scenario: Section flags forwarded without CLI llmOptimizedContext override
 
 - **GIVEN** `llmOptimizedContext: true` in configuration
 - **WHEN** `specd change context my-change designing --rules` is executed
-- **THEN** the CLI passes `llmOptimizedContext: false` into the `CompileContext` configuration request
+- **THEN** the CLI forwards `sections: ['rules']` on `CompileContext.execute`
+- **AND** the CLI does not pass `llmOptimizedContext` when it matches the yaml default
+- **AND** optimization bypass behaviour is verified by `core:compile-context` (see "Optimization bypassed when only rules requested")
 
 #### Scenario: Blocking artifacts come from CompileContext output
 

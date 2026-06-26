@@ -67,6 +67,7 @@ import {
 } from './kernel-registries.js'
 import { LazySchemaProvider } from './lazy-schema-provider.js'
 import { createSpecWorkspaceRoutes } from './spec-workspace-routes.js'
+import { buildCompileContextConfig } from './build-compile-context-config.js'
 import { createDefaultLogger } from '../infrastructure/logging/pino-logger.js'
 import { VcsImplementationDetector } from '../infrastructure/vcs/vcs-implementation-detector.js'
 import { buildSchema } from '../domain/services/build-schema.js'
@@ -156,6 +157,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const registry = createKernelRegistryView(createBuiltinKernelRegistry(), options)
   const i = await createKernelInternals(config, registry, options)
   const workspaceRoutes = createSpecWorkspaceRoutes(config.workspaces)
+  const defaultCompileContextConfig = buildCompileContextConfig(config)
 
   const logDir = path.join(config.configPath, 'log')
   const logFilePath = path.join(logDir, 'specd.log')
@@ -282,6 +284,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.registry.extractorTransforms,
         workspaceRoutes,
         lifecycle,
+        defaultCompileContextConfig,
       ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
@@ -350,6 +353,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.hasher,
         i.registry.extractorTransforms,
         workspaceRoutes,
+        defaultCompileContextConfig,
       ),
       getConfig: new GetConfig(config),
       getMetadata: getProjectMetadata,

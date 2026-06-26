@@ -35,7 +35,7 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command invokes the `CompileContext` use case. The `CompileContextConfig`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.\n\nWhen `llmOptimizedContext` is active in project config, the CLI prefers optimized context by default, unless `--no-optimized` is passed, or section flags are explicitly provided that exclude either rules or constraints.\n\nThe effective `llmOptimizedContext` value is determined as follows:\n\n- If `--no-optimized` is passed, it is `false`.\n- If `--optimized` is passed, it is `true` (subject to section flag constraints).\n- If section flags are passed:\n  - If both rules and constraints are included in the requested sections (either because both `--rules` and `--constraints` are explicitly passed, or because no section flags are passed and the defaults apply), the effective value is `true` if configured or forced via `--optimized`.\n  - If only one of rules or constraints is explicitly requested (e.g. `--rules` without `--constraints`, or `--constraints` without `--rules`), the effective value is `false` (optimization is bypassed).\n- Otherwise, it falls back to the `llmOptimizedContext` value from the resolved project configuration (defaulting to `false`).\n\nWhen `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.\n\nWhen `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint."
+        "The command invokes the `CompileContext` use case.\n\nThe CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `CompileContext` instance at composition time.\n\nThe CLI MUST pass only runtime overrides to `CompileContext.execute`:\n\n- `name` and `step` from positional arguments\n- `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `hybrid` when yaml default is not `full`/`hybrid`)\n- `llmOptimizedContext` only when explicitly resolved via `--optimized` or `--no-optimized` and the resolved value differs from the yaml default (omit the field when it matches the baked default)\n- `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` from the corresponding CLI flags\n\nThe effective `llmOptimizedContext` value for explicit CLI overrides is determined as follows:\n\n- If `--no-optimized` is passed, it is `false`.\n- If `--optimized` is passed, it is `true`.\n- Otherwise, the CLI does not pass `llmOptimizedContext` on `execute` — the baked yaml default applies.\n\nOptimization bypass when only a subset of sections is requested (for example `--rules` without `--constraints`) is enforced by `CompileContext` from the forwarded `sections` input and the baked `llmOptimizedContext` default. The CLI MUST NOT recompute or override `llmOptimizedContext` based on section flags.\n\nWhen `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.\n\nWhen `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint."
       ]
     },
     {
@@ -257,11 +257,20 @@
     },
     {
       "requirement": "Behaviour",
+      "name": "CLI does not build CompileContextConfig inline",
+      "when": ["specd change context is run"],
+      "then": [
+        "the command does not construct a CompileContextConfig object from SpecdConfig",
+        "AND it invokes CompileContext.execute with runtime overrides only"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
       "name": "CLI forwards traversal and fingerprint options to CompileContext",
       "when": [
         "specd change context is run with flags such as --include-change-specs, --follow-deps, --depth, or --fingerprint"
       ],
-      "then": ["the command forwards those options into the CompileContext request"]
+      "then": ["the command forwards those options into the CompileContext.execute input"]
     },
     {
       "requirement": "Behaviour",
@@ -269,7 +278,7 @@
       "given": ["llmOptimizedContext: true in configuration"],
       "when": ["specd change context my-change designing --no-optimized is executed"],
       "then": [
-        "the CLI passes llmOptimizedContext: false into the CompileContext configuration request"
+        "the CLI passes llmOptimizedContext: false as a runtime override on CompileContext.execute"
       ]
     },
     {
@@ -278,25 +287,18 @@
       "given": ["llmOptimizedContext: false in configuration"],
       "when": ["specd change context my-change designing --optimized is executed"],
       "then": [
-        "the CLI passes llmOptimizedContext: true into the CompileContext configuration request"
+        "the CLI passes llmOptimizedContext: true as a runtime override on CompileContext.execute"
       ]
     },
     {
       "requirement": "Behaviour",
-      "name": "Section flags do not override llmOptimizedContext when both rules and constraints are requested",
-      "given": ["llmOptimizedContext: true in configuration"],
-      "when": ["specd change context my-change designing --rules --constraints is executed"],
-      "then": [
-        "the CLI passes llmOptimizedContext: true into the CompileContext configuration request"
-      ]
-    },
-    {
-      "requirement": "Behaviour",
-      "name": "Section flags override llmOptimizedContext to false when only rules are requested",
+      "name": "Section flags forwarded without CLI llmOptimizedContext override",
       "given": ["llmOptimizedContext: true in configuration"],
       "when": ["specd change context my-change designing --rules is executed"],
       "then": [
-        "the CLI passes llmOptimizedContext: false into the CompileContext configuration request"
+        "the CLI forwards sections: ['rules'] on CompileContext.execute",
+        "AND the CLI does not pass llmOptimizedContext when it matches the yaml default",
+        "AND optimization bypass behaviour is verified by core:compile-context (see \"Optimization bypassed when only rules requested\")"
       ]
     },
     {
@@ -334,10 +336,21 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-context",
+        "file": "cli:src/commands/change/context.ts"
+      },
+      {
+        "specId": "cli:change-context",
+        "file": "cli:test/commands/change-context.spec.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:b62cb02fb537e6c6d46571e3f5b9d417f616c1b37ff30a37c0222cc922e38a91",
-    "verify.md": "sha256:ff6e01833e2e7131677804597aa81627bb9607d69a0fcec85aa33cf2b82b7271"
+    "spec.md": "sha256:c1dd2a90552f228157fe9cff4bae86bf55cb48d01acd43b4fb506a29f6d8f0d2",
+    "verify.md": "sha256:2ff476d8d23bbd8d7493f786695b12678fce53e911acb0933d096e8cd2251533"
   },
   "generatedBy": "core"
 }

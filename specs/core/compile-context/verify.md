@@ -272,17 +272,38 @@
 
 ### Requirement: Ports and constructor
 
-#### Scenario: CompileContext is constructed with LifecycleEngine
+#### Scenario: CompileContext is constructed with LifecycleEngine and default config
 
-- **WHEN** `CompileContext` is assembled
-- **THEN** it receives `PreviewSpec` and `LifecycleEngine` alongside its existing repositories and utilities
+- **WHEN** `CompileContext` is assembled from a resolved `SpecdConfig`
+- **THEN** it receives `PreviewSpec`, `LifecycleEngine`, and a yaml-derived `CompileContextConfig` default snapshot alongside its existing repositories and utilities
 
 ### Requirement: Input
 
-#### Scenario: Input includes step, config, and optional traversal controls
+#### Scenario: Input accepts runtime overrides without config
 
 - **WHEN** `CompileContext.execute` is called
-- **THEN** it accepts the change name, target step, resolved config, and optional flags such as `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+- **THEN** it accepts the change name, target step, and optional runtime overrides such as `contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+- **AND** it does not accept a `config` field
+
+#### Scenario: Runtime contextMode overrides baked default
+
+- **GIVEN** `CompileContext` was constructed with `contextMode: 'summary'` in its default snapshot
+- **WHEN** `execute` is called with `contextMode: 'full'`
+- **THEN** specs are rendered using full mode
+
+### Requirement: Baked default configuration merge
+
+#### Scenario: Yaml-derived fields come from construction default
+
+- **GIVEN** `CompileContext` was constructed with project-level include patterns in its default snapshot
+- **WHEN** `execute` is called without `contextMode` or `llmOptimizedContext` overrides
+- **THEN** context collection uses the baked include/exclude patterns and yaml `contextMode`
+
+#### Scenario: llmOptimizedContext runtime override wins over baked default
+
+- **GIVEN** the baked default has `llmOptimizedContext: false`
+- **WHEN** `execute` is called with `llmOptimizedContext: true`
+- **THEN** optimized context is preferred when available
 
 ### Requirement: Caller-owned implementation tracking refresh
 

@@ -117,28 +117,7 @@ export function registerProjectStatus(parent: Command): void {
           | undefined
         let fullContext: string[] | undefined
         if (opts.context) {
-          const compileConfig = {
-            projectRoot: config.projectRoot,
-            configPath: config.configPath,
-            llmOptimizedContext: config.llmOptimizedContext,
-            ...(config.context !== undefined
-              ? {
-                  context: config.context.map((e) =>
-                    'file' in e ? { file: e.file } : { instruction: e.instruction },
-                  ),
-                }
-              : {}),
-            ...(config.contextIncludeSpecs !== undefined
-              ? { contextIncludeSpecs: [...config.contextIncludeSpecs] }
-              : {}),
-            ...(config.contextExcludeSpecs !== undefined
-              ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
-              : {}),
-          }
-
-          const ctxResult = await kernel.project.getProjectContext.execute({
-            config: compileConfig,
-          })
+          const ctxResult = await kernel.project.getProjectContext.execute({})
 
           // Emit warnings to stderr
           for (const w of ctxResult.warnings) {
@@ -164,7 +143,7 @@ export function registerProjectStatus(parent: Command): void {
           if (isFresh) {
             optimizedContext = ctxResult.contextEntries[0]
             const rawResult = await kernel.project.getProjectContext.execute({
-              config: { ...compileConfig, llmOptimizedContext: false },
+              llmOptimizedContext: false,
             })
             specsList = rawResult.specs.map((s) => s.specId)
           } else {

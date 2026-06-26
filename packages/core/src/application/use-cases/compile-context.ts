@@ -25,6 +25,7 @@ import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { Logger } from '../logger.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+import { mergeCompileContextRuntimeOverrides } from './_shared/merge-compile-context-config.js'
 
 const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
   includePattern: 0,
@@ -97,8 +98,16 @@ export interface CompileContextInput {
   readonly name: string
   /** The lifecycle step being entered (e.g. `'designing'`, `'implementing'`). */
   readonly step: string
-  /** Resolved project configuration. */
-  readonly config: CompileContextConfig
+  /**
+   * Runtime override for display mode.
+   * When absent, the construction-time yaml default is used.
+   */
+  readonly contextMode?: CompileContextConfig['contextMode']
+  /**
+   * Runtime override for whether optimized context is preferred.
+   * When absent, the construction-time yaml default is used.
+   */
+  readonly llmOptimizedContext?: boolean
   /**
    * When `true`, directly seeds `change.specIds` into the collected set.
    * When `false` or absent, direct `specIds` seeding is skipped.
@@ -217,6 +226,7 @@ export class CompileContext {
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _lifecycle: LifecycleEngine
+  private readonly _defaultConfig: CompileContextConfig
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -231,6 +241,7 @@ export class CompileContext {
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    * @param lifecycle - Shared lifecycle interpreter
+   * @param defaultConfig - Yaml-derived context configuration baked at composition time
    */
   constructor(
     changes: ChangeRepository,
@@ -243,6 +254,7 @@ export class CompileContext {
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
+    defaultConfig: CompileContextConfig = {},
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
@@ -254,6 +266,7 @@ export class CompileContext {
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
     this._lifecycle = lifecycle
+    this._defaultConfig = defaultConfig
   }
 
   /**
@@ -265,6 +278,13 @@ export class CompileContext {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: CompileContextInput): Promise<CompileContextResult> {
+    const config = mergeCompileContextRuntimeOverrides(this._defaultConfig, {
+      ...(input.contextMode !== undefined ? { contextMode: input.contextMode } : {}),
+      ...(input.llmOptimizedContext !== undefined
+        ? { llmOptimizedContext: input.llmOptimizedContext }
+        : {}),
+    })
+
     const change = await this._changes.get(input.name)
     if (change === null) throw new ChangeNotFoundError(input.name)
 
@@ -285,10 +305,10 @@ export class CompileContext {
       metadata: projectMeta,
       isFresh,
       warnings: optimizationWarnings,
-    } = await checkProjectMetadataFreshness(input.config, this._files, this._hasher, workspaceMap)
+    } = await checkProjectMetadataFreshness(config, this._files, this._hasher, workspaceMap)
 
     const shouldUseOptimizedContext =
-      input.config.llmOptimizedContext === true &&
+      config.llmOptimizedContext === true &&
       (input.sections === undefined ||
         (input.sections.includes('rules') && input.sections.includes('constraints')))
 
@@ -354,7 +374,7 @@ export class CompileContext {
     // --- 5-step context spec collection ---
     if (!useOptimizedProjectContext) {
       // Step 1: Project-level include patterns (all workspaces, bare * = all)
-      for (const pattern of input.config.contextIncludeSpecs ?? []) {
+      for (const pattern of config.contextIncludeSpecs ?? []) {
         const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
         for (const spec of matches) {
           registerCollectedSpec(spec, 'includePattern')
@@ -363,7 +383,7 @@ export class CompileContext {
 
       // Step 2: Project-level exclude patterns
       const projectExcludedKeys = new Set<string>()
-      for (const pattern of input.config.contextExcludeSpecs ?? []) {
+      for (const pattern of config.contextExcludeSpecs ?? []) {
         const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
         for (const spec of matches) {
           projectExcludedKeys.add(`${spec.workspace}:${spec.capPath}`)
@@ -377,7 +397,7 @@ export class CompileContext {
     // Step 3: Workspace-level include patterns (active workspaces only)
     const activeWorkspaces = new Set(change.workspaces)
 
-    for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
+    for (const [wsName, wsConfig] of Object.entries(config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextIncludeSpecs ?? []) {
         const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
@@ -388,7 +408,7 @@ export class CompileContext {
     }
 
     // Step 4: Workspace-level exclude patterns (active workspaces only)
-    for (const [wsName, wsConfig] of Object.entries(input.config.workspaces ?? {})) {
+    for (const [wsName, wsConfig] of Object.entries(config.workspaces ?? {})) {
       if (!activeWorkspaces.has(wsName)) continue
       for (const pattern of wsConfig.contextExcludeSpecs ?? []) {
         const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
@@ -486,8 +506,7 @@ export class CompileContext {
     const allSpecs: ResolvedSpec[] = [...collectedSpecs.values()]
 
     // --- Display mode classification ---
-    const contextMode: 'list' | 'summary' | 'full' | 'hybrid' =
-      input.config.contextMode ?? 'summary'
+    const contextMode: 'list' | 'summary' | 'full' | 'hybrid' = config.contextMode ?? 'summary'
 
     const lifecycle = this._lifecycle.evaluate(change, schema)
     const requestedStepVerdict = lifecycle.availableSteps.find((step) => step.step === input.step)
@@ -509,7 +528,7 @@ export class CompileContext {
     if (useOptimizedProjectContext && projectMeta) {
       projectContext.push({ source: 'instruction', content: projectMeta.optimized.context })
     } else {
-      for (const entry of input.config.context ?? []) {
+      for (const entry of config.context ?? []) {
         if ('instruction' in entry) {
           projectContext.push({ source: 'instruction', content: entry.instruction })
         } else {
@@ -591,7 +610,7 @@ export class CompileContext {
       if (metadata !== null) {
         title = metadata.title ?? ''
         description =
-          (input.config.llmOptimizedContext && metadata.optimizedDescription) ||
+          (config.llmOptimizedContext && metadata.optimizedDescription) ||
           metadata.description ||
           ''
       }

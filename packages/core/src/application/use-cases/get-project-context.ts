@@ -26,11 +26,20 @@ import {
   type MetadataArtifactInput,
 } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+import { mergeCompileContextRuntimeOverrides } from './_shared/merge-compile-context-config.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
-  /** Resolved project configuration. */
-  readonly config: CompileContextConfig
+  /**
+   * Runtime override for display mode.
+   * When absent, the construction-time yaml default is used.
+   */
+  readonly contextMode?: CompileContextConfig['contextMode']
+  /**
+   * Runtime override for whether optimized context is preferred.
+   * When absent, the construction-time yaml default is used.
+   */
+  readonly llmOptimizedContext?: boolean
   /**
    * When `true`, follows `dependsOn` links from `metadata.json` transitively to
    * discover additional specs beyond those matched by include/exclude patterns.
@@ -76,6 +85,7 @@ export class GetProjectContext {
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
+  private readonly _defaultConfig: CompileContextConfig
 
   /**
    * Creates a new `GetProjectContext` use case instance.
@@ -87,6 +97,7 @@ export class GetProjectContext {
    * @param hasher - Content hasher for metadata freshness checks
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
+   * @param defaultConfig - Yaml-derived context configuration baked at composition time
    */
   constructor(
     listWorkspaces: ListWorkspaces,
@@ -96,6 +107,7 @@ export class GetProjectContext {
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+    defaultConfig: CompileContextConfig = {},
   ) {
     this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
@@ -104,6 +116,7 @@ export class GetProjectContext {
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
+    this._defaultConfig = defaultConfig
   }
 
   /**
@@ -114,6 +127,13 @@ export class GetProjectContext {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: GetProjectContextInput): Promise<GetProjectContextResult> {
+    const config = mergeCompileContextRuntimeOverrides(this._defaultConfig, {
+      ...(input.contextMode !== undefined ? { contextMode: input.contextMode } : {}),
+      ...(input.llmOptimizedContext !== undefined
+        ? { llmOptimizedContext: input.llmOptimizedContext }
+        : {}),
+    })
+
     const schema = await this._schemaProvider.get()
 
     const warnings: ContextWarning[] = []
@@ -127,7 +147,7 @@ export class GetProjectContext {
       metadata: projectMeta,
       isFresh,
       warnings: optimizationWarnings,
-    } = await checkProjectMetadataFreshness(input.config, this._files, this._hasher, workspaceMap)
+    } = await checkProjectMetadataFreshness(config, this._files, this._hasher, workspaceMap)
 
     warnings.push(...optimizationWarnings)
 
@@ -141,7 +161,7 @@ export class GetProjectContext {
     }
 
     // Collect project-level context entries (labelled with their source)
-    for (const entry of input.config.context ?? []) {
+    for (const entry of config.context ?? []) {
       if ('instruction' in entry) {
         contextEntries.push(`**Source: instruction**\n\n${entry.instruction}`)
       } else {
@@ -162,7 +182,7 @@ export class GetProjectContext {
     const includedSpecs = new Map<string, ResolvedSpec>()
 
     // Step 1: Project-level include patterns (all workspaces, bare * = all)
-    for (const pattern of input.config.contextIncludeSpecs ?? []) {
+    for (const pattern of config.contextIncludeSpecs ?? []) {
       const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) {
         const key = `${spec.workspace}:${spec.capPath}`
@@ -172,7 +192,7 @@ export class GetProjectContext {
 
     // Step 2: Project-level exclude patterns
     const excludedKeys = new Set<string>()
-    for (const pattern of input.config.contextExcludeSpecs ?? []) {
+    for (const pattern of config.contextExcludeSpecs ?? []) {
       const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) excludedKeys.add(`${spec.workspace}:${spec.capPath}`)
     }
@@ -216,11 +236,11 @@ export class GetProjectContext {
 
     // Render entries for each included spec according to contextMode.
     const resolvedMode: ContextSpecEntry['mode'] =
-      input.config.contextMode === undefined
+      config.contextMode === undefined
         ? 'summary'
-        : input.config.contextMode === 'hybrid'
+        : config.contextMode === 'hybrid'
           ? 'full'
-          : input.config.contextMode
+          : config.contextMode
 
     const sectionsFilter = input.sections ?? (['rules', 'constraints'] as const)
 
@@ -251,7 +271,7 @@ export class GetProjectContext {
       const source: ContextSpecEntry['source'] = 'includePattern'
 
       // Check for missing optimization if enabled
-      if (input.config.llmOptimizedContext && metadata !== null) {
+      if (config.llmOptimizedContext && metadata !== null) {
         if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
           warnings.push({
             type: 'stale-optimization',
@@ -274,11 +294,7 @@ export class GetProjectContext {
       let content: string
 
       if (isFresh && metadata !== null) {
-        content = this._renderFromMetadata(
-          metadata,
-          sectionsFilter,
-          input.config.llmOptimizedContext,
-        )
+        content = this._renderFromMetadata(metadata, sectionsFilter, config.llmOptimizedContext)
       } else {
         if (metadata !== null) {
           warnings.push({
@@ -305,7 +321,7 @@ export class GetProjectContext {
             extraction,
             workspaceMap,
             sectionsFilter,
-            input.config.llmOptimizedContext,
+            config.llmOptimizedContext,
           )
         }
 

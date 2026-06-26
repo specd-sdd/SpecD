@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { type CompileContextConfig, type SpecSection } from '@specd/core'
+import { type SpecSection } from '@specd/core'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -100,51 +100,15 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
               ? 'hybrid'
               : config.contextMode)
 
-          /**
-           * Context filter settings for a single workspace.
-           *
-           * @remarks Used when building the CompileContextConfig from specd.yaml workspace entries.
-           */
-          type WorkspaceCtx = { contextIncludeSpecs?: string[]; contextExcludeSpecs?: string[] }
-          const workspacesConfig: Record<string, WorkspaceCtx> = {}
-          for (const ws of config.workspaces) {
-            if (ws.contextIncludeSpecs !== undefined || ws.contextExcludeSpecs !== undefined) {
-              const entry: WorkspaceCtx = {}
-              if (ws.contextIncludeSpecs !== undefined)
-                entry.contextIncludeSpecs = [...ws.contextIncludeSpecs]
-              if (ws.contextExcludeSpecs !== undefined)
-                entry.contextExcludeSpecs = [...ws.contextExcludeSpecs]
-              workspacesConfig[ws.name] = entry
-            }
-          }
-
-          const compileConfig: CompileContextConfig = {
-            projectRoot: config.projectRoot,
-            configPath: config.configPath,
-            llmOptimizedContext,
-            ...(config.context !== undefined
-              ? {
-                  context: config.context.map((e) =>
-                    'file' in e ? { file: e.file } : { instruction: e.instruction },
-                  ),
-                }
-              : {}),
-            ...(config.contextIncludeSpecs !== undefined
-              ? { contextIncludeSpecs: [...config.contextIncludeSpecs] }
-              : {}),
-            ...(config.contextExcludeSpecs !== undefined
-              ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
-              : {}),
-            ...(effectiveMode !== undefined ? { contextMode: effectiveMode } : {}),
-            ...(Object.keys(workspacesConfig).length > 0 ? { workspaces: workspacesConfig } : {}),
-          }
-
           await kernel.changes.refreshImplementationTracking.execute({ name })
 
           const result = await kernel.changes.compile.execute({
             name,
             step,
-            config: compileConfig,
+            ...(effectiveMode !== undefined ? { contextMode: effectiveMode } : {}),
+            ...(llmOptimizedContext !== (config.llmOptimizedContext ?? false)
+              ? { llmOptimizedContext }
+              : {}),
             includeChangeSpecs: opts.includeChangeSpecs === true,
             ...(opts.followDeps ? { followDeps: true } : {}),
             ...(opts.depth !== undefined ? { depth: opts.depth } : {}),

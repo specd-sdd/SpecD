@@ -140,11 +140,7 @@ describe('Behaviour', () => {
     await program.parseAsync(['node', 'specd', 'project', 'context'])
 
     expect(kernel.project.getProjectContext.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({
-          contextExcludeSpecs: ['auth/*'],
-        }),
-      }),
+      expect.not.objectContaining({ config: expect.anything() }),
     )
   })
 
@@ -164,11 +160,7 @@ describe('Behaviour', () => {
     await program.parseAsync(['node', 'specd', 'project', 'context'])
 
     expect(kernel.project.getProjectContext.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({
-          contextIncludeSpecs: ['default:*'],
-        }),
-      }),
+      expect.not.objectContaining({ config: expect.anything() }),
     )
     expect(stdout()).not.toContain('billing')
   })
@@ -317,6 +309,41 @@ describe('Behaviour', () => {
     await program.parseAsync(['node', 'specd', 'project', 'context'])
 
     expect(stdout()).toContain('Hello world')
+  })
+
+  it('passes llmOptimizedContext when --no-optimized overrides yaml default', async () => {
+    const { config, kernel } = setup()
+    ;(config as { llmOptimizedContext?: boolean }).llmOptimizedContext = true
+    kernel.project.getProjectContext.execute.mockResolvedValue({
+      contextEntries: [],
+      specs: [],
+      warnings: [],
+    })
+
+    const program = makeProgram()
+    registerProjectContext(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'context', '--no-optimized'])
+
+    const callArgs = kernel.project.getProjectContext.execute.mock.calls[0]![0]
+    expect(callArgs).not.toHaveProperty('config')
+    expect(callArgs.llmOptimizedContext).toBe(false)
+  })
+
+  it('passes contextMode when --mode is provided', async () => {
+    const { kernel } = setup()
+    kernel.project.getProjectContext.execute.mockResolvedValue({
+      contextEntries: [],
+      specs: [],
+      warnings: [],
+    })
+
+    const program = makeProgram()
+    registerProjectContext(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'context', '--mode', 'full'])
+
+    const callArgs = kernel.project.getProjectContext.execute.mock.calls[0]![0]
+    expect(callArgs).not.toHaveProperty('config')
+    expect(callArgs.contextMode).toBe('full')
   })
 })
 

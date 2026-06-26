@@ -4,15 +4,17 @@
 
 ### Requirement: Accepts GetProjectContextInput as input
 
-#### Scenario: Minimal input with config only
+#### Scenario: Minimal input with no overrides
 
-- **WHEN** `execute` is called with `{ config: { context: [], contextIncludeSpecs: [] } }`
-- **THEN** the call succeeds and returns a result with empty `contextEntries`, `specs`, and `warnings`
+- **GIVEN** `GetProjectContext` was constructed with a baked default configuration
+- **WHEN** `execute` is called with `{}`
+- **THEN** the call succeeds using the baked default snapshot
 
 #### Scenario: Full optional input supported
 
-- **WHEN** `execute` is called with `followDeps: true`, `depth: 2`, and `sections: ["rules"]`
+- **WHEN** `execute` is called with `followDeps: true`, `depth: 2`, `sections: ["rules"]`, and `contextMode: "full"`
 - **THEN** the call succeeds and respects all optional parameters
+- **AND** no `config` field is required
 
 #### Scenario: Sections only affect full-mode rendering
 
@@ -190,10 +192,10 @@
 
 ### Requirement: Construction dependencies
 
-#### Scenario: Constructor accepts all required ports
+#### Scenario: Constructor accepts all required ports and default config
 
-- **WHEN** `GetProjectContext` is instantiated
-- **THEN** it requires `specs` (ReadonlyMap\<string, SpecRepository>), `schemaProvider` (SchemaProvider), `files` (FileReader), `parsers` (ArtifactParserRegistry), and `hasher` (ContentHasher) in its constructor
+- **WHEN** `GetProjectContext` is instantiated from a resolved `SpecdConfig`
+- **THEN** it requires `listWorkspaces`, `schemaProvider`, `files`, `parsers`, `hasher`, and a yaml-derived `CompileContextConfig` default snapshot in its constructor
 
 ### Requirement: Project context optimization and invalidation
 

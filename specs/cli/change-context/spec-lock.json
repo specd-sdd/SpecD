@@ -12,5 +12,12 @@
     "core:get-hook-instructions",
     "core:refresh-implementation-tracking"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/context.ts"
+    },
+    {
+      "file": "cli:test/commands/change-context.spec.ts"
+    }
+  ]
 }

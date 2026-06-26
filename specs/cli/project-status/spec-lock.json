@@ -3,11 +3,19 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:list-workspaces", "core:list-drafts", "core:list-changes"],
+  "dependsOn": [
+    "core:list-workspaces",
+    "core:list-drafts",
+    "core:list-changes",
+    "core:get-project-context"
+  ],
   "implementation": [
     {
       "file": "cli:src/commands/project/status.ts",
       "symbols": ["registerProjectStatus"]
+    },
+    {
+      "file": "cli:test/commands/project-status.spec.ts"
     }
   ]
 }

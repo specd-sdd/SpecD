@@ -1,7 +1,12 @@
 {
   "title": "project status command",
   "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.",
-  "dependsOn": ["core:list-workspaces", "core:list-drafts", "core:list-changes"],
+  "dependsOn": [
+    "core:list-workspaces",
+    "core:list-drafts",
+    "core:list-changes",
+    "core:get-project-context"
+  ],
   "context": [
     "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information."
   ],
@@ -57,7 +62,7 @@
     {
       "requirement": "supports --context flag",
       "rules": [
-        "When `--context` flag is provided, the output MUST include project context references.\n\nIn `text` mode:\n\n- The command MUST display the **full** project context (not truncated).\n- If `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedContext` from `project-metadata.json` if it is fresh.\n- If `llmOptimizedContext` is enabled but optimized context is missing or stale, the command MUST fall back to raw context entries and emit a `stale-optimization` warning.\n- The warning MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\".\n\nIn `json`/`toon` mode, the output MUST include:\n\n- Instruction entries (the directive text without reading files)\n- File entries (which files should be read without content)\n- Spec entries (which specs should be read without content)\n- `optimizedContext` (optional string, included if fresh and enabled)"
+        "When `--context` flag is provided, the output MUST include project context references.\n\nIn `text` mode:\n\n- The command MUST display the **full** project context (not truncated).\n- If `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedContext` from `project-metadata.json` if it is fresh.\n- If `llmOptimizedContext` is enabled but optimized context is missing or stale, the command MUST fall back to raw context entries and emit a `stale-optimization` warning.\n- The warning MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\".\n\nIn `json`/`toon` mode, the output MUST include:\n\n- Instruction entries (the directive text without reading files)\n- File entries (which files should be read without content)\n- Spec entries (which specs should be read without content)\n- `optimizedContext` (optional string, included if fresh and enabled)\n\nWhen assembling context references for `--context`, the command MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. It MUST invoke the kernel-wired `GetProjectContext` use case, which carries yaml-derived defaults from composition time.\n\nThe command MUST call `GetProjectContext.execute` with runtime overrides only:\n\n- `execute({})` for the primary context assembly (baked yaml defaults)\n- `execute({ llmOptimizedContext: false })` when it needs the raw spec catalogue alongside fresh optimized project context (for example to populate spec reference lists without optimized spec bodies)\n\nSection-filtered optimization bypass behaviour is enforced by `GetProjectContext` / `CompileContext` from forwarded `sections` when applicable; this command does not recompute `llmOptimizedContext` from section flags."
       ]
     },
     {
@@ -152,6 +157,31 @@
       "then": ["it displays the optimized context content"]
     },
     {
+      "requirement": "supports --context flag",
+      "name": "CLI does not build CompileContextConfig inline for --context",
+      "when": ["specd project status --context is run"],
+      "then": [
+        "the command does not construct a CompileContextConfig object from SpecdConfig",
+        "AND it invokes GetProjectContext.execute with runtime overrides only"
+      ]
+    },
+    {
+      "requirement": "supports --context flag",
+      "name": "Primary context call uses baked defaults",
+      "given": ["specd project status --context is executed"],
+      "when": ["the handler loads project context"],
+      "then": ["it calls GetProjectContext.execute({}) first"]
+    },
+    {
+      "requirement": "supports --context flag",
+      "name": "Raw spec catalogue uses llmOptimizedContext override when optimized context is fresh",
+      "given": ["llmOptimizedContext is enabled and optimized project context is fresh"],
+      "when": ["specd project status --context is executed"],
+      "then": [
+        "it calls GetProjectContext.execute({ llmOptimizedContext: false }) to obtain the raw spec id list"
+      ]
+    },
+    {
       "requirement": "Optimization warning signal",
       "name": "Displays warning when project cache is stale",
       "given": ["llmOptimizedContext: true", "AND project metadata is stale"],
@@ -192,6 +222,12 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "cli:project-status",
+        "file": "cli:test/commands/project-status.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "cli:project-status",
@@ -201,8 +237,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:eb8d61d8805cd325d5c8998c96cfb516d3aaee80f28cbd219e8c2260e748c207",
-    "verify.md": "sha256:337068fde1f543beb92e038470fc02cea325fbee7cf5920522f4376b6be6f070"
+    "spec.md": "sha256:f4c793b42b6256d5665a48bdddab8be6aaf17579967641c0f01e4b93f397ea07",
+    "verify.md": "sha256:0cfa114c63a953d5801000282f1c04ef8ba31479dabb4f29da33118ac8bb474b"
   },
   "generatedBy": "core"
 }
