@@ -1,0 +1,17 @@
+- op: added
+  description: Verify workflow status after switching between active changes
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: overview includes workflow and validation status$'
+    after:
+      type: section
+      matches: '^Scenario: Archive shown only when archivable$'
+  content: |
+    #### Scenario: Active change keeps workflow status after sidebar switch
+
+    - **GIVEN** active changes `alpha` and `beta` where `beta` was updated more recently
+    - **AND** Overview for `alpha` previously showed blockers or next action
+    - **WHEN** user selects `beta` then selects `alpha` again
+    - **THEN** Overview workflow section shows `alpha` status again
+    - **AND** does not show **Workflow status unavailable.**

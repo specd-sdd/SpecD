@@ -1,0 +1,24 @@
+- op: added
+  description: Require per-change status cache and ifModifiedSince isolation in useChangesRead
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: hooks MUST prevent infinite render loops through stable results$'
+  content: |
+    ### Requirement: useChangesRead scopes status cache per change key
+
+    `useChangesRead` MUST track `ifModifiedSince` and the last full `ChangeStatusDto` separately for each status cache key (`changeReadCacheKey(listSection, "change-status:<name>")`).
+
+    When the open change name or list section changes, the hook MUST:
+
+    - restore the last cached full status for the new key immediately (if any), without showing an empty workflow state while a fetch is in flight;
+    - send `ifModifiedSince` for **only** that key's last seen `updatedAt`, never a timestamp from a different change or section bucket.
+
+    When `get*Status` returns `{ unchanged: true }`, the hook MUST keep exposing the cached full status for the current key. It MUST NOT clear visible status or treat the poll as "no data available".
+
+    When a full status payload arrives (not `unchanged`), the hook MUST update the per-key cache and `ifModifiedSince` for that key only.
+
+    Detail loading behaviour is unchanged. This requirement applies only to status polling enabled via `pollStatus`.

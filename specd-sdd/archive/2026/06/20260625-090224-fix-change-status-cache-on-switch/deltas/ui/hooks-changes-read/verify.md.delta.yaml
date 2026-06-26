@@ -1,0 +1,35 @@
+- op: added
+  description: Verify status survives switching between active changes
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: hooks MUST prevent infinite render loops through stable results$'
+  content: |
+    ### Requirement: useChangesRead scopes status cache per change key
+
+    #### Scenario: Revisiting a change restores cached workflow status
+
+    - **GIVEN** active changes `alpha` and `beta` with `beta.updatedAt` newer than `alpha.updatedAt`
+    - **AND** the shell opened `alpha` and received a full `getChangeStatus` payload
+    - **WHEN** the user opens `beta` then returns to `alpha`
+    - **THEN** `useChangesRead` calls `getChangeStatus("alpha", { ifModifiedSince: <alpha last seen> })`
+    - **AND** does not pass `beta`'s `updatedAt` as `ifModifiedSince` for `alpha`
+    - **AND** consumers still receive `alpha`'s blockers and next action (from cache or fresh payload)
+    - **AND** Overview does not show **Workflow status unavailable.**
+
+    #### Scenario: Unchanged poll retains visible status for the same change
+
+    - **GIVEN** `useChangesRead` has a full status cached for change `alpha`
+    - **WHEN** the next poll returns `{ unchanged: true, updatedAt: <alpha> }`
+    - **THEN** the hook keeps returning the cached full status for `alpha`
+    - **AND** `isLoading` is false once the poll settles
+
+    #### Scenario: Section bucket does not leak status cache
+
+    - **GIVEN** the same change name could appear under different list sections (e.g. after restore)
+    - **WHEN** `listSection` changes the status cache key
+    - **THEN** `ifModifiedSince` and cached status are read from the new bucket only
+    - **AND** not from the previous section bucket

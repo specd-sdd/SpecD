@@ -35,6 +35,12 @@
       "rules": [
         "Hooks that return arrays or complex objects from async resources (e.g. `useChangeArtifactList`, `useChangeArtifacts`) SHALL ensure the returned references are stable when data is unchanged. They MUST avoid returning new array/object literals on every render when data sources or dependencies have not logically changed.\n\nMulti-artifact readers MUST memoize their normalized parameter sets (e.g. filenames) using stringified representations (e.g. `join('|')`) to prevent re-triggering loads when a parent component passes a new array reference containing identical content."
       ]
+    },
+    {
+      "requirement": "useChangesRead scopes status cache per change key",
+      "rules": [
+        "`useChangesRead` MUST track `ifModifiedSince` and the last full `ChangeStatusDto` separately for each status cache key (`changeReadCacheKey(listSection, \"change-status:<name>\")`).\n\nWhen the open change name or list section changes, the hook MUST:\n\n- restore the last cached full status for the new key immediately (if any), without showing an empty workflow state while a fetch is in flight;\n- send `ifModifiedSince` for **only** that key's last seen `updatedAt`, never a timestamp from a different change or section bucket.\n\nWhen `get*Status` returns `{ unchanged: true }`, the hook MUST keep exposing the cached full status for the current key. It MUST NOT clear visible status or treat the poll as \"no data available\".\n\nWhen a full status payload arrives (not `unchanged`), the hook MUST update the per-key cache and `ifModifiedSince` for that key only.\n\nDetail loading behaviour is unchanged. This requirement applies only to status polling enabled via `pollStatus`."
+      ]
     }
   ],
   "scenarios": [
@@ -176,10 +182,63 @@
         "normalizedFilenames reference remains stable",
         "AND useAsyncResource does not re-trigger a load"
       ]
+    },
+    {
+      "requirement": "useChangesRead scopes status cache per change key",
+      "name": "Revisiting a change restores cached workflow status",
+      "given": [
+        "active changes alpha and beta with beta.updatedAt newer than alpha.updatedAt",
+        "AND the shell opened alpha and received a full getChangeStatus payload"
+      ],
+      "when": ["the user opens beta then returns to alpha"],
+      "then": [
+        "useChangesRead calls getChangeStatus(\"alpha\", { ifModifiedSince: <alpha last seen> })",
+        "AND does not pass beta's updatedAt as ifModifiedSince for alpha",
+        "AND consumers still receive alpha's blockers and next action (from cache or fresh payload)",
+        "AND Overview does not show Workflow status unavailable."
+      ]
+    },
+    {
+      "requirement": "useChangesRead scopes status cache per change key",
+      "name": "Unchanged poll retains visible status for the same change",
+      "given": ["useChangesRead has a full status cached for change alpha"],
+      "when": ["the next poll returns { unchanged: true, updatedAt: <alpha> }"],
+      "then": [
+        "the hook keeps returning the cached full status for alpha",
+        "AND isLoading is false once the poll settles"
+      ]
+    },
+    {
+      "requirement": "useChangesRead scopes status cache per change key",
+      "name": "Section bucket does not leak status cache",
+      "given": [
+        "the same change name could appear under different list sections (e.g. after restore)"
+      ],
+      "when": ["listSection changes the status cache key"],
+      "then": [
+        "ifModifiedSince and cached status are read from the new bucket only",
+        "AND not from the previous section bucket"
+      ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "ui:hooks-changes-read",
+        "file": "ui:test/use-changes-read.spec.ts"
+      }
+    ],
     "symbols": [
+      {
+        "specId": "ui:hooks-changes-read",
+        "file": "ui:src/hooks/use-changes-read.ts",
+        "symbol": "StatusCacheEntry"
+      },
+      {
+        "specId": "ui:hooks-changes-read",
+        "file": "ui:src/hooks/use-changes-read.ts",
+        "symbol": "applyStatusPollResult"
+      },
       {
         "specId": "ui:hooks-changes-read",
         "file": "ui:src/hooks/use-changes-read.ts",
@@ -188,8 +247,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e4f04861ef58dc9f36e33a7caebdd630749589a7eccc6c1d2d1380abf1c10c27",
-    "verify.md": "sha256:44ca8067e590b14a9760e3efbeb5351a0df2b70d9b39ac573f3eed8b8186c36d"
+    "spec.md": "sha256:4568c844a441906e875d0b03f9b092756db943d71d67ca8ad788a0c03fb1be18",
+    "verify.md": "sha256:5723bac6d0ffc867ec43a78631f3b1f102048505eb50e1446456fd285e72a8a5"
   },
   "generatedBy": "core"
 }

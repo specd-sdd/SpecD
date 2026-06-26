@@ -27,7 +27,7 @@
     {
       "requirement": "overview includes workflow and validation status",
       "rules": [
-        "Overview MUST embed `getChangeStatus` results for the open **active** or **drafted** change: next action, blockers, and lifecycle transitions. Overview MUST NOT duplicate the Artifacts tab (no per-artifact file list on Overview). Next actions and blockers MUST be displayed using shadcn **`Card`** or **`Alert`** components as appropriate for their severity.\n\nFor **archived** and **discarded** changes, the shell MUST NOT poll workflow status. The **Workflow & validation** card MUST show the embedded message **Workflow status unavailable.** (same copy as archived), not an API error from `getChangeStatus`."
+        "Overview MUST embed `getChangeStatus` results for the open **active** or **drafted** change: next action, blockers, and lifecycle transitions. Overview MUST NOT duplicate the Artifacts tab (no per-artifact file list on Overview). Next actions and blockers MUST be displayed using shadcn **`Card`** or **`Alert`** components as appropriate for their severity.\n\nFor **active** and **drafted** changes, re-selecting a change after viewing another change in the sidebar MUST still show workflow status (from cache or fresh fetch). The embedded **Workflow status unavailable.** copy MUST NOT appear solely because the user navigated away and back while status polling remains enabled.\n\nFor **archived** and **discarded** changes, the shell MUST NOT poll workflow status. The **Workflow & validation** card MUST show the embedded message **Workflow status unavailable.** (same copy as archived), not an API error from `getChangeStatus`."
       ]
     },
     {
@@ -114,6 +114,19 @@
       "then": [
         "blockers are listed in the workflow section on Overview",
         "AND there is no separate Validation tab to open"
+      ]
+    },
+    {
+      "requirement": "overview includes workflow and validation status",
+      "name": "Active change keeps workflow status after sidebar switch",
+      "given": [
+        "active changes alpha and beta where beta was updated more recently",
+        "AND Overview for alpha previously showed blockers or next action"
+      ],
+      "when": ["user selects beta then selects alpha again"],
+      "then": [
+        "Overview workflow section shows alpha status again",
+        "AND does not show Workflow status unavailable."
       ]
     },
     {
@@ -213,7 +226,18 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "ui:change-tab-overview",
+        "file": "ui:src/sidebar/ChangesSidebar.tsx"
+      }
+    ],
     "symbols": [
+      {
+        "specId": "ui:change-tab-overview",
+        "file": "ui:src/hooks/use-changes-read.ts",
+        "symbol": "useChangesRead"
+      },
       {
         "specId": "ui:change-tab-overview",
         "file": "ui:src/change/ChangeOverview.tsx",
@@ -222,8 +246,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:d21f4d2c37046534738b261162d9ce025c676b1cb1884788246f93e5fa0ae1c8",
-    "verify.md": "sha256:2bcc66477612a5679998ab39d17bb09987f2bcf2d1d369cecd2b27c3d61bd507"
+    "spec.md": "sha256:995d4558914bb64785ea8e31b66f63592f8ba3241d85dab6bc42024f1c1be26b",
+    "verify.md": "sha256:ae829ee81880afc5a7db994a8cd4fb127bc30eea37aae8b825d2932ea81ee987"
   },
   "generatedBy": "core"
 }

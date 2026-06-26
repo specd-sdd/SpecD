@@ -4,7 +4,8 @@ import process from 'node:process'
 const repoRoot = process.cwd()
 const port = Number(process.env.STUDIO_E2E_PORT ?? 4450)
 const apiBaseUrl = process.env.STUDIO_E2E_BASE_URL ?? `http://127.0.0.1:${port}`
-const uiBaseUrl = process.env.STUDIO_E2E_UI_BASE_URL ?? 'http://127.0.0.1:5174'
+// Vite dev server binds to localhost (often ::1); 127.0.0.1 can refuse connections.
+const uiBaseUrl = process.env.STUDIO_E2E_UI_BASE_URL ?? 'http://localhost:5174'
 const healthUrl = `${apiBaseUrl.replace(/\/$/, '')}/v1/health`
 const rawPlaywrightArgs = process.argv.slice(2)
 const playwrightArgs =

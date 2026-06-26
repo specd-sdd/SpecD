@@ -57,6 +57,7 @@ export function ChangesSidebar({
         selected={selected}
         onSelect={onSelect}
         fixedCircleColor="text-muted-foreground/50"
+        rowTestIdPrefix="studio-draft-change"
       />
       {archived !== undefined ? (
         <Section

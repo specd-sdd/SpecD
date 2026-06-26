@@ -41,6 +41,21 @@ Hooks that return arrays or complex objects from async resources (e.g. `useChang
 
 Multi-artifact readers MUST memoize their normalized parameter sets (e.g. filenames) using stringified representations (e.g. `join('|')`) to prevent re-triggering loads when a parent component passes a new array reference containing identical content.
 
+### Requirement: useChangesRead scopes status cache per change key
+
+`useChangesRead` MUST track `ifModifiedSince` and the last full `ChangeStatusDto` separately for each status cache key (`changeReadCacheKey(listSection, "change-status:<name>")`).
+
+When the open change name or list section changes, the hook MUST:
+
+- restore the last cached full status for the new key immediately (if any), without showing an empty workflow state while a fetch is in flight;
+- send `ifModifiedSince` for **only** that key's last seen `updatedAt`, never a timestamp from a different change or section bucket.
+
+When `get*Status` returns `{ unchanged: true }`, the hook MUST keep exposing the cached full status for the current key. It MUST NOT clear visible status or treat the poll as "no data available".
+
+When a full status payload arrives (not `unchanged`), the hook MUST update the per-key cache and `ifModifiedSince` for that key only.
+
+Detail loading behaviour is unchanged. This requirement applies only to status polling enabled via `pollStatus`.
+
 ## Spec Dependencies
 
 - [`client:specd-data-port`](../../client/specd-data-port/spec.md) — data access

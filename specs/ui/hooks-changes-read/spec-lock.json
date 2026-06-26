@@ -7,7 +7,10 @@
   "implementation": [
     {
       "file": "ui:src/hooks/use-changes-read.ts",
-      "symbols": ["useChangesRead"]
+      "symbols": ["StatusCacheEntry", "applyStatusPollResult", "useChangesRead"]
+    },
+    {
+      "file": "ui:test/use-changes-read.spec.ts"
     }
   ]
 }

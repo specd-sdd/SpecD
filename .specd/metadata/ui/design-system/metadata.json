@@ -74,7 +74,7 @@
     {
       "requirement": "titlebar respects platform window-control safe zones",
       "rules": [
-        "Studio titlebar chrome MUST expose CSS custom properties (or equivalent Tailwind\nutilities) for non-client safe areas:\n\n| Host platform | `--studio-safe-left` | `--studio-safe-right` |\n| ------------- | -------------------- | --------------------- |\n| macOS (`darwin`) | ~96px (traffic lights + gap before toggle) | ~12px |\n| Windows / Linux | ~12px | ~138px (minimize/maximize/close) |\n| Web | ~12px | ~12px |\n\nInteractive controls MUST NOT render inside the right safe zone on Windows/Linux.\nOn **macOS desktop**, the titlebar MUST reserve the left safe zone via a dedicated traffic-light slot; **`SidebarTrigger`** MUST be the first interactive control after that slot.\n\nThe titlebar MUST apply `padding-inline-start` and `padding-inline-end` from these\ntokens on hosts that do not use an explicit traffic slot (non-darwin or web).\n\nDesktop hosts MUST set a root `data-platform` attribute (`darwin`, `win32`, `linux`,\nor `web`) so token values apply without feature-level platform branching in every\ncomponent."
+        "Studio titlebar chrome MUST expose CSS custom properties (or equivalent Tailwind\nutilities) for non-client safe areas:\n\n| Host platform    | `--studio-safe-left`                       | `--studio-safe-right`            |\n| ---------------- | ------------------------------------------ | -------------------------------- |\n| macOS (`darwin`) | ~96px (traffic lights + gap before toggle) | ~12px                            |\n| Windows / Linux  | ~12px                                      | ~138px (minimize/maximize/close) |\n| Web              | ~12px                                      | ~12px                            |\n\nInteractive controls MUST NOT render inside the right safe zone on Windows/Linux.\nOn **macOS desktop**, the titlebar MUST reserve the left safe zone via a dedicated traffic-light slot; **`SidebarTrigger`** MUST be the first interactive control after that slot.\n\nThe titlebar MUST apply `padding-inline-start` and `padding-inline-end` from these\ntokens on hosts that do not use an explicit traffic slot (non-darwin or web).\n\nDesktop hosts MUST set a root `data-platform` attribute (`darwin`, `win32`, `linux`,\nor `web`) so token values apply without feature-level platform branching in every\ncomponent."
       ]
     },
     {
@@ -663,9 +663,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:12179790025f1fe655d8e81ba0fc8d8161fa516602bd0c08a7bb9e71e70afd1c",
+    "spec.md": "sha256:ca4a4e576754ab0605791f4bfa33523d5bbd3ca895e1f8298187394248dccd4f",
     "verify.md": "sha256:4e3e36710bc63b6bd724738f906e4a60fddfd0654148eaa8c221c83a6332cf2d"
   },
-  "generatedBy": "core",
-  "dependsOn": []
+  "generatedBy": "core"
 }

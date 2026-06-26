@@ -45,6 +45,115 @@ async function openFirstActiveChange(page: import('@playwright/test').Page): Pro
   return changeName!
 }
 
+type SidebarChangeTarget = {
+  readonly name: string
+  readonly testIdPrefix: 'studio-active-change' | 'studio-draft-change'
+}
+
+function changeNameFromTestId(
+  testId: string | null,
+  testIdPrefix: SidebarChangeTarget['testIdPrefix'],
+): string | undefined {
+  if (!testId) {
+    return undefined
+  }
+  const prefix = `${testIdPrefix}-`
+  return testId.startsWith(prefix) ? testId.slice(prefix.length) : undefined
+}
+
+async function requireTwoSidebarChanges(
+  page: import('@playwright/test').Page,
+): Promise<readonly [SidebarChangeTarget, SidebarChangeTarget]> {
+  await openStudioShell(page)
+
+  await expect(page.locator('.studio-panel-header', { hasText: /^Changes$/ })).toBeVisible()
+
+  await expect(async () => {
+    const activeCount = await page.locator('[data-testid^="studio-active-change-"]').count()
+    const draftCount = await page.locator('[data-testid^="studio-draft-change-"]').count()
+    if (activeCount + draftCount < 2) {
+      throw new Error('Waiting for sidebar changes to load')
+    }
+  }).toPass({ timeout: 20_000 })
+
+  const activeRows = page.locator('[data-testid^="studio-active-change-"]')
+  const draftRows = page.locator('[data-testid^="studio-draft-change-"]')
+  const activeCount = await activeRows.count()
+  const draftCount = await draftRows.count()
+
+  if (activeCount >= 2) {
+    const firstName = changeNameFromTestId(
+      await activeRows.nth(0).getAttribute('data-testid'),
+      'studio-active-change',
+    )
+    const secondName = changeNameFromTestId(
+      await activeRows.nth(1).getAttribute('data-testid'),
+      'studio-active-change',
+    )
+    if (firstName && secondName) {
+      return [
+        { name: firstName, testIdPrefix: 'studio-active-change' },
+        { name: secondName, testIdPrefix: 'studio-active-change' },
+      ]
+    }
+  }
+
+  if (draftCount >= 2) {
+    const firstName = changeNameFromTestId(
+      await draftRows.nth(0).getAttribute('data-testid'),
+      'studio-draft-change',
+    )
+    const secondName = changeNameFromTestId(
+      await draftRows.nth(1).getAttribute('data-testid'),
+      'studio-draft-change',
+    )
+    if (firstName && secondName) {
+      return [
+        { name: firstName, testIdPrefix: 'studio-draft-change' },
+        { name: secondName, testIdPrefix: 'studio-draft-change' },
+      ]
+    }
+  }
+
+  if (activeCount >= 1 && draftCount >= 1) {
+    const activeName = changeNameFromTestId(
+      await activeRows.first().getAttribute('data-testid'),
+      'studio-active-change',
+    )
+    const draftName = changeNameFromTestId(
+      await draftRows.first().getAttribute('data-testid'),
+      'studio-draft-change',
+    )
+    if (activeName && draftName) {
+      return [
+        { name: activeName, testIdPrefix: 'studio-active-change' },
+        { name: draftName, testIdPrefix: 'studio-draft-change' },
+      ]
+    }
+  }
+
+  test.skip(true, 'Need at least two sidebar changes (active and/or draft)')
+  throw new Error('Need at least two sidebar changes (active and/or draft)')
+}
+
+async function openSidebarChange(
+  page: import('@playwright/test').Page,
+  target: SidebarChangeTarget,
+): Promise<void> {
+  await page.getByTestId(`${target.testIdPrefix}-${target.name}`).click()
+  await expect(page.getByRole('heading', { level: 1, name: target.name })).toBeVisible({
+    timeout: 12_000,
+  })
+  await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible({ timeout: 12_000 })
+}
+
+async function expectWorkflowStatusAvailable(page: import('@playwright/test').Page): Promise<void> {
+  const panel = page.getByTestId('studio-change-workflow-status')
+  await expect(panel).toBeVisible({ timeout: 12_000 })
+  await expect(panel.getByText('Workflow status unavailable.')).not.toBeVisible()
+  await expect(panel.getByText('Next action')).toBeVisible({ timeout: 12_000 })
+}
+
 test.describe('SpecD Studio UI', () => {
   test('loads studio title', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
@@ -92,6 +201,19 @@ test.describe('SpecD Studio UI', () => {
 
   test('selecting a change shows the overview', async ({ page }) => {
     await openFirstActiveChange(page)
+  })
+
+  test('switching between changes keeps workflow status on overview', async ({ page }) => {
+    const [first, second] = await requireTwoSidebarChanges(page)
+
+    await openSidebarChange(page, first)
+    await expectWorkflowStatusAvailable(page)
+
+    await openSidebarChange(page, second)
+    await expectWorkflowStatusAvailable(page)
+
+    await openSidebarChange(page, first)
+    await expectWorkflowStatusAvailable(page)
   })
 
   test('command palette shows remote result categories', async ({ page }) => {

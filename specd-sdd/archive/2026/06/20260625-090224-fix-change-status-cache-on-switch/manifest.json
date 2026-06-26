@@ -1,0 +1,393 @@
+{
+  "name": "fix-change-status-cache-on-switch",
+  "createdAt": "2026-06-25T09:02:24.774Z",
+  "updatedAt": "2026-06-26T08:50:17.825Z",
+  "description": "Fix useChangesRead status cache when switching between changes in Studio",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["ui:hooks-changes-read", "ui:change-tab-overview"],
+  "specDependsOn": {
+    "ui:hooks-changes-read": ["client:specd-data-port", "client:port-changes-read"],
+    "ui:change-tab-overview": ["client:specd-data-port", "ui:change-metadata-editor"]
+  },
+  "invalidationPolicy": "none",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/ui/src/hooks/use-changes-read.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/use-changes-read.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-web/playwright.config.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-web/tests/e2e/studio.ui.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/run-studio-ui-e2e.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/change/ChangeOverview.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/sidebar/ChangesSidebar.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/docs/studio/merge-main-analysis-2026-06-25.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/deltas/ui/change-tab-overview/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/deltas/ui/change-tab-overview/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/deltas/ui/hooks-changes-read/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/deltas/ui/hooks-changes-read/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260625-090224-fix-change-status-cache-on-switch/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/docs/studio/core-refactor-on-main.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "ui:hooks-changes-read",
+      "file": "packages/ui/src/hooks/use-changes-read.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["StatusCacheEntry", "applyStatusPollResult", "useChangesRead"]
+    },
+    {
+      "specId": "ui:change-tab-overview",
+      "file": "packages/ui/src/hooks/use-changes-read.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["useChangesRead"]
+    },
+    {
+      "specId": "ui:hooks-changes-read",
+      "file": "packages/ui/test/use-changes-read.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "ui:change-tab-overview",
+      "file": "packages/ui/src/change/ChangeOverview.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangeOverview"]
+    },
+    {
+      "specId": "ui:change-tab-overview",
+      "file": "packages/ui/src/sidebar/ChangesSidebar.tsx",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:7cd4f08607ae9efbb302634adfa457f13e0a5b382fd5be22079aa22c06696eb9"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "ui:hooks-changes-read",
+          "filename": "deltas/ui/hooks-changes-read/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1f25822a0d7e429946549843f9c776e9ceef7c6ac1d21d6ec76818a6e45db378"
+        },
+        {
+          "key": "ui:change-tab-overview",
+          "filename": "deltas/ui/change-tab-overview/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:85dbfad608279b3cd523795b6442db611e1a84aa4e092179fdbdc20ff5f71fe2"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "ui:hooks-changes-read",
+          "filename": "deltas/ui/hooks-changes-read/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d4b99e4c6d6d843f0cd11cd2f5a141b4668a43da06ea850b7beec6c87dc0c874"
+        },
+        {
+          "key": "ui:change-tab-overview",
+          "filename": "deltas/ui/change-tab-overview/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:28352e05124bf4a12cb6af6da16d3a40d0e7cf4507f4c5b7889fed5aa5846794"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:cd543c32ba07eeda520dc1e9da25d78097c50db46de513a84c6111cd5eefa583"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:cac2dfa640b4c9dec1265dbaaf36a6046e27dcf84cc94eec06f9a28289d7f2fc"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-25T09:02:24.774Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["ui:hooks-changes-read", "ui:change-tab-overview"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-25T09:02:24.813Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "ui:hooks-changes-read"
+        },
+        {
+          "type": "specs",
+          "key": "ui:change-tab-overview"
+        },
+        {
+          "type": "verify",
+          "key": "ui:hooks-changes-read"
+        },
+        {
+          "type": "verify",
+          "key": "ui:change-tab-overview"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:03:35.627Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:06:37.530Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:15:39.623Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-25T09:30:07.749Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:30:07.749Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:47:34.653Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T09:50:54.647Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:25:04.929Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:30:08.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:30:25.407Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:50:17.825Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-26T08:50:17.868Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

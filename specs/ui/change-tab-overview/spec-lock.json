@@ -6,8 +6,15 @@
   "dependsOn": ["client:specd-data-port", "ui:change-metadata-editor"],
   "implementation": [
     {
+      "file": "ui:src/hooks/use-changes-read.ts",
+      "symbols": ["useChangesRead"]
+    },
+    {
       "file": "ui:src/change/ChangeOverview.tsx",
       "symbols": ["ChangeOverview"]
+    },
+    {
+      "file": "ui:src/sidebar/ChangesSidebar.tsx"
     }
   ]
 }

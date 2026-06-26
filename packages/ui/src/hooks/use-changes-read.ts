@@ -10,6 +10,23 @@ import {
 } from '../lib/change-read-routes.js'
 import { useAsyncResource } from './use-async-resource.js'
 
+type StatusCacheEntry = {
+  readonly lastModified: string | undefined
+  readonly status: ChangeStatusDto | undefined
+}
+
+const EMPTY_STATUS_CACHE: StatusCacheEntry = {
+  lastModified: undefined,
+  status: undefined,
+}
+
+function applyStatusPollResult(entry: StatusCacheEntry, next: ChangeStatusDto): StatusCacheEntry {
+  if (next.unchanged === true) {
+    return entry
+  }
+  return { status: next, lastModified: next.updatedAt }
+}
+
 /**
  *
  * @param changeName
@@ -38,21 +55,20 @@ export function useChangesRead(
   const listSection: ChangeReadSection = options.listSection ?? null
   const pollStatus = options.pollStatus ?? true
   const enabled = Boolean(changeName)
-  const [lastModified, setLastModified] = React.useState<string | undefined>(
-    options.ifModifiedSince,
-  )
+  const statusCacheKey = changeReadCacheKey(listSection, `change-status:${changeName ?? ''}`)
+  const statusCacheRef = React.useRef(new Map<string, StatusCacheEntry>())
 
   const loadDetail = React.useCallback(
     () => loadChangeDetail(port, changeName!, listSection),
     [port, changeName, listSection],
   )
-  const loadStatus = React.useCallback(
-    () =>
-      loadChangeStatus(port, changeName!, listSection, {
-        ifModifiedSince: lastModified,
-      }),
-    [port, changeName, listSection, lastModified],
-  )
+  const loadStatus = React.useCallback(() => {
+    const key = changeReadCacheKey(listSection, `change-status:${changeName ?? ''}`)
+    const cached = statusCacheRef.current.get(key)
+    return loadChangeStatus(port, changeName!, listSection, {
+      ifModifiedSince: cached?.lastModified ?? options.ifModifiedSince,
+    })
+  }, [port, changeName, listSection, options.ifModifiedSince])
 
   const detail = useAsyncResource(
     changeReadCacheKey(listSection, `change-detail:${changeName ?? ''}`),
@@ -63,32 +79,37 @@ export function useChangesRead(
     },
   )
 
-  const statusResource = useAsyncResource(
-    changeReadCacheKey(listSection, `change-status:${changeName ?? ''}`),
-    loadStatus,
-    {
-      enabled: enabled && pollStatus,
-      refreshKey: options.refreshKey,
-    },
+  const statusResource = useAsyncResource(statusCacheKey, loadStatus, {
+    enabled: enabled && pollStatus,
+    refreshKey: options.refreshKey,
+  })
+
+  const [statusData, setStatusData] = React.useState<ChangeStatusDto | undefined>(
+    () => statusCacheRef.current.get(statusCacheKey)?.status,
+  )
+  const [lastModified, setLastModified] = React.useState<string | undefined>(
+    () => statusCacheRef.current.get(statusCacheKey)?.lastModified ?? options.ifModifiedSince,
   )
 
-  const [statusData, setStatusData] = React.useState<ChangeStatusDto | undefined>()
-
   React.useEffect(() => {
-    setStatusData(undefined)
-  }, [changeName])
+    const cached = statusCacheRef.current.get(statusCacheKey)
+    setStatusData(cached?.status)
+    setLastModified(cached?.lastModified ?? options.ifModifiedSince)
+  }, [statusCacheKey, options.ifModifiedSince])
 
   React.useEffect(() => {
     const next = statusResource.data
-    if (!next) {
+    if (!next || next.name !== changeName) {
       return
     }
-    if (next.unchanged === true) {
-      return
+    const prev = statusCacheRef.current.get(statusCacheKey) ?? EMPTY_STATUS_CACHE
+    const entry = applyStatusPollResult(prev, next)
+    statusCacheRef.current.set(statusCacheKey, entry)
+    if (entry.status !== undefined) {
+      setStatusData(entry.status)
+      setLastModified(entry.lastModified)
     }
-    setStatusData(next)
-    setLastModified(next.updatedAt)
-  }, [statusResource.data])
+  }, [statusResource.data, statusCacheKey, changeName])
 
   const status = React.useMemo(
     () => ({

@@ -76,6 +76,14 @@
 - **THEN** blockers are listed in the workflow section on Overview
 - **AND** there is no separate Validation tab to open
 
+#### Scenario: Active change keeps workflow status after sidebar switch
+
+- **GIVEN** active changes `alpha` and `beta` where `beta` was updated more recently
+- **AND** Overview for `alpha` previously showed blockers or next action
+- **WHEN** user selects `beta` then selects `alpha` again
+- **THEN** Overview workflow section shows `alpha` status again
+- **AND** does not show **Workflow status unavailable.**
+
 ### Requirement: overview hosts change metadata editor
 
 #### Scenario: Specs readonly panel on Overview

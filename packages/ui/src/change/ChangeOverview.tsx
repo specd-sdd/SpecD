@@ -87,7 +87,7 @@ export function ChangeOverview({
       </div>
 
       <div className="grid w-full grid-cols-1 gap-3 @[640px]:grid-cols-2 @[960px]:grid-cols-3">
-        <Card title="Workflow & validation" className="col-span-full">
+        <Card title="Workflow & validation" className="col-span-full" testId="studio-change-workflow-status">
           <ChangeStatusPanel
             embedded
             status={status}
@@ -169,13 +169,15 @@ function Card({
   title,
   children,
   className = '',
+  testId,
 }: {
   title: string
   children: React.ReactNode
   className?: string
+  testId?: string
 }): React.ReactElement {
   return (
-    <StudioCard className={className}>
+    <StudioCard className={className} data-testid={testId}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
