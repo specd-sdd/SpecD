@@ -80,6 +80,12 @@ The `@specd/code-graph` package (or its providers) SHALL manage a centralized, f
 - The lock file location is standardized inside the project's config directory (e.g. `.specd/config/graph/index.lock`).
 - Any client of the provider (CLI, MCP, etc.) can verify or assert lock availability to prevent concurrent indexing operations.
 
+### Requirement: Health orchestration use case
+
+Staleness comparison primitives (`isGraphStale`, fingerprint helpers) remain in this spec. Hosts MUST NOT reimplement VCS ref resolution plus staleness and fingerprint assembly inline when `GetGraphHealth` is available.
+
+`GetGraphHealth` (see `code-graph:get-graph-health`) is the canonical orchestration entry point for graph health diagnostics consumed by `graph stats`, `project status --graph`, and SDK snapshot builders.
+
 ### Requirement: Effective configuration building
 
 The `@specd/code-graph` package SHALL provide functions to merge workspace-specific configuration options (`allowedPaths`, `excludePaths`, `respectGitignore`) and global project parameters with custom runtime/CLI overrides (such as `--include-path` and `--exclude-path`). It returns a unified, effective `ProjectGraphConfig`.
@@ -97,6 +103,6 @@ When running in a directory without a discovered `specd.yaml` configuration file
 
 ## Spec Dependencies
 
-- [`code-graph:graph-store`](../graph-store/spec.md) — `GraphStore` meta storage, `GraphStatistics`
-- [`code-graph:indexer`](../indexer/spec.md) — `IndexOptions`, `IndexCodeGraph`
-- [`cli:graph-stats`](../../cli/graph-stats/spec.md) — `graph stats` command output
+- [`code-graph:graph-store`](../graph-store/spec.md) — metadata keys for `lastIndexedRef`
+- [`code-graph:indexer`](../indexer/spec.md) — persists VCS ref at index time
+- [`code-graph:get-graph-health`](../get-graph-health/spec.md) — host orchestration for diagnostics

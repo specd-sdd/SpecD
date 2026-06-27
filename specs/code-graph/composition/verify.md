@@ -102,3 +102,10 @@
 - **WHEN** the `@specd/code-graph` package is inspected
 - **THEN** its `package.json` has a dependency on `@specd/core`
 - **AND** the primary factory accepts `SpecdConfig` from `@specd/core`
+
+### Requirement: Host use cases
+
+#### Scenario: Package exports host use case factories
+
+- **WHEN** `@specd/code-graph` is imported
+- **THEN** `createGetGraphHealth`, `createIndexProjectGraph`, `createGetSpecCoverage`, and `createGetChangeSpecCoverage` are available as named exports

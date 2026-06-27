@@ -6,7 +6,8 @@
     "core:config",
     "code-graph:composition",
     "code-graph:staleness-detection",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "code-graph:get-graph-health"
   ],
   "context": [
     "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance."
@@ -21,7 +22,7 @@
     {
       "requirement": "Statistics retrieval",
       "rules": [
-        "The command resolves the graph context and delegates project fingerprint comparison, VCS ref resolution, and staleness calculation entirely to the `@specd/code-graph` provider. It outputs the returned statistics, closes the provider, and exits."
+        "The command resolves the graph context, opens the provider, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()`. It outputs the returned result fields, closes the provider, and exits.\n\nThe command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison."
       ]
     },
     {
@@ -75,11 +76,20 @@
     },
     {
       "requirement": "Statistics retrieval",
+      "name": "Command delegates health to GetGraphHealth",
+      "when": ["specd graph stats is executed in configured mode with kernel available"],
+      "then": [
+        "it calls GetGraphHealth.execute() with workspaces from ListWorkspaces",
+        "AND it does not call isGraphStale or detectFingerprintMismatch directly in the command handler"
+      ]
+    },
+    {
+      "requirement": "Statistics retrieval",
       "name": "Command obtains orchestrated project structure",
       "when": ["specd graph stats is executed in configured mode"],
       "then": [
         "it calls ListWorkspaces to obtain the rich workspace list",
-        "AND it uses this list to compute the project fingerprint"
+        "AND it passes that list to GetGraphHealth for fingerprint comparison"
       ]
     },
     {
@@ -164,31 +174,22 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "cli:graph-stats",
-        "file": "cli:src/commands/graph/stats.ts"
-      },
-      {
-        "specId": "cli:graph-stats",
-        "file": "cli:src/commands/graph/search.ts"
-      },
-      {
-        "specId": "cli:graph-stats",
-        "file": "cli:src/commands/project/status.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "cli:graph-stats",
-        "file": "cli:src/commands/graph/warn-graph-staleness.ts",
-        "symbol": "warnGraphStale"
+        "file": "cli:src/commands/graph/stats.ts",
+        "symbol": "registerGraphStats"
+      },
+      {
+        "specId": "cli:graph-stats",
+        "file": "cli:src/commands/project/status.ts",
+        "symbol": "loadGraphData"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b981dab77cd52219ab61a25697a2e9e45d271f9ae6a920ee1820395ba288222e",
-    "verify.md": "sha256:9d61e6f6da9a016fcdf17d53ef7c2581a488f0cf27cb1feaeb28b74c56aa78a9"
+    "spec.md": "sha256:3bb11dbf5200298f56d94a2678dabb0ac110c6c45c8f825c651de0090a327f58",
+    "verify.md": "sha256:4fff430032e3295e5868d80637e1022b9c9b5a9151cb57d5e37052e5762a75d5"
   },
   "generatedBy": "core"
 }

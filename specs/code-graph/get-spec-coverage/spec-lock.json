@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:composition", "code-graph:symbol-model"],
+  "implementation": [
+    {
+      "file": "code-graph:src/application/use-cases/get-spec-coverage.ts",
+      "symbols": ["GetSpecCoverage", "GetSpecCoverageInput", "GetSpecCoverageResult"]
+    },
+    {
+      "file": "code-graph:src/composition/use-cases/get-spec-coverage.ts",
+      "symbols": ["createGetSpecCoverage"]
+    }
+  ]
+}

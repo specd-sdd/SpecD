@@ -1,9 +1,9 @@
 import { Command, Option } from 'commander'
 import {
-  type IndexOptions,
   type IndexResult,
   acquireGraphIndexLock,
   buildProjectGraphConfig,
+  createIndexProjectGraph,
 } from '@specd/code-graph'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
@@ -114,84 +114,77 @@ export function registerGraphIndex(parent: Command): void {
               process.exit(0)
             })
           } else {
-            await withProvider(
-              config,
-              opts.format,
-              async (provider) => {
-                const workspaces =
-                  kernel !== null
-                    ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
-                        name: ws.name,
-                        prefix: ws.prefix,
-                        codeRoot: ws.codeRoot,
-                        specRepo: ws.specRepo,
-                        ownership: ws.ownership,
-                        isExternal: ws.isExternal,
-                      }))
-                    : config.workspaces.map((ws) => {
-                        const specsPath = ws.specsPath ?? join(config.projectRoot, 'specs')
-                        const specRepo = core.createSpecRepository(
-                          'fs',
-                          {
-                            workspace: ws.name,
-                            ownership: ws.ownership,
-                            isExternal: ws.isExternal,
-                            configPath: config.configPath,
-                          },
-                          {
-                            specsPath,
-                            metadataPath: join(specsPath, '..', '.specd', 'metadata'),
-                          },
-                        )
-                        return {
-                          name: ws.name,
-                          prefix: null,
-                          codeRoot: ws.codeRoot,
-                          specRepo,
+            await withProvider(config, opts.format, async (provider) => {
+              const workspaces =
+                kernel !== null
+                  ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
+                      name: ws.name,
+                      prefix: ws.prefix,
+                      codeRoot: ws.codeRoot,
+                      specRepo: ws.specRepo,
+                      ownership: ws.ownership,
+                      isExternal: ws.isExternal,
+                    }))
+                  : config.workspaces.map((ws) => {
+                      const specsPath = ws.specsPath ?? join(config.projectRoot, 'specs')
+                      const specRepo = core.createSpecRepository(
+                        'fs',
+                        {
+                          workspace: ws.name,
                           ownership: ws.ownership,
                           isExternal: ws.isExternal,
-                        }
-                      })
-                const projectRoot = config.projectRoot
+                          configPath: config.configPath,
+                        },
+                        {
+                          specsPath,
+                          metadataPath: join(specsPath, '..', '.specd', 'metadata'),
+                        },
+                      )
+                      return {
+                        name: ws.name,
+                        prefix: null,
+                        codeRoot: ws.codeRoot,
+                        specRepo,
+                        ownership: ws.ownership,
+                        isExternal: ws.isExternal,
+                      }
+                    })
+              const projectRoot = config.projectRoot
 
-                const vcs = await Promise.resolve(core.createVcsAdapter(projectRoot)).catch(
-                  () => null,
-                )
-                const vcsRef = (await vcs?.ref()) ?? undefined
+              const vcs = await Promise.resolve(core.createVcsAdapter(projectRoot)).catch(
+                () => null,
+              )
+              const vcsRef = (await vcs?.ref()) ?? undefined
 
-                const graphConfig = buildProjectGraphConfig(config, {
-                  ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
-                })
+              const graphConfig = buildProjectGraphConfig(config, {
+                ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
+              })
 
-                const indexOptions: IndexOptions = {
-                  projectRoot,
-                  workspaces,
-                  graphConfig,
-                  codeGraphVersion,
-                  ...(vcsRef !== undefined ? { vcsRef } : {}),
-                  onProgress: (percent, phase) => {
-                    if (fmt === 'text') {
-                      const pct = Math.round(percent)
-                      process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
-                    }
-                  },
-                }
+              const indexProjectGraph = createIndexProjectGraph()
 
-                const result = await provider.index(indexOptions)
-
-                if (fmt === 'text') {
-                  process.stdout.write('\n')
-                  output(formatTextIndexResult(result), 'text')
-                } else {
-                  output(result, fmt)
-                }
-              },
-              opts.force
-                ? {
-                    beforeOpen: async (provider) => provider.recreate(),
+              const result = await indexProjectGraph.execute({
+                provider,
+                projectRoot,
+                workspaces,
+                graphConfig,
+                codeGraphVersion,
+                force: opts.force,
+                ...(vcsRef !== undefined ? { vcsRef } : {}),
+                onProgress: (percent, phase) => {
+                  if (fmt === 'text') {
+                    const pct = Math.round(percent)
+                    process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
                   }
-                : undefined,
-            )
+                },
+              })
+
+              if (fmt === 'text') {
+                process.stdout.write('\n')
+                output(formatTextIndexResult(result), 'text')
+              } else {
+                output(result, fmt)
+              }
+            })
           }
         } catch (err) {
           if (lockRelease) lockRelease()

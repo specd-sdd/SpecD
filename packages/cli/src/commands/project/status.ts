@@ -1,12 +1,11 @@
 import {
   createCodeGraphProvider,
-  parseFingerprintMap,
-  detectFingerprintMismatch,
-  type GraphStatistics,
+  createGetGraphHealth,
+  type GetGraphHealthResult,
   type HotspotResult,
-  buildProjectGraphConfig,
+  type WorkspaceIndexTarget,
 } from '@specd/code-graph'
-import { createVcsAdapter, type SpecdConfig } from '@specd/core'
+import { type SpecdConfig } from '@specd/core'
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
@@ -48,12 +47,12 @@ export function registerProjectStatus(parent: Command): void {
           configPath: opts.config,
         })
 
-        const [workspaces, summary, graphData] = await Promise.all([
-          kernel.project.listWorkspaces.execute(),
+        const workspaces = await kernel.project.listWorkspaces.execute()
+        const [summary, graphData] = await Promise.all([
           kernel.project.getProjectSummary.execute(),
-          loadGraphData(config, opts.graph ?? false),
+          loadGraphData(config, opts.graph ?? false, workspaces),
         ])
-        const graphStats = graphData.stats
+        const graphHealth = graphData.health
         const hotspots = graphData.hotspots
 
         const specCounts = Object.entries(summary.specsByWorkspace).map(([name, count]) => ({
@@ -62,40 +61,9 @@ export function registerProjectStatus(parent: Command): void {
         }))
         const totalSpecs = Object.values(summary.specsByWorkspace).reduce((acc, c) => acc + c, 0)
 
-        const graphFreshness = graphStats?.lastIndexedAt ?? null
-        let graphStale: boolean | null = null
-        let fingerprintMismatch: boolean | null = null
-        if (graphStats !== null) {
-          let currentRef: string | null = null
-          try {
-            const vcs = await createVcsAdapter(config.projectRoot)
-            currentRef = await vcs.ref()
-          } catch {
-            // No VCS
-          }
-          if (graphStats.lastIndexedRef !== null && currentRef !== null) {
-            graphStale = graphStats.lastIndexedRef !== currentRef
-          } else if (graphFreshness !== null) {
-            graphStale = Date.now() - new Date(graphFreshness).getTime() > 24 * 60 * 60 * 1000
-          }
-
-          if (graphStats.graphFingerprint !== null) {
-            try {
-              const storedMap = parseFingerprintMap(graphStats.graphFingerprint)
-              const graphConfig = buildProjectGraphConfig(config)
-
-              fingerprintMismatch = detectFingerprintMismatch(
-                storedMap,
-                codeGraphVersion,
-                config.projectRoot,
-                workspaces,
-                graphConfig,
-              )
-            } catch {
-              fingerprintMismatch = null
-            }
-          }
-        }
+        const graphFreshness = graphHealth?.lastIndexedAt ?? null
+        const graphStale = graphHealth?.stale ?? null
+        const fingerprintMismatch = graphHealth?.fingerprintMismatch ?? null
 
         const approvals = {
           specEnabled: config.approvals?.spec ?? false,
@@ -180,12 +148,12 @@ export function registerProjectStatus(parent: Command): void {
                 freshness: graphFreshness,
                 stale: graphStale,
                 fingerprintMismatch,
-                ...(opts.graph && graphStats
+                ...(opts.graph && graphHealth
                   ? {
-                      fileCount: graphStats.fileCount,
-                      symbolCount: graphStats.symbolCount,
-                      relationCounts: graphStats.relationCounts,
-                      languages: graphStats.languages,
+                      fileCount: graphHealth.fileCount,
+                      symbolCount: graphHealth.symbolCount,
+                      relationCounts: graphHealth.relationCounts,
+                      languages: graphHealth.languages,
                       hotspots: hotspots
                         ? hotspots.entries.map((e) => ({
                             symbol: {
@@ -227,11 +195,11 @@ export function registerProjectStatus(parent: Command): void {
           ...(fingerprintMismatch === true
             ? ['graph.derivation: ⚠ fingerprint mismatch — reindex recommended']
             : []),
-          ...(opts.graph && graphStats
+          ...(opts.graph && graphHealth
             ? [
-                `graph.files: ${graphStats.fileCount}`,
-                `graph.symbols: ${graphStats.symbolCount}`,
-                `graph.languages: ${graphStats.languages.join(', ') || 'none'}`,
+                `graph.files: ${graphHealth.fileCount}`,
+                `graph.symbols: ${graphHealth.symbolCount}`,
+                `graph.languages: ${graphHealth.languages.join(', ') || 'none'}`,
                 ...(hotspots && hotspots.entries.length > 0
                   ? [
                       `graph.hotspots:`,
@@ -269,21 +237,30 @@ export function registerProjectStatus(parent: Command): void {
 }
 
 /**
- * Loads code graph statistics and optionally hotspots.
+ * Loads code graph health diagnostics and optionally hotspots.
  *
  * @param config - Resolved project configuration.
  * @param includeHotspots - Whether to load hotspot entries.
- * @returns Graph statistics and hotspots, or nulls when unavailable.
+ * @param workspaces - Workspace targets for fingerprint comparison.
+ * @returns Graph health and hotspots, or nulls when unavailable.
  */
 async function loadGraphData(
   config: SpecdConfig,
   includeHotspots: boolean,
-): Promise<{ stats: GraphStatistics | null; hotspots: HotspotResult | null }> {
+  workspaces: readonly WorkspaceIndexTarget[],
+): Promise<{ health: GetGraphHealthResult | null; hotspots: HotspotResult | null }> {
   try {
     const provider = createCodeGraphProvider(config)
     await provider.open()
     try {
-      const stats = await provider.getStatistics()
+      const getGraphHealth = createGetGraphHealth()
+      const health = await getGraphHealth.execute({
+        config,
+        provider,
+        codeGraphVersion,
+        workspaces: [...workspaces],
+        assertUnlocked: false,
+      })
       let hotspots: HotspotResult | null = null
       if (includeHotspots) {
         try {
@@ -292,11 +269,11 @@ async function loadGraphData(
           // ignore
         }
       }
-      return { stats, hotspots }
+      return { health, hotspots }
     } finally {
       await provider.close()
     }
   } catch {
-    return { stats: null, hotspots: null }
+    return { health: null, hotspots: null }
   }
 }

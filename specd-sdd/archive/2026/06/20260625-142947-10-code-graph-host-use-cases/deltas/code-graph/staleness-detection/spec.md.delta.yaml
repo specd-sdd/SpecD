@@ -1,0 +1,25 @@
+- op: added
+  description: Document GetGraphHealth as orchestration entry point
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Centralized index lock control'
+  content: |
+    ### Requirement: Health orchestration use case
+
+    Staleness comparison primitives (`isGraphStale`, fingerprint helpers) remain in this spec. Hosts MUST NOT reimplement VCS ref resolution plus staleness and fingerprint assembly inline when `GetGraphHealth` is available.
+
+    `GetGraphHealth` (see `code-graph:get-graph-health`) is the canonical orchestration entry point for graph health diagnostics consumed by `graph stats`, `project status --graph`, and SDK snapshot builders.
+
+- op: modified
+  description: Update spec dependencies
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`code-graph:graph-store`](../graph-store/spec.md) — metadata keys for `lastIndexedRef`
+    - [`code-graph:indexer`](../indexer/spec.md) — persists VCS ref at index time
+    - [`code-graph:get-graph-health`](../get-graph-health/spec.md) — host orchestration for diagnostics

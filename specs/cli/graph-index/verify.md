@@ -85,13 +85,14 @@
 #### Scenario: Command passes progress callback in text mode
 
 - **WHEN** `specd graph index` is run in text mode
-- **THEN** the command passes an `onProgress` callback to the provider
+- **THEN** the command passes an `onProgress` callback to `IndexProjectGraph.execute()`
 - **AND** when the callback is invoked, it prints the progress percentage and phase to stdout
 
-#### Scenario: Command delegates configuration and locking
+#### Scenario: Worker uses IndexProjectGraph
 
-- **WHEN** `specd graph index` is executed
-- **THEN** it delegates bootstrap config fallback, effective project config merging, lock acquisition, and index execution to the provider
+- **GIVEN** the worker process is indexing
+- **WHEN** index execution runs
+- **THEN** it calls `IndexProjectGraph.execute()` instead of calling `provider.index()` directly in the command handler
 
 #### Scenario: Worker subprocess performs indexing in isolation
 

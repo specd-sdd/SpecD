@@ -1,7 +1,7 @@
 {
   "title": "Staleness Detection",
   "description": "The code graph powers impact analysis, search, and hotspot detection — but there is no way to know whether it reflects the current state of the codebase. Users and agents can operate on stale data without realising it, leading to incorrect impact results, missed dependencies, and false confidence. This spec defines how staleness is detected by comparing VCS refs and the policy for handling stale data.",
-  "dependsOn": ["code-graph:graph-store", "code-graph:indexer", "cli:graph-stats"],
+  "dependsOn": ["code-graph:graph-store", "code-graph:indexer", "code-graph:get-graph-health"],
   "context": [
     "The code graph powers impact analysis, search, and hotspot detection — but there is no way to know whether it reflects the current state of the codebase. Users and agents can operate on stale data without realising it, leading to incorrect impact results, missed dependencies, and false confidence. This spec defines how staleness is detected by comparing VCS refs and the policy for handling stale data."
   ],
@@ -52,6 +52,12 @@
       "requirement": "Centralized index lock control",
       "rules": [
         "The `@specd/code-graph` package (or its providers) SHALL manage a centralized, filesystem-based indexing lock.\n\n- Exposes mechanisms to acquire, release, and assert lock status (`assertGraphIndexUnlocked`).\n- The lock file location is standardized inside the project's config directory (e.g. `.specd/config/graph/index.lock`).\n- Any client of the provider (CLI, MCP, etc.) can verify or assert lock availability to prevent concurrent indexing operations."
+      ]
+    },
+    {
+      "requirement": "Health orchestration use case",
+      "rules": [
+        "Staleness comparison primitives (`isGraphStale`, fingerprint helpers) remain in this spec. Hosts MUST NOT reimplement VCS ref resolution plus staleness and fingerprint assembly inline when `GetGraphHealth` is available.\n\n`GetGraphHealth` (see `code-graph:get-graph-health`) is the canonical orchestration entry point for graph health diagnostics consumed by `graph stats`, `project status --graph`, and SDK snapshot builders."
       ]
     },
     {
@@ -229,6 +235,15 @@
       ]
     },
     {
+      "requirement": "Health orchestration use case",
+      "name": "Hosts use GetGraphHealth for diagnostics assembly",
+      "given": ["a host needs graph statistics with staleness and fingerprint fields"],
+      "when": ["it assembles health output"],
+      "then": [
+        "it delegates to GetGraphHealth rather than calling isGraphStale and fingerprint helpers inline"
+      ]
+    },
+    {
       "requirement": "Effective configuration building",
       "name": "Effective configuration merges overrides",
       "given": ["project config with excludePaths: [\"foo\"]"],
@@ -260,32 +275,10 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "code-graph:staleness-detection",
-        "file": "code-graph:test/application/use-cases/compute-graph-fingerprint.spec.ts"
-      },
-      {
-        "specId": "code-graph:staleness-detection",
-        "file": "code-graph:test/domain/services/is-graph-stale.spec.ts"
-      },
-      {
-        "specId": "code-graph:staleness-detection",
-        "file": "code-graph:test/application/services/bootstrap-graph-config.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "code-graph:staleness-detection",
-        "file": "code-graph:src/domain/services/is-graph-stale.ts",
-        "symbol": "isGraphStale"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:97295aab4b5a9978af2fb3630376430e4d71343a7a859a1581872922e091a476",
-    "verify.md": "sha256:7b134b5389cded4e6728c67ab4e4d7efa5b06433b2a42f8fa86f899e577fc952"
+    "spec.md": "sha256:220a5774ff5e9f61de4227b4b7e77a778c68d0872ff761813df4f7152d74c6b5",
+    "verify.md": "sha256:bcc64a5832d44bdd36cd8f4c2b8b52cfea3ddabe3c9568eb4f7c2d491af9ef4f"
   },
   "generatedBy": "core"
 }

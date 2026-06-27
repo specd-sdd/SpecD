@@ -1,0 +1,94 @@
+{
+  "title": "GetSpecCoverage",
+  "description": "Studio and future API surfaces need implementation coverage for a single spec — which files and symbols the graph links to that spec — without callers orchestrating multiple `CodeGraphProvider` query methods. `GetSpecCoverage` returns a structured coverage snapshot for one `specId`.",
+  "dependsOn": ["code-graph:composition", "code-graph:symbol-model"],
+  "context": [
+    "Studio and future API surfaces need implementation coverage for a single spec — which files and symbols the graph links to that spec — without callers orchestrating multiple `CodeGraphProvider` query methods. `GetSpecCoverage` returns a structured coverage snapshot for one `specId`."
+  ],
+  "rules": [
+    {
+      "requirement": "Returns spec coverage snapshot",
+      "rules": [
+        "`GetSpecCoverage.execute(input)` MUST return `GetSpecCoverageResult` with:\n\n- `specId: string` — echoed from input\n- `found: boolean` — `true` when `provider.getSpec(specId)` returns a node\n- `coveredFiles: Relation[]` — from `provider.getCoveredFiles(specId)`\n- `coveredSymbols: Relation[]` — from `provider.getCoveredSymbols(specId)`\n- `fileCount: number` — count of unique file targets in `coveredFiles`\n- `symbolCount: number` — count of unique symbol targets in `coveredSymbols`\n\nWhen the spec is not indexed (`found: false`), coverage arrays MUST be empty and counts MUST be zero."
+      ]
+    },
+    {
+      "requirement": "Accepts open provider",
+      "rules": [
+        "`GetSpecCoverageInput` MUST include:\n\n- `provider: CodeGraphProvider` (already opened)\n- `specId: string`\n\nThe use case MUST NOT open or close the provider."
+      ]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "rules": [
+        "`createGetSpecCoverage()` in composition MUST return a stateless `GetSpecCoverage` instance."
+      ]
+    }
+  ],
+  "constraints": [
+    "MUST NOT throw when the spec is absent from the graph — return found: false instead.",
+    "MUST NOT load spec artifact content from SpecRepository."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Returns spec coverage snapshot",
+      "name": "Indexed spec with coverage",
+      "given": ["a spec indexed with covered files and symbols"],
+      "when": ["GetSpecCoverage.execute({ specId }) runs"],
+      "then": [
+        "found is true",
+        "AND coveredFiles and coveredSymbols match provider relations",
+        "AND counts reflect unique targets"
+      ]
+    },
+    {
+      "requirement": "Returns spec coverage snapshot",
+      "name": "Spec not in graph",
+      "given": ["provider.getSpec(specId) returns undefined"],
+      "when": ["GetSpecCoverage.execute() runs"],
+      "then": ["found is false", "AND arrays are empty and counts are zero"]
+    },
+    {
+      "requirement": "Accepts open provider",
+      "name": "Does not open or close provider",
+      "given": ["a mock provider with spied lifecycle methods"],
+      "when": ["GetSpecCoverage.execute() runs"],
+      "then": ["open and close are not called"]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "name": "Factory returns stateless instance",
+      "when": ["createGetSpecCoverage() is called"],
+      "then": ["it returns a GetSpecCoverage with no captured config"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:get-spec-coverage",
+        "file": "code-graph:src/application/use-cases/get-spec-coverage.ts",
+        "symbol": "GetSpecCoverage"
+      },
+      {
+        "specId": "code-graph:get-spec-coverage",
+        "file": "code-graph:src/application/use-cases/get-spec-coverage.ts",
+        "symbol": "GetSpecCoverageInput"
+      },
+      {
+        "specId": "code-graph:get-spec-coverage",
+        "file": "code-graph:src/application/use-cases/get-spec-coverage.ts",
+        "symbol": "GetSpecCoverageResult"
+      },
+      {
+        "specId": "code-graph:get-spec-coverage",
+        "file": "code-graph:src/composition/use-cases/get-spec-coverage.ts",
+        "symbol": "createGetSpecCoverage"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d55baba031c472eae25d95d7d68edd82c7a89fe42ef66780f63ae388a4921fdb",
+    "verify.md": "sha256:ee98f7d08e172a39fc39208b1230f9bf56ee2e84bbf5255d39f69ba01f167267"
+  },
+  "generatedBy": "core"
+}

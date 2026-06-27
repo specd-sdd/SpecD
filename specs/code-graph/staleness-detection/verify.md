@@ -135,6 +135,14 @@
 - **THEN** the lock file is created containing the current process PID
 - **AND** calling the returned release callback removes the lock file
 
+### Requirement: Health orchestration use case
+
+#### Scenario: Hosts use GetGraphHealth for diagnostics assembly
+
+- **GIVEN** a host needs graph statistics with staleness and fingerprint fields
+- **WHEN** it assembles health output
+- **THEN** it delegates to `GetGraphHealth` rather than calling `isGraphStale` and fingerprint helpers inline
+
 ### Requirement: Effective configuration building
 
 #### Scenario: Effective configuration merges overrides

@@ -1,0 +1,758 @@
+{
+  "name": "10-code-graph-host-use-cases",
+  "createdAt": "2026-06-25T14:29:47.328Z",
+  "description": "G1: GetGraphHealth, IndexProjectGraph, GetSpecCoverage, GetChangeSpecCoverage use cases",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:composition",
+    "code-graph:staleness-detection",
+    "cli:graph-stats",
+    "cli:graph-index",
+    "code-graph:get-graph-health",
+    "code-graph:index-project-graph",
+    "code-graph:get-spec-coverage",
+    "code-graph:get-change-spec-coverage"
+  ],
+  "specDependsOn": {
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:get-graph-health",
+      "code-graph:index-project-graph",
+      "code-graph:get-spec-coverage",
+      "code-graph:get-change-spec-coverage"
+    ],
+    "code-graph:staleness-detection": [
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:get-graph-health"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:staleness-detection",
+      "core:list-workspaces",
+      "code-graph:get-graph-health"
+    ],
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:graph-store",
+      "core:list-workspaces",
+      "code-graph:index-project-graph"
+    ],
+    "code-graph:get-graph-health": [
+      "code-graph:composition",
+      "code-graph:staleness-detection",
+      "core:config",
+      "core:list-workspaces"
+    ],
+    "code-graph:index-project-graph": [
+      "code-graph:composition",
+      "code-graph:indexer",
+      "code-graph:graph-store",
+      "core:config"
+    ],
+    "code-graph:get-spec-coverage": ["code-graph:composition", "code-graph:symbol-model"],
+    "code-graph:get-change-spec-coverage": [
+      "code-graph:get-spec-coverage",
+      "code-graph:composition",
+      "core:change-repository-port"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/use-cases/index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-spec-coverage.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/use-cases/get-spec-coverage.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-change-spec-coverage.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/use-cases/get-change-spec-coverage.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-stats/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/staleness-detection/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/code-graph/traversal/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/spec-repository-port/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "approval-system-notes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/code-graph-host-port.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-change-spec-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-spec-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/host-use-case-factories.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGraphHealth", "GetGraphHealthInput", "GetGraphHealthResult"]
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/src/composition/use-cases/get-graph-health.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetGraphHealth"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexProjectGraph", "IndexProjectGraphInput"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/src/composition/use-cases/index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createIndexProjectGraph"]
+    },
+    {
+      "specId": "code-graph:get-spec-coverage",
+      "file": "packages/code-graph/src/application/use-cases/get-spec-coverage.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetSpecCoverage", "GetSpecCoverageInput", "GetSpecCoverageResult"]
+    },
+    {
+      "specId": "code-graph:get-spec-coverage",
+      "file": "packages/code-graph/src/composition/use-cases/get-spec-coverage.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetSpecCoverage"]
+    },
+    {
+      "specId": "code-graph:get-change-spec-coverage",
+      "file": "packages/code-graph/src/application/use-cases/get-change-spec-coverage.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GetChangeSpecCoverage",
+        "GetChangeSpecCoverageInput",
+        "GetChangeSpecCoverageResult"
+      ]
+    },
+    {
+      "specId": "code-graph:get-change-spec-coverage",
+      "file": "packages/code-graph/src/composition/use-cases/get-change-spec-coverage.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetChangeSpecCoverage"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphStats"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphIndex"]
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/src/application/ports/code-graph-host-port.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphHostPort"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/application/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadGraphData"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:2ccb9b6742cacd0824dadb833a7f2913a595587002cb11cb87efd7976e56846a"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bf0b15ed67082ef96ed6cb8e061e661389af894170614c0800df1ff98a39b080"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a6f6aa41bec4d85d5f350949b80c35809df2344af2476151cd5b330037f61d6f"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:debae173b27d40214832d5a38df7c86d1f1a127ff10118bb896be2fb1a1dfe49"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ea73381066301007c5c89375c034892cdfb6c5fd1110d378b9f15cffeb04e487"
+        },
+        {
+          "key": "code-graph:get-graph-health",
+          "filename": "specs/code-graph/get-graph-health/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:3188e8f0d14ef9f944e54e18ddd05235bca4e61d4565acf80190a72a5a8b5ae0"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "specs/code-graph/index-project-graph/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:080fbf710b81634dc07b36ebb28e21c716d1cd73b8fd4c67a3b75e62d9bc3058"
+        },
+        {
+          "key": "code-graph:get-spec-coverage",
+          "filename": "specs/code-graph/get-spec-coverage/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:d55baba031c472eae25d95d7d68edd82c7a89fe42ef66780f63ae388a4921fdb"
+        },
+        {
+          "key": "code-graph:get-change-spec-coverage",
+          "filename": "specs/code-graph/get-change-spec-coverage/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:cdb7ff3afb185e8c744a8a3187272525c443783ffcc10d89675a3d308bafd717"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d8f798d6bd4da5d29bae50d38fb33dccf60c43ba2edb31b6bbe9fdcb64558afe"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c540f31d23c115f2b4d183d485d907c276b3b4ca6753baa26ba69efac08a1d84"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d3a48d1a015299ece094232dda6c1ff8fecaaee0a4eda2a08f1a7116d38d0211"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0412e573e053f0c0fa7d7d080d9ca339041029b773f35cd1b13550cf59e67034"
+        },
+        {
+          "key": "code-graph:get-graph-health",
+          "filename": "specs/code-graph/get-graph-health/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:bc44336bced2c20b11e1d10984bb60439def3d770c6be3d744b0748792f1de00"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "specs/code-graph/index-project-graph/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:72b27944bee9c70cf7f7cbdf4e93d3eb62a46e5bd2b680a9ba20e0b542c82222"
+        },
+        {
+          "key": "code-graph:get-spec-coverage",
+          "filename": "specs/code-graph/get-spec-coverage/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:ee98f7d08e172a39fc39208b1230f9bf56ee2e84bbf5255d39f69ba01f167267"
+        },
+        {
+          "key": "code-graph:get-change-spec-coverage",
+          "filename": "specs/code-graph/get-change-spec-coverage/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:946ed8fda6df02bae52e02a0245ddd7fcabd63b9c2313decac5bbe99cef84484"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:68151c1ec3ca93794f49a9df2a47d8d96a1e24fa9125867bd896d0261835e37d"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:2e488ccf37bdfd036deaccfc66164392f7fc4574148644d46138985647aa2d6e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-25T14:29:47.328Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:composition",
+        "code-graph:staleness-detection",
+        "cli:graph-stats",
+        "cli:graph-index"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-25T14:29:47.373Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T16:32:22.933Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T16:34:45.527Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:composition",
+            "code-graph:staleness-detection",
+            "cli:graph-stats",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:composition",
+            "code-graph:staleness-detection",
+            "cli:graph-stats",
+            "cli:graph-index"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-27T16:34:45.528Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:get-graph-health"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:get-spec-coverage"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:get-change-spec-coverage"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:get-graph-health"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:get-spec-coverage"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:get-change-spec-coverage"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T16:37:17.901Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:staleness-detection]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["code-graph:staleness-detection"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T16:37:48.652Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:get-graph-health]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T16:39:35.190Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T17:09:11.041Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T17:28:13.567Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T17:34:03.288Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T17:34:08.209Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-27T17:37:32.282Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:get-graph-health\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-27T17:37:53.905Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:composition\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-27T17:38:01.417Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:composition': extracted dependencies [code-graph:symbol-model, code-graph:graph-store, code-graph:indexer, code-graph:traversal, default:_global/architecture, code-graph:get-graph-health, code-graph:index-project-graph, code-graph:get-spec-coverage, code-graph:get-change-spec-coverage] do not match persisted dependencies [code-graph:symbol-model, code-graph:graph-store, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, code-graph:language-adapter, code-graph:indexer, code-graph:traversal, default:_global/architecture, code-graph:document-model, code-graph:get-graph-health,code-graph:index-project-graph,code-graph:get-spec-coverage,code-graph:get-change-spec-coverage]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T17:38:17.241Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-27T17:38:17.308Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

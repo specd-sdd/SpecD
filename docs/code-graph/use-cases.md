@@ -91,3 +91,61 @@ function discoverFiles(
 #### Returns: `string[]`
 
 An array of absolute paths to discovered files.
+
+---
+
+## Host orchestration use cases
+
+Application-layer use cases for CLI, SDK, and Studio hosts. Each receives an **already-open** `CodeGraphProvider`; callers manage `open()` / `close()` lifecycle.
+
+| Use case                | Factory                         | Purpose                                                              |
+| ----------------------- | ------------------------------- | -------------------------------------------------------------------- |
+| `GetGraphHealth`        | `createGetGraphHealth()`        | Statistics plus VCS staleness and derivation fingerprint diagnostics |
+| `IndexProjectGraph`     | `createIndexProjectGraph()`     | Project index execution with optional `force` recreate               |
+| `GetSpecCoverage`       | `createGetSpecCoverage()`       | Covered files/symbols for one spec                                   |
+| `GetChangeSpecCoverage` | `createGetChangeSpecCoverage()` | Per-spec coverage for a change's `specIds`                           |
+
+### GetGraphHealth
+
+```typescript
+import { createGetGraphHealth } from '@specd/code-graph'
+
+const health = await createGetGraphHealth().execute({
+  config,
+  provider,
+  codeGraphVersion,
+  workspaces, // optional, for fingerprint comparison
+  assertUnlocked: true, // default; set false when lock checked earlier
+})
+```
+
+Returns `GraphStatistics` fields plus `stale`, `currentRef`, and `fingerprintMismatch`.
+
+**Consumers:** `specd graph stats`, `project status --graph`, future SDK `buildProjectStatusSnapshot`.
+
+### IndexProjectGraph
+
+```typescript
+import { createIndexProjectGraph } from '@specd/code-graph'
+
+const result = await createIndexProjectGraph().execute({
+  provider,
+  projectRoot,
+  workspaces,
+  graphConfig,
+  codeGraphVersion,
+  vcsRef,
+  force: false,
+  onProgress,
+})
+```
+
+**Consumers:** `specd graph index` worker body, future SDK `runIndexProjectGraph`. CLI retains lock acquisition and worker subprocess isolation.
+
+### GetSpecCoverage / GetChangeSpecCoverage
+
+`GetSpecCoverage` queries `getCoveredFiles` and `getCoveredSymbols` for one `specId`.
+
+`GetChangeSpecCoverage` loads a change via `ChangeRepository.get(name)` and delegates per `specId`; throws `ChangeNotFoundError` when absent.
+
+**Consumers:** Studio change coverage views (future).

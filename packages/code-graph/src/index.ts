@@ -8,6 +8,31 @@ export {
 } from './composition/graph-store-factory.js'
 export type { CodeGraphProvider } from './composition/code-graph-provider.js'
 
+// Host use cases
+export {
+  GetGraphHealth,
+  type GetGraphHealthInput,
+  type GetGraphHealthResult,
+} from './application/use-cases/get-graph-health.js'
+export { createGetGraphHealth } from './composition/use-cases/get-graph-health.js'
+export {
+  IndexProjectGraph,
+  type IndexProjectGraphInput,
+} from './application/use-cases/index-project-graph.js'
+export { createIndexProjectGraph } from './composition/use-cases/index-project-graph.js'
+export {
+  GetSpecCoverage,
+  type GetSpecCoverageInput,
+  type GetSpecCoverageResult,
+} from './application/use-cases/get-spec-coverage.js'
+export { createGetSpecCoverage } from './composition/use-cases/get-spec-coverage.js'
+export {
+  GetChangeSpecCoverage,
+  type GetChangeSpecCoverageInput,
+  type GetChangeSpecCoverageResult,
+} from './application/use-cases/get-change-spec-coverage.js'
+export { createGetChangeSpecCoverage } from './composition/use-cases/get-change-spec-coverage.js'
+
 // Value objects
 export { type FileNode } from './domain/value-objects/file-node.js'
 export { type DocumentNode } from './domain/value-objects/document-node.js'

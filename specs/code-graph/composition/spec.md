@@ -68,6 +68,7 @@ Callers MUST NOT construct `CodeGraphProvider` directly — the constructor is n
 The `@specd/code-graph` package SHALL export only:
 
 - **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`
+- **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`
 - **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
 - **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
 - **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
@@ -88,6 +89,17 @@ The provider does not auto-open or auto-close — callers manage the lifecycle e
 ### Requirement: Dependency on @specd/core
 
 `@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive `storagePath` only — the provider is stateless and does not cache the config. Workspace targets and spec sources are built by the caller and passed via `IndexOptions` at each `index()` call.
+
+### Requirement: Host use cases
+
+`@specd/code-graph` SHALL expose application use cases for host orchestration above `CodeGraphProvider`:
+
+- `GetGraphHealth` / `createGetGraphHealth` — statistics plus staleness and fingerprint diagnostics
+- `IndexProjectGraph` / `createIndexProjectGraph` — project index execution with optional force recreate
+- `GetSpecCoverage` / `createGetSpecCoverage` — single-spec implementation coverage
+- `GetChangeSpecCoverage` / `createGetChangeSpecCoverage` — change-scoped coverage aggregation
+
+Host use cases receive an already-open `CodeGraphProvider`. They MUST NOT replace direct provider methods for search, hotspots, impact, or traversal — those remain facade delegates.
 
 ## Constraints
 
@@ -131,12 +143,12 @@ await provider.close()
 
 ## Spec Dependencies
 
-- [`code-graph:symbol-model`](../symbol-model/spec.md) — shared node and relation vocabulary
-- [`code-graph:graph-store`](../graph-store/spec.md) — store-backed query and maintenance contract
-- [`code-graph:ladybug-graph-store`](../ladybug-graph-store/spec.md) — concrete Ladybug backend available through the factory
-- [`code-graph:sqlite-graph-store`](../sqlite-graph-store/spec.md) — concrete SQLite backend available through the factory
-- [`code-graph:language-adapter`](../language-adapter/spec.md) — built-in and additive adapter registration
-- [`code-graph:indexer`](../indexer/spec.md) — indexing use case composed into the provider facade
-- [`code-graph:traversal`](../traversal/spec.md) — traversal and impact operations exposed through the provider
-- [`default:_global/architecture`](../../../_global/architecture/spec.md) — thin orchestration and composition-layer constraints
-- [`code-graph:document-model`](../document-model/spec.md) — provider-level document search and `root:` identity handling
+- [`code-graph:symbol-model`](../symbol-model/spec.md) — graph vocabulary
+- [`code-graph:graph-store`](../graph-store/spec.md) — persistence contract
+- [`code-graph:indexer`](../indexer/spec.md) — indexing pipeline
+- [`code-graph:traversal`](../traversal/spec.md) — query-side traversal
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal layering
+- [`code-graph:get-graph-health`](../get-graph-health/spec.md) — health orchestration use case
+- [`code-graph:index-project-graph`](../index-project-graph/spec.md) — index orchestration use case
+- [`code-graph:get-spec-coverage`](../get-spec-coverage/spec.md) — spec coverage use case
+- [`code-graph:get-change-spec-coverage`](../get-change-spec-coverage/spec.md) — change coverage use case

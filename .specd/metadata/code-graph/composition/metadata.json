@@ -4,13 +4,13 @@
   "dependsOn": [
     "code-graph:symbol-model",
     "code-graph:graph-store",
-    "code-graph:ladybug-graph-store",
-    "code-graph:sqlite-graph-store",
-    "code-graph:language-adapter",
     "code-graph:indexer",
     "code-graph:traversal",
     "default:_global/architecture",
-    "code-graph:document-model"
+    "code-graph:get-graph-health",
+    "code-graph:index-project-graph",
+    "code-graph:get-spec-coverage",
+    "code-graph:get-change-spec-coverage"
   ],
   "context": [
     "Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface."
@@ -31,7 +31,7 @@
     {
       "requirement": "Package exports",
       "rules": [
-        "The `@specd/code-graph` package SHALL export only:\n\n- **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`\n- **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`\n- **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`\n- **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`\n- **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`\n- **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`\n- **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`\n- **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`\n- **Language Adapter**: `LanguageAdapter`\n- **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`\n- **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)"
+        "The `@specd/code-graph` package SHALL export only:\n\n- **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`\n- **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`\n- **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`\n- **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`\n- **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`\n- **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`\n- **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`\n- **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`\n- **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`\n- **Language Adapter**: `LanguageAdapter`\n- **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`\n- **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)"
       ]
     },
     {
@@ -44,6 +44,12 @@
       "requirement": "Dependency on @specd/core",
       "rules": [
         "`@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive `storagePath` only — the provider is stateless and does not cache the config. Workspace targets and spec sources are built by the caller and passed via `IndexOptions` at each `index()` call."
+      ]
+    },
+    {
+      "requirement": "Host use cases",
+      "rules": [
+        "`@specd/code-graph` SHALL expose application use cases for host orchestration above `CodeGraphProvider`:\n\n- `GetGraphHealth` / `createGetGraphHealth` — statistics plus staleness and fingerprint diagnostics\n- `IndexProjectGraph` / `createIndexProjectGraph` — project index execution with optional force recreate\n- `GetSpecCoverage` / `createGetSpecCoverage` — single-spec implementation coverage\n- `GetChangeSpecCoverage` / `createGetChangeSpecCoverage` — change-scoped coverage aggregation\n\nHost use cases receive an already-open `CodeGraphProvider`. They MUST NOT replace direct provider methods for search, hotspots, impact, or traversal — those remain facade delegates."
       ]
     }
   ],
@@ -180,6 +186,14 @@
         "its package.json has a dependency on @specd/core",
         "AND the primary factory accepts SpecdConfig from @specd/core"
       ]
+    },
+    {
+      "requirement": "Host use cases",
+      "name": "Package exports host use case factories",
+      "when": ["@specd/code-graph is imported"],
+      "then": [
+        "createGetGraphHealth, createIndexProjectGraph, createGetSpecCoverage, and createGetChangeSpecCoverage are available as named exports"
+      ]
     }
   ],
   "implementation": {
@@ -190,65 +204,13 @@
       },
       {
         "specId": "code-graph:composition",
-        "file": "code-graph:test/composition/code-graph-provider.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/application/services/bootstrap-graph-config.ts",
-        "symbol": "createBootstrapGraphConfig"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/application/services/build-project-graph-config.ts",
-        "symbol": "buildProjectGraphConfig"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/infrastructure/index-lock.ts",
-        "symbol": "acquireGraphIndexLock"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/infrastructure/index-lock.ts",
-        "symbol": "assertGraphIndexUnlocked"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/infrastructure/index-lock.ts",
-        "symbol": "getGraphIndexLockPath"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/composition/code-graph-provider.ts",
-        "symbol": "CodeGraphProvider"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/domain/value-objects/index-options.ts",
-        "symbol": "WorkspaceIndexTarget"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/domain/value-objects/index-options.ts",
-        "symbol": "DiscoveredSpec"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/domain/errors/spec-not-found-error.ts",
-        "symbol": "SpecNotFoundError"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/application/services/resolve-graph-selector.ts",
-        "symbol": "normalizeFileSelectorPath"
+        "file": "code-graph:src/application/index.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:15e060b8fbef8ff3041b11ff4fd5ebc8dafa614aa0fd77742a84363636a7302b",
-    "verify.md": "sha256:b9b6d85d8c8cf5910638635b1b00353e5a6e5ea456b099a0f60baf71be0c8368"
+    "spec.md": "sha256:b518c478f63d70372858f2a9373e8a8c4f39d8bfba18799ad59f8a73c54599a3",
+    "verify.md": "sha256:443c923597b27b7871c3bf579e9bcc462509e9312def5d786445b26107bec64e"
   },
   "generatedBy": "core"
 }

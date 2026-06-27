@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:composition",
+    "code-graph:staleness-detection",
+    "core:config",
+    "core:list-workspaces"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/application/use-cases/get-graph-health.ts",
+      "symbols": ["GetGraphHealth", "GetGraphHealthInput", "GetGraphHealthResult"]
+    },
+    {
+      "file": "code-graph:src/composition/use-cases/get-graph-health.ts",
+      "symbols": ["createGetGraphHealth"]
+    },
+    {
+      "file": "code-graph:src/application/ports/code-graph-host-port.ts",
+      "symbols": ["CodeGraphHostPort"]
+    }
+  ]
+}

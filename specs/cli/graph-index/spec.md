@@ -22,11 +22,17 @@ specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path
 
 ### Requirement: Indexing behaviour
 
-The command obtains the workspace targets and spec sources from the project configuration.
-It delegates bootstrap configuration creation, effective project graph config merging, lock acquisition, and index execution entirely to the `@specd/code-graph` provider.
-The command SHALL pass an `onProgress` callback to the provider's `index()` method. When running in `text` mode, this callback prints the current progress percentage and indexing phase to stdout.
+The command obtains workspace targets and spec sources from the project configuration.
+It delegates effective project graph config merging and index execution to `IndexProjectGraph.execute()` inside the worker process (or current process when worker bypass is active).
 
-Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs the actual indexing work, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
+The command SHALL retain CLI-only concerns:
+
+- shared graph indexing lock acquisition in the parent process before spawning a worker
+- worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`
+- `onProgress` callback wiring for text-mode progress output
+- `provider.recreate()` for `--force` is triggered by passing `force: true` to `IndexProjectGraph`
+
+Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `IndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
 
 When `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests.
 
@@ -120,3 +126,4 @@ $ specd graph index --format json
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
 - [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration
+- [`code-graph:index-project-graph`](../../code-graph/index-project-graph/spec.md) — index execution use case

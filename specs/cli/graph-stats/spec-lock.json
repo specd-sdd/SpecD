@@ -8,21 +8,17 @@
     "core:config",
     "code-graph:composition",
     "code-graph:staleness-detection",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "code-graph:get-graph-health"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/stats.ts"
+      "file": "cli:src/commands/graph/stats.ts",
+      "symbols": ["registerGraphStats"]
     },
     {
-      "file": "cli:src/commands/graph/search.ts"
-    },
-    {
-      "file": "cli:src/commands/project/status.ts"
-    },
-    {
-      "file": "cli:src/commands/graph/warn-graph-staleness.ts",
-      "symbols": ["warnGraphStale"]
+      "file": "cli:src/commands/project/status.ts",
+      "symbols": ["loadGraphData"]
     }
   ]
 }

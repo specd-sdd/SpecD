@@ -3,20 +3,6 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["code-graph:graph-store", "code-graph:indexer", "cli:graph-stats"],
-  "implementation": [
-    {
-      "file": "code-graph:src/domain/services/is-graph-stale.ts",
-      "symbols": ["isGraphStale"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/compute-graph-fingerprint.spec.ts"
-    },
-    {
-      "file": "code-graph:test/domain/services/is-graph-stale.spec.ts"
-    },
-    {
-      "file": "code-graph:test/application/services/bootstrap-graph-config.spec.ts"
-    }
-  ]
+  "dependsOn": ["code-graph:graph-store", "code-graph:indexer", "code-graph:get-graph-health"],
+  "implementation": []
 }

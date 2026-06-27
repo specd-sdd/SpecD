@@ -8,15 +8,13 @@
     "core:config",
     "code-graph:composition",
     "code-graph:graph-store",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "code-graph:index-project-graph"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/graph/index-graph.ts",
       "symbols": ["registerGraphIndex"]
-    },
-    {
-      "file": "cli:src/commands/graph/resolve-graph-cli-context.ts"
     }
   ]
 }

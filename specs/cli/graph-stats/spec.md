@@ -22,7 +22,9 @@ specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 
 ### Requirement: Statistics retrieval
 
-The command resolves the graph context and delegates project fingerprint comparison, VCS ref resolution, and staleness calculation entirely to the `@specd/code-graph` provider. It outputs the returned statistics, closes the provider, and exits.
+The command resolves the graph context, opens the provider, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()`. It outputs the returned result fields, closes the provider, and exits.
+
+The command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.
 
 ### Requirement: Concurrent indexing guard
 
@@ -118,3 +120,4 @@ Last indexed: 2026-03-13T09:00:00.000Z
 - [`code-graph:composition`](../../code-graph/composition/spec.md)
 - [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md)
+- [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration

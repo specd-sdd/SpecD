@@ -1,0 +1,114 @@
+{
+  "title": "IndexProjectGraph",
+  "description": "Hosts (`graph index`, SDK `runIndexProjectGraph`) currently assemble workspace targets, merge graph configuration, and invoke `provider.index()` inline. `IndexProjectGraph` extracts that orchestration so adapters handle only I/O formatting, locks, and subprocess isolation while the code-graph package owns index execution semantics.",
+  "dependsOn": [
+    "code-graph:composition",
+    "code-graph:indexer",
+    "code-graph:graph-store",
+    "core:config"
+  ],
+  "context": [
+    "Hosts (`graph index`, SDK `runIndexProjectGraph`) currently assemble workspace targets, merge graph configuration, and invoke `provider.index()` inline. `IndexProjectGraph` extracts that orchestration so adapters handle only I/O formatting, locks, and subprocess isolation while the code-graph package owns index execution semantics."
+  ],
+  "rules": [
+    {
+      "requirement": "Executes project indexing",
+      "rules": [
+        "`IndexProjectGraph.execute(input)` MUST call `provider.index()` with an `IndexOptions` object built from:\n\n- `projectRoot`\n- `workspaces`\n- `graphConfig`\n- `codeGraphVersion`\n- optional `vcsRef`\n- optional `onProgress`\n\nand MUST return the resulting `IndexResult` unchanged."
+      ]
+    },
+    {
+      "requirement": "Supports force recreate",
+      "rules": [
+        "When `input.force` is `true`, `IndexProjectGraph` MUST call `provider.recreate()` before `provider.index()`. When `force` is `false` or omitted, it MUST NOT recreate the store."
+      ]
+    },
+    {
+      "requirement": "Accepts open provider and prepared inputs",
+      "rules": [
+        "`IndexProjectGraphInput` MUST include:\n\n- `provider: CodeGraphProvider` (already opened)\n- `projectRoot: string`\n- `workspaces: WorkspaceIndexTarget[]`\n- `graphConfig: ProjectGraphConfig`\n- `codeGraphVersion: string`\n- optional `vcsRef: string`\n- optional `force: boolean`\n- optional `onProgress: IndexProgressCallback`\n\nThe use case MUST NOT resolve workspaces from `specd.yaml`, acquire locks, or spawn worker processes — callers supply prepared targets and config."
+      ]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "rules": [
+        "`createIndexProjectGraph()` in composition MUST return a stateless `IndexProjectGraph` instance."
+      ]
+    }
+  ],
+  "constraints": [
+    "MUST NOT open or close the provider.",
+    "MUST NOT acquire or release the graph indexing lock.",
+    "Per-file index errors are reported in IndexResult.errors; the use case MUST NOT throw for parse failures."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Executes project indexing",
+      "name": "Incremental index",
+      "given": ["an opened provider and prepared IndexProjectGraphInput"],
+      "when": ["IndexProjectGraph.execute() runs with force: false"],
+      "then": [
+        "provider.index() is called once with merged options",
+        "AND the returned IndexResult is passed through unchanged"
+      ]
+    },
+    {
+      "requirement": "Executes project indexing",
+      "name": "Progress callback forwarded",
+      "given": ["an onProgress callback in input"],
+      "when": ["indexing runs"],
+      "then": ["the callback is passed to provider.index()"]
+    },
+    {
+      "requirement": "Supports force recreate",
+      "name": "Force rebuild",
+      "given": ["force: true"],
+      "when": ["IndexProjectGraph.execute() runs"],
+      "then": ["provider.recreate() is called before provider.index()"]
+    },
+    {
+      "requirement": "Supports force recreate",
+      "name": "No recreate without force",
+      "given": ["force is omitted or false"],
+      "when": ["IndexProjectGraph.execute() runs"],
+      "then": ["provider.recreate() is not called"]
+    },
+    {
+      "requirement": "Accepts open provider and prepared inputs",
+      "name": "Does not resolve workspaces or acquire lock",
+      "given": ["a mock provider"],
+      "when": ["IndexProjectGraph.execute() runs"],
+      "then": ["it does not call lock helpers or read specd.yaml"]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "name": "Factory returns stateless instance",
+      "when": ["createIndexProjectGraph() is called"],
+      "then": ["it returns an IndexProjectGraph with no captured config"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:index-project-graph",
+        "file": "code-graph:src/application/use-cases/index-project-graph.ts",
+        "symbol": "IndexProjectGraph"
+      },
+      {
+        "specId": "code-graph:index-project-graph",
+        "file": "code-graph:src/application/use-cases/index-project-graph.ts",
+        "symbol": "IndexProjectGraphInput"
+      },
+      {
+        "specId": "code-graph:index-project-graph",
+        "file": "code-graph:src/composition/use-cases/index-project-graph.ts",
+        "symbol": "createIndexProjectGraph"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:080fbf710b81634dc07b36ebb28e21c716d1cd73b8fd4c67a3b75e62d9bc3058",
+    "verify.md": "sha256:72b27944bee9c70cf7f7cbdf4e93d3eb62a46e5bd2b680a9ba20e0b542c82222"
+  },
+  "generatedBy": "core"
+}

@@ -1,12 +1,5 @@
 import { Command } from 'commander'
-import { createVcsAdapter } from '@specd/core'
-import {
-  parseFingerprintMap,
-  detectFingerprintMismatch,
-  isGraphStale,
-  buildProjectGraphConfig,
-  assertGraphIndexUnlocked,
-} from '@specd/code-graph'
+import { assertGraphIndexUnlocked, createGetGraphHealth } from '@specd/code-graph'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
@@ -58,6 +51,9 @@ JSON/TOON output schema:
           1,
         ),
       )
+
+      const getGraphHealth = createGetGraphHealth()
+
       try {
         assertGraphIndexUnlocked(config)
       } catch (err: unknown) {
@@ -65,75 +61,74 @@ JSON/TOON output schema:
         return
       }
 
-      await withProvider(config, opts.format, async (provider) => {
-        const stats = await provider.getStatistics()
+      try {
+        await withProvider(config, opts.format, async (provider) => {
+          const workspaces =
+            kernel !== null
+              ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
+                  name: ws.name,
+                  prefix: ws.prefix,
+                  codeRoot: ws.codeRoot,
+                  specRepo: ws.specRepo,
+                  ownership: ws.ownership,
+                  isExternal: ws.isExternal,
+                }))
+              : undefined
 
-        let currentRef: string | null = null
-        try {
-          const vcs = await createVcsAdapter(config.projectRoot)
-          currentRef = await vcs.ref()
-        } catch {
-          // No VCS or ref() failed — staleness detection unavailable
-        }
+          const health = await getGraphHealth.execute({
+            config,
+            provider,
+            codeGraphVersion,
+            assertUnlocked: false,
+            ...(workspaces !== undefined ? { workspaces } : {}),
+          })
 
-        const stale = isGraphStale(stats.lastIndexedRef, currentRef)
+          const { stale, currentRef, fingerprintMismatch, ...stats } = health
 
-        let fingerprintMismatch: boolean | null = null
-        if (kernel !== null && stats.graphFingerprint !== null) {
-          try {
-            const workspaces = await kernel.project.listWorkspaces.execute()
-            const storedMap = parseFingerprintMap(stats.graphFingerprint)
-            const graphConfig = buildProjectGraphConfig(config)
+          if (fmt === 'text') {
+            const lines = [
+              `Files:     ${String(stats.fileCount)}`,
+              `Documents: ${String(stats.documentCount)}`,
+              `Symbols:   ${String(stats.symbolCount)}`,
+              `Specs:     ${String(stats.specCount)}`,
+              `Languages: ${stats.languages.join(', ') || 'none'}`,
+            ]
 
-            fingerprintMismatch = detectFingerprintMismatch(
-              storedMap,
-              codeGraphVersion,
-              config.projectRoot,
-              workspaces,
-              graphConfig,
-            )
-          } catch {
-            fingerprintMismatch = null
-          }
-        }
-
-        if (fmt === 'text') {
-          const lines = [
-            `Files:     ${String(stats.fileCount)}`,
-            `Documents: ${String(stats.documentCount)}`,
-            `Symbols:   ${String(stats.symbolCount)}`,
-            `Specs:     ${String(stats.specCount)}`,
-            `Languages: ${stats.languages.join(', ') || 'none'}`,
-          ]
-
-          const relEntries = Object.entries(stats.relationCounts).filter(([, count]) => count > 0)
-          if (relEntries.length > 0) {
-            lines.push('Relations:')
-            for (const [type, count] of relEntries) {
-              lines.push(`  ${type}: ${String(count)}`)
+            const relEntries = Object.entries(stats.relationCounts).filter(([, count]) => count > 0)
+            if (relEntries.length > 0) {
+              lines.push('Relations:')
+              for (const [type, count] of relEntries) {
+                lines.push(`  ${type}: ${String(count)}`)
+              }
             }
-          }
 
-          if (stats.lastIndexedAt) {
-            lines.push(`Last indexed: ${stats.lastIndexedAt}`)
-          }
+            if (stats.lastIndexedAt) {
+              lines.push(`Last indexed: ${stats.lastIndexedAt}`)
+            }
 
-          if (stale === true && stats.lastIndexedRef !== null && currentRef !== null) {
-            lines.push(
-              `⚠ Graph is stale (indexed at ${stats.lastIndexedRef.slice(0, 7)}, current: ${currentRef.slice(0, 7)})`,
-            )
-          }
+            if (stale === true && stats.lastIndexedRef !== null && currentRef !== null) {
+              lines.push(
+                `⚠ Graph is stale (indexed at ${stats.lastIndexedRef.slice(0, 7)}, current: ${currentRef.slice(0, 7)})`,
+              )
+            }
 
-          if (fingerprintMismatch === true) {
-            process.stderr.write(
-              '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index\n',
-            )
-          }
+            if (fingerprintMismatch === true) {
+              process.stderr.write(
+                '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index\n',
+              )
+            }
 
-          output(lines.join('\n'), 'text')
-        } else {
-          output({ ...stats, stale, currentRef, fingerprintMismatch }, fmt)
-        }
-      })
+            output(lines.join('\n'), 'text')
+          } else {
+            output({ ...stats, stale, currentRef, fingerprintMismatch }, fmt)
+          }
+        })
+      } catch (err: unknown) {
+        cliError(
+          err instanceof Error ? err.message : 'failed to read graph statistics',
+          opts.format,
+          3,
+        )
+      }
     })
 }
