@@ -4,7 +4,10 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
+import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
+import { type ApprovalGates } from './transition-change.js'
 
 /** Input for the {@link ApproveSpec} use case. */
 export interface ApproveSpecInput {
@@ -12,8 +15,6 @@ export interface ApproveSpecInput {
   readonly name: string
   /** Free-text rationale recorded in the approval event. */
   readonly reason: string
-  /** Whether the spec approval gate is enabled in the active configuration. */
-  readonly approvalsSpec: boolean
 }
 
 /**
@@ -28,6 +29,7 @@ export class ApproveSpec {
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
   private readonly _hasher: ContentHasher
+  private readonly _approvals: ApprovalGates
 
   /**
    * Creates a new `ApproveSpec` use case instance.
@@ -36,17 +38,20 @@ export class ApproveSpec {
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param hasher - Content hasher for computing artifact hashes
+   * @param approvals - Whether approval gates are active in the project configuration
    */
   constructor(
     changes: ChangeRepository,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
     hasher: ContentHasher,
+    approvals: ApprovalGates,
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
     this._hasher = hasher
+    this._approvals = approvals
   }
 
   /**
@@ -57,18 +62,29 @@ export class ApproveSpec {
    * @throws {ApprovalGateDisabledError} If the spec approval gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {InvalidStateTransitionError} If the change is not in `pending-spec-approval` state
+   * @throws {SchemaMismatchError} If the change schema differs from the active schema
    */
   async execute(input: ApproveSpecInput): Promise<Change> {
-    if (!input.approvalsSpec) {
+    if (!this._approvals.spec) {
       throw new ApprovalGateDisabledError('spec')
     }
 
+    const change = await this._changes.get(input.name)
+    if (change === null) {
+      throw new ChangeNotFoundError(input.name)
+    }
+
     const actor = await this._actor.identity()
-    return this._changes.mutate(input.name, async (change) => {
-      const artifactHashes = await this._computeArtifactHashes(change)
-      change.recordSpecApproval(input.reason, artifactHashes, actor)
-      change.transition('spec-approved', actor)
-      return change
+    const schema = await this._schemaProvider.get()
+    if (schema.name() !== change.schemaName) {
+      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    }
+
+    return this._changes.mutate(input.name, async (freshChange) => {
+      const artifactHashes = await this._computeArtifactHashes(freshChange)
+      freshChange.recordSpecApproval(input.reason, artifactHashes, actor)
+      freshChange.transition('spec-approved', actor)
+      return freshChange
     })
   }
 

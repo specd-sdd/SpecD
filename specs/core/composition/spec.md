@@ -48,9 +48,12 @@ At least one of these should be provided; if neither is available, artifact sync
 const kernel = createKernel(config)
 kernel.changes.archive // ArchiveChange
 kernel.changes.create // CreateChange
-kernel.specs.approve // ApproveSpec
+kernel.changes.approveSpec // ApproveSpec — change lifecycle gate
+kernel.changes.approveSignoff // ApproveSignoff — change lifecycle gate
 // …
 ```
+
+Approval gate use cases belong to the change lifecycle group (`kernel.changes`), not `kernel.specs`, because they mutate `Change` state via `ChangeRepository`.
 
 The kernel is a convenience — it is not the mandatory entry point. Callers that need a single use case call its factory directly.
 

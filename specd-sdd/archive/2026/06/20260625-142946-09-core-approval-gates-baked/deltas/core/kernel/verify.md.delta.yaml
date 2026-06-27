@@ -1,0 +1,20 @@
+- op: modified
+  description: Changes group includes approve use cases
+  selector:
+    type: section
+    matches: 'Scenario: Changes group contains all change use cases'
+  content: |
+    - **WHEN** `kernel.changes` is inspected
+    - **THEN** it contains entries for: `create`, `status`, `transition`, `approveSpec`, `approveSignoff`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
+    - **AND** it contains `repo` as the underlying `ChangeRepository`
+
+- op: modified
+  description: Specs group excludes approve use cases
+  selector:
+    type: section
+    matches: 'Scenario: Specs group contains all spec use cases'
+  content: |
+    - **WHEN** `kernel.specs` is inspected
+    - **THEN** it contains entries for: `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+    - **AND** it does not contain `approveSpec` or `approveSignoff`
+    - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`

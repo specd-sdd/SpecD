@@ -14,14 +14,44 @@
 - **WHEN** `specd change approve review my-change --reason "ok"` is run with an unknown sub-verb
 - **THEN** the command exits with code 1 and prints a usage error to stderr
 
+### Requirement: Delegates gate state to kernel
+
+#### Scenario: Approve spec omits gate flag
+
+- **WHEN** `specd change approve spec my-change --reason "ok"` is run
+- **THEN** `ApproveSpec.execute` is called with `{ name, reason }` only
+- **AND** `approvalsSpec` is not passed on the input object
+- **AND** the call is routed through `kernel.changes.approveSpec`
+
+#### Scenario: Approve signoff omits gate flag
+
+- **WHEN** `specd change approve signoff my-change --reason "done"` is run
+- **THEN** `ApproveSignoff.execute` is called with `{ name, reason }` only
+- **AND** `approvalsSignoff` is not passed on the input object
+- **AND** the call is routed through `kernel.changes.approveSignoff`
+
+#### Scenario: Approve spec execute call shape
+
+- **GIVEN** the change approve spec command succeeds
+- **WHEN** the handler invokes the kernel use case
+- **THEN** `kernel.changes.approveSpec.execute` receives an object with exactly `name` and `reason`
+- **AND** `kernel.specs.approveSpec` is not invoked
+
+#### Scenario: Approve signoff execute call shape
+
+- **GIVEN** the change approve signoff command succeeds
+- **WHEN** the handler invokes the kernel use case
+- **THEN** `kernel.changes.approveSignoff.execute` receives an object with exactly `name` and `reason`
+- **AND** `kernel.specs.approveSignoff` is not invoked
+
 ### Requirement: Artifact hash computation
 
-#### Scenario: Hashes computed from disk
+#### Scenario: Hashes computed by use case from disk
 
 - **GIVEN** artifact files exist on disk for the change
 - **WHEN** `specd change approve spec my-change --reason "ok"` is run
-- **THEN** the approval event in history contains `artifactHashes` computed from the current file content on disk
-- **AND** the user did not supply any hash values
+- **THEN** the approval event in history contains `artifactHashes` computed by `ApproveSpec` from current file content on disk
+- **AND** the CLI did not compute or pass hash values
 
 ### Requirement: Approve spec behaviour
 

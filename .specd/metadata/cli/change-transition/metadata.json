@@ -33,7 +33,7 @@
     {
       "requirement": "Approval-gate routing",
       "rules": [
-        "The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case, via `LifecycleEngine`, applies smart routing:\n\n- When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`\n- When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`\n\nThe user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target."
+        "The CLI MUST NOT pass approval gate flags to `TransitionChange.execute`. Approval routing uses gate state baked into the kernel's `TransitionChange` instance from `config.approvals` at kernel construction.\n\nThe use case, via `LifecycleEngine`, applies smart routing:\n\n- When the change is in `ready` and `config.approvals.spec` is `true`, `implementing` is silently routed to `pending-spec-approval`\n- When the change is in `done` and `config.approvals.signoff` is `true`, `archivable` is silently routed to `pending-signoff`\n\nThe user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target."
       ]
     },
     {
@@ -201,6 +201,16 @@
       ]
     },
     {
+      "requirement": "Approval-gate routing",
+      "name": "Transition execute omits approval flags",
+      "given": ["config.approvals.spec: true"],
+      "when": ["specd change transition my-change implementing runs"],
+      "then": [
+        "TransitionChange.execute is called with { name, to } only",
+        "AND approval gate flags are not passed on the input object"
+      ]
+    },
+    {
       "requirement": "Output on success",
       "name": "Successful direct transition",
       "when": ["specd change transition my-change designing succeeds"],
@@ -330,17 +340,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:change-transition",
-        "file": "cli:src/commands/change/transition.ts",
-        "symbol": "registerChangeTransition"
+        "file": "cli:src/commands/change/transition.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:d75c51dd6934e91fcdb2705ec8b076ede44d366f43d5bf308c6dd4fe7046a7b9",
-    "verify.md": "sha256:8033e6408ccb35756e075ce42f9ea77b17b7e5228db861e5704c14530c7ac69b"
+    "spec.md": "sha256:c9d2e3c42d652c5144ecc7a7b4c21115b9e4fe973b7dad2ec149bdfd9cc31788",
+    "verify.md": "sha256:ef528ae534729a665c9246940707b6887976b71222c76db0396464fe40b77b6d"
   },
   "generatedBy": "core"
 }

@@ -33,14 +33,13 @@ JSON/TOON output schema:
     )
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({
+        const { kernel } = await resolveCliContext({
           configPath: opts.config,
         })
 
-        await kernel.specs.approveSpec.execute({
+        await kernel.changes.approveSpec.execute({
           name,
           reason: opts.reason,
-          approvalsSpec: config.approvals.spec,
         })
 
         const fmt = parseFormat(opts.format)
@@ -72,14 +71,13 @@ JSON/TOON output schema:
     )
     .action(async (name: string, opts: { reason: string; format: string; config?: string }) => {
       try {
-        const { config, kernel } = await resolveCliContext({
+        const { kernel } = await resolveCliContext({
           configPath: opts.config,
         })
 
-        await kernel.specs.approveSignoff.execute({
+        await kernel.changes.approveSignoff.execute({
           name,
           reason: opts.reason,
-          approvalsSignoff: config.approvals.signoff,
         })
 
         const fmt = parseFormat(opts.format)

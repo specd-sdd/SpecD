@@ -10,8 +10,8 @@ After implementation, a final human signoff is needed to confirm the change is r
 
 The gate guard sequence is:
 
-1. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
-2. Assert the change is in `done` state. If not, throw `InvalidStateTransitionError`.
+1. If `approvals.signoff` is `false` (baked at construction), throw `ApprovalGateDisabledError` with gate `'signoff'`. No repository access occurs.
+2. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
 3. Resolve the current actor identity via `ActorResolver`.
 4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
 5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
@@ -54,25 +54,33 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 The `ApproveSignoffInput` interface MUST include:
 
-- `name` (string) -- the change slug identifying the target change.
-- `reason` (string) -- free-text rationale recorded in the signoff event.
-- `approvalsSignoff` (boolean) -- whether the signoff gate is enabled in the active configuration.
+- `name` (string) — the change slug identifying the target change.
+- `reason` (string) — free-text rationale recorded in the signoff event.
 
-All fields are required and readonly.
+All fields are required and readonly. Approval gate state MUST NOT appear on the input.
+
+### Requirement: Approval gate baked at construction
+
+`ApproveSignoff` SHALL accept approval gate configuration at construction time:
+
+```typescript
+type ApprovalGates = { readonly spec: boolean; readonly signoff: boolean }
+```
+
+The constructor MUST receive `approvals: ApprovalGates`. `createApproveSignoff(config)` and kernel wiring MUST pass `config.approvals`.
+
+`ApproveSignoff.execute` MUST evaluate the signoff gate using `approvals.signoff` from construction. Callers MUST NOT supply gate flags per invocation.
 
 ## Constraints
 
-- The gate check MUST be the first validation step -- no I/O occurs if the gate is disabled.
+- The gate check MUST be the first validation step — no I/O occurs if the gate is disabled.
 - Artifact hashes are computed from on-disk content at signoff time, not from cached or in-memory state.
-- The use case does not validate artifact content beyond hashing it -- content validation is a separate concern.
-- The use case does not determine whether the gate should be enabled; the caller passes that decision as `approvalsSignoff`.
+- The use case does not validate artifact content beyond hashing it — content validation is a separate concern.
+- The use case does not determine whether the gate should be enabled at execute time; gate state is fixed at construction from project configuration.
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) -- Change entity lifecycle and state machine
-
-- [`core:schema-format`](../schema-format/spec.md) -- schema structure and pre-hash cleanup rules
-
-- [`core:composition`](../composition/spec.md) -- how the use case is wired and injected
-
-- [`core:kernel`](../kernel/spec.md) -- kernel entry under `specs.approveSignoff`
+- [`core:change`](../change/spec.md) — Change entity lifecycle and state machine
+- [`core:schema-format`](../schema-format/spec.md) — schema structure and pre-hash cleanup rules
+- [`core:composition`](../composition/spec.md) — how the use case is wired and injected
+- [`core:kernel`](../kernel/spec.md) — kernel entry under `changes.approveSignoff`

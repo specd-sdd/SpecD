@@ -124,8 +124,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:86684fd0adf04cbe4deaad445f8328807f7291fad46fdc7907752034935044bb",
-    "verify.md": "sha256:b2fd1f7b17687f334899f67d84cf508dbce0150ac11c5f4e6010c817f81729f1"
+    "spec.md": "sha256:d19d9ece9463786decc726690547b2ef3ef28d5d7715fb240b95467f2ade5f4f",
+    "verify.md": "sha256:78bd57223feadd292dfd739877486423411aa59614818730ece1d676edb603a8"
   },
   "generatedBy": "core"
 }

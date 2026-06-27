@@ -47,13 +47,8 @@
   ],
   "implementation": [
     {
-      "file": "core:test/composition/kernel-get-config.spec.ts"
-    },
-    {
-      "file": "core:test/composition/config-mutation-exports.spec.ts"
-    },
-    {
-      "file": "core:test/application/use-cases/kernel-input-boundary.spec.ts"
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["Kernel"]
     }
   ]
 }

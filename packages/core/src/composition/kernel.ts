@@ -106,11 +106,11 @@ export interface Kernel {
     getImplementationReview: GetImplementationReview
     detectOverlap: DetectOverlap
     preview: PreviewSpec
+    approveSpec: ApproveSpec
+    approveSignoff: ApproveSignoff
   }
   specs: {
     repos: ReadonlyMap<string, SpecRepository>
-    approveSpec: ApproveSpec
-    approveSignoff: ApproveSignoff
     list: ListSpecs
     search: SearchSpecs
     get: GetSpec
@@ -246,6 +246,10 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         schemaProvider,
         runStepHooks,
         refreshImplementationTracking,
+        {
+          spec: config.approvals.spec,
+          signoff: config.approvals.signoff,
+        },
         lifecycle,
       ),
       draft: new DraftChange(i.changes, i.actor),
@@ -324,11 +328,17 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.expander,
         lifecycle,
       ),
+      approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher, {
+        spec: config.approvals.spec,
+        signoff: config.approvals.signoff,
+      }),
+      approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher, {
+        spec: config.approvals.spec,
+        signoff: config.approvals.signoff,
+      }),
     },
     specs: {
       repos: i.specs,
-      approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher),
-      approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher),
       list: new ListSpecs(listWorkspaces, i.hasher, i.yaml),
       search: new SearchSpecs(listWorkspaces, i.hasher, i.yaml),
       get: new GetSpec(i.specs),

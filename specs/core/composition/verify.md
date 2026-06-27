@@ -70,6 +70,12 @@
 - **WHEN** a caller needs only `CreateChange`
 - **THEN** calling `createCreateChange(config)` directly returns a ready use case without requiring the full kernel
 
+#### Scenario: Approval gate use cases are grouped under changes
+
+- **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+- **THEN** `kernel.changes.approveSpec` and `kernel.changes.approveSignoff` are defined
+- **AND** `kernel.specs.approveSpec` and `kernel.specs.approveSignoff` are not defined
+
 ### Requirement: Composition layer exposes a kernel builder
 
 #### Scenario: Builder is a public alternative to createKernel

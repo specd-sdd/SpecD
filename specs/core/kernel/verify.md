@@ -13,13 +13,14 @@
 #### Scenario: Changes group contains all change use cases
 
 - **WHEN** `kernel.changes` is inspected
-- **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
+- **THEN** it contains entries for: `create`, `status`, `transition`, `approveSpec`, `approveSignoff`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
 - **AND** it contains `repo` as the underlying `ChangeRepository`
 
 #### Scenario: Specs group contains all spec use cases
 
 - **WHEN** `kernel.specs` is inspected
-- **THEN** it contains entries for: `approveSpec`, `approveSignoff`, `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+- **THEN** it contains entries for: `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+- **AND** it does not contain `approveSpec` or `approveSignoff`
 - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
 
 #### Scenario: Project group contains query use cases only

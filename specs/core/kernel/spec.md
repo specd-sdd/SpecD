@@ -10,8 +10,8 @@ Consumers of `@specd/core` need a single, stable entry point that exposes domain
 
 The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
 
-- `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
-- `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
+- `changes` — use cases that operate on change lifecycle (create, transition, approve spec, approve signoff, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
+- `specs` — use cases that operate on specs (list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context, resolve schema)
 - `project` — use cases that query project configuration (list workspaces, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot including `plugins`, get metadata, update metadata)
 
 Plugin declaration listing is not a kernel use case — declarations are config data on the `getConfig` snapshot. Config file mutation is not a kernel use case — delivery uses `createConfigWriter()`.
@@ -117,6 +117,8 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `changes.create`                 | `CreateChange`           | [core:create-change](../create-change/spec.md)                       | Creates a new change                                    |
 | `changes.status`                 | `GetStatus`              | [core:get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
 | `changes.transition`             | `TransitionChange`       | [core:transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+| `changes.approveSpec`            | `ApproveSpec`            | [core:approve-spec](../approve-spec/spec.md)                         | Records spec gate approval and transitions state        |
+| `changes.approveSignoff`         | `ApproveSignoff`         | [core:approve-signoff](../approve-signoff/spec.md)                   | Records signoff gate approval and transitions state     |
 | `changes.draft`                  | `DraftChange`            | [core:draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
 | `changes.restore`                | `RestoreChange`          | [core:restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
 | `changes.discard`                | `DiscardChange`          | [core:discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
@@ -141,8 +143,6 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | Kernel path                | Use case class                        | Spec                                                                 | Description                                                 |
 | -------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                                    | Spec repositories keyed by workspace name                   |
-| `specs.approveSpec`        | `ApproveSpec`                         | [core:approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |
-| `specs.approveSignoff`     | `ApproveSignoff`                      | [core:approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |
 | `specs.list`               | `ListSpecs`                           | [core:list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
 | `specs.search`             | `SearchSpecs`                         | [core:search-specs](../search-specs/spec.md)                         | Searches spec content across all workspaces                 |
 | `specs.get`                | `GetSpec`                             | [core:get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |

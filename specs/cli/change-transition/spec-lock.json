@@ -12,8 +12,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/transition.ts",
-      "symbols": ["registerChangeTransition"]
+      "file": "cli:src/commands/change/transition.ts"
     }
   ]
 }

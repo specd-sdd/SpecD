@@ -39,7 +39,7 @@
     {
       "requirement": "Kernel builds all use cases from SpecdConfig",
       "rules": [
-        "`createKernel(config: SpecdConfig)` calls every use-case factory with the given config and returns an object containing all pre-wired use cases. The kernel object groups use cases by domain area:\n\n```typescript\nconst kernel = createKernel(config)\nkernel.changes.archive // ArchiveChange\nkernel.changes.create // CreateChange\nkernel.specs.approve // ApproveSpec\n// …\n```\n\nThe kernel is a convenience — it is not the mandatory entry point. Callers that need a single use case call its factory directly."
+        "`createKernel(config: SpecdConfig)` calls every use-case factory with the given config and returns an object containing all pre-wired use cases. The kernel object groups use cases by domain area:\n\n```typescript\nconst kernel = createKernel(config)\nkernel.changes.archive // ArchiveChange\nkernel.changes.create // CreateChange\nkernel.changes.approveSpec // ApproveSpec — change lifecycle gate\nkernel.changes.approveSignoff // ApproveSignoff — change lifecycle gate\n// …\n```\n\nApproval gate use cases belong to the change lifecycle group (`kernel.changes`), not `kernel.specs`, because they mutate `Change` state via `ChangeRepository`.\n\nThe kernel is a convenience — it is not the mandatory entry point. Callers that need a single use case call its factory directly."
       ]
     },
     {
@@ -177,6 +177,15 @@
       ]
     },
     {
+      "requirement": "Kernel builds all use cases from SpecdConfig",
+      "name": "Approval gate use cases are grouped under changes",
+      "when": ["createKernel(config) is called with a valid SpecdConfig"],
+      "then": [
+        "kernel.changes.approveSpec and kernel.changes.approveSignoff are defined",
+        "AND kernel.specs.approveSpec and kernel.specs.approveSignoff are not defined"
+      ]
+    },
+    {
       "requirement": "Composition layer exposes a kernel builder",
       "name": "Builder is a public alternative to createKernel",
       "when": ["the public composition exports are inspected"],
@@ -259,33 +268,27 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:composition",
-        "file": "core:test/composition/config-mutation-exports.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:composition",
-        "file": "core:src/composition/config-writer.ts",
-        "symbol": "createConfigWriter"
+        "file": "core:src/composition/use-cases/transition-change.ts",
+        "symbol": "createTransitionChange"
       },
       {
         "specId": "core:composition",
-        "file": "core:src/composition/index.ts",
-        "symbol": "createConfigWriter"
+        "file": "core:src/composition/use-cases/approve-spec.ts",
+        "symbol": "createApproveSpec"
       },
       {
         "specId": "core:composition",
-        "file": "core:test/composition/config-writer.spec.ts",
-        "symbol": "createConfigWriter"
+        "file": "core:src/composition/use-cases/approve-signoff.ts",
+        "symbol": "createApproveSignoff"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:531383b94a0b61974e2279c5a53ff3cc313d8e8dc26e6023680b286d1e191210",
-    "verify.md": "sha256:ee4045a9f51668fbbd266ad44439e9d86e4f64f82feab217a7a4339d57ca0892"
+    "spec.md": "sha256:4769e01e8b6563c53210588a8da4f8273b81d4eb35f2c651d21e52fbcd58a746",
+    "verify.md": "sha256:0f0bf405b7b6bbf1f89d2d3acdf3ea3e6f811fa83135cb8ee71545dfb7c35ac2"
   },
   "generatedBy": "core"
 }

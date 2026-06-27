@@ -18,9 +18,19 @@ specd change approve signoff <name> --reason <text> [--format text|json|toon]
 - `--reason <text>` — required; a human-readable explanation for the approval decision
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
+### Requirement: Delegates gate state to kernel
+
+The CLI MUST NOT pass `approvalsSpec` or `approvalsSignoff` to `ApproveSpec.execute` or `ApproveSignoff.execute`.
+
+Gate enablement is determined by `config.approvals` baked into the kernel's approve use cases at construction. The CLI passes only `name` and `reason`.
+
+The CLI MUST invoke `kernel.changes.approveSpec` and `kernel.changes.approveSignoff` — not `kernel.specs.*`.
+
 ### Requirement: Artifact hash computation
 
-Before invoking the use case, the CLI computes the current hash of each artifact file on disk (applying `preHashCleanup` if declared in the schema) and passes the resulting `artifactHashes` map to the use case. The user never supplies artifact hashes.
+The CLI MUST NOT compute artifact hashes. Hash computation is owned by `ApproveSpec` and `ApproveSignoff` internally from on-disk artifact content using schema-defined pre-hash cleanup rules.
+
+The user never supplies artifact hashes.
 
 ### Requirement: Approve spec behaviour
 
@@ -35,16 +45,7 @@ Before invoking the use case, the CLI computes the current hash of each artifact
 On success, output depends on `--format`:
 
 - `text` (default): prints to stdout:
-
-  ```
-  approved <gate> for <name>
-  ```
-
 - `json` or `toon`: outputs the following to stdout (encoded in the respective format):
-
-  ```json
-  {"result": "ok", "gate": "spec"|"signoff", "name": "<name>"}
-  ```
 
 where `<gate>` is `spec` or `signoff`.
 

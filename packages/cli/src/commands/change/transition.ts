@@ -215,7 +215,7 @@ JSON/TOON output schema:
               ? parseCommaSeparatedValues(opts.skipHooks, VALID_HOOK_PHASES, '--skip-hooks')
               : new Set<HookPhaseSelector>()
 
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
 
           const statusResult = await kernel.changes.status.execute({
             name,
@@ -240,8 +240,6 @@ JSON/TOON output schema:
               {
                 name,
                 to: requestedTarget,
-                approvalsSpec: config.approvals.spec,
-                approvalsSignoff: config.approvals.signoff,
                 skipHookPhases,
               },
               onProgress,

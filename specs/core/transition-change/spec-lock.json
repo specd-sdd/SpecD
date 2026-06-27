@@ -15,11 +15,7 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange", "TransitionChangeInput"]
-    },
-    {
-      "file": "core:src/composition/use-cases/transition-change.ts",
-      "symbols": ["createTransitionChange"]
+      "symbols": ["ApprovalGates", "TransitionChange"]
     }
   ]
 }

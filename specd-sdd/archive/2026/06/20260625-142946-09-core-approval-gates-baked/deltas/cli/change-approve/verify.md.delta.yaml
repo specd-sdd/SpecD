@@ -1,0 +1,51 @@
+- op: added
+  description: CLI delegates gate state and hash computation to kernel
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signatures'
+  content: |
+    ### Requirement: Delegates gate state to kernel
+
+    #### Scenario: Approve spec omits gate flag
+
+    - **WHEN** `specd change approve spec my-change --reason "ok"` is run
+    - **THEN** `ApproveSpec.execute` is called with `{ name, reason }` only
+    - **AND** `approvalsSpec` is not passed on the input object
+    - **AND** the call is routed through `kernel.changes.approveSpec`
+
+    #### Scenario: Approve signoff omits gate flag
+
+    - **WHEN** `specd change approve signoff my-change --reason "done"` is run
+    - **THEN** `ApproveSignoff.execute` is called with `{ name, reason }` only
+    - **AND** `approvalsSignoff` is not passed on the input object
+    - **AND** the call is routed through `kernel.changes.approveSignoff`
+
+    #### Scenario: Approve spec execute call shape
+
+    - **GIVEN** the change approve spec command succeeds
+    - **WHEN** the handler invokes the kernel use case
+    - **THEN** `kernel.changes.approveSpec.execute` receives an object with exactly `name` and `reason`
+    - **AND** `kernel.specs.approveSpec` is not invoked
+
+    #### Scenario: Approve signoff execute call shape
+
+    - **GIVEN** the change approve signoff command succeeds
+    - **WHEN** the handler invokes the kernel use case
+    - **THEN** `kernel.changes.approveSignoff.execute` receives an object with exactly `name` and `reason`
+    - **AND** `kernel.specs.approveSignoff` is not invoked
+
+- op: modified
+  description: Hashes computed inside use case not CLI
+  selector:
+    type: section
+    matches: 'Scenario: Hashes computed from disk'
+  rename: 'Scenario: Hashes computed by use case from disk'
+  content: |
+    - **GIVEN** artifact files exist on disk for the change
+    - **WHEN** `specd change approve spec my-change --reason "ok"` is run
+    - **THEN** the approval event in history contains `artifactHashes` computed by `ApproveSpec` from current file content on disk
+    - **AND** the CLI did not compute or pass hash values

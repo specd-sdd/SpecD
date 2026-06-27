@@ -3,6 +3,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GetProjectSummary } from '../../src/application/use-cases/get-project-summary.js'
+import { ApproveSpec } from '../../src/application/use-cases/approve-spec.js'
+import { ApproveSignoff } from '../../src/application/use-cases/approve-signoff.js'
 import { createKernel } from '../../src/composition/kernel.js'
 import { GetConfig } from '../../src/application/use-cases/get-config.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
@@ -84,6 +86,16 @@ describe('createKernel project.getConfig', () => {
       const kernel = await createKernel(config)
 
       expect(kernel.project.getProjectSummary).toBeInstanceOf(GetProjectSummary)
+    })
+
+    it('exposes approveSpec and approveSignoff on kernel.changes', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.changes.approveSpec).toBeInstanceOf(ApproveSpec)
+      expect(kernel.changes.approveSignoff).toBeInstanceOf(ApproveSignoff)
+      expect(kernel.specs).not.toHaveProperty('approveSpec')
+      expect(kernel.specs).not.toHaveProperty('approveSignoff')
     })
 
     it('does not expose listPlugins on kernel.project', async () => {

@@ -141,7 +141,7 @@ describe('Approval-gate routing', () => {
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
 
     expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'implementing', approvalsSpec: true }),
+      expect.objectContaining({ to: 'implementing' }),
       expect.any(Function),
     )
     expect(stdout()).toContain('pending-spec-approval')

@@ -95,6 +95,13 @@
 - **THEN** the change transitions to `pending-signoff`
 - **AND** stdout shows `transitioned my-change: done → pending-signoff`
 
+#### Scenario: Transition execute omits approval flags
+
+- **GIVEN** `config.approvals.spec: true`
+- **WHEN** `specd change transition my-change implementing` runs
+- **THEN** `TransitionChange.execute` is called with `{ name, to }` only
+- **AND** approval gate flags are not passed on the input object
+
 ### Requirement: Output on success
 
 #### Scenario: Successful direct transition

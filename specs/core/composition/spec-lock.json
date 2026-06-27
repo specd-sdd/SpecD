@@ -6,19 +6,16 @@
   "dependsOn": ["default:_global/architecture", "core:resolve-schema", "core:config-writer-port"],
   "implementation": [
     {
-      "file": "core:src/composition/config-writer.ts",
-      "symbols": ["createConfigWriter"]
+      "file": "core:src/composition/use-cases/transition-change.ts",
+      "symbols": ["createTransitionChange"]
     },
     {
-      "file": "core:src/composition/index.ts",
-      "symbols": ["createConfigWriter"]
+      "file": "core:src/composition/use-cases/approve-spec.ts",
+      "symbols": ["createApproveSpec"]
     },
     {
-      "file": "core:test/composition/config-writer.spec.ts",
-      "symbols": ["createConfigWriter"]
-    },
-    {
-      "file": "core:test/composition/config-mutation-exports.spec.ts"
+      "file": "core:src/composition/use-cases/approve-signoff.ts",
+      "symbols": ["createApproveSignoff"]
     }
   ]
 }

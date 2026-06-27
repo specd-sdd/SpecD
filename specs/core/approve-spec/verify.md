@@ -6,7 +6,8 @@
 
 #### Scenario: Spec approval gate is disabled
 
-- **WHEN** `execute()` is called with `approvalsSpec: false`
+- **GIVEN** `ApproveSpec` is constructed with `approvals.spec: false`
+- **WHEN** `execute()` is called with `{ name, reason }`
 - **THEN** an `ApprovalGateDisabledError` is thrown with gate `'spec'`
 - **AND** no repository access occurs
 
@@ -67,8 +68,29 @@
 
 ### Requirement: Input contract
 
-#### Scenario: All input fields are required
+#### Scenario: Input fields are name and reason only
 
 - **WHEN** `ApproveSpecInput` is constructed
-- **THEN** `name`, `reason`, and `approvalsSpec` are all required
-- **AND** all fields are readonly
+- **THEN** `name` and `reason` are required
+- **AND** approval gate state is not part of the input
+
+### Requirement: Approval gate baked at construction
+
+#### Scenario: Factory passes config.approvals
+
+- **WHEN** `createApproveSpec(config)` constructs the use case
+- **THEN** the instance receives `config.approvals` as its baked gate configuration
+
+#### Scenario: Enabled gate allows execute with name and reason
+
+- **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
+- **GIVEN** the change is in `pending-spec-approval` state
+- **WHEN** `execute({ name, reason })` is called
+- **THEN** the change transitions to `spec-approved`
+
+#### Scenario: Schema mismatch fails in gate guard
+
+- **GIVEN** `ApproveSpec` is constructed with `approvals.spec: true`
+- **GIVEN** the active schema name differs from the change `schemaName`
+- **WHEN** `execute({ name, reason })` is called
+- **THEN** a `SchemaMismatchError` is thrown before `mutate` is invoked

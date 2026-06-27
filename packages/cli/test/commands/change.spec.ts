@@ -826,7 +826,7 @@ describe('change transition', () => {
     expect(parsed.to).toBe('designing')
   })
 
-  it('passes approvals flags from config', async () => {
+  it('does not pass approval flags to transition execute (baked at kernel construction)', async () => {
     const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
     vi.mocked(loadConfig).mockResolvedValue(config)
     const kernel = makeMockKernel()
@@ -860,8 +860,8 @@ describe('change transition', () => {
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'feat', 'implementing'])
 
     const call = kernel.changes.transition.execute.mock.calls[0]![0]
-    expect(call.approvalsSpec).toBe(true)
-    expect(call.approvalsSignoff).toBe(false)
+    expect(call.approvalsSpec).toBeUndefined()
+    expect(call.approvalsSignoff).toBeUndefined()
   })
 })
 

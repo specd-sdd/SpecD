@@ -51,10 +51,12 @@ When rendering a repair guide after a failed transition, the command MUST call `
 
 ### Requirement: Approval-gate routing
 
-The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case, via `LifecycleEngine`, applies smart routing:
+The CLI MUST NOT pass approval gate flags to `TransitionChange.execute`. Approval routing uses gate state baked into the kernel's `TransitionChange` instance from `config.approvals` at kernel construction.
 
-- When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`
-- When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
+The use case, via `LifecycleEngine`, applies smart routing:
+
+- When the change is in `ready` and `config.approvals.spec` is `true`, `implementing` is silently routed to `pending-spec-approval`
+- When the change is in `done` and `config.approvals.signoff` is `true`, `archivable` is silently routed to `pending-signoff`
 
 The user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target.
 

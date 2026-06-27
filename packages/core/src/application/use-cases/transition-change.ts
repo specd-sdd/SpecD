@@ -15,6 +15,9 @@ import { Logger } from '../logger.js'
 /** Selectors for granular hook phase skipping during transitions. */
 export type HookPhaseSelector = 'source.pre' | 'source.post' | 'target.pre' | 'target.post' | 'all'
 
+/** Approval gate configuration baked at use-case construction from `SpecdConfig.approvals`. */
+export type ApprovalGates = { readonly spec: boolean; readonly signoff: boolean }
+
 /** Input for the {@link TransitionChange} use case. */
 export interface TransitionChangeInput {
   /** The change to transition. */
@@ -22,29 +25,15 @@ export interface TransitionChangeInput {
   /**
    * The requested target state.
    *
-   * Smart routing applies at two decision points:
+   * Smart routing applies at two decision points when gates are active at construction:
    * - `'implementing'` requested from `ready`: routes to `pending-spec-approval`
-   *   when `approvalsSpec` is `true`.
+   *   when the spec gate is enabled.
    * - `'archivable'` requested from `done`: routes to `pending-signoff` when
-   *   `approvalsSignoff` is `true`.
+   *   the signoff gate is enabled.
    *
    * All other states are transitioned directly.
    */
   readonly to: ChangeState
-  /**
-   * Whether the spec approval gate is enabled in the active configuration.
-   *
-   * When `true` and the change is in `ready` state transitioning toward
-   * `implementing`, the actual target is routed to `pending-spec-approval`.
-   */
-  readonly approvalsSpec: boolean
-  /**
-   * Whether the signoff gate is enabled in the active configuration.
-   *
-   * When `true` and the change is in `done` state transitioning toward
-   * `archivable`, the actual target is routed to `pending-signoff`.
-   */
-  readonly approvalsSignoff: boolean
   /**
    * Which hook phases to skip during the transition. Valid selectors:
    * `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`.
@@ -107,6 +96,7 @@ export class TransitionChange {
   private readonly _schemaProvider: SchemaProvider
   private readonly _runStepHooks: RunStepHooks
   private readonly _refresh: RefreshImplementationTracking
+  private readonly _approvals: ApprovalGates
   private readonly _lifecycle: LifecycleEngine
 
   /**
@@ -117,6 +107,7 @@ export class TransitionChange {
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param runStepHooks - Use case for executing workflow hooks
    * @param refreshImplementationTracking - Primitive for optional pre-transition refresh
+   * @param approvals - Whether approval gates are active in the project configuration
    * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
@@ -125,6 +116,7 @@ export class TransitionChange {
     schemaProvider: SchemaProvider,
     runStepHooks: RunStepHooks,
     refreshImplementationTracking: RefreshImplementationTracking,
+    approvals: ApprovalGates,
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
@@ -132,6 +124,7 @@ export class TransitionChange {
     this._schemaProvider = schemaProvider
     this._runStepHooks = runStepHooks
     this._refresh = refreshImplementationTracking
+    this._approvals = approvals
     this._lifecycle = lifecycle
   }
 
@@ -168,7 +161,7 @@ export class TransitionChange {
     const schema = await this._schemaProvider.get()
     const lifecycle = this._lifecycle.evaluate(change, schema, {
       requestedTarget: input.to,
-      approvals: { spec: input.approvalsSpec, signoff: input.approvalsSignoff },
+      approvals: this._approvals,
     })
     const effectiveTarget = lifecycle.effectiveTarget ?? input.to
     const workflowStep = schema.workflowStep(effectiveTarget) ?? null
@@ -197,7 +190,7 @@ export class TransitionChange {
 
     if (
       (input.to === 'pending-spec-approval' || input.to === 'spec-approved') &&
-      !input.approvalsSpec
+      !this._approvals.spec
     ) {
       throw new InvalidStateTransitionError(fromState, effectiveTarget, {
         type: 'gate-not-required',
@@ -205,7 +198,7 @@ export class TransitionChange {
       })
     }
 
-    if ((input.to === 'pending-signoff' || input.to === 'signed-off') && !input.approvalsSignoff) {
+    if ((input.to === 'pending-signoff' || input.to === 'signed-off') && !this._approvals.signoff) {
       throw new InvalidStateTransitionError(fromState, effectiveTarget, {
         type: 'gate-not-required',
         gate: 'signoff',

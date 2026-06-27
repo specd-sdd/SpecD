@@ -56,6 +56,8 @@ export interface FsTransitionChangeOptions {
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Absolute path to the project root. */
   readonly projectRoot: string
+  /** Approval gate configuration from project config. */
+  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
 }
 
 /**
@@ -136,6 +138,7 @@ export function createTransitionChange(
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
+        approvals: config.approvals,
       },
     )
   }
@@ -180,6 +183,7 @@ export function createTransitionChange(
     schemaProvider,
     runStepHooks,
     refreshImplementationTracking,
+    opts.approvals,
     new LifecycleEngine(Logger.debug.bind(Logger)),
   )
 }

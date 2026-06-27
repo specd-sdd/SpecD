@@ -179,6 +179,8 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
       execute: vi.fn().mockResolvedValue({ hasOverlap: false, entries: [] }),
     },
     preview: { execute: vi.fn() },
+    approveSpec: { execute: vi.fn() },
+    approveSignoff: { execute: vi.fn() },
   }
 
   const specs = {
@@ -188,8 +190,6 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
         { resolveFromPath: vi.fn().mockResolvedValue(null) } as unknown as SpecRepository,
       ],
     ]),
-    approveSpec: { execute: vi.fn() },
-    approveSignoff: { execute: vi.fn() },
     list: { execute: vi.fn().mockResolvedValue([]) },
     search: { execute: vi.fn().mockResolvedValue([]) },
     get: { execute: vi.fn() },
