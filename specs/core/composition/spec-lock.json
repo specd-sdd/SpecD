@@ -4,18 +4,5 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture", "core:resolve-schema", "core:config-writer-port"],
-  "implementation": [
-    {
-      "file": "core:src/composition/use-cases/transition-change.ts",
-      "symbols": ["createTransitionChange"]
-    },
-    {
-      "file": "core:src/composition/use-cases/approve-spec.ts",
-      "symbols": ["createApproveSpec"]
-    },
-    {
-      "file": "core:src/composition/use-cases/approve-signoff.ts",
-      "symbols": ["createApproveSignoff"]
-    }
-  ]
+  "implementation": []
 }

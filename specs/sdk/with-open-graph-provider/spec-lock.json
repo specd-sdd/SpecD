@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["sdk:host-context", "code-graph:composition"],
+  "implementation": [
+    {
+      "file": "sdk:src/composition/with-open-graph-provider.ts",
+      "symbols": ["WithOpenGraphProviderOptions", "withOpenGraphProvider"]
+    }
+  ]
+}

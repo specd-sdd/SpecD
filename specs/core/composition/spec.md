@@ -105,6 +105,12 @@ The fields `artifactRules` and `workflow` (project-level hook additions) are no 
 
 `createGetActiveSchema(config: SpecdConfig)` must construct `GetActiveSchema` with a `ResolveSchema` instance from `createResolveSchema(config)`.
 
+### Requirement: @specd/sdk orchestrates cross-package host bootstrap
+
+Delivery hosts (CLI, MCP, API, IPC) SHOULD bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.
+
+`@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration. Direct core imports for bootstrap are permitted only in `@specd/sdk` itself and in tests until host migration (change 12) completes.
+
 ## Constraints
 
 - `composition/` is the only directory in `@specd/core` permitted to import from `infrastructure/`

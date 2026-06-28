@@ -560,15 +560,7 @@
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:kernel",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "Kernel"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:feb0e00aa2800bdfda87b7c3978dfed7c74ed3923428ae8ca6cf39cc6b56a5b8",
     "verify.md": "sha256:004b5784f09a792990261ee7ccb602daa9438ea76a9405cac292affc77635e3a"

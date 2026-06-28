@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["sdk:composition", "core:kernel", "core:composition"],
+  "implementation": [
+    {
+      "file": "sdk:src/composition/host-context.ts",
+      "symbols": [
+        "SdkHostContext",
+        "OpenSpecdHostInput",
+        "OpenSpecdHostResult",
+        "createSdkContext",
+        "openSpecdHost"
+      ]
+    }
+  ]
+}

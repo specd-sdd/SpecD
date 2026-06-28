@@ -1,0 +1,130 @@
+{
+  "title": "SDK Host Context",
+  "description": "Hosts need one call that loads project config, builds the kernel, and exposes a graph-provider factory bound to the same resolved config. Without this, every adapter repeats `createConfigLoader` + `createKernel` + `createCodeGraphProvider` wiring and risks config drift between kernel and graph subsystems.",
+  "dependsOn": ["sdk:composition", "core:kernel", "core:composition"],
+  "context": [
+    "Hosts need one call that loads project config, builds the kernel, and exposes a graph-provider factory bound to the same resolved config. Without this, every adapter repeats `createConfigLoader` + `createKernel` + `createCodeGraphProvider` wiring and risks config drift between kernel and graph subsystems."
+  ],
+  "rules": [
+    {
+      "requirement": "SdkHostContext shape",
+      "rules": [
+        "`SdkHostContext` SHALL be a readonly object:\n\n```typescript\ninterface SdkHostContext {\n  readonly kernel: Kernel\n  readonly createGraphProvider: () => CodeGraphProvider\n}\n```\n\nThe context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST go through `kernel.project.getConfig.execute()`."
+      ]
+    },
+    {
+      "requirement": "createSdkContext",
+      "rules": [
+        "`createSdkContext(config: SpecdConfig, options?: KernelOptions): Promise<SdkHostContext>` SHALL:\n\n1. Await `createKernel(config, options)` from `@specd/core`\n2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config) }`\n\n`createGraphProvider` MUST close over the same `config` instance passed to `createKernel`. Each call to `createGraphProvider()` MUST return a new `CodeGraphProvider` instance (not a shared singleton)."
+      ]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "rules": [
+        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Use `createConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`\n2. Await `createSdkContext(config, input.kernelOptions)`\n3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\n`OpenSpecdHostInput` MAY include optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
+      ]
+    },
+    {
+      "requirement": "Config mutation boundary",
+      "rules": [
+        "Host context bootstrap MUST NOT perform config file writes. `initProject`, `addPlugin`, and `removePlugin` remain on `createConfigWriter()` — not on `SdkHostContext` or `kernel.project`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "SdkHostContext shape",
+      "name": "Context exposes kernel and provider factory only",
+      "when": ["createSdkContext returns a context"],
+      "then": [
+        "it has kernel and createGraphProvider properties",
+        "AND it does not expose a top-level config field duplicating kernel state"
+      ]
+    },
+    {
+      "requirement": "createSdkContext",
+      "name": "Provider factory uses same config as kernel",
+      "when": ["await createSdkContext(config) is called"],
+      "then": [
+        "createKernel receives config",
+        "AND each createGraphProvider() call invokes createCodeGraphProvider with the same config reference"
+      ]
+    },
+    {
+      "requirement": "createSdkContext",
+      "name": "createSdkContext awaits kernel construction",
+      "when": ["createSdkContext(config) is invoked"],
+      "then": [
+        "the caller MUST await the returned promise before using kernel or createGraphProvider"
+      ]
+    },
+    {
+      "requirement": "createSdkContext",
+      "name": "Each provider call returns new instance",
+      "when": ["createGraphProvider() is called twice on the same context"],
+      "then": ["two distinct CodeGraphProvider instances are returned"]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "name": "Discovery mode loads config from cwd",
+      "given": ["a valid specd.yaml in the current working directory"],
+      "when": ["openSpecdHost() is called without configPath"],
+      "then": [
+        "config is loaded via createConfigLoader() discovery mode",
+        "AND configFilePath points to the discovered file"
+      ]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "name": "Forced config path",
+      "when": ["openSpecdHost({ configPath: '/path/to/specd.yaml' }) is called"],
+      "then": ["the loader uses forced mode for that path"]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "name": "Kernel options forwarded",
+      "when": ["openSpecdHost({ kernelOptions: { ... } }) is called"],
+      "then": ["createKernel receives the provided options"]
+    },
+    {
+      "requirement": "Config mutation boundary",
+      "name": "Host context has no write methods",
+      "when": ["inspecting SdkHostContext type exports"],
+      "then": ["no initProject, addPlugin, or removePlugin methods exist on the context"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "SdkHostContext"
+      },
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "OpenSpecdHostInput"
+      },
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "OpenSpecdHostResult"
+      },
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "createSdkContext"
+      },
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "openSpecdHost"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:48e79364c95b23745eab683e8f3099a03395033bc7bbe3729393372c7889343c",
+    "verify.md": "sha256:c7e0419cbf443319bea2d3035534c6bfe769d46cd0d7f08d44e6845c002aa9a4"
+  },
+  "generatedBy": "core"
+}

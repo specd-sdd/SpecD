@@ -45,10 +45,5 @@
     "core:resolve-schema",
     "core:spec-overlap"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["Kernel"]
-    }
-  ]
+  "implementation": []
 }

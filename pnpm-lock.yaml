@@ -348,6 +348,15 @@ importers:
 
   packages/schema-std: {}
 
+  packages/sdk:
+    dependencies:
+      '@specd/code-graph':
+        specifier: workspace:*
+        version: link:../code-graph
+      '@specd/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/skills:
     dependencies:
       '@specd/core':

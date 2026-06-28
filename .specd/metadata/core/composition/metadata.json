@@ -77,6 +77,12 @@
       "rules": [
         "`createResolveSchema(config: SpecdConfig)` must construct a `ResolveSchema` use case with:\n\n- The `SchemaRegistry` adapter\n- `config.schema` as the schema reference\n- The resolved workspace schemas paths map\n- `config.schemaPlugins` (defaulting to `[]` if absent)\n- `config.schemaOverrides` (defaulting to `undefined` if absent)\n\n`createGetActiveSchema(config: SpecdConfig)` must construct `GetActiveSchema` with a `ResolveSchema` instance from `createResolveSchema(config)`."
       ]
+    },
+    {
+      "requirement": "@specd/sdk orchestrates cross-package host bootstrap",
+      "rules": [
+        "Delivery hosts (CLI, MCP, API, IPC) SHOULD bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.\n\n`@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration. Direct core imports for bootstrap are permitted only in `@specd/sdk` itself and in tests until host migration (change 12) completes."
+      ]
     }
   ],
   "constraints": [
@@ -265,30 +271,20 @@
       "name": "ResolveSchema factory is wired in kernel",
       "when": ["createKernel is called"],
       "then": ["ResolveSchema use case is available via kernel.specs.resolve"]
+    },
+    {
+      "requirement": "@specd/sdk orchestrates cross-package host bootstrap",
+      "name": "SDK package exists for host bootstrap",
+      "when": ["a delivery host needs config, kernel, and graph provider wiring"],
+      "then": [
+        "@specd/sdk provides openSpecdHost and createSdkContext as the documented entry points"
+      ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/use-cases/transition-change.ts",
-        "symbol": "createTransitionChange"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/use-cases/approve-spec.ts",
-        "symbol": "createApproveSpec"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/use-cases/approve-signoff.ts",
-        "symbol": "createApproveSignoff"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:4769e01e8b6563c53210588a8da4f8273b81d4eb35f2c651d21e52fbcd58a746",
-    "verify.md": "sha256:0f0bf405b7b6bbf1f89d2d3acdf3ea3e6f811fa83135cb8ee71545dfb7c35ac2"
+    "spec.md": "sha256:3580d841ca68b2fe39eda85c65e4786a7ef4b09bb133ec7a77ef1ffa843d04a6",
+    "verify.md": "sha256:401b20e86765bdec4b3624470d34cf4a09a02012172069c7a3ba88b35f41cf37"
   },
   "generatedBy": "core"
 }

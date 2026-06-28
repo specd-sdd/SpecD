@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "sdk:with-open-graph-provider",
+    "code-graph:index-project-graph",
+    "core:list-workspaces"
+  ],
+  "implementation": [
+    {
+      "file": "sdk:src/orchestration/run-index-project-graph.ts",
+      "symbols": ["RunIndexProjectGraphInput", "RunIndexProjectGraphResult", "runIndexProjectGraph"]
+    }
+  ]
+}

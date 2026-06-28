@@ -151,3 +151,10 @@
 
 - **WHEN** `createKernel` is called
 - **THEN** `ResolveSchema` use case is available via `kernel.specs.resolve`
+
+### Requirement: @specd/sdk orchestrates cross-package host bootstrap
+
+#### Scenario: SDK package exists for host bootstrap
+
+- **WHEN** a delivery host needs config, kernel, and graph provider wiring
+- **THEN** `@specd/sdk` provides `openSpecdHost` and `createSdkContext` as the documented entry points

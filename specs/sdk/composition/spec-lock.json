@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "core:composition", "code-graph:composition"],
+  "implementation": [
+    {
+      "file": "sdk:src/index.ts",
+      "symbols": ["SDK_VERSION"]
+    }
+  ]
+}

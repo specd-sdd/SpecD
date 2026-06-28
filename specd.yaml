@@ -87,6 +87,14 @@ workspaces:
     codeRoot: packages/code-graph
     ownership: owned
 
+  sdk:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/sdk
+    codeRoot: packages/sdk
+    ownership: owned
+
   skills:
     specs:
       adapter: fs

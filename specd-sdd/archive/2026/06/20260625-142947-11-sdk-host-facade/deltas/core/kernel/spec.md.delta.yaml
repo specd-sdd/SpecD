@@ -1,0 +1,2 @@
+- op: no-op
+  description: Kernel contract unchanged — SDK consumes existing Kernel interface and createKernel

@@ -1,0 +1,90 @@
+{
+  "title": "SDK With Open Graph Provider",
+  "description": "Graph operations require an opened `CodeGraphProvider`, but hosts should not reimplement open/close/error cleanup in every command. This spec defines a shared lifecycle helper that opens a provider from an `SdkHostContext`, runs a callback, and closes on success or failure.",
+  "dependsOn": ["sdk:host-context", "code-graph:composition"],
+  "context": [
+    "Graph operations require an opened `CodeGraphProvider`, but hosts should not reimplement open/close/error cleanup in every command. This spec defines a shared lifecycle helper that opens a provider from an `SdkHostContext`, runs a callback, and closes on success or failure."
+  ],
+  "rules": [
+    {
+      "requirement": "withOpenGraphProvider signature",
+      "rules": [
+        "`withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider: CodeGraphProvider) => Promise<T>): Promise<T>` SHALL:\n\n1. Call `ctx.createGraphProvider()` to obtain a provider\n2. Call `provider.open()`\n3. Invoke `fn(provider)` and return its result\n4. Call `provider.close()` in a `finally` block after `fn` completes or throws"
+      ]
+    },
+    {
+      "requirement": "Error propagation",
+      "rules": [
+        "When `fn` throws, `withOpenGraphProvider` MUST still attempt `provider.close()`. Close failures during error cleanup MUST NOT mask the original error from `fn`. The original error MUST propagate to the caller."
+      ]
+    },
+    {
+      "requirement": "No process exit side effects",
+      "rules": [
+        "Unlike CLI-specific `withProvider`, the SDK helper MUST NOT call `process.exit()`. Signal handling and forced exit semantics remain the responsibility of the host adapter (CLI change 12)."
+      ]
+    },
+    {
+      "requirement": "Optional beforeOpen hook",
+      "rules": [
+        "`withOpenGraphProvider` MAY accept an optional `beforeOpen` callback invoked after provider creation and before `open()`, for host-specific setup (e.g. lock acquisition in CLI). When omitted, the flow proceeds directly to `open()`."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "withOpenGraphProvider signature",
+      "name": "Provider opened and closed around callback",
+      "when": ["withOpenGraphProvider(ctx, fn) runs successfully"],
+      "then": [
+        "provider.open() is called before fn",
+        "AND provider.close() is called after fn completes"
+      ]
+    },
+    {
+      "requirement": "Error propagation",
+      "name": "Original error preserved when close fails during cleanup",
+      "given": ["fn throws error E", "AND provider.close() also throws during cleanup"],
+      "when": ["withOpenGraphProvider completes"],
+      "then": ["error E propagates to the caller"]
+    },
+    {
+      "requirement": "Error propagation",
+      "name": "Close attempted after fn throws",
+      "given": ["fn throws"],
+      "when": ["withOpenGraphProvider runs"],
+      "then": ["provider.close() is still invoked"]
+    },
+    {
+      "requirement": "No process exit side effects",
+      "name": "SDK helper does not exit process",
+      "when": ["withOpenGraphProvider completes normally"],
+      "then": ["process.exit is not called by the SDK implementation"]
+    },
+    {
+      "requirement": "Optional beforeOpen hook",
+      "name": "beforeOpen runs before open",
+      "when": ["withOpenGraphProvider is called with beforeOpen"],
+      "then": ["beforeOpen(provider) runs after provider creation and before open()"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "sdk:with-open-graph-provider",
+        "file": "sdk:src/composition/with-open-graph-provider.ts",
+        "symbol": "WithOpenGraphProviderOptions"
+      },
+      {
+        "specId": "sdk:with-open-graph-provider",
+        "file": "sdk:src/composition/with-open-graph-provider.ts",
+        "symbol": "withOpenGraphProvider"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e1575d2f3cfb9f748b8ae98278a92b7fb5ab9363e0d704d197b4076d1986576c",
+    "verify.md": "sha256:70233cb88202cb0e5c34b0942eab60e08e048077d5c61a45143f72d8376ef042"
+  },
+  "generatedBy": "core"
+}

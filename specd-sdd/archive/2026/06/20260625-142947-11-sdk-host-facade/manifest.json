@@ -1,0 +1,1213 @@
+{
+  "name": "11-sdk-host-facade",
+  "createdAt": "2026-06-25T14:29:47.910Z",
+  "description": "A2a: new @specd/sdk package — re-exports, openSpecdHost, createSdkContext, withOpenGraphProvider, orchestration",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:composition",
+    "core:kernel",
+    "sdk:composition",
+    "sdk:host-context",
+    "sdk:with-open-graph-provider",
+    "sdk:build-project-status-snapshot",
+    "sdk:run-index-project-graph"
+  ],
+  "specDependsOn": {
+    "core:composition": [
+      "default:_global/architecture",
+      "core:resolve-schema",
+      "core:config-writer-port"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:save-spec-metadata",
+      "core:invalidate-spec-metadata",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap"
+    ],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition"
+    ],
+    "sdk:host-context": ["sdk:composition", "core:kernel", "core:composition"],
+    "sdk:with-open-graph-provider": ["sdk:host-context", "code-graph:composition"],
+    "sdk:build-project-status-snapshot": [
+      "sdk:host-context",
+      "core:get-project-summary",
+      "code-graph:get-graph-health"
+    ],
+    "sdk:run-index-project-graph": [
+      "sdk:with-open-graph-provider",
+      "code-graph:index-project-graph",
+      "core:list-workspaces"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/sdk.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "approval-system-notes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/eslint.config.js",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/shared/code-graph-version.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-project-status-snapshot.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/tsconfig.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/vitest.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/sdk/.gitkeep",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SDK_VERSION"]
+    },
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SdkHostContext",
+        "OpenSpecdHostInput",
+        "OpenSpecdHostResult",
+        "createSdkContext",
+        "openSpecdHost"
+      ]
+    },
+    {
+      "specId": "sdk:with-open-graph-provider",
+      "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["WithOpenGraphProviderOptions", "withOpenGraphProvider"]
+    },
+    {
+      "specId": "sdk:build-project-status-snapshot",
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "BuildProjectStatusSnapshotOptions",
+        "BuildProjectStatusSnapshotResult",
+        "buildProjectStatusSnapshot"
+      ]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["RunIndexProjectGraphInput", "RunIndexProjectGraphResult", "runIndexProjectGraph"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:682e39aa5dde54c7592cf95126c7dcd1c1f7771d50d6c75d496574d009b9401b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:924e36542844a0fa2bd3148aa3f9bd709c99b8df8e2810e1830006da794b46cb"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b49c51fc5cd683d91a66540b29a849c3eec7408973d0044ec466e5f41ebce3c9"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "specs/sdk/composition/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:c8a4eeeb51d35ba5516a424b8be8dd2454ee95908eb9d6a5fe9f69d8d0d888f8"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "specs/sdk/host-context/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:48e79364c95b23745eab683e8f3099a03395033bc7bbe3729393372c7889343c"
+        },
+        {
+          "key": "sdk:with-open-graph-provider",
+          "filename": "specs/sdk/with-open-graph-provider/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:e1575d2f3cfb9f748b8ae98278a92b7fb5ab9363e0d704d197b4076d1986576c"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "specs/sdk/build-project-status-snapshot/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:46cf574b2dd01a71f4349e6f51da7401c236018415f8da0d4077b72b9c205568"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "specs/sdk/run-index-project-graph/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:d9763e6b3799d574eb4027fb12e7ce43448a918cb336fdd1dcf5878c5d9cf74a"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bdecb28b5c69a907ac5f10ec5a9ce3353a30d4488e9e3ad93ab15d07811134b6"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c88858c96ad111c6fe46781f640464b7c02be8292042564aaa02dbc454172537"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "specs/sdk/composition/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:839619b20932b53129fb107c98e7154f82863c5aad9ef7d002af4e41a1a6df54"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "specs/sdk/host-context/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:c7e0419cbf443319bea2d3035534c6bfe769d46cd0d7f08d44e6845c002aa9a4"
+        },
+        {
+          "key": "sdk:with-open-graph-provider",
+          "filename": "specs/sdk/with-open-graph-provider/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:70233cb88202cb0e5c34b0942eab60e08e048077d5c61a45143f72d8376ef042"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "specs/sdk/build-project-status-snapshot/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:8322250dde3eb00e7fdec3aedbdb05a8b2baa614184a2ff97933315b4dd467df"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "specs/sdk/run-index-project-graph/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:269255d240474c343a76eae4162683a5071352f0a63084904ef700753c7048da"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:27c866a032537f6909f5578f21d274a412990f8b7cf44ac47e1cb3baaa9da2e9"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:a2ccd65524a4027cdede0bfa1856ad67fa1d184f86966b7ae56420112adaadff"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-25T14:29:47.910Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:composition", "core:kernel"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-25T14:29:47.923Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:composition"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-25T15:47:36.489Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '01-core-kernel-get-config' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T15:47:36.489Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T10:39:27.903Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '05-core-config-list-plugins' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T10:39:38.348Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '05-core-config-list-plugins' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T10:39:56.664Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '05-core-config-list-plugins' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T14:30:30.017Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '06-core-config-editing-boundary' was archived with overlapping specs: core:composition, core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T14:31:06.436Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '06-core-config-editing-boundary' was archived with overlapping specs: core:composition, core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T14:31:18.336Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '06-core-config-editing-boundary' was archived with overlapping specs: core:composition, core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T14:31:40.330Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '06-core-config-editing-boundary' was archived with overlapping specs: core:composition, core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T15:34:22.028Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '07-core-kernel-input-audit' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T15:34:41.240Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '07-core-kernel-input-audit' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T15:34:50.142Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '07-core-kernel-input-audit' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T15:35:04.441Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '07-core-kernel-input-audit' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T16:29:05.715Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '09-core-approval-gates-baked' was archived with overlapping specs: core:composition, core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T16:29:18.082Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '09-core-approval-gates-baked' was archived with overlapping specs: core:composition, core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T21:34:32.196Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-27T21:34:32.197Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-27T21:39:57.091Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T07:30:30.296Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-28T07:47:45.120Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:host-context]; verify [sdk:host-context]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:host-context"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:host-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T07:47:45.120Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T07:48:05.558Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T07:48:07.798Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T07:49:23.836Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T07:55:40.008Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-28T08:01:01.162Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:build-project-status-snapshot, sdk:composition, sdk:run-index-project-graph]; verify [sdk:build-project-status-snapshot, sdk:composition]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:build-project-status-snapshot",
+            "sdk:composition",
+            "sdk:run-index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:build-project-status-snapshot", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:01:01.162Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:21:02.652Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:22:50.287Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:24:16.290Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:25:42.493Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:25:55.468Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-28T08:31:04.290Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"sdk:composition\" points outside workspace \"sdk\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-28T08:31:23.166Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:composition': extracted dependencies [default:_global/architecture, core:resolve-schema, core:config-writer-port] do not match persisted dependencies [default:_global/architecture, core:resolve-schema]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-28T08:31:32.366Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:kernel': extracted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:config-writer-port, core:list-workspaces, core:get-project-context, core:get-config, core:project-metadata, core:update-project-metadata, core:resolve-schema, core:spec-overlap] do not match persisted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:init-project, core:record-skill-install, core:get-skills-manifest, core:get-project-context, core:resolve-schema, core:spec-overlap]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-28T08:31:48.367Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:kernel': extracted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:config-writer-port, core:list-workspaces, core:get-project-context, core:get-config, core:project-metadata, core:update-project-metadata, core:resolve-schema, core:spec-overlap] do not match persisted dependencies [default:_global/architecture,core:composition,core:create-change,core:get-status,core:transition-change,core:draft-change,core:restore-change,core:discard-change,core:archive-change,core:validate-artifacts,core:compile-context,core:list-changes,core:list-drafts,core:list-discarded,core:edit-change,core:skip-artifact,core:update-spec-deps,core:list-archived,core:get-archived-change,core:run-step-hooks,core:get-hook-instructions,core:get-artifact-instruction,core:approve-spec,core:approve-signoff,core:list-specs,core:get-spec,core:save-spec-metadata,core:invalidate-spec-metadata,core:get-active-schema,core:validate-specs,core:generate-metadata,core:get-spec-context,core:config-writer-port,core:list-workspaces,core:get-config,core:project-metadata,core:update-project-metadata,core:resolve-schema,core:spec-overlap]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-28T08:31:59.245Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:kernel': extracted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:config-writer-port, core:list-workspaces, core:get-project-context, core:get-config, core:project-metadata, core:update-project-metadata, core:resolve-schema, core:spec-overlap] do not match persisted dependencies [default:_global/architecture,core:composition,core:create-change,core:get-status,core:transition-change,core:draft-change,core:restore-change,core:discard-change,core:archive-change,core:validate-artifacts,core:compile-context,core:list-changes,core:list-drafts,core:list-discarded,core:edit-change,core:skip-artifact,core:update-spec-deps,core:list-archived,core:get-archived-change,core:run-step-hooks,core:get-hook-instructions,core:get-artifact-instruction,core:approve-spec,core:approve-signoff,core:list-specs,core:get-spec,core:save-spec-metadata,core:invalidate-spec-metadata,core:get-active-schema,core:validate-specs,core:generate-metadata,core:get-spec-context,core:config-writer-port,core:list-workspaces,core:get-config,core:project-metadata,core:update-project-metadata,core:resolve-schema,core:spec-overlap, core:get-project-context]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-28T08:32:23.077Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:kernel': extracted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:config-writer-port, core:list-workspaces, core:get-project-context, core:get-config, core:project-metadata, core:update-project-metadata, core:resolve-schema, core:spec-overlap] do not match persisted dependencies [default:_global/architecture,core:composition,core:create-change,core:get-status,core:transition-change,core:draft-change,core:restore-change,core:discard-change,core:archive-change,core:validate-artifacts,core:compile-context,core:list-changes,core:list-drafts,core:list-discarded,core:edit-change,core:skip-artifact,core:update-spec-deps,core:list-archived,core:get-archived-change,core:run-step-hooks,core:get-hook-instructions,core:get-artifact-instruction,core:approve-spec,core:approve-signoff,core:list-specs,core:get-spec,core:save-spec-metadata,core:invalidate-spec-metadata,core:get-active-schema,core:validate-specs,core:generate-metadata,core:get-spec-context,core:config-writer-port,core:list-workspaces,core:get-project-context,core:get-config,core:project-metadata,core:update-project-metadata,core:resolve-schema,core:spec-overlap]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:32:53.800Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-28T08:32:53.853Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

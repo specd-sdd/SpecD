@@ -1,0 +1,112 @@
+{
+  "title": "SDK Build Project Status Snapshot",
+  "description": "`project status --graph` and future API hosts need a single orchestration that combines core project summary data with code-graph health in one call. Today the CLI duplicates this wiring. `buildProjectStatusSnapshot` centralises the cross-package read path in `@specd/sdk`.",
+  "dependsOn": ["sdk:host-context", "core:get-project-summary", "code-graph:get-graph-health"],
+  "context": [
+    "`project status --graph` and future API hosts need a single orchestration that combines core project summary data with code-graph health in one call. Today the CLI duplicates this wiring. `buildProjectStatusSnapshot` centralises the cross-package read path in `@specd/sdk`."
+  ],
+  "rules": [
+    {
+      "requirement": "buildProjectStatusSnapshot orchestration",
+      "rules": [
+        "`buildProjectStatusSnapshot(ctx: SdkHostContext, options?: BuildProjectStatusSnapshotOptions): Promise<BuildProjectStatusSnapshotResult>` SHALL:\n\n1. Call `ctx.kernel.project.getProjectSummary.execute()` for workspace counts, change/draft/discarded/archive totals, and spec counts per workspace\n2. When `options.includeGraph` is `true` (default `false`), call `withOpenGraphProvider(ctx, async (provider) => { ... })`, construct `createGetGraphHealth()` from `@specd/code-graph`, and run `getGraphHealth.execute({ config, provider, codeGraphVersion, workspaces, assertUnlocked: false })` where `config` comes from `ctx.kernel.project.getConfig.execute()` and `workspaces` from `ctx.kernel.project.listWorkspaces.execute()`\n3. Return a merged result object containing summary fields plus optional `graphHealth` and `hotspots` when graph data was requested\n\nWhen graph loading fails (provider open, health query, or hotspots), the function MUST return `graphHealth: null` (and `hotspots: null` when requested) without throwing — hosts treat null as unavailable graph data.\n\nWhen `includeGraph` is `false`, the function MUST NOT open a graph provider."
+      ]
+    },
+    {
+      "requirement": "Result shape stability",
+      "rules": [
+        "`BuildProjectStatusSnapshotResult` MUST expose:\n\n- `summary` — the `GetProjectSummaryResult` from core\n- `graphHealth` — `GetGraphHealthResult | null` (null when graph not requested or unavailable)\n- `approvals` — `{ specEnabled: boolean; signoffEnabled: boolean }` derived from `ctx.kernel.project.getConfig.execute()`\n- `llmOptimizedContext` — boolean from config\n\nHotspots MAY be included when `options.includeHotspots` is true and graph is loaded; otherwise omitted or null."
+      ]
+    },
+    {
+      "requirement": "No presenter formatting",
+      "rules": [
+        "The function MUST return structured data only. Text/JSON/toon formatting remains in CLI presenters (change 12)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "buildProjectStatusSnapshot orchestration",
+      "name": "Summary only without graph",
+      "when": ["buildProjectStatusSnapshot(ctx, { includeGraph: false }) is called"],
+      "then": [
+        "kernel.project.getProjectSummary.execute() is invoked",
+        "AND no graph provider is opened",
+        "AND graphHealth is null"
+      ]
+    },
+    {
+      "requirement": "buildProjectStatusSnapshot orchestration",
+      "name": "Graph health included when requested",
+      "when": ["buildProjectStatusSnapshot(ctx, { includeGraph: true }) is called"],
+      "then": [
+        "withOpenGraphProvider wraps a GetGraphHealth execution",
+        "AND workspaces passed to graph health come from listWorkspaces"
+      ]
+    },
+    {
+      "requirement": "buildProjectStatusSnapshot orchestration",
+      "name": "Graph unavailable returns null without throwing",
+      "when": [
+        "buildProjectStatusSnapshot(ctx, { includeGraph: true }) is called and graph loading fails"
+      ],
+      "then": ["graphHealth is null", "AND the function resolves without throwing"]
+    },
+    {
+      "requirement": "buildProjectStatusSnapshot orchestration",
+      "name": "Hotspots included when requested",
+      "when": [
+        "buildProjectStatusSnapshot(ctx, { includeGraph: true, includeHotspots: true }) is called"
+      ],
+      "then": ["hotspots is populated from provider.getHotspots() when available"]
+    },
+    {
+      "requirement": "Result shape stability",
+      "name": "Approvals derived from getConfig",
+      "given": ["config has approvals.spec: true"],
+      "when": ["snapshot is built"],
+      "then": ["approvals.specEnabled is true"]
+    },
+    {
+      "requirement": "Result shape stability",
+      "name": "llmOptimizedContext forwarded",
+      "given": ["config has llmOptimizedContext: true"],
+      "when": ["snapshot is built"],
+      "then": ["result llmOptimizedContext is true"]
+    },
+    {
+      "requirement": "No presenter formatting",
+      "name": "Returns structured object",
+      "when": ["snapshot completes"],
+      "then": [
+        "the result is a plain object with summary, graphHealth, approvals, and llmOptimizedContext fields",
+        "AND no formatted text output is produced"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "sdk:build-project-status-snapshot",
+        "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
+        "symbol": "BuildProjectStatusSnapshotOptions"
+      },
+      {
+        "specId": "sdk:build-project-status-snapshot",
+        "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
+        "symbol": "BuildProjectStatusSnapshotResult"
+      },
+      {
+        "specId": "sdk:build-project-status-snapshot",
+        "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
+        "symbol": "buildProjectStatusSnapshot"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:46cf574b2dd01a71f4349e6f51da7401c236018415f8da0d4077b72b9c205568",
+    "verify.md": "sha256:8322250dde3eb00e7fdec3aedbdb05a8b2baa614184a2ff97933315b4dd467df"
+  },
+  "generatedBy": "core"
+}

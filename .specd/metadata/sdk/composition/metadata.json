@@ -1,0 +1,89 @@
+{
+  "title": "SDK Composition",
+  "description": "Delivery hosts (CLI, MCP, API, IPC) need a single package that wires `@specd/core` and `@specd/code-graph` without importing infrastructure or duplicating bootstrap logic. `@specd/sdk` is that package: a thin composition layer that re-exports curated factories and hosts cross-package orchestration helpers defined in sibling specs.",
+  "dependsOn": ["default:_global/architecture", "core:composition", "code-graph:composition"],
+  "context": [
+    "Delivery hosts (CLI, MCP, API, IPC) need a single package that wires `@specd/core` and `@specd/code-graph` without importing infrastructure or duplicating bootstrap logic. `@specd/sdk` is that package: a thin composition layer that re-exports curated factories and hosts cross-package orchestration helpers defined in sibling specs."
+  ],
+  "rules": [
+    {
+      "requirement": "Package identity and dependencies",
+      "rules": [
+        "The `@specd/sdk` package SHALL live at `packages/sdk/` in the monorepo with workspace name `sdk` in `specd.yaml`. Runtime dependencies MUST be limited to `@specd/core` and `@specd/code-graph` workspace packages. The package MUST NOT depend on `@specd/cli`, `@specd/mcp`, or plugin packages."
+      ]
+    },
+    {
+      "requirement": "Layer structure",
+      "rules": [
+        "`@specd/sdk` SHALL follow hexagonal boundaries from `default:_global/architecture`:\n\n- `src/composition/` — host bootstrap (`openSpecdHost`, `createSdkContext`) and graph lifecycle (`withOpenGraphProvider`)\n- `src/orchestration/` — cross-package workflows (`buildProjectStatusSnapshot`, `runIndexProjectGraph`)\n- `src/shared/` — internal cross-cutting helpers (e.g. package version constants) not exported from the public barrel\n- `src/index.ts` — public barrel only\n\nThe package MUST NOT contain domain entities, application ports, or infrastructure adapters. Files under `src/shared/` MUST NOT be re-exported from `src/index.ts`."
+      ]
+    },
+    {
+      "requirement": "Public barrel exports for A2a",
+      "rules": [
+        "`src/index.ts` SHALL export:\n\n- From host-context spec: `openSpecdHost`, `createSdkContext`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`\n- From graph lifecycle spec: `withOpenGraphProvider`\n- From orchestration specs: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types\n- Re-exports from `@specd/core`: `createConfigLoader`, `createConfigWriter`, `createKernel`, `Kernel`, `KernelOptions`, `SpecdConfig`\n- Re-exports from `@specd/code-graph`: `CodeGraphProvider`, `createCodeGraphProvider`\n\nThe barrel MUST NOT export infrastructure adapters, internal composition helpers, or `export *` of either dependency package."
+      ]
+    },
+    {
+      "requirement": "Version constant",
+      "rules": [
+        "The package SHALL export `SDK_VERSION` as a string constant matching `package.json` version."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Package identity and dependencies",
+      "name": "SDK depends only on core and code-graph",
+      "when": ["inspecting packages/sdk/package.json dependencies"],
+      "then": [
+        "only @specd/core and @specd/code-graph workspace packages are listed as runtime dependencies",
+        "AND @specd/cli and @specd/mcp are absent"
+      ]
+    },
+    {
+      "requirement": "Layer structure",
+      "name": "No infrastructure in SDK source tree",
+      "when": ["listing packages/sdk/src/"],
+      "then": [
+        "directories are limited to composition/, orchestration/, shared/, and index.ts",
+        "AND no infrastructure/ or domain/ directories exist"
+      ]
+    },
+    {
+      "requirement": "Public barrel exports for A2a",
+      "name": "Barrel exports host and orchestration symbols",
+      "when": ["importing from @specd/sdk"],
+      "then": [
+        "openSpecdHost, createSdkContext, withOpenGraphProvider, buildProjectStatusSnapshot, and runIndexProjectGraph are available",
+        "AND createConfigLoader, createConfigWriter, and createKernel are re-exported from core"
+      ]
+    },
+    {
+      "requirement": "Public barrel exports for A2a",
+      "name": "Barrel does not export internals",
+      "when": ["attempting to import FsConfigLoader or raw use-case classes from @specd/sdk"],
+      "then": ["the import fails at compile time"]
+    },
+    {
+      "requirement": "Version constant",
+      "name": "SDK_VERSION matches package version",
+      "when": ["reading SDK_VERSION from @specd/sdk"],
+      "then": ["it equals the version field in packages/sdk/package.json"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:src/index.ts",
+        "symbol": "SDK_VERSION"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:c8a4eeeb51d35ba5516a424b8be8dd2454ee95908eb9d6a5fe9f69d8d0d888f8",
+    "verify.md": "sha256:839619b20932b53129fb107c98e7154f82863c5aad9ef7d002af4e41a1a6df54"
+  },
+  "generatedBy": "core"
+}

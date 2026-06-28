@@ -1,0 +1,98 @@
+{
+  "title": "SDK Run Index Project Graph",
+  "description": "`graph index` requires listing workspaces, resolving VCS state, and invoking `IndexProjectGraph` with the correct project graph config. Hosts should not assemble this pipeline manually. `runIndexProjectGraph` provides the SDK orchestration entry used by CLI (with optional lock wrapper) and future hosts.",
+  "dependsOn": [
+    "sdk:with-open-graph-provider",
+    "code-graph:index-project-graph",
+    "core:list-workspaces"
+  ],
+  "context": [
+    "`graph index` requires listing workspaces, resolving VCS state, and invoking `IndexProjectGraph` with the correct project graph config. Hosts should not assemble this pipeline manually. `runIndexProjectGraph` provides the SDK orchestration entry used by CLI (with optional lock wrapper) and future hosts."
+  ],
+  "rules": [
+    {
+      "requirement": "runIndexProjectGraph orchestration",
+      "rules": [
+        "`runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` SHALL:\n\n1. Resolve `SpecdConfig` via `ctx.kernel.project.getConfig.execute()`\n2. Call `ctx.kernel.project.listWorkspaces.execute()` for workspace targets\n3. Run inside `withOpenGraphProvider(ctx, async (provider) => { ... })`\n4. Invoke `createIndexProjectGraph()` from `@specd/code-graph` and call `indexProjectGraph.execute({ provider, projectRoot, workspaces, graphConfig, codeGraphVersion, force, vcsRef, onProgress })` with values prepared from config, workspace list, VCS ref, and `input`\n\n`input.workspaces` MAY restrict indexing to a subset; when omitted, all configured workspaces MUST be indexed."
+      ]
+    },
+    {
+      "requirement": "Lock acquisition out of scope",
+      "rules": [
+        "Subprocess lock for concurrent index exclusion (`acquireGraphIndexLock`) MUST NOT run inside `runIndexProjectGraph`. CLI adapters MAY call lock helpers in a `beforeOpen` hook passed to `withOpenGraphProvider`."
+      ]
+    },
+    {
+      "requirement": "Progress callback passthrough",
+      "rules": [
+        "When `input.onProgress` is provided, the orchestration MUST forward progress events from `IndexProjectGraph` without transformation."
+      ]
+    },
+    {
+      "requirement": "Result passthrough",
+      "rules": [
+        "`RunIndexProjectGraphResult` MUST match `IndexProjectGraph` result fields (indexed file/symbol counts, per-workspace breakdown, errors) without lossy mapping."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "runIndexProjectGraph orchestration",
+      "name": "Full workspace index",
+      "when": ["runIndexProjectGraph(ctx, { force: false }) is called without workspace filter"],
+      "then": [
+        "listWorkspaces is invoked",
+        "AND IndexProjectGraph runs inside withOpenGraphProvider for all workspaces"
+      ]
+    },
+    {
+      "requirement": "runIndexProjectGraph orchestration",
+      "name": "Subset workspace index",
+      "when": ["runIndexProjectGraph(ctx, { workspaces: ['core'] }) is called"],
+      "then": ["only the specified workspaces are passed to IndexProjectGraph"]
+    },
+    {
+      "requirement": "Lock acquisition out of scope",
+      "name": "SDK does not acquire index lock",
+      "when": ["runIndexProjectGraph runs without CLI beforeOpen hook"],
+      "then": ["acquireGraphIndexLock is not called by the SDK implementation"]
+    },
+    {
+      "requirement": "Progress callback passthrough",
+      "name": "onProgress receives index events",
+      "given": ["input.onProgress is provided"],
+      "when": ["indexing emits progress"],
+      "then": ["the same callback receives the events unchanged"]
+    },
+    {
+      "requirement": "Result passthrough",
+      "name": "Index result fields preserved",
+      "when": ["indexing completes"],
+      "then": ["returned counts and per-workspace breakdown match IndexProjectGraph output"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "sdk:run-index-project-graph",
+        "file": "sdk:src/orchestration/run-index-project-graph.ts",
+        "symbol": "RunIndexProjectGraphInput"
+      },
+      {
+        "specId": "sdk:run-index-project-graph",
+        "file": "sdk:src/orchestration/run-index-project-graph.ts",
+        "symbol": "RunIndexProjectGraphResult"
+      },
+      {
+        "specId": "sdk:run-index-project-graph",
+        "file": "sdk:src/orchestration/run-index-project-graph.ts",
+        "symbol": "runIndexProjectGraph"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:d9763e6b3799d574eb4027fb12e7ce43448a918cb336fdd1dcf5878c5d9cf74a",
+    "verify.md": "sha256:269255d240474c343a76eae4162683a5071352f0a63084904ef700753c7048da"
+  },
+  "generatedBy": "core"
+}
