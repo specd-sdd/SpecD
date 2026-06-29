@@ -15,7 +15,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeTransition } from '../../src/commands/change/transition.js'
-import { InvalidStateTransitionError, HookFailedError, InvalidChangeError } from '@specd/core'
+import { InvalidStateTransitionError, HookFailedError, InvalidChangeError } from '@specd/sdk'
 
 function setup(configOverrides: Record<string, unknown> = {}) {
   const config = makeMockConfig(configOverrides)

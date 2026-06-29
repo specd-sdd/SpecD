@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
+  "implementation": [
+    {
+      "file": "cli:src/helpers/cli-context.ts",
+      "symbols": ["buildCliKernelOptions", "resolveCliContext"]
+    },
+    {
+      "file": "cli:src/helpers/sdk-host.ts",
+      "symbols": ["resolveSdkHostContext"]
+    },
+    {
+      "file": "cli:src/helpers/cli-context-types.ts",
+      "symbols": ["CliContext"]
+    }
+  ]
+}

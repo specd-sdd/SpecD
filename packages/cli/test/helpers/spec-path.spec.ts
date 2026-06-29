@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseSpecId } from '../../src/helpers/spec-path.js'
-import { type SpecdConfig } from '@specd/core'
+import { type SpecdConfig } from '@specd/sdk'
 
 function makeConfig(workspaceNames: string[]): SpecdConfig {
   return {

@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError, handleError } from '../../handle-error.js'
-import { type Schema } from '@specd/core'
+import { type Schema } from '@specd/sdk'
 
 /**
  * Serializes a resolved Schema entity to a plain object for JSON output.

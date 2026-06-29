@@ -133,4 +133,9 @@ export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-erro
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'
 export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
+import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/installed-code-graph-version.js'
+
 export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
+
+/** Installed version of `@specd/code-graph`. */
+export const CODE_GRAPH_VERSION: string = readInstalledCodeGraphVersion()

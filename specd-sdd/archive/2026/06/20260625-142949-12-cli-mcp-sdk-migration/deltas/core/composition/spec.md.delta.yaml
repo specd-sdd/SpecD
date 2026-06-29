@@ -1,0 +1,11 @@
+- op: modified
+  description: Delivery hosts bootstrap through SDK only
+  selector:
+    type: section
+    matches: 'Requirement: @specd/sdk orchestrates cross-package host bootstrap'
+  content: |
+    Delivery hosts (CLI, MCP, API, IPC) MUST bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.
+
+    `@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration.
+
+    `@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct runtime dependency on specd platform packages. Direct core/code-graph bootstrap imports in delivery hosts are permitted only in `@specd/sdk` itself and in tests.

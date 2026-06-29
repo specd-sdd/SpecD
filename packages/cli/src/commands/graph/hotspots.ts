@@ -1,10 +1,10 @@
 import { Command, Option } from 'commander'
 import {
-  DEFAULT_HOTSPOT_KINDS,
   type HotspotOptions,
   type RiskLevel,
+  SymbolKind,
   assertGraphIndexUnlocked,
-} from '@specd/code-graph'
+} from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
@@ -22,9 +22,13 @@ function collect(value: string, previous: string[]): string[] {
   return [...previous, value]
 }
 
-const DEFAULT_HOTSPOT_KIND_LIST = (DEFAULT_HOTSPOT_KINDS ?? ['class', 'method', 'function']).join(
-  ',',
-)
+const CLI_DEFAULT_HOTSPOT_KINDS = [
+  SymbolKind.Class,
+  SymbolKind.Method,
+  SymbolKind.Function,
+] as const
+
+const DEFAULT_HOTSPOT_KIND_LIST = CLI_DEFAULT_HOTSPOT_KINDS.join(',')
 
 /**
  * Registers the `graph hotspots` command.
@@ -149,7 +153,7 @@ Exclude examples:
           await warnGraphStale(provider, config, kernel)
           const options: HotspotOptions = {
             ...(opts.workspace ? { workspace: opts.workspace } : undefined),
-            ...(kinds !== undefined ? { kinds } : undefined),
+            kinds: kinds ?? [...CLI_DEFAULT_HOTSPOT_KINDS],
             ...(opts.file ? { filePath: opts.file } : undefined),
             ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
             ...(opts.excludeWorkspace.length > 0

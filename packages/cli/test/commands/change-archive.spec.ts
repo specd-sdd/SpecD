@@ -8,22 +8,23 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
-import { ChangeNotFoundError } from '@specd/core'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
+import { ChangeNotFoundError } from '@specd/sdk'
 import { registerChangeArchive } from '../../src/commands/change/archive.js'
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   kernel.changes.status.execute.mockResolvedValue({
     change: { workspaces: ['default'] },
     artifactStatuses: [],
@@ -176,7 +177,7 @@ describe('change archive', () => {
 
   it('exits 1 when change is not in archivable state', async () => {
     const { kernel, stderr } = setup()
-    const { InvalidStateTransitionError } = await import('@specd/core')
+    const { InvalidStateTransitionError } = await import('@specd/sdk')
     kernel.changes.archive.execute.mockRejectedValue(
       new InvalidStateTransitionError('done', 'archivable'),
     )

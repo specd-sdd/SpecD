@@ -6,19 +6,16 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:config",
-    "code-graph:composition",
     "code-graph:staleness-detection",
     "core:list-workspaces",
-    "code-graph:get-graph-health"
+    "code-graph:get-graph-health",
+    "sdk:with-open-graph-provider",
+    "sdk:host-context"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/graph/stats.ts",
       "symbols": ["registerGraphStats"]
-    },
-    {
-      "file": "cli:src/commands/project/status.ts",
-      "symbols": ["loadGraphData"]
     }
   ]
 }

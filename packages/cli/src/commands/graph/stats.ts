@@ -1,10 +1,10 @@
 import { Command } from 'commander'
-import { assertGraphIndexUnlocked, createGetGraphHealth } from '@specd/code-graph'
+import { assertGraphIndexUnlocked, codeGraphVersion, createGetGraphHealth } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
+import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { codeGraphVersion } from './code-graph-version.js'
 
 /**
  * Registers the `graph stats` command.
@@ -33,6 +33,7 @@ JSON/TOON output schema:
     lastIndexedRef?: string | null
     stale: boolean | null
     currentRef: string | null
+    fingerprintMismatch: boolean | null
   }
 `,
     )
@@ -61,8 +62,11 @@ JSON/TOON output schema:
         return
       }
 
-      try {
-        await withProvider(config, opts.format, async (provider) => {
+      const host = await resolveSdkHostContext(config, kernel)
+      await withProvider(
+        config,
+        opts.format,
+        async (provider) => {
           const workspaces =
             kernel !== null
               ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
@@ -122,13 +126,8 @@ JSON/TOON output schema:
           } else {
             output({ ...stats, stale, currentRef, fingerprintMismatch }, fmt)
           }
-        })
-      } catch (err: unknown) {
-        cliError(
-          err instanceof Error ? err.message : 'failed to read graph statistics',
-          opts.format,
-          3,
-        )
-      }
+        },
+        { host },
+      )
     })
 }

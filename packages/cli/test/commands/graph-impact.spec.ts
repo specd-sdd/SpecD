@@ -21,8 +21,8 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
-vi.mock('@specd/code-graph', async () => {
-  const actual = await vi.importActual<typeof import('@specd/code-graph')>('@specd/code-graph')
+vi.mock('@specd/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
   return {
     ...actual,
     assertGraphIndexUnlocked: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('@specd/code-graph', async () => {
 
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
-import { assertGraphIndexUnlocked, type ImpactResult } from '@specd/code-graph'
+import { assertGraphIndexUnlocked, type ImpactResult } from '@specd/sdk'
 import { registerGraphImpact } from '../../src/commands/graph/impact.js'
 
 function setup() {
@@ -131,7 +131,7 @@ function setup() {
         throw err
       }
       const { handleError } = await import('../../src/handle-error.js')
-      const { SpecdError } = await import('@specd/core')
+      const { SpecdError } = await import('@specd/sdk')
       if (err instanceof SpecdError) {
         handleError(err, format)
       }

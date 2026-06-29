@@ -9,6 +9,11 @@ import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { computeContentHash } from '../../../src/application/use-cases/compute-content-hash.js'
+import { CODE_GRAPH_VERSION } from '../../../src/index.js'
+import {
+  buildExpectedFingerprintMap,
+  expectStoredFingerprintMap,
+} from '../../helpers/expected-fingerprint-map.js'
 
 /**
  * Creates a mock spec repository.
@@ -456,5 +461,78 @@ describe('Workspace indexing', () => {
     expect(node!.content).toBe('# Spec\n\n# Verify\n\n')
     expect(node!.contentHash).not.toBe('sha256:sidecar-hash')
     expect(node!.contentHash).toBe(computeContentHash('# Spec\n\n# Verify\n\n'))
+  })
+
+  // specs/code-graph/indexer/spec.md — Discovery fingerprint uses effective config
+  // specs/code-graph/staleness-detection/spec.md — Graph derivation freshness
+  it('persists derivation fingerprint from installed code-graph version and effective config', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'src/a.ts': 'export const a = 1',
+    })
+
+    const graphConfig = { includePaths: [], workspaces: new Map() }
+    const workspace = {
+      name: 'ws1',
+      prefix: null,
+      codeRoot: ws1Dir,
+      specRepo: makeMockRepo(),
+      ownership: 'owned' as const,
+      isExternal: false,
+    }
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      codeGraphVersion: CODE_GRAPH_VERSION,
+      workspaces: [workspace],
+      graphConfig,
+    })
+
+    const stats = await store.getStatistics()
+    expectStoredFingerprintMap(
+      stats.graphFingerprint,
+      buildExpectedFingerprintMap(CODE_GRAPH_VERSION, tempDir, [workspace], graphConfig),
+    )
+  })
+
+  // specs/code-graph/indexer/spec.md — effective @specd/code-graph package version when omitted
+  it('defaults omitted codeGraphVersion to the installed package version', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {
+      'src/a.ts': 'export const a = 1',
+    })
+
+    const graphConfig = { includePaths: [], workspaces: new Map() }
+    const workspace = {
+      name: 'ws1',
+      prefix: null,
+      codeRoot: ws1Dir,
+      specRepo: makeMockRepo(),
+      ownership: 'owned' as const,
+      isExternal: false,
+    }
+
+    const uc = new IndexCodeGraph(store, registry)
+
+    await uc.execute({
+      projectRoot: tempDir,
+      workspaces: [workspace],
+      graphConfig,
+    })
+    const omittedStats = await store.getStatistics()
+
+    await store.clear()
+    await uc.execute({
+      projectRoot: tempDir,
+      codeGraphVersion: CODE_GRAPH_VERSION,
+      workspaces: [workspace],
+      graphConfig,
+    })
+    const explicitStats = await store.getStatistics()
+
+    expect(omittedStats.graphFingerprint).toBe(explicitStats.graphFingerprint)
+    expectStoredFingerprintMap(
+      omittedStats.graphFingerprint,
+      buildExpectedFingerprintMap(CODE_GRAPH_VERSION, tempDir, [workspace], graphConfig),
+    )
   })
 })

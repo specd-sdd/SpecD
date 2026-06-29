@@ -18,7 +18,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerSchemaExtend } from '../../src/commands/schema/extend.js'
-import { type SchemaRawResult } from '@specd/core'
+import { type SchemaRawResult } from '@specd/sdk'
 
 const mockRaw: SchemaRawResult = {
   data: { name: 'schema-std', kind: 'schema' as const, version: 1 },

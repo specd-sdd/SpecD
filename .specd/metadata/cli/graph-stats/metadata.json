@@ -4,10 +4,11 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:config",
-    "code-graph:composition",
     "code-graph:staleness-detection",
     "core:list-workspaces",
-    "code-graph:get-graph-health"
+    "code-graph:get-graph-health",
+    "sdk:with-open-graph-provider",
+    "sdk:host-context"
   ],
   "context": [
     "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance."
@@ -22,7 +23,7 @@
     {
       "requirement": "Statistics retrieval",
       "rules": [
-        "The command resolves the graph context, opens the provider, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()`. It outputs the returned result fields, closes the provider, and exits.\n\nThe command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison."
+        "The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through `withOpenGraphProvider(ctx, fn)`, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()` inside the callback. It outputs the returned result fields, closes the provider via the SDK lifecycle wrapper, and exits.\n\nThe command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.\n\nGraph context and provider lifecycle MUST go through `cli:graph-cli-context` and `@specd/sdk` symbols."
       ]
     },
     {
@@ -45,10 +46,10 @@
     }
   ],
   "constraints": [
-    "The CLI does not compute statistics, manage locks, or calculate staleness — it delegates entirely to @specd/code-graph",
-    "process.exit(0) is called explicitly after closing the provider",
+    "Health orchestration runs inside withOpenGraphProvider from @specd/sdk; the CLI does not manage provider lifecycle inline",
+    "process.exit(0) is called explicitly after the SDK wrapper closes the provider",
     "Zero-value relation counts are omitted from text output for readability",
-    "Context resolution SHALL use the shared graph CLI model"
+    "Bootstrap mode (--path) resolves host context through openSpecdHost with the appropriate config path input"
   ],
   "scenarios": [
     {
@@ -76,11 +77,12 @@
     },
     {
       "requirement": "Statistics retrieval",
-      "name": "Command delegates health to GetGraphHealth",
+      "name": "Command delegates health to GetGraphHealth via SDK",
       "when": ["specd graph stats is executed in configured mode with kernel available"],
       "then": [
-        "it calls GetGraphHealth.execute() with workspaces from ListWorkspaces",
-        "AND it does not call isGraphStale or detectFingerprintMismatch directly in the command handler"
+        "it opens the provider via withOpenGraphProvider from @specd/sdk",
+        "AND it calls GetGraphHealth.execute() with workspaces from ListWorkspaces",
+        "AND graph context and lifecycle go through cli:graph-cli-context"
       ]
     },
     {
@@ -91,6 +93,12 @@
         "it calls ListWorkspaces to obtain the rich workspace list",
         "AND it passes that list to GetGraphHealth for fingerprint comparison"
       ]
+    },
+    {
+      "requirement": "Statistics retrieval",
+      "name": "Host context from openSpecdHost",
+      "when": ["specd graph stats is executed"],
+      "then": ["it obtains host context via openSpecdHost from @specd/sdk"]
     },
     {
       "requirement": "Concurrent indexing guard",
@@ -179,17 +187,12 @@
         "specId": "cli:graph-stats",
         "file": "cli:src/commands/graph/stats.ts",
         "symbol": "registerGraphStats"
-      },
-      {
-        "specId": "cli:graph-stats",
-        "file": "cli:src/commands/project/status.ts",
-        "symbol": "loadGraphData"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3bb11dbf5200298f56d94a2678dabb0ac110c6c45c8f825c651de0090a327f58",
-    "verify.md": "sha256:4fff430032e3295e5868d80637e1022b9c9b5a9151cb57d5e37052e5762a75d5"
+    "spec.md": "sha256:2234b8b91d0ae1c4ba8a61c2ef807e82eeb00ef24ae2cbc4b921f9cf49af99b5",
+    "verify.md": "sha256:9fee4da117bce97f84d57a988126333af65ee03f5dec7d5c3ec72eb183d950d4"
   },
   "generatedBy": "core"
 }

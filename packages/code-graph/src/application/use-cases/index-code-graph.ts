@@ -38,6 +38,7 @@ import {
   detectFingerprintMismatch,
 } from './_shared/compute-graph-fingerprint.js'
 import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
+import { readInstalledCodeGraphVersion } from './_shared/installed-code-graph-version.js'
 
 const DEFAULT_CHUNK_BYTES = 20 * 1024 * 1024
 
@@ -437,7 +438,7 @@ export class IndexCodeGraph {
       }
 
       // ── Fingerprint comparison ──
-      const version = options.codeGraphVersion ?? '0.0.0'
+      const version = options.codeGraphVersion ?? readInstalledCodeGraphVersion()
       const currentFingerprintMap = new Map<string, string>()
       for (const ws of options.workspaces) {
         currentFingerprintMap.set(

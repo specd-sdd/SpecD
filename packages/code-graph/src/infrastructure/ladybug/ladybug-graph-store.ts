@@ -1748,6 +1748,7 @@ export class LadybugGraphStore extends GraphStore {
    * Recreates the backend-owned persisted graph files from scratch.
    */
   async recreate(): Promise<void> {
+    const wasOpen = this._isOpen
     if (this._isOpen) {
       await this.close()
     }
@@ -1756,6 +1757,10 @@ export class LadybugGraphStore extends GraphStore {
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
     this._graphFingerprint = null
+
+    if (wasOpen) {
+      await this.open()
+    }
   }
 
   /**

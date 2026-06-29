@@ -55,6 +55,18 @@
       ]
     },
     {
+      "requirement": "Host package SDK dependency boundary",
+      "rules": [
+        "Delivery host packages `@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct workspace dependency on specd platform packages (`@specd/core`, `@specd/code-graph`, `@specd/sdk`). Plugin, schema, and third-party dependencies are unaffected.\n\n`@specd/mcp` declares `@specd/sdk` as its specd platform dependency even when the package contains no MCP tools yet."
+      ]
+    },
+    {
+      "requirement": "Banner version labels",
+      "rules": [
+        "When the root help banner renders version labels, it MUST show installed versions for `@specd/cli`, `@specd/sdk`, the `@specd/core` version obtained through `@specd/sdk` re-exports (`CORE_VERSION`), and the `@specd/code-graph` version obtained through `@specd/sdk` re-exports (`codeGraphVersion`)."
+      ]
+    },
+    {
       "requirement": "Excess arguments rejected",
       "rules": [
         "Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored."
@@ -279,6 +291,20 @@
       ]
     },
     {
+      "requirement": "Host package SDK dependency boundary",
+      "name": "MCP depends on SDK only",
+      "when": ["packages/mcp/package.json dependencies are inspected"],
+      "then": ["@specd/sdk is the specd platform dependency", "AND @specd/core is absent"]
+    },
+    {
+      "requirement": "Banner version labels",
+      "name": "Root banner shows CLI SDK core and code-graph versions",
+      "when": ["specd --help is run with a configured project"],
+      "then": [
+        "stdout includes cli  v, sdk   v, core  v, and graph v version labels from installed packages"
+      ]
+    },
+    {
       "requirement": "Output format flag",
       "name": "Text format produces human-readable output",
       "when": ["a command is run with --format text (or without --format)"],
@@ -338,39 +364,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:entrypoint",
-        "file": "cli:src/errors/specd-cli-error.ts",
-        "symbol": "SpecdCliError"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/errors/cli-validation-error.ts",
-        "symbol": "CliValidationError"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/formatter.ts",
-        "symbol": "parseFormat"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/formatter.ts",
-        "symbol": "output"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/helpers/parse-comma-values.ts",
-        "symbol": "parseCommaSeparatedValues"
+        "file": "cli:package.json"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:56092c81a6091bea888288b17291782a25e3cb2de8cf298f37afc2971a14708e",
-    "verify.md": "sha256:5c24ca92c87c7d1cd158461b38c1f8b04785e766bbf3b8ca418045f834f9c008"
+    "spec.md": "sha256:e5293050d50b803eaf2e0202e5b3e9fe7e7cec37fa03eb508acb3190d57bc638",
+    "verify.md": "sha256:a81f05998f0ec3714665c3f3fdb90d87e64cb9a25a476b8d4c825448ee297db7"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Global CLI: config discovery, stdout/stderr conventions, --format flag, exit codes, and error formatting.",
-  "optimizedContext": "# CLI Entrypoint\n\n## Rules\n\n- **Config discovery**: No `--config` → walk CWD to git root, load first `specd.yaml`. Not found → exit 1 + error on stderr.\n- **Config override**: `--config <path>` global. `preAction` propagates root value to subcommand without own `--config`. Pre-subcommand and post-subcommand both work. Skips discovery. Missing/unparseable → exit 1.\n- **Output**: Normal → stdout. Errors → stderr. Never mix.\n- **Exit codes**: 0=Success, 1=User/domain error, 2=Hook failure, 3=System error.\n- **Error format**: `error:` prefix (exit 1). `fatal:` prefix (exit 3). Stack trace only when debug enabled.\n- **Format flag**: `--format text|json|toon`, default `text`. Errors always plain text on stderr.\n- **Structured errors**: Typed error classes per Specd Error Contract. `SpecdCliError` extends `SpecdError`. No raw `Error` from formatters/helpers.\n- **JSON/TOON schema in help**: `\\nJSON/TOON output schema:` + TS type annotation via `addHelpText('after')`.\n- **Excess args**: `.allowExcessArguments(false)` on all leaves. Exit 1 + usage error.\n- **Banner**: SpecD ASCII art via `addHelpText('before')` on root `--help`. Not in subcommand help.\n- **Auto-dashboard**: No subcommand + config found → dispatch `project dashboard`. No config → help.\n- **Init alias**: `specd init` delegates to `specd project init`. Same flags, codes, formats.\n\n## Constraints\n\n- All leaves call `.allowExcessArguments(false)`\n- `--config` global; subcommands MAY redeclare. Double `--config` → last-value-wins\n- Config discovery stops at git root\n- stdout/stderr independent — no interleaving\n- Exit code 2 reserved exclusively for hook failures\n- `--format` never touches stderr\n- `json`/`toon` errors go to both stderr (plain) + stdout (structured)\n- Banner only on root `--help`"
+  "generatedBy": "core"
 }

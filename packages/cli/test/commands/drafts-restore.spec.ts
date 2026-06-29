@@ -13,7 +13,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 }))
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
-import { ChangeNotFoundError, InvalidChangeError } from '@specd/core'
+import { ChangeNotFoundError, InvalidChangeError } from '@specd/sdk'
 import { registerDraftsRestore } from '../../src/commands/drafts/restore.js'
 
 function setup() {

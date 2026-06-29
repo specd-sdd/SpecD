@@ -7,8 +7,8 @@ const mockInitProject = vi.fn().mockResolvedValue({
   workspaces: ['default'],
 })
 
-vi.mock('@specd/core', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@specd/core')>()
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@specd/sdk')>()
   return {
     ...original,
     createConfigWriter: vi.fn(() => ({
@@ -34,7 +34,7 @@ vi.mock('../../src/commands/plugins/install.js', () => ({
   installPluginsWithKernel: vi.fn(),
 }))
 
-import { createConfigWriter } from '@specd/core'
+import { createConfigWriter } from '@specd/sdk'
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { installPluginsWithKernel } from '../../src/commands/plugins/install.js'
 import { registerProjectInit } from '../../src/commands/project/init.js'

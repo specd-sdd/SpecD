@@ -38,7 +38,9 @@ User-facing documentation for this command MUST prefer the concrete aliases `dep
 
 ### Requirement: File impact analysis
 
-Single-file and multi-file impact analyses resolve selectors and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `@specd/code-graph` provider.
+Single-file and multi-file impact analyses resolve selectors via `cli:graph-cli-context`, open the provider through `withProvider`, and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `CodeGraphProvider`.
+
+Platform symbols MUST come from `@specd/sdk`.
 
 ### Requirement: Symbol impact analysis
 
@@ -167,7 +169,7 @@ If the provider cannot be opened, the command exits with code 3.
 
 ## Constraints
 
-- The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates entirely to `@specd/code-graph`
+- The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates to the provider opened via `@specd/sdk` lifecycle helpers
 - `process.exit(0)` is called explicitly after closing the provider
 - Output path formatting and console text/JSON formatting are managed by the CLI
 
@@ -206,7 +208,7 @@ $ specd graph impact --file /repo/packages/core/src/auth.ts --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
 - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider facade
 - [`code-graph:traversal`](../../code-graph/traversal/spec.md) — impact analysis semantics
 - [`code-graph:workspace-integration`](../../code-graph/workspace-integration/spec.md) — canonical workspace paths and config-relative file lookup semantics

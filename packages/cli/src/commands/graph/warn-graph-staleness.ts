@@ -1,12 +1,12 @@
-import { createVcsAdapter, type Kernel, type SpecdConfig } from '@specd/core'
+import { createVcsAdapter, type Kernel, type SpecdConfig } from '@specd/sdk'
 import {
   isGraphStale,
   detectFingerprintMismatch,
   parseFingerprintMap,
   buildProjectGraphConfig,
   type CodeGraphProvider,
-} from '@specd/code-graph'
-import { codeGraphVersion } from './code-graph-version.js'
+} from '@specd/sdk'
+import { codeGraphVersion } from '@specd/sdk'
 
 /**
  * Checks if the graph is stale or has a derivation fingerprint mismatch,

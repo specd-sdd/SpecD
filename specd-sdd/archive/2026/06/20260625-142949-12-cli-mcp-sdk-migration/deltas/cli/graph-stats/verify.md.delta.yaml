@@ -1,0 +1,26 @@
+- op: modified
+  description: Health retrieval via SDK withOpenGraphProvider
+  selector:
+    type: section
+    matches: 'Scenario: Command delegates health to GetGraphHealth'
+  rename: 'Scenario: Command delegates health to GetGraphHealth via SDK'
+  content: |
+    - **WHEN** `specd graph stats` is executed in configured mode with kernel available
+    - **THEN** it opens the provider via `withOpenGraphProvider` from `@specd/sdk`
+    - **AND** it calls `GetGraphHealth.execute()` with workspaces from `ListWorkspaces`
+    - **AND** graph context and lifecycle go through `cli:graph-cli-context`
+
+- op: added
+  description: Host context from SDK
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Statistics retrieval'
+    after:
+      type: section
+      matches: 'Scenario: Command obtains orchestrated project structure'
+  content: |
+    #### Scenario: Host context from openSpecdHost
+
+    - **WHEN** `specd graph stats` is executed
+    - **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`

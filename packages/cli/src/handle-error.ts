@@ -5,7 +5,7 @@ import {
   SchemaValidationError,
   HookFailedError,
   HistoricalImplementationGuardError,
-} from '@specd/core'
+} from '@specd/sdk'
 import { output } from './formatter.js'
 
 /**

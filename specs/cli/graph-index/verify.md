@@ -85,14 +85,14 @@
 #### Scenario: Command passes progress callback in text mode
 
 - **WHEN** `specd graph index` is run in text mode
-- **THEN** the command passes an `onProgress` callback to `IndexProjectGraph.execute()`
+- **THEN** the command passes an `onProgress` callback to `runIndexProjectGraph`
 - **AND** when the callback is invoked, it prints the progress percentage and phase to stdout
 
-#### Scenario: Worker uses IndexProjectGraph
+#### Scenario: Worker uses runIndexProjectGraph
 
 - **GIVEN** the worker process is indexing
 - **WHEN** index execution runs
-- **THEN** it calls `IndexProjectGraph.execute()` instead of calling `provider.index()` directly in the command handler
+- **THEN** it calls `runIndexProjectGraph(ctx, input)` in the worker process
 
 #### Scenario: Worker subprocess performs indexing in isolation
 
@@ -101,3 +101,9 @@
 - **THEN** the parent process spawns a child worker with `SPECD_GRAPH_INDEX_WORKER=true`
 - **AND** the parent forwards `SIGINT` and `SIGTERM` to the worker
 - **AND** the parent releases the indexing lock when the worker exits
+
+#### Scenario: Host context from openSpecdHost
+
+- **WHEN** `specd graph index` executes in the worker
+- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
+- **AND** platform symbols come from `@specd/sdk`

@@ -1,6 +1,6 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
-import { type OverlapReport } from '@specd/core'
+import { type OverlapReport } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'

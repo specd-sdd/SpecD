@@ -158,3 +158,9 @@
 
 - **WHEN** a delivery host needs config, kernel, and graph provider wiring
 - **THEN** `@specd/sdk` provides `openSpecdHost` and `createSdkContext` as the documented entry points
+
+#### Scenario: CLI and MCP declare SDK as platform dependency
+
+- **WHEN** `@specd/cli` or `@specd/mcp` package dependencies are inspected
+- **THEN** `@specd/sdk` is the sole direct workspace dependency on specd platform packages
+- **AND** host bootstrap flows through `@specd/sdk`

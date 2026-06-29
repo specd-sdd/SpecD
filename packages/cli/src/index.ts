@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
-import { createConfigLoader } from '@specd/core'
+import { createConfigLoader } from '@specd/sdk'
 import { handleError } from './handle-error.js'
 import { renderBanner } from './banner.js'
-import { CLI_VERSION, CORE_VERSION } from './version.js'
+import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from './version.js'
 
 // change
 import { registerChangeCreate } from './commands/change/create.js'
@@ -97,7 +97,12 @@ const program = new Command('specd')
 
 program.addHelpText(
   'before',
-  renderBanner({ cliVersion: CLI_VERSION, coreVersion: CORE_VERSION }) + '\n\n',
+  renderBanner({
+    cliVersion: CLI_VERSION,
+    sdkVersion: SDK_VERSION,
+    coreVersion: CORE_VERSION,
+    codeGraphVersion: CODE_GRAPH_VERSION,
+  }) + '\n\n',
 )
 
 program.hook('preAction', (_thisCommand, actionCommand) => {

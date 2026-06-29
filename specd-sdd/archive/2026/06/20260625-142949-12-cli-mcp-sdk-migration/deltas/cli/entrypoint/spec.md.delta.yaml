@@ -1,0 +1,29 @@
+- op: added
+  description: Host package SDK dependency boundary
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: JSON/TOON output schema in help'
+  content: |
+    ### Requirement: Host package SDK dependency boundary
+
+    Delivery host packages `@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct workspace dependency on specd platform packages (`@specd/core`, `@specd/code-graph`, `@specd/sdk`). Plugin, schema, and third-party dependencies are unaffected.
+
+    `@specd/mcp` declares `@specd/sdk` as its specd platform dependency even when the package contains no MCP tools yet.
+
+- op: added
+  description: Banner shows CLI SDK and core versions
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Host package SDK dependency boundary'
+  content: |
+    ### Requirement: Banner version labels
+
+    When the root help banner renders version labels, it MUST show installed versions for `@specd/cli`, `@specd/sdk`, the `@specd/core` version obtained through `@specd/sdk` re-exports (`CORE_VERSION`), and the `@specd/code-graph` version obtained through `@specd/sdk` re-exports (`codeGraphVersion`).

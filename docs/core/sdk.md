@@ -51,10 +51,25 @@ Optional `beforeOpen` supports host-specific setup (e.g. CLI index lock acquisit
 
 Both return structured data — formatting stays in CLI presenters.
 
-## Re-exports (A2a)
+## CLI and MCP hosts
 
-- `createConfigLoader`, `createConfigWriter`, `createKernel`
-- `createCodeGraphProvider`, `CodeGraphProvider`
+`@specd/cli` and `@specd/mcp` depend on `@specd/sdk` only — no direct `@specd/core` or `@specd/code-graph` runtime imports in delivery hosts.
+
+| CLI surface                            | SDK entry                                        |
+| -------------------------------------- | ------------------------------------------------ |
+| `resolveCliContext`                    | `openSpecdHost` + `buildCliKernelOptions`        |
+| `project status`                       | `buildProjectStatusSnapshot`                     |
+| `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth` |
+| `graph index` (worker)                 | `runIndexProjectGraph`                           |
+| `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`       |
+
+The SDK barrel re-exports `@specd/core` and `@specd/code-graph` symbols hosts need (config factories, graph locks, health types). Host adapters import platform symbols from `@specd/sdk`, not from lower packages.
+
+## Re-exports
+
+- `createConfigLoader`, `createConfigWriter`, `createKernel`, and the full `@specd/core` / `@specd/code-graph` public surfaces needed by hosts
+- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`
+- `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`
 - `SDK_VERSION`
 
-Full public-surface curation is handled in change 13 (`public-api-surface`).
+Full public-surface curation continues in change 13 (`public-api-surface`).

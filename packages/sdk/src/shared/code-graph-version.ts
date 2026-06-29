@@ -1,6 +1,4 @@
-import { createRequire } from 'node:module'
-
-const require = createRequire(import.meta.url)
+import { CODE_GRAPH_VERSION } from '@specd/code-graph'
 
 /**
  * Installed version of `@specd/code-graph` for graph fingerprint and indexing.
@@ -8,13 +6,8 @@ const require = createRequire(import.meta.url)
  * @returns The semver version string
  */
 export function getCodeGraphVersion(): string {
-  try {
-    const pkg = require('@specd/code-graph/package.json') as { version?: string }
-    return pkg.version ?? '0.0.0'
-  } catch {
-    return '0.0.0'
-  }
+  return CODE_GRAPH_VERSION
 }
 
 /** Cached `@specd/code-graph` package version. */
-export const codeGraphVersion: string = getCodeGraphVersion()
+export const codeGraphVersion: string = CODE_GRAPH_VERSION

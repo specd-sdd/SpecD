@@ -4,10 +4,9 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:config",
-    "code-graph:composition",
-    "code-graph:graph-store",
     "core:list-workspaces",
-    "code-graph:index-project-graph"
+    "sdk:run-index-project-graph",
+    "sdk:host-context"
   ],
   "context": [
     "Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness."
@@ -22,7 +21,7 @@
     {
       "requirement": "Indexing behaviour",
       "rules": [
-        "The command obtains workspace targets and spec sources from the project configuration.\nIt delegates effective project graph config merging and index execution to `IndexProjectGraph.execute()` inside the worker process (or current process when worker bypass is active).\n\nThe command SHALL retain CLI-only concerns:\n\n- shared graph indexing lock acquisition in the parent process before spawning a worker\n- worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`\n- `onProgress` callback wiring for text-mode progress output\n- `provider.recreate()` for `--force` is triggered by passing `force: true` to `IndexProjectGraph`\n\nUnless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `IndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).\n\nWhen `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests."
+        "Index execution MUST go through `runIndexProjectGraph(ctx, input)` inside `@specd/sdk`. The worker process (or current process when worker bypass is active) obtains host context via `openSpecdHost`.\n\nThe command SHALL retain CLI-only concerns:\n\n- shared graph indexing lock acquisition in the parent process before spawning a worker\n- worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`\n- `onProgress` callback wiring for text-mode progress output\n- passing `force: true` to `runIndexProjectGraph` when `--force` is set\n\nThe command handler invokes `runIndexProjectGraph` for index execution; workspace assembly and `IndexProjectGraph` orchestration live in `@specd/sdk`.\n\nUnless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `runIndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).\n\nWhen `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests."
       ]
     },
     {
@@ -45,12 +44,12 @@
     }
   ],
   "constraints": [
-    "The CLI does not contain indexing logic, lock management, or configuration building — it delegates entirely to @specd/code-graph",
+    "Index execution orchestration lives in @specd/sdk — the CLI does not assemble workspace targets, VCS refs, or IndexProjectGraph inputs inline",
+    "Lock management and worker subprocess isolation remain CLI-only adapter concerns",
     "process.exit(0) is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive",
-    "--force delegates destructive backend recreation to the graph-store contract",
-    "The withProvider helper manages lifecycle and registers SIGINT/SIGTERM signal handlers",
-    "Workspace targets and spec sources are derived from SpecdConfig and Kernel",
-    "Worker subprocess isolation keeps native graph-store threads out of the parent CLI process; tests bypass spawning via SPECD_GRAPH_INDEX_NO_WORKER"
+    "--force is forwarded to runIndexProjectGraph input",
+    "Worker subprocess isolation keeps native graph-store threads out of the parent CLI process; tests bypass spawning via SPECD_GRAPH_INDEX_NO_WORKER",
+    "Platform symbols for the graph index handler come from @specd/sdk"
   ],
   "scenarios": [
     {
@@ -152,18 +151,16 @@
       "name": "Command passes progress callback in text mode",
       "when": ["specd graph index is run in text mode"],
       "then": [
-        "the command passes an onProgress callback to IndexProjectGraph.execute()",
+        "the command passes an onProgress callback to runIndexProjectGraph",
         "AND when the callback is invoked, it prints the progress percentage and phase to stdout"
       ]
     },
     {
       "requirement": "Indexing behaviour",
-      "name": "Worker uses IndexProjectGraph",
+      "name": "Worker uses runIndexProjectGraph",
       "given": ["the worker process is indexing"],
       "when": ["index execution runs"],
-      "then": [
-        "it calls IndexProjectGraph.execute() instead of calling provider.index() directly in the command handler"
-      ]
+      "then": ["it calls runIndexProjectGraph(ctx, input) in the worker process"]
     },
     {
       "requirement": "Indexing behaviour",
@@ -174,6 +171,15 @@
         "the parent process spawns a child worker with SPECD_GRAPH_INDEX_WORKER=true",
         "AND the parent forwards SIGINT and SIGTERM to the worker",
         "AND the parent releases the indexing lock when the worker exits"
+      ]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Host context from openSpecdHost",
+      "when": ["specd graph index executes in the worker"],
+      "then": [
+        "it obtains host context via openSpecdHost from @specd/sdk",
+        "AND platform symbols come from @specd/sdk"
       ]
     }
   ],
@@ -187,8 +193,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a633a9c5fd5da41da93fa0d43c06d4f78416c67cbc08998c7cf7a8b6c395e539",
-    "verify.md": "sha256:b74e4f00f26ce54f8087c1beb32d43ba037e0504596bfc6931df38420472c77b"
+    "spec.md": "sha256:605892207f4a32adc1ee61ec13a64c426663a42a91eab667b463091cbfcc6945",
+    "verify.md": "sha256:91fb81d390469b08c04a58a29a079f07c571aec2bb3ed98ba1ad718c41197273"
   },
   "generatedBy": "core"
 }

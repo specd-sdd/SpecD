@@ -81,7 +81,7 @@
     {
       "requirement": "@specd/sdk orchestrates cross-package host bootstrap",
       "rules": [
-        "Delivery hosts (CLI, MCP, API, IPC) SHOULD bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.\n\n`@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration. Direct core imports for bootstrap are permitted only in `@specd/sdk` itself and in tests until host migration (change 12) completes."
+        "Delivery hosts (CLI, MCP, API, IPC) MUST bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.\n\n`@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration.\n\n`@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct runtime dependency on specd platform packages. Direct core/code-graph bootstrap imports in delivery hosts are permitted only in `@specd/sdk` itself and in tests."
       ]
     }
   ],
@@ -279,12 +279,21 @@
       "then": [
         "@specd/sdk provides openSpecdHost and createSdkContext as the documented entry points"
       ]
+    },
+    {
+      "requirement": "@specd/sdk orchestrates cross-package host bootstrap",
+      "name": "CLI and MCP declare SDK as platform dependency",
+      "when": ["@specd/cli or @specd/mcp package dependencies are inspected"],
+      "then": [
+        "@specd/sdk is the sole direct workspace dependency on specd platform packages",
+        "AND host bootstrap flows through @specd/sdk"
+      ]
     }
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:3580d841ca68b2fe39eda85c65e4786a7ef4b09bb133ec7a77ef1ffa843d04a6",
-    "verify.md": "sha256:401b20e86765bdec4b3624470d34cf4a09a02012172069c7a3ba88b35f41cf37"
+    "spec.md": "sha256:661fc94b32181eb49f9aff3db6be949554f8b168c58718eeabbbb3c901019548",
+    "verify.md": "sha256:ad3300ba612335ae113a0559ad046a7109424493488f88537cd808517632d9de"
   },
   "generatedBy": "core"
 }

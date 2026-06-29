@@ -26,9 +26,9 @@ import {
   ConfigValidationError,
   ArchiveDependencyMismatchError,
   type LoggerPort,
-} from '@specd/core'
+} from '@specd/sdk'
 import { handleError } from '../src/handle-error.js'
-import { CliValidationError } from '../src/errors/index.js'
+import { CliValidationError, InvalidFormatError } from '../src/errors/index.js'
 import { mockProcessExit, ExitSentinel } from './commands/helpers.js'
 
 function capturedStderr(): string {
@@ -194,6 +194,14 @@ describe('handleError — structured error output', () => {
     expect(parsed.code).toBe('CHANGE_NOT_FOUND')
     expect(parsed.exitCode).toBe(1)
     expect(parsed.message).toContain('my-change')
+  })
+
+  it('InvalidFormatError emits structured JSON to stdout when format is json', () => {
+    callHandleError(new InvalidFormatError("invalid format 'xml'"), 'json')
+    const parsed = JSON.parse(capturedStdout()) as Record<string, unknown>
+    expect(parsed.result).toBe('error')
+    expect(parsed.code).toBe('INVALID_FORMAT')
+    expect(parsed.exitCode).toBe(1)
   })
 
   it('CliValidationError emits structured JSON to stdout when format is json', () => {

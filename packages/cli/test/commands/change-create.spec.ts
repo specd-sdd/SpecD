@@ -15,14 +15,18 @@ import {
   ExitSentinel,
 } from './helpers.js'
 
-vi.mock('../../src/helpers/cli-context.js', () => ({
-  resolveCliContext: vi.fn(),
-}))
+vi.mock('../../src/helpers/cli-context.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/helpers/cli-context.js')>()
+  return {
+    ...actual,
+    resolveCliContext: vi.fn(),
+  }
+})
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
-import { createCliKernel } from '../../src/kernel.js'
 import { registerChangeCreate } from '../../src/commands/change/create.js'
-import { ChangeAlreadyExistsError, type Kernel, type SpecdConfig } from '@specd/core'
+import { ChangeAlreadyExistsError, createKernel, type Kernel, type SpecdConfig } from '@specd/sdk'
+import { buildCliKernelOptions } from '../../src/helpers/cli-context.js'
 
 function setup(configOverrides: Record<string, unknown> = {}) {
   const config = makeMockConfig(configOverrides)
@@ -402,7 +406,7 @@ describe('Integration (real kernel)', () => {
       },
       approvals: { spec: false, signoff: false },
     }
-    kernel = await createCliKernel(config)
+    kernel = await createKernel(config, buildCliKernelOptions())
     vi.mocked(resolveCliContext).mockResolvedValue({
       config,
       configFilePath: config.configPath,

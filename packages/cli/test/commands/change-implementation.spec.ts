@@ -17,7 +17,7 @@ vi.mock('../../src/commands/change/_implementation-tracking.js', () => ({
   enrichImplementationTracking: vi.fn(),
 }))
 
-import { ImplementationFileNotFoundError } from '@specd/core'
+import { ImplementationFileNotFoundError } from '@specd/sdk'
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { enrichImplementationTracking } from '../../src/commands/change/_implementation-tracking.js'
 import { registerChangeImplementation } from '../../src/commands/change/implementation.js'

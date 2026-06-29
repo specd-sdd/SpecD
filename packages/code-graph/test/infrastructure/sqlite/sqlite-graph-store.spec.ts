@@ -189,6 +189,25 @@ describe('SQLiteGraphStore', () => {
     expect(existsSync(join(tempDir, 'graph'))).toBe(false)
   })
 
+  it('recreate on an open store reopens the store for subsequent operations', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.recreate()
+
+    await expect(store.getStatistics()).resolves.toEqual(
+      expect.objectContaining({
+        fileCount: 0,
+        documentCount: 0,
+        symbolCount: 0,
+        specCount: 0,
+      }),
+    )
+
+    await store.close()
+  })
+
   it('configures sqlite pragmas for concurrent reads and tolerant lock waits', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
 

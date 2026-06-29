@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   computeGraphFingerprint,
   detectFingerprintMismatch,
@@ -7,6 +10,9 @@ import {
   computeWorkspaceFingerprint,
   computeRootFingerprint,
 } from '../../../src/application/use-cases/_shared/compute-graph-fingerprint.js'
+import { CODE_GRAPH_VERSION } from '../../../src/index.js'
+
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 describe('Fingerprint logic', () => {
   const codeGraphVersion = '1.0.0'
@@ -142,5 +148,28 @@ describe('Fingerprint logic', () => {
     expect(
       detectFingerprintMismatch(storedMap, codeGraphVersion, projectRoot, [ws1], mockGraphConfig),
     ).toBe(true)
+  })
+
+  it('CODE_GRAPH_VERSION matches package.json and affects workspace fingerprints', () => {
+    const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
+      version: string
+    }
+    expect(CODE_GRAPH_VERSION).toBe(packageJson.version)
+
+    const withInstalled = computeWorkspaceFingerprint(
+      CODE_GRAPH_VERSION,
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      mockGraphConfig,
+    )
+    const withZero = computeWorkspaceFingerprint(
+      '0.0.0',
+      projectRoot,
+      mockWorkspace,
+      [mockWorkspace],
+      mockGraphConfig,
+    )
+    expect(withInstalled).not.toBe(withZero)
   })
 })

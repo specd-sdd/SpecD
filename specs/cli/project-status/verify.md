@@ -56,6 +56,8 @@
 - **GIVEN** a project with an indexed code graph
 - **WHEN** `specd project status` runs without --graph flag
 - **THEN** graph staleness and last indexed timestamp are included
+- **AND** the command obtains them via `buildProjectStatusSnapshot` with `{ includeGraph: true }`
+- **AND** graph data comes exclusively from `@specd/sdk`
 
 ### Requirement: supports --graph flag
 
@@ -64,6 +66,7 @@
 - **GIVEN** a project with indexed code
 - **WHEN** `specd project status --graph` runs
 - **THEN** indexed files count, symbols count, and hotspots are included
+- **AND** the command calls `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }`
 
 ### Requirement: supports --context flag
 
@@ -136,3 +139,10 @@
 
 - **WHEN** `specd project status --format toon` runs
 - **THEN** output is TOON-formatted
+
+### Requirement: SDK host bootstrap
+
+#### Scenario: Host context from openSpecdHost
+
+- **WHEN** `specd project status` is executed
+- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`)

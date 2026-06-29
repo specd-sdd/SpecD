@@ -1,7 +1,7 @@
 {
   "title": "Graph Hotspots",
   "description": "Users and agents need a fast way to identify the most structurally coupled symbols in the code graph before changing code, writing specs, or exploring an unfamiliar area. The `specd graph hotspots` command provides that ranking, including filtering and output options that make the result usable both for day-to-day inspection and for bootstrap work against repositories that do not yet have a full `specd.yaml`.",
-  "dependsOn": ["cli:entrypoint", "core:config", "code-graph:composition"],
+  "dependsOn": ["cli:entrypoint", "core:config", "code-graph:composition", "cli:graph-cli-context"],
   "context": [
     "Users and agents need a fast way to identify the most structurally coupled symbols in the code graph before changing code, writing specs, or exploring an unfamiliar area. The `specd graph hotspots` command provides that ranking, including filtering and output options that make the result usable both for day-to-day inspection and for bootstrap work against repositories that do not yet have a full `specd.yaml`."
   ],
@@ -27,7 +27,7 @@
     {
       "requirement": "Hotspot retrieval",
       "rules": [
-        "The command SHALL resolve graph context, create a `CodeGraphProvider`, and delegate hotspot computation to `provider.getHotspots(...)`.\n\nThe command SHALL pass all requested filters through to the provider, including workspace, kind list, file path, exclusion filters, limit, score threshold, and minimum risk."
+        "The command SHALL resolve graph context via `cli:graph-cli-context`, open a provider through `withProvider`, and delegate hotspot computation to `provider.getHotspots(...)`.\n\nPlatform symbols MUST come from `@specd/sdk`.\n\nThe command SHALL pass all requested filters through to the provider, including workspace, kind list, file path, exclusion filters, limit, score threshold, and minimum risk."
       ]
     },
     {
@@ -56,10 +56,10 @@
     }
   ],
   "constraints": [
-    "The CLI SHALL delegate hotspot computation to @specd/code-graph",
+    "Hotspot computation remains delegated to the graph provider; the CLI does not implement scoring",
     "--kind validation SHALL use the same allowed kind set as the code graph symbol model",
     "Bootstrap mode SHALL not reinterpret --config; it is selected only by --path or by missing config",
-    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress"
+    "The command checks the shared graph indexing lock (via @specd/sdk re-export) before opening the provider and fails fast while indexing is in progress"
   ],
   "scenarios": [
     {
@@ -174,8 +174,15 @@
         "specd graph hotspots --workspace core --kind class,method --file \"src/*\" --exclude-path \"test/*\" --exclude-workspace cli --limit 15 --min-score 3 --min-risk HIGH is run"
       ],
       "then": [
-        "the provider receives the workspace, kind list, file, exclusion filters, limit, score threshold, and risk threshold exactly as requested"
+        "the provider receives the workspace, kind list, file, exclusion filters, limit, score threshold, and risk threshold exactly as requested",
+        "AND the command opens the provider via withProvider"
       ]
+    },
+    {
+      "requirement": "Hotspot retrieval",
+      "name": "Hotspots use SDK graph context",
+      "when": ["specd graph hotspots is executed"],
+      "then": ["platform symbols are sourced from @specd/sdk"]
     },
     {
       "requirement": "Concurrent indexing guard",
@@ -257,9 +264,18 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:graph-hotspots",
+        "file": "cli:src/commands/graph/hotspots.ts",
+        "symbol": "registerGraphHotspots"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:33622600394a68a0f24d549ab8fcb632af9a88033a1c30f38c15bce12395ff81",
-    "verify.md": "sha256:1083d80664da28dbb3615dc315c50f95e9f97e96e5b542828f72f259f85fded6"
+    "spec.md": "sha256:b00fd05fa018f2e8b5217a998772fc56f5e313c1eca3742a718778de59d1946e",
+    "verify.md": "sha256:ea6bd62a1af6b3b304eeadf16f7230cf4ff9b3a7c0285f60bc6034132ceb0f8b"
   },
   "generatedBy": "core"
 }

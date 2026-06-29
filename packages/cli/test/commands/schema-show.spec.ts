@@ -13,7 +13,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 }))
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
-import { SchemaNotFoundError } from '@specd/core'
+import { SchemaNotFoundError } from '@specd/sdk'
 import { registerSchemaShow } from '../../src/commands/schema/show.js'
 
 /** Minimal mock artifact with all required fields. */

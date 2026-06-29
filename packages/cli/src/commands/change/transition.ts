@@ -6,7 +6,7 @@ import {
   type OnTransitionProgress,
   VALID_TRANSITIONS,
   InvalidStateTransitionError,
-} from '@specd/core'
+} from '@specd/sdk'
 import { createSpinner, type Spinner } from 'nanospinner'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'

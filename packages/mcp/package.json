@@ -24,6 +24,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@specd/core": "workspace:*"
+    "@specd/sdk": "workspace:*"
   }
 }

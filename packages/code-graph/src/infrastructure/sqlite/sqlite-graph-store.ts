@@ -1002,11 +1002,15 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   async recreate(): Promise<void> {
+    const wasOpen = this.db !== undefined
     await this.close()
     rmSync(this.graphDir, { recursive: true, force: true })
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
     this._graphFingerprint = null
+    if (wasOpen) {
+      await this.open()
+    }
   }
 
   private ensureOpen(): SqliteDatabase {

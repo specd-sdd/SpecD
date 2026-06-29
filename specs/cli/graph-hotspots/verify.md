@@ -88,6 +88,12 @@
 
 - **WHEN** `specd graph hotspots --workspace core --kind class,method --file "src/*" --exclude-path "test/*" --exclude-workspace cli --limit 15 --min-score 3 --min-risk HIGH` is run
 - **THEN** the provider receives the workspace, kind list, file, exclusion filters, limit, score threshold, and risk threshold exactly as requested
+- **AND** the command opens the provider via `withProvider`
+
+#### Scenario: Hotspots use SDK graph context
+
+- **WHEN** `specd graph hotspots` is executed
+- **THEN** platform symbols are sourced from `@specd/sdk`
 
 ### Requirement: Concurrent indexing guard
 

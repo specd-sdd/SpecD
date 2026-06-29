@@ -1,4 +1,4 @@
-import { SpecdError } from '@specd/core'
+import { SpecdError } from '@specd/sdk'
 
 /**
  * Base class for all CLI-specific errors.

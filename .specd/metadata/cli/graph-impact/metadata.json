@@ -3,8 +3,8 @@
   "description": "Before modifying code, developers and agents need to understand the blast radius — which other files and symbols depend on the change. The `specd graph impact` command runs impact analysis on a file, symbol, or set of changed files, reporting risk level, dependency counts, and affected files.",
   "dependsOn": [
     "cli:entrypoint",
+    "cli:graph-cli-context",
     "core:config",
-    "code-graph:composition",
     "code-graph:traversal",
     "code-graph:workspace-integration"
   ],
@@ -21,7 +21,7 @@
     {
       "requirement": "File impact analysis",
       "rules": [
-        "Single-file and multi-file impact analyses resolve selectors and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `@specd/code-graph` provider."
+        "Single-file and multi-file impact analyses resolve selectors via `cli:graph-cli-context`, open the provider through `withProvider`, and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `CodeGraphProvider`.\n\nPlatform symbols MUST come from `@specd/sdk`."
       ]
     },
     {
@@ -56,7 +56,7 @@
     }
   ],
   "constraints": [
-    "The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates entirely to @specd/code-graph",
+    "The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates to the provider opened via @specd/sdk lifecycle helpers",
     "process.exit(0) is called explicitly after closing the provider",
     "Output path formatting and console text/JSON formatting are managed by the CLI"
   ],
@@ -117,6 +117,15 @@
         "AND the analysis direction is upstream",
         "AND the default depth is 3",
         "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "File impact analysis",
+      "name": "Impact uses SDK graph context",
+      "when": ["specd graph impact --file <path> is executed"],
+      "then": [
+        "it resolves context via resolveGraphCliContext and opens via withProvider",
+        "AND platform symbols are sourced from @specd/sdk"
       ]
     },
     {
@@ -353,22 +362,12 @@
         "specId": "cli:graph-impact",
         "file": "cli:src/commands/graph/impact.ts",
         "symbol": "registerGraphImpact"
-      },
-      {
-        "specId": "cli:graph-impact",
-        "file": "cli:src/commands/graph/impact.ts",
-        "symbol": "handleFilesImpact"
-      },
-      {
-        "specId": "cli:graph-impact",
-        "file": "cli:src/commands/graph/impact.ts",
-        "symbol": "handleSpecImpact"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:adeaf721136a683866e9f8cb33d3cd3a7ceff9befcf067034b82de402a470391",
-    "verify.md": "sha256:06406d2994edc56b6d0fe91f9ca28f8568326bcca54326787d4d25362f57fe7b"
+    "spec.md": "sha256:be517cc6da80ee7c9865c1932043c8ecb690557037c84fb1dbbbbc150d5ae1df",
+    "verify.md": "sha256:f97cbf5f14fa5d9500984a03406ab7a8166476aba2c449d026851a6cd02cdb0c"
   },
   "generatedBy": "core"
 }

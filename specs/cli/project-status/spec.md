@@ -48,20 +48,26 @@ The command output MUST include:
 
 ### Requirement: includes graph freshness (always)
 
-The command output MUST always include:
+The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with `{ includeGraph: true }`:
 
 - Whether the code graph is stale (boolean)
 - Last indexed timestamp (or null if never indexed)
+
+The command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.
+
+Graph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.
 
 This is included by default, not behind a flag.
 
 ### Requirement: supports --graph flag
 
-When `--graph` flag is provided, the command MUST include extended graph statistics:
+When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }` and include extended graph statistics from the snapshot:
 
-- Number of indexed files
-- Number of indexed symbols
-- Hotspots (if available)
+- Number of indexed files (`graphHealth.fileCount`)
+- Number of indexed symbols (`graphHealth.symbolCount`)
+- Hotspots (from snapshot `hotspots` when available)
+
+Presenter formatting (text/json/toon) remains in the CLI command handler.
 
 ### Requirement: includes config flags (always)
 
@@ -113,6 +119,10 @@ Without `--format` flag, output MUST be plain text formatted for readability.
 When `--format json` is provided, output MUST be valid JSON.
 When `--format toon` is provided, output MUST be TOON-formatted.
 
+### Requirement: SDK host bootstrap
+
+The command MUST obtain host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`). Project summary, approval flags, and graph snapshot orchestration MUST use the returned `SdkHostContext`.
+
 ## Constraints
 
 - The command MUST NOT auto-index the graph — callers decide whether to index
@@ -125,3 +135,5 @@ When `--format toon` is provided, output MUST be TOON-formatted.
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure in workspace output
 - [`core:get-project-summary`](../../core/get-project-summary/spec.md) — consolidated change and spec counts
 - [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly
+- [`sdk:build-project-status-snapshot`](../../sdk/build-project-status-snapshot/spec.md) — graph freshness and extended graph stats orchestration
+- [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

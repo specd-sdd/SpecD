@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { ChangeNotFoundError, ApprovalGateDisabledError } from '@specd/core'
+import { ChangeNotFoundError, ApprovalGateDisabledError } from '@specd/sdk'
 import {
   makeMockConfig,
   makeMockChange,
@@ -10,21 +10,22 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeApprove } from '../../src/commands/change/approve.js'
 
 function setup() {
   const config = makeMockConfig({ approvals: { spec: true, signoff: true } })
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   kernel.changes.status.execute.mockResolvedValue({
     change: makeMockChange({ name: 'my-change', state: 'pending-spec-approval' }),
     artifactStatuses: [],

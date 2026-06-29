@@ -8,15 +8,14 @@ import {
   captureStderr,
 } from './commands/helpers.js'
 import { renderBanner } from '../src/banner.js'
+import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../src/version.js'
 
-vi.mock('../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../src/load-config.js'
-import { createCliKernel } from '../src/kernel.js'
+import { resolveCliContext } from '../src/helpers/cli-context.js'
 import { registerProjectDashboard } from '../src/commands/project/dashboard.js'
 import { registerProjectInit } from '../src/commands/project/init.js'
 
@@ -140,6 +139,49 @@ describe('banner in --help', () => {
     expect(stdout()).toMatch(/┌─┐/)
   })
 
+  it('renderBanner shows cli, sdk, core, and code-graph version labels', () => {
+    const banner = renderBanner({
+      cliVersion: '1.0.0',
+      sdkVersion: '2.0.0',
+      coreVersion: '3.0.0',
+      codeGraphVersion: '4.0.0',
+    })
+
+    expect(banner).toContain('cli  v1.0.0')
+    expect(banner).toContain('sdk   v2.0.0')
+    expect(banner).toContain('core  v3.0.0')
+    expect(banner).toContain('graph v4.0.0')
+  })
+
+  // specs/cli/entrypoint verify (change 12) — Banner version labels
+  it('Scenario: Root banner shows CLI SDK core and code-graph versions from installed packages', async () => {
+    const program = new Command('specd')
+      .exitOverride()
+      .option('--config <path>', 'path to specd.yaml')
+
+    program.addHelpText(
+      'before',
+      renderBanner({
+        cliVersion: CLI_VERSION,
+        sdkVersion: SDK_VERSION,
+        coreVersion: CORE_VERSION,
+        codeGraphVersion: CODE_GRAPH_VERSION,
+      }) + '\n\n',
+    )
+
+    const stdout = captureStdout()
+    await program.parseAsync(['node', 'specd', '--help']).catch(() => {
+      /* exitOverride */
+    })
+
+    const output = stdout()
+    expect(output).toContain(`cli  v${CLI_VERSION}`)
+    expect(output).toContain(`sdk   v${SDK_VERSION}`)
+    expect(output).toContain(`core  v${CORE_VERSION}`)
+    expect(output).toContain(`graph v${CODE_GRAPH_VERSION}`)
+    expect(CODE_GRAPH_VERSION).not.toBe('0.0.0')
+  })
+
   it('subcommand --help output does not contain the SpecD banner', async () => {
     const program = makeRootProgram()
     addProbeCommand(program)
@@ -162,8 +204,11 @@ describe('auto-dashboard default action', () => {
   function setupDashboard() {
     const config = makeMockConfig()
     const kernel = makeMockKernel()
-    vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    })
     const stdout = captureStdout()
     const stderr = captureStderr()
     mockProcessExit()

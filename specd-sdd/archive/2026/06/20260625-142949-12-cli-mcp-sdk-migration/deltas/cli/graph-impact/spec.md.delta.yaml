@@ -1,0 +1,31 @@
+- op: modified
+  description: File impact via SDK graph context
+  selector:
+    type: section
+    matches: 'Requirement: File impact analysis'
+  content: |
+    Single-file and multi-file impact analyses resolve selectors via `cli:graph-cli-context`, open the provider through `withProvider`, and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `CodeGraphProvider`.
+
+    Platform symbols MUST come from `@specd/sdk`.
+
+- op: modified
+  description: Constraints reflect SDK delegation
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates to the provider opened via `@specd/sdk` lifecycle helpers
+    - `process.exit(0)` is called explicitly after closing the provider
+    - Output path formatting and console text/JSON formatting are managed by the CLI
+
+- op: modified
+  description: Update spec dependencies
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
+    - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+    - [`code-graph:traversal`](../../code-graph/traversal/spec.md) — impact analysis semantics
+    - [`code-graph:workspace-integration`](../../code-graph/workspace-integration/spec.md) — canonical workspace paths and config-relative file lookup semantics

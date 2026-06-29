@@ -1,16 +1,6 @@
 import { createRequire } from 'node:module'
 
 export {
-  createConfigLoader,
-  createConfigWriter,
-  createKernel,
-  type Kernel,
-  type KernelOptions,
-  type SpecdConfig,
-} from '@specd/core'
-export { createCodeGraphProvider, type CodeGraphProvider } from '@specd/code-graph'
-
-export {
   createSdkContext,
   openSpecdHost,
   withOpenGraphProvider,
@@ -28,6 +18,42 @@ export {
   type RunIndexProjectGraphInput,
   type RunIndexProjectGraphResult,
 } from './orchestration/index.js'
+
+export * from '@specd/core'
+
+export {
+  acquireGraphIndexLock,
+  assertGraphIndexUnlocked,
+  createGetGraphHealth,
+  createBootstrapGraphConfig,
+  createCodeGraphProvider,
+  createIndexProjectGraph,
+  SymbolKind,
+  DEFAULT_HOTSPOT_KINDS,
+  isGraphStale,
+  detectFingerprintMismatch,
+  parseFingerprintMap,
+  buildProjectGraphConfig,
+  normalizeFileSelectorPath,
+  SpecNotFoundError as GraphSpecNotFoundError,
+  computeWorkspaceFingerprint,
+  computeRootFingerprint,
+  serializeFingerprintMap,
+  type GraphFingerprintInput,
+  type GetGraphHealthInput,
+  type GetGraphHealthResult,
+  type HotspotResult,
+  type IndexResult,
+  type CodeGraphProvider,
+  type SearchOptions,
+  type HotspotOptions,
+  type RiskLevel,
+  type FileImpactResult,
+  type ImpactResult,
+  CODE_GRAPH_VERSION,
+} from '@specd/code-graph'
+
+export { codeGraphVersion, getCodeGraphVersion } from './shared/code-graph-version.js'
 
 const require = createRequire(import.meta.url)
 

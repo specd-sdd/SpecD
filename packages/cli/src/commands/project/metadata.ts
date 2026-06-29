@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { ProjectMetadataNotFoundError } from '@specd/core'
+import { ProjectMetadataNotFoundError } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'

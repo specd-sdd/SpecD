@@ -48,6 +48,12 @@
 - **AND** the default depth is 3
 - **AND** the process exits with code 0
 
+#### Scenario: Impact uses SDK graph context
+
+- **WHEN** `specd graph impact --file <path>` is executed
+- **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
+- **AND** platform symbols are sourced from `@specd/sdk`
+
 #### Scenario: Unprefixed relative file resolves through configRelativePath
 
 - **GIVEN** file `core:src/auth.ts` is indexed with `configRelativePath` `packages/core/src/auth.ts`

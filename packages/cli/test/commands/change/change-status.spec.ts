@@ -19,7 +19,7 @@ vi.mock('../../../src/commands/change/_implementation-tracking.js', () => ({
 import { resolveCliContext } from '../../../src/helpers/cli-context.js'
 import { enrichImplementationTracking } from '../../../src/commands/change/_implementation-tracking.js'
 import { registerChangeStatus } from '../../../src/commands/change/status.js'
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError } from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()

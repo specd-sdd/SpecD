@@ -1,7 +1,13 @@
 {
   "title": "project status command",
   "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.",
-  "dependsOn": ["core:list-workspaces", "core:get-project-summary", "core:get-project-context"],
+  "dependsOn": [
+    "core:list-workspaces",
+    "core:get-project-summary",
+    "core:get-project-context",
+    "sdk:build-project-status-snapshot",
+    "sdk:host-context"
+  ],
   "context": [
     "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information."
   ],
@@ -39,13 +45,13 @@
     {
       "requirement": "includes graph freshness (always)",
       "rules": [
-        "The command output MUST always include:\n\n- Whether the code graph is stale (boolean)\n- Last indexed timestamp (or null if never indexed)\n\nThis is included by default, not behind a flag."
+        "The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with `{ includeGraph: true }`:\n\n- Whether the code graph is stale (boolean)\n- Last indexed timestamp (or null if never indexed)\n\nThe command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.\n\nGraph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.\n\nThis is included by default, not behind a flag."
       ]
     },
     {
       "requirement": "supports --graph flag",
       "rules": [
-        "When `--graph` flag is provided, the command MUST include extended graph statistics:\n\n- Number of indexed files\n- Number of indexed symbols\n- Hotspots (if available)"
+        "When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }` and include extended graph statistics from the snapshot:\n\n- Number of indexed files (`graphHealth.fileCount`)\n- Number of indexed symbols (`graphHealth.symbolCount`)\n- Hotspots (from snapshot `hotspots` when available)\n\nPresenter formatting (text/json/toon) remains in the CLI command handler."
       ]
     },
     {
@@ -74,6 +80,12 @@
       "requirement": "supports json and toon formats",
       "rules": [
         "When `--format json` is provided, output MUST be valid JSON.\nWhen `--format toon` is provided, output MUST be TOON-formatted."
+      ]
+    },
+    {
+      "requirement": "SDK host bootstrap",
+      "rules": [
+        "The command MUST obtain host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`). Project summary, approval flags, and graph snapshot orchestration MUST use the returned `SdkHostContext`."
       ]
     }
   ],
@@ -140,14 +152,21 @@
       "name": "Graph freshness included by default",
       "given": ["a project with an indexed code graph"],
       "when": ["specd project status runs without --graph flag"],
-      "then": ["graph staleness and last indexed timestamp are included"]
+      "then": [
+        "graph staleness and last indexed timestamp are included",
+        "AND the command obtains them via buildProjectStatusSnapshot with { includeGraph: true }",
+        "AND graph data comes exclusively from @specd/sdk"
+      ]
     },
     {
       "requirement": "supports --graph flag",
       "name": "Extended graph stats with --graph flag",
       "given": ["a project with indexed code"],
       "when": ["specd project status --graph runs"],
-      "then": ["indexed files count, symbols count, and hotspots are included"]
+      "then": [
+        "indexed files count, symbols count, and hotspots are included",
+        "AND the command calls buildProjectStatusSnapshot with { includeGraph: true, includeHotspots: true }"
+      ]
     },
     {
       "requirement": "supports --context flag",
@@ -226,19 +245,17 @@
       "name": "TOON output is formatted",
       "when": ["specd project status --format toon runs"],
       "then": ["output is TOON-formatted"]
+    },
+    {
+      "requirement": "SDK host bootstrap",
+      "name": "Host context from openSpecdHost",
+      "when": ["specd project status is executed"],
+      "then": [
+        "it obtains host context via openSpecdHost from @specd/sdk (directly or through resolveCliContext)"
+      ]
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "cli:project-status",
-        "file": "cli:test/commands/project-status.spec.ts"
-      },
-      {
-        "specId": "cli:project-status",
-        "file": "cli:test/commands/helpers.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "cli:project-status",
@@ -248,8 +265,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9450418255c41bf40ca4b596c409e498b5a0a79335e61bc9781fd3d2a266e562",
-    "verify.md": "sha256:a2f4eddf4cbcd77ee3ae4a3881c729e138837d73a9f59e172fe020d1c18f4b4d"
+    "spec.md": "sha256:24de611cdd4adeea683dcbf678934d8bb3bc2702e8cf0f3755299c6193ee2954",
+    "verify.md": "sha256:129e4a10a498bce796003315453c869a8328589a29471821965cbea6f89c0678"
   },
   "generatedBy": "core"
 }

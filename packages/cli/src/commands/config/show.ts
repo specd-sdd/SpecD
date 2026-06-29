@@ -2,7 +2,7 @@ import { type Command } from 'commander'
 import { loadConfig } from '../../load-config.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { type SpecdConfig } from '@specd/core'
+import { type SpecdConfig } from '@specd/sdk'
 
 /**
  * Renders a human-readable text summary of the config.

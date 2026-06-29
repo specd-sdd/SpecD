@@ -9,22 +9,23 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
-import { ChangeNotFoundError } from '@specd/core'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
+import { ChangeNotFoundError } from '@specd/sdk'
 import { registerChangeEdit } from '../../src/commands/change/edit.js'
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -241,8 +242,11 @@ describe('change edit', () => {
       ],
     })
     const kernel = makeMockKernel()
-    vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    })
     const stderr = captureStderr()
     mockProcessExit()
 

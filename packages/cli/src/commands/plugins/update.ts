@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import type { SpecdConfig } from '@specd/core'
+import type { SpecdConfig } from '@specd/sdk'
 import { UpdatePlugin, createPluginLoader } from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'

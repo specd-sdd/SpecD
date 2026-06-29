@@ -22,17 +22,18 @@ specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path
 
 ### Requirement: Indexing behaviour
 
-The command obtains workspace targets and spec sources from the project configuration.
-It delegates effective project graph config merging and index execution to `IndexProjectGraph.execute()` inside the worker process (or current process when worker bypass is active).
+Index execution MUST go through `runIndexProjectGraph(ctx, input)` inside `@specd/sdk`. The worker process (or current process when worker bypass is active) obtains host context via `openSpecdHost`.
 
 The command SHALL retain CLI-only concerns:
 
 - shared graph indexing lock acquisition in the parent process before spawning a worker
 - worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`
 - `onProgress` callback wiring for text-mode progress output
-- `provider.recreate()` for `--force` is triggered by passing `force: true` to `IndexProjectGraph`
+- passing `force: true` to `runIndexProjectGraph` when `--force` is set
 
-Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `IndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
+The command handler invokes `runIndexProjectGraph` for index execution; workspace assembly and `IndexProjectGraph` orchestration live in `@specd/sdk`.
+
+Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `runIndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
 
 When `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests.
 
@@ -84,12 +85,12 @@ For each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documen
 
 ## Constraints
 
-- The CLI does not contain indexing logic, lock management, or configuration building — it delegates entirely to `@specd/code-graph`
+- Index execution orchestration lives in `@specd/sdk` — the CLI does not assemble workspace targets, VCS refs, or `IndexProjectGraph` inputs inline
+- Lock management and worker subprocess isolation remain CLI-only adapter concerns
 - `process.exit(0)` is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive
-- `--force` delegates destructive backend recreation to the graph-store contract
-- The `withProvider` helper manages lifecycle and registers `SIGINT`/`SIGTERM` signal handlers
-- Workspace targets and spec sources are derived from `SpecdConfig` and `Kernel`
+- `--force` is forwarded to `runIndexProjectGraph` input
 - Worker subprocess isolation keeps native graph-store threads out of the parent CLI process; tests bypass spawning via `SPECD_GRAPH_INDEX_NO_WORKER`
+- Platform symbols for the graph index handler come from `@specd/sdk`
 
 ## Examples
 
@@ -123,7 +124,6 @@ $ specd graph index --format json
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
 - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
-- [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`
-- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration
-- [`code-graph:index-project-graph`](../../code-graph/index-project-graph/spec.md) — index execution use case
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration (via SDK)
+- [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — index execution orchestration
+- [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

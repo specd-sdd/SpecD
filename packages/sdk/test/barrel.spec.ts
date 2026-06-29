@@ -28,9 +28,27 @@ describe('@specd/sdk barrel', () => {
     expect(typeof sdk.createKernel).toBe('function')
   })
 
-  it('does not export infrastructure or internal helpers', () => {
+  it('re-exports host-adapter code-graph symbols', () => {
+    expect(typeof sdk.acquireGraphIndexLock).toBe('function')
+    expect(typeof sdk.assertGraphIndexUnlocked).toBe('function')
+    expect(typeof sdk.createGetGraphHealth).toBe('function')
+    expect(typeof sdk.GraphSpecNotFoundError).toBe('function')
+    expect(typeof sdk.codeGraphVersion).toBe('string')
+    expect(typeof sdk.getCodeGraphVersion).toBe('function')
+    expect(typeof sdk.CODE_GRAPH_VERSION).toBe('string')
+    expect(sdk.codeGraphVersion).toBe(sdk.CODE_GRAPH_VERSION)
+    expect(sdk.codeGraphVersion).not.toBe('0.0.0')
+  })
+
+  it('exports codeGraphVersion matching @specd/code-graph package.json', () => {
+    const codeGraphPackageJson = JSON.parse(
+      readFileSync(join(packageRoot, '../code-graph/package.json'), 'utf8'),
+    ) as { version: string }
+    expect(sdk.codeGraphVersion).toBe(codeGraphPackageJson.version)
+    expect(sdk.getCodeGraphVersion()).toBe(codeGraphPackageJson.version)
+  })
+
+  it('does not export infrastructure implementation classes', () => {
     expect('FsConfigLoader' in sdk).toBe(false)
-    expect('codeGraphVersion' in sdk).toBe(false)
-    expect('createVcsAdapter' in sdk).toBe(false)
   })
 })

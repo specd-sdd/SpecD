@@ -14,15 +14,13 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
-import { ChangeNotFoundError } from '@specd/core'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
+import { ChangeNotFoundError } from '@specd/sdk'
 import { registerDraftsList } from '../../src/commands/drafts/list.js'
 import { registerDraftsShow } from '../../src/commands/drafts/show.js'
 import { registerDiscardedList } from '../../src/commands/discarded/list.js'
@@ -34,8 +32,11 @@ import { registerSpecList } from '../../src/commands/spec/list.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -732,10 +733,9 @@ describe('spec list', () => {
 
   it('shows "no workspaces configured" when no workspaces', async () => {
     const config = makeMockConfig({ workspaces: [] })
-    vi.mocked(loadConfig).mockResolvedValue(config)
     const kernel = makeMockKernel()
     kernel.project.listWorkspaces.execute.mockResolvedValue([])
-    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
     const stdout = captureStdout()
     captureStderr()
     mockProcessExit()

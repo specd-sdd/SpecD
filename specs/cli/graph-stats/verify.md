@@ -24,17 +24,23 @@
 
 ### Requirement: Statistics retrieval
 
-#### Scenario: Command delegates health to GetGraphHealth
+#### Scenario: Command delegates health to GetGraphHealth via SDK
 
 - **WHEN** `specd graph stats` is executed in configured mode with kernel available
-- **THEN** it calls `GetGraphHealth.execute()` with workspaces from `ListWorkspaces`
-- **AND** it does not call `isGraphStale` or `detectFingerprintMismatch` directly in the command handler
+- **THEN** it opens the provider via `withOpenGraphProvider` from `@specd/sdk`
+- **AND** it calls `GetGraphHealth.execute()` with workspaces from `ListWorkspaces`
+- **AND** graph context and lifecycle go through `cli:graph-cli-context`
 
 #### Scenario: Command obtains orchestrated project structure
 
 - **WHEN** `specd graph stats` is executed in configured mode
 - **THEN** it calls `ListWorkspaces` to obtain the rich workspace list
 - **AND** it passes that list to `GetGraphHealth` for fingerprint comparison
+
+#### Scenario: Host context from openSpecdHost
+
+- **WHEN** `specd graph stats` is executed
+- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
 
 ### Requirement: Concurrent indexing guard
 

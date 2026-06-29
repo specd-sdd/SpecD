@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError } from '@specd/sdk'
 import {
   makeMockConfig,
   makeMockKernel,

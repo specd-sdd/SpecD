@@ -19,7 +19,7 @@ import {
   ChangeNotFoundError,
   InvalidChangeError,
   HistoricalImplementationGuardError,
-} from '@specd/core'
+} from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()

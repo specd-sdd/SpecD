@@ -2,20 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { enrichImplementationTracking } from '../../src/commands/change/_implementation-tracking.js'
 import { makeMockConfig } from './helpers.js'
 
-vi.mock('@specd/code-graph', () => ({
-  createCodeGraphProvider: vi.fn(),
-}))
-
-vi.mock('@specd/core', async () => {
-  const actual = await vi.importActual<typeof import('@specd/core')>('@specd/core')
+vi.mock('@specd/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
   return {
     ...actual,
+    createCodeGraphProvider: vi.fn(),
     createVcsAdapter: vi.fn(),
   }
 })
 
-import { createCodeGraphProvider } from '@specd/code-graph'
-import { createVcsAdapter } from '@specd/core'
+import { createCodeGraphProvider } from '@specd/sdk'
+import { createVcsAdapter } from '@specd/sdk'
 
 afterEach(() => vi.restoreAllMocks())
 

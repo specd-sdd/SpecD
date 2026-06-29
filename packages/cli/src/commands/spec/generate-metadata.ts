@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { SpecPath, type SpecMetadataStatus } from '@specd/core'
+import { SpecPath, type SpecMetadataStatus } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -96,8 +96,8 @@ JSON/TOON output schema:
  * @param opts.force - Whether to skip conflict detection
  */
 async function executeSingle(
-  kernel: import('@specd/core').Kernel,
-  config: import('@specd/core').SpecdConfig,
+  kernel: import('@specd/sdk').Kernel,
+  config: import('@specd/sdk').SpecdConfig,
   specPath: string,
   opts: { format: string; write?: boolean; force?: boolean },
 ): Promise<void> {
@@ -146,8 +146,8 @@ async function executeSingle(
  * @param opts.status - Comma-separated status filter (default: `"stale,missing"`)
  */
 async function executeBatch(
-  kernel: import('@specd/core').Kernel,
-  _config: import('@specd/core').SpecdConfig,
+  kernel: import('@specd/sdk').Kernel,
+  _config: import('@specd/sdk').SpecdConfig,
   opts: { format: string; force?: boolean; status?: string },
 ): Promise<void> {
   // Parse and validate --status

@@ -1,0 +1,118 @@
+{
+  "title": "Graph CLI Context",
+  "description": "Graph subcommands share config resolution, bootstrap mode, and `CodeGraphProvider` lifecycle. `resolveGraphCliContext` and `withProvider` centralize that wiring through `@specd/sdk`, while the CLI adapter retains bootstrap semantics, signal handling, and format-aware error reporting.",
+  "dependsOn": [
+    "cli:host-context",
+    "cli:entrypoint",
+    "core:config",
+    "sdk:with-open-graph-provider",
+    "sdk:composition"
+  ],
+  "context": [
+    "Graph subcommands share config resolution, bootstrap mode, and `CodeGraphProvider` lifecycle. `resolveGraphCliContext` and `withProvider` centralize that wiring through `@specd/sdk`, while the CLI adapter retains bootstrap semantics, signal handling, and format-aware error reporting."
+  ],
+  "rules": [
+    {
+      "requirement": "resolveGraphCliContext uses SDK imports",
+      "rules": [
+        "`resolveGraphCliContext` MUST resolve configured mode via `resolveCliContext` / `openSpecdHost` and MUST import platform types exclusively from `@specd/sdk` re-exports.\n\nIn bootstrap mode (`--path` or no-config fallback), the command MUST use a synthetic single-workspace project rooted at the resolved VCS root."
+      ]
+    },
+    {
+      "requirement": "withProvider delegates to withOpenGraphProvider",
+      "rules": [
+        "`withProvider` in `packages/cli/src/commands/graph/with-provider.ts` MUST open and close the graph provider through `withOpenGraphProvider` from `@specd/sdk`, building a `SdkHostContext` from the resolved config (and kernel when available).\n\nCLI-only concerns retained in `withProvider`:\n\n- `SIGINT` / `SIGTERM` signal handlers for configured commands\n- explicit `process.exit(0)` after close when required to release native graph-store threads\n- format-aware fatal error reporting before provider open"
+      ]
+    },
+    {
+      "requirement": "Graph command platform imports",
+      "rules": [
+        "Graph command handlers (`search`, `hotspots`, `impact`, `stats`) MUST obtain shared provider lifecycle through `withProvider` in this module.\n\n`graph index` MUST delegate indexing orchestration to `runIndexProjectGraph` from `@specd/sdk`; it does not open a long-lived provider through `withProvider` because the worker subprocess performs indexing in isolation.\n\nGraph command handlers MUST obtain host symbols from `@specd/sdk` via this module or `cli:host-context`."
+      ]
+    },
+    {
+      "requirement": "Lock helpers via SDK barrel",
+      "rules": [
+        "Graph commands that call `assertGraphIndexUnlocked` or `acquireGraphIndexLock` MUST import those symbols from the `@specd/sdk` public barrel."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "resolveGraphCliContext uses SDK imports",
+      "name": "Configured mode uses resolveCliContext",
+      "when": ["a graph command runs with --config or autodiscovered config"],
+      "then": [
+        "resolveGraphCliContext obtains kernel via resolveCliContext",
+        "AND platform symbols are imported from @specd/sdk"
+      ]
+    },
+    {
+      "requirement": "resolveGraphCliContext uses SDK imports",
+      "name": "Bootstrap mode uses synthetic default workspace",
+      "when": ["a graph command runs with --path or no-config bootstrap fallback"],
+      "then": ["a synthetic default workspace is used with codeRoot at the resolved VCS root"]
+    },
+    {
+      "requirement": "withProvider delegates to withOpenGraphProvider",
+      "name": "Provider lifecycle via SDK",
+      "when": ["a graph command opens a provider through withProvider"],
+      "then": [
+        "withOpenGraphProvider from @specd/sdk performs open/close",
+        "AND the callback receives an opened CodeGraphProvider"
+      ]
+    },
+    {
+      "requirement": "Graph command platform imports",
+      "name": "Graph search uses shared context module",
+      "when": ["specd graph search executes"],
+      "then": [
+        "it resolves context via resolveGraphCliContext and opens via withProvider",
+        "AND platform symbols are sourced from @specd/sdk"
+      ]
+    },
+    {
+      "requirement": "Graph command platform imports",
+      "name": "Graph stats uses shared context module",
+      "when": ["specd graph stats executes"],
+      "then": [
+        "it resolves context via resolveGraphCliContext and opens via withProvider",
+        "AND platform symbols are sourced from @specd/sdk"
+      ]
+    },
+    {
+      "requirement": "Graph command platform imports",
+      "name": "Graph index uses SDK orchestration without withProvider",
+      "when": ["specd graph index executes in the worker process"],
+      "then": [
+        "it calls runIndexProjectGraph from @specd/sdk",
+        "AND it does not open a provider through withProvider"
+      ]
+    },
+    {
+      "requirement": "Lock helpers via SDK barrel",
+      "name": "Stats uses assertGraphIndexUnlocked from SDK",
+      "when": ["specd graph stats checks the indexing lock"],
+      "then": ["it imports assertGraphIndexUnlocked from @specd/sdk"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:graph-cli-context",
+        "file": "cli:src/commands/graph/resolve-graph-cli-context.ts",
+        "symbol": "resolveGraphCliContext"
+      },
+      {
+        "specId": "cli:graph-cli-context",
+        "file": "cli:src/commands/graph/with-provider.ts",
+        "symbol": "withProvider"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:10dded5048103ea1a7972e2e9c91f7c814053921c4df1815d633e1a4d9c91303",
+    "verify.md": "sha256:d8d2c7b4204be8705f08fa12954a5d9374a832a44521e38b06f12113f63ab133"
+  },
+  "generatedBy": "core"
+}

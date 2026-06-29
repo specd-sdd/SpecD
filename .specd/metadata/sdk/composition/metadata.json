@@ -1,7 +1,12 @@
 {
   "title": "SDK Composition",
   "description": "Delivery hosts (CLI, MCP, API, IPC) need a single package that wires `@specd/core` and `@specd/code-graph` without importing infrastructure or duplicating bootstrap logic. `@specd/sdk` is that package: a thin composition layer that re-exports curated factories and hosts cross-package orchestration helpers defined in sibling specs.",
-  "dependsOn": ["default:_global/architecture", "core:composition", "code-graph:composition"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "code-graph:composition",
+    "cli:host-context"
+  ],
   "context": [
     "Delivery hosts (CLI, MCP, API, IPC) need a single package that wires `@specd/core` and `@specd/code-graph` without importing infrastructure or duplicating bootstrap logic. `@specd/sdk` is that package: a thin composition layer that re-exports curated factories and hosts cross-package orchestration helpers defined in sibling specs."
   ],
@@ -21,7 +26,13 @@
     {
       "requirement": "Public barrel exports for A2a",
       "rules": [
-        "`src/index.ts` SHALL export:\n\n- From host-context spec: `openSpecdHost`, `createSdkContext`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`\n- From graph lifecycle spec: `withOpenGraphProvider`\n- From orchestration specs: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types\n- Re-exports from `@specd/core`: `createConfigLoader`, `createConfigWriter`, `createKernel`, `Kernel`, `KernelOptions`, `SpecdConfig`\n- Re-exports from `@specd/code-graph`: `CodeGraphProvider`, `createCodeGraphProvider`\n\nThe barrel MUST NOT export infrastructure adapters, internal composition helpers, or `export *` of either dependency package."
+        "`src/index.ts` SHALL export:\n\n- From host-context spec: `openSpecdHost`, `createSdkContext`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`\n- From graph lifecycle spec: `withOpenGraphProvider`\n- From orchestration specs: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types\n- Re-exports from `@specd/core`: `createConfigLoader`, `createConfigWriter`, `createKernel`, `Kernel`, `KernelOptions`, `SpecdConfig`, and the remainder of the `@specd/core` public surface via `export * from '@specd/core'` until change `13-public-api-surface` narrows the curated list\n- Re-exports from `@specd/code-graph`: `CodeGraphProvider`, `createCodeGraphProvider`, plus host-adapter symbols listed under **Public barrel exports for host adapters**\n\nThe barrel MUST NOT export infrastructure adapters or internal composition helpers from either dependency package. `export * from '@specd/core'` is permitted as a transitional re-export boundary for delivery hosts migrating off direct `@specd/core` dependencies."
+      ]
+    },
+    {
+      "requirement": "Public barrel exports for host adapters",
+      "rules": [
+        "`src/index.ts` SHALL re-export the following symbols from `@specd/code-graph` for CLI host adapters:\n\n- `acquireGraphIndexLock`\n- `assertGraphIndexUnlocked`\n- `createGetGraphHealth`\n- `type GetGraphHealthResult`\n- `type IndexResult`\n- `type HotspotResult`\n- `codeGraphVersion` and `getCodeGraphVersion`\n- `GraphSpecNotFoundError` (alias for graph `SpecNotFoundError`)\n- Additional host-adapter symbols used by CLI graph commands: `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`, `normalizeFileSelectorPath`, `createBootstrapGraphConfig`, fingerprint helpers, and related impact/search types\n\nDelivery hosts MUST import these symbols from `@specd/sdk`, not from `@specd/code-graph` directly."
       ]
     },
     {
@@ -66,6 +77,16 @@
       "then": ["the import fails at compile time"]
     },
     {
+      "requirement": "Public barrel exports for host adapters",
+      "name": "Lock and health helpers available from SDK",
+      "when": ["importing from @specd/sdk"],
+      "then": [
+        "acquireGraphIndexLock, assertGraphIndexUnlocked, and createGetGraphHealth are available",
+        "AND GetGraphHealthResult, IndexResult, and HotspotResult types are available",
+        "AND codeGraphVersion and getCodeGraphVersion are available"
+      ]
+    },
+    {
       "requirement": "Version constant",
       "name": "SDK_VERSION matches package version",
       "when": ["reading SDK_VERSION from @specd/sdk"],
@@ -77,13 +98,33 @@
       {
         "specId": "sdk:composition",
         "file": "sdk:src/index.ts",
-        "symbol": "SDK_VERSION"
+        "symbol": "acquireGraphIndexLock"
+      },
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:src/index.ts",
+        "symbol": "assertGraphIndexUnlocked"
+      },
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:src/index.ts",
+        "symbol": "createGetGraphHealth"
+      },
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:src/index.ts",
+        "symbol": "GetGraphHealthInput"
+      },
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:src/index.ts",
+        "symbol": "GraphSpecNotFoundError"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c8a4eeeb51d35ba5516a424b8be8dd2454ee95908eb9d6a5fe9f69d8d0d888f8",
-    "verify.md": "sha256:839619b20932b53129fb107c98e7154f82863c5aad9ef7d002af4e41a1a6df54"
+    "spec.md": "sha256:4c75b72d8d45c8e497209761b9e771e0a67e130562937d037c837c1b5dea9b57",
+    "verify.md": "sha256:cf45893708b3428a66099fff2cfabc68b7b5f17e7ae0da0d92a13a4f697d20ea"
   },
   "generatedBy": "core"
 }

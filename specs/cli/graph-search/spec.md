@@ -40,7 +40,9 @@ Search ranking MUST prioritize primary identities at the top of the result set a
 
 ### Requirement: Search behaviour
 
-The command uses the shared graph CLI context model to resolve explicit config, autodetected config, or bootstrap mode before creating a `CodeGraphProvider` via `withProvider`.
+The command uses the shared graph CLI context model (`cli:graph-cli-context`) to resolve explicit config, autodetected config, or bootstrap mode before opening a `CodeGraphProvider` via `withProvider`.
+
+Platform symbols MUST come from `@specd/sdk`.
 
 It delegates to:
 
@@ -196,8 +198,9 @@ Documents (10 shown, limit 10):
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, and output conventions
-- [`core:config`](../../core/config/spec.md) — configured operation and graph discovery config
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
+- [`core:config`](../../core/config/spec.md) — bootstrap vs configured mode
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
 - [`code-graph:document-model`](../../code-graph/document-model/spec.md) — defines document node category
 - [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities

@@ -8,11 +8,26 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/helpers/cli-context.js', () => ({
-  resolveCliContext: vi.fn(),
-}))
+vi.mock('@specd/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
+  return {
+    ...actual,
+    openSpecdHost: vi.fn(),
+    buildProjectStatusSnapshot: vi.fn(),
+  }
+})
 
-import { resolveCliContext } from '../../src/helpers/cli-context.js'
+vi.mock('../../src/helpers/cli-context.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/helpers/cli-context.js')>(
+    '../../src/helpers/cli-context.js',
+  )
+  return {
+    ...actual,
+    buildCliKernelOptions: vi.fn(() => ({})),
+  }
+})
+
+import { openSpecdHost, buildProjectStatusSnapshot, type GetGraphHealthResult } from '@specd/sdk'
 import { registerProjectStatus } from '../../src/commands/project/status.js'
 import { type MockKernel } from './helpers.js'
 
@@ -25,15 +40,43 @@ const emptySummary = {
   workspaceCount: 0,
 }
 
-function stubProjectStatusKernel(kernel: MockKernel, summary = emptySummary) {
+function stubSnapshot(
+  kernel: MockKernel,
+  summary = emptySummary,
+  graphHealth: GetGraphHealthResult | null = {
+    lastIndexedAt: '2026-01-01',
+    stale: false,
+    fingerprintMismatch: false,
+    fileCount: 0,
+    documentCount: 0,
+    symbolCount: 0,
+    specCount: 0,
+    relationCounts: {} as GetGraphHealthResult['relationCounts'],
+    languages: [],
+    lastIndexedRef: null,
+    graphFingerprint: null,
+    currentRef: null,
+  },
+) {
   kernel.project.listWorkspaces.execute.mockResolvedValue([])
-  kernel.project.getProjectSummary.execute.mockResolvedValue(summary)
+  vi.mocked(buildProjectStatusSnapshot).mockResolvedValue({
+    summary,
+    graphHealth,
+    approvals: { specEnabled: false, signoffEnabled: false },
+    llmOptimizedContext: false,
+  })
 }
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
+  vi.mocked(openSpecdHost).mockResolvedValue({
+    config,
+    configFilePath: null,
+    kernel,
+    createGraphProvider: vi.fn(),
+  })
+  stubSnapshot(kernel)
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -44,8 +87,7 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('project status', () => {
   it('command name is status', async () => {
-    const { kernel } = setup()
-    stubProjectStatusKernel(kernel)
+    setup()
 
     const program = makeProgram()
     const projectCmd = program.command('project')
@@ -57,7 +99,7 @@ describe('project status', () => {
 
   it('obtains change and spec counts via getProjectSummary', async () => {
     const { kernel, stdout } = setup()
-    stubProjectStatusKernel(kernel, {
+    stubSnapshot(kernel, {
       activeCount: 2,
       draftCount: 1,
       discardedCount: 3,
@@ -70,10 +112,10 @@ describe('project status', () => {
     registerProjectStatus(program.command('project'))
     await program.parseAsync(['node', 'specd', 'project', 'status'])
 
-    expect(kernel.project.getProjectSummary.execute).toHaveBeenCalledOnce()
-    expect(kernel.changes.list.execute).not.toHaveBeenCalled()
-    expect(kernel.changes.listDrafts.execute).not.toHaveBeenCalled()
-    expect(kernel.changes.listDiscarded.execute).not.toHaveBeenCalled()
+    expect(buildProjectStatusSnapshot).toHaveBeenCalledWith(expect.objectContaining({ kernel }), {
+      includeGraph: true,
+      includeHotspots: false,
+    })
 
     const out = stdout()
     expect(out).toContain('changes: 2 active, 1 drafts, 3 discarded, 4 archived')
@@ -84,7 +126,7 @@ describe('project status', () => {
 
   it('includes archived count in JSON output', async () => {
     const { kernel, stdout } = setup()
-    stubProjectStatusKernel(kernel, {
+    stubSnapshot(kernel, {
       activeCount: 1,
       draftCount: 2,
       discardedCount: 3,
@@ -110,7 +152,7 @@ describe('project status', () => {
 
   it('includes archived count in TOON output', async () => {
     const { kernel, stdout } = setup()
-    stubProjectStatusKernel(kernel, {
+    stubSnapshot(kernel, {
       activeCount: 0,
       draftCount: 0,
       discardedCount: 0,
@@ -132,7 +174,7 @@ describe('project status', () => {
       Object.assign(config, {
         llmOptimizedContext: true,
       })
-      stubProjectStatusKernel(kernel)
+      stubSnapshot(kernel)
 
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: ['**Optimized Context**'],
@@ -154,7 +196,7 @@ describe('project status', () => {
       Object.assign(config, {
         llmOptimizedContext: true,
       })
-      stubProjectStatusKernel(kernel)
+      stubSnapshot(kernel)
 
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: ['Raw instructions'],
@@ -178,7 +220,7 @@ describe('project status', () => {
 
     it('displays full context in text mode', async () => {
       const { kernel, stdout } = setup()
-      stubProjectStatusKernel(kernel)
+      stubSnapshot(kernel)
 
       const longContext = 'Line 1\nLine 2\nLine 3\nLine 4'
       kernel.project.getProjectContext.execute.mockResolvedValue({
@@ -200,7 +242,7 @@ describe('project status', () => {
 
     it('does not pass inline CompileContextConfig on getProjectContext.execute', async () => {
       const { kernel } = setup()
-      stubProjectStatusKernel(kernel)
+      stubSnapshot(kernel)
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: [],
         specs: [],
@@ -218,7 +260,7 @@ describe('project status', () => {
 
     it('calls getProjectContext.execute({}) for primary context assembly', async () => {
       const { kernel } = setup()
-      stubProjectStatusKernel(kernel)
+      stubSnapshot(kernel)
       kernel.project.getProjectContext.execute.mockResolvedValue({
         contextEntries: ['Raw'],
         specs: [
@@ -243,7 +285,7 @@ describe('project status', () => {
     it('calls getProjectContext.execute({ llmOptimizedContext: false }) for raw spec catalogue when optimized context is fresh', async () => {
       const { config, kernel } = setup()
       Object.assign(config, { llmOptimizedContext: true })
-      stubProjectStatusKernel(kernel)
+      stubSnapshot(kernel)
 
       kernel.project.getProjectContext.execute
         .mockResolvedValueOnce({
@@ -274,5 +316,58 @@ describe('project status', () => {
         llmOptimizedContext: false,
       })
     })
+  })
+
+  // specs/cli/project-status — graph freshness when graph unavailable
+  it('Scenario: Graph freshness shows unknown when graphHealth is null', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, emptySummary, null)
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status'])
+
+    expect(stdout()).toContain('graph.freshness: never indexed (unknown)')
+  })
+
+  // specs/cli/project-status/verify.md — Extended graph stats with --graph flag
+  it('Scenario: Extended graph stats with --graph flag', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, emptySummary, {
+      lastIndexedAt: '2026-01-01',
+      stale: false,
+      fingerprintMismatch: false,
+      fileCount: 42,
+      documentCount: 1,
+      symbolCount: 99,
+      specCount: 3,
+      relationCounts: {} as GetGraphHealthResult['relationCounts'],
+      languages: ['typescript', 'go'],
+      lastIndexedRef: 'abc',
+      graphFingerprint: null,
+      currentRef: 'abc',
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--graph'])
+
+    const out = stdout()
+    expect(out).toContain('graph.files: 42')
+    expect(out).toContain('graph.symbols: 99')
+    expect(out).toContain('graph.languages: typescript, go')
+  })
+
+  it('omits extended graph stats when --graph is set but graphHealth is null', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, emptySummary, null)
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--graph'])
+
+    const out = stdout()
+    expect(out).not.toContain('graph.files:')
+    expect(out).not.toContain('graph.symbols:')
   })
 })

@@ -179,4 +179,19 @@ describe('CodeGraphProvider', () => {
     await provider.close()
     await expect(provider.close()).resolves.not.toThrow()
   })
+
+  it('recreate on an open provider keeps the store ready for subsequent operations', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-recreate-open-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+    })
+    await provider.open()
+    await provider.recreate()
+
+    const stats = await provider.getStatistics()
+    expect(stats.fileCount).toBe(0)
+
+    await provider.close()
+  })
 })

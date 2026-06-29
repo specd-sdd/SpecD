@@ -3,9 +3,9 @@ import {
   createCodeGraphProvider,
   assertGraphIndexUnlocked,
   type FileImpactResult,
-  SpecNotFoundError,
+  GraphSpecNotFoundError as SpecNotFoundError,
   normalizeFileSelectorPath,
-} from '@specd/code-graph'
+} from '@specd/sdk'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'

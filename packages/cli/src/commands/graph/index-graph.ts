@@ -1,18 +1,10 @@
 import { Command, Option } from 'commander'
-import {
-  type IndexResult,
-  acquireGraphIndexLock,
-  buildProjectGraphConfig,
-  createIndexProjectGraph,
-} from '@specd/code-graph'
+import { acquireGraphIndexLock, runIndexProjectGraph, type IndexResult } from '@specd/sdk'
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
-import * as core from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
+import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
-import { withProvider } from './with-provider.js'
-import { codeGraphVersion } from './code-graph-version.js'
 
 const GRAPH_INDEX_WORKER_ENV = 'SPECD_GRAPH_INDEX_WORKER'
 const GRAPH_INDEX_LOCK_HELD_ENV = 'SPECD_GRAPH_INDEX_LOCK_HELD'
@@ -37,6 +29,27 @@ export function registerGraphIndex(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    filesDiscovered: number
+    filesIndexed: number
+    documentsIndexed: number
+    filesSkipped: number
+    filesRemoved: number
+    specsDiscovered: number
+    specsIndexed: number
+    errors: Array<{ filePath, message }>
+    duration: number
+    workspaces: Array<{ name, filesDiscovered, filesIndexed, documentsIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }>
+    vcsRef: string | null
+    graphFingerprint: string
+    fullRebuildReason: string | null
+  }
+`,
+    )
     .action(
       async (opts: {
         force: boolean
@@ -114,81 +127,29 @@ export function registerGraphIndex(parent: Command): void {
               process.exit(0)
             })
           } else {
-            await withProvider(config, opts.format, async (provider) => {
-              const workspaces =
-                kernel !== null
-                  ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
-                      name: ws.name,
-                      prefix: ws.prefix,
-                      codeRoot: ws.codeRoot,
-                      specRepo: ws.specRepo,
-                      ownership: ws.ownership,
-                      isExternal: ws.isExternal,
-                    }))
-                  : config.workspaces.map((ws) => {
-                      const specsPath = ws.specsPath ?? join(config.projectRoot, 'specs')
-                      const specRepo = core.createSpecRepository(
-                        'fs',
-                        {
-                          workspace: ws.name,
-                          ownership: ws.ownership,
-                          isExternal: ws.isExternal,
-                          configPath: config.configPath,
-                        },
-                        {
-                          specsPath,
-                          metadataPath: join(specsPath, '..', '.specd', 'metadata'),
-                        },
-                      )
-                      return {
-                        name: ws.name,
-                        prefix: null,
-                        codeRoot: ws.codeRoot,
-                        specRepo,
-                        ownership: ws.ownership,
-                        isExternal: ws.isExternal,
-                      }
-                    })
-              const projectRoot = config.projectRoot
-
-              const vcs = await Promise.resolve(core.createVcsAdapter(projectRoot)).catch(
-                () => null,
-              )
-              const vcsRef = (await vcs?.ref()) ?? undefined
-
-              const graphConfig = buildProjectGraphConfig(config, {
-                ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
-              })
-
-              const indexProjectGraph = createIndexProjectGraph()
-
-              const result = await indexProjectGraph.execute({
-                provider,
-                projectRoot,
-                workspaces,
-                graphConfig,
-                codeGraphVersion,
-                force: opts.force,
-                ...(vcsRef !== undefined ? { vcsRef } : {}),
-                onProgress: (percent, phase) => {
-                  if (fmt === 'text') {
-                    const pct = Math.round(percent)
-                    process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
-                  }
-                },
-              })
-
-              if (fmt === 'text') {
-                process.stdout.write('\n')
-                output(formatTextIndexResult(result), 'text')
-              } else {
-                output(result, fmt)
-              }
+            const host = await resolveSdkHostContext(config, kernel)
+            const result = await runIndexProjectGraph(host, {
+              force: opts.force,
+              ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
+              onProgress: (percent, phase) => {
+                if (fmt === 'text') {
+                  const pct = Math.round(percent)
+                  process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
+                }
+              },
             })
+
+            if (fmt === 'text') {
+              process.stdout.write('\n')
+              output(formatTextIndexResult(result), 'text')
+            } else {
+              output(result, fmt)
+            }
+            process.exit(0)
           }
         } catch (err) {
           if (lockRelease) lockRelease()
-          cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 1)
+          cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 3)
         }
       },
     )

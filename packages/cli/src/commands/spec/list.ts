@@ -5,7 +5,7 @@ import {
   type SpecMetadataStatus,
   type ProjectWorkspace,
   type SpecRepository,
-} from '@specd/core'
+} from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { output, parseFormat } from '../../formatter.js'

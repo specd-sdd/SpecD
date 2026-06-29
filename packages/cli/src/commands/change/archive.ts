@@ -1,6 +1,6 @@
 import { type Command } from 'commander'
 import * as path from 'node:path'
-import { type ArchiveHookPhaseSelector, SpecOverlapError } from '@specd/core'
+import { type ArchiveHookPhaseSelector, SpecOverlapError } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'

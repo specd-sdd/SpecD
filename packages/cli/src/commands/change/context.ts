@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { type SpecSection } from '@specd/core'
+import { type SpecSection } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'

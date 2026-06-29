@@ -8,13 +8,10 @@
     "core:config",
     "code-graph:composition",
     "code-graph:document-model",
-    "code-graph:graph-store"
+    "code-graph:graph-store",
+    "cli:graph-cli-context"
   ],
   "implementation": [
-    {
-      "file": "cli:src/commands/graph/normalize-snippet.ts",
-      "symbols": ["normalizeSnippet"]
-    },
     {
       "file": "cli:src/commands/graph/search.ts",
       "symbols": ["registerGraphSearch"]

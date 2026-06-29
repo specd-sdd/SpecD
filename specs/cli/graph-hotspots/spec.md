@@ -70,7 +70,9 @@ Providing `--kind` alone SHALL NOT disable the default risk threshold, score thr
 
 ### Requirement: Hotspot retrieval
 
-The command SHALL resolve graph context, create a `CodeGraphProvider`, and delegate hotspot computation to `provider.getHotspots(...)`.
+The command SHALL resolve graph context via `cli:graph-cli-context`, open a provider through `withProvider`, and delegate hotspot computation to `provider.getHotspots(...)`.
+
+Platform symbols MUST come from `@specd/sdk`.
 
 The command SHALL pass all requested filters through to the provider, including workspace, kind list, file path, exclusion filters, limit, score threshold, and minimum risk.
 
@@ -120,13 +122,14 @@ The CLI help text for `specd graph hotspots` and the existing reference document
 
 ## Constraints
 
-- The CLI SHALL delegate hotspot computation to `@specd/code-graph`
+- Hotspot computation remains delegated to the graph provider; the CLI does not implement scoring
 - `--kind` validation SHALL use the same allowed kind set as the code graph symbol model
 - Bootstrap mode SHALL not reinterpret `--config`; it is selected only by `--path` or by missing config
-- The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
+- The command checks the shared graph indexing lock (via `@specd/sdk` re-export) before opening the provider and fails fast while indexing is in progress
 
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — shared CLI error handling, output conventions, and explicit config flag semantics
+- [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
 - [`core:config`](../../core/config/spec.md) — config discovery contract and bootstrap-mode relationship to configured operation
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider facade used by the command

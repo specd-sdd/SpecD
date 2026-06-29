@@ -206,6 +206,12 @@
 - **WHEN** `specd graph search "core"` is run
 - **THEN** the real identity-component hit is shown before the arbitrary-substring hit
 
+#### Scenario: Search uses SDK graph context
+
+- **WHEN** `specd graph search` is executed
+- **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
+- **AND** platform symbols are sourced from `@specd/sdk`
+
 ### Requirement: Error cases
 
 #### Scenario: Provider cannot be opened exits with code 3

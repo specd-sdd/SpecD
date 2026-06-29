@@ -22,9 +22,11 @@ specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 
 ### Requirement: Statistics retrieval
 
-The command resolves the graph context, opens the provider, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()`. It outputs the returned result fields, closes the provider, and exits.
+The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through `withOpenGraphProvider(ctx, fn)`, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()` inside the callback. It outputs the returned result fields, closes the provider via the SDK lifecycle wrapper, and exits.
 
 The command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.
+
+Graph context and provider lifecycle MUST go through `cli:graph-cli-context` and `@specd/sdk` symbols.
 
 ### Requirement: Concurrent indexing guard
 
@@ -81,10 +83,10 @@ If the provider cannot be opened or statistics retrieval fails due to an infrast
 
 ## Constraints
 
-- The CLI does not compute statistics, manage locks, or calculate staleness — it delegates entirely to `@specd/code-graph`
-- `process.exit(0)` is called explicitly after closing the provider
+- Health orchestration runs inside `withOpenGraphProvider` from `@specd/sdk`; the CLI does not manage provider lifecycle inline
+- `process.exit(0)` is called explicitly after the SDK wrapper closes the provider
 - Zero-value relation counts are omitted from text output for readability
-- Context resolution SHALL use the shared graph CLI model
+- Bootstrap mode (`--path`) resolves host context through `openSpecdHost` with the appropriate config path input
 
 ## Examples
 
@@ -117,7 +119,8 @@ Last indexed: 2026-03-13T09:00:00.000Z
 
 - [`cli:entrypoint`](../entrypoint/spec.md)
 - [`core:config`](../../core/config/spec.md)
-- [`code-graph:composition`](../../code-graph/composition/spec.md)
 - [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md)
-- [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration
+- [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration (invoked via SDK host session)
+- [`sdk:with-open-graph-provider`](../../sdk/with-open-graph-provider/spec.md) — provider lifecycle wrapper
+- [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

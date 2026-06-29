@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { type SdkHostContext } from '../../src/composition/host-context.js'
 
@@ -11,9 +14,13 @@ vi.mock('../../src/composition/with-open-graph-provider.js', () => ({
   withOpenGraphProvider,
 }))
 
-vi.mock('@specd/code-graph', () => ({
-  createGetGraphHealth,
-}))
+vi.mock('@specd/code-graph', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@specd/code-graph')>()
+  return {
+    ...actual,
+    createGetGraphHealth,
+  }
+})
 
 const { buildProjectStatusSnapshot } =
   await import('../../src/orchestration/build-project-status-snapshot.js')
@@ -62,6 +69,21 @@ describe('buildProjectStatusSnapshot', () => {
     const result = await buildProjectStatusSnapshot(ctx, { includeGraph: true })
     expect(withOpenGraphProvider).toHaveBeenCalled()
     expect(createGetGraphHealth).toHaveBeenCalled()
+    const getGraphHealth = createGetGraphHealth.mock.results[0]?.value as {
+      execute: ReturnType<typeof vi.fn>
+    }
+    const codeGraphPackageJson = JSON.parse(
+      readFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), '../../../code-graph/package.json'),
+        'utf8',
+      ),
+    ) as { version: string }
+
+    expect(getGraphHealth.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codeGraphVersion: codeGraphPackageJson.version,
+      }),
+    )
     expect(result.graphHealth).toEqual({ fileCount: 10, stale: false })
   })
 

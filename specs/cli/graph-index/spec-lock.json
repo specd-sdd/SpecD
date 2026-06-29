@@ -6,10 +6,9 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:config",
-    "code-graph:composition",
-    "code-graph:graph-store",
     "core:list-workspaces",
-    "code-graph:index-project-graph"
+    "sdk:run-index-project-graph",
+    "sdk:host-context"
   ],
   "implementation": [
     {

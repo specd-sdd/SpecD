@@ -1,16 +1,8 @@
-import {
-  createCodeGraphProvider,
-  createGetGraphHealth,
-  type GetGraphHealthResult,
-  type HotspotResult,
-  type WorkspaceIndexTarget,
-} from '@specd/code-graph'
-import { type SpecdConfig } from '@specd/core'
+import { buildProjectStatusSnapshot, openSpecdHost } from '@specd/sdk'
 import { type Command } from 'commander'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
-import { codeGraphVersion } from '../graph/code-graph-version.js'
 
 /** Parsed options accepted by the `project status` command. */
 interface ProjectStatusOptions {
@@ -40,20 +32,43 @@ export function registerProjectStatus(parent: Command): void {
     .option('--graph', 'Include extended graph stats', false)
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    projectRoot: string
+    schema: string
+    workspaces: Array<{ name, prefix, ownership, isExternal, codeRoot }>
+    specs: { total: number, byWorkspace: Record<string, number> }
+    changes: { active, drafts, discarded, archived }
+    graph: { freshness, stale, fingerprintMismatch, files?, symbols?, languages?, hotspots? }
+    approvals: { spec, signoff }
+    llmOptimizedContext: boolean
+    context?: { instructions, files, specs, optimizedContext? }
+  }
+`,
+    )
     .action(async (opts: ProjectStatusOptions) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, kernel } = await resolveCliContext({
-          configPath: opts.config,
+        const host = await openSpecdHost({
+          ...(opts.config !== undefined ? { configPath: opts.config } : {}),
+          kernelOptions: buildCliKernelOptions(),
         })
+        const { config, kernel } = {
+          config: host.config,
+          kernel: host.kernel,
+        }
 
         const workspaces = await kernel.project.listWorkspaces.execute()
-        const [summary, graphData] = await Promise.all([
-          kernel.project.getProjectSummary.execute(),
-          loadGraphData(config, opts.graph ?? false, workspaces),
-        ])
-        const graphHealth = graphData.health
-        const hotspots = graphData.hotspots
+        const snapshot = await buildProjectStatusSnapshot(host, {
+          includeGraph: true,
+          includeHotspots: opts.graph ?? false,
+        })
+        const summary = snapshot.summary
+        const graphHealth = snapshot.graphHealth
+        const hotspots = snapshot.hotspots
 
         const specCounts = Object.entries(summary.specsByWorkspace).map(([name, count]) => ({
           name,
@@ -65,11 +80,8 @@ export function registerProjectStatus(parent: Command): void {
         const graphStale = graphHealth?.stale ?? null
         const fingerprintMismatch = graphHealth?.fingerprintMismatch ?? null
 
-        const approvals = {
-          specEnabled: config.approvals?.spec ?? false,
-          signoffEnabled: config.approvals?.signoff ?? false,
-        }
-        const llmOptimizedContext = config.llmOptimizedContext ?? false
+        const approvals = snapshot.approvals
+        const llmOptimizedContext = snapshot.llmOptimizedContext
 
         let contextData:
           | {
@@ -83,7 +95,6 @@ export function registerProjectStatus(parent: Command): void {
         if (opts.context) {
           const ctxResult = await kernel.project.getProjectContext.execute({})
 
-          // Emit warnings to stderr
           for (const w of ctxResult.warnings) {
             process.stderr.write(`warning: ${w.message}\n`)
           }
@@ -191,7 +202,7 @@ export function registerProjectStatus(parent: Command): void {
           `specs: ${String(totalSpecs)} total`,
           ...specCounts.map((c) => `  ${c.name}: ${String(c.count)}`),
           `changes: ${summary.activeCount} active, ${summary.draftCount} drafts, ${summary.discardedCount} discarded, ${summary.archivedCount} archived`,
-          `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale ? 'stale' : 'fresh'})`,
+          `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale === true ? 'stale' : graphStale === false ? 'fresh' : 'unknown'})`,
           ...(fingerprintMismatch === true
             ? ['graph.derivation: ⚠ fingerprint mismatch — reindex recommended']
             : []),
@@ -234,46 +245,4 @@ export function registerProjectStatus(parent: Command): void {
         handleError(err, opts.format)
       }
     })
-}
-
-/**
- * Loads code graph health diagnostics and optionally hotspots.
- *
- * @param config - Resolved project configuration.
- * @param includeHotspots - Whether to load hotspot entries.
- * @param workspaces - Workspace targets for fingerprint comparison.
- * @returns Graph health and hotspots, or nulls when unavailable.
- */
-async function loadGraphData(
-  config: SpecdConfig,
-  includeHotspots: boolean,
-  workspaces: readonly WorkspaceIndexTarget[],
-): Promise<{ health: GetGraphHealthResult | null; hotspots: HotspotResult | null }> {
-  try {
-    const provider = createCodeGraphProvider(config)
-    await provider.open()
-    try {
-      const getGraphHealth = createGetGraphHealth()
-      const health = await getGraphHealth.execute({
-        config,
-        provider,
-        codeGraphVersion,
-        workspaces: [...workspaces],
-        assertUnlocked: false,
-      })
-      let hotspots: HotspotResult | null = null
-      if (includeHotspots) {
-        try {
-          hotspots = await provider.getHotspots()
-        } catch {
-          // ignore
-        }
-      }
-      return { health, hotspots }
-    } finally {
-      await provider.close()
-    }
-  } catch {
-    return { health: null, hotspots: null }
-  }
 }

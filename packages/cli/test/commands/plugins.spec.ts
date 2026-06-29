@@ -13,8 +13,8 @@ const mockInstall = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
 const mockAddPlugin = vi.fn().mockResolvedValue(undefined)
 const mockRemovePlugin = vi.fn().mockResolvedValue(undefined)
 
-vi.mock('@specd/core', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@specd/core')>()
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@specd/sdk')>()
   return {
     ...original,
     createConfigWriter: vi.fn(() => ({

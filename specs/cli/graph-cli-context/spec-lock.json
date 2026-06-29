@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:host-context",
+    "cli:entrypoint",
+    "core:config",
+    "sdk:with-open-graph-provider",
+    "sdk:composition"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/graph/resolve-graph-cli-context.ts",
+      "symbols": ["resolveGraphCliContext"]
+    },
+    {
+      "file": "cli:src/commands/graph/with-provider.ts",
+      "symbols": ["withProvider"]
+    }
+  ]
+}

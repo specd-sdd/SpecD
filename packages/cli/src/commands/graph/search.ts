@@ -1,5 +1,5 @@
 import { Command, Option } from 'commander'
-import { type SearchOptions, assertGraphIndexUnlocked } from '@specd/code-graph'
+import { type SearchOptions, assertGraphIndexUnlocked } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'

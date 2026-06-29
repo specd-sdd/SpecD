@@ -4,8 +4,8 @@ import {
   parseSpecId,
   type ImplementationTrackingProjection,
   type SpecdConfig,
-} from '@specd/core'
-import { createCodeGraphProvider } from '@specd/code-graph'
+} from '@specd/sdk'
+import { createCodeGraphProvider } from '@specd/sdk'
 
 /** Implementation link enriched with point-in-time stale diagnostics. */
 export interface EnrichedImplementationLink {

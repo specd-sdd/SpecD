@@ -1,0 +1,18 @@
+- op: added
+  description: Verify host adapter barrel exports
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Public barrel exports for A2a'
+  content: |
+    ### Requirement: Public barrel exports for host adapters
+
+    #### Scenario: Lock and health helpers available from SDK
+
+    - **WHEN** importing from `@specd/sdk`
+    - **THEN** `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, and `createGetGraphHealth` are available
+    - **AND** `GetGraphHealthResult`, `IndexResult`, and `HotspotResult` types are available
+    - **AND** `codeGraphVersion` and `getCodeGraphVersion` are available

@@ -6,20 +6,7 @@
   "dependsOn": ["core:config", "default:_global/error-handling-conventions"],
   "implementation": [
     {
-      "file": "cli:src/errors/specd-cli-error.ts",
-      "symbols": ["SpecdCliError"]
-    },
-    {
-      "file": "cli:src/errors/cli-validation-error.ts",
-      "symbols": ["CliValidationError"]
-    },
-    {
-      "file": "cli:src/formatter.ts",
-      "symbols": ["parseFormat", "output"]
-    },
-    {
-      "file": "cli:src/helpers/parse-comma-values.ts",
-      "symbols": ["parseCommaSeparatedValues"]
+      "file": "cli:package.json"
     }
   ]
 }

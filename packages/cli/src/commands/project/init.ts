@@ -1,9 +1,9 @@
 import { type Command } from 'commander'
-import { createConfigWriter, createVcsAdapter } from '@specd/core'
+import { createConfigWriter, createVcsAdapter } from '@specd/sdk'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { renderBanner } from '../../banner.js'
-import { CLI_VERSION, CORE_VERSION } from '../../version.js'
+import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../../version.js'
 import * as path from 'node:path'
 import { collect } from '../../helpers/collect.js'
 import { fileExists } from '../../helpers/file-exists.js'
@@ -62,7 +62,12 @@ export function registerProjectInit(parent: Command): void {
           const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
             process.stdout.write(
-              renderBanner({ cliVersion: CLI_VERSION, coreVersion: CORE_VERSION }) + '\n\n',
+              renderBanner({
+                cliVersion: CLI_VERSION,
+                sdkVersion: SDK_VERSION,
+                coreVersion: CORE_VERSION,
+                codeGraphVersion: CODE_GRAPH_VERSION,
+              }) + '\n\n',
             )
           }
 

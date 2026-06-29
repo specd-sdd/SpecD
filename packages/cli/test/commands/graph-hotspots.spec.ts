@@ -16,8 +16,8 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
-vi.mock('@specd/code-graph', async () => {
-  const actual = await vi.importActual<typeof import('@specd/code-graph')>('@specd/code-graph')
+vi.mock('@specd/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
   return {
     ...actual,
     assertGraphIndexUnlocked: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('@specd/code-graph', async () => {
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { registerGraphHotspots } from '../../src/commands/graph/hotspots.js'
-import { assertGraphIndexUnlocked } from '@specd/code-graph'
+import { assertGraphIndexUnlocked } from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()
@@ -114,7 +114,9 @@ describe('graph hotspots', () => {
     const program = makeHotspotsProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'hotspots'])
 
-    expect(mockProvider.getHotspots).toHaveBeenCalledWith({})
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({
+      kinds: ['class', 'method', 'function'],
+    })
   })
 
   it('lets an explicit limit override only the limit', async () => {
@@ -123,7 +125,10 @@ describe('graph hotspots', () => {
     const program = makeHotspotsProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--limit', '50'])
 
-    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ limit: 50 })
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({
+      limit: 50,
+      kinds: ['class', 'method', 'function'],
+    })
   })
 
   it('passes all parsed kinds to hotspot retrieval', async () => {
@@ -158,7 +163,10 @@ describe('graph hotspots', () => {
     const program = makeHotspotsProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--min-risk', 'HIGH'])
 
-    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ minRisk: 'HIGH' })
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({
+      minRisk: 'HIGH',
+      kinds: ['class', 'method', 'function'],
+    })
   })
 
   it('lets min-score override only the score threshold', async () => {
@@ -167,7 +175,10 @@ describe('graph hotspots', () => {
     const program = makeHotspotsProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--min-score', '0'])
 
-    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ minScore: 0 })
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({
+      minScore: 0,
+      kinds: ['class', 'method', 'function'],
+    })
   })
 
   it('widens the query only when include-importer-only is explicit', async () => {
@@ -176,7 +187,10 @@ describe('graph hotspots', () => {
     const program = makeHotspotsProgram()
     await program.parseAsync(['node', 'specd', 'graph', 'hotspots', '--include-importer-only'])
 
-    expect(mockProvider.getHotspots).toHaveBeenCalledWith({ includeImporterOnly: true })
+    expect(mockProvider.getHotspots).toHaveBeenCalledWith({
+      includeImporterOnly: true,
+      kinds: ['class', 'method', 'function'],
+    })
   })
 
   it('rejects invalid kind values before querying', async () => {
@@ -233,7 +247,7 @@ describe('graph hotspots', () => {
     }
 
     const help = getStdout()
-    expect(help).toContain('Defaults (no flags): kinds class,interface,method,function')
+    expect(help).toContain('Defaults (no flags): kinds class,method,function')
     expect(help).toContain('Default view excludes importer-only symbols unless widened with')
     expect(help).toContain('--include-importer-only')
     expect(help).toContain('Passing --kind replaces the default kind set')
@@ -244,7 +258,7 @@ describe('graph hotspots', () => {
     const docs = await readFile('../../docs/cli/cli-reference.md', 'utf8')
 
     expect(docs).toContain(
-      'By default, `graph hotspots` shows only `class`, `interface`, `method`, and `function` symbols',
+      'By default, `graph hotspots` shows only `class`, `method`, and `function` symbols',
     )
     expect(docs).toContain('When you pass `--kind`, that list fully replaces the default kind set')
     expect(docs).toContain(

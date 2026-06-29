@@ -31,6 +31,15 @@
 - **WHEN** attempting to import `FsConfigLoader` or raw use-case classes from `@specd/sdk`
 - **THEN** the import fails at compile time
 
+### Requirement: Public barrel exports for host adapters
+
+#### Scenario: Lock and health helpers available from SDK
+
+- **WHEN** importing from `@specd/sdk`
+- **THEN** `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, and `createGetGraphHealth` are available
+- **AND** `GetGraphHealthResult`, `IndexResult`, and `HotspotResult` types are available
+- **AND** `codeGraphVersion` and `getCodeGraphVersion` are available
+
 ### Requirement: Version constant
 
 #### Scenario: SDK_VERSION matches package version

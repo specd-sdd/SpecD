@@ -14,7 +14,7 @@ vi.mock('../../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../../src/helpers/cli-context.js'
 import { registerChangeInvalidate } from '../../../src/commands/change/invalidate.js'
-import { ChangeNotFoundError, SpecdError } from '@specd/core'
+import { ChangeNotFoundError, SpecdError } from '@specd/sdk'
 
 class TestInvalidateRequiresForceError extends SpecdError {
   override get code(): string {

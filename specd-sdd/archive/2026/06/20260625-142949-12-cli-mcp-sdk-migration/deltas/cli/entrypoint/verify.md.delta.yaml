@@ -1,0 +1,34 @@
+- op: added
+  description: Verify host package dependency boundary
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: JSON/TOON output schema in help'
+  content: |
+    ### Requirement: Host package SDK dependency boundary
+
+    #### Scenario: MCP depends on SDK only
+
+    - **WHEN** `packages/mcp/package.json` dependencies are inspected
+    - **THEN** `@specd/sdk` is the specd platform dependency
+    - **AND** `@specd/core` is absent
+
+- op: added
+  description: Verify banner version labels
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Host package SDK dependency boundary'
+  content: |
+    ### Requirement: Banner version labels
+
+    #### Scenario: Root banner shows CLI SDK core and code-graph versions
+
+    - **WHEN** `specd --help` is run with a configured project
+    - **THEN** stdout includes `cli  v`, `sdk   v`, `core  v`, and `graph v` version labels from installed packages

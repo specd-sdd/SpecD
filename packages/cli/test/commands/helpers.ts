@@ -1,14 +1,14 @@
 /**
  * Shared test helpers for CLI command tests.
  *
- * All command tests mock `loadConfig` and `createCliKernel`. This module
+ * All command tests mock `resolveCliContext` (or `loadConfig` for config show). This module
  * provides factory functions for minimal-valid mock objects so individual
  * test files stay focused on what they're testing.
  */
 import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
-import type { SpecdConfig, Kernel, SpecRepository, ChangeRepository } from '@specd/core'
+import type { SpecdConfig, Kernel, SpecRepository, ChangeRepository } from '@specd/sdk'
 
 /**
  * Mirrors the {@link Kernel} shape but with every `execute` replaced by a

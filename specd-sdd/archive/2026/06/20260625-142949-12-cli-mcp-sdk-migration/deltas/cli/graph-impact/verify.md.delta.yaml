@@ -1,0 +1,15 @@
+- op: added
+  description: Verify SDK graph context for impact
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: File impact analysis'
+    after:
+      type: section
+      matches: 'Scenario: Upstream file analysis with defaults'
+  content: |
+    #### Scenario: Impact uses SDK graph context
+
+    - **WHEN** `specd graph impact --file <path>` is executed
+    - **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
+    - **AND** platform symbols are sourced from `@specd/sdk`

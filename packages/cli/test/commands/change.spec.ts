@@ -5,7 +5,7 @@ import {
   InvalidStateTransitionError,
   HistoricalImplementationGuardError,
   HookFailedError,
-} from '@specd/core'
+} from '@specd/sdk'
 import {
   makeMockConfig,
   makeMockChange,
@@ -17,17 +17,16 @@ import {
 } from './helpers.js'
 
 // Module mocks — hoisted by vitest
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
+
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
 vi.mock('../../src/commands/change/_implementation-tracking.js', () => ({
   enrichImplementationTracking: vi.fn(),
 }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
 import { enrichImplementationTracking } from '../../src/commands/change/_implementation-tracking.js'
 import { registerChangeList } from '../../src/commands/change/list.js'
 import { registerChangeCreate } from '../../src/commands/change/create.js'
@@ -40,8 +39,11 @@ import { registerDraftsRestore } from '../../src/commands/drafts/restore.js'
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   vi.mocked(enrichImplementationTracking).mockResolvedValue({
     trackedFiles: [],
     links: [],
@@ -254,7 +256,7 @@ describe('change create', () => {
 
   it('handles ChangeAlreadyExistsError → exit 1 on stderr', async () => {
     const { kernel, stderr } = setup()
-    const { ChangeAlreadyExistsError } = await import('@specd/core')
+    const { ChangeAlreadyExistsError } = await import('@specd/sdk')
     kernel.changes.create.execute.mockRejectedValue(new ChangeAlreadyExistsError('new-feat'))
 
     const program = makeProgram()
@@ -828,9 +830,8 @@ describe('change transition', () => {
 
   it('does not pass approval flags to transition execute (baked at kernel construction)', async () => {
     const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
-    vi.mocked(loadConfig).mockResolvedValue(config)
     const kernel = makeMockKernel()
-    vi.mocked(createCliKernel).mockResolvedValue(kernel)
+    vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
     captureStdout()
     captureStderr()
     mockProcessExit()

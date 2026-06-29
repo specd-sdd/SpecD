@@ -8,23 +8,24 @@ import {
   captureStdout,
   captureStderr,
 } from './helpers.js'
-import { ConfigValidationError } from '@specd/core'
+import { ConfigValidationError } from '@specd/sdk'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerProjectDashboard } from '../../src/commands/project/dashboard.js'
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -172,8 +173,11 @@ describe('project dashboard', () => {
     const config = makeMockConfig({
       projectRoot: '/very/long/path/that/definitely/exceeds/the/project/box/width/limit',
     })
-    vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config,
+      configFilePath: null,
+      kernel: makeMockKernel(),
+    })
     const stdout = captureStdout()
     mockProcessExit()
 
@@ -190,7 +194,7 @@ describe('project dashboard', () => {
 
   it('exits 1 when config is missing', async () => {
     const { stderr } = setup()
-    vi.mocked(loadConfig).mockRejectedValue(
+    vi.mocked(resolveCliContext).mockRejectedValue(
       new ConfigValidationError('specd.yaml', 'config file not found'),
     )
 
