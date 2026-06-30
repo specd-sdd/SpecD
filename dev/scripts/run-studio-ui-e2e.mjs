@@ -4,8 +4,9 @@ import process from 'node:process'
 const repoRoot = process.cwd()
 const port = Number(process.env.STUDIO_E2E_PORT ?? 4450)
 const apiBaseUrl = process.env.STUDIO_E2E_BASE_URL ?? `http://127.0.0.1:${port}`
-// Vite dev server binds to localhost (often ::1); 127.0.0.1 can refuse connections.
-const uiBaseUrl = process.env.STUDIO_E2E_UI_BASE_URL ?? 'http://localhost:5174'
+// Bundle plugin (`plugin-ui-studio`) is served from the API origin; only set a separate
+// UI URL when using `@specd/studio-web` Vite dev server.
+const uiBaseUrl = process.env.STUDIO_E2E_UI_BASE_URL ?? apiBaseUrl
 const healthUrl = `${apiBaseUrl.replace(/\/$/, '')}/v1/health`
 const rawPlaywrightArgs = process.argv.slice(2)
 const playwrightArgs =
