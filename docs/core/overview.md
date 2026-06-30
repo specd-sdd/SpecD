@@ -4,9 +4,11 @@
 
 ## Who this documentation is for
 
-`docs/core/` targets integrators: developers who want to build a new delivery adapter (a CLI, an HTTP API, an IDE extension), implement a custom port (a database-backed repository, a remote schema registry), or consume the core as a standalone SDK.
+`docs/core/` is the **plugin and `@specd/core` package reference** — domain model, ports, composition factories, and use-case semantics.
 
-If you are using the `specd` CLI or MCP server, you do not need to read these documents — the [configuration reference](../config/config-reference.md) and [schema format reference](../schemas/schema-format.md) are the right starting points.
+**Delivery hosts** (CLI, MCP, API) should use [`@specd/sdk`](../sdk/index.md) as the single import; see the SDK docs for bootstrap and orchestration.
+
+If you are using the `specd` CLI or MCP server as an end user, you do not need to read these documents — the [configuration reference](../config/config-reference.md) and [schema format reference](../schemas/schema-format.md) are the right starting points.
 
 ## Architecture
 

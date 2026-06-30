@@ -65,13 +65,13 @@ Callers MUST NOT construct `CodeGraphProvider` directly — the constructor is n
 
 ### Requirement: Package exports
 
-The `@specd/code-graph` package SHALL export only:
+The `@specd/code-graph` `"."` public barrel SHALL export only:
 
 - **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`
 - **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`
 - **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
 - **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
-- **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
+- **Indexer & Discovery (public types only)**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
 - **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`
 - **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`
 - **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`
@@ -79,6 +79,18 @@ The `@specd/code-graph` package SHALL export only:
 - **Language Adapter**: `LanguageAdapter`
 - **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`
 - **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)
+- **Version**: `CODE_GRAPH_VERSION`
+
+The following MUST be exported only from `"./internal"`, not from `"."`: `InMemoryIndexSession`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, concrete graph-store adapter classes, and indexer implementation modules.
+
+### Requirement: Public and internal entry points
+
+`@specd/code-graph` MUST publish:
+
+- `src/public.ts` (or equivalent) as `"."` — curated public surface aligned with **Package exports** below
+- `src/index.ts` as `"./internal"` — full barrel including indexer internals, store adapter symbols, and `InMemoryIndexSession`
+
+`package.json` `exports` MUST map these entry points. The `"."` barrel MUST NOT use unrestricted `export *` of infrastructure modules.
 
 ### Requirement: Lifecycle management
 
@@ -104,8 +116,8 @@ Host use cases receive an already-open `CodeGraphProvider`. They MUST NOT replac
 ## Constraints
 
 - `createCodeGraphProvider` is the only construction path — `CodeGraphProvider` constructor is not exported
-- Internal components are not re-exported from the package
-- The `LanguageAdapter` interface is exported so consumers can write custom adapters
+- Internal components and store adapter implementations are exported only from `"./internal"`
+- The `LanguageAdapter` interface is exported from `"."` so consumers can write custom adapters
 - Graph-store backend selection is registry-driven and internal to composition; it is not a `specd.yaml` setting
 - The provider builds exactly one active `GraphStore` per construction path, selected by backend id from the merged graph-store registry
 - `CodeGraphProvider` holds no domain logic — it only delegates

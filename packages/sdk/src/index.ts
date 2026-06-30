@@ -19,7 +19,7 @@ export {
   type RunIndexProjectGraphResult,
 } from './orchestration/index.js'
 
-export * from '@specd/core'
+export * from './core-reexports.js'
 
 export {
   acquireGraphIndexLock,

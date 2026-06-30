@@ -70,9 +70,43 @@ export const publicDocsExclude = ['adr/**'] as const
 export const generatedApiPath = '.generated/api'
 
 /**
- * Initial package entrypoints used to derive the public API reference.
+ * Public package surface documented in the generated API reference.
  */
-export const initialApiEntryPoints = ['../../packages/core/src/index.ts'] as const
+export type ApiPackageEntryPoint = {
+  readonly id: string
+  readonly packageName: string
+  readonly entryPoint: string
+}
+
+/**
+ * Curated package entrypoints used to derive the public API reference.
+ *
+ * Order is intentional: SDK first for integrators, then core and code-graph package barrels.
+ */
+export const apiPackageEntryPoints = [
+  {
+    id: 'sdk',
+    packageName: '@specd/sdk',
+    entryPoint: '../../packages/sdk/src/index.ts',
+  },
+  {
+    id: 'core',
+    packageName: '@specd/core',
+    entryPoint: '../../packages/core/src/public.ts',
+  },
+  {
+    id: 'code-graph',
+    packageName: '@specd/code-graph',
+    entryPoint: '../../packages/code-graph/src/public.ts',
+  },
+] as const satisfies readonly ApiPackageEntryPoint[]
+
+/**
+ * Flat entrypoint paths for callers that only need generation roots.
+ */
+export const initialApiEntryPoints = apiPackageEntryPoints.map(
+  (entry) => entry.entryPoint,
+) as readonly string[]
 
 /**
  * Returns whether the generated API reference should be mounted for the current process.

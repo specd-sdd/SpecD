@@ -38,6 +38,11 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'SDK',
+      items: ['sdk/index'],
+    },
+    {
+      type: 'category',
       label: 'Core',
       items: [
         'core/index',
@@ -88,6 +93,11 @@ const sidebars: SidebarsConfig = {
           ],
         },
       ],
+    },
+    {
+      type: 'category',
+      label: 'Code graph',
+      items: ['code-graph/index', 'code-graph/use-cases', 'code-graph/services'],
     },
   ],
 }

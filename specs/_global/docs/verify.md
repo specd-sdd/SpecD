@@ -76,6 +76,33 @@
 - **WHEN** a new port interface is added to `@specd/core/application/ports/`
 - **THEN** a corresponding entry in `docs/core/` must be created in the same change
 
+### Requirement: SDK documentation
+
+#### Scenario: docs/sdk is the only integrator entry point
+
+- **WHEN** the Docusaurus sidebar is inspected
+- **THEN** **SDK** appears as the integrator category
+- **AND** `docs/sdk/` contains the canonical host guide
+- **AND** `docs/core/` and `docs/code-graph/` are labeled or positioned as package reference, not peer integrator entry points
+
+#### Scenario: package-reference indexes redirect hosts to SDK
+
+- **WHEN** `docs/core/index.md` or `docs/code-graph/index.md` is read
+- **THEN** a callout directs hosts to `docs/sdk/` and `@specd/sdk` imports
+- **AND** the page does not instruct hosts to mix `@specd/core` and `@specd/code-graph` imports
+
+#### Scenario: sdk docs forbid mixed host imports
+
+- **WHEN** `docs/sdk/` is read
+- **THEN** it states hosts import from `@specd/sdk` only
+- **AND** it does not present `@specd/core` + `@specd/code-graph` as a combined host pattern
+
+#### Scenario: core use-cases label core-only audience
+
+- **WHEN** `docs/core/use-cases.md` shows `@specd/core` imports
+- **THEN** examples are labeled for plugin / core-only consumers
+- **AND** host integrators are directed to `docs/sdk/` for `@specd/sdk` examples
+
 ### Requirement: JSDoc on all symbols
 
 #### Scenario: Exported function without JSDoc

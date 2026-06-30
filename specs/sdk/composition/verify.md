@@ -18,18 +18,27 @@
 - **THEN** directories are limited to `composition/`, `orchestration/`, `shared/`, and `index.ts`
 - **AND** no `infrastructure/` or `domain/` directories exist
 
-### Requirement: Public barrel exports for A2a
+### Requirement: Public barrel exports
 
-#### Scenario: Barrel exports host and orchestration symbols
+#### Scenario: SDK root does not use export star from core
+
+- **WHEN** `packages/sdk/src/index.ts` is inspected
+- **THEN** it does not contain `export * from '@specd/core'`
+
+#### Scenario: SDK exports orchestration and bootstrap symbols
 
 - **WHEN** importing from `@specd/sdk`
-- **THEN** `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, and `runIndexProjectGraph` are available
-- **AND** `createConfigLoader`, `createConfigWriter`, and `createKernel` are re-exported from core
+- **THEN** `openSpecdHost`, `createKernel`, and `buildProjectStatusSnapshot` are available
 
-#### Scenario: Barrel does not export internals
+#### Scenario: SDK re-exports kernel-equivalent factories from core
 
-- **WHEN** attempting to import `FsConfigLoader` or raw use-case classes from `@specd/sdk`
-- **THEN** the import fails at compile time
+- **WHEN** importing from `@specd/sdk`
+- **THEN** `createGetStatus` and `createSpecRepository` are available
+
+#### Scenario: SDK ports subpath re-exports core ports
+
+- **WHEN** importing `ChangeRepository` from `@specd/sdk/ports`
+- **THEN** the type resolves to the same contract as `@specd/core/ports`
 
 ### Requirement: Public barrel exports for host adapters
 
@@ -39,6 +48,19 @@
 - **THEN** `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, and `createGetGraphHealth` are available
 - **AND** `GetGraphHealthResult`, `IndexResult`, and `HotspotResult` types are available
 - **AND** `codeGraphVersion` and `getCodeGraphVersion` are available
+
+### Requirement: Import policy for integrators
+
+#### Scenario: CLI has no direct core dependency
+
+- **WHEN** `packages/cli/package.json` runtime dependencies are inspected
+- **THEN** only `@specd/sdk` is listed among specd platform packages
+
+#### Scenario: Plugin may depend on core directly
+
+- **WHEN** `packages/plugin-manager/package.json` runtime dependencies are inspected
+- **THEN** `@specd/core` may be present
+- **AND** `@specd/sdk` is not required
 
 ### Requirement: Version constant
 

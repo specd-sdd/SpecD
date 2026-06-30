@@ -118,6 +118,7 @@ export interface Kernel {
     saveMetadata: SaveSpecMetadata
     invalidateMetadata: InvalidateSpecMetadata
     getActiveSchema: GetActiveSchema
+    resolve: ResolveSchema
     validateSchema: ValidateSchema
     validate: ValidateSpecs
     generateMetadata: GenerateSpecMetadata
@@ -346,6 +347,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       saveMetadata,
       invalidateMetadata: new InvalidateSpecMetadata(i.specs),
       getActiveSchema,
+      resolve: resolveSchema,
       validateSchema: new ValidateSchema(i.schemas, config.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
       generateMetadata,

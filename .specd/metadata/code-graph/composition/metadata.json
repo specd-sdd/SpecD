@@ -31,7 +31,13 @@
     {
       "requirement": "Package exports",
       "rules": [
-        "The `@specd/code-graph` package SHALL export only:\n\n- **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`\n- **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`\n- **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`\n- **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`\n- **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`\n- **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`\n- **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`\n- **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`\n- **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`\n- **Language Adapter**: `LanguageAdapter`\n- **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`\n- **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)"
+        "The `@specd/code-graph` `\".\"` public barrel SHALL export only:\n\n- **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`\n- **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`\n- **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`\n- **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`\n- **Indexer & Discovery (public types only)**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`\n- **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`\n- **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`\n- **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`\n- **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`\n- **Language Adapter**: `LanguageAdapter`\n- **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`\n- **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)\n- **Version**: `CODE_GRAPH_VERSION`\n\nThe following MUST be exported only from `\"./internal\"`, not from `\".\"`: `InMemoryIndexSession`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, concrete graph-store adapter classes, and indexer implementation modules."
+      ]
+    },
+    {
+      "requirement": "Public and internal entry points",
+      "rules": [
+        "`@specd/code-graph` MUST publish:\n\n- `src/public.ts` (or equivalent) as `\".\"` — curated public surface aligned with **Package exports** below\n- `src/index.ts` as `\"./internal\"` — full barrel including indexer internals, store adapter symbols, and `InMemoryIndexSession`\n\n`package.json` `exports` MUST map these entry points. The `\".\"` barrel MUST NOT use unrestricted `export *` of infrastructure modules."
       ]
     },
     {
@@ -55,8 +61,8 @@
   ],
   "constraints": [
     "createCodeGraphProvider is the only construction path — CodeGraphProvider constructor is not exported",
-    "Internal components are not re-exported from the package",
-    "The LanguageAdapter interface is exported so consumers can write custom adapters",
+    "Internal components and store adapter implementations are exported only from \"./internal\"",
+    "The LanguageAdapter interface is exported from \".\" so consumers can write custom adapters",
     "Graph-store backend selection is registry-driven and internal to composition; it is not a specd.yaml setting",
     "The provider builds exactly one active GraphStore per construction path, selected by backend id from the merged graph-store registry",
     "CodeGraphProvider holds no domain logic — it only delegates",
@@ -158,6 +164,21 @@
       ]
     },
     {
+      "requirement": "Public and internal entry points",
+      "name": "package.json exports public and internal",
+      "when": ["packages/code-graph/package.json exports is inspected"],
+      "then": ["\".\" and \"./internal\" entry points exist"]
+    },
+    {
+      "requirement": "Public and internal entry points",
+      "name": "InMemoryIndexSession only on internal entry",
+      "when": ["importing from @specd/code-graph \".\""],
+      "then": [
+        "InMemoryIndexSession is not available at compile time",
+        "AND importing from @specd/code-graph/internal succeeds"
+      ]
+    },
+    {
       "requirement": "Lifecycle management",
       "name": "Method before open throws",
       "given": ["a CodeGraphProvider created but not opened"],
@@ -197,20 +218,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "code-graph:composition",
-        "file": "code-graph:src/index.ts"
-      },
-      {
-        "specId": "code-graph:composition",
-        "file": "code-graph:src/application/index.ts"
+        "file": "code-graph:src/public.ts",
+        "symbol": "CODE_GRAPH_VERSION"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b518c478f63d70372858f2a9373e8a8c4f39d8bfba18799ad59f8a73c54599a3",
-    "verify.md": "sha256:443c923597b27b7871c3bf579e9bcc462509e9312def5d786445b26107bec64e"
+    "spec.md": "sha256:77861164992a8f5010f9f2867995eca75793f3131a9ac94164f83fc8c74c99d1",
+    "verify.md": "sha256:b5b379d01ea2e4befac841783f08acfe898a2dbf1409bd4a3fe0f79dcb6ae3f7"
   },
   "generatedBy": "core"
 }

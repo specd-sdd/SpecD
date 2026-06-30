@@ -3,6 +3,10 @@
   "out": ".generated/api",
   "readme": "none",
   "skipErrorChecking": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "gitRevision": "main",
+  "gitRemote": "origin",
   "hideBreadcrumbs": true,
   "hidePageHeader": true,
   "entryFileName": "index.md"

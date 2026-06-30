@@ -44,12 +44,13 @@ Dependencies are wired manually at the application entry point of each package. 
 
 Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:
 
-- **Use-case factories** — one per domain use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.
-- **Kernel** — `createKernel(config: SpecdConfig)` calls domain use-case factories and returns grouped use cases. It is a convenience, not a mandatory entry point. Config mutation is not wired into the kernel. Values from the resolved `SpecdConfig` (including `approvals` and `plugins`) are injected at construction time; delivery mechanisms MUST NOT re-pass those values on per-call `execute()` inputs. Hosts read config via `kernel.project.getConfig` when needed.
-- **Config loader port** — `createConfigLoader()` returns a `ConfigLoader` that resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.
-- **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml` (`initProject`, `addPlugin`, `removePlugin`). Implementations live in `infrastructure/`. Delivery mechanisms call port methods on the returned instance.
+- **Kernel** — `createKernel(config: SpecdConfig)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.
+- **Config loader port** — `createConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.
+- **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml`. Delivery mechanisms call port methods on the returned instance.
 
-Concrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import use-case factories, `createConfigLoader`, `createConfigWriter`, and the kernel — never infrastructure classes or use case constructors.
+Every capability mounted on `Kernel` MUST also be obtainable without `createKernel`: public `createX` use-case factories for each kernel-mounted use case, and public repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, `createSchemaRegistry`) for storage wired on the kernel. Repository factories accept an adapter id (for example `'fs'`; extensible to plugin-registered ids via `*StorageFactory` on `./extensions`). `createKernel` is the recommended full-bootstrap path, not the only path.
+
+Concrete adapter classes are never exported from public entry points. Delivery hosts (`@specd/cli`, `@specd/mcp`) that use both core and code-graph MUST import from `@specd/sdk` per the import policy in `sdk:composition`.
 
 ### Requirement: YAML inputs validated at the infrastructure boundary
 
@@ -61,7 +62,18 @@ Packages that serve as delivery mechanisms (`@specd/cli`, `@specd/mcp`, `@specd/
 
 ### Requirement: No circular dependencies between packages
 
-Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `core`. `mcp` → `core`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles.
+Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `sdk`. `mcp` → `sdk`. `sdk` → `core`, `code-graph`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles.
+
+### Requirement: Curated public package entry points
+
+Packages with business logic (`@specd/core`, `@specd/code-graph`) and the host facade (`@specd/sdk`) MUST expose curated public barrels through `package.json` `exports`:
+
+- `"."` — integrator-facing surface (composition bootstrap, kernel types, kernel-equivalent factories, domain types, errors). MUST NOT export concrete adapter classes or infrastructure implementations.
+- `"./ports"` (`@specd/core` only) — port interfaces and abstract classes plus associated `*Config` / `*Result` types. MUST NOT export adapter implementations.
+- `"./extensions"` (`@specd/core` only) — kernel registry and storage-factory registration types (`*StorageFactory`, `KernelRegistryInput`, `KernelBuilder`, hook/VCS/actor providers). MUST NOT export builtin factory markers or infrastructure wiring.
+- `"./internal"` — full development barrel for monorepo tests and advanced callers only.
+
+`@specd/sdk` MUST additionally expose `"./ports"` and `"./extensions"` as re-exports of the corresponding `@specd/core` subpaths.
 
 ## Constraints
 
@@ -77,6 +89,10 @@ Package dependency direction is strictly one-way: `plugin-*` → `skills` → `c
 - All port methods are explicit methods — no property signatures
 - No package may introduce a circular `workspace:*` dependency
 - Infrastructure adapters that read external YAML files must validate the parsed content with a schema validator before constructing any domain or application objects; unvalidated YAML must never reach domain or application code
+- Public `"."` barrels MUST NOT export concrete adapter classes or infrastructure implementations
+- Public `"."` barrels MUST export kernel-equivalent `createX` use-case factories and repository-level factories for every capability on `Kernel`
+- Port contracts live on `@specd/core/ports` (and `@specd/sdk/ports`); extension registration types live on `@specd/core/extensions` (and `@specd/sdk/extensions`)
+- Delivery hosts (`cli`, `mcp`) MUST NOT declare direct runtime dependencies on both `@specd/core` and `@specd/code-graph` when `@specd/sdk` covers their needs
 
 ## Spec Dependencies
 

@@ -109,3 +109,50 @@ export {
   type PreviewSpecWorkspace,
   type FsPreviewSpecOptions,
 } from './preview-spec.js'
+export { createResolveSchema, type FsResolveSchemaOptions } from './resolve-schema.js'
+export {
+  createUpdateSpecDeps,
+  type UpdateSpecDepsContext,
+  type FsUpdateSpecDepsOptions,
+} from './update-spec-deps.js'
+export {
+  createInvalidateChange,
+  type InvalidateChangeContext,
+  type FsInvalidateChangeOptions,
+} from './invalidate-change.js'
+export {
+  createRunStepHooks,
+  type RunStepHooksContext,
+  type FsRunStepHooksOptions,
+} from './run-step-hooks.js'
+export {
+  createGetHookInstructions,
+  type GetHookInstructionsContext,
+  type FsGetHookInstructionsOptions,
+} from './get-hook-instructions.js'
+export {
+  createGetArtifactInstruction,
+  type GetArtifactInstructionContext,
+  type FsGetArtifactInstructionOptions,
+} from './get-artifact-instruction.js'
+export {
+  createUpdateImplementationTracking,
+  type UpdateImplementationTrackingContext,
+  type FsUpdateImplementationTrackingOptions,
+} from './update-implementation-tracking.js'
+export {
+  createRefreshImplementationTracking,
+  type RefreshImplementationTrackingContext,
+  type FsRefreshImplementationTrackingOptions,
+} from './refresh-implementation-tracking.js'
+export {
+  createGetImplementationReview,
+  type GetImplementationReviewContext,
+  type FsGetImplementationReviewOptions,
+} from './get-implementation-review.js'
+export { createGetSpecOutline, type FsGetSpecOutlineOptions } from './get-spec-outline.js'
+export { createValidateSchema, type FsValidateSchemaOptions } from './validate-schema.js'
+export { createGenerateSpecMetadata } from './generate-spec-metadata.js'
+export { createUpdateSpecMetadata } from './update-spec-metadata.js'
+export { createGetProjectMetadata } from './get-project-metadata.js'
+export { createUpdateProjectMetadata } from './update-project-metadata.js'

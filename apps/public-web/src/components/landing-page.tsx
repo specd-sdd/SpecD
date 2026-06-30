@@ -45,7 +45,7 @@ export function LandingPage({
             <a className="cta-card" href={publicApiHref}>
               <span>Browse the API</span>
               <strong>
-                Generated reference for the exported `@specd/core` surface.
+                Generated reference for the exported `@specd/sdk` surface.
               </strong>
             </a>
           ) : null}

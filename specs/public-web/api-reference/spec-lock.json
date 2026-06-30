@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "public-web:public-site",
+    "default:_global/docs",
+    "sdk:composition",
+    "core:composition",
+    "code-graph:composition"
+  ],
+  "implementation": [
+    {
+      "file": "public-web:src/lib/public-docs-config.ts",
+      "symbols": ["initialApiEntryPoints"]
+    }
+  ]
+}

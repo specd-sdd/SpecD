@@ -4,12 +4,5 @@
     "version": 1
   },
   "dependsOn": [],
-  "implementation": [
-    {
-      "file": "default:docs/core/overview.md"
-    },
-    {
-      "file": "default:docs/core/use-cases.md"
-    }
-  ]
+  "implementation": []
 }

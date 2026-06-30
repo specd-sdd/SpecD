@@ -26,6 +26,19 @@ describe('@specd/sdk barrel', () => {
     expect(typeof sdk.createConfigLoader).toBe('function')
     expect(typeof sdk.createConfigWriter).toBe('function')
     expect(typeof sdk.createKernel).toBe('function')
+    expect(typeof sdk.createGetStatus).toBe('function')
+    expect(typeof sdk.createSpecRepository).toBe('function')
+  })
+
+  it('does not use export star from @specd/core in the SDK index source', () => {
+    const indexSource = readFileSync(join(packageRoot, 'src/index.ts'), 'utf8')
+    expect(indexSource).not.toMatch(/export \* from '@specd\/core'/)
+  })
+
+  it('re-exports curated core surface via core-reexports', () => {
+    expect(typeof sdk.createGetStatus).toBe('function')
+    expect(typeof sdk.createSpecRepository).toBe('function')
+    expect(typeof sdk.CORE_VERSION).toBe('string')
   })
 
   it('re-exports host-adapter code-graph symbols', () => {

@@ -16,10 +16,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/index.ts"
-    },
-    {
-      "file": "code-graph:src/application/index.ts"
+      "file": "code-graph:src/public.ts",
+      "symbols": ["CODE_GRAPH_VERSION"]
     }
   ]
 }

@@ -21,33 +21,46 @@ The `@specd/sdk` package SHALL live at `packages/sdk/` in the monorepo with work
 
 The package MUST NOT contain domain entities, application ports, or infrastructure adapters. Files under `src/shared/` MUST NOT be re-exported from `src/index.ts`.
 
-### Requirement: Public barrel exports for A2a
+### Requirement: Public barrel exports
 
-`src/index.ts` SHALL export:
+`package.json` `exports` MUST include:
 
-- From host-context spec: `openSpecdHost`, `createSdkContext`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`
-- From graph lifecycle spec: `withOpenGraphProvider`
-- From orchestration specs: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types
-- Re-exports from `@specd/core`: `createConfigLoader`, `createConfigWriter`, `createKernel`, `Kernel`, `KernelOptions`, `SpecdConfig`, and the remainder of the `@specd/core` public surface via `export * from '@specd/core'` until change `13-public-api-surface` narrows the curated list
-- Re-exports from `@specd/code-graph`: `CodeGraphProvider`, `createCodeGraphProvider`, plus host-adapter symbols listed under **Public barrel exports for host adapters**
+- `"."` → `src/index.ts` (curated host surface)
+- `"./ports"` → re-export `@specd/core/ports`
+- `"./extensions"` → re-export `@specd/core/extensions`
 
-The barrel MUST NOT export infrastructure adapters or internal composition helpers from either dependency package. `export * from '@specd/core'` is permitted as a transitional re-export boundary for delivery hosts migrating off direct `@specd/core` dependencies.
+`src/index.ts` SHALL export explicitly (no `export * from '@specd/core'`):
+
+- SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`
+- SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types
+- Explicit re-exports from `@specd/core` `"."` public barrel (bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O types, domain entities, errors)
+- Explicit re-exports from `@specd/code-graph` `"."` public barrel (provider factory, host use cases, graph host-adapter symbols listed under **Public barrel exports for host adapters**)
+- `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`
+
+The `"."` barrel MUST NOT export infrastructure adapters, internal composition helpers, or symbols that are only available from `"./internal"` entry points of dependency packages.
 
 ### Requirement: Public barrel exports for host adapters
 
-`src/index.ts` SHALL re-export the following symbols from `@specd/code-graph` for CLI host adapters:
+`src/index.ts` SHALL re-export the following symbols from `@specd/code-graph` `"."` for CLI host adapters:
 
-- `acquireGraphIndexLock`
-- `assertGraphIndexUnlocked`
-- `createGetGraphHealth`
-- `type GetGraphHealthResult`
-- `type IndexResult`
-- `type HotspotResult`
-- `codeGraphVersion` and `getCodeGraphVersion`
+- `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
+- `createGetGraphHealth`, `type GetGraphHealthInput`, `type GetGraphHealthResult`
+- `type IndexResult`, `type HotspotResult`, `type ImpactResult`, `type FileImpactResult`
+- `codeGraphVersion`, `getCodeGraphVersion` (SDK-owned aliases where applicable)
 - `GraphSpecNotFoundError` (alias for graph `SpecNotFoundError`)
-- Additional host-adapter symbols used by CLI graph commands: `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`, `normalizeFileSelectorPath`, `createBootstrapGraphConfig`, fingerprint helpers, and related impact/search types
+- `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`
+- `normalizeFileSelectorPath`, `createBootstrapGraphConfig`
+- Fingerprint helpers: `isGraphStale`, `detectFingerprintMismatch`, `parseFingerprintMap`, `buildProjectGraphConfig`
 
 Delivery hosts MUST import these symbols from `@specd/sdk`, not from `@specd/code-graph` directly.
+
+### Requirement: Import policy for integrators
+
+Delivery hosts (`@specd/cli`, `@specd/mcp`, and future API/IPC hosts) that use both `@specd/core` and `@specd/code-graph` MUST depend on `@specd/sdk` only — not on `@specd/core` and `@specd/code-graph` as parallel direct runtime dependencies.
+
+Packages that need only `@specd/core` (for example `plugin-*`, `skills`) MAY import `@specd/core` directly.
+
+Custom storage implementers MAY import port contracts from `@specd/core/ports` or `@specd/sdk/ports`, and registration types from `@specd/core/extensions` or `@specd/sdk/extensions`.
 
 ### Requirement: Version constant
 

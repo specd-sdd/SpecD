@@ -75,6 +75,19 @@
 - **THEN** `SpecNotFoundError` is available as an import
 - **AND** thrown instances expose machine-readable code `SPEC_NOT_FOUND` and the requested spec id
 
+### Requirement: Public and internal entry points
+
+#### Scenario: package.json exports public and internal
+
+- **WHEN** `packages/code-graph/package.json` `exports` is inspected
+- **THEN** `"."` and `"./internal"` entry points exist
+
+#### Scenario: InMemoryIndexSession only on internal entry
+
+- **WHEN** importing from `@specd/code-graph` `"."`
+- **THEN** `InMemoryIndexSession` is not available at compile time
+- **AND** importing from `@specd/code-graph/internal` succeeds
+
 ### Requirement: Lifecycle management
 
 #### Scenario: Method before open throws

@@ -1,5 +1,7 @@
 # Use Cases
 
+> **Audience:** plugin authors and `@specd/core` consumers. Delivery hosts should use [`@specd/sdk`](../sdk/index.md) instead of wiring use cases directly.
+
 Use cases are the entry points to `@specd/core`'s business logic. Each use case is a class with an `execute(input)` method. You construct them once — injecting the ports and sub-use-cases they need — and call `execute` for each operation.
 
 All use case classes and their associated input/result types are exported from `@specd/core`.

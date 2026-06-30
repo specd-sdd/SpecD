@@ -120,7 +120,30 @@ Every MCP tool and resource exposed by `@specd/mcp` has a corresponding entry in
 
 ### Requirement: Core documentation
 
-Public types, ports, and use cases in `@specd/core` are documented in `docs/core/` with their purpose, contracts, and usage examples.
+Public types, ports, and kernel use cases are documented in `docs/core/` as **`@specd/core` package reference** — semantics, contracts, and behaviour. That section is NOT an integrator import guide.
+
+**Integrators (hosts: cli, mcp, API, IPC) MUST import from `@specd/sdk` only.** Documentation MUST NOT present a pattern of mixing `@specd/core` and `@specd/code-graph` imports for the same host.
+
+`docs/core/index.md` and `docs/code-graph/index.md` MUST include a prominent callout: hosts start at `docs/sdk/` and import from `@specd/sdk`.
+
+Where examples show `@specd/core` imports, they MUST be labeled **plugin / core-only** audience — not hosts. An optional footnote MAY note the symbol is also re-exported from `@specd/sdk`; it MUST NOT read as "integrators may choose either package".
+
+Core-only packages (`plugin-*`, `skills`) MAY use `@specd/core` as the primary import in examples.
+
+Examples in `docs/sdk/` MUST use `@specd/sdk` imports and document both assembly paths where relevant: `createKernel` + `kernel.*.execute()` and standalone `createX` / `create*Repository` factories.
+
+### Requirement: SDK documentation
+
+`docs/sdk/` is the **only** integrator entry point in Docusaurus (sidebar category **SDK**, positioned before package-reference sections). It MUST document:
+
+- `@specd/sdk` as the **single** import surface for hosts — core, code-graph, and SDK orchestration on `"."`, `"./ports"`, and `"./extensions"`
+- Explicit rule: hosts do not declare parallel `@specd/core` + `@specd/code-graph` dependencies or mix imports across those packages
+- Host bootstrap (`openSpecdHost`, `createSdkContext`) and orchestration helpers
+- Kernel-equivalent assembly via `createKernel` or standalone `createX` / `create*Repository` factories (all from `@specd/sdk`)
+
+Legacy `docs/core/sdk.md` content MUST move into `docs/sdk/`. `docs/core/` and `docs/code-graph/` remain package-reference sections (sidebar label **Package reference** or nested under SDK) for plugin authors and symbol semantics — not parallel integrator paths.
+
+When public API reference content is generated for the website, generation entry points and landing copy MUST treat `@specd/sdk` as the integrator surface per `public-web:api-reference`.
 
 ### Requirement: JSDoc on all symbols
 

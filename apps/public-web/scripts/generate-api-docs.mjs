@@ -39,6 +39,73 @@ export function escapeMdxBracesInLine(line) {
     .join('')
 }
 
+const MEMBER_SECTION_HEADINGS = new Set(['Properties', 'Methods', 'Accessors'])
+
+/**
+ * Drops inherited members whose source file lives under node_modules.
+ *
+ * TypeDoc documents Error/Object inherited members with full Node.js JSDoc examples
+ * (including `function a()` sample code), which overwhelms specd error class pages.
+ *
+ * @param markdown Generated class or interface markdown.
+ * @returns Markdown without externally sourced member blocks.
+ */
+export function stripExternallyDefinedMembers(markdown) {
+  const lines = markdown.split('\n')
+  const output = []
+  let inMemberSection = false
+  let index = 0
+
+  while (index < lines.length) {
+    const line = lines[index]
+    const sectionMatch = line.match(/^## (.+)$/)
+
+    if (sectionMatch) {
+      inMemberSection = MEMBER_SECTION_HEADINGS.has(sectionMatch[1])
+      output.push(line)
+      index += 1
+      continue
+    }
+
+    if (inMemberSection && line.startsWith('### ')) {
+      const block = [line]
+      index += 1
+
+      while (index < lines.length) {
+        const nextLine = lines[index]
+
+        if (nextLine.startsWith('### ') || nextLine.startsWith('## ')) {
+          break
+        }
+
+        block.push(nextLine)
+        index += 1
+
+        if (nextLine === '***') {
+          break
+        }
+      }
+
+      const isExternal = block.some((blockLine) =>
+        /^Defined in:.*node\\?_modules/.test(blockLine),
+      )
+
+      if (!isExternal) {
+        output.push(...block)
+      }
+
+      continue
+    }
+
+    output.push(line)
+    index += 1
+  }
+
+  return output
+    .join('\n')
+    .replace(/\n## (?:Properties|Methods|Accessors)\n+(?=\n## |$)/g, '\n')
+}
+
 /**
  * Rewrites generated Markdown files so Docusaurus MDX parsing does not treat prose braces as JSX.
  *
@@ -61,7 +128,7 @@ export async function sanitizeGeneratedMarkdown(outputPath) {
         return
       }
 
-      const source = await fs.readFile(entryPath, 'utf8')
+      const source = stripExternallyDefinedMembers(await fs.readFile(entryPath, 'utf8'))
       const lines = source.split('\n')
       let inFence = false
       const sanitized = lines.map((line) => {
@@ -85,25 +152,36 @@ export async function sanitizeGeneratedMarkdown(outputPath) {
 /**
  * Builds the synthetic API landing page rendered at `/api`.
  *
+ * @param packages Curated package entrypoints in sidebar order.
  * @returns Markdown content for the public API overview page.
  */
-export function buildApiIndexContent() {
+export function buildApiIndexContent(packages) {
+  const packageSections = packages
+    .map(
+      (pkg) => `## ${pkg.packageName}
+
+Browse the curated public \`"."\` export for \`${pkg.packageName}\`.
+
+- [Package index](/api/${pkg.id}/)`,
+    )
+    .join('\n\n')
+
   return `---
 title: API Reference
 sidebar_position: 1
 ---
 
-# @specd/core API Reference
+# Public API Reference
 
-This section exposes the generated public API reference for \`@specd/core\`.
+Generated reference for curated public barrels. Host integrations MUST import from \`@specd/sdk\`; \`@specd/core\` and \`@specd/code-graph\` document their public package exports for package-level discovery.
 
-Use the sidebar to browse the exported surface by kind:
+${packageSections}
 
-- [Classes](/api/classes/AlreadyInitialisedError)
-- [Interfaces](/api/interfaces/ActorIdentity)
-- [Functions](/api/functions/applyPreHashCleanup)
-- [Type Aliases](/api/type-aliases/ArchiveHookPhaseSelector)
-- [Variables](/api/variables/CORE_VERSION)
+Use the sidebar to browse each package by symbol kind. Example SDK entries:
+
+- [Classes](/api/sdk/classes/AlreadyInitialisedError)
+- [Interfaces](/api/sdk/interfaces/ActorIdentity)
+- [Functions](/api/sdk/functions/createKernel)
 `
 }
 
@@ -126,27 +204,49 @@ export async function loadPublicDocsConfig() {
 }
 
 /**
- * Resolves TypeDoc options for the initial public API reference generation.
+ * Resolves TypeDoc options for one public package API reference generation run.
  *
+ * @param input Generation roots for a single curated package surface.
+ * @param input.entryPoint Repository-relative package public entry file.
+ * @param input.outputPath Absolute output directory for the generated markdown tree.
  * @returns TypeDoc bootstrap options with concrete absolute paths.
  */
-export async function resolveTypeDocOptions() {
-  const [typedocConfigSource, publicDocsConfig] = await Promise.all([
-    fs.readFile(typedocConfigPath, 'utf8'),
-    loadPublicDocsConfig(),
-  ])
+export async function resolveTypeDocOptions({ entryPoint, outputPath }) {
+  const typedocConfigSource = await fs.readFile(typedocConfigPath, 'utf8')
   const typedocConfig = JSON.parse(typedocConfigSource)
-  const outputPath = path.join(appRootPath, publicDocsConfig.generatedApiPath)
-  const entryPoints = publicDocsConfig.initialApiEntryPoints.map((entryPoint) =>
-    path.resolve(appRootPath, entryPoint),
-  )
 
   return {
     ...typedocConfig,
-    entryPoints,
+    entryPoints: [path.resolve(appRootPath, entryPoint)],
     out: outputPath,
     tsconfig: path.join(appRootPath, 'tsconfig.typedoc.json'),
   }
+}
+
+/**
+ * Generates markdown API reference files for one curated public package.
+ *
+ * @param input Generation roots for a single curated package surface.
+ * @param input.entryPoint Repository-relative package public entry file.
+ * @param input.outputPath Absolute output directory for the generated markdown tree.
+ * @returns Promise that resolves when the package reference has been generated.
+ * @throws Error when the TypeDoc project cannot be converted.
+ */
+export async function generatePackageApiDocs({ entryPoint, outputPath }) {
+  const options = await resolveTypeDocOptions({ entryPoint, outputPath })
+
+  await fs.rm(options.out, { force: true, recursive: true })
+  await fs.mkdir(options.out, { recursive: true })
+
+  const application = await Application.bootstrapWithPlugins(options)
+  const project = await application.convert()
+
+  if (!project) {
+    throw new Error(`TypeDoc could not convert API entrypoint: ${entryPoint}`)
+  }
+
+  await application.generateOutputs(project)
+  await sanitizeGeneratedMarkdown(options.out)
 }
 
 /**
@@ -156,21 +256,23 @@ export async function resolveTypeDocOptions() {
  * @throws Error when the TypeDoc project cannot be converted.
  */
 export async function generateApiDocs() {
-  const options = await resolveTypeDocOptions()
+  const publicDocsConfig = await loadPublicDocsConfig()
+  const outputRoot = path.join(appRootPath, publicDocsConfig.generatedApiPath)
 
-  await fs.rm(options.out, { force: true, recursive: true })
-  await fs.mkdir(options.out, { recursive: true })
+  await fs.rm(outputRoot, { force: true, recursive: true })
+  await fs.mkdir(outputRoot, { recursive: true })
 
-  const application = await Application.bootstrapWithPlugins(options)
-  const project = await application.convert()
-
-  if (!project) {
-    throw new Error('TypeDoc could not convert the configured public API entrypoints.')
+  for (const pkg of publicDocsConfig.apiPackageEntryPoints) {
+    await generatePackageApiDocs({
+      entryPoint: pkg.entryPoint,
+      outputPath: path.join(outputRoot, pkg.id),
+    })
   }
 
-  await application.generateOutputs(project)
-  await fs.writeFile(path.join(options.out, 'index.md'), buildApiIndexContent())
-  await sanitizeGeneratedMarkdown(options.out)
+  await fs.writeFile(
+    path.join(outputRoot, 'index.md'),
+    buildApiIndexContent(publicDocsConfig.apiPackageEntryPoints),
+  )
 }
 
 /**

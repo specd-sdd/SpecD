@@ -87,6 +87,33 @@
 - **WHEN** a new package declares a `workspace:*` dependency that creates a cycle
 - **THEN** pnpm must reject it
 
+### Requirement: Curated public package entry points
+
+#### Scenario: FsConfigLoader not importable from core public root
+
+- **WHEN** a consumer imports from `@specd/core` `"."`
+- **THEN** `FsConfigLoader` is not an export
+- **AND** the import fails at compile time
+
+#### Scenario: Port contracts available from core ports subpath
+
+- **WHEN** a consumer imports `ChangeRepository` from `@specd/core/ports`
+- **THEN** the type is available
+- **AND** no concrete `FsChangeRepository` is exported from that subpath
+
+#### Scenario: createSpecRepository available from core public root
+
+- **WHEN** a consumer imports `createSpecRepository` from `@specd/core` `"."`
+- **THEN** the function is available
+- **AND** `FsSpecRepository` is not an export
+
+#### Scenario: CLI depends on SDK not core
+
+- **GIVEN** `packages/cli/package.json`
+- **WHEN** runtime dependencies are inspected
+- **THEN** `@specd/sdk` is declared
+- **AND** `@specd/core` and `@specd/code-graph` are absent
+
 ### Requirement: Composition layer for use-case wiring
 
 #### Scenario: Dependency injection is manual and explicit

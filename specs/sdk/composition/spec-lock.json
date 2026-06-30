@@ -12,13 +12,7 @@
   "implementation": [
     {
       "file": "sdk:src/index.ts",
-      "symbols": [
-        "acquireGraphIndexLock",
-        "assertGraphIndexUnlocked",
-        "createGetGraphHealth",
-        "GetGraphHealthInput",
-        "GraphSpecNotFoundError"
-      ]
+      "symbols": ["openSpecdHost", "createGetStatus"]
     }
   ]
 }

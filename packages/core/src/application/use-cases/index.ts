@@ -177,3 +177,26 @@ export {
   type PreviewSpecResult,
   type PreviewSpecFileEntry,
 } from './preview-spec.js'
+export {
+  type InvalidateChange,
+  type InvalidateTargetInput,
+  type InvalidateChangeInput,
+  type AffectedArtifactFile,
+  type InvalidateChangeResult,
+} from './invalidate-change.js'
+export {
+  type GetSpecOutline,
+  type GetSpecOutlineInput,
+  type SpecOutlineResult,
+} from './get-spec-outline.js'
+export {
+  type UpdateSpecMetadata,
+  type UpdateSpecMetadataInput,
+  type UpdateSpecMetadataResult,
+} from './update-spec-metadata.js'
+export { type GetProjectMetadata, type GetProjectMetadataResult } from './get-project-metadata.js'
+export {
+  type UpdateProjectMetadata,
+  type UpdateProjectMetadataInput,
+  type UpdateProjectMetadataResult,
+} from './update-project-metadata.js'
