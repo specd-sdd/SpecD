@@ -9,9 +9,27 @@ import {
   mockProcessExit,
 } from './helpers.js'
 
-const mockInstall = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
+const mockInstallAgent = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
+const mockInstallUi = vi.fn().mockResolvedValue({ success: true, message: 'ok ui' })
 const mockAddPlugin = vi.fn().mockResolvedValue(undefined)
 const mockRemovePlugin = vi.fn().mockResolvedValue(undefined)
+
+function pluginTypeForName(pluginName: string): 'agent' | 'ui' {
+  return pluginName.includes('studio') || pluginName.includes('ui-studio') ? 'ui' : 'agent'
+}
+
+function mockLoadedPlugin(pluginName: string) {
+  const type = pluginTypeForName(pluginName)
+  return {
+    name: pluginName,
+    type,
+    version: '0.0.1',
+    configSchema: {},
+    init: vi.fn(),
+    destroy: vi.fn(),
+    ...(type === 'agent' ? { install: vi.fn(), uninstall: vi.fn() } : {}),
+  }
+}
 
 vi.mock('@specd/sdk', async (importOriginal) => {
   const original = await importOriginal<typeof import('@specd/sdk')>()
@@ -34,27 +52,18 @@ vi.mock('@specd/plugin-manager', () => ({
   createPluginLoader: vi.fn().mockReturnValue({}),
   isUiPlugin: vi.fn().mockReturnValue(false),
   InstallPlugin: vi.fn().mockImplementation(() => ({
-    execute: mockInstall,
+    execute: mockInstallAgent,
   })),
   InstallUiPlugin: vi.fn().mockImplementation(() => ({
-    execute: mockInstall,
+    execute: mockInstallUi,
   })),
   UpdatePlugin: vi.fn().mockImplementation(() => ({
     execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
   })),
   LoadPlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({
-      plugin: {
-        name: '@specd/plugin-agent-claude',
-        type: 'agent',
-        version: '0.0.1',
-        configSchema: {},
-        init: vi.fn(),
-        destroy: vi.fn(),
-        install: vi.fn(),
-        uninstall: vi.fn(),
-      },
-    }),
+    execute: vi.fn().mockImplementation(({ pluginName }: { pluginName: string }) => ({
+      plugin: mockLoadedPlugin(pluginName),
+    })),
   })),
   ListPlugins: vi.fn().mockImplementation(() => ({
     execute: vi.fn().mockResolvedValue({
@@ -102,7 +111,7 @@ describe('plugins install', () => {
 
     await program.parseAsync(['node', 'specd', 'plugins', 'install', '@specd/plugin-agent-claude'])
 
-    expect(mockInstall).toHaveBeenCalledWith(
+    expect(mockInstallAgent).toHaveBeenCalledWith(
       expect.objectContaining({
         pluginName: '@specd/plugin-agent-claude',
         config,
@@ -112,6 +121,27 @@ describe('plugins install', () => {
       '/project/specd.yaml',
       'agents',
       '@specd/plugin-agent-claude',
+    )
+  })
+
+  it('installs ui plugin via InstallUiPlugin and persists plugins.ui', async () => {
+    const { config } = setup()
+    const program = makeProgram()
+    registerPluginsInstall(program.command('plugins'))
+
+    await program.parseAsync(['node', 'specd', 'plugins', 'install', '@specd/plugin-ui-studio'])
+
+    expect(mockInstallUi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pluginName: '@specd/plugin-ui-studio',
+        config,
+      }),
+    )
+    expect(mockInstallAgent).not.toHaveBeenCalled()
+    expect(mockAddPlugin).toHaveBeenCalledWith(
+      '/project/specd.yaml',
+      'ui',
+      '@specd/plugin-ui-studio',
     )
   })
 
@@ -158,7 +188,7 @@ describe('plugins install', () => {
 
   it('exits 1 when any plugin install fails', async () => {
     setup()
-    mockInstall.mockRejectedValueOnce(new Error('install failed'))
+    mockInstallAgent.mockRejectedValueOnce(new Error('install failed'))
 
     const program = makeProgram()
     registerPluginsInstall(program.command('plugins'))

@@ -1,0 +1,200 @@
+{
+  "name": "fix-plugins-install-ui",
+  "createdAt": "2026-06-30T16:31:36.041Z",
+  "updatedAt": "2026-06-30T16:42:12.671Z",
+  "description": "Route UI plugins through InstallUiPlugin and plugins.ui in plugins install",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:plugins-install"],
+  "specDependsOn": {
+    "cli:plugins-install": [
+      "plugin-manager:install-plugin-use-case",
+      "plugin-manager:load-plugin-use-case",
+      "core:composition",
+      "core:config-writer-port",
+      "core:get-config",
+      "plugin-manager:ui-plugin-type"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:d6e2a9e0fb3f8da374205d47ea7b1400b3b6d312deb5d6202f82f538484f275f"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:plugins-install",
+          "filename": "deltas/cli/plugins-install/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7faa12ed4af4cf4029fce00f34dddc910fc75f9af3ea39db0a0ace729a042e7e"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:plugins-install",
+          "filename": "deltas/cli/plugins-install/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:506345f72deb5e97c2b8ecb18bc3d9e38a7e881bb0887211eb78357522f8b08e"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:97c467e62163d0f5496ba645f211d920f22b7d49da7f8ddf23090007ceb2885c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:6245e6206990128db8198150807818ea3be4d8d9137617ac9ffa9042982a5834"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-30T16:31:36.041Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:plugins-install"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-30T16:31:36.055Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:plugins-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-install"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:31:42.094Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-30T16:33:06.501Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:plugins-install]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:plugins-install"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:42:11.408Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:42:12.671Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    }
+  ]
+}

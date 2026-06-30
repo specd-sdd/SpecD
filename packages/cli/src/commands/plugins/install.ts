@@ -7,9 +7,11 @@ import { handleError } from '../../handle-error.js'
 import { getDeclaredPlugins } from './get-declared-plugins.js'
 import {
   InstallPlugin,
+  InstallUiPlugin,
   LoadPlugin,
   createPluginLoader,
   type InstallPluginOutput,
+  type PluginType,
 } from '@specd/plugin-manager'
 
 /**
@@ -49,11 +51,14 @@ export async function installPluginsWithKernel(input: {
   readonly pluginNames: readonly string[]
 }): Promise<PluginInstallBatchResult> {
   const loader = createPluginLoader({ config: input.config })
-  const install = new InstallPlugin(loader)
+  const installAgent = new InstallPlugin(loader)
+  const installUi = new InstallUiPlugin(loader)
   const load = new LoadPlugin(loader)
   const writer = createConfigWriter()
-  const declared = getDeclaredPlugins(input.config, 'agents')
-  const declaredSet = new Set(declared.map((entry) => entry.name))
+  const declaredByBucket = new Map<string, Set<string>>([
+    ['agents', new Set(getDeclaredPlugins(input.config, 'agents').map((entry) => entry.name))],
+    ['ui', new Set(getDeclaredPlugins(input.config, 'ui').map((entry) => entry.name))],
+  ])
 
   const plugins: PluginInstallEntry[] = []
   let hasErrors = false
@@ -69,26 +74,35 @@ export async function installPluginsWithKernel(input: {
       continue
     }
 
-    if (declaredSet.has(pluginName)) {
-      const detail = `${pluginName} already installed; use update to reinstall`
-      process.stderr.write(`warning: ${detail}\n`)
-      plugins.push({
-        name: pluginName,
-        status: 'skipped',
-        detail,
-      })
-      continue
-    }
-
     try {
       const loaded = await load.execute({ pluginName })
-      const installResult: InstallPluginOutput = await install.execute({
-        pluginName,
-        config: input.config,
-      })
       const pluginBucket = toPluginBucket(loaded.plugin.type)
+      const declaredSet = declaredByBucket.get(pluginBucket) ?? new Set<string>()
+
+      if (declaredSet.has(pluginName)) {
+        const detail = `${pluginName} already installed; use update to reinstall`
+        process.stderr.write(`warning: ${detail}\n`)
+        plugins.push({
+          name: pluginName,
+          status: 'skipped',
+          detail,
+        })
+        continue
+      }
+
+      const installResult: InstallPluginOutput =
+        loaded.plugin.type === 'ui'
+          ? await installUi.execute({
+              pluginName,
+              config: input.config,
+            })
+          : await installAgent.execute({
+              pluginName,
+              config: input.config,
+            })
       await writer.addPlugin(input.configPath, pluginBucket, pluginName)
       declaredSet.add(pluginName)
+      declaredByBucket.set(pluginBucket, declaredSet)
       plugins.push({
         name: pluginName,
         status: 'installed',
@@ -165,8 +179,13 @@ function renderInstallOutput(result: PluginInstallBatchResult, format: OutputFor
  * @param pluginType - Runtime plugin type.
  * @returns Config bucket name under `plugins`.
  */
-function toPluginBucket(pluginType: string): string {
-  return pluginType === 'agent' ? 'agents' : `${pluginType}s`
+function toPluginBucket(pluginType: PluginType): string {
+  switch (pluginType) {
+    case 'agent':
+      return 'agents'
+    case 'ui':
+      return 'ui'
+  }
 }
 
 /**
