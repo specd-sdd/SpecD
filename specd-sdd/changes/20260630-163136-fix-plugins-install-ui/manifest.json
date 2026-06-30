@@ -1,7 +1,7 @@
 {
   "name": "fix-plugins-install-ui",
   "createdAt": "2026-06-30T16:31:36.041Z",
-  "updatedAt": "2026-06-30T16:43:46.136Z",
+  "updatedAt": "2026-06-30T16:46:46.344Z",
   "description": "Route UI plugins through InstallUiPlugin and plugins.ui in plugins install",
   "schema": {
     "name": "schema-std",
@@ -255,6 +255,39 @@
       },
       "from": "ready",
       "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:45:15.148Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:46:39.838Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:46:43.862Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
     }
   ]
 }
