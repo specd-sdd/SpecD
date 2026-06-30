@@ -19,10 +19,15 @@ specd plugins uninstall <plugin> [<plugin>...]
 For each plugin name:
 
 1. The command MUST load the plugin via `LoadPlugin` use case.
-2. The command MUST call the plugin's `uninstall()` method.
-3. The command MUST call `createConfigWriter().removePlugin(configPath, type, name)` to remove from `specd.yaml`.
+2. The command MUST call `UninstallPlugin` from `@specd/plugin-manager` (which supports both agent and UI plugins).
+3. The command MUST call `createConfigWriter().removePlugin(configPath, type, name)` where `type` is `agents` for agent plugins and `ui` for UI plugins, determined from the loaded `plugin.type`.
 
 The command MUST NOT call `kernel.project.removePlugin`.
+The command MUST NOT remove UI plugin declarations from `plugins.agents`.
+
+### Requirement: UI plugin uninstall bucket
+
+For UI plugins (`plugin.type` `ui`), the command MUST call `createConfigWriter().removePlugin` with bucket `ui`. Agent plugins MUST use bucket `agents`.
 
 ### Requirement: Exit code
 

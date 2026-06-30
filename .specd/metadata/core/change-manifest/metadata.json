@@ -20,6 +20,12 @@
       ]
     },
     {
+      "requirement": "updatedAt revision clock",
+      "rules": [
+        "Each manifest MUST include **`updatedAt`** (ISO 8601).\n\n- On **create**, `updatedAt` MUST equal `createdAt`.\n- On **every** manifest persist (`save`), `updatedAt` MUST be set to the save timestamp (validate-only writes, artifact saves, transitions, edit, scaffold sync, draft/discard paths that rewrite the manifest).\n- `createdAt` remains immutable.\n\nLegacy manifests without `updatedAt` MUST be accepted on load; the repository MUST derive an initial value once (for example max of `createdAt` and latest `history[].at`) and persist it on the next save."
+      ]
+    },
+    {
       "requirement": "Archive outcome history events",
       "rules": [
         "The active change manifest history MUST preserve explicit failed-archive traceability.\n\nThe `archive-failed` event is appended when an archive attempt fails after archive execution begins but before a successful archive commit is completed.\n\n`archive-failed` MUST include:\n\n- `step` — the archive phase in which the failure occurred\n- `message` — a human-readable diagnostic summary\n- `commitStarted` — whether staged archive commit had already begun\n\nSuccessful archive completion MUST remain traceable through the archived manifest metadata (`archivedAt`, `archivedBy`, and archive location data) rather than by appending a new active-change history event after the change has ceased to be an active change.\n\nA failed pre-commit archive attempt MUST NOT by itself imply that archive completed or that permanent specs were partially accepted."
@@ -145,6 +151,26 @@
         "AND symbols is omitted for file-level-only links",
         "AND fileLinkExplicit: false is only valid when symbols is present and non-empty"
       ]
+    },
+    {
+      "requirement": "updatedAt revision clock",
+      "name": "Create sets updatedAt equal to createdAt",
+      "when": ["a new change manifest is first persisted"],
+      "then": ["updatedAt equals createdAt", "AND both are ISO 8601 strings"]
+    },
+    {
+      "requirement": "updatedAt revision clock",
+      "name": "Save bumps updatedAt",
+      "given": ["manifest loaded with prior updatedAt"],
+      "when": ["any operation persists the manifest"],
+      "then": ["updatedAt advances to save timestamp", "AND createdAt is unchanged"]
+    },
+    {
+      "requirement": "updatedAt revision clock",
+      "name": "Legacy manifest backfills on load",
+      "given": ["manifest file lacks updatedAt"],
+      "when": ["repository loads the change"],
+      "then": ["derived updatedAt is applied in memory", "AND next save persists the derived value"]
     },
     {
       "requirement": "Archive outcome history events",
@@ -310,8 +336,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:789f698f76b842553aaf0e1269b5b4bd72b278e236a82a69edf2ee16f4df5324",
-    "verify.md": "sha256:704a7cde1d6b5977a09370bca14a8a7c46158522f975ea1ba54f25b3e4a074ea"
+    "spec.md": "sha256:49c1d8e4efc1d94d2e865687f9dccbc077201d245a111abf04f5035b86fcc8ab",
+    "verify.md": "sha256:17368e74bff81fc382d89c61563fec9682ac37afaf111dc3557dbddb7f76f7f1"
   },
   "generatedBy": "core"
 }

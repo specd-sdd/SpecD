@@ -52,6 +52,21 @@
 - **THEN** the command succeeds and does not produce an error
 - **AND** `specd.yaml` is not modified
 
+### Requirement: UI plugin update enumeration
+
+#### Scenario: Update all includes plugins.ui
+
+- **GIVEN** `@specd/plugin-ui-studio` is declared under `plugins.ui`
+- **AND** `@specd/plugin-agent-claude` is declared under `plugins.agents`
+- **WHEN** `specd plugins update` is invoked with no plugin names
+- **THEN** both plugins are updated
+
+#### Scenario: Update single UI plugin by name
+
+- **GIVEN** `@specd/plugin-ui-studio` is declared under `plugins.ui`
+- **WHEN** `specd plugins update @specd/plugin-ui-studio` is invoked
+- **THEN** `UpdatePlugin` is called for `@specd/plugin-ui-studio`
+
 ### Requirement: Output
 
 #### Scenario: Machine-parseable JSON output

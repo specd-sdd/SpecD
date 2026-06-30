@@ -6,16 +6,15 @@
   "dependsOn": ["plugin-manager:update-plugin-use-case", "core:get-config"],
   "implementation": [
     {
-      "file": "cli:src/commands/plugins/get-declared-plugins.ts",
-      "symbols": ["getDeclaredPlugins"]
-    },
-    {
-      "file": "cli:src/commands/project/update.ts",
-      "symbols": ["registerProjectUpdate"]
-    },
-    {
       "file": "cli:src/commands/plugins/update.ts",
-      "symbols": ["updatePluginsWithKernel", "registerPluginsUpdate"]
+      "symbols": ["updatePluginsWithKernel"]
+    },
+    {
+      "file": "cli:src/commands/plugins/plugin-bucket.ts",
+      "symbols": ["listDeclaredPlugins"]
+    },
+    {
+      "file": "cli:test/commands/plugins-update.spec.ts"
     }
   ]
 }

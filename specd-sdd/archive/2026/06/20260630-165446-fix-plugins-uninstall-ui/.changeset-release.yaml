@@ -1,0 +1,3 @@
+releases:
+  cli:plugins-uninstall: patch
+  cli:plugins-update: patch

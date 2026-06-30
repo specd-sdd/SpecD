@@ -1,0 +1,367 @@
+{
+  "name": "fix-plugins-uninstall-ui",
+  "createdAt": "2026-06-30T16:54:46.491Z",
+  "updatedAt": "2026-06-30T17:06:22.492Z",
+  "description": "Route plugins uninstall and update by plugin type bucket",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:plugins-uninstall", "cli:plugins-update"],
+  "specDependsOn": {
+    "cli:plugins-uninstall": [
+      "plugin-manager:uninstall-plugin-use-case",
+      "plugin-manager:load-plugin-use-case",
+      "core:composition",
+      "core:config-writer-port"
+    ],
+    "cli:plugins-update": ["plugin-manager:update-plugin-use-case", "core:get-config"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/cli/plugins-install/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/uninstall.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-update.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/plugins-install/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/plugins-install/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/plugins-install/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260630-fix-plugins-install-ui-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260630-fix-plugins-install-ui.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/plugin-bucket.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/:memory:/tmp/index-stage-1782838731869/pass1-00000.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/:memory:/tmp/index-stage-1782838731869/pass2-00000.json",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "cli:plugins-uninstall",
+      "file": "packages/cli/src/commands/plugins/uninstall.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["uninstallPluginsWithKernel"]
+    },
+    {
+      "specId": "cli:plugins-uninstall",
+      "file": "packages/cli/src/commands/plugins/plugin-bucket.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toPluginBucket"]
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["updatePluginsWithKernel"]
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/src/commands/plugins/plugin-bucket.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["listDeclaredPlugins"]
+    },
+    {
+      "specId": "cli:plugins-uninstall",
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/test/commands/plugins-update.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:80ce4ab0adef1aff219b828654b4723acc6823a095247102a6496de68943b175"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:plugins-uninstall",
+          "filename": "deltas/cli/plugins-uninstall/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a23a6de31ad54f34ae2b68d4336c81f7d61dd3f4d1adc3fd5b6a4610e2173756"
+        },
+        {
+          "key": "cli:plugins-update",
+          "filename": "deltas/cli/plugins-update/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:992c53f0cb6d7ffd22bc1c128f151c177cf15f6b4880932bcad1fd1459251a9a"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:plugins-uninstall",
+          "filename": "deltas/cli/plugins-uninstall/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7555318d8a80f1c65b21bfee23877b79b5997a5879d59a6972d0c61ff432ad83"
+        },
+        {
+          "key": "cli:plugins-update",
+          "filename": "deltas/cli/plugins-update/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7f5fd9550a305b30d576184f6437e35149ca2107ebe570cfd2dbc74ce5bae995"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:4e5fecd9a9c3fe76438d73d2be73c34cdc12fe261e5b18a26be40756da8ea61f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:548d5d1b67f0ec2b439d35210c8c45e97967082741b082762b98a7a79f88b169"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-30T16:54:46.491Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:plugins-uninstall", "cli:plugins-update"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-30T16:54:46.510Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:plugins-uninstall"
+        },
+        {
+          "type": "specs",
+          "key": "cli:plugins-update"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-uninstall"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-update"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:54:56.570Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-30T16:56:35.973Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:plugins-uninstall, cli:plugins-update]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:plugins-uninstall", "cli:plugins-update"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:plugins-uninstall", "cli:plugins-update"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:56:48.866Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:56:51.388Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:59:15.661Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T17:00:17.505Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T17:00:43.748Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T17:06:22.492Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-30T17:06:22.818Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

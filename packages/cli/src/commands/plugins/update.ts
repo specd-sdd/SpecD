@@ -4,7 +4,7 @@ import { UpdatePlugin, createPluginLoader } from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { getDeclaredPlugins } from './get-declared-plugins.js'
+import { listDeclaredPlugins } from './plugin-bucket.js'
 
 /**
  * One plugin-update command result entry.
@@ -42,13 +42,13 @@ export async function updatePluginsWithKernel(input: {
   readonly configPath: string
   readonly pluginNames?: readonly string[]
 }): Promise<PluginUpdateBatchResult> {
-  const declared = getDeclaredPlugins(input.config, 'agents')
-  const declaredMap = new Map(declared.map((plugin) => [plugin.name, plugin]))
+  const allDeclared = listDeclaredPlugins(input.config)
+  const declaredMap = new Map(allDeclared.map((plugin) => [plugin.name, plugin]))
 
   const selectedNames =
     input.pluginNames !== undefined && input.pluginNames.length > 0
       ? [...input.pluginNames]
-      : declared.map((plugin) => plugin.name)
+      : allDeclared.map((plugin) => plugin.name)
 
   const loader = createPluginLoader({ config: input.config })
   const update = new UpdatePlugin(loader)

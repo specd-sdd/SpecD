@@ -1,0 +1,18 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Uninstall workflow'
+  content: |
+    ### Requirement: UI plugin uninstall bucket
+
+    #### Scenario: UI plugin removes plugins.ui declaration
+
+    - **GIVEN** `@specd/plugin-ui-studio` is declared under `plugins.ui`
+    - **WHEN** `specd plugins uninstall @specd/plugin-ui-studio` is invoked
+    - **THEN** `LoadPlugin` determines `plugin.type` is `ui`
+    - **AND** `createConfigWriter().removePlugin` is called with bucket `ui`
+    - **AND** the declaration is removed from `plugins.ui` in `specd.yaml`

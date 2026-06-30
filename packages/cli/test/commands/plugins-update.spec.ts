@@ -7,6 +7,25 @@ import {
   mockProcessExit,
 } from './helpers.js'
 
+const mockUpdate = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
+
+function pluginTypeForName(pluginName: string): 'agent' | 'ui' {
+  return pluginName.includes('studio') || pluginName.includes('ui-studio') ? 'ui' : 'agent'
+}
+
+function mockLoadedPlugin(pluginName: string) {
+  const type = pluginTypeForName(pluginName)
+  return {
+    name: pluginName,
+    type,
+    version: '0.0.1',
+    configSchema: {},
+    init: vi.fn(),
+    destroy: vi.fn(),
+    ...(type === 'agent' ? { install: vi.fn(), uninstall: vi.fn() } : {}),
+  }
+}
+
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
 }))
@@ -17,18 +36,9 @@ vi.mock('@specd/plugin-manager', () => ({
     execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
   })),
   LoadPlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({
-      plugin: {
-        name: '@specd/plugin-agent-claude',
-        type: 'agent',
-        version: '0.0.1',
-        configSchema: {},
-        init: vi.fn(),
-        destroy: vi.fn(),
-        install: vi.fn(),
-        uninstall: vi.fn(),
-      },
-    }),
+    execute: vi.fn().mockImplementation(({ pluginName }: { pluginName: string }) => ({
+      plugin: mockLoadedPlugin(pluginName),
+    })),
   })),
   ListPlugins: vi.fn().mockImplementation(() => ({
     execute: vi.fn().mockResolvedValue({
@@ -45,7 +55,7 @@ vi.mock('@specd/plugin-manager', () => ({
     execute: vi.fn().mockResolvedValue(undefined),
   })),
   UpdatePlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+    execute: mockUpdate,
   })),
 }))
 
@@ -72,6 +82,23 @@ function setup(configOverrides: Parameters<typeof makeMockConfig>[0] = {}) {
 afterEach(() => vi.clearAllMocks())
 
 describe('plugins update', () => {
+  it('updates declared ui plugins when listed under plugins.ui', async () => {
+    const { stdout } = setup({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+        ui: [{ name: '@specd/plugin-ui-studio' }],
+      },
+    })
+    const program = makeProgram()
+    registerPluginsUpdate(program.command('plugins'))
+    await program.parseAsync(['node', 'specd', 'plugins', 'update'])
+
+    expect(stdout()).toContain('@specd/plugin-ui-studio')
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ pluginName: '@specd/plugin-ui-studio' }),
+    )
+  })
+
   it('updates all declared plugins when no args are provided', async () => {
     const { stdout } = setup()
     const program = makeProgram()

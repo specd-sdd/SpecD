@@ -80,7 +80,7 @@
     {
       "requirement": "Auto-invalidation on get when artifact files drift",
       "rules": [
-        "When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a persisted or derived non-complete state caused by content drift. If drift is detected AND either of the following conditions holds, the repository must collect the full set of affected files per artifact, call `change.invalidate('artifact-drift', SYSTEM_ACTOR, ...)`, and persist the updated state before returning:\n\n1. The change is beyond `designing` state (has progressed past the initial design phase), OR\n2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.\n\nThe invalidation payload must preserve every drifted file key for every affected artifact before the rollback is recorded. This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`core:change-repository-port`](../change-repository-port/spec.md) for the full port-level contract.\n\nHistorical manifests may still contain `invalidated` events whose persisted cause is `\"artifact-change\"`. The fs read path must accept that legacy value as backward-compatible history and normalize it to the current artifact-drift semantics when the raw manifest is deserialized."
+        "When `ChangeRepository.get()` loads a change, the `FsChangeRepository` implementation must check whether any previously-validated artifact file has drifted — i.e. the file had a `validatedHash` set but now has a persisted or derived non-complete state caused by content drift. If drift is detected AND either of the following conditions holds, the repository must collect the full set of affected files per artifact, call `change.invalidate('artifact-drift', SYSTEM_ACTOR, ...)`, and persist the updated state before returning **only when** invalidation appends new history:\n\n1. The change is beyond `designing` state (has progressed past the initial design phase), OR\n2. The change has an active approval (spec approval or signoff) not superseded by a subsequent `invalidated` event.\n\nWhen the change is already in `designing` and the drift scope matches the most recent `artifact-drift` invalidation per `core:change`, repeated loads MUST NOT append duplicate history or rewrite the manifest. This keeps kernel-triggered status polls (Studio, API, CLI) honest and side-effect free when drift scope is unchanged.\n\nThe invalidation payload must preserve every drifted file key for every affected artifact before the rollback is recorded. This ensures that both state-inconsistent artifact changes and approval drift are detected eagerly on any change load, not only during explicit validation. See [`core:change-repository-port`](../change-repository-port/spec.md) for the full port-level contract.\n\nHistorical manifests may still contain `invalidated` events whose persisted cause is `\"artifact-change\"`. The fs read path must accept that legacy value as backward-compatible history and normalize it to the current artifact-drift semantics when the raw manifest is deserialized."
       ]
     },
     {
@@ -438,6 +438,20 @@
       ]
     },
     {
+      "requirement": "Auto-invalidation on get when artifact files drift",
+      "name": "Repeated kernel load with unchanged drift scope is idempotent",
+      "given": [
+        "a change already in designing with a persisted artifact-drift invalidation for the current drift scope"
+      ],
+      "when": [
+        "a kernel use case loads that change through ChangeRepository.get() twice without mutating artifacts"
+      ],
+      "then": [
+        "the second load does not append another invalidated event",
+        "AND the manifest on disk is unchanged after the second load"
+      ]
+    },
+    {
       "requirement": "Kernel exposes repository instances for adapter access",
       "name": "ChangeRepository accessible via kernel",
       "when": ["kernel.changes.repo is accessed"],
@@ -562,8 +576,8 @@
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:feb0e00aa2800bdfda87b7c3978dfed7c74ed3923428ae8ca6cf39cc6b56a5b8",
-    "verify.md": "sha256:0808f0fcd72b275514a1e0795d73fcb969dbbfab680a410050be44502c8a48a7"
+    "spec.md": "sha256:40d61c9c9c0abe949b7a0807aeb37fc3095bcaf25f7e4aa3add69fcace944c78",
+    "verify.md": "sha256:04c482dd066b69d30452c4a06d81dc3ce3c182b633b6b2e736ee5f286f48d623"
   },
   "generatedBy": "core"
 }

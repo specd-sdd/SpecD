@@ -12,7 +12,11 @@
   "implementation": [
     {
       "file": "cli:src/commands/plugins/uninstall.ts",
-      "symbols": ["registerPluginsUninstall"]
+      "symbols": ["uninstallPluginsWithKernel"]
+    },
+    {
+      "file": "cli:src/commands/plugins/plugin-bucket.ts",
+      "symbols": ["toPluginBucket"]
     },
     {
       "file": "cli:test/commands/plugins.spec.ts"

@@ -18,14 +18,22 @@ specd plugins update [<plugin>...]
 
 The command MUST enumerate declared plugins from the loaded `SpecdConfig.plugins` field (via `loadConfig` or an equivalent config snapshot). It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.
 
-When no plugin names are provided, the command MUST derive the update set from `config.plugins.agents` (or the appropriate declared type buckets).
+When no plugin names are provided, the command MUST derive the update set from all declared plugin buckets (`plugins.agents` and `plugins.ui`).
+
+When plugin names are provided, the command MUST resolve each name against declared plugins in any supported bucket before updating.
 
 ### Requirement: Update behavior
 
-- **Without arguments**: Updates all declared plugins in `specd.yaml`.
-- **With plugin names**: Updates only the specified plugins.
+- **Without arguments**: Updates all declared plugins in `specd.yaml` across supported type buckets (`agents` and `ui`).
+- **With plugin names**: Updates only the specified plugins when declared in any supported bucket.
 - The command MUST be idempotent — running update multiple times produces the same result.
 - The command MUST NOT mutate the plugin configuration in `specd.yaml`.
+
+### Requirement: UI plugin update enumeration
+
+When no plugin names are provided, the command MUST include plugins declared under `plugins.ui` in the update set alongside `plugins.agents`.
+
+When plugin names are provided, the command MUST resolve each name against declared plugins in `plugins.agents` or `plugins.ui` before updating.
 
 ### Requirement: Exit code
 

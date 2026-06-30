@@ -15,13 +15,19 @@
     {
       "requirement": "Declaration source",
       "rules": [
-        "The command MUST enumerate declared plugins from the loaded `SpecdConfig.plugins` field (via `loadConfig` or an equivalent config snapshot). It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.\n\nWhen no plugin names are provided, the command MUST derive the update set from `config.plugins.agents` (or the appropriate declared type buckets)."
+        "The command MUST enumerate declared plugins from the loaded `SpecdConfig.plugins` field (via `loadConfig` or an equivalent config snapshot). It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.\n\nWhen no plugin names are provided, the command MUST derive the update set from all declared plugin buckets (`plugins.agents` and `plugins.ui`).\n\nWhen plugin names are provided, the command MUST resolve each name against declared plugins in any supported bucket before updating."
       ]
     },
     {
       "requirement": "Update behavior",
       "rules": [
-        "- **Without arguments**: Updates all declared plugins in `specd.yaml`.\n- **With plugin names**: Updates only the specified plugins.\n- The command MUST be idempotent — running update multiple times produces the same result.\n- The command MUST NOT mutate the plugin configuration in `specd.yaml`."
+        "- **Without arguments**: Updates all declared plugins in `specd.yaml` across supported type buckets (`agents` and `ui`).\n- **With plugin names**: Updates only the specified plugins when declared in any supported bucket.\n- The command MUST be idempotent — running update multiple times produces the same result.\n- The command MUST NOT mutate the plugin configuration in `specd.yaml`."
+      ]
+    },
+    {
+      "requirement": "UI plugin update enumeration",
+      "rules": [
+        "When no plugin names are provided, the command MUST include plugins declared under `plugins.ui` in the update set alongside `plugins.agents`.\n\nWhen plugin names are provided, the command MUST resolve each name against declared plugins in `plugins.agents` or `plugins.ui` before updating."
       ]
     },
     {
@@ -92,6 +98,23 @@
       ]
     },
     {
+      "requirement": "UI plugin update enumeration",
+      "name": "Update all includes plugins.ui",
+      "given": [
+        "@specd/plugin-ui-studio is declared under plugins.ui",
+        "AND @specd/plugin-agent-claude is declared under plugins.agents"
+      ],
+      "when": ["specd plugins update is invoked with no plugin names"],
+      "then": ["both plugins are updated"]
+    },
+    {
+      "requirement": "UI plugin update enumeration",
+      "name": "Update single UI plugin by name",
+      "given": ["@specd/plugin-ui-studio is declared under plugins.ui"],
+      "when": ["specd plugins update @specd/plugin-ui-studio is invoked"],
+      "then": ["UpdatePlugin is called for @specd/plugin-ui-studio"]
+    },
+    {
       "requirement": "Output",
       "name": "Machine-parseable JSON output",
       "when": ["specd plugins update --format json is invoked"],
@@ -99,17 +122,13 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "cli:plugins-update",
+        "file": "cli:test/commands/plugins-update.spec.ts"
+      }
+    ],
     "symbols": [
-      {
-        "specId": "cli:plugins-update",
-        "file": "cli:src/commands/plugins/get-declared-plugins.ts",
-        "symbol": "getDeclaredPlugins"
-      },
-      {
-        "specId": "cli:plugins-update",
-        "file": "cli:src/commands/project/update.ts",
-        "symbol": "registerProjectUpdate"
-      },
       {
         "specId": "cli:plugins-update",
         "file": "cli:src/commands/plugins/update.ts",
@@ -117,14 +136,14 @@
       },
       {
         "specId": "cli:plugins-update",
-        "file": "cli:src/commands/plugins/update.ts",
-        "symbol": "registerPluginsUpdate"
+        "file": "cli:src/commands/plugins/plugin-bucket.ts",
+        "symbol": "listDeclaredPlugins"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ebab0228dbc104363352f701cab90b6d20667c99bb83921e47f55f2dbb9072d7",
-    "verify.md": "sha256:be71410fdab03fbe7cf7cb7bb51f1bf4ab9a3b1a3178784d477caa30ea841547"
+    "spec.md": "sha256:d00fd2bb077872b027bfdf6d6b15320159997be40bf6cdded59ce832dd675409",
+    "verify.md": "sha256:f8f7a45f1b96624da64f10d0db24532bc9f96a6c4bc9bbe130bf6164ac047d12"
   },
   "generatedBy": "core"
 }

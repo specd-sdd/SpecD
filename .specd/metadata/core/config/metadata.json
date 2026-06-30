@@ -135,6 +135,18 @@
       ]
     },
     {
+      "requirement": "API authentication settings",
+      "rules": [
+        "`specd.yaml` MAY include an optional top-level **`api`** section for HTTP API delivery (`specd serve`, `specd ui serve`). Studio renderer code MUST NOT read this section from disk; it discovers effective auth only via API responses (`GET /v1/project`, `GET /v1/health`).\n\n**`api.auth`** MUST be an object with:\n\n- **`type`** (string, required when `api.auth` is present) — v1 MUST allow only **`disabled`**. Loaders MUST default to `{ type: 'disabled' }` when `api.auth` is omitted.\n- **`config`** (optional object) — reserved for future verifier-specific settings; MUST be ignored when `type` is `disabled`.\n\n**`api.cors`** (optional, separate requirement in `api:middleware-cors`) MAY be documented in the same `api` section in examples; cors behaviour is specified by API specs, not duplicated here.\n\nStartup validation (`Requirement: Startup validation`) MUST reject unknown `api.auth.type` values in v1 with a clear error before the HTTP server listens.\n\nCLI `specd serve` / `specd ui serve` `--auth` MAY override `api.auth.type` for that process only; v1 MUST reject any value other than `disabled`."
+      ]
+    },
+    {
+      "requirement": "UI plugins",
+      "rules": [
+        "`specd.yaml` MAY declare **`plugins.ui`** as an array of `{ name, config? }` entries (same shape as `plugins.agents`). v1 uses the **first** entry as the active Studio UI plugin for `specd ui serve`.\n\nDistribution installs SHOULD use `@specd/plugin-ui-studio` (`hasServer() === false`). Monorepo development MAY use `@specd/studio-web` (`hasServer() === true`)."
+      ]
+    },
+    {
       "requirement": "Logging configuration",
       "rules": [
         "`specd.yaml` MAY declare a `logging` section at the root. This section is OPTIONAL. If omitted, the system SHALL fallback to built-in defaults.\n\n- **`level`** (optional) — sets the minimum log level for the project. Supported values MUST include `trace`, `debug`, `info`, `warn`, `error`, and `silent`. Defaults to `info`."
@@ -1240,6 +1252,40 @@
       "then": ["approvals.signoff is true"]
     },
     {
+      "requirement": "API authentication settings",
+      "name": "Omitted api.auth defaults to disabled",
+      "given": ["specd.yaml has no api section"],
+      "when": ["configuration is loaded for serve"],
+      "then": ["effective api.auth.type is disabled"]
+    },
+    {
+      "requirement": "API authentication settings",
+      "name": "Explicit disabled type is accepted",
+      "given": ["specd.yaml sets api.auth.type: disabled"],
+      "when": ["startup validation runs"],
+      "then": [
+        "configuration loads successfully",
+        "AND createApiServer resolves the disabled verifier"
+      ]
+    },
+    {
+      "requirement": "API authentication settings",
+      "name": "Unknown auth type fails startup validation",
+      "given": ["specd.yaml sets api.auth.type: bearer"],
+      "when": ["startup validation runs before listen"],
+      "then": [
+        "validation fails with an error naming supported v1 types",
+        "AND HTTP server does not start"
+      ]
+    },
+    {
+      "requirement": "UI plugins",
+      "name": "Omitted plugins.ui disables ui serve plugin selection",
+      "given": ["specd.yaml has no plugins.ui"],
+      "when": ["specd ui serve resolves the active UI plugin"],
+      "then": ["it fails with UI_PLUGIN_NOT_CONFIGURED"]
+    },
+    {
       "requirement": "Config writer port",
       "name": "ConfigWriter port defines initProject method",
       "when": ["ConfigWriter interface is inspected"],
@@ -1297,10 +1343,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:fb74e0f7bb929d717b0abb39ab0971a895f3826b56b3e3c0526753c3a33bd645",
-    "verify.md": "sha256:60889d07c358b6ca2922cc1764fa25ffd18010624b0de0dbe23af374e65fea1d"
+    "spec.md": "sha256:648362871ce6dc7956633ef7d5d8e8c1b7362e77605c43111459f69397edb4db",
+    "verify.md": "sha256:f0cd2b32aa3f5536e571454f236d5b9dc585ede9f94dd403d6ddadbacab3990e"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "specd.yaml is the single project-level config file governing schema, workspaces, storage, plugins, and graph settings.",
-  "optimizedContext": "# Project Config\n\n## Rules\n\n- `specd.yaml` MUST be valid YAML. Discovery: `--config` flag → walk up from CWD bounded by git root → CWD only (no git). Within dir: `specd.yaml` → `specd.*.yaml` (alpha) → `specd.local.yaml` → `specd.local.*.yaml` (alpha). Search never above git root.\n- `extends: true` inherits from previous layer. `extends: <path>` only activates when base active in chain. `remove` only valid with `extends`. `remove.root` drops optional top-level fields. `remove.<mapName>` removes map keys. `remove.<arrayName>` removes inherited entries by identity keys. Required fields not removable.\n- Config inheritance uses local structural identity: `context[]` uses optional `id`; `plugins.agents[]` uses `name`; keyed maps use object keys. No AST-wide selectors.\n- `schema` required. Single per project. Prefix: `@scope/name` (npm), `#workspace:name` (workspace), `#name`/bare (default), `./path` (relative), `/abs/path`. Resolution at command dispatch. `--help|init|config validate|plugin` skip resolution.\n- `workspaces` must declare `default`. `root` reserved. Each: `specs` (adapter+path), optional `schemas`, `codeRoot`, `ownership` (`owned|shared|readOnly`), `prefix`.\n- `storage` requires `changes|drafts|discarded|archive` sub-keys with per-key adapter. Unknown adapter → validation error.\n- `contextIncludeSpecs`/`contextExcludeSpecs` at project level (always) and workspace level (when active). Pattern syntax: `*`, `workspace:*`, `prefix/*`, `workspace:prefix/*`, `path/name`, `workspace:path/name`. \n- `contextMode` project-only: `list|summary(default)|full|hybrid`. `lazy` rejected.\n- `context` array injects instructions before spec content. Entry: `{instruction}` or `{file}` or `{id, instruction}` or `{id, file}`. Missing file warns.\n- `approvals.spec` (default `false`) gates `ready→implementing`. `approvals.signoff` (default `false`) gates `done→archivable`.\n- `logging` optional. `level`: `trace|debug|info|warn|error|silent`. Default `info`.\n- `llmOptimizedContext` boolean. Default `false`.\n- `plugins` validated by Zod. `agents?: Array<{name, config?}>`. Unknown types rejected.\n- `privacy` section: `mode` = `hash|mask|anonymous`. `excludeActors` defaults to `[\"specd\", \"system@getspecd.dev\"]`.\n- Env vars override: `SPECD_ACTOR_PROVIDER`, `SPECD_PRIVACY_SALT`, `SPECD_PRIVACY_MODE`.\n- `actorProvider` forces provider selection, bypassing auto-detection.\n- `invalidationPolicy`: `none|surgical|downstream|global`.\n- `configPath` (default `.specd/config`). Derived: `{configPath}/graph`, `{configPath}/tmp`, `{configPath}/tmp/change-locks`.\n- `schemaPlugins` array applies merge layers after base schema extends. Each ref MUST have `kind: schema-plugin`.\n- `schemaOverrides` uses `create|remove|set|append|prepend` operations. Validated structurally at startup.\n- Template variables use `{{namespace.key}}`. Unknown tokens preserved with warning.\n- Project-level `graph`: `includePaths` (glob), `excludePaths` (gitignore). Resources → `root:` namespace when outside workspace `codeRoot`.\n- Workspace `graph`: `respectGitignore` (default true), `allowedPaths` (glob), `excludePaths` (gitignore, replaces built-in defaults).\n- Startup validation rejects: `remove` without `extends`, invalid `extends`, remove required fields, remove nonexistent keys, unresolvable array removal.\n- `ConfigWriter` port: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n\n## Constraints\n\n- Every field validated at load time by Zod schema\n- `privacy.mode=hash` requires salt (config or env) or validation fails\n- Unknown top-level fields rejected by strict Zod schema"
+  "generatedBy": "core"
 }

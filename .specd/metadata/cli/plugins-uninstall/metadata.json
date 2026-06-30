@@ -20,7 +20,13 @@
     {
       "requirement": "Uninstall workflow",
       "rules": [
-        "For each plugin name:\n\n1. The command MUST load the plugin via `LoadPlugin` use case.\n2. The command MUST call the plugin's `uninstall()` method.\n3. The command MUST call `createConfigWriter().removePlugin(configPath, type, name)` to remove from `specd.yaml`.\n\nThe command MUST NOT call `kernel.project.removePlugin`."
+        "For each plugin name:\n\n1. The command MUST load the plugin via `LoadPlugin` use case.\n2. The command MUST call `UninstallPlugin` from `@specd/plugin-manager` (which supports both agent and UI plugins).\n3. The command MUST call `createConfigWriter().removePlugin(configPath, type, name)` where `type` is `agents` for agent plugins and `ui` for UI plugins, determined from the loaded `plugin.type`.\n\nThe command MUST NOT call `kernel.project.removePlugin`.\nThe command MUST NOT remove UI plugin declarations from `plugins.agents`."
+      ]
+    },
+    {
+      "requirement": "UI plugin uninstall bucket",
+      "rules": [
+        "For UI plugins (`plugin.type` `ui`), the command MUST call `createConfigWriter().removePlugin` with bucket `ui`. Agent plugins MUST use bucket `agents`."
       ]
     },
     {
@@ -67,6 +73,17 @@
       ]
     },
     {
+      "requirement": "UI plugin uninstall bucket",
+      "name": "UI plugin removes plugins.ui declaration",
+      "given": ["@specd/plugin-ui-studio is declared under plugins.ui"],
+      "when": ["specd plugins uninstall @specd/plugin-ui-studio is invoked"],
+      "then": [
+        "LoadPlugin determines plugin.type is ui",
+        "AND createConfigWriter().removePlugin is called with bucket ui",
+        "AND the declaration is removed from plugins.ui in specd.yaml"
+      ]
+    },
+    {
       "requirement": "Output",
       "name": "Machine-parseable JSON output",
       "when": ["specd plugins uninstall @specd/plugin-agent-claude --format json is invoked"],
@@ -84,13 +101,18 @@
       {
         "specId": "cli:plugins-uninstall",
         "file": "cli:src/commands/plugins/uninstall.ts",
-        "symbol": "registerPluginsUninstall"
+        "symbol": "uninstallPluginsWithKernel"
+      },
+      {
+        "specId": "cli:plugins-uninstall",
+        "file": "cli:src/commands/plugins/plugin-bucket.ts",
+        "symbol": "toPluginBucket"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2c0cda8891c1da7f55bcf6daba0f4faeb87b495c362c1d538bff46ac1ed35878",
-    "verify.md": "sha256:a8f01c91c4a04fe2f45b2f5a00c3951dd533adede5cf47907466ca9a2c8693e3"
+    "spec.md": "sha256:0fee0e1b1b85a4fd621c70636b5a13040ea197951bab60a5e351cbdc5412be6b",
+    "verify.md": "sha256:b3dacf3b40912fc75823bb999f66471309c2df5bf7bf680f96ec98ace1cda09c"
   },
   "generatedBy": "core"
 }

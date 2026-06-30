@@ -257,6 +257,19 @@ describe('plugins list/show/uninstall', () => {
     expect(parsed.capabilities).toContain('install')
   })
 
+  it('uninstalls ui plugin and removes plugins.ui declaration', async () => {
+    setup()
+    const program = makeProgram()
+    registerPluginsUninstall(program.command('plugins'))
+    await program.parseAsync(['node', 'specd', 'plugins', 'uninstall', '@specd/plugin-ui-studio'])
+
+    expect(mockRemovePlugin).toHaveBeenCalledWith(
+      '/project/specd.yaml',
+      'ui',
+      '@specd/plugin-ui-studio',
+    )
+  })
+
   it('uninstalls plugin and removes declaration', async () => {
     setup()
     const program = makeProgram()

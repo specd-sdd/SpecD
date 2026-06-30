@@ -5,13 +5,13 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { getDeclaredPlugins } from './get-declared-plugins.js'
+import { toPluginBucket } from './plugin-bucket.js'
 import {
   InstallPlugin,
   InstallUiPlugin,
   LoadPlugin,
   createPluginLoader,
   type InstallPluginOutput,
-  type PluginType,
 } from '@specd/plugin-manager'
 
 /**
@@ -171,21 +171,6 @@ function renderInstallOutput(result: PluginInstallBatchResult, format: OutputFor
     return
   }
   output(result, format)
-}
-
-/**
- * Maps a plugin runtime type to the config bucket key.
- *
- * @param pluginType - Runtime plugin type.
- * @returns Config bucket name under `plugins`.
- */
-function toPluginBucket(pluginType: PluginType): string {
-  switch (pluginType) {
-    case 'agent':
-      return 'agents'
-    case 'ui':
-      return 'ui'
-  }
 }
 
 /**
