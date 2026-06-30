@@ -4,24 +4,11 @@
 
 ### Requirement: one kernel per open local project
 
-#### Scenario: Opening folder constructs kernel
+#### Scenario: Local open uses createSdkContext
 
-- **WHEN** user opens directory with `specd.yaml`
-- **THEN** main process creates one `Kernel`
-- **AND** IPC serves port methods
-
-#### Scenario: Second open reuses until switch
-
-- **GIVEN** project already open
-- **WHEN** user triggers refresh
-- **THEN** same kernel instance serves requests
-- **AND** no duplicate kernels
-
-#### Scenario: Invalid folder shows error
-
-- **WHEN** user picks directory without `specd.yaml`
-- **THEN** open is rejected
-- **AND** no kernel is created
+- **WHEN** the user opens a local project directory
+- **THEN** the main process awaits `createSdkContext` from `@specd/sdk` once for that project root
+- **AND** it does not call `createKernel` from `@specd/core` directly
 
 ### Requirement: project switch tears down kernel and graph state
 
@@ -73,6 +60,22 @@
 - **WHEN** CLI and API package dependencies are inspected
 - **THEN** they depend on `@specd/code-graph`
 - **AND** they do not depend on `@specd/code-graph-electron`
+
+### Requirement: desktop main process launches as Electron
+
+#### Scenario: start clears ELECTRON_RUN_AS_NODE
+
+- **WHEN** `pnpm start` runs in `apps/specd-studio-desktop`
+- **THEN** the spawned Electron process can access `app.whenReady`
+- **AND** `require('electron')` in the main bundle is not the npm CLI path string
+
+### Requirement: main process entry is bundled for pnpm and Electron
+
+#### Scenario: main entry uses bundled CJS artifact
+
+- **WHEN** inspecting `apps/specd-studio-desktop/package.json` after build
+- **THEN** `main` is `dist/main/index.cjs`
+- **AND** `tsup` externalises `electron`, `@specd/code-graph-electron`, `@specd/sdk`, and `@specd/client`
 
 ### Requirement: desktop kernel configures plain-text logs
 

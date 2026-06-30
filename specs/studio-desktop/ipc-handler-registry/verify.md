@@ -42,6 +42,15 @@
 - **THEN** failure envelope returned to renderer
 - **AND** stack not leaked raw
 
+### Requirement: SDK kernel access in IPC handlers
+
+#### Scenario: IPC handler uses SDK-bootstrapped kernel
+
+- **GIVEN** a local desktop project is open
+- **WHEN** an IPC handler executes a `SpecdDataPort` operation
+- **THEN** it invokes use cases on the kernel from the SDK host context
+- **AND** it does not construct a separate kernel in the handler
+
 ### Requirement: graph IPC methods use the Electron graph runtime
 
 #### Scenario: Local graph IPC uses the Electron graph provider package

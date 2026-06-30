@@ -1,9 +1,9 @@
 {
   "title": "Main Window Manager",
-  "description": "Electron desktop host concern — **Main Window Manager**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer.",
+  "description": "Electron desktop host concern — **Main Window Manager**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer.",
   "dependsOn": ["client:specd-data-port"],
   "context": [
-    "Electron desktop host concern — **Main Window Manager**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer."
+    "Electron desktop host concern — **Main Window Manager**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer."
   ],
   "rules": [
     {
@@ -111,7 +111,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b39dddae61d1cd316f163a3818937dca1c77aad53950935e55a638c97803353f",
+    "spec.md": "sha256:e8a1a1c3f1b2281136335e4b8537956b7e3092bc28035effbc4ca91be756618c",
     "verify.md": "sha256:91282630a1c2b1033bec9cdd928b2d041d0c3f7ba78ca9d193658bc663377e69"
   },
   "generatedBy": "core"

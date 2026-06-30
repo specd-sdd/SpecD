@@ -54,6 +54,7 @@ This includes wildcard params, canonical artifact reads, context queries, `GET /
 
 ## Constraints
 
+- `@specd/api` delivery and composition code MUST import host bootstrap and kernel types from `@specd/sdk`, not `@specd/core` or `@specd/code-graph` directly.
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
 - Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.

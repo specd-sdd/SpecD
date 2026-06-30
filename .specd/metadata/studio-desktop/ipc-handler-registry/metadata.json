@@ -1,20 +1,26 @@
 {
   "title": "Ipc Handler Registry",
-  "description": "Electron desktop host concern — **Ipc Handler Registry**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP.",
-  "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope"],
+  "description": "Electron desktop host concern — **Ipc Handler Registry**. Local mode uses an SDK-bootstrapped kernel in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP.",
+  "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope", "sdk:host-context"],
   "context": [
-    "Electron desktop host concern — **Ipc Handler Registry**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP."
+    "Electron desktop host concern — **Ipc Handler Registry**. Local mode uses an SDK-bootstrapped kernel in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP."
   ],
   "rules": [
     {
       "requirement": "IPC handlers mirror SpecdDataPort operations",
       "rules": [
-        "Each handler MUST call the same kernel use cases as the HTTP API would for the equivalent port method (no duplicated business rules in the renderer).\n\nv1 local desktop MUST implement draft-aware port methods `previewChangeDraft`, `outlineChangeArtifact`, and `outlineSpecDraft` via the same kernel use cases as `POST` preview/outline routes."
+        "Each handler MUST call the same kernel use cases as the HTTP API would for the equivalent port method (no duplicated business rules in the renderer). Kernel access MUST go through the process-scoped SDK host context created by `createSdkContext`.\n\nv1 local desktop MUST implement draft-aware port methods `previewChangeDraft`, `outlineChangeArtifact`, and `outlineSpecDraft` via the same kernel use cases as `POST` preview/outline routes."
       ]
     },
     {
       "requirement": "handlers use ipc-message-envelope",
       "rules": ["Request/response serialization MUST follow `client:ipc-message-envelope`."]
+    },
+    {
+      "requirement": "SDK kernel access in IPC handlers",
+      "rules": [
+        "IPC handlers MUST invoke kernel use cases on the process-scoped kernel from `createSdkContext`. They MUST NOT construct a separate kernel per handler invocation."
+      ]
     },
     {
       "requirement": "graph IPC methods use the Electron graph runtime",
@@ -61,6 +67,16 @@
       "then": ["failure envelope returned to renderer", "AND stack not leaked raw"]
     },
     {
+      "requirement": "SDK kernel access in IPC handlers",
+      "name": "IPC handler uses SDK-bootstrapped kernel",
+      "given": ["a local desktop project is open"],
+      "when": ["an IPC handler executes a SpecdDataPort operation"],
+      "then": [
+        "it invokes use cases on the kernel from the SDK host context",
+        "AND it does not construct a separate kernel in the handler"
+      ]
+    },
+    {
       "requirement": "graph IPC methods use the Electron graph runtime",
       "name": "Local graph IPC uses the Electron graph provider package",
       "when": [
@@ -87,11 +103,18 @@
         "specId": "studio-desktop:ipc-handler-registry",
         "file": "studio-desktop:src/main/index.ts"
       }
+    ],
+    "symbols": [
+      {
+        "specId": "studio-desktop:ipc-handler-registry",
+        "file": "studio-desktop:src/main/ipc-handlers.ts",
+        "symbol": "dispatchIpc"
+      }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:872d364ba1e7bcd3e3a0e753432220ef7ce1ac2ab5a4a1df068dad9515c18321",
-    "verify.md": "sha256:f129d23653ef58a97a7438d0f2834033942a846b7c928f8f1c48be3735c2b6bf"
+    "spec.md": "sha256:8e9a782f563a188af5ebe672df21ef3eef67e9ee3d139d9b7d34e0badadd34d4",
+    "verify.md": "sha256:3e40bab283f38198c29809e645f607b5a9b0a7186788bc294ddc59e463637a93"
   },
   "generatedBy": "core"
 }

@@ -7,10 +7,10 @@
     "default:_global/architecture",
     "default:_global/conventions",
     "api:routes-changes-read",
-    "core:kernel",
     "core:get-change-artifact",
     "core:get-read-only-change-artifact",
-    "core:get-status"
+    "core:get-status",
+    "sdk:composition"
   ],
   "implementation": [
     {

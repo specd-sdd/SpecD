@@ -3,6 +3,19 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["client:specd-data-port"],
-  "implementation": []
+  "dependsOn": ["client:specd-data-port", "sdk:host-context"],
+  "implementation": [
+    {
+      "file": "studio-desktop:src/main/index.ts"
+    },
+    {
+      "file": "studio-desktop:package.json"
+    },
+    {
+      "file": "studio-desktop:tsup.main.config.ts"
+    },
+    {
+      "file": "studio-desktop:test/desktop-graph-runtime.spec.ts"
+    }
+  ]
 }

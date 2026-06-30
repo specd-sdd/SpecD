@@ -3,11 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "sdk:host-context"],
   "implementation": [
     {
       "file": "api:src/composition/create-api-context.ts",
-      "symbols": ["ApiContext", "ApiServerState", "createApiContext"]
+      "symbols": ["createApiContext", "ApiContext", "ApiServerState"]
     }
   ]
 }

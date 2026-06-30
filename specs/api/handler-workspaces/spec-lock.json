@@ -6,8 +6,8 @@
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "api:routes-workspaces",
-    "core:kernel"
+    "sdk:composition",
+    "api:routes-workspaces"
   ],
   "implementation": [
     {

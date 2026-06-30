@@ -42,6 +42,7 @@ stable section order without transport-specific normalization.
 
 ## Constraints
 
+- `@specd/ui` and `@specd/client` MUST NOT import `@specd/core` or `@specd/sdk` for kernel bootstrap.
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
 - Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.

@@ -1,14 +1,14 @@
 {
   "title": "Handler Workspaces",
-  "description": "HTTP handlers for **workspaces** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Workspaces**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "description": "HTTP handlers for **workspaces** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.",
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "api:routes-workspaces",
-    "core:kernel"
+    "sdk:composition",
+    "api:routes-workspaces"
   ],
   "context": [
-    "HTTP handlers for **workspaces** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Workspaces**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+    "HTTP handlers for **workspaces** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module."
   ],
   "rules": [
     {
@@ -20,7 +20,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `ListWorkspaces`\n- `ListSpecs`\n- `kernel.specs.get`\n- `kernel.specs.getOutline`\n- `kernel.specs.getContext`\n- `kernel.specs.search`"
+        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel`, including:\n\n- `ListWorkspaces`\n- `ListSpecs`\n- `kernel.specs.get`\n- `kernel.specs.getOutline`\n- `kernel.specs.getContext`\n- `kernel.specs.search`"
       ]
     },
     {
@@ -40,9 +40,16 @@
       "rules": [
         "`GET /v1/workspaces` MUST preserve the declaration order produced by `ListWorkspaces`. Any optional descriptor enrichment from `SpecdConfig` MUST be joined onto those orchestrated rows without re-sorting or filtering them."
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "rules": [
+        "Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly."
+      ]
     }
   ],
   "constraints": [
+    "Handler modules MUST import kernel types and use-case entry points from @specd/sdk, not @specd/core directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -160,6 +167,15 @@
         "kernel read use case still succeeds",
         "AND no history event is written for the call"
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "name": "Handler imports kernel surface from SDK",
+      "when": ["inspecting handler-workspaces module imports"],
+      "then": [
+        "kernel types and errors are imported from @specd/sdk",
+        "AND @specd/core is not imported directly"
+      ]
     }
   ],
   "implementation": {
@@ -172,8 +188,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ff8b6107b3795d8603486661423e20929463ef8893622a12a87ba2cebb324953",
-    "verify.md": "sha256:c0f28b4d856388e826c6de5138029f49a1c3aaaa03eacbd390c8bd5a9166607a"
+    "spec.md": "sha256:6d7e0ac6acb64b198a9321e915b2771e565fbd35f1460bc50b3810930f488962",
+    "verify.md": "sha256:7f213f2092bf8901c31fb7976ce26e28d36d8fda0d6e6ccd7d27dd6a8aa7c554"
   },
   "generatedBy": "core"
 }

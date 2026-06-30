@@ -1,9 +1,9 @@
 {
   "title": "Bottom Panel Terminal",
-  "description": "Electron desktop host concern — **Bottom Panel Terminal**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel.",
+  "description": "Electron desktop host concern — **Bottom Panel Terminal**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel.",
   "dependsOn": ["client:specd-data-port"],
   "context": [
-    "Electron desktop host concern — **Bottom Panel Terminal**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel."
+    "Electron desktop host concern — **Bottom Panel Terminal**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel."
   ],
   "rules": [
     {
@@ -37,7 +37,7 @@
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:8da19c88afcdb047f04d46fe4b383c3a45f4b4930133656dac1905403dcf2a0a",
+    "spec.md": "sha256:d324eec28ba41e1842c1e9c25938471afee4c438ea75ee672939d602ebfe8787",
     "verify.md": "sha256:57802f58341226dcb7b18c9947d66931b683d1da06a207f1d449e80acbdd1164"
   },
   "generatedBy": "core"

@@ -15,7 +15,7 @@
     {
       "requirement": "presenter does not encode business rules",
       "rules": [
-        "The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in `@specd/core` use cases."
+        "The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in core use cases invoked via the SDK kernel surface."
       ]
     }
   ],
@@ -83,7 +83,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:04653be8f9a4f96ab4bdba2d4db75e9fc4889637744ac02492e6219255d5a07a",
+    "spec.md": "sha256:fa6dc6d688c363ff948542e5b9ffb546fdad825ab89ef655fd8cec69ac45bbaa",
     "verify.md": "sha256:10794a3f6afb66038154918967dbd9d5f7204a6dd56c296543e782475c970f60"
   },
   "generatedBy": "core"

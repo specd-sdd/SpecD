@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture", "api:dto-implementation-review"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "client:src/dto/implementation-tracking.ts",
+      "symbols": ["ImplementationReviewDto", "ImplementationTrackingDto"]
+    }
+  ]
 }

@@ -1,9 +1,9 @@
 {
   "title": "Routes Graph",
-  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Graph** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP contract for code-graph operations via `createCodeGraphProvider` (not CLI/MCP).",
+  "description": "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Graph** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP contract for code-graph operations via the SDK host graph factory (`apiContext.createGraphProvider`, `runIndexProjectGraph`) — not CLI/MCP.",
   "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
   "context": [
-    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Graph** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP contract for code-graph operations via `createCodeGraphProvider` (not CLI/MCP)."
+    "Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Graph** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP contract for code-graph operations via the SDK host graph factory (`apiContext.createGraphProvider`, `runIndexProjectGraph`) — not CLI/MCP."
   ],
   "rules": [
     {
@@ -15,13 +15,13 @@
     {
       "requirement": "POST graph index rebuilds the code graph index",
       "rules": [
-        "`POST /v1/graph/index` MUST trigger reindex via `createCodeGraphProvider`. v1 MAY block until completion; async job ids are deferred.\n\nIndexing MUST rebuild the full project graph, not a workspace-scoped subset, so cross-workspace spec-to-symbol and symbol-to-symbol links remain globally consistent.\n\nWhen the request body includes `force: true`, the handler MUST recreate persistent graph storage before indexing so the run starts from an empty graph. The response MUST return the graph provider's indexing summary DTO, including per-workspace breakdown.\n\n`POST /v1/graph/index` MUST accept only the documented body shape `{ force?: boolean }`. Unknown properties such as `workspaces` MUST be rejected with HTTP 400 `application/problem+json` and code `INVALID_REQUEST`."
+        "`POST /v1/graph/index` MUST trigger reindex via `runIndexProjectGraph` from `@specd/sdk` (using the process-scoped SDK host context). v1 MAY block until completion; async job ids are deferred.\n\nIndexing MUST rebuild the full project graph, not a workspace-scoped subset, so cross-workspace spec-to-symbol and symbol-to-symbol links remain globally consistent.\n\nWhen the request body includes `force: true`, the handler MUST recreate persistent graph storage before indexing so the run starts from an empty graph. The response MUST return the graph provider's indexing summary DTO, including per-workspace breakdown.\n\n`POST /v1/graph/index` MUST accept only the documented body shape `{ force?: boolean }`. Unknown properties such as `workspaces` MUST be rejected with HTTP 400 `application/problem+json` and code `INVALID_REQUEST`."
       ]
     },
     {
       "requirement": "graph index preparation mirrors the CLI assembly flow",
       "rules": [
-        "Before invoking the provider index operation, the API MUST assemble index input the same way the current CLI does:\n\n- obtain orchestrated workspaces from `kernel.project.listWorkspaces.execute()`\n- derive effective graph config from project `SpecdConfig`\n- pass that assembled project-level input into the code-graph provider\n\nThe API MUST NOT maintain a separate legacy workspace-target bootstrap path that can drift from CLI behavior."
+        "Before invoking the provider index operation, the API MUST assemble index input through `runIndexProjectGraph` from `@specd/sdk`, which mirrors the CLI assembly flow:\n\n- obtain orchestrated workspaces from `kernel.project.listWorkspaces.execute()`\n- derive effective graph config from project `SpecdConfig`\n- pass that assembled project-level input into the code-graph provider\n\nThe API MUST NOT maintain a separate legacy workspace-target bootstrap path that can drift from CLI behavior."
       ]
     },
     {
@@ -44,6 +44,7 @@
     }
   ],
   "constraints": [
+    "@specd/api delivery and composition code MUST import host bootstrap and kernel types from @specd/sdk, not @specd/core or @specd/code-graph directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -220,7 +221,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:fb69c65bb9b659b0039e7a55d2d619aa01320803beb48119b31baa029683259a",
+    "spec.md": "sha256:5d2002d9497af4ffc763ca87b2914f76d6109873552e3e411a69837f42f05f5a",
     "verify.md": "sha256:b971d3e13baa1ceaffc9a174ba85981f80a412394d2564cef9e9ca293ef0c1d3"
   },
   "generatedBy": "core"

@@ -126,3 +126,11 @@
 - **WHEN** each mutation runs through the same context
 - **THEN** the same `actor` is passed to every mutating call
 - **AND** history entries share the same `by`
+
+### Requirement: SDK delivery imports
+
+#### Scenario: Handler imports kernel surface from SDK
+
+- **WHEN** inspecting `handler-specs-mutate` module imports
+- **THEN** kernel types and errors are imported from `@specd/sdk`
+- **AND** `@specd/core` is not imported directly

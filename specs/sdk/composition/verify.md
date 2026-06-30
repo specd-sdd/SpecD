@@ -51,16 +51,17 @@
 
 ### Requirement: Import policy for integrators
 
-#### Scenario: CLI has no direct core dependency
+#### Scenario: API package depends on SDK only
 
-- **WHEN** `packages/cli/package.json` runtime dependencies are inspected
-- **THEN** only `@specd/sdk` is listed among specd platform packages
+- **WHEN** inspecting `packages/api/package.json` runtime dependencies
+- **THEN** `@specd/sdk` is declared
+- **AND** `@specd/core` and `@specd/code-graph` are not direct runtime dependencies
 
-#### Scenario: Plugin may depend on core directly
+#### Scenario: Desktop main depends on SDK for kernel bootstrap
 
-- **WHEN** `packages/plugin-manager/package.json` runtime dependencies are inspected
-- **THEN** `@specd/core` may be present
-- **AND** `@specd/sdk` is not required
+- **WHEN** inspecting `apps/specd-studio-desktop` main-process imports for kernel construction
+- **THEN** bootstrap uses `@specd/sdk`
+- **AND** `@specd/core` is not imported directly for host wiring
 
 ### Requirement: Version constant
 

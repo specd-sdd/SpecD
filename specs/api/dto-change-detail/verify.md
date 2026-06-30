@@ -59,7 +59,7 @@
 
 #### Scenario: history events are extensible per event type — primary path
 
-- **WHEN** Each history[] element MUST include type, at, and
+- **WHEN** Each history\[] element MUST include type, at, and
 - **THEN** behaviour matches the spec requirement
 - **AND** no forbidden side effects occur
 

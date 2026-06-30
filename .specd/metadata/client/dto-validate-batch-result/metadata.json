@@ -44,7 +44,15 @@
       "then": ["errors or skips are explicit and documented"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:dto-validate-batch-result",
+        "file": "client:src/dto/validate-batch-result.ts",
+        "symbol": "ValidateBatchResultDto"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:c15dd2d8ae0eec95eb9f0f343381b839f3f58f17e0b9c261187f5aa8cf833cab",
     "verify.md": "sha256:93110e014af7a6e11eb208fd77db8a839442e1ea74dbb83f06d7e03642e2bb72"

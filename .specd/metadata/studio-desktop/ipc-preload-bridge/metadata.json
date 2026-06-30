@@ -1,9 +1,9 @@
 {
   "title": "Ipc Preload Bridge",
-  "description": "Electron desktop host concern — **Ipc Preload Bridge**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`.",
+  "description": "Electron desktop host concern — **Ipc Preload Bridge**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`.",
   "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope"],
   "context": [
-    "Electron desktop host concern — **Ipc Preload Bridge**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`."
+    "Electron desktop host concern — **Ipc Preload Bridge**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`."
   ],
   "rules": [
     {
@@ -72,7 +72,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:248fe6598867d8ab83674d8063c5e7f5a4f2148903d70a79e25abef91a7a8e98",
+    "spec.md": "sha256:1ef61e97dfe6088f1a6f4163c5e07f72b5fc73c0d445f9a22bc2677cc54ec271",
     "verify.md": "sha256:19b455cfc18dda85697cadddc8cabe8262e8fd450c93d12a9e2700f6bdd21f23"
   },
   "generatedBy": "core"

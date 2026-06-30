@@ -1,0 +1,37 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: SIGINT triggers graceful shutdown'
+  content: |
+    ### Requirement: bootstrap uses createApiServer SDK wiring
+
+    Process startup MUST delegate kernel and graph bootstrap to `api:composition-create-api-server`, which in turn MUST use `createSdkContext` from `@specd/sdk`. This spec does not define an alternate `createKernel` entry point.
+
+- op: modified
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    ## Constraints
+
+    - Server bootstrap MUST NOT call `createKernel` from `@specd/core` directly.
+    - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
+    - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
+    - Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.
+    - There is no `GET /changes/{name}/validation` resource; use `GET .../status` and `POST .../validate`.
+    - Canonical workspace spec artifacts are read-only in Studio v1.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    ## Spec Dependencies
+
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
+    - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+    - [`api:composition-create-api-server`](../composition-create-api-server/spec.md) — SDK-backed server factory

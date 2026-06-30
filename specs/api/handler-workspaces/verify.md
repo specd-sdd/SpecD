@@ -98,3 +98,11 @@
 - **WHEN** handler serves a read-only GET that does not write history
 - **THEN** kernel read use case still succeeds
 - **AND** no history event is written for the call
+
+### Requirement: SDK delivery imports
+
+#### Scenario: Handler imports kernel surface from SDK
+
+- **WHEN** inspecting `handler-workspaces` module imports
+- **THEN** kernel types and errors are imported from `@specd/sdk`
+- **AND** `@specd/core` is not imported directly

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Electron desktop host concern — **Bottom Panel Terminal**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel.
+Electron desktop host concern — **Bottom Panel Terminal**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Optional integrated terminal (xterm + node-pty) in the desktop bottom panel.
 
 ## Requirements
 

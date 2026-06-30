@@ -6,7 +6,9 @@
     "default:_global/conventions",
     "api:auth-adapter-registry",
     "api:middleware-auth",
-    "core:kernel"
+    "core:kernel",
+    "sdk:host-context",
+    "sdk:composition"
   ],
   "context": [
     "SpecD Studio and `specd serve` need one factory that turns a discovered project into a listening HTTP server without reimplementing CLI workflow rules. `createApiServer` loads `api.auth` from `specd.yaml`, resolves the auth adapter once at startup, constructs a single process-scoped `Kernel`, registers all Studio routes under `/v1`, and can optionally mount the built `@specd/ui` bundle for embedded `specd ui serve`."
@@ -27,7 +29,7 @@
     {
       "requirement": "one kernel per process with per-request context",
       "rules": [
-        "The factory MUST call `createKernel` once per process with a `LogRingBuffer` (callback destination) and build per-request context via `createApiContext`.\n\nThe kernel MUST receive `logFormatter: createLogFormatter({ colorize: false })` so Studio log readback (`GET /v1/logs?prettier=true`) returns plain text without ANSI escape sequences."
+        "The factory MUST call `createSdkContext` from `@specd/sdk` once per process with a `LogRingBuffer` (callback destination) and build per-request context via `createApiContext`.\n\nProcess-scoped state (`ApiServerState`) MUST include the `SdkHostContext` fields (`kernel`, `createGraphProvider`), resolved `SpecdConfig`, kernel actor resolver, and effective auth type.\n\nThe SDK context MUST receive `logFormatter: createLogFormatter({ colorize: false })` so Studio log readback (`GET /v1/logs?prettier=true`) returns plain text without ANSI escape sequences."
       ]
     },
     {
@@ -44,6 +46,7 @@
     }
   ],
   "constraints": [
+    "@specd/api composition and delivery code MUST import host bootstrap and kernel types from @specd/sdk, not @specd/core or @specd/code-graph directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -92,21 +95,18 @@
     },
     {
       "requirement": "one kernel per process with per-request context",
-      "name": "Single kernel shared across requests",
-      "when": ["two HTTP requests hit running server"],
-      "then": ["same Kernel instance", "AND separate createApiContext per request"]
+      "name": "createApiServer uses createSdkContext",
+      "when": ["createApiServer is called for a project root"],
+      "then": [
+        "it awaits createSdkContext from @specd/sdk exactly once per process",
+        "AND createApiContext builds per-request context from the resulting ApiServerState"
+      ]
     },
     {
       "requirement": "one kernel per process with per-request context",
-      "name": "Context includes graph provider factory",
-      "when": ["handler calls createGraphProvider()"],
-      "then": ["factory closes over project config", "AND graph routes use provider"]
-    },
-    {
-      "requirement": "one kernel per process with per-request context",
-      "name": "Process exit closes server",
-      "when": ["SIGINT received"],
-      "then": ["server stops accepting connections", "AND kernel teardown is bounded"]
+      "name": "Log formatter disables ANSI for API readback",
+      "when": ["the API kernel boots"],
+      "then": ["createSdkContext receives logFormatter: createLogFormatter({ colorize: false })"]
     },
     {
       "requirement": "all API routes mount under /v1",
@@ -151,23 +151,23 @@
       {
         "specId": "api:composition-create-api-server",
         "file": "api:src/composition/create-api-server.ts",
+        "symbol": "createApiServer"
+      },
+      {
+        "specId": "api:composition-create-api-server",
+        "file": "api:src/composition/create-api-server.ts",
         "symbol": "CreateApiServerOptions"
       },
       {
         "specId": "api:composition-create-api-server",
         "file": "api:src/composition/create-api-server.ts",
         "symbol": "ApiServer"
-      },
-      {
-        "specId": "api:composition-create-api-server",
-        "file": "api:src/composition/create-api-server.ts",
-        "symbol": "createApiServer"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3c0396777f99607dfc1880e9c8678e456a48f9e6b62d5013834d25f73ead744d",
-    "verify.md": "sha256:d91ea960935f4d30d21c2ec60870f7d8a1e8c8a3c463efff66bf62c1f2061b53"
+    "spec.md": "sha256:5d94bf8e80ac0110c5e74c3517611ee08341e7128506b5e748c0148f1d1da2ac",
+    "verify.md": "sha256:04f64d75a862f785cb8087f84764bda39eaf2df53702e12b0f8e6c69e362d169"
   },
   "generatedBy": "core"
 }

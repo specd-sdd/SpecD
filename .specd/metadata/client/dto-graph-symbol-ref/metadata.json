@@ -20,9 +20,10 @@
     }
   ],
   "constraints": [
+    "@specd/ui and @specd/client MUST NOT import @specd/core or @specd/sdk for kernel bootstrap.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
-    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only\ndisabled; no server-side Bearer enforcement on loopback or specd ui serve.",
-    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw\nChangeRepository.saveArtifact from HTTP handlers.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw",
     "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
     "Canonical workspace spec artifacts are read-only in Studio v1."
   ],
@@ -50,9 +51,17 @@
       "then": ["DTO definitions have single source", "AND no duplicated interface copies"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:dto-graph-symbol-ref",
+        "file": "client:src/dto/graph-symbol-ref.ts",
+        "symbol": "GraphSymbolRefDto"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:89b8bd7015fa9f03d1c188bd45879f54d82041c44703a5e1f7c4b1b773ab0a88",
+    "spec.md": "sha256:fe5d0708172828aa2c457e436ca50ac980f0b37c33d53ab842810a4dab021dd2",
     "verify.md": "sha256:0550f6856b2a4a0fee74f2aa05e17205b9e7bd39ea4901c7f25c7ee3648428aa"
   },
   "generatedBy": "core"

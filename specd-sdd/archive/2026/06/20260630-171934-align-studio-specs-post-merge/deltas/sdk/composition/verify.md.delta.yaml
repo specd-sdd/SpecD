@@ -1,0 +1,18 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Import policy for integrators'
+  content: |
+    ### Requirement: Import policy for integrators
+
+    #### Scenario: API package depends on SDK only
+
+    - **WHEN** inspecting `packages/api/package.json` runtime dependencies
+    - **THEN** `@specd/sdk` is declared
+    - **AND** `@specd/core` and `@specd/code-graph` are not direct runtime dependencies
+
+    #### Scenario: Desktop main depends on SDK for kernel bootstrap
+
+    - **WHEN** inspecting `apps/specd-studio-desktop` main-process imports for kernel construction
+    - **THEN** bootstrap uses `@specd/sdk`
+    - **AND** `@specd/core` is not imported directly for host wiring

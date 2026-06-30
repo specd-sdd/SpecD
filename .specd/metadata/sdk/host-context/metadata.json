@@ -29,6 +29,12 @@
       "rules": [
         "Host context bootstrap MUST NOT perform config file writes. `initProject`, `addPlugin`, and `removePlugin` remain on `createConfigWriter()` — not on `SdkHostContext` or `kernel.project`."
       ]
+    },
+    {
+      "requirement": "Studio host bootstrap",
+      "rules": [
+        "`@specd/api` and the Electron desktop main process MUST obtain their process-scoped kernel and `createGraphProvider` factory through `createSdkContext` (or `openSpecdHost`) from `@specd/sdk`.\n\nAPI server state (`ApiServerState`) and per-request API context (`ApiContext`) MAY extend `SdkHostContext` with host-specific fields (for example resolved `SpecdConfig`, auth type, and request actor) but MUST NOT construct a parallel kernel or graph provider outside the SDK bootstrap path."
+      ]
     }
   ],
   "scenarios": [
@@ -91,10 +97,34 @@
       "name": "Host context has no write methods",
       "when": ["inspecting SdkHostContext type exports"],
       "then": ["no initProject, addPlugin, or removePlugin methods exist on the context"]
+    },
+    {
+      "requirement": "Studio host bootstrap",
+      "name": "API server bootstraps via createSdkContext",
+      "when": ["createApiServer starts for a project"],
+      "then": [
+        "it calls createSdkContext from @specd/sdk once per process",
+        "AND per-request context is built from the resulting SdkHostContext"
+      ]
+    },
+    {
+      "requirement": "Studio host bootstrap",
+      "name": "Desktop main bootstraps local project via createSdkContext",
+      "given": ["the user opens a local project folder in desktop"],
+      "when": ["the main process constructs the project kernel"],
+      "then": [
+        "it uses createSdkContext from @specd/sdk",
+        "AND it does not call createKernel from @specd/core directly"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "createSdkContext"
+      },
       {
         "specId": "sdk:host-context",
         "file": "sdk:src/composition/host-context.ts",
@@ -113,18 +143,13 @@
       {
         "specId": "sdk:host-context",
         "file": "sdk:src/composition/host-context.ts",
-        "symbol": "createSdkContext"
-      },
-      {
-        "specId": "sdk:host-context",
-        "file": "sdk:src/composition/host-context.ts",
         "symbol": "openSpecdHost"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:48e79364c95b23745eab683e8f3099a03395033bc7bbe3729393372c7889343c",
-    "verify.md": "sha256:c7e0419cbf443319bea2d3035534c6bfe769d46cd0d7f08d44e6845c002aa9a4"
+    "spec.md": "sha256:fe53a95437603360c6da7d5659ade1001639a073eb535c5e635adf4f5c43df85",
+    "verify.md": "sha256:25b9675238b3d51b6d4e3c0165ab88ca6a7753428856c44010732772fa2add60"
   },
   "generatedBy": "core"
 }

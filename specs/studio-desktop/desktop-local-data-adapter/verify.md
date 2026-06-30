@@ -4,23 +4,11 @@
 
 ### Requirement: local adapter is selected for opened project folders
 
-#### Scenario: Open folder switches renderer to IPC adapter
+#### Scenario: Renderer uses IPC adapter for local profile
 
-- **WHEN** user opens local project via welcome
-- **THEN** `SpecdDataPort` uses IPC implementation
-- **AND** remote HTTP adapter not active
-
-#### Scenario: Remote connect keeps HTTP adapter
-
-- **WHEN** user connects to remote URL
-- **THEN** HTTP transport selected
-- **AND** IPC adapter not used for data
-
-#### Scenario: Profile switch swaps adapter instance
-
-- **WHEN** user moves from local to remote profile
-- **THEN** hooks rebind to new adapter
-- **AND** port interface unchanged
+- **WHEN** the user opens a local project in desktop
+- **THEN** the renderer uses this adapter instead of `adapter-remote-specd-data`
+- **AND** the adapter does not bootstrap a kernel — it calls IPC only
 
 ### Requirement: local adapter does not attach Authorization headers
 
@@ -43,3 +31,11 @@
 - **WHEN** HTTP transport runs
 - **THEN** Authorization header present
 - **AND** local and remote paths differ by design
+
+### Requirement: renderer does not bootstrap kernel
+
+#### Scenario: Adapter does not call createSdkContext
+
+- **WHEN** the renderer uses the local data adapter
+- **THEN** it issues IPC calls only
+- **AND** it does not import `createSdkContext` or `createKernel`

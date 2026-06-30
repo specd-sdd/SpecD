@@ -8,10 +8,10 @@
     {
       "file": "sdk:src/composition/host-context.ts",
       "symbols": [
+        "createSdkContext",
         "SdkHostContext",
         "OpenSpecdHostInput",
         "OpenSpecdHostResult",
-        "createSdkContext",
         "openSpecdHost"
       ]
     }

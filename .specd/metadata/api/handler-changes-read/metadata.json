@@ -1,17 +1,17 @@
 {
   "title": "Handler Changes Read",
-  "description": "HTTP handlers for **changes read** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Changes Read**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "description": "HTTP handlers for **changes read** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.",
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
     "api:routes-changes-read",
-    "core:kernel",
     "core:get-change-artifact",
     "core:get-read-only-change-artifact",
-    "core:get-status"
+    "core:get-status",
+    "sdk:composition"
   ],
   "context": [
-    "HTTP handlers for **changes read** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Changes Read**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+    "HTTP handlers for **changes read** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module."
   ],
   "rules": [
     {
@@ -23,7 +23,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `GetStatus` (with optional `ifModifiedSince`)\n- `GetChangeArtifact`\n- `GetReadOnlyChangeArtifact` (draft and discarded artifact bodies)\n- `CompileContext`\n- `PreviewSpec` (GET and POST with optional `artifactOverrides`)\n- `OutlineChangeArtifact`\n- `GetArtifactInstruction`\n- `GetHookInstructions`\n- `GetImplementationReview`\n- change detail via repository get (metadata only, no artifact bodies inline)\n\nWhen serving change or read-only artifact lists, the handler MAY combine repository/view metadata with `GetStatus` and active schema metadata in order to expose `hasTasks`, `totalTasks`, and `completedTasks` without duplicating task-completion rules in the UI."
+        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel` (types and factories imported from `@specd/sdk`), including:\n\n- `GetStatus` (with optional `ifModifiedSince`)\n- `GetChangeArtifact`\n- `GetReadOnlyChangeArtifact` (draft and discarded artifact bodies)\n- `CompileContext`\n- `PreviewSpec` (GET and POST with optional `artifactOverrides`)\n- `OutlineChangeArtifact`\n- `GetArtifactInstruction`\n- `GetHookInstructions`\n- `GetImplementationReview`\n- change detail via repository get (metadata only, no artifact bodies inline)\n\nWhen serving change or read-only artifact lists, the handler MAY combine repository/view metadata with `GetStatus` and active schema metadata in order to expose `hasTasks`, `totalTasks`, and `completedTasks` without duplicating task-completion rules in the UI."
       ]
     },
     {
@@ -49,9 +49,16 @@
       "rules": [
         "Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field."
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "rules": [
+        "Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly."
+      ]
     }
   ],
   "constraints": [
+    "Handler modules MUST import kernel types and use-case entry points from @specd/sdk, not @specd/core directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Active artifact save/load MUST use core:save-change-artifact and core:get-change-artifact. Draft/discarded artifact GET MUST use core:get-read-only-change-artifact — not raw ChangeRepository from HTTP handlers.",
@@ -222,6 +229,15 @@
         "the same actor is passed to every mutating call",
         "AND history entries share the same by"
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "name": "Handler imports kernel surface from SDK",
+      "when": ["inspecting handler-changes-read module imports"],
+      "then": [
+        "kernel types and errors are imported from @specd/sdk",
+        "AND @specd/core is not imported directly"
+      ]
     }
   ],
   "implementation": {
@@ -234,8 +250,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2d3450a4a8c0a6264c00aa82dd85bfa67a3d293910f13adbb771ce91e23bb5b4",
-    "verify.md": "sha256:e48d0b6b7cf958bfdd4ad4b1425d69f013e133fb2af80b1d263a5bea153fdb88"
+    "spec.md": "sha256:9128cbef5bc47683cd3b5de014b0f8d04b149b9b583a8c2dd938f995791d9462",
+    "verify.md": "sha256:fd38400edaf3057f98b0a219e318a749d5a39cee81bd45d1773230bca6ae8fbe"
   },
   "generatedBy": "core"
 }

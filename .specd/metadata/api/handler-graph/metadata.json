@@ -1,14 +1,15 @@
 {
   "title": "Handler Graph",
-  "description": "HTTP handlers for **graph** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Graph**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "description": "HTTP handlers for **graph** in SpecD Studio. They validate requests, call graph operations through the SDK host context (`createGraphProvider`, `runIndexProjectGraph`) and kernel use cases from `@specd/sdk`, and map results through presenters. Business rules live in code-graph and core use cases — not in this delivery module.",
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "api:routes-graph",
-    "core:kernel"
+    "sdk:composition",
+    "sdk:run-index-project-graph",
+    "api:routes-graph"
   ],
   "context": [
-    "HTTP handlers for **graph** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Graph**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+    "HTTP handlers for **graph** in SpecD Studio. They validate requests, call graph operations through the SDK host context (`createGraphProvider`, `runIndexProjectGraph`) and kernel use cases from `@specd/sdk`, and map results through presenters. Business rules live in code-graph and core use cases — not in this delivery module."
   ],
   "rules": [
     {
@@ -20,7 +21,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `createCodeGraphProvider` → stats, index, search, impact, hotspots\n- change-scoped graph view composed from change `specIds`"
+        "Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:\n\n- `apiContext.createGraphProvider()` for stats, search, impact, and hotspots\n- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`\n- change-scoped graph view composed from change `specIds` via kernel use cases\n\nThe handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly."
       ]
     },
     {
@@ -38,11 +39,18 @@
     {
       "requirement": "graph indexing uses CLI-aligned project assembly",
       "rules": [
-        "For `POST /v1/graph/index`, the handler MUST assemble the provider input from orchestrated project state:\n\n- `kernel.project.listWorkspaces.execute()`\n- effective graph config derived from `SpecdConfig`\n- optional project VCS ref when available\n\nIt MUST NOT build a parallel legacy workspace-target shape that bypasses the merged graph input model."
+        "For `POST /v1/graph/index`, the handler MUST call `runIndexProjectGraph` from `@specd/sdk` with the resolved `SpecdConfig` and process-scoped kernel. It MUST NOT build a parallel legacy workspace-target shape or duplicate CLI assembly logic outside the SDK helper."
+      ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "rules": [
+        "Handler modules MUST import graph orchestration helpers and kernel types from `@specd/sdk`. They MUST NOT import `@specd/core` or `@specd/code-graph` directly."
       ]
     }
   ],
   "constraints": [
+    "Handler modules MUST import graph orchestration and kernel types from @specd/sdk, not @specd/core or @specd/code-graph directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -150,6 +158,15 @@
         "kernel read use case still succeeds",
         "AND no history event is written for the call"
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "name": "Graph index uses runIndexProjectGraph",
+      "when": ["POST /v1/graph/index is handled"],
+      "then": [
+        "the handler calls runIndexProjectGraph from @specd/sdk",
+        "AND it does not import graph orchestration from @specd/code-graph directly"
+      ]
     }
   ],
   "implementation": {
@@ -162,8 +179,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:d2274b56085d690e598216177ddce8de04144ce2a65b862425217e5dfbb7bd56",
-    "verify.md": "sha256:d59665eecca3d5feb0225f8fce1cf35126f2f2f147d6e0a01ee5be72156b7c21"
+    "spec.md": "sha256:c5738a5306e10414d0c37020b3c6927b4c68e1748f28c3ef3c8ca2cad1c5abb6",
+    "verify.md": "sha256:ebeac47caf38462e62fbe23593a1a3bc1248a79791c84dc628663b48bc12a334"
   },
   "generatedBy": "core"
 }

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Graph** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP contract for code-graph operations via `createCodeGraphProvider` (not CLI/MCP).
+Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **Routes Graph** under `/v1`. Handlers and OpenAPI MUST match this spec exactly so CLI, agents, and Studio stay aligned. HTTP contract for code-graph operations via the SDK host graph factory (`apiContext.createGraphProvider`, `runIndexProjectGraph`) — not CLI/MCP.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 ### Requirement: POST graph index rebuilds the code graph index
 
-`POST /v1/graph/index` MUST trigger reindex via `createCodeGraphProvider`. v1 MAY block until completion; async job ids are deferred.
+`POST /v1/graph/index` MUST trigger reindex via `runIndexProjectGraph` from `@specd/sdk` (using the process-scoped SDK host context). v1 MAY block until completion; async job ids are deferred.
 
 Indexing MUST rebuild the full project graph, not a workspace-scoped subset, so cross-workspace spec-to-symbol and symbol-to-symbol links remain globally consistent.
 
@@ -22,7 +22,7 @@ When the request body includes `force: true`, the handler MUST recreate persiste
 
 ### Requirement: graph index preparation mirrors the CLI assembly flow
 
-Before invoking the provider index operation, the API MUST assemble index input the same way the current CLI does:
+Before invoking the provider index operation, the API MUST assemble index input through `runIndexProjectGraph` from `@specd/sdk`, which mirrors the CLI assembly flow:
 
 - obtain orchestrated workspaces from `kernel.project.listWorkspaces.execute()`
 - derive effective graph config from project `SpecdConfig`
@@ -63,6 +63,7 @@ Search queries MUST require `q`. Impact queries MUST require exactly one of `sym
 
 ## Constraints
 
+- `@specd/api` delivery and composition code MUST import host bootstrap and kernel types from `@specd/sdk`, not `@specd/core` or `@specd/code-graph` directly.
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
 - Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.

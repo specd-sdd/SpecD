@@ -63,7 +63,15 @@
       "then": ["it implements the remaining PortStudioPanel log methods"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:port-studio-panel",
+        "file": "client:src/port-studio-panel.ts",
+        "symbol": "PortStudioPanel"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:33aae39dfe40cf530ba879e787d46e01506e6a007d89751b5104d641899b7914",
     "verify.md": "sha256:13821d10619ece164f231712413c70f7b51a8dabc89d2d6f426bf43d6e34e4aa"

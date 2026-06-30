@@ -1,0 +1,16 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: bootstrap uses createApiServer SDK wiring'
+  content: |
+    ### Requirement: bootstrap uses createApiServer SDK wiring
+
+    #### Scenario: HTTP listen path uses SDK host context
+
+    - **WHEN** Studio starts the HTTP server for a project
+    - **THEN** `createApiServer` is used
+    - **AND** the process-scoped kernel is created only through `createSdkContext`

@@ -35,7 +35,14 @@
       ]
     }
   ],
-  "constraints": ["MUST NOT expose endpoints that read log files from disk or arbitrary paths."],
+  "constraints": [
+    "@specd/api delivery and composition code MUST import host bootstrap and kernel types from @specd/sdk, not @specd/core or @specd/code-graph directly.",
+    "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
+    "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
+    "Canonical workspace spec artifacts are read-only in Studio v1."
+  ],
   "scenarios": [
     {
       "requirement": "GET and POST /v1/logs",
@@ -77,9 +84,17 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:routes-project-logs",
+        "file": "api:src/delivery/http/handlers/handler-project-logs.ts",
+        "symbol": "registerProjectLogsRoutes"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:1347ea846ac52479c4ddba8f3a83c053c0be6e03ad566f662d379966eb4c6329",
+    "spec.md": "sha256:62d37ca89909f4b5e80497545dfb5cd3722178dc43bea542f491112bbaba0449",
     "verify.md": "sha256:533132d113dc87af3e393a30b70118218c07abf878ee7e8dcebedd83a6dd3d00"
   },
   "generatedBy": "core"

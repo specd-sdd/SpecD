@@ -1,7 +1,11 @@
 {
   "title": "Http Server Bootstrap",
   "description": "Studio serves HTTP for the remote profile and embedded `ui serve` mode; listeners must start reliably, expose API routes under `/v1`, and shut down cleanly. This spec defines process-level server lifecycle: bind, mount handlers, health probe with auth metadata, and graceful SIGINT handling.",
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:composition-create-api-server"
+  ],
   "context": [
     "Studio serves HTTP for the remote profile and embedded `ui serve` mode; listeners must start reliably, expose API routes under `/v1`, and shut down cleanly. This spec defines process-level server lifecycle: bind, mount handlers, health probe with auth metadata, and graceful SIGINT handling."
   ],
@@ -23,9 +27,16 @@
       "rules": [
         "On `SIGINT` (and `SIGTERM` where supported), the server MUST stop accepting new connections and close within a bounded timeout."
       ]
+    },
+    {
+      "requirement": "bootstrap uses createApiServer SDK wiring",
+      "rules": [
+        "Process startup MUST delegate kernel and graph bootstrap to `api:composition-create-api-server`, which in turn MUST use `createSdkContext` from `@specd/sdk`. This spec does not define an alternate `createKernel` entry point."
+      ]
     }
   ],
   "constraints": [
+    "Server bootstrap MUST NOT call createKernel from @specd/core directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -91,6 +102,15 @@
       "name": "Shutdown releases kernel resources",
       "when": ["graceful shutdown completes"],
       "then": ["graph provider handles closed", "AND process exits cleanly"]
+    },
+    {
+      "requirement": "bootstrap uses createApiServer SDK wiring",
+      "name": "HTTP listen path uses SDK host context",
+      "when": ["Studio starts the HTTP server for a project"],
+      "then": [
+        "createApiServer is used",
+        "AND the process-scoped kernel is created only through createSdkContext"
+      ]
     }
   ],
   "implementation": {
@@ -103,8 +123,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:44c12218cb4aa3a20baa99aa1219fb52355e8690cb596ece14a9f8094062b021",
-    "verify.md": "sha256:37f8b2c7107f7d8d1f0cf5c9e4f899e5858bed51022adc8a4a8662be0261b324"
+    "spec.md": "sha256:561618ca94949e776497be72435c9c555cbe045c1a11cd8fd160f1d10d1a974b",
+    "verify.md": "sha256:5c86c53945369a9c32a43acbed999ea33fe6cf6f0202830f229ceee6071bca12"
   },
   "generatedBy": "core"
 }

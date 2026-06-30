@@ -190,8 +190,18 @@ type TaskSummaryByType = ReadonlyMap<
   { readonly totalTasks: number; readonly completedTasks: number }
 >
 
+export class SessionSupersededError extends Error {
+  constructor() {
+    super('Desktop session superseded')
+    this.name = 'SessionSupersededError'
+  }
+}
+
+let sessionGeneration = 0
+let hostPromiseGeneration = 0
 let hostPromise: Promise<DesktopHostContext> | undefined
 let logRing: LogRingBuffer | undefined
+const openGraphProviders = new Set<ReturnType<typeof createCodeGraphProvider>>()
 
 interface DesktopHostContext {
   readonly kernel: Kernel
@@ -252,7 +262,9 @@ export let activeProjectRoot: string | undefined = undefined
  * @returns Active desktop host context.
  */
 async function getHost(): Promise<DesktopHostContext> {
-  if (hostPromise === undefined) {
+  const gen = sessionGeneration
+  if (hostPromise === undefined || hostPromiseGeneration !== gen) {
+    hostPromiseGeneration = gen
     hostPromise = (async () => {
       const loader = createConfigLoader({ startDir: activeProjectRoot ?? process.cwd() })
       const config = await loader.load()
@@ -269,7 +281,11 @@ async function getHost(): Promise<DesktopHostContext> {
       }
     })()
   }
-  return await hostPromise
+  const host = await hostPromise
+  if (gen !== sessionGeneration) {
+    throw new SessionSupersededError()
+  }
+  return host
 }
 
 /**
@@ -293,11 +309,13 @@ async function withGraphProvider<TResult>(
   const config = await getConfig()
   Logger.info('Opening graph provider', { projectRoot: config.projectRoot })
   const provider = createCodeGraphProvider(config)
+  openGraphProviders.add(provider)
   await provider.open()
   try {
     return await run(provider)
   } finally {
-    await provider.close()
+    openGraphProviders.delete(provider)
+    await provider.close().catch(() => undefined)
   }
 }
 
@@ -2081,8 +2099,8 @@ export async function dispatchIpc(envelope: IpcRequestEnvelope): Promise<IpcResp
         const loader = createConfigLoader({ startDir: dir })
         const tempConfig = await loader.load()
 
-        activeProjectRoot = dir
         resetDesktopKernel()
+        activeProjectRoot = dir
 
         await addRecentConnection({ kind: 'local', path: dir })
         notifySessionChanged({ kind: 'local', path: dir })
@@ -2105,8 +2123,8 @@ export async function dispatchIpc(envelope: IpcRequestEnvelope): Promise<IpcResp
         const loader = createConfigLoader({ startDir: dir })
         const tempConfig = await loader.load()
 
-        activeProjectRoot = dir
         resetDesktopKernel()
+        activeProjectRoot = dir
 
         await addRecentConnection({ kind: 'local', path: dir })
         notifySessionChanged({ kind: 'local', path: dir })
@@ -2131,14 +2149,23 @@ export async function dispatchIpc(envelope: IpcRequestEnvelope): Promise<IpcResp
 
     return await handlePortMethod(envelope)
   } catch (err) {
+    if (err instanceof SessionSupersededError) {
+      return createIpcFailure(envelope.id, { message: 'Session changed; request cancelled' })
+    }
     const message = err instanceof Error ? err.message : String(err)
     return createIpcFailure(envelope.id, { message })
   }
 }
 
 /**
- * Resets kernel state after a project switch or teardown.
+ * Resets SDK host and graph state after a project switch or teardown.
  */
 export function resetDesktopKernel(): void {
+  sessionGeneration += 1
   hostPromise = undefined
+  logRing = undefined
+  for (const provider of openGraphProviders) {
+    void provider.close().catch(() => undefined)
+  }
+  openGraphProviders.clear()
 }

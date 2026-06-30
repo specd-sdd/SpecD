@@ -82,6 +82,19 @@ The package MUST preserve the same graph semantics as `@specd/code-graph` for:
 
 Desktop-specific composition MAY differ in packaging, dependency resolution, or runtime-targeted native rebuilds, but it MUST NOT intentionally diverge from the functional graph behaviour defined by the shared code-graph specs.
 
+### Requirement: workspace dependency on shared code-graph package
+
+`@specd/code-graph-electron` MUST declare a workspace runtime dependency on `@specd/code-graph`.
+
+The bundled `dist/` entry MUST resolve `CODE_GRAPH_VERSION` from the installed `@specd/code-graph` package without requiring the bundle file to live inside the `@specd/code-graph` source tree.
+
+Version lookup MUST search ancestor directories for both:
+
+- a parent `package.json` with `name: "@specd/code-graph"`
+- `node_modules/@specd/code-graph/package.json`
+
+Package `exports` MUST expose a `require` condition alongside `import` so desktop CommonJS main bundles can load the Electron graph provider.
+
 ### Requirement: Internal-only distribution role
 
 `@specd/code-graph-electron` SHALL be treated as an internal workspace package for desktop application packaging.
@@ -103,6 +116,6 @@ If `studio-desktop` upgrades its Electron major line as part of adopting `@specd
 
 ## Spec Dependencies
 
-- [`code-graph:composition`](../../../specs/code-graph/composition/spec.md) — shared provider surface and composition expectations that the Electron package must preserve
-- [`code-graph:sqlite-graph-store`](../../../specs/code-graph/sqlite-graph-store/spec.md) — SQLite-backed graph behaviour whose native runtime path must be isolated for Electron
-- [`default:_global/architecture`](../../../specs/_global/architecture/spec.md) — package-layering and composition constraints for runtime-specific wiring
+- [`code-graph:composition`](../../code-graph/composition/spec.md) — shared provider surface and composition expectations that the Electron package must preserve
+- [`code-graph:sqlite-graph-store`](../../code-graph/sqlite-graph-store/spec.md) — SQLite-backed graph behaviour whose native runtime path must be isolated for Electron
+- [`default:_global/architecture`](../../default/_global/architecture/spec.md) — package-layering and composition constraints for runtime-specific wiring

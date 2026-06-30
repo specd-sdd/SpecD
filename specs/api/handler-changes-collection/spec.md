@@ -2,7 +2,7 @@
 
 ## Purpose
 
-HTTP handlers for **changes collection** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Changes Collection**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.
+HTTP handlers for **changes collection** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ The module MUST implement every method, path, query, and body declared in [`api:
 
 ### Requirement: handler delegates to kernel without duplicating domain rules
 
-Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:
+Business rules for lifecycle, validation, approvals, and conflicts MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel`, including:
 
 - `CreateChange`
 - `kernel.changes.list`
@@ -33,8 +33,13 @@ Thrown kernel errors and validation failures MUST be converted through `api:prob
 
 When mapping `kernel.changes.listArchived`, the handler MUST preserve the split `items/meta` shape introduced by the merged archive index contract. It MUST NOT flatten archive rows into a bare array that loses pagination metadata.
 
+### Requirement: SDK delivery imports
+
+Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly.
+
 ## Constraints
 
+- Handler modules MUST import kernel types and use-case entry points from `@specd/sdk`, not `@specd/core` directly.
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
 - Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.
@@ -45,5 +50,5 @@ When mapping `kernel.changes.listArchived`, the handler MUST preserve the split 
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+- [`sdk:composition`](../../sdk/composition/spec.md) — SDK import policy for API delivery
 - [`api:routes-changes-collection`](../routes-changes-collection/spec.md) — HTTP contract
-- [`core:kernel`](../../core/kernel/spec.md) — kernel use cases

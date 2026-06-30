@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Electron desktop host concern — **Desktop Remote Profile**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Desktop renderer path that talks to a remote `@specd/api` like `specd-studio-web`.
+Electron desktop host concern — **Desktop Remote Profile**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Desktop renderer path that talks to a remote `@specd/api` like `specd-studio-web`.
 
 ## Requirements
 

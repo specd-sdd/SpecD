@@ -12,7 +12,7 @@ Given the same kernel or graph result, the presenter MUST produce the same DTO J
 
 ### Requirement: presenter does not encode business rules
 
-The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in `@specd/core` use cases.
+The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in core use cases invoked via the SDK kernel surface.
 
 ## Constraints
 

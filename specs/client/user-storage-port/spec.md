@@ -28,6 +28,7 @@ The `@specd/client` package SHALL implement and export `FileUserStorage` which i
 
 ## Constraints
 
+- `@specd/ui` and `@specd/client` MUST NOT import `@specd/core` or `@specd/sdk` for kernel bootstrap.
 - Client storage implementations MUST NOT import `@specd/core`.
 - The storage interface SHALL handle JSON serialization and deserialization internally for objects/arrays.
 

@@ -53,3 +53,18 @@
 
 - **WHEN** inspecting `SdkHostContext` type exports
 - **THEN** no `initProject`, `addPlugin`, or `removePlugin` methods exist on the context
+
+### Requirement: Studio host bootstrap
+
+#### Scenario: API server bootstraps via createSdkContext
+
+- **WHEN** `createApiServer` starts for a project
+- **THEN** it calls `createSdkContext` from `@specd/sdk` once per process
+- **AND** per-request context is built from the resulting `SdkHostContext`
+
+#### Scenario: Desktop main bootstraps local project via createSdkContext
+
+- **GIVEN** the user opens a local project folder in desktop
+- **WHEN** the main process constructs the project kernel
+- **THEN** it uses `createSdkContext` from `@specd/sdk`
+- **AND** it does not call `createKernel` from `@specd/core` directly

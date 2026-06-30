@@ -8,5 +8,10 @@
     "api:composition-create-api-server",
     "default:_global/architecture"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/handlers/handler-project-logs.ts",
+      "symbols": ["registerProjectLogsRoutes"]
+    }
+  ]
 }

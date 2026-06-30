@@ -1,14 +1,14 @@
 {
   "title": "Handler Project",
-  "description": "HTTP handlers for **project** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Project**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "description": "HTTP handlers for **project** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.",
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "api:routes-project",
-    "core:kernel"
+    "sdk:composition",
+    "api:routes-project"
   ],
   "context": [
-    "HTTP handlers for **project** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Project**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+    "HTTP handlers for **project** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module."
   ],
   "rules": [
     {
@@ -20,7 +20,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `GetProjectContext`\n- project status aggregation (`ListChanges`, `ListDrafts`, `ListDiscarded`, list archived, graph stats via `createCodeGraphProvider`)\n- `kernel.specs.getActiveSchema`\n- `kernel.specs.validateSchema`"
+        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel` (types imported from `@specd/sdk`), including:\n\n- `GetProjectContext`\n- project status aggregation (`ListChanges`, `ListDrafts`, `ListDiscarded`, list archived, graph stats via `apiContext.createGraphProvider()`)\n- `kernel.specs.getActiveSchema`\n- `kernel.specs.validateSchema`"
       ]
     },
     {
@@ -46,9 +46,16 @@
       "rules": [
         "Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field."
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "rules": [
+        "Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly."
+      ]
     }
   ],
   "constraints": [
+    "Handler modules MUST import kernel types and use-case entry points from @specd/sdk, not @specd/core directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -192,9 +199,24 @@
         "the same actor is passed to every mutating call",
         "AND history entries share the same by"
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "name": "Handler imports kernel surface from SDK",
+      "when": ["inspecting handler-project module imports"],
+      "then": [
+        "kernel types and errors are imported from @specd/sdk",
+        "AND @specd/core is not imported directly"
+      ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "api:handler-project",
+        "file": "api:src/delivery/http/handlers/handler-project-logs.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "api:handler-project",
@@ -204,8 +226,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:be81345b328613920a81b29cbb6524b1c4760b11962aaf2141ebd9ddfa6a911f",
-    "verify.md": "sha256:4366413bfebe1cacaffa8beaab25be8f24b5ef0fa14a2d2e762389b3efeff264"
+    "spec.md": "sha256:c7a4631654304640c1a0c9de3dd7102d1e384e1c6a546138b8bb7859e409e9d2",
+    "verify.md": "sha256:ee60e844ae5b8d4452a68486b4326e13ffb976a3599f9b08345e561aae5ddbb5"
   },
   "generatedBy": "core"
 }

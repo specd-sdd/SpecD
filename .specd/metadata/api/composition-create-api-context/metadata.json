@@ -1,7 +1,7 @@
 {
   "title": "Composition Create Api Context",
   "description": "HTTP route handlers need a consistent way to reach the kernel, the request actor, and graph tooling without each handler wiring dependencies by hand. This composition builds a per-request API context that shares the process-scoped `Kernel` and resolved actor while exposing a factory for code-graph providers.",
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "sdk:host-context"],
   "context": [
     "HTTP route handlers need a consistent way to reach the kernel, the request actor, and graph tooling without each handler wiring dependencies by hand. This composition builds a per-request API context that shares the process-scoped `Kernel` and resolved actor while exposing a factory for code-graph providers."
   ],
@@ -9,17 +9,18 @@
     {
       "requirement": "context exposes kernel and actor",
       "rules": [
-        "`createApiContext(request)` MUST return `{ kernel, actor, createGraphProvider }` where `kernel` is the process-scoped `Kernel` and `actor` is the identity from `api:adapter-api-actor-resolver`."
+        "`createApiContext(request)` MUST return `{ kernel, actor, createGraphProvider, config, authType, apiActor }` where:\n\n- `kernel` and `createGraphProvider` come from the process-scoped `SdkHostContext` created by `createSdkContext`\n- `actor` is the identity from `api:adapter-api-actor-resolver` wrapped for the request\n- `config` is the resolved `SpecdConfig` for the served project\n\n`ApiContext` and `ApiServerState` MUST extend `SdkHostContext` from `@specd/sdk`."
       ]
     },
     {
       "requirement": "graph provider factory is per project config",
       "rules": [
-        "`createGraphProvider()` MUST call `createCodeGraphProvider` with the active `SpecdConfig` for the served project root."
+        "`createGraphProvider()` on the API context MUST delegate to the `createGraphProvider` factory from the process-scoped `SdkHostContext`. It MUST NOT construct `@specd/code-graph` providers independently of that factory."
       ]
     }
   ],
   "constraints": [
+    "@specd/api composition code MUST import SdkHostContext and related bootstrap types from @specd/sdk.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -29,32 +30,11 @@
   "scenarios": [
     {
       "requirement": "context exposes kernel and actor",
-      "name": "createApiContext returns shared kernel and resolved actor",
-      "given": ["a process-scoped Kernel exists for the HTTP server"],
-      "when": ["createApiContext(request) runs after auth middleware resolved the actor"],
+      "name": "ApiContext extends SdkHostContext",
+      "when": ["middleware attaches request.apiContext"],
       "then": [
-        "return value includes the process-scoped kernel",
-        "AND return value includes actor from api:adapter-api-actor-resolver",
-        "AND return value exposes createGraphProvider as a function"
-      ]
-    },
-    {
-      "requirement": "context exposes kernel and actor",
-      "name": "Per-request contexts do not leak actor state",
-      "given": ["two concurrent requests in the same server process"],
-      "when": ["each request calls createApiContext independently"],
-      "then": [
-        "each context carries its own actor",
-        "AND both contexts reference the same kernel instance"
-      ]
-    },
-    {
-      "requirement": "context exposes kernel and actor",
-      "name": "Handlers use the context bundle instead of constructing kernel",
-      "when": ["an HTTP handler handles a mutating /v1 request"],
-      "then": [
-        "handler reads kernel and actor from createApiContext",
-        "AND handler does not instantiate a new Kernel per request"
+        "the context exposes kernel and createGraphProvider from the process-scoped SDK host context",
+        "AND ApiContext includes request-scoped actor, config, and auth fields"
       ]
     },
     {
@@ -92,23 +72,23 @@
       {
         "specId": "api:composition-create-api-context",
         "file": "api:src/composition/create-api-context.ts",
+        "symbol": "createApiContext"
+      },
+      {
+        "specId": "api:composition-create-api-context",
+        "file": "api:src/composition/create-api-context.ts",
         "symbol": "ApiContext"
       },
       {
         "specId": "api:composition-create-api-context",
         "file": "api:src/composition/create-api-context.ts",
         "symbol": "ApiServerState"
-      },
-      {
-        "specId": "api:composition-create-api-context",
-        "file": "api:src/composition/create-api-context.ts",
-        "symbol": "createApiContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:65328ef7c14b8a8762f7a20a73f8db5227341ddf8727bce43d160b2189f6f545",
-    "verify.md": "sha256:28d4fac7cb122aa3ac7b53fee17e93051b685b4612b6f5828283a4cb78ae78a7"
+    "spec.md": "sha256:96fa2f249a4569aef0ec02213029bf9ad1f080ed467f595c1d88944628bf1919",
+    "verify.md": "sha256:f99b3b313aeea1dfed125fd4b1a1a068b1a82d93b0dec306f80fe2d3eee299f3"
   },
   "generatedBy": "core"
 }

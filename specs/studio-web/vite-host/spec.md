@@ -12,7 +12,7 @@ Browser host for standalone Studio — **Vite Host**. Does not load a project ke
 
 ### Requirement: host does not bootstrap a Specd kernel
 
-The Vite host MUST NOT load `specd.yaml`, MUST NOT call `createKernel`, and MUST NOT start an API process — the API is started separately (e.g. `specd ui serve`).
+The Vite host MUST NOT load `specd.yaml`, MUST NOT call `createKernel` or `createSdkContext`, and MUST NOT start an API process — the API is started separately (e.g. `specd ui serve`).
 
 ### Requirement: Vite receives API base from ui serve
 

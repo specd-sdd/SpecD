@@ -2,17 +2,33 @@
 
 Documento de preparación para mergear `main` en la rama de feature del Studio. Describe qué cambió en `main` desde el último merge, dónde hay solapamiento con el trabajo del Studio, y qué habrá que adaptar en la capa API/IPC.
 
-**Fecha:** 2026-06-30 (actualizado tras completar Track A en `main`)  
-**Rama feature:** `feat/user-interface` (`HEAD` ≈ `3c261cba` — **sin merge de `main` aún**)  
-**Último merge de main:** `1865ee76` — _chore(root): merge main into feat/user-interface_  
-**Punto de main en ese merge:** `25b9cca0` — _feat(all): enforce read-only semantics for drafted changes_  
-**Main actual:** `87401d64` — _feat(all)!: add curated public barrels for core sdk code-graph_  
-**Delta main → feature:** **31 commits** en `main` pendientes de integrar (merge-base `25b9cca0`).
+**Fecha:** 2026-06-30 (post-merge)  
+**Rama feature:** `feat/user-interface` — **integrada en `main`**  
+**Último merge de main → feature:** `f2a3de90` — _merge(main): Track A SDK refactor_  
+**Merge feature → main:** fast-forward `87401d64` → `fed3b7e4` (2026-06-30)  
+**`main` actual:** `fed3b7e4` — _fix(cli): route plugins uninstall and update by type bucket_
 
 **Documentos relacionados:**
 
-- **[Refactorización en `main`](./core-refactor-on-main.md)** — Track A **completado** en `main` (detalle de lo implementado y deltas vs plan original).
-- Este documento — merge `main` → `feat/user-interface`; adaptación api/IPC/desktop tras heredar `@specd/sdk`.
+- **[Refactorización en `main`](./core-refactor-on-main.md)** — Track A **completado** en `main`.
+- Este documento — merge `main` → feature, Track B (api/IPC/desktop → `@specd/sdk`), estado post-merge.
+- **Change archivado (specs):** `20260630-171934-align-studio-specs-post-merge` — specs Studio/API alineados con `@specd/sdk` + runtime desktop.
+
+---
+
+## Estado post-merge (2026-06-30)
+
+| Hito                                          | Estado | Notas                                                                                |
+| --------------------------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| Track A (`@specd/sdk`, CLI/MCP)               | ✅     | En `main` desde `87401d64`                                                           |
+| Merge `main` → `feat/user-interface`          | ✅     | `f2a3de90`                                                                           |
+| Track B api + desktop → `@specd/sdk`          | ✅     | `0cc90abb`; sin imports directos `@specd/core` en `packages/api` / desktop IPC       |
+| Plugin CLI install/uninstall/update buckets   | ✅     | Archivados; en `main` (`38cff059`, `fed3b7e4`)                                       |
+| Merge `feat/user-interface` → `main`          | ✅     | FF `fed3b7e4`                                                                        |
+| Specs Studio/API vs código                    | ✅     | Change `align-studio-specs-post-merge`: 113 deltas, 134 impl links, validate 229/229 |
+| Workspaces `api` / `studio-*` en `specd.yaml` | ✅     | `api`, `client`, `studio-desktop`, `studio-web`, `code-graph-electron` registrados   |
+| E2E Studio skips sin changes activos          | ⚠️     | Esperado; no bloquea                                                                 |
+| `change-validate.spec.ts` (graph lock)        | ✅     | Mock `validateBatch` en helpers; suite CLI verde                                     |
 
 ---
 
@@ -36,7 +52,7 @@ Documento de preparación para mergear `main` en la rama de feature del Studio. 
 | A2b CLI + MCP → solo `@specd/sdk`          | ✅     | `bbeee9f5`             |
 | A3 public barrels core/code-graph          | ✅     | `87401d64`             |
 
-**Siguiente paso:** Track B — `git merge main` en `feat/user-interface` y cableado api/IPC (§ Checklist Fase 1–5).
+**Siguiente paso:** ~~Track B~~ **completado.** Specs Studio/API: change `align-studio-specs-post-merge`.
 
 **No está en `main` (solo feature — conservar en merge):**
 
@@ -336,21 +352,9 @@ Refactor archivado como change `code-graph-logic-refactor`. Mueve responsabilida
 
 ---
 
-### 10. WIP local en feature (sin commit) — **NUEVO**
+### 10. WIP local en feature — **resuelto (2026-06-30)**
 
-Además del delta de `main`, hay **cambios sin commitear** en la rama feature que conviene tener en cuenta antes/durante el merge:
-
-| Archivo                                             | Cambio                                                                             |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `packages/ui/src/hooks/use-changes-read.ts`         | Cache de status poll con `ifModifiedSince`; respeta `unchanged: true` del servidor |
-| `packages/ui/test/use-changes-read.spec.ts`         | Test nuevo (untracked)                                                             |
-| `packages/ui/src/sidebar/ChangesSidebar.tsx`        | Ajuste menor                                                                       |
-| `packages/ui/src/change/ChangeOverview.tsx`         | Ajuste menor                                                                       |
-| `apps/specd-studio-web/tests/e2e/studio.ui.spec.ts` | +121 líneas e2e                                                                    |
-| `apps/specd-studio-web/playwright.config.mjs`       | Config e2e                                                                         |
-| `dev/scripts/run-studio-ui-e2e.mjs`                 | Script e2e                                                                         |
-
-**Recomendación:** commitear o stashear este WIP **antes** del merge de `main` para separar conflictos de “trabajo Studio en curso” vs “integración main”. El hook `use-changes-read` está directamente alineado con `ifModifiedSince` de feature — tras merge de `get-status.ts`, revalidar que el cache sigue coherente.
+El WIP de polling UI / e2e quedó integrado en el merge y verificado en Fase 4. Pendiente solo QA manual opcional (Fase 4).
 
 ---
 
@@ -404,7 +408,7 @@ Track A creó `packages/sdk` (`@specd/sdk`). Detalle completo en [core-refactor-
 | `listPluginDeclarations` en core                     | `getDeclaredPlugins` helper en CLI (`plugins/get-declared-plugins.ts`)            |
 | `buildProjectStatusSnapshot` → `{ summary, graph }`  | `{ summary, graphHealth, approvals, llmOptimizedContext, hotspots? }`             |
 | `orchestration/changes/*` en SDK                     | **No implementado** — hosts llaman `kernel.changes.*` directo                     |
-| Hosts sin import de core/graph                       | ✅ CLI y MCP cumplen; **api/IPC/desktop pendiente** (Track B)                     |
+| Hosts sin import de core/graph                       | ✅ CLI, MCP, `api`, desktop IPC — solo `@specd/sdk` (Track B + post-archive)      |
 
 ### Estructura de archivos (`packages/sdk/src/`)
 
@@ -862,22 +866,22 @@ Ya usa `GetStatus`; tras merge: quitar refresh manual si existe; `refreshImpleme
 
 **Track A — en `main`:** ✅ **completado** (`87401d64`). Ver [core-refactor-on-main.md](./core-refactor-on-main.md).
 
-**Track B — tras merge `main` → `feat/user-interface`:** ⏳ **pendiente**
+**Track B — tras merge `main` → `feat/user-interface`:** ✅ **completado**
 
-1. `git merge main` (hereda `packages/sdk` + core/code-graph refactorizados).
-2. Resolver conflictos: `kernel.ts` → `get-status.ts` (`ifModifiedSince`) → code-graph → lockfile.
-3. **Cableado** en `api`, `ipc-handlers`, `studio-desktop`: orquestación inline → `@specd/sdk` / use cases G1; presenters → DTO.
-4. Regla: hosts Studio importan solo `@specd/sdk`; no ampliar SDK salvo gap explícito.
+1. `git merge main` — heredado `packages/sdk` + core/code-graph refactorizados.
+2. Conflictos resueltos: `kernel.ts`, `get-status.ts` (`ifModifiedSince`), code-graph, lockfile.
+3. Cableado `api`, `ipc-handlers`, `studio-desktop` → `@specd/sdk`; presenters → DTO.
+4. Post-archive: CJS main bundle, `ELECTRON_RUN_AS_NODE`, IPC session teardown, `exports.require` en sdk/client/code-graph-electron.
 
 ### Decisiones abiertas (post Track A)
 
-| Tema                                    | Estado en `main`                                | Pendiente en Studio (Track B)                                |
-| --------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------ |
-| Barrel vs namespaces                    | Barrel plano `.` con `core-reexports.ts` curado | Migrar imports api/IPC                                       |
-| Warnings staleness                      | `GetGraphHealthResult.warnings[]`; CLI stderr   | Exponer en `GraphStatusDto` (opcional)                       |
-| Presenters                              | En CLI (`output()`); no en SDK                  | Siguen en api/ipc                                            |
-| `ifModifiedSince`                       | **No en main**                                  | Fusionar en `get-status.ts` + conservar polling UI           |
-| `createSdkContext` con kernel existente | Solo desde `config`                             | Desktop lazy singleton: evaluar wrapper local o extender SDK |
+| Tema                                    | Estado en `main`                                | Studio (Track B)                                                |
+| --------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| Barrel vs namespaces                    | Barrel plano `.` con `core-reexports.ts` curado | ✅ Imports api/IPC migrados                                     |
+| Warnings staleness                      | `GetGraphHealthResult.warnings[]`; CLI stderr   | ⏳ Opcional: exponer en `GraphStatusDto`                        |
+| Presenters                              | En CLI (`output()`); no en SDK                  | ✅ Siguen en api/ipc                                            |
+| `ifModifiedSince`                       | **No en main**                                  | ✅ Fusionado en `get-status.ts`; polling UI conservado          |
+| `createSdkContext` con kernel existente | Solo desde `config`                             | ✅ Desktop: `createSdkContext` + `resetDesktopKernel` en switch |
 
 ### Criterio de hecho
 
@@ -888,13 +892,13 @@ Ya usa `GetStatus`; tras merge: quitar refresh manual si existe; `refreshImpleme
 - [x] Public barrels en core y code-graph (`public.ts`)
 - [x] Use cases host en core (P0–P3) y code-graph (G1)
 
-**Track B (feature, post-merge) — pendiente:**
+**Track B (feature, post-merge) — cumplido:**
 
-- [ ] Cero comparaciones `lastIndexedRef !== currentRef` inline en handlers api/IPC
-- [ ] `indexGraph` bajo lock (`beforeOpen` en `runIndexProjectGraph` o `acquireGraphIndexLock`)
-- [ ] `api`, `ipc-handlers`, `studio-desktop` sin import directo de `@specd/core` / `@specd/code-graph`
-- [ ] `@specd/client` sin dependencia de `core` / `code-graph` (ya cumple)
-- [ ] `ifModifiedSince` preservado tras merge de `get-status.ts`
+- [x] Cero comparaciones `lastIndexedRef !== currentRef` inline en handlers api/IPC
+- [x] `indexGraph` bajo lock (`runIndexProjectGraph` + `beforeOpen`)
+- [x] `api`, `ipc-handlers`, `studio-desktop` sin import directo de `@specd/core` / `@specd/code-graph`
+- [x] `@specd/client` sin dependencia de `core` / `code-graph`
+- [x] `ifModifiedSince` preservado tras merge de `get-status.ts`
 
 ## División `core` vs `@specd/sdk` (resumen)
 
@@ -1005,40 +1009,51 @@ Ninguno de estos existe en `main`; el merge **no debe eliminarlos**.
 - [x] Tests `packages/sdk` (composition, orchestration, barrel boundary)
 - [x] CLI + MCP migrados a `@specd/sdk`
 
-### Fase 1 — Merge + core (feature, post-merge)
+### Fase 1 — Merge + core (feature, post-merge) — ✅
 
-- [ ] Resolver `kernel.ts` (main + extensiones Studio)
-- [ ] Resolver `get-status.ts` (merge `ifModifiedSince` + schema-walking)
-- [ ] Adoptar implementation tracking endurecido de main
-- [ ] Resolver `sqlite-graph-store.ts` + añadir `in-memory-index-session.ts`
-- [ ] Resolver extracción graph `4de31d39`: `code-graph-provider.ts`, `index-lock.ts`, eliminar duplicados CLI
-- [ ] `pnpm install` / lockfile
+- [x] Resolver `kernel.ts` (main + extensiones Studio)
+- [x] Resolver `get-status.ts` (merge `ifModifiedSince` + schema-walking)
+- [x] Adoptar implementation tracking endurecido de main
+- [x] Resolver `sqlite-graph-store.ts` + añadir `in-memory-index-session.ts`
+- [x] Resolver extracción graph `4de31d39`: `code-graph-provider.ts`, `index-lock.ts`, eliminar duplicados CLI
+- [x] `pnpm install` / lockfile
 
-### Fase 2 — Verificar contratos
+### Fase 2 — Verificar contratos — ✅
 
-- [ ] `pnpm --filter @specd/core test`
-- [ ] `pnpm --filter @specd/code-graph test` (incl. `is-graph-stale`, `index-lock`, `traversal`)
-- [ ] `pnpm --filter @specd/code-graph-electron test` (si aplica tras sqlite merge)
+- [x] `pnpm --filter @specd/core test`
+- [x] `pnpm --filter @specd/code-graph test` (incl. `is-graph-stale`, `index-lock`, `traversal`)
+- [x] `pnpm --filter @specd/code-graph-electron test`
 
-### Fase 3 — API + IPC (feature, post-merge)
+### Fase 3 — API + IPC (feature, post-merge) — ✅
 
-- [ ] Sustituir orquestación inline por `@specd/sdk` / use cases core (ver § Adaptación en feature)
-- [ ] **Eliminar** `readArtifactTaskMapsForChange` / `readArtifactTaskMaps`; list-artifacts usa `GetStatus` + presenter
-- [ ] Quitar refresh manual en `getChangeStatus`, `transition`, `getChangeContext`
-- [ ] Eliminar imports directos de `core`/`code-graph` en `api`, `ipc-handlers`, `studio-desktop`
-- [ ] Presenters/DTO; regenerar OpenAPI si aplica
-- [ ] Tests: `desktop-local-data-adapter.spec.ts`, `ipc-graph-provider.spec.ts`
+- [x] Sustituir orquestación inline por `@specd/sdk` / use cases core (ver § Adaptación en feature)
+- [x] **Eliminar** `readArtifactTaskMapsForChange` / `readArtifactTaskMaps`; list-artifacts usa `GetStatus` + presenter
+- [x] Quitar refresh manual en handlers (refresh bakeado en use cases de main)
+- [x] Eliminar imports directos de `core`/`code-graph` en `api`, `ipc-handlers`, `studio-desktop`
+- [x] Presenters/DTO; tests api/desktop verdes en sesión de verificación
+- [x] Tests: `desktop-local-data-adapter.spec.ts`, `desktop-graph-runtime.spec.ts`
 
-### Fase 4 — UI
+### Fase 4 — UI — ✅ (con notas)
 
-- [ ] Commitear o integrar WIP de `use-changes-read.ts` + test
-- [ ] `pnpm --filter @specd/ui test`
-- [ ] E2E: `apps/specd-studio-web/tests/e2e/studio.ui.spec.ts`
-- [ ] Probar manualmente: status poll, archive sidebar, graph search con snippets
+- [x] `pnpm --filter @specd/ui test`
+- [x] E2E: `apps/specd-studio-web/tests/e2e/studio.ui.spec.ts` — 5 pass / 3 skip (sin changes activos)
+- [ ] Probar manualmente: status poll, archive sidebar, graph search con snippets (opcional)
 
-### Fase 5 — Regresión CLI (paridad con Studio)
+### Fase 5 — Regresión CLI (paridad con Studio) — ✅
 
-- [ ] `change status`, `change deps`, `graph search --snippet`, `archive list`
+- [x] `change status`, `change deps`, `graph search --snippet`, `archive list`
+- [x] `plugins install` / `uninstall` / `update` con bucket UI (`fix-plugins-*-ui`)
+
+### Fase 6 — Specs y proyecto specd — ✅
+
+- [x] Registrar workspaces Studio en `specd.yaml` (`api`, `studio-desktop`, `studio-web`, `client`, `code-graph-electron`)
+- [x] Change `align-studio-specs-post-merge`: 113 spec deltas → `@specd/sdk` / IPC / runtime fixes
+- [x] Implementation links (134) desde `spec-lock` + overrides — 112/113 specs (sin `bottom-panel-terminal`, sin xterm en disco)
+- [x] Desktop smoke: `pnpm build && pnpm start` OK (`ELECTRON_RUN_AS_NODE=` + CJS main)
+- [x] `change transition align-studio-specs-post-merge ready` → implement/verify → archive
+- [x] Archive: `specd-sdd/archive/2026/06/20260630-171934-align-studio-specs-post-merge`
+
+**Pendiente opcional (no bloquea):** QA manual Fase 4; spec `bottom-panel-terminal` sin impl xterm; warnings staleness en `GraphStatusDto`.
 
 ---
 
@@ -1073,12 +1088,8 @@ Ninguno de estos existe en `main`; el merge **no debe eliminarlos**.
 
 ## Referencias
 
-- Último merge: `git show 1865ee76`
-- Rango main: `git log --oneline 25b9cca0..main` (31 commits; HEAD `87401d64`)
+- Merge main → feature: `git show f2a3de90`
+- Merge feature → main: `fed3b7e4` (fast-forward)
 - Track A detalle: [core-refactor-on-main.md](./core-refactor-on-main.md)
-- Diff paquetes: `git diff --stat 25b9cca0..main -- packages/ apps/`
-- Solapamiento: `comm -12 <(git diff --name-only 25b9cca0..main -- packages/ apps/ \| sort) <(git diff --name-only 1865ee76..HEAD -- packages/ apps/ \| sort)`
-- ADR archive split: `docs/adr/0022-split-archive-index-and-detail-models.md` (en main)
-- Docs graph refactor: `docs/code-graph/services.md`, `docs/code-graph/use-cases.md` (añadidos en `4de31d39`)
-- Core host orchestration: [core-refactor-on-main.md](./core-refactor-on-main.md)
-- WIP local: `git status` / `git diff` en `packages/ui`, `apps/specd-studio-web`
+- Track B commit: `0cc90abb` — api + desktop → `@specd/sdk`
+- Plugin CLI: `38cff059`, `fed3b7e4`

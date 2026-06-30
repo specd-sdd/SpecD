@@ -1,9 +1,9 @@
 {
   "title": "Recent Connections",
-  "description": "Electron desktop host concern — **Recent Connections**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Persist most-recently used local project paths and remote API profiles.",
+  "description": "Electron desktop host concern — **Recent Connections**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Persist most-recently used local project paths and remote API profiles.",
   "dependsOn": ["client:specd-data-port"],
   "context": [
-    "Electron desktop host concern — **Recent Connections**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Persist most-recently used local project paths and remote API profiles."
+    "Electron desktop host concern — **Recent Connections**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Persist most-recently used local project paths and remote API profiles."
   ],
   "rules": [
     {
@@ -61,9 +61,16 @@
       "then": ["token deleted from storage", "AND subsequent connect requires re-entry"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "studio-desktop:recent-connections",
+        "file": "studio-desktop:src/main/connection-store.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:832cab29219f4782ec8c29c9b1e536f2809b6ca4d5e90ba70f983683f2e03b6c",
+    "spec.md": "sha256:d4406ebe3c9be814da2d6ed8eaba1f01315e7f876479d569d32704afe26a0168",
     "verify.md": "sha256:6d38cc1481975959096e6038b4f88f06c047de2d88ab4f464ce2560cebad4b1a"
   },
   "generatedBy": "core"

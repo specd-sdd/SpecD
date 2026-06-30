@@ -1,9 +1,9 @@
 {
   "title": "Desktop Local Data Adapter",
-  "description": "Electron desktop host concern — **Desktop Local Data Adapter**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Renderer-side `SpecdDataPort` that calls IPC instead of HTTP for the local desktop profile.",
+  "description": "Electron desktop host concern — **Desktop Local Data Adapter**. Renderer-side `SpecdDataPort` that calls IPC instead of HTTP when the desktop app has opened a local project folder. Kernel ownership stays in the main process SDK host context — not in the renderer adapter.",
   "dependsOn": ["client:specd-data-port"],
   "context": [
-    "Electron desktop host concern — **Desktop Local Data Adapter**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Renderer-side `SpecdDataPort` that calls IPC instead of HTTP for the local desktop profile."
+    "Electron desktop host concern — **Desktop Local Data Adapter**. Renderer-side `SpecdDataPort` that calls IPC instead of HTTP when the desktop app has opened a local project folder. Kernel ownership stays in the main process SDK host context — not in the renderer adapter."
   ],
   "rules": [
     {
@@ -15,26 +15,23 @@
     {
       "requirement": "local adapter does not attach Authorization headers",
       "rules": ["The local profile MUST NOT use `client:adapter-bearer-auth`."]
+    },
+    {
+      "requirement": "renderer does not bootstrap kernel",
+      "rules": [
+        "The local data adapter MUST NOT call `createKernel` or `createSdkContext`. Kernel ownership remains in the Electron main process."
+      ]
     }
   ],
   "scenarios": [
     {
       "requirement": "local adapter is selected for opened project folders",
-      "name": "Open folder switches renderer to IPC adapter",
-      "when": ["user opens local project via welcome"],
-      "then": ["SpecdDataPort uses IPC implementation", "AND remote HTTP adapter not active"]
-    },
-    {
-      "requirement": "local adapter is selected for opened project folders",
-      "name": "Remote connect keeps HTTP adapter",
-      "when": ["user connects to remote URL"],
-      "then": ["HTTP transport selected", "AND IPC adapter not used for data"]
-    },
-    {
-      "requirement": "local adapter is selected for opened project folders",
-      "name": "Profile switch swaps adapter instance",
-      "when": ["user moves from local to remote profile"],
-      "then": ["hooks rebind to new adapter", "AND port interface unchanged"]
+      "name": "Renderer uses IPC adapter for local profile",
+      "when": ["the user opens a local project in desktop"],
+      "then": [
+        "the renderer uses this adapter instead of adapter-remote-specd-data",
+        "AND the adapter does not bootstrap a kernel — it calls IPC only"
+      ]
     },
     {
       "requirement": "local adapter does not attach Authorization headers",
@@ -55,12 +52,29 @@
       "given": ["remote profile with token"],
       "when": ["HTTP transport runs"],
       "then": ["Authorization header present", "AND local and remote paths differ by design"]
+    },
+    {
+      "requirement": "renderer does not bootstrap kernel",
+      "name": "Adapter does not call createSdkContext",
+      "when": ["the renderer uses the local data adapter"],
+      "then": [
+        "it issues IPC calls only",
+        "AND it does not import createSdkContext or createKernel"
+      ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "studio-desktop:desktop-local-data-adapter",
+        "file": "studio-desktop:src/renderer/desktop-local-data-adapter.ts",
+        "symbol": "createDesktopLocalDataAdapter"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:23bf043712962538711ee03ffe1d0896f66ec2f1975b1e148487594914e7ec2a",
-    "verify.md": "sha256:99e994c86ded2e357939d12d7d3f3876a800a1a531c7bf270cad1453527627f3"
+    "spec.md": "sha256:5f46bf1773f7028a6a740e5297ada01354a09d6b45403505e48acbaa09dd34aa",
+    "verify.md": "sha256:27e079c8eb6b1baaf5e0d608ea1c18600add9ba541eba07b9e46bb80a107cc83"
   },
   "generatedBy": "core"
 }

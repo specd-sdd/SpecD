@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Electron desktop host concern — **Main Window Manager**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer.
+Electron desktop host concern — **Main Window Manager**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Create and manage the primary Electron `BrowserWindow` hosting the Studio renderer.
 
 ## Requirements
 

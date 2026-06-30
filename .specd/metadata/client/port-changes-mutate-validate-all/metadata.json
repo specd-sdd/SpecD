@@ -86,7 +86,15 @@
       "then": ["errors or skips are explicit and documented"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "client:port-changes-mutate-validate-all",
+        "file": "client:src/port-changes-mutate.ts",
+        "symbol": "validateChangeAll"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:071eaf7e206bc5169455aafaf158e3efb2e5bf8ca64904e02ac97a8366b1615c",
     "verify.md": "sha256:3f48f02adc173bf47d43a5f8becc622744ade8de5a30776a9ac5fa4807547d53"

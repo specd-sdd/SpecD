@@ -3,7 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "sdk:run-index-project-graph"
+  ],
   "implementation": [
     {
       "file": "api:src/composition/graph-provider.ts"

@@ -4,5 +4,9 @@
     "version": 1
   },
   "dependsOn": [],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "studio-web:vite.config.ts"
+    }
+  ]
 }

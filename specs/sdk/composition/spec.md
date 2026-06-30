@@ -56,11 +56,18 @@ Delivery hosts MUST import these symbols from `@specd/sdk`, not from `@specd/cod
 
 ### Requirement: Import policy for integrators
 
-Delivery hosts (`@specd/cli`, `@specd/mcp`, and future API/IPC hosts) that use both `@specd/core` and `@specd/code-graph` MUST depend on `@specd/sdk` only — not on `@specd/core` and `@specd/code-graph` as parallel direct runtime dependencies.
+Delivery hosts that use both `@specd/core` and `@specd/code-graph` MUST depend on `@specd/sdk` only — not on `@specd/core` and `@specd/code-graph` as parallel direct runtime dependencies. This includes:
+
+- `@specd/cli`
+- `@specd/mcp`
+- `@specd/api` (Studio HTTP server)
+- `apps/specd-studio-desktop` main process (local IPC profile)
 
 Packages that need only `@specd/core` (for example `plugin-*`, `skills`) MAY import `@specd/core` directly.
 
 Custom storage implementers MAY import port contracts from `@specd/core/ports` or `@specd/sdk/ports`, and registration types from `@specd/core/extensions` or `@specd/sdk/extensions`.
+
+Desktop graph execution that requires the Electron SQLite runtime MAY additionally depend on `@specd/code-graph-electron` for provider construction in the main process. That exception applies only to graph IPC paths — kernel and change/spec orchestration MUST still flow through `@specd/sdk`.
 
 ### Requirement: Version constant
 

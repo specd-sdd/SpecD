@@ -1,0 +1,12 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: context exposes kernel and actor'
+  content: |
+    ### Requirement: context exposes kernel and actor
+
+    #### Scenario: ApiContext extends SdkHostContext
+
+    - **WHEN** middleware attaches `request.apiContext`
+    - **THEN** the context exposes `kernel` and `createGraphProvider` from the process-scoped SDK host context
+    - **AND** `ApiContext` includes request-scoped `actor`, `config`, and auth fields

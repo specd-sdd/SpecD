@@ -4,5 +4,12 @@
     "version": 1
   },
   "dependsOn": ["plugin-manager:ui-plugin-type", "cli:serve-ui", "studio-web:vite-host"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "studio-web:src/plugin.ts"
+    },
+    {
+      "file": "studio-web:scripts/sync-plugin-ui-studio.mjs"
+    }
+  ]
 }

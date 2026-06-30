@@ -10,6 +10,12 @@
   ],
   "implementation": [
     {
+      "file": "code-graph-electron:package.json"
+    },
+    {
+      "file": "code-graph-electron:src/index.ts"
+    },
+    {
       "file": "code-graph-electron:scripts/electron-build-metadata.mjs",
       "symbols": [
         "isPortableElectronBuildMetadata",

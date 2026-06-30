@@ -6,8 +6,9 @@
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "api:routes-graph",
-    "core:kernel"
+    "sdk:composition",
+    "sdk:run-index-project-graph",
+    "api:routes-graph"
   ],
   "implementation": [
     {

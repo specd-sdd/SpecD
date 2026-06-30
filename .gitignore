@@ -6,6 +6,7 @@ dist/
 
 # Generated Electron vendored sqlite tree (code-graph-electron)
 packages/code-graph-electron/vendor/
+packages/code-graph/:memory:/
 
 # Playwright (studio-web e2e)
 apps/specd-studio-web/test-results/

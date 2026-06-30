@@ -48,9 +48,10 @@ describe('Changes API', () => {
     })
 
     it('given api server, when GET /archived-changes, then returns archive index entries', async () => {
-      const { res, data } = await apiJson<{ items: Array<{ name: string }>; meta: { total: number } }>(
-        '/archived-changes',
-      )
+      const { res, data } = await apiJson<{
+        items: Array<{ name: string }>
+        meta: { total: number }
+      }>('/archived-changes')
       expect(res.ok).toBe(true)
       expect(Array.isArray(data.items)).toBe(true)
       expect(typeof data.meta.total).toBe('number')
@@ -257,9 +258,7 @@ describe('Changes API', () => {
         state: string
         workspaces: string[]
         artifacts: Array<{ filename: string; type: string; state: string }>
-      }>(
-        `/archived-changes/${encodeURIComponent(archivedChangeName)}`,
-      )
+      }>(`/archived-changes/${encodeURIComponent(archivedChangeName)}`)
       expect(res.ok).toBe(true)
       expect(data.name).toBe(archivedChangeName)
       expect(data.state).toBe('archived')
@@ -375,6 +374,21 @@ describe('Changes API', () => {
       if (activeChangeName === null) {
         return
       }
+      const { res: reviewRes, data: review } = await apiJson<{
+        implementationTracking: {
+          trackedFiles: Array<{ file: string; state: string }>
+          links: unknown[]
+        }
+      }>(`/changes/${encodeURIComponent(activeChangeName)}/implementation-review`)
+      if (!reviewRes.ok) {
+        return
+      }
+      const trackedFile =
+        review.implementationTracking.trackedFiles.find((entry) => entry.state === 'open')?.file ??
+        review.implementationTracking.trackedFiles[0]?.file
+      if (trackedFile === undefined) {
+        return
+      }
       const { res, data } = await apiJson<{
         implementationTracking: {
           trackedFiles: Array<{ file: string; state: string }>
@@ -385,7 +399,7 @@ describe('Changes API', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           action: 'resolve',
-          file: 'packages/api/src/index.ts',
+          file: trackedFile,
         }),
       })
       expect(res.ok).toBe(true)

@@ -66,3 +66,11 @@
 - **WHEN** graceful shutdown completes
 - **THEN** graph provider handles closed
 - **AND** process exits cleanly
+
+### Requirement: bootstrap uses createApiServer SDK wiring
+
+#### Scenario: HTTP listen path uses SDK host context
+
+- **WHEN** Studio starts the HTTP server for a project
+- **THEN** `createApiServer` is used
+- **AND** the process-scoped kernel is created only through `createSdkContext`

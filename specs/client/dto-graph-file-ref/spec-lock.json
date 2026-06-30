@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture", "api:dto-graph-file-ref"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "client:src/dto/graph-file-ref.ts",
+      "symbols": ["GraphFileRefDto"]
+    }
+  ]
 }

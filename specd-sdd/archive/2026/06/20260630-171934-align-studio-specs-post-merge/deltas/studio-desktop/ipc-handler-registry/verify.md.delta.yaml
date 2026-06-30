@@ -1,0 +1,17 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: handlers use ipc-message-envelope'
+  content: |
+    ### Requirement: SDK kernel access in IPC handlers
+
+    #### Scenario: IPC handler uses SDK-bootstrapped kernel
+
+    - **GIVEN** a local desktop project is open
+    - **WHEN** an IPC handler executes a `SpecdDataPort` operation
+    - **THEN** it invokes use cases on the kernel from the SDK host context
+    - **AND** it does not construct a separate kernel in the handler

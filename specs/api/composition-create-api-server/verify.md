@@ -46,23 +46,16 @@
 
 ### Requirement: one kernel per process with per-request context
 
-#### Scenario: Single kernel shared across requests
+#### Scenario: createApiServer uses createSdkContext
 
-- **WHEN** two HTTP requests hit running server
-- **THEN** same `Kernel` instance
-- **AND** separate `createApiContext` per request
+- **WHEN** `createApiServer` is called for a project root
+- **THEN** it awaits `createSdkContext` from `@specd/sdk` exactly once per process
+- **AND** `createApiContext` builds per-request context from the resulting `ApiServerState`
 
-#### Scenario: Context includes graph provider factory
+#### Scenario: Log formatter disables ANSI for API readback
 
-- **WHEN** handler calls `createGraphProvider()`
-- **THEN** factory closes over project config
-- **AND** graph routes use provider
-
-#### Scenario: Process exit closes server
-
-- **WHEN** SIGINT received
-- **THEN** server stops accepting connections
-- **AND** kernel teardown is bounded
+- **WHEN** the API kernel boots
+- **THEN** `createSdkContext` receives `logFormatter: createLogFormatter({ colorize: false })`
 
 ### Requirement: all API routes mount under /v1
 

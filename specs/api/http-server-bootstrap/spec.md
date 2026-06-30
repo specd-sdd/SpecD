@@ -18,8 +18,13 @@ All Studio API route plugins MUST be registered under the `/v1` prefix. Non-API 
 
 On `SIGINT` (and `SIGTERM` where supported), the server MUST stop accepting new connections and close within a bounded timeout.
 
+### Requirement: bootstrap uses createApiServer SDK wiring
+
+Process startup MUST delegate kernel and graph bootstrap to `api:composition-create-api-server`, which in turn MUST use `createSdkContext` from `@specd/sdk`. This spec does not define an alternate `createKernel` entry point.
+
 ## Constraints
 
+- Server bootstrap MUST NOT call `createKernel` from `@specd/core` directly.
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
 - Artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact` — not raw `ChangeRepository.saveArtifact` from HTTP handlers.
@@ -30,3 +35,4 @@ On `SIGINT` (and `SIGTERM` where supported), the server MUST stop accepting new 
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+- [`api:composition-create-api-server`](../composition-create-api-server/spec.md) — SDK-backed server factory

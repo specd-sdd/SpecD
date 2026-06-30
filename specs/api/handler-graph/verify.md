@@ -91,3 +91,11 @@
 - **WHEN** handler serves a read-only GET that does not write history
 - **THEN** kernel read use case still succeeds
 - **AND** no history event is written for the call
+
+### Requirement: SDK delivery imports
+
+#### Scenario: Graph index uses runIndexProjectGraph
+
+- **WHEN** `POST /v1/graph/index` is handled
+- **THEN** the handler calls `runIndexProjectGraph` from `@specd/sdk`
+- **AND** it does not import graph orchestration from `@specd/code-graph` directly

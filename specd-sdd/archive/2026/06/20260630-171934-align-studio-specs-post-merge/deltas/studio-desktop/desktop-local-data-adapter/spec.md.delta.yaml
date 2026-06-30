@@ -1,0 +1,21 @@
+- op: modified
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    ## Purpose
+
+    Electron desktop host concern — **Desktop Local Data Adapter**. Renderer-side `SpecdDataPort` that calls IPC instead of HTTP when the desktop app has opened a local project folder. Kernel ownership stays in the main process SDK host context — not in the renderer adapter.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: local adapter does not attach Authorization headers'
+  content: |
+    ### Requirement: renderer does not bootstrap kernel
+
+    The local data adapter MUST NOT call `createKernel` or `createSdkContext`. Kernel ownership remains in the Electron main process.

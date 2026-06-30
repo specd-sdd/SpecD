@@ -54,3 +54,12 @@
 - **WHEN** `POST /v1/graph/index` completes
 - **THEN** subsequent status shows `stale: false`
 - **AND** indexedAt advances
+
+### Requirement: SDK graph provider factory
+
+#### Scenario: Graph handler uses SdkHostContext factory
+
+- **GIVEN** an API request with `apiContext` attached
+- **WHEN** a graph handler needs a provider
+- **THEN** it calls `apiContext.createGraphProvider()`
+- **AND** it does not import `createCodeGraphProvider` from `@specd/code-graph` directly

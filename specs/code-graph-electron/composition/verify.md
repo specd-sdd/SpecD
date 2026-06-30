@@ -102,3 +102,17 @@
 - **WHEN** the Electron-specific graph package is rebuilt or repackaged for that line
 - **THEN** the compatibility adjustment remains scoped to desktop runtime packaging
 - **AND** CLI and API do not inherit the same Electron runtime target
+
+### Requirement: workspace dependency on shared code-graph package
+
+#### Scenario: bundled dist resolves code-graph version from node_modules
+
+- **WHEN** `@specd/code-graph-electron` is imported from `apps/specd-studio-desktop` after build
+- **THEN** module initialisation does not throw `Unable to resolve @specd/code-graph package version`
+- **AND** `CODE_GRAPH_VERSION` matches the workspace `@specd/code-graph` package version
+
+#### Scenario: package.json declares code-graph dependency
+
+- **WHEN** inspecting `packages/code-graph-electron/package.json`
+- **THEN** `dependencies` includes `@specd/code-graph`
+- **AND** `exports["."].require` points at the built `dist` entry

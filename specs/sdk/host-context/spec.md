@@ -42,8 +42,14 @@ The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST 
 
 Host context bootstrap MUST NOT perform config file writes. `initProject`, `addPlugin`, and `removePlugin` remain on `createConfigWriter()` — not on `SdkHostContext` or `kernel.project`.
 
+### Requirement: Studio host bootstrap
+
+`@specd/api` and the Electron desktop main process MUST obtain their process-scoped kernel and `createGraphProvider` factory through `createSdkContext` (or `openSpecdHost`) from `@specd/sdk`.
+
+API server state (`ApiServerState`) and per-request API context (`ApiContext`) MAY extend `SdkHostContext` with host-specific fields (for example resolved `SpecdConfig`, auth type, and request actor) but MUST NOT construct a parallel kernel or graph provider outside the SDK bootstrap path.
+
 ## Spec Dependencies
 
 - [`sdk:composition`](../composition/spec.md) — package placement and export surface
-- [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type and `createKernel`
-- [`core:composition`](../../../../specs/core/composition/spec.md) — `createConfigLoader` factory
+- [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type constructed inside `createSdkContext`
+- [`core:composition`](../../../../specs/core/composition/spec.md) — config loader factory used by `openSpecdHost`

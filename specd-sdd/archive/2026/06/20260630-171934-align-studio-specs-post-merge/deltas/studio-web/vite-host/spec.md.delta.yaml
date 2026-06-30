@@ -1,0 +1,8 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: host does not bootstrap a Specd kernel'
+  content: |
+    ### Requirement: host does not bootstrap a Specd kernel
+
+    The Vite host MUST NOT load `specd.yaml`, MUST NOT call `createKernel` or `createSdkContext`, and MUST NOT start an API process — the API is started separately (e.g. `specd ui serve`).

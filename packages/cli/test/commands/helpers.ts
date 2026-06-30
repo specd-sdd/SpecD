@@ -160,6 +160,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     discard: { execute: vi.fn() },
     archive: { execute: vi.fn() },
     validate: { execute: vi.fn() },
+    validateBatch: { execute: vi.fn() },
     edit: { execute: vi.fn() },
     skipArtifact: { execute: vi.fn() },
     compile: { execute: vi.fn() },

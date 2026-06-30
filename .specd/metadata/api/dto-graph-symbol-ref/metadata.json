@@ -26,9 +26,10 @@
     }
   ],
   "constraints": [
+    "@specd/api delivery and composition code MUST import host bootstrap and kernel types from @specd/sdk, not @specd/core or @specd/code-graph directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
-    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only\ndisabled; no server-side Bearer enforcement on loopback or specd ui serve.",
-    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw\nChangeRepository.saveArtifact from HTTP handlers.",
+    "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
+    "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
     "There is no GET /changes/{name}/validation resource; use GET .../status and POST .../validate.",
     "Canonical workspace spec artifacts are read-only in Studio v1."
   ],
@@ -68,10 +69,18 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "api:dto-graph-symbol-ref",
+        "file": "api:src/delivery/http/dto/graph-symbol-ref.ts",
+        "symbol": "GraphSymbolRefDto"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:a4165171385b4291be79c16178aa5f2cf2fc947f50523d7d9bfa2407d484cbe1",
-    "verify.md": "sha256:f76cd0deaeb1c7ae75e06682743ba8fa4711932b67f3da11916fb9676c68e872"
+    "spec.md": "sha256:0ec0cc39fc6d9eca3408d21668d902543bc0dec091ae8bf25b5cec932873a54d",
+    "verify.md": "sha256:7b3e83d9dec0aed6ffe52e35a6fca52451a2d451e6ec1b127f7a56f63ab94ab3"
   },
   "generatedBy": "core"
 }

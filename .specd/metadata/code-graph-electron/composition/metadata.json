@@ -47,6 +47,12 @@
       ]
     },
     {
+      "requirement": "workspace dependency on shared code-graph package",
+      "rules": [
+        "`@specd/code-graph-electron` MUST declare a workspace runtime dependency on `@specd/code-graph`.\n\nThe bundled `dist/` entry MUST resolve `CODE_GRAPH_VERSION` from the installed `@specd/code-graph` package without requiring the bundle file to live inside the `@specd/code-graph` source tree.\n\nVersion lookup MUST search ancestor directories for both:\n\n- a parent `package.json` with `name: \"@specd/code-graph\"`\n- `node_modules/@specd/code-graph/package.json`\n\nPackage `exports` MUST expose a `require` condition alongside `import` so desktop CommonJS main bundles can load the Electron graph provider."
+      ]
+    },
+    {
       "requirement": "Internal-only distribution role",
       "rules": [
         "`@specd/code-graph-electron` SHALL be treated as an internal workspace package for desktop application packaging.\n\nThe package MUST NOT be designed as a separately published public npm package by default. Its primary distribution role is to support the packaged `studio-desktop` application and desktop development workflows inside the monorepo."
@@ -187,10 +193,36 @@
         "the compatibility adjustment remains scoped to desktop runtime packaging",
         "AND CLI and API do not inherit the same Electron runtime target"
       ]
+    },
+    {
+      "requirement": "workspace dependency on shared code-graph package",
+      "name": "bundled dist resolves code-graph version from node_modules",
+      "when": ["@specd/code-graph-electron is imported from apps/specd-studio-desktop after build"],
+      "then": [
+        "module initialisation does not throw Unable to resolve @specd/code-graph package version",
+        "AND CODE_GRAPH_VERSION matches the workspace @specd/code-graph package version"
+      ]
+    },
+    {
+      "requirement": "workspace dependency on shared code-graph package",
+      "name": "package.json declares code-graph dependency",
+      "when": ["inspecting packages/code-graph-electron/package.json"],
+      "then": [
+        "dependencies includes @specd/code-graph",
+        "AND exports[\".\"].require points at the built dist entry"
+      ]
     }
   ],
   "implementation": {
     "files": [
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:package.json"
+      },
+      {
+        "specId": "code-graph-electron:composition",
+        "file": "code-graph-electron:src/index.ts"
+      },
       {
         "specId": "code-graph-electron:composition",
         "file": "code-graph-electron:scripts/rebuild-vendored-sqlite-electron.mjs"
@@ -232,8 +264,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0a94eb05de50196e7c4569025b4a1b7ed26cb0e9a4c6a6d5e0c82efe96397f1a",
-    "verify.md": "sha256:21b58476f6dddea1369c599b5d2f300cdc29ad527b05418d2dbb5b5e1f97dc13"
+    "spec.md": "sha256:b2e85d86a24789a8041c20cb52d636202b2bc4e7b1ea8b6f6db2814a5d5cbda4",
+    "verify.md": "sha256:75f251ebb12f343a42ee3db0651bf868894383c12ba5a177d4381b4af28faefd"
   },
   "generatedBy": "core"
 }

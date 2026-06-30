@@ -1,0 +1,59 @@
+- op: modified
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    ## Purpose
+
+    HTTP handlers for **archived changes** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: handler delegates to kernel without duplicating domain rules'
+  content: |
+    ### Requirement: handler delegates to kernel without duplicating domain rules
+
+    Business rules MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel`, including:
+
+    - `GetArchivedChange`
+    - `GetReadOnlyChangeArtifact` for archived artifact body reads
+
+- op: modified
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    ## Constraints
+
+    - Handler modules MUST import kernel types and use-case entry points from `@specd/sdk`, not `@specd/core` directly.
+    - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
+    - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
+    - Artifact save/load MUST use `core:save-change-artifact`, `core:get-change-artifact`, and `core:get-read-only-change-artifact` as appropriate — not raw repository access from HTTP handlers.
+    - There is no `GET /changes/{name}/validation` resource; use `GET .../status` and `POST .../validate`.
+    - Canonical workspace spec artifacts are read-only in Studio v1.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: archived detail preserves read-only change fields'
+  content: |
+    ### Requirement: SDK delivery imports
+
+    Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    ## Spec Dependencies
+
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
+    - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+    - [`sdk:composition`](../../sdk/composition/spec.md) — SDK import policy for API delivery
+    - [`api:routes-archived-changes`](../routes-archived-changes/spec.md) — HTTP contract

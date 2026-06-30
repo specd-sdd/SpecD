@@ -1,14 +1,14 @@
 {
   "title": "Handler Specs Read",
-  "description": "HTTP handlers for **specs read** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Specs Read**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "description": "HTTP handlers for **specs read** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.",
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "api:routes-specs-read",
-    "core:kernel"
+    "sdk:composition",
+    "api:routes-specs-read"
   ],
   "context": [
-    "HTTP handlers for **specs read** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Specs Read**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+    "HTTP handlers for **specs read** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module."
   ],
   "rules": [
     {
@@ -20,7 +20,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `ListSpecs`\n- spec repository get (metadata)\n- `GetOutline`\n- `GetContext`\n- `kernel.specs.search`\n- canonical artifact read (no write in v1)"
+        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel`, including:\n\n- `ListSpecs`\n- spec repository get (metadata)\n- `GetOutline`\n- `GetContext`\n- `kernel.specs.search`\n- canonical artifact read (no write in v1)"
       ]
     },
     {
@@ -46,9 +46,16 @@
       "rules": [
         "Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field."
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "rules": [
+        "Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly."
+      ]
     }
   ],
   "constraints": [
+    "Handler modules MUST import kernel types and use-case entry points from @specd/sdk, not @specd/core directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -210,6 +217,15 @@
         "the same actor is passed to every mutating call",
         "AND history entries share the same by"
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "name": "Handler imports kernel surface from SDK",
+      "when": ["inspecting handler-specs-read module imports"],
+      "then": [
+        "kernel types and errors are imported from @specd/sdk",
+        "AND @specd/core is not imported directly"
+      ]
     }
   ],
   "implementation": {
@@ -222,8 +238,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:d09cfdbe01c3ff1eed5fb320bff6e8d53d0e2012f2bcc00201c8a6c1d2a805ec",
-    "verify.md": "sha256:ad5584317d19093418190bf3f37ea0f8b296e5c5cc2af5c3826c67e9041abccb"
+    "spec.md": "sha256:31c860a587a55436cb5fdb14d21602a01b2b10c25e9c2fd94f4389e7424aca6d",
+    "verify.md": "sha256:9f60045bf8490ca170467ea6c28c57755b972c43958246559117b70f37baf00f"
   },
   "generatedBy": "core"
 }

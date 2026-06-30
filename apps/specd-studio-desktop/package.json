@@ -3,8 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "private": true,
-  "type": "module",
-  "main": "dist/main/index.js",
+  "main": "dist/main/index.cjs",
   "scripts": {
     "build:main": "tsup --config tsup.main.config.ts",
     "build:preload": "tsup --config tsup.preload.config.ts",
@@ -15,7 +14,7 @@
     "rebuild:graph-sqlite-electron": "pnpm --filter @specd/code-graph-electron rebuild:vendored-sqlite-electron",
     "rebuild:graph-electron": "pnpm rebuild:graph-sqlite-electron",
     "prestart": "pnpm rebuild:graph-sqlite-electron",
-    "start": "electron .",
+    "start": "env ELECTRON_RUN_AS_NODE= electron .",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint ."

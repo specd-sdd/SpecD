@@ -3,8 +3,12 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope"],
+  "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope", "sdk:host-context"],
   "implementation": [
+    {
+      "file": "studio-desktop:src/main/ipc-handlers.ts",
+      "symbols": ["dispatchIpc"]
+    },
     {
       "file": "studio-desktop:src/main/index.ts"
     }

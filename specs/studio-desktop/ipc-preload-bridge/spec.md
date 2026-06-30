@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Electron desktop host concern — **Ipc Preload Bridge**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`.
+Electron desktop host concern — **Ipc Preload Bridge**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Expose a narrow, typed IPC API to the renderer via `contextBridge`.
 
 ## Requirements
 

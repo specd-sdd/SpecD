@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Electron desktop host concern — **Welcome And File Menu**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API.
+Electron desktop host concern — **Welcome And File Menu**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API.
 
 ## Requirements
 

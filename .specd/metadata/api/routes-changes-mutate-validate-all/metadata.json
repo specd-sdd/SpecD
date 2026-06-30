@@ -69,7 +69,14 @@
       "then": ["body has top-level passed, failures, warnings, files without results array"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "api:routes-changes-mutate-validate-all",
+        "file": "api:src/delivery/http/handlers/handler-changes-mutate.ts"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:5654b3e994b425f755646f47f2310dfaa6b1b7d312d5bf66fc231cc8637ef653",
     "verify.md": "sha256:8f017f5f1fb1e52a9fdf4ef07fa9679582a4628bcc86fc3e32c9efc6cb195416"

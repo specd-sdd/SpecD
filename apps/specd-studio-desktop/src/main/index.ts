@@ -8,13 +8,12 @@ import {
   shell,
 } from 'electron'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { IpcRequestEnvelope, IpcResponseEnvelope } from '@specd/client'
 import { dispatchIpc, onSessionChangeMain } from './ipc-handlers.js'
 import { readRecents, writeRecents, type RecentConnection } from './connection-store.js'
 import { getSettingSync, setSettingSync, removeSettingSync } from './settings-store.js'
 
-const dirname = path.dirname(fileURLToPath(import.meta.url))
+const dirname = __dirname
 let mainWindow: BrowserWindow | null = null
 
 type StorageGetPayload = { readonly key: string }

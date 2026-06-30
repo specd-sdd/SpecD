@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["client:specd-data-port", "api:routes-project-logs"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "client:src/port-studio-panel.ts",
+      "symbols": ["PortStudioPanel"]
+    }
+  ]
 }

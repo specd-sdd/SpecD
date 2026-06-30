@@ -1,0 +1,8 @@
+- op: modified
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    ## Purpose
+
+    Electron desktop host concern — **Recent Connections**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Persist most-recently used local project paths and remote API profiles.

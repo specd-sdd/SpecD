@@ -4,5 +4,16 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "client:src/storage/user-storage-port.ts",
+      "symbols": ["IUserStorage"]
+    },
+    {
+      "file": "client:src/storage/file-user-storage.ts"
+    },
+    {
+      "file": "client:src/storage/local-storage-user-storage.ts"
+    }
+  ]
 }

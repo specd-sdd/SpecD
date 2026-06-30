@@ -8,5 +8,9 @@
     "api:routes-changes-mutate",
     "api:dto-validate-batch-result"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "api:src/delivery/http/handlers/handler-changes-mutate.ts"
+    }
+  ]
 }

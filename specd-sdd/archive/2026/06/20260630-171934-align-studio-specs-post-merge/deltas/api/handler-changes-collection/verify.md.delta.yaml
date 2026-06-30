@@ -1,0 +1,16 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: SDK delivery imports'
+  content: |
+    ### Requirement: SDK delivery imports
+
+    #### Scenario: Handler imports kernel surface from SDK
+
+    - **WHEN** inspecting `handler-changes-collection` module imports
+    - **THEN** kernel types and errors are imported from `@specd/sdk`
+    - **AND** `@specd/core` is not imported directly

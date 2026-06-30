@@ -1,21 +1,21 @@
 {
   "title": "Main Kernel Lifecycle",
-  "description": "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Electron main process owns `createKernel` for locally opened projects.",
-  "dependsOn": ["client:specd-data-port"],
+  "description": "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project.",
+  "dependsOn": ["client:specd-data-port", "sdk:host-context"],
   "context": [
-    "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Electron main process owns `createKernel` for locally opened projects."
+    "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project."
   ],
   "rules": [
     {
       "requirement": "one kernel per open local project",
       "rules": [
-        "Opening a project directory MUST construct exactly one `Kernel` for that `specd.yaml` root until the project is closed or switched."
+        "Opening a project directory MUST construct exactly one SDK host context (kernel + `createGraphProvider` from `createSdkContext`) for that `specd.yaml` root until the project is closed or switched."
       ]
     },
     {
       "requirement": "project switch tears down kernel and graph state",
       "rules": [
-        "Switching projects MUST dispose the previous kernel/graph provider before creating a new one to avoid cross-project leakage."
+        "Switching projects MUST dispose the previous SDK host context and any desktop graph provider state before creating a new one to avoid cross-project leakage."
       ]
     },
     {
@@ -25,31 +25,33 @@
       ]
     },
     {
+      "requirement": "desktop main process launches as Electron",
+      "rules": [
+        "The desktop `start` script MUST clear `ELECTRON_RUN_AS_NODE` before spawning Electron so the main process receives the Electron API (`app`, `BrowserWindow`, `ipcMain`) instead of the npm CLI path export.\n\nWhen `ELECTRON_RUN_AS_NODE` is set, startup MUST NOT proceed with a broken main process that cannot call `app.whenReady()`."
+      ]
+    },
+    {
+      "requirement": "main process entry is bundled for pnpm and Electron",
+      "rules": [
+        "The Electron main entry MUST be built as a bundled CommonJS artifact at `dist/main/index.cjs`.\n\nThe bundle MUST externalise `electron`, `@specd/code-graph-electron`, `@specd/sdk`, and\n`@specd/client`, relying on workspace `exports.require` surfaces for correct pnpm\nresolution under the Electron main process.\n\n`package.json` `main` MUST reference `dist/main/index.cjs`."
+      ]
+    },
+    {
       "requirement": "desktop kernel configures plain-text logs",
       "rules": [
-        "The desktop kernel MUST receive `logFormatter: createLogFormatter({ colorize: false })` so that log readback through local IPC returns plain text without ANSI escape sequences."
+        "`createSdkContext` for the desktop main process MUST receive `logFormatter: createLogFormatter({ colorize: false })` so that log readback through local IPC returns plain text without ANSI escape sequences."
       ]
     }
   ],
   "scenarios": [
     {
       "requirement": "one kernel per open local project",
-      "name": "Opening folder constructs kernel",
-      "when": ["user opens directory with specd.yaml"],
-      "then": ["main process creates one Kernel", "AND IPC serves port methods"]
-    },
-    {
-      "requirement": "one kernel per open local project",
-      "name": "Second open reuses until switch",
-      "given": ["project already open"],
-      "when": ["user triggers refresh"],
-      "then": ["same kernel instance serves requests", "AND no duplicate kernels"]
-    },
-    {
-      "requirement": "one kernel per open local project",
-      "name": "Invalid folder shows error",
-      "when": ["user picks directory without specd.yaml"],
-      "then": ["open is rejected", "AND no kernel is created"]
+      "name": "Local open uses createSdkContext",
+      "when": ["the user opens a local project directory"],
+      "then": [
+        "the main process awaits createSdkContext from @specd/sdk once for that project root",
+        "AND it does not call createKernel from @specd/core directly"
+      ]
     },
     {
       "requirement": "project switch tears down kernel and graph state",
@@ -107,6 +109,24 @@
       ]
     },
     {
+      "requirement": "desktop main process launches as Electron",
+      "name": "start clears ELECTRON_RUN_AS_NODE",
+      "when": ["pnpm start runs in apps/specd-studio-desktop"],
+      "then": [
+        "the spawned Electron process can access app.whenReady",
+        "AND require('electron') in the main bundle is not the npm CLI path string"
+      ]
+    },
+    {
+      "requirement": "main process entry is bundled for pnpm and Electron",
+      "name": "main entry uses bundled CJS artifact",
+      "when": ["inspecting apps/specd-studio-desktop/package.json after build"],
+      "then": [
+        "main is dist/main/index.cjs",
+        "AND tsup externalises electron, @specd/code-graph-electron, @specd/sdk, and @specd/client"
+      ]
+    },
+    {
       "requirement": "desktop kernel configures plain-text logs",
       "name": "Local desktop logs are formatted without colors",
       "when": ["desktop local kernel is created"],
@@ -116,10 +136,29 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:src/main/index.ts"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:package.json"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:tsup.main.config.ts"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:test/desktop-graph-runtime.spec.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:dfb16207948972f256b47e01078ec81d2e6814f251b96a2869daf2fc3b406942",
-    "verify.md": "sha256:ec2b308cbbeb1e5d40137217e9386011abc44b7729bafd14952716ce8eb8d8a1"
+    "spec.md": "sha256:8dc2df570ca9cc5081b84a634de5fdffb43cbec354726f2b6bce181027f0328b",
+    "verify.md": "sha256:22e577250141df78353b819deb8886a9187eaaacd9cf3f18fa1b32163d5c157e"
   },
   "generatedBy": "core"
 }

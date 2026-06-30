@@ -11,15 +11,23 @@ import { fileURLToPath } from 'node:url'
  */
 export function readInstalledCodeGraphVersion(): string {
   let dir = dirname(fileURLToPath(import.meta.url))
-  for (let depth = 0; depth < 6; depth++) {
-    const candidate = join(dir, 'package.json')
-    try {
-      const json = JSON.parse(readFileSync(candidate, 'utf8')) as { name?: string; version: string }
-      if (json.name === '@specd/code-graph') {
-        return json.version
+  for (let depth = 0; depth < 8; depth++) {
+    const candidates = [
+      join(dir, 'package.json'),
+      join(dir, 'node_modules', '@specd', 'code-graph', 'package.json'),
+    ]
+    for (const candidate of candidates) {
+      try {
+        const json = JSON.parse(readFileSync(candidate, 'utf8')) as {
+          name?: string
+          version: string
+        }
+        if (json.name === '@specd/code-graph') {
+          return json.version
+        }
+      } catch {
+        // try next candidate
       }
-    } catch {
-      // try parent directory
     }
     dir = dirname(dir)
   }

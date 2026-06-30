@@ -1,9 +1,9 @@
 {
   "title": "Desktop Remote Profile",
-  "description": "Electron desktop host concern — **Desktop Remote Profile**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Desktop renderer path that talks to a remote `@specd/api` like `specd-studio-web`.",
+  "description": "Electron desktop host concern — **Desktop Remote Profile**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Desktop renderer path that talks to a remote `@specd/api` like `specd-studio-web`.",
   "dependsOn": ["client:specd-data-port"],
   "context": [
-    "Electron desktop host concern — **Desktop Remote Profile**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Desktop renderer path that talks to a remote `@specd/api` like `specd-studio-web`."
+    "Electron desktop host concern — **Desktop Remote Profile**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Desktop renderer path that talks to a remote `@specd/api` like `specd-studio-web`."
   ],
   "rules": [
     {
@@ -48,7 +48,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0b205fbe5da50f2366b03030bd058b1663780b906307d43a9c7a517ec1866ef8",
+    "spec.md": "sha256:4999eb1f71e98a49e75ea259eef71f759697fb5eadbad86fe6d9c12abcab36d4",
     "verify.md": "sha256:7c9dae7fb67e5a213a53e979455429f9659f02ecea8c6d9902e8975b3acb441c"
   },
   "generatedBy": "core"

@@ -1,0 +1,17 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: one kernel per process with per-request context'
+  content: |
+    ### Requirement: one SDK host context per process with per-request context
+
+    #### Scenario: createApiServer uses createSdkContext
+
+    - **WHEN** `createApiServer` is called for a project root
+    - **THEN** it awaits `createSdkContext` from `@specd/sdk` exactly once per process
+    - **AND** `createApiContext` builds per-request context from the resulting `ApiServerState`
+
+    #### Scenario: Log formatter disables ANSI for API readback
+
+    - **WHEN** the API kernel boots
+    - **THEN** `createSdkContext` receives `logFormatter: createLogFormatter({ colorize: false })`

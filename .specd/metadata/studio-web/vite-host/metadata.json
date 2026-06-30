@@ -14,7 +14,7 @@
     {
       "requirement": "host does not bootstrap a Specd kernel",
       "rules": [
-        "The Vite host MUST NOT load `specd.yaml`, MUST NOT call `createKernel`, and MUST NOT start an API process — the API is started separately (e.g. `specd ui serve`)."
+        "The Vite host MUST NOT load `specd.yaml`, MUST NOT call `createKernel` or `createSdkContext`, and MUST NOT start an API process — the API is started separately (e.g. `specd ui serve`)."
       ]
     },
     {
@@ -70,9 +70,16 @@
       "then": ["the connect default API URL matches the server-provided base"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "studio-web:vite-host",
+        "file": "studio-web:vite.config.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e875086402061d9ec385fa3e546b85772f381585de1efa2e3ec122ad8ead0330",
+    "spec.md": "sha256:327f1a1bd05ac20a78f5a5e8089aa805cdad628a1f6e023deffad5e963b7f978",
     "verify.md": "sha256:ee84317b378f60974d23da68bd0b4fa8d1959f15b924a93a7a9409fa4449d8f4"
   },
   "generatedBy": "core",

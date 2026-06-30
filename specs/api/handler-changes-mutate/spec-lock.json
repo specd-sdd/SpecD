@@ -6,8 +6,8 @@
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
+    "sdk:composition",
     "api:routes-changes-mutate",
-    "core:kernel",
     "core:save-change-artifact"
   ],
   "implementation": [

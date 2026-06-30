@@ -6,6 +6,9 @@
   "dependsOn": ["client:port-studio-panel", "default:_global/architecture"],
   "implementation": [
     {
+      "file": "client:package.json"
+    },
+    {
       "file": "client:src/specd-data-port.ts",
       "symbols": ["SpecdDataPort"]
     }

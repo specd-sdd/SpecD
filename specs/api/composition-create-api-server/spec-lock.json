@@ -8,12 +8,14 @@
     "default:_global/conventions",
     "api:auth-adapter-registry",
     "api:middleware-auth",
-    "core:kernel"
+    "core:kernel",
+    "sdk:host-context",
+    "sdk:composition"
   ],
   "implementation": [
     {
       "file": "api:src/composition/create-api-server.ts",
-      "symbols": ["CreateApiServerOptions", "ApiServer", "createApiServer"]
+      "symbols": ["createApiServer", "CreateApiServerOptions", "ApiServer"]
     }
   ]
 }

@@ -4,26 +4,11 @@
 
 ### Requirement: context exposes kernel and actor
 
-#### Scenario: createApiContext returns shared kernel and resolved actor
+#### Scenario: ApiContext extends SdkHostContext
 
-- **GIVEN** a process-scoped `Kernel` exists for the HTTP server
-- **WHEN** `createApiContext(request)` runs after auth middleware resolved the actor
-- **THEN** return value includes the process-scoped `kernel`
-- **AND** return value includes `actor` from `api:adapter-api-actor-resolver`
-- **AND** return value exposes `createGraphProvider` as a function
-
-#### Scenario: Per-request contexts do not leak actor state
-
-- **GIVEN** two concurrent requests in the same server process
-- **WHEN** each request calls `createApiContext` independently
-- **THEN** each context carries its own `actor`
-- **AND** both contexts reference the same `kernel` instance
-
-#### Scenario: Handlers use the context bundle instead of constructing kernel
-
-- **WHEN** an HTTP handler handles a mutating `/v1` request
-- **THEN** handler reads `kernel` and `actor` from `createApiContext`
-- **AND** handler does not instantiate a new `Kernel` per request
+- **WHEN** middleware attaches `request.apiContext`
+- **THEN** the context exposes `kernel` and `createGraphProvider` from the process-scoped SDK host context
+- **AND** `ApiContext` includes request-scoped `actor`, `config`, and auth fields
 
 ### Requirement: graph provider factory is per project config
 

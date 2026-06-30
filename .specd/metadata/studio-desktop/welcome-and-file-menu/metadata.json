@@ -1,9 +1,9 @@
 {
   "title": "Welcome And File Menu",
-  "description": "Electron desktop host concern — **Welcome And File Menu**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API.",
+  "description": "Electron desktop host concern — **Welcome And File Menu**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API.",
   "dependsOn": ["client:specd-data-port"],
   "context": [
-    "Electron desktop host concern — **Welcome And File Menu**. Local mode runs `createKernel` in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API."
+    "Electron desktop host concern — **Welcome And File Menu**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Entry flows use the shared `@specd/ui` project chooser to open a local project folder or connect to a remote API."
   ],
   "rules": [
     {
@@ -103,9 +103,16 @@
       "then": ["recents section empty or disabled", "AND no broken placeholders"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "studio-desktop:welcome-and-file-menu",
+        "file": "studio-desktop:src/main/index.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:7a864af237defe535eb8c018d987289d714c9973de1d9859f679efc97bc943c2",
+    "spec.md": "sha256:aa2be6ad4851a8e743fcfbafdcfee4ee9c32a0119a79365da8c6ab4d3887fc33",
     "verify.md": "sha256:6d4eeab0e126754c482bcd01bcbba819fe4c5ac29faac7a7b2794eb3bf086708"
   },
   "generatedBy": "core"

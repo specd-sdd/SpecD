@@ -2,7 +2,7 @@
 
 ## Purpose
 
-HTTP handlers for **changes read** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Changes Read**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.
+HTTP handlers for **changes read** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.
 
 ## Requirements
 
@@ -12,7 +12,7 @@ The module MUST implement every method, path, query, and body declared in [`api:
 
 ### Requirement: handler delegates to kernel without duplicating domain rules
 
-Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:
+Business rules for lifecycle, validation, approvals, and conflicts MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel` (types and factories imported from `@specd/sdk`), including:
 
 - `GetStatus` (with optional `ifModifiedSince`)
 - `GetChangeArtifact`
@@ -43,8 +43,13 @@ Thrown kernel errors and validation failures MUST be converted through `api:prob
 
 Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field.
 
+### Requirement: SDK delivery imports
+
+Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly.
+
 ## Constraints
 
+- Handler modules MUST import kernel types and use-case entry points from `@specd/sdk`, not `@specd/core` directly.
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
 - v1 server auth: `api.auth.type` from `specd.yaml` (never `studio.*`); registry registers only `disabled`; no server-side Bearer enforcement on loopback or `specd ui serve`.
 - Active artifact save/load MUST use `core:save-change-artifact` and `core:get-change-artifact`. Draft/discarded artifact GET MUST use `core:get-read-only-change-artifact` — not raw `ChangeRepository` from HTTP handlers.
@@ -55,8 +60,8 @@ Every mutating kernel call MUST receive the `actor` resolved in `createApiContex
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
-- [`api:routes-changes-read`](../routes-changes-read/spec.md) — HTTP contract
-- [`core:kernel`](../../core/kernel/spec.md) — kernel use cases
-- [`core:get-change-artifact`](../../core/get-change-artifact/spec.md) — GET active artifact body
-- [`core:get-read-only-change-artifact`](../../core/get-read-only-change-artifact/spec.md) — GET draft/discarded artifact bodies
-- [`core:get-status`](../../core/get-status/spec.md) — conditional status
+- [`sdk:composition`](../../sdk/composition/spec.md) — SDK import policy for API delivery
+- [`api:routes-changes-read`](../routes-changes-read/spec.md) — route contract
+- [`core:get-status`](../../core/get-status/spec.md) — status use case
+- [`core:get-change-artifact`](../../core/get-change-artifact/spec.md) — artifact read
+- [`core:get-read-only-change-artifact`](../../core/get-read-only-change-artifact/spec.md) — draft/discarded artifact read

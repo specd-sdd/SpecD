@@ -1,15 +1,15 @@
 {
   "title": "Handler Changes Mutate",
-  "description": "HTTP handlers for **changes mutate** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Changes Mutate**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module.",
+  "description": "HTTP handlers for **changes mutate** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module.",
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
+    "sdk:composition",
     "api:routes-changes-mutate",
-    "core:kernel",
     "core:save-change-artifact"
   ],
   "context": [
-    "HTTP handlers for **changes mutate** in SpecD Studio. They validate requests, call existing `@specd/core` (or graph) operations listed in the paired `routes-*` spec, and map results through presenters — HTTP handler wiring for **Changes Mutate**: validates input, invokes kernel or graph operations, maps results through presenters. Business rules live in `@specd/core`, not in this module."
+    "HTTP handlers for **changes mutate** in SpecD Studio. They validate requests, call kernel use cases exposed through `@specd/sdk` as listed in the paired `routes-*` spec, and map results through presenters. Business rules live in core use cases invoked via `apiContext.kernel` — not in this delivery module."
   ],
   "rules": [
     {
@@ -21,7 +21,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in `@specd/core`. This handler MUST invoke only:\n\n- `SaveChangeArtifact`\n- `ValidateArtifacts`\n- `TransitionChange`\n- `EditChange`\n- draft / restore / discard / archive\n- `approveSpec` / `approveSignoff`\n- `InvalidateChange`\n- `SkipArtifact`\n- `updateSpecDeps`\n- `updateImplementationTracking`"
+        "Business rules for lifecycle, validation, approvals, and conflicts MUST live in core use cases. This handler MUST invoke them only through `apiContext.kernel`, including:\n\n- `SaveChangeArtifact`\n- `ValidateArtifacts`\n- `TransitionChange`\n- `EditChange`\n- draft / restore / discard / archive\n- `approveSpec` / `approveSignoff`\n- `InvalidateChange`\n- `SkipArtifact`\n- `updateSpecDeps`\n- `updateImplementationTracking`"
       ]
     },
     {
@@ -47,9 +47,16 @@
       "rules": [
         "Every mutating kernel call MUST receive the `actor` resolved in `createApiContext` so history events record the correct `by` field."
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "rules": [
+        "Handler modules MUST import kernel types, errors, and use-case entry points from `@specd/sdk`. They MUST NOT import `@specd/core` directly."
+      ]
     }
   ],
   "constraints": [
+    "Handler modules MUST import kernel types and use-case entry points from @specd/sdk, not @specd/core directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -193,6 +200,15 @@
         "the same actor is passed to every mutating call",
         "AND history entries share the same by"
       ]
+    },
+    {
+      "requirement": "SDK delivery imports",
+      "name": "Handler imports kernel surface from SDK",
+      "when": ["inspecting handler-changes-mutate module imports"],
+      "then": [
+        "kernel types and errors are imported from @specd/sdk",
+        "AND @specd/core is not imported directly"
+      ]
     }
   ],
   "implementation": {
@@ -205,8 +221,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b5e7790f15610ebbfa3fd047af417d22e64416535b9613cda43054bea0b4f76d",
-    "verify.md": "sha256:e5ca13800e20085dc4dc4b3c5851faec077d4af78b6d88d612fffe25d00c8e90"
+    "spec.md": "sha256:34dfc90efd353670b94b4a92c86aca047e56e028e22a6e51fa8ed63e4f13357d",
+    "verify.md": "sha256:a86e7fb76d7c211438ac0737d362befc6edac6c805d60b6167a7832d1116e2fa"
   },
   "generatedBy": "core"
 }

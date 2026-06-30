@@ -20,6 +20,7 @@
     }
   ],
   "constraints": [
+    "@specd/api delivery and composition code MUST import host bootstrap and kernel types from @specd/sdk, not @specd/core or @specd/code-graph directly.",
     "HTTP handlers MUST NOT import @specd/core from @specd/ui or @specd/client.",
     "v1 server auth: api.auth.type from specd.yaml (never studio.*); registry registers only disabled; no server-side Bearer enforcement on loopback or specd ui serve.",
     "Artifact save/load MUST use core:save-change-artifact and core:get-change-artifact — not raw ChangeRepository.saveArtifact from HTTP handlers.",
@@ -68,7 +69,7 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9ae6732d6b4e44d4e7916609574f3dfcebe4e11e757e258ac7daab9eddb64106",
+    "spec.md": "sha256:859fbef40fc64a02211c09e94466c3802b7f09c68c299134a7e852a46baceefd",
     "verify.md": "sha256:ccab8bf7a29589a4c22c161219ad80759db59b15941d929400cbe7b8ad9c1d1f"
   },
   "generatedBy": "core"

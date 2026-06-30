@@ -38,7 +38,7 @@
     {
       "requirement": "Import policy for integrators",
       "rules": [
-        "Delivery hosts (`@specd/cli`, `@specd/mcp`, and future API/IPC hosts) that use both `@specd/core` and `@specd/code-graph` MUST depend on `@specd/sdk` only — not on `@specd/core` and `@specd/code-graph` as parallel direct runtime dependencies.\n\nPackages that need only `@specd/core` (for example `plugin-*`, `skills`) MAY import `@specd/core` directly.\n\nCustom storage implementers MAY import port contracts from `@specd/core/ports` or `@specd/sdk/ports`, and registration types from `@specd/core/extensions` or `@specd/sdk/extensions`."
+        "Delivery hosts that use both `@specd/core` and `@specd/code-graph` MUST depend on `@specd/sdk` only — not on `@specd/core` and `@specd/code-graph` as parallel direct runtime dependencies. This includes:\n\n- `@specd/cli`\n- `@specd/mcp`\n- `@specd/api` (Studio HTTP server)\n- `apps/specd-studio-desktop` main process (local IPC profile)\n\nPackages that need only `@specd/core` (for example `plugin-*`, `skills`) MAY import `@specd/core` directly.\n\nCustom storage implementers MAY import port contracts from `@specd/core/ports` or `@specd/sdk/ports`, and registration types from `@specd/core/extensions` or `@specd/sdk/extensions`.\n\nDesktop graph execution that requires the Electron SQLite runtime MAY additionally depend on `@specd/code-graph-electron` for provider construction in the main process. That exception applies only to graph IPC paths — kernel and change/spec orchestration MUST still flow through `@specd/sdk`."
       ]
     },
     {
@@ -103,15 +103,21 @@
     },
     {
       "requirement": "Import policy for integrators",
-      "name": "CLI has no direct core dependency",
-      "when": ["packages/cli/package.json runtime dependencies are inspected"],
-      "then": ["only @specd/sdk is listed among specd platform packages"]
+      "name": "API package depends on SDK only",
+      "when": ["inspecting packages/api/package.json runtime dependencies"],
+      "then": [
+        "@specd/sdk is declared",
+        "AND @specd/core and @specd/code-graph are not direct runtime dependencies"
+      ]
     },
     {
       "requirement": "Import policy for integrators",
-      "name": "Plugin may depend on core directly",
-      "when": ["packages/plugin-manager/package.json runtime dependencies are inspected"],
-      "then": ["@specd/core may be present", "AND @specd/sdk is not required"]
+      "name": "Desktop main depends on SDK for kernel bootstrap",
+      "when": ["inspecting apps/specd-studio-desktop main-process imports for kernel construction"],
+      "then": [
+        "bootstrap uses @specd/sdk",
+        "AND @specd/core is not imported directly for host wiring"
+      ]
     },
     {
       "requirement": "Version constant",
@@ -121,6 +127,16 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:src/core-reexports.ts"
+      },
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:package.json"
+      }
+    ],
     "symbols": [
       {
         "specId": "sdk:composition",
@@ -135,8 +151,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:af6c02a6fc652fd4f7f9340049f37497cbf0f166f5d915a847fe88a8e39429bd",
-    "verify.md": "sha256:43a083fce155eadc8f99c4df903b5fb3926a4f61f0e6f6ba4429c61ef5a31dd7"
+    "spec.md": "sha256:154636c59a702ebed66b0072e2c91c7c97877f416440c869d8612e20388cd6d7",
+    "verify.md": "sha256:bd132ffb23056cc29bbe4ff056606db37dfd5eb3593a862be8a57626bcc03174"
   },
   "generatedBy": "core"
 }

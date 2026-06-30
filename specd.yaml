@@ -170,6 +170,62 @@ workspaces:
       excludePaths:
         - '*'
 
+  api:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/api
+    codeRoot: packages/api
+    ownership: owned
+
+  client:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/client
+    codeRoot: packages/client
+    ownership: owned
+
+  ui:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/ui
+    codeRoot: packages/ui
+    ownership: owned
+
+  studio-desktop:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/studio-desktop
+    codeRoot: apps/specd-studio-desktop
+    ownership: owned
+
+  studio-web:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/studio-web
+    codeRoot: apps/specd-studio-web
+    ownership: owned
+
+  code-graph-electron:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/code-graph-electron
+    codeRoot: packages/code-graph-electron
+    ownership: owned
+
+  plugin-ui-studio:
+    specs:
+      adapter: fs
+      fs:
+        path: specs/plugin-ui-studio
+    codeRoot: packages/plugin-ui-studio
+    ownership: owned
+
 storage:
   changes:
     adapter: fs

@@ -1,0 +1,32 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Shared source model without behavioural fork'
+  content: |
+    ### Requirement: workspace dependency on shared code-graph package
+
+    `@specd/code-graph-electron` MUST declare a workspace runtime dependency on `@specd/code-graph`.
+
+    The bundled `dist/` entry MUST resolve `CODE_GRAPH_VERSION` from the installed `@specd/code-graph` package without requiring the bundle file to live inside the `@specd/code-graph` source tree.
+
+    Version lookup MUST search ancestor directories for both:
+
+    - a parent `package.json` with `name: "@specd/code-graph"`
+    - `node_modules/@specd/code-graph/package.json`
+
+    Package `exports` MUST expose a `require` condition alongside `import` so desktop CommonJS main bundles can load the Electron graph provider.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    ## Spec Dependencies
+
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — shared provider surface and composition expectations that the Electron package must preserve
+    - [`code-graph:sqlite-graph-store`](../../code-graph/sqlite-graph-store/spec.md) — SQLite-backed graph behaviour whose native runtime path must be isolated for Electron
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — package-layering and composition constraints for runtime-specific wiring

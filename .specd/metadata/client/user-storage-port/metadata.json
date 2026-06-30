@@ -26,6 +26,7 @@
     }
   ],
   "constraints": [
+    "@specd/ui and @specd/client MUST NOT import @specd/core or @specd/sdk for kernel bootstrap.",
     "Client storage implementations MUST NOT import @specd/core.",
     "The storage interface SHALL handle JSON serialization and deserialization internally for objects/arrays."
   ],
@@ -63,9 +64,27 @@
       "then": ["it delegates to the preloaded IPC bridge"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "client:user-storage-port",
+        "file": "client:src/storage/file-user-storage.ts"
+      },
+      {
+        "specId": "client:user-storage-port",
+        "file": "client:src/storage/local-storage-user-storage.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "client:user-storage-port",
+        "file": "client:src/storage/user-storage-port.ts",
+        "symbol": "IUserStorage"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:4761766f7cc50c7f6488bf044c7d5d6f0f1ccde275480eb36760cd58ade8aef8",
+    "spec.md": "sha256:b76ea3f28ee0a3959e1a2aaa1d4de297dae117fb411300adf8209c1626e00491",
     "verify.md": "sha256:c6f56fe808f7ac2be52e365bca64c48cc6eb67c6cf934030dfaffc4dab44e6fd"
   },
   "generatedBy": "core"

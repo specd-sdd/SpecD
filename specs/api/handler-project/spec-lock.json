@@ -6,13 +6,16 @@
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "api:routes-project",
-    "core:kernel"
+    "sdk:composition",
+    "api:routes-project"
   ],
   "implementation": [
     {
       "file": "api:src/delivery/http/handlers/handler-project.ts",
       "symbols": ["registerProjectRoutes"]
+    },
+    {
+      "file": "api:src/delivery/http/handlers/handler-project-logs.ts"
     }
   ]
 }
