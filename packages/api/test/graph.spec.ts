@@ -102,12 +102,10 @@ describe('Graph API', () => {
   })
 
   it('given api server, when GET /graph/hotspots, then returns hotspot ranking', async () => {
-    const { res, data } = await apiJson<{ entries: unknown[]; totalSymbols: number }>(
-      '/graph/hotspots?limit=5',
-    )
+    const { res, data } =
+      await apiJson<readonly Record<string, unknown>[]>('/graph/hotspots?limit=5')
     expect(res.ok).toBe(true)
-    expect(Array.isArray(data.entries)).toBe(true)
-    expect(data.totalSymbols).toBeGreaterThanOrEqual(0)
+    expect(Array.isArray(data)).toBe(true)
   })
 
   it('given force flag, when POST /graph/index, then returns indexing summary dto', async () => {

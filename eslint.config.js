@@ -213,18 +213,6 @@ export default tseslint.config(
   // Test files (specs and helpers) — relax all quality rules
   {
     files: ['packages/*/test/**/*.ts', 'apps/*/test/**/*.ts', 'apps/*/test/**/*.tsx'],
-    languageOptions: {
-      parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            'packages/*/test/*.ts',
-            'packages/*/test/*.tsx',
-            'apps/*/test/*.ts',
-            'apps/*/test/*.tsx',
-          ],
-        },
-      },
-    },
     rules: {
       'jsdoc/require-jsdoc': 'off',
       'jsdoc/require-description': 'off',
