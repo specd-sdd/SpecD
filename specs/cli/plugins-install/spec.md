@@ -20,7 +20,7 @@ Each `plugin` is an npm package name (e.g., `@specd/plugin-agent-claude`).
 
 When the command needs the set of declared plugins (for example to detect already-installed plugins), it MUST read from the loaded `SpecdConfig.plugins` field. It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.
 
-For already-installed detection, the command MUST consult `config.plugins.agents` (or the appropriate type bucket).
+For already-installed detection, the command MUST consult the appropriate type bucket in `config.plugins` (`agents` for agent plugins, `ui` for UI plugins) after the plugin type is known from `LoadPlugin`.
 
 ### Requirement: Display name
 
@@ -36,13 +36,26 @@ When a plugin name is already declared in `specd.yaml` under the appropriate typ
 
 ### Requirement: Installation workflow
 
-For each plugin name that is not already installed:
+For each plugin name that is not already installed in its type bucket:
 
-1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.
-2. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` to record the plugin in `specd.yaml`.
-3. On failure, the command MUST emit the error message and continue with the remaining plugins.
+1. The command MUST load the plugin via `LoadPlugin` to determine `plugin.type`.
+2. For `agent` plugins, the command MUST call `InstallPlugin` from `@specd/plugin-manager`.
+3. For `ui` plugins, the command MUST call `InstallUiPlugin` from `@specd/plugin-manager`.
+4. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` where `type` is `agents` for agent plugins and `ui` for UI plugins.
+5. On failure, the command MUST emit the error message and continue with the remaining plugins.
 
 The command MUST NOT call `kernel.project.addPlugin`. It SHOULD construct a kernel only when subsequent domain operations require one.
+
+The command MUST NOT route UI plugins through `InstallPlugin` or persist them under `plugins.agents`.
+
+### Requirement: Plugin type bucket mapping
+
+Runtime `plugin.type` MUST map to config buckets as follows:
+
+| `plugin.type` | `plugins` bucket |
+| ------------- | ---------------- |
+| `agent`       | `agents`         |
+| `ui`          | `ui`             |
 
 ### Requirement: Exit code
 
@@ -65,7 +78,8 @@ The format MUST be machine-parseable when invoked with `--format json`.
 
 ## Spec Dependencies
 
-- [`plugin-manager:install-plugin-use-case`](../../plugin-manager/install-plugin-use-case/spec.md) — orchestrates plugin installation
+- [`plugin-manager:install-plugin-use-case`](../../plugin-manager/install-plugin-use-case/spec.md) — agent plugin installation
+- [`plugin-manager:ui-plugin-type`](../../plugin-manager/ui-plugin-type/spec.md) — UI plugin installation via `InstallUiPlugin`
 - [`plugin-manager:load-plugin-use-case`](../../plugin-manager/load-plugin-use-case/spec.md) — validates plugin before installation
 - [`core:composition`](../../core/composition/spec.md) — `createConfigWriter()` factory
 - [`core:config-writer-port`](../../core/config-writer-port/spec.md) — persists plugin declarations via `addPlugin`

@@ -1,7 +1,7 @@
 {
   "name": "fix-plugins-install-ui",
   "createdAt": "2026-06-30T16:31:36.041Z",
-  "updatedAt": "2026-06-30T16:46:46.344Z",
+  "updatedAt": "2026-06-30T16:49:04.560Z",
   "description": "Route UI plugins through InstallUiPlugin and plugins.ui in plugins install",
   "schema": {
     "name": "schema-std",
@@ -22,11 +22,24 @@
   "trackedImplementationFiles": [
     {
       "file": "packages/cli/src/commands/plugins/install.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/plugins.spec.ts",
-      "state": "open"
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "cli:plugins-install",
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["installPluginsWithKernel", "registerPluginsInstall", "toPluginBucket"]
+    },
+    {
+      "specId": "cli:plugins-install",
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "fileLinkExplicit": true
     }
   ],
   "artifacts": [
@@ -288,6 +301,23 @@
       },
       "from": "done",
       "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:49:04.560Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
     }
-  ]
+  ],
+  "archivedAt": "2026-06-30T16:49:04.589Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }

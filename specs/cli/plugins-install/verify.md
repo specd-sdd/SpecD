@@ -23,6 +23,13 @@
 - **THEN** the command detects the plugin as already installed from `config.plugins`
 - **AND** it does not call `kernel.project.listPlugins`
 
+#### Scenario: UI already-installed check uses plugins.ui
+
+- **GIVEN** `@specd/plugin-ui-studio` is declared under `plugins.ui` in the loaded config
+- **WHEN** `specd plugins install @specd/plugin-ui-studio` is invoked
+- **THEN** the command detects the plugin as already installed from `config.plugins.ui`
+- **AND** it does not call `InstallUiPlugin` again
+
 #### Scenario: Declaration read does not re-read disk via ConfigWriter
 
 - **GIVEN** a loaded `SpecdConfig` snapshot is available
@@ -52,8 +59,32 @@
 
 - **WHEN** `specd plugins install @specd/plugin-agent-claude` is invoked with plugin not installed
 - **THEN** `InstallPlugin` use case is called
-- **AND** `createConfigWriter().addPlugin` is called to record the plugin in `specd.yaml`
+- **AND** `createConfigWriter().addPlugin` is called with bucket `agents`
 - **AND** `kernel.project.addPlugin` is not called
+
+#### Scenario: UI plugin uses InstallUiPlugin and plugins.ui
+
+- **GIVEN** `@specd/plugin-ui-studio` is not declared under `plugins.ui`
+- **WHEN** `specd plugins install @specd/plugin-ui-studio` is invoked
+- **THEN** `LoadPlugin` determines `plugin.type` is `ui`
+- **AND** `InstallUiPlugin` use case is called
+- **AND** `InstallPlugin` is not called
+- **AND** `createConfigWriter().addPlugin` is called with bucket `ui`
+- **AND** the declaration is recorded under `plugins.ui` in `specd.yaml`
+
+### Requirement: Plugin type bucket mapping
+
+#### Scenario: Agent plugin maps to agents bucket
+
+- **GIVEN** a loaded agent plugin with `plugin.type` `agent`
+- **WHEN** the install workflow persists the declaration
+- **THEN** `addPlugin` is called with bucket `agents`
+
+#### Scenario: UI plugin maps to ui bucket
+
+- **GIVEN** a loaded UI plugin with `plugin.type` `ui`
+- **WHEN** the install workflow persists the declaration
+- **THEN** `addPlugin` is called with bucket `ui`
 
 ### Requirement: Exit code
 

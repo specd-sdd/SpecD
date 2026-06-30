@@ -3,6 +3,7 @@
   "description": "Defines the CLI contract for installing specd plugins. The command reads the current plugin configuration, validates each requested plugin, installs it via the plugin manager, and records the installation in the project configuration.",
   "dependsOn": [
     "plugin-manager:install-plugin-use-case",
+    "plugin-manager:ui-plugin-type",
     "plugin-manager:load-plugin-use-case",
     "core:composition",
     "core:config-writer-port",
@@ -21,7 +22,7 @@
     {
       "requirement": "Declaration source",
       "rules": [
-        "When the command needs the set of declared plugins (for example to detect already-installed plugins), it MUST read from the loaded `SpecdConfig.plugins` field. It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.\n\nFor already-installed detection, the command MUST consult `config.plugins.agents` (or the appropriate type bucket)."
+        "When the command needs the set of declared plugins (for example to detect already-installed plugins), it MUST read from the loaded `SpecdConfig.plugins` field. It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.\n\nFor already-installed detection, the command MUST consult the appropriate type bucket in `config.plugins` (`agents` for agent plugins, `ui` for UI plugins) after the plugin type is known from `LoadPlugin`."
       ]
     },
     {
@@ -39,7 +40,13 @@
     {
       "requirement": "Installation workflow",
       "rules": [
-        "For each plugin name that is not already installed:\n\n1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.\n2. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` to record the plugin in `specd.yaml`.\n3. On failure, the command MUST emit the error message and continue with the remaining plugins.\n\nThe command MUST NOT call `kernel.project.addPlugin`. It SHOULD construct a kernel only when subsequent domain operations require one."
+        "For each plugin name that is not already installed in its type bucket:\n\n1. The command MUST load the plugin via `LoadPlugin` to determine `plugin.type`.\n2. For `agent` plugins, the command MUST call `InstallPlugin` from `@specd/plugin-manager`.\n3. For `ui` plugins, the command MUST call `InstallUiPlugin` from `@specd/plugin-manager`.\n4. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` where `type` is `agents` for agent plugins and `ui` for UI plugins.\n5. On failure, the command MUST emit the error message and continue with the remaining plugins.\n\nThe command MUST NOT call `kernel.project.addPlugin`. It SHOULD construct a kernel only when subsequent domain operations require one.\n\nThe command MUST NOT route UI plugins through `InstallPlugin` or persist them under `plugins.agents`."
+      ]
+    },
+    {
+      "requirement": "Plugin type bucket mapping",
+      "rules": [
+        "Runtime `plugin.type` MUST map to config buckets as follows:\n\n| `plugin.type` | `plugins` bucket |\n| ------------- | ---------------- |\n| `agent`       | `agents`         |\n| `ui`          | `ui`             |"
       ]
     },
     {
@@ -86,6 +93,16 @@
     },
     {
       "requirement": "Declaration source",
+      "name": "UI already-installed check uses plugins.ui",
+      "given": ["@specd/plugin-ui-studio is declared under plugins.ui in the loaded config"],
+      "when": ["specd plugins install @specd/plugin-ui-studio is invoked"],
+      "then": [
+        "the command detects the plugin as already installed from config.plugins.ui",
+        "AND it does not call InstallUiPlugin again"
+      ]
+    },
+    {
+      "requirement": "Declaration source",
       "name": "Declaration read does not re-read disk via ConfigWriter",
       "given": ["a loaded SpecdConfig snapshot is available"],
       "when": ["the install workflow checks declared plugins"],
@@ -115,9 +132,36 @@
       ],
       "then": [
         "InstallPlugin use case is called",
-        "AND createConfigWriter().addPlugin is called to record the plugin in specd.yaml",
+        "AND createConfigWriter().addPlugin is called with bucket agents",
         "AND kernel.project.addPlugin is not called"
       ]
+    },
+    {
+      "requirement": "Installation workflow",
+      "name": "UI plugin uses InstallUiPlugin and plugins.ui",
+      "given": ["@specd/plugin-ui-studio is not declared under plugins.ui"],
+      "when": ["specd plugins install @specd/plugin-ui-studio is invoked"],
+      "then": [
+        "LoadPlugin determines plugin.type is ui",
+        "AND InstallUiPlugin use case is called",
+        "AND InstallPlugin is not called",
+        "AND createConfigWriter().addPlugin is called with bucket ui",
+        "AND the declaration is recorded under plugins.ui in specd.yaml"
+      ]
+    },
+    {
+      "requirement": "Plugin type bucket mapping",
+      "name": "Agent plugin maps to agents bucket",
+      "given": ["a loaded agent plugin with plugin.type agent"],
+      "when": ["the install workflow persists the declaration"],
+      "then": ["addPlugin is called with bucket agents"]
+    },
+    {
+      "requirement": "Plugin type bucket mapping",
+      "name": "UI plugin maps to ui bucket",
+      "given": ["a loaded UI plugin with plugin.type ui"],
+      "when": ["the install workflow persists the declaration"],
+      "then": ["addPlugin is called with bucket ui"]
     },
     {
       "requirement": "Exit code",
@@ -144,12 +188,22 @@
         "specId": "cli:plugins-install",
         "file": "cli:src/commands/plugins/install.ts",
         "symbol": "installPluginsWithKernel"
+      },
+      {
+        "specId": "cli:plugins-install",
+        "file": "cli:src/commands/plugins/install.ts",
+        "symbol": "registerPluginsInstall"
+      },
+      {
+        "specId": "cli:plugins-install",
+        "file": "cli:src/commands/plugins/install.ts",
+        "symbol": "toPluginBucket"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:406ac03b97e41133c07ba7676391f825c5872b1e24c38837f9c41baa1561113d",
-    "verify.md": "sha256:0ff07e0858fc69cf8775c4d81f265576ffbe99e8c468b9da6f0c9482c630e877"
+    "spec.md": "sha256:9e5f1aeca4905c3b507fad8f53aeb02e3de57e3e3d27d16337beb26f74feb546",
+    "verify.md": "sha256:4d2cb3bbb053edf66ca6683d80d85b9d43e13c7f8634639aee188e35becb092a"
   },
   "generatedBy": "core"
 }

@@ -8,12 +8,13 @@
     "plugin-manager:load-plugin-use-case",
     "core:composition",
     "core:config-writer-port",
-    "core:get-config"
+    "core:get-config",
+    "plugin-manager:ui-plugin-type"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/plugins/install.ts",
-      "symbols": ["installPluginsWithKernel"]
+      "symbols": ["installPluginsWithKernel", "registerPluginsInstall", "toPluginBucket"]
     },
     {
       "file": "cli:test/commands/plugins.spec.ts"
