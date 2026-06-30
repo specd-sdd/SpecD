@@ -1,7 +1,7 @@
 {
   "name": "fix-plugins-install-ui",
   "createdAt": "2026-06-30T16:31:36.041Z",
-  "updatedAt": "2026-06-30T16:42:12.671Z",
+  "updatedAt": "2026-06-30T16:43:46.136Z",
   "description": "Route UI plugins through InstallUiPlugin and plugins.ui in plugins install",
   "schema": {
     "name": "schema-std",
@@ -19,6 +19,16 @@
     ]
   },
   "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "state": "open"
+    }
+  ],
   "artifacts": [
     {
       "type": "proposal",
@@ -86,7 +96,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:6245e6206990128db8198150807818ea3be4d8d9137617ac9ffa9042982a5834"
+          "validatedHash": "sha256:3e8cb3402c3d4e0670721ea471cf503256b9d34c399373901252dc4ef8e88ba1"
         }
       ]
     }
@@ -188,6 +198,56 @@
     {
       "type": "transitioned",
       "at": "2026-06-30T16:42:12.671Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-30T16:42:59.225Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:42:59.225Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:43:39.019Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-30T16:43:41.919Z",
       "by": {
         "name": "M***a",
         "email": "1***i@u***.com",
