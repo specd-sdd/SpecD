@@ -9,7 +9,7 @@
     {
       "requirement": "list() method",
       "rules": [
-        "The `list()` method MUST:\n\n- Return an array of all `Skill` objects (metadata only, no template content)\n- Return `readonly Skill[]`"
+        "The `list()` method MUST:\n\n- Return an array of all `Skill` objects (metadata only, no template content)\n- Scan both `templates/skills/` and `templates/agents/` directories\n- Correctlty set the `kind` property for each skill based on its parent directory\n- Return `readonly Skill[]`"
       ]
     },
     {
@@ -43,9 +43,12 @@
   "scenarios": [
     {
       "requirement": "list() method",
-      "name": "List returns skills",
+      "name": "List returns skills and agents with correct kind",
       "when": ["repository.list() is called"],
-      "then": ["an array of Skill objects is returned"]
+      "then": [
+        "it returns both skills and agents",
+        "AND each object has the correct kind property based on its source folder"
+      ]
     },
     {
       "requirement": "get() method",
@@ -120,32 +123,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "skills:skill-repository",
-        "file": "skills:test/infrastructure/skill-repository.spec.ts",
-        "symbol": "FsSkillRepository"
-      },
-      {
-        "specId": "skills:skill-repository",
-        "file": "skills:test/infrastructure/skill-repository.spec.ts",
-        "symbol": "TemplateRenderer"
-      },
-      {
-        "specId": "skills:skill-repository",
-        "file": "skills:src/infrastructure/repository/skill-template-metadata-reader.ts",
-        "symbol": "SkillTemplateMetadataReader"
-      },
-      {
-        "specId": "skills:skill-repository",
-        "file": "skills:src/infrastructure/repository/skill-repository.ts",
-        "symbol": "FsSkillRepository"
+        "file": "skills:src/infrastructure/repository/skill-repository.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f86ce0203152f3f5a23796d420daf14d6c7f24cc5c1729aa806ecc7bb882a9f3",
-    "verify.md": "sha256:6995ca2af4355767355c0de1d3e282e4fa58e97769f5912b9f099900470994a4"
+    "spec.md": "sha256:0381d4cf147dca53773f5c9878435914901f1ec752d93a1814dad3ac378dc862",
+    "verify.md": "sha256:c01e530a7b8827c3aedce4a457ddb4f0dbff18b029c4c656e12124c5ead6cabc"
   },
   "generatedBy": "core"
 }

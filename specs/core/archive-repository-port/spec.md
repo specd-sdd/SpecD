@@ -105,6 +105,18 @@ This mirrors `ChangeRepository.changePath(change)` for active changes. The path 
 
 This method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes.
 
+### Requirement: internalPaths returns absolute storage paths
+
+`internalPaths()` MUST return an array of absolute filesystem paths to internal specd management directories owned by the repository, or `undefined` when the concept does not apply.
+
+Returning `undefined` signals that internal-path exclusion is not applicable (e.g. remote backends that do not manage local filesystem directories). Implementations MUST NOT return an empty array to signal inapplicability; an empty array means "no paths to exclude".
+
+For `FsArchiveRepository`, this MUST include:
+
+- the absolute path to the archive root directory
+
+These paths are used by implementation discovery to avoid tracking specd's own metadata.
+
 ### Requirement: reindex rebuilds the archive index
 
 `reindex()` MUST rebuild `index.jsonl` by scanning the archive directory for all manifest files, sorting entries by `archivedAt` in chronological order, and writing a clean index. The resulting file MUST be in chronological order (oldest first) so that git diffs show only added or removed lines — never reorderings.

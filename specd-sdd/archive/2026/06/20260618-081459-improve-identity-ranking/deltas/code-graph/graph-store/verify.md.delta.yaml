@@ -1,0 +1,143 @@
+- op: modified
+  description: Extend abstract search verification with token expansion and token-strength identity ordering scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Search with exact-match prioritization$'
+  rename: 'Requirement: Search with primary-identity prioritization'
+  content: |
+    #### Scenario: Symbol search matches normalized compound names
+
+    - **GIVEN** symbols `createUser`, `deleteUser`, and `listOrders` are indexed
+    - **WHEN** `searchSymbols({ query: 'user' })` is called
+    - **THEN** `createUser` and `deleteUser` are returned ahead of unrelated symbols
+
+    #### Scenario: Symbol search includes comments
+
+    - **GIVEN** a symbol with comment text containing `Validates the user's authentication token`
+    - **WHEN** `searchSymbols({ query: 'authentication token' })` is called
+    - **THEN** that symbol is returned
+
+    #### Scenario: Symbol search result includes file-backed snippet
+
+    - **GIVEN** a matching symbol with a persisted source file and recorded location
+    - **WHEN** `searchSymbols(...)` returns that symbol
+    - **THEN** the result includes a `snippet` preview derived from persisted file source content around the symbol location
+
+    #### Scenario: Spec search matches description and content
+
+    - **GIVEN** a spec whose description mentions `adapter parsing`
+    - **AND** another spec whose content contains `lifecycle state transition`
+    - **WHEN** the corresponding queries are issued through `searchSpecs`
+    - **THEN** the matching spec is returned in each case with a relevance score
+
+    #### Scenario: Spec search result includes snippet
+
+    - **WHEN** `searchSpecs(...)` returns a matching spec
+    - **THEN** each result includes a `snippet` preview explaining the hit
+
+    #### Scenario: Exact Spec ID match is prioritized first
+
+    - **GIVEN** a spec with ID `core:change`
+    - **AND** a search query `core:change`
+    - **WHEN** the spec search is executed
+    - **THEN** the spec `core:change` appears as the first result
+
+    #### Scenario: Exact Document Path match is prioritized first
+
+    - **GIVEN** a document with path `root:package.json`
+    - **AND** a search query `root:package.json`
+    - **WHEN** the document search is executed
+    - **THEN** the document `root:package.json` appears as the first result
+
+    #### Scenario: Filters are applied before limiting results
+
+    - **GIVEN** more than 20 matching symbols exist across multiple workspaces
+    - **WHEN** `searchSymbols({ query: 'hook', workspace: 'core', limit: 5 })` is called
+    - **THEN** only workspace `core` contributes candidates
+    - **AND** at most 5 filtered results are returned
+
+    #### Scenario: Search indexes can be rebuilt explicitly
+
+    - **GIVEN** a backend whose search indexes are not auto-maintained during bulk writes
+    - **WHEN** `rebuildFtsIndexes()` is called after bulk data changes
+    - **THEN** subsequent abstract search queries see the new symbols and specs
+
+    #### Scenario: Persisted file content does not introduce file search surface
+
+    - **GIVEN** a backend persists file source content for symbol snippet extraction
+    - **WHEN** consumers use the abstract search contract
+    - **THEN** the contract exposes search across symbols, specs, and documents only
+    - **AND** no separate file full-text search category is implied by persisted file content
+
+    #### Scenario: Spec-id segment outranks content-only hit
+
+    - **GIVEN** a spec with ID `default:_global/architecture`
+    - **AND** another spec contains `architecture` repeatedly only in its body content
+    - **WHEN** `searchSpecs({ query: 'architecture' })` is executed
+    - **THEN** the spec-id hit appears ahead of the content-only hit
+
+    #### Scenario: Symbol declared name outranks comment-only hit
+
+    - **GIVEN** a symbol whose declared name is `SearchSpecs`
+    - **AND** another symbol contains `search specs` only in its comment text
+    - **WHEN** `searchSymbols({ query: 'SearchSpecs' })` is executed
+    - **THEN** the declared-name hit appears ahead of the comment-only hit
+
+    #### Scenario: Document path component outranks body-only hit
+
+    - **GIVEN** a document whose canonical path contains `graph-search`
+    - **AND** another document contains `graph search` only in its body content
+    - **WHEN** `searchDocuments({ query: 'graph-search' })` is executed
+    - **THEN** the path-identity hit appears ahead of the body-only hit
+
+    #### Scenario: Search expands specd-shaped tokens before identity ranking
+
+    - **GIVEN** a spec with ID `core:change`
+    - **AND** another spec mentions `core change` only in body content
+    - **WHEN** `searchSpecs({ query: 'core:change' })` is executed
+    - **THEN** the backend may use tokens including `core:change`, `core`, and `change`
+    - **AND** the spec-id hit appears ahead of the body-only hit
+
+    #### Scenario: Strong identity hit may be discovered outside backend-native FTS tokenization
+
+    - **GIVEN** a backend whose native tokenizer does not surface every suffix or substring identity hit through its default full-text candidate set
+    - **AND** one candidate still has the strongest observable identity evidence required by this contract
+    - **WHEN** `searchSymbols(...)`, `searchSpecs(...)`, or `searchDocuments(...)` is executed
+    - **THEN** that strong identity hit is still returned
+    - **AND** it is ordered according to the required identity-strength ladder rather than being dropped for lack of native tokenizer coverage
+
+    #### Scenario: Search expands CamelCase tokens before identity ranking
+
+    - **GIVEN** a symbol named `ArchiveChange`
+    - **AND** another symbol contains `archive change` only in comment text
+    - **WHEN** `searchSymbols({ query: 'ArchiveChange' })` is executed
+    - **THEN** the backend may use tokens including `archivechange`, `archive`, and `change`
+    - **AND** the declared-name hit appears ahead of the comment-only hit
+
+    #### Scenario: Exact token match outranks prefix token match
+
+    - **GIVEN** one candidate identity matches token `change` exactly
+    - **AND** another candidate identity matches `change` only by prefix
+    - **WHEN** `searchSymbols({ query: 'change' })` is executed
+    - **THEN** the exact-token hit appears ahead of the prefix-only hit
+
+    #### Scenario: Prefix token match outranks suffix token match
+
+    - **GIVEN** one candidate identity matches token `repo` by prefix
+    - **AND** another candidate identity matches `repo` only by suffix
+    - **WHEN** `searchSymbols({ query: 'repo' })` is executed
+    - **THEN** the prefix-token hit appears ahead of the suffix-only hit
+
+    #### Scenario: Suffix token match outranks arbitrary substring token match
+
+    - **GIVEN** one candidate identity matches token `repository` by suffix
+    - **AND** another candidate identity matches `repository` only as an arbitrary substring
+    - **WHEN** `searchDocuments({ query: 'repository' })` is executed
+    - **THEN** the suffix-token hit appears ahead of the arbitrary-substring hit
+
+    #### Scenario: Real identity component outranks arbitrary substring match
+
+    - **GIVEN** one spec ID is `core:change`
+    - **AND** another spec ID contains substring `core` only inside a larger token such as `score`
+    - **WHEN** `searchSpecs({ query: 'core' })` is executed
+    - **THEN** the real component match appears ahead of the arbitrary-substring hit

@@ -1,0 +1,5 @@
+releases:
+  core:kernel: minor
+  cli:plugins-list: patch
+  cli:plugins-install: patch
+  cli:plugins-update: patch

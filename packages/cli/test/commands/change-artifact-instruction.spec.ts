@@ -90,7 +90,7 @@ describe('change artifact-instruction', () => {
 
   it('handles domain errors via handleError', async () => {
     const { kernel, stderr } = setup()
-    const { ChangeNotFoundError } = await import('@specd/core')
+    const { ChangeNotFoundError } = await import('@specd/sdk')
     kernel.changes.getArtifactInstruction.execute.mockRejectedValue(
       new ChangeNotFoundError('missing'),
     )

@@ -1,0 +1,24 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Implementation traceability policy'
+  content: |
+    ### Requirement: Context optimization policy
+
+    When `llmOptimizedContext` is enabled, the system SHALL prefer using ultra-terse representations for all context compiled from metadata.
+
+    Orchestrator agents SHOULD delegate context optimization to specialized subagents (`specd-project-context-optimizer`, `specd-spec-context-optimizer`) whenever the runtime supports subagent flows.
+
+    If subagent flows are not supported, the orchestrator agent SHALL perform optimization inline following the "smart caveman" style defined in [`skills:agents`](../agents/spec.md).
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples
+    - [`skills:agents`](../agents/spec.md) — defines specialized optimizer agents and their prompts.

@@ -1,0 +1,23 @@
+- op: added
+  description: Verify default orchestration callers
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input contract'
+  content: |
+    ### Requirement: Default orchestration by host use cases
+
+    #### Scenario: GetStatus delegates to RefreshImplementationTracking
+
+    - **GIVEN** `GetStatus` is configured with a `RefreshImplementationTracking` collaborator
+    - **WHEN** `GetStatus` performs a default active-change status load
+    - **THEN** it calls `RefreshImplementationTracking.execute({ name })` rather than `ImplementationDetector` directly
+
+    #### Scenario: TransitionChange delegates to RefreshImplementationTracking
+
+    - **GIVEN** `TransitionChange` is configured with a `RefreshImplementationTracking` collaborator
+    - **WHEN** `TransitionChange` performs a default active-change transition
+    - **THEN** it calls `RefreshImplementationTracking.execute({ name })` rather than `ImplementationDetector` directly

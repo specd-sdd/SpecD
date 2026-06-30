@@ -1,0 +1,11 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: list\(\) method'
+  content: |
+    The `list()` method MUST:
+
+    - Return an array of all `Skill` objects (metadata only, no template content)
+    - Scan both `templates/skills/` and `templates/agents/` directories
+    - Correctlty set the `kind` property for each skill based on its parent directory
+    - Return `readonly Skill[]`

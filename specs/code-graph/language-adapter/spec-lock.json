@@ -1,0 +1,37 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:symbol-model"],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "symbols": [
+        "PhpLanguageAdapter",
+        "selectCandidatePath",
+        "resolveCakeTarget",
+        "resolveCodeIgniterTarget",
+        "resolveYiiImportTarget",
+        "resolveGenericPhpTarget",
+        "resolveFrameworkClassLiteralTarget"
+      ]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/language-adapter.ts",
+      "symbols": ["LanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "symbols": ["GoLanguageAdapter"]
+    }
+  ]
+}

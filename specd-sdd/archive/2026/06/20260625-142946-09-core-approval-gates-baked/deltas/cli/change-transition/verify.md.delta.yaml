@@ -1,0 +1,16 @@
+- op: added
+  description: Verify CLI omits approval flags on execute
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Approval-gate routing'
+    after:
+      type: section
+      matches: 'Scenario: Signoff gate active'
+  content: |
+    #### Scenario: Transition execute omits approval flags
+
+    - **GIVEN** `config.approvals.spec: true`
+    - **WHEN** `specd change transition my-change implementing` runs
+    - **THEN** `TransitionChange.execute` is called with `{ name, to }` only
+    - **AND** approval gate flags are not passed on the input object

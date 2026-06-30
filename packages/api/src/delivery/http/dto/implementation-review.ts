@@ -9,7 +9,7 @@ export interface ImplementationLinkDto {
 /** Tracked implementation file in implementation-review responses. */
 export interface TrackedImplementationFileDto {
   readonly file: string
-  readonly state: 'open' | 'resolved' | 'ignored'
+  readonly state: 'open' | 'resolved' | 'ignored' | 'removed'
 }
 
 /** Manifest implementation-tracking projection. */

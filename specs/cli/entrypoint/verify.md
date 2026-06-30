@@ -176,6 +176,21 @@
 - **THEN** the help text includes a `JSON/TOON output schema:` section
 - **AND** it shows the output shape as a TypeScript-style type annotation
 
+### Requirement: Host package SDK dependency boundary
+
+#### Scenario: MCP depends on SDK only
+
+- **WHEN** `packages/mcp/package.json` dependencies are inspected
+- **THEN** `@specd/sdk` is the specd platform dependency
+- **AND** `@specd/core` is absent
+
+### Requirement: Banner version labels
+
+#### Scenario: Root banner shows CLI SDK core and code-graph versions
+
+- **WHEN** `specd --help` is run with a configured project
+- **THEN** stdout includes `cli  v`, `sdk   v`, `core  v`, and `graph v` version labels from installed packages
+
 ### Requirement: Output format flag
 
 #### Scenario: Text format produces human-readable output

@@ -22,23 +22,15 @@ specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 
 ### Requirement: Statistics retrieval
 
-The command:
+The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through `withOpenGraphProvider(ctx, fn)`, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()` inside the callback. It outputs the returned result fields, closes the provider via the SDK lifecycle wrapper, and exits.
 
-1. Resolves graph context.
-2. In configured mode, obtains the orchestrated project structure via `ListWorkspaces`.
-3. Uses the orchestrated list together with the effective graph discovery configuration to determine the project fingerprint and compare it against the graph store's metadata.
-4. Creates, opens, and queries the `CodeGraphProvider`.
-5. Resolves the current VCS ref and compares it against `statistics.lastIndexedRef` to determine staleness.
-6. Outputs the statistics.
-7. Closes the provider and exits.
+The command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.
+
+Graph context and provider lifecycle MUST go through `cli:graph-cli-context` and `@specd/sdk` symbols.
 
 ### Requirement: Concurrent indexing guard
 
-Before attempting to open the provider, `graph stats` SHALL check the shared graph indexing lock used by `graph index`.
-
-If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.
-
-This guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph.
+Before attempting to open the provider, `graph stats` SHALL query the lock status from the provider. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message.
 
 ### Requirement: Output format
 
@@ -69,6 +61,14 @@ If the graph is stale, a warning line SHALL be appended after `Last indexed`:
 
 Where `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.
 
+If the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration, a warning line SHALL be appended to stderr in text mode:
+
+```text
+⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index
+```
+
+This warning is independent from the VCS staleness line. Both MAY appear when the graph is stale by ref and mismatched by derivation fingerprint.
+
 In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with three additional fields:
 
 - `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown
@@ -83,11 +83,10 @@ If the provider cannot be opened or statistics retrieval fails due to an infrast
 
 ## Constraints
 
-- The CLI does not compute statistics — it delegates entirely to `@specd/code-graph`
-- `process.exit(0)` is called explicitly after closing the provider
+- Health orchestration runs inside `withOpenGraphProvider` from `@specd/sdk`; the CLI does not manage provider lifecycle inline
+- `process.exit(0)` is called explicitly after the SDK wrapper closes the provider
 - Zero-value relation counts are omitted from text output for readability
-- Context resolution SHALL use the shared graph CLI model rather than command-local path semantics
-- The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
+- Bootstrap mode (`--path`) resolves host context through `openSpecdHost` with the appropriate config path input
 
 ## Examples
 
@@ -120,6 +119,8 @@ Last indexed: 2026-03-13T09:00:00.000Z
 
 - [`cli:entrypoint`](../entrypoint/spec.md)
 - [`core:config`](../../core/config/spec.md)
-- [`code-graph:composition`](../../code-graph/composition/spec.md)
 - [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md)
+- [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration (invoked via SDK host session)
+- [`sdk:with-open-graph-provider`](../../sdk/with-open-graph-provider/spec.md) — provider lifecycle wrapper
+- [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

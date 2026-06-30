@@ -1,0 +1,8 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Skill creation'
+  content: |
+    - **WHEN** a Skill object is created
+    - **THEN** it has `name`, `description`, `kind`, and `templates` properties
+    - **AND** `kind` is either `'skill'` or `'agent'`

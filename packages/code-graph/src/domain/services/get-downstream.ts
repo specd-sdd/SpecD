@@ -51,7 +51,10 @@ export async function getDownstream(
   options?: TraversalOptions,
 ): Promise<TraversalResult> {
   const maxDepth = options?.maxDepth ?? 3
+  const includeFiles = options?.includeFiles ?? true
   const visited = new Set<string>([symbolId])
+  const visitedFiles = new Set<string>()
+
   const levels = new Map<number, SymbolNode[]>()
   let currentIds = [symbolId]
   let truncated = false
@@ -67,6 +70,30 @@ export async function getDownstream(
         if (!visited.has(rel.target) && !nextIdSet.has(rel.target)) {
           nextIdSet.add(rel.target)
           nextIds.push(rel.target)
+        }
+      }
+    }
+
+    if (includeFiles) {
+      const symbols = await Promise.all(currentIds.map((id) => store.getSymbol(id)))
+      const filePaths = new Set(
+        symbols.map((s) => s?.filePath).filter((p): p is string => p !== undefined),
+      )
+
+      for (const fp of filePaths) {
+        if (!visitedFiles.has(fp)) {
+          visitedFiles.add(fp)
+          const importRelations = await store.getImportees(fp)
+          for (const rel of importRelations) {
+            const importedFile = rel.target
+            const exportedSymbols = await store.getExportedSymbols(importedFile)
+            for (const sym of exportedSymbols) {
+              if (!visited.has(sym.id) && !nextIdSet.has(sym.id)) {
+                nextIdSet.add(sym.id)
+                nextIds.push(sym.id)
+              }
+            }
+          }
         }
       }
     }
@@ -96,11 +123,32 @@ export async function getDownstream(
 
     if (depth === maxDepth && resolvedNextIds.length > 0) {
       const nextRelations = await getOutgoingRelationsBatch(store, resolvedNextIds)
+      let hasMore = false
       for (const relations of nextRelations.values()) {
         if (relations.some((r) => !visited.has(r.target))) {
-          truncated = true
+          hasMore = true
           break
         }
+      }
+
+      if (!hasMore && includeFiles) {
+        const nextSymbols = await Promise.all(resolvedNextIds.map((id) => store.getSymbol(id)))
+        const nextFilePaths = new Set(
+          nextSymbols.map((s) => s?.filePath).filter((p): p is string => p !== undefined),
+        )
+        for (const fp of nextFilePaths) {
+          if (!visitedFiles.has(fp)) {
+            const importRelations = await store.getImportees(fp)
+            if (importRelations.length > 0) {
+              hasMore = true
+              break
+            }
+          }
+        }
+      }
+
+      if (hasMore) {
+        truncated = true
       }
     }
   }

@@ -1,0 +1,55 @@
+- op: modified
+  description: Extend TransitionChangeInput with optional pre-transition refresh flag
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    `TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:
+
+    - `name` (string, required) — the change to transition
+    - `to` (ChangeState, required) — the requested target state
+    - `approvalsSpec` (boolean, required) — whether the spec approval gate is enabled
+    - `approvalsSignoff` (boolean, required) — whether the signoff gate is enabled
+    - `skipHookPhases` (ReadonlySet\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.
+    - `refreshImplementationTrackingBefore` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before transition for **active** changes only; when `false`, skip refresh
+
+    The `implementingTaskChecks` and `implementingRequires` fields are removed. Task completion checks are now derived automatically from the schema during requires enforcement (see Requirement: Task completion check during requires enforcement). Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema directly.
+
+- op: modified
+  description: Bake optional pre-transition refresh into TransitionChange
+  selector:
+    type: section
+    matches: 'Requirement: Caller-owned implementation tracking refresh'
+  rename: 'Requirement: Optional pre-transition implementation tracking refresh'
+  content: |
+    When `refreshImplementationTrackingBefore` is not `false` (default `true`) and the change exists in active storage, `TransitionChange` MUST invoke `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation, hook execution, and mutation.
+
+    When `refreshImplementationTrackingBefore` is `false`, `TransitionChange` MUST NOT invoke `RefreshImplementationTracking`.
+
+    `TransitionChange` MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate refresh merge logic.
+
+    Lifecycle rules MUST be evaluated against tracked implementation state after any refresh.
+
+- op: modified
+  description: Inject RefreshImplementationTracking into TransitionChange dependencies
+  selector:
+    type: section
+    matches: 'Requirement: Dependencies'
+  content: |
+    `TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`.
+
+    `TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly.
+
+- op: modified
+  description: Clarify refresh-implementation-tracking dependency role
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — lifecycle state machine and artifact review downgrade semantics
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md) — hook execution entry point
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook ordering and failure semantics
+    - [`core:workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
+    - [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative lifecycle routing and dependency interpretation used before hook execution and persistence
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — primitive invoked by default before active-change transitions

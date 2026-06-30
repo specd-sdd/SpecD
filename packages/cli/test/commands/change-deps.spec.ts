@@ -14,7 +14,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeDeps } from '../../src/commands/change/deps.js'
-import { ChangeNotFoundError, SpecNotInChangeError } from '@specd/core'
+import { ChangeNotFoundError, SpecNotInChangeError } from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()

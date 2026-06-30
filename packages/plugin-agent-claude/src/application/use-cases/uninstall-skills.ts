@@ -10,7 +10,7 @@ import { resolveSharedFolder } from './shared-folder.js'
  */
 export class UninstallSkills {
   /**
-   * Removes installed skills from `.claude/skills`.
+   * Removes installed skills from `.claude/skills` and agents from `.claude/agents`.
    *
    * @param config - Project configuration.
    * @param options - Uninstall options.
@@ -18,6 +18,7 @@ export class UninstallSkills {
    */
   async execute(config: SpecdConfig, options?: AgentInstallOptions): Promise<void> {
     const targetDir = path.join(config.projectRoot, '.claude', 'skills')
+    const agentsTargetDir = path.join(config.projectRoot, '.claude', 'agents')
     const sharedDir = resolveSharedFolder(
       config.projectRoot,
       config.configPath,
@@ -25,19 +26,33 @@ export class UninstallSkills {
         ? options.variables['sharedFolder']
         : undefined,
     ).absolutePath
+    let hasFilter = false
     if (options?.skills !== undefined && options.skills.length > 0) {
+      hasFilter = true
       for (const skill of options.skills) {
         await rm(path.join(targetDir, skill), { recursive: true, force: true })
         await rm(path.join(targetDir, `${skill}.md`), { force: true })
       }
+    }
+    if (options?.agents !== undefined && options.agents.length > 0) {
+      hasFilter = true
+      for (const agent of options.agents) {
+        await rm(path.join(agentsTargetDir, `${agent}.md`), { force: true })
+      }
+    }
+    if (hasFilter) {
       return
     }
-    const managedSkills = createSkillRepository()
-      .list()
-      .map((skill) => skill.name)
+    const repository = createSkillRepository()
+    const managedItems = await repository.list()
+    const managedSkills = managedItems.filter((s) => s.kind === 'skill').map((s) => s.name)
+    const managedAgents = managedItems.filter((s) => s.kind === 'agent').map((s) => s.name)
     for (const skill of managedSkills) {
       await rm(path.join(targetDir, skill), { recursive: true, force: true })
       await rm(path.join(targetDir, `${skill}.md`), { force: true })
+    }
+    for (const agent of managedAgents) {
+      await rm(path.join(agentsTargetDir, `${agent}.md`), { force: true })
     }
     await rm(sharedDir, { recursive: true, force: true })
   }

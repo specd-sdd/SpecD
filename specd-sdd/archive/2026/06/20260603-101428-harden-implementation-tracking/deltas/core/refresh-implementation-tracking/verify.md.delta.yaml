@@ -1,0 +1,68 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Detection merge semantics'
+  content: |
+    ### Requirement: Deletion and removal semantics
+    #### Scenario: Missing tracked files are marked removed
+    - **GIVEN** `packages/core/src/deleted.ts` is tracked as `open`
+    - **AND** the file no longer exists on disk
+    - **WHEN** refresh runs
+    - **THEN** its state transitions to `removed`
+    #### Scenario: Links for missing files are cleaned up
+    - **GIVEN** `packages/core/src/deleted.ts` is tracked as `open`
+    - **AND** a confirmed link exists for this file
+    - **AND** the file no longer exists on disk
+    - **WHEN** refresh runs
+    - **THEN** the link is removed from `implementationLinks`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Deletion and removal semantics'
+  content: |
+    ### Requirement: Resurrections and re-appearances
+    #### Scenario: Removed file reappearing via detector becomes open
+    - **GIVEN** `packages/core/src/resurrected.ts` is tracked as `removed`
+    - **AND** the detector identifies it as modified
+    - **WHEN** refresh runs
+    - **THEN** its state transitions back to `open`
+    #### Scenario: Removed file found on disk becomes open
+    - **GIVEN** `packages/core/src/resurrected.ts` is tracked as `removed`
+    - **AND** the file exists on disk during the existence check
+    - **WHEN** refresh runs
+    - **THEN** its state transitions back to `open`
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Resurrections and re-appearances'
+  content: |
+    ### Requirement: Internal directory filtering
+    #### Scenario: Use case excludes internal repository paths
+    - **GIVEN** `ChangeRepository` returns `changes/` and `drafts/` as internal paths
+    - **AND** `ArchiveRepository` returns `archive/`
+    - **WHEN** refresh runs
+    - **THEN** it passes these paths as `excludePaths` to the detector
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Use case receives repository and detector'
+  rename: 'Scenario: Use case receives repositories and detector'
+  content: |
+    - **GIVEN** `RefreshImplementationTracking` is assembled by the kernel
+    - **WHEN** the use case is constructed
+    - **THEN** it receives `ChangeRepository`, `ArchiveRepository`, and `ImplementationDetector`

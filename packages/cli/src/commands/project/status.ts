@@ -1,17 +1,8 @@
-import path from 'node:path'
-import {
-  createCodeGraphProvider,
-  parseFingerprintMap,
-  detectFingerprintMismatch,
-  type GraphStatistics,
-} from '@specd/code-graph'
-import { createVcsAdapter, type SpecdConfig } from '@specd/core'
+import { buildProjectStatusSnapshot, openSpecdHost } from '@specd/sdk'
 import { type Command } from 'commander'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
-import { buildProjectGraphConfig } from '../graph/build-project-graph-config.js'
-import { codeGraphVersion } from '../graph/code-graph-version.js'
 
 /** Parsed options accepted by the `project status` command. */
 interface ProjectStatusOptions {
@@ -41,113 +32,105 @@ export function registerProjectStatus(parent: Command): void {
     .option('--graph', 'Include extended graph stats', false)
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    projectRoot: string
+    schema: string
+    workspaces: Array<{ name, prefix, ownership, isExternal, codeRoot }>
+    specs: { total: number, byWorkspace: Record<string, number> }
+    changes: { active, drafts, discarded, archived }
+    graph: { freshness, stale, fingerprintMismatch, files?, symbols?, languages?, hotspots? }
+    approvals: { spec, signoff }
+    llmOptimizedContext: boolean
+    context?: { instructions, files, specs, optimizedContext? }
+  }
+`,
+    )
     .action(async (opts: ProjectStatusOptions) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, kernel } = await resolveCliContext({
-          configPath: opts.config,
+        const host = await openSpecdHost({
+          ...(opts.config !== undefined ? { configPath: opts.config } : {}),
+          kernelOptions: buildCliKernelOptions(),
         })
-
-        const [workspaces, activeChanges, drafts, discarded, graphStats] = await Promise.all([
-          kernel.project.listWorkspaces.execute(),
-          kernel.changes.list.execute(),
-          kernel.changes.listDrafts.execute(),
-          kernel.changes.listDiscarded.execute(),
-          loadGraphStats(config),
-        ])
-
-        const specCounts = await Promise.all(
-          workspaces.map(async (ws) => ({
-            name: ws.name,
-            count: await ws.specRepo.count(),
-          })),
-        )
-        const totalSpecs = specCounts.reduce((acc, c) => acc + c.count, 0)
-
-        const graphFreshness = graphStats?.lastIndexedAt ?? null
-        let graphStale: boolean | null = null
-        let fingerprintMismatch: boolean | null = null
-        if (graphStats !== null) {
-          let currentRef: string | null = null
-          try {
-            const vcs = await createVcsAdapter(config.projectRoot)
-            currentRef = await vcs.ref()
-          } catch {
-            // No VCS
-          }
-          if (graphStats.lastIndexedRef !== null && currentRef !== null) {
-            graphStale = graphStats.lastIndexedRef !== currentRef
-          } else if (graphFreshness !== null) {
-            graphStale = Date.now() - new Date(graphFreshness).getTime() > 24 * 60 * 60 * 1000
-          }
-
-          if (graphStats.graphFingerprint !== null) {
-            try {
-              const storedMap = parseFingerprintMap(graphStats.graphFingerprint)
-              const graphConfig = buildProjectGraphConfig(config)
-
-              fingerprintMismatch = detectFingerprintMismatch(
-                storedMap,
-                codeGraphVersion,
-                config.projectRoot,
-                workspaces,
-                graphConfig,
-              )
-            } catch {
-              fingerprintMismatch = null
-            }
-          }
+        const { config, kernel } = {
+          config: host.config,
+          kernel: host.kernel,
         }
 
-        const approvals = {
-          specEnabled: config.approvals?.spec ?? false,
-          signoffEnabled: config.approvals?.signoff ?? false,
-        }
-        const llmOptimizedContext = config.llmOptimizedContext ?? false
+        const workspaces = await kernel.project.listWorkspaces.execute()
+        const snapshot = await buildProjectStatusSnapshot(host, {
+          includeGraph: true,
+          includeHotspots: opts.graph ?? false,
+        })
+        const summary = snapshot.summary
+        const graphHealth = snapshot.graphHealth
+        const hotspots = snapshot.hotspots
+
+        const specCounts = Object.entries(summary.specsByWorkspace).map(([name, count]) => ({
+          name,
+          count,
+        }))
+        const totalSpecs = Object.values(summary.specsByWorkspace).reduce((acc, c) => acc + c, 0)
+
+        const graphFreshness = graphHealth?.lastIndexedAt ?? null
+        const graphStale = graphHealth?.stale ?? null
+        const fingerprintMismatch = graphHealth?.fingerprintMismatch ?? null
+
+        const approvals = snapshot.approvals
+        const llmOptimizedContext = snapshot.llmOptimizedContext
 
         let contextData:
-          | Array<{ instruction: string; files: string[]; specs: string[] }>
+          | {
+              instructions: string[]
+              files: string[]
+              specs: string[]
+              optimizedContext?: string
+            }
           | undefined
+        let fullContext: string[] | undefined
         if (opts.context) {
-          const compileConfig = {
-            projectRoot: config.projectRoot,
-            configPath: config.configPath,
-            llmOptimizedContext: config.llmOptimizedContext,
-            ...(config.context !== undefined
-              ? {
-                  context: config.context.map((e) =>
-                    'file' in e ? { file: e.file } : { instruction: e.instruction },
-                  ),
-                }
-              : {}),
-            ...(config.contextIncludeSpecs !== undefined
-              ? { contextIncludeSpecs: [...config.contextIncludeSpecs] }
-              : {}),
-            ...(config.contextExcludeSpecs !== undefined
-              ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
-              : {}),
+          const ctxResult = await kernel.project.getProjectContext.execute({})
+
+          for (const w of ctxResult.warnings) {
+            process.stderr.write(`warning: ${w.message}\n`)
           }
 
-          const ctxResult = await kernel.project.getProjectContext.execute({
-            config: compileConfig,
-          })
+          fullContext = ctxResult.contextEntries
 
-          const firstContextEntry = config.context?.[0]
-          const instruction =
-            firstContextEntry !== undefined && 'instruction' in firstContextEntry
-              ? firstContextEntry.instruction
-              : ''
-          const files: string[] = [
-            path.join(config.projectRoot, '.specd', 'config'),
-            path.join(config.projectRoot, '.specd', 'metadata'),
-          ]
-          contextData = [
-            {
-              instruction,
-              files,
-              specs: ctxResult.specs.map((s) => s.specId),
-            },
-          ]
+          const instructionEntries = (config.context ?? [])
+            .filter((e): e is { instruction: string } => 'instruction' in e)
+            .map((e) => e.instruction)
+
+          const fileEntries = (config.context ?? [])
+            .filter((e): e is { file: string } => 'file' in e)
+            .map((e) => e.file)
+
+          let specsList: string[] = []
+          let optimizedContext: string | undefined
+
+          const isFresh =
+            config.llmOptimizedContext &&
+            !ctxResult.warnings.some((w) => w.type === 'stale-optimization')
+          if (isFresh) {
+            optimizedContext = ctxResult.contextEntries[0]
+            const rawResult = await kernel.project.getProjectContext.execute({
+              llmOptimizedContext: false,
+            })
+            specsList = rawResult.specs.map((s) => s.specId)
+          } else {
+            specsList = ctxResult.specs.map((s) => s.specId)
+          }
+
+          contextData = {
+            instructions: instructionEntries,
+            files: fileEntries,
+            specs: specsList,
+            ...(optimizedContext !== undefined ? { optimizedContext } : {}),
+          }
         }
 
         if (fmt !== 'text') {
@@ -157,6 +140,7 @@ export function registerProjectStatus(parent: Command): void {
               schemaRef: config.schemaRef,
               workspaces: workspaces.map((w) => ({
                 name: w.name,
+                prefix: w.prefix,
                 ownership: w.ownership,
                 codeRoot: w.codeRoot,
                 isExternal: w.isExternal,
@@ -166,20 +150,33 @@ export function registerProjectStatus(parent: Command): void {
                 byWorkspace: Object.fromEntries(specCounts.map((c) => [c.name, c.count])),
               },
               changes: {
-                active: activeChanges.length,
-                drafts: drafts.length,
-                discarded: discarded.length,
+                active: summary.activeCount,
+                drafts: summary.draftCount,
+                discarded: summary.discardedCount,
+                archived: summary.archivedCount,
               },
               graph: {
                 freshness: graphFreshness,
                 stale: graphStale,
                 fingerprintMismatch,
-                ...(opts.graph && graphStats
+                ...(opts.graph && graphHealth
                   ? {
-                      fileCount: graphStats.fileCount,
-                      symbolCount: graphStats.symbolCount,
-                      relationCounts: graphStats.relationCounts,
-                      languages: graphStats.languages,
+                      fileCount: graphHealth.fileCount,
+                      symbolCount: graphHealth.symbolCount,
+                      relationCounts: graphHealth.relationCounts,
+                      languages: graphHealth.languages,
+                      hotspots: hotspots
+                        ? hotspots.entries.map((e) => ({
+                            symbol: {
+                              id: e.symbol.id,
+                              name: e.symbol.name,
+                              kind: e.symbol.kind,
+                              filePath: e.symbol.filePath,
+                            },
+                            score: e.score,
+                            riskLevel: e.riskLevel,
+                          }))
+                        : [],
                     }
                   : {}),
               },
@@ -192,38 +189,53 @@ export function registerProjectStatus(parent: Command): void {
           return
         }
 
-        const firstContext = contextData?.[0]
         const lines = [
           `projectRoot: ${config.projectRoot}`,
           `schema: ${config.schemaRef}`,
           `workspaces:`,
           ...workspaces.map(
             (w) =>
-              `  ${w.name} [${w.ownership}, ${
+              `  ${w.name} [prefix: ${w.prefix}, ${w.ownership}, ${
                 w.isExternal ? 'external' : 'local'
               }, codeRoot: ${w.codeRoot}]`,
           ),
           `specs: ${String(totalSpecs)} total`,
           ...specCounts.map((c) => `  ${c.name}: ${String(c.count)}`),
-          `changes: ${activeChanges.length} active, ${drafts.length} drafts, ${discarded.length} discarded`,
-          `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale ? 'stale' : 'fresh'})`,
+          `changes: ${summary.activeCount} active, ${summary.draftCount} drafts, ${summary.discardedCount} discarded, ${summary.archivedCount} archived`,
+          `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale === true ? 'stale' : graphStale === false ? 'fresh' : 'unknown'})`,
           ...(fingerprintMismatch === true
             ? ['graph.derivation: ⚠ fingerprint mismatch — reindex recommended']
             : []),
-          ...(opts.graph && graphStats
+          ...(opts.graph && graphHealth
             ? [
-                `graph.files: ${graphStats.fileCount}`,
-                `graph.symbols: ${graphStats.symbolCount}`,
-                `graph.languages: ${graphStats.languages.join(', ') || 'none'}`,
+                `graph.files: ${graphHealth.fileCount}`,
+                `graph.symbols: ${graphHealth.symbolCount}`,
+                `graph.languages: ${graphHealth.languages.join(', ') || 'none'}`,
+                ...(hotspots && hotspots.entries.length > 0
+                  ? [
+                      `graph.hotspots:`,
+                      ...hotspots.entries
+                        .slice(0, 5)
+                        .map(
+                          (e) =>
+                            `  - [${e.symbol.kind}] ${e.symbol.name} (${e.symbol.filePath}) - score: ${e.score}, risk: ${e.riskLevel}`,
+                        ),
+                    ]
+                  : []),
               ]
             : []),
           `approvals.spec: ${approvals.specEnabled ? 'on' : 'off'}`,
           `approvals.signoff: ${approvals.signoffEnabled ? 'on' : 'off'}`,
           `llmOptimizedContext: ${llmOptimizedContext ? 'on' : 'off'}`,
-          ...(opts.context && firstContext !== undefined
+          ...(opts.context && fullContext !== undefined
             ? [
-                `context.instruction: ${firstContext.instruction.slice(0, 80)}...`,
-                `context.specs: ${firstContext.specs.join(', ')}`,
+                `context:`,
+                ...fullContext.map((c) =>
+                  c
+                    .split('\n')
+                    .map((l) => `  ${l}`)
+                    .join('\n'),
+                ),
               ]
             : []),
         ]
@@ -233,24 +245,4 @@ export function registerProjectStatus(parent: Command): void {
         handleError(err, opts.format)
       }
     })
-}
-
-/**
- * Loads code graph statistics.
- *
- * @param config - Resolved project configuration used to create the graph provider.
- * @returns Graph statistics, or `null` when the graph is not available.
- */
-async function loadGraphStats(config: SpecdConfig): Promise<GraphStatistics | null> {
-  try {
-    const provider = createCodeGraphProvider(config)
-    await provider.open()
-    try {
-      return await provider.getStatistics()
-    } finally {
-      await provider.close()
-    }
-  } catch {
-    return null
-  }
 }

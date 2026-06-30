@@ -6,7 +6,8 @@
 
 #### Scenario: Signoff gate is disabled
 
-- **WHEN** `execute()` is called with `approvalsSignoff: false`
+- **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: false`
+- **WHEN** `execute()` is called with `{ name, reason }`
 - **THEN** an `ApprovalGateDisabledError` is thrown with gate `'signoff'`
 - **AND** no repository access occurs
 
@@ -67,8 +68,29 @@
 
 ### Requirement: Input contract
 
-#### Scenario: All input fields are required
+#### Scenario: Input fields are name and reason only
 
 - **WHEN** `ApproveSignoffInput` is constructed
-- **THEN** `name`, `reason`, and `approvalsSignoff` are all required
-- **AND** all fields are readonly
+- **THEN** `name` and `reason` are required
+- **AND** approval gate state is not part of the input
+
+### Requirement: Approval gate baked at construction
+
+#### Scenario: Factory passes config.approvals
+
+- **WHEN** `createApproveSignoff(config)` constructs the use case
+- **THEN** the instance receives `config.approvals` as its baked gate configuration
+
+#### Scenario: Enabled gate allows execute with name and reason
+
+- **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: true`
+- **GIVEN** the change is in `pending-signoff` state
+- **WHEN** `execute({ name, reason })` is called
+- **THEN** the change transitions to `signed-off`
+
+#### Scenario: Schema mismatch fails in gate guard
+
+- **GIVEN** `ApproveSignoff` is constructed with `approvals.signoff: true`
+- **GIVEN** the active schema name differs from the change `schemaName`
+- **WHEN** `execute({ name, reason })` is called
+- **THEN** a `SchemaMismatchError` is thrown before `mutate` is invoked

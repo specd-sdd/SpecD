@@ -15,7 +15,7 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/transition-change.ts",
-      "symbols": ["TransitionChange"]
+      "symbols": ["ApprovalGates", "TransitionChange"]
     }
   ]
 }

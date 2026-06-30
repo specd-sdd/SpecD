@@ -4,7 +4,9 @@
   "dependsOn": [
     "plugin-manager:install-plugin-use-case",
     "plugin-manager:load-plugin-use-case",
-    "core:config-writer-port"
+    "core:composition",
+    "core:config-writer-port",
+    "core:get-config"
   ],
   "context": [
     "Defines the CLI contract for installing specd plugins. The command reads the current plugin configuration, validates each requested plugin, installs it via the plugin manager, and records the installation in the project configuration."
@@ -14,6 +16,12 @@
       "requirement": "Command signature",
       "rules": [
         "The command MUST accept one or more plugin names as positional arguments:\n\n```bash\nspecd plugins install <plugin> [<plugin>...]\n```\n\nEach `plugin` is an npm package name (e.g., `@specd/plugin-agent-claude`)."
+      ]
+    },
+    {
+      "requirement": "Declaration source",
+      "rules": [
+        "When the command needs the set of declared plugins (for example to detect already-installed plugins), it MUST read from the loaded `SpecdConfig.plugins` field. It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.\n\nFor already-installed detection, the command MUST consult `config.plugins.agents` (or the appropriate type bucket)."
       ]
     },
     {
@@ -31,7 +39,7 @@
     {
       "requirement": "Installation workflow",
       "rules": [
-        "For each plugin name that is not already installed:\n\n1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.\n2. On success, the command MUST call `ConfigWriter.addPlugin()` to record the plugin in `specd.yaml`.\n3. On failure, the command MUST emit the error message and continue with the remaining plugins."
+        "For each plugin name that is not already installed:\n\n1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.\n2. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` to record the plugin in `specd.yaml`.\n3. On failure, the command MUST emit the error message and continue with the remaining plugins.\n\nThe command MUST NOT call `kernel.project.addPlugin`. It SHOULD construct a kernel only when subsequent domain operations require one."
       ]
     },
     {
@@ -67,6 +75,23 @@
       "then": ["the command attempts to install both plugins"]
     },
     {
+      "requirement": "Declaration source",
+      "name": "Already-installed check uses config.plugins",
+      "given": ["@specd/plugin-agent-claude is declared under plugins.agents in the loaded config"],
+      "when": ["specd plugins install @specd/plugin-agent-claude is invoked"],
+      "then": [
+        "the command detects the plugin as already installed from config.plugins",
+        "AND it does not call kernel.project.listPlugins"
+      ]
+    },
+    {
+      "requirement": "Declaration source",
+      "name": "Declaration read does not re-read disk via ConfigWriter",
+      "given": ["a loaded SpecdConfig snapshot is available"],
+      "when": ["the install workflow checks declared plugins"],
+      "then": ["it reads config.plugins in memory", "AND it does not call ConfigWriter.listPlugins"]
+    },
+    {
       "requirement": "Already-installed handling",
       "name": "Plugin already installed",
       "given": ["@specd/plugin-agent-claude is already in specd.yaml"],
@@ -90,7 +115,8 @@
       ],
       "then": [
         "InstallPlugin use case is called",
-        "AND ConfigWriter.addPlugin() is called to record the plugin in specd.yaml"
+        "AND createConfigWriter().addPlugin is called to record the plugin in specd.yaml",
+        "AND kernel.project.addPlugin is not called"
       ]
     },
     {
@@ -106,9 +132,24 @@
       "then": ["output is machine-parseable JSON"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:plugins-install",
+        "file": "cli:test/commands/plugins.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:plugins-install",
+        "file": "cli:src/commands/plugins/install.ts",
+        "symbol": "installPluginsWithKernel"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e5dc613b8411f6e8a8c7df79607e6418a8a3973f777a4a395401462e097a1d9e",
-    "verify.md": "sha256:5643ac903233885c39beddd1db73c349a8f17a3e94bbc5a3ca7fae3b8f7711e4"
+    "spec.md": "sha256:406ac03b97e41133c07ba7676391f825c5872b1e24c38837f9c41baa1561113d",
+    "verify.md": "sha256:0ff07e0858fc69cf8775c4d81f265576ffbe99e8c468b9da6f0c9482c630e877"
   },
   "generatedBy": "core"
 }

@@ -26,7 +26,7 @@ vi.mock('chalk', () => {
 
 import { resolveCliContext } from '../../../src/helpers/cli-context.js'
 import { registerChangeSpecPreview } from '../../../src/commands/change/spec-preview.js'
-import { ChangeNotFoundError, SpecNotInChangeError } from '@specd/core'
+import { ChangeNotFoundError, SpecNotInChangeError } from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()

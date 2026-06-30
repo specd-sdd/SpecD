@@ -30,11 +30,8 @@ import { SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js
 import { InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
 import { GetActiveSchema } from '../application/use-cases/get-active-schema.js'
 import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
-import { InitProject } from '../application/use-cases/init-project.js'
-import { AddPlugin } from '../application/use-cases/add-plugin.js'
-import { RemovePlugin } from '../application/use-cases/remove-plugin.js'
-import { ListPlugins } from '../application/use-cases/list-plugins.js'
 import { GetProjectContext } from '../application/use-cases/get-project-context.js'
+import { GetConfig } from '../application/use-cases/get-config.js'
 import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { GenerateSpecMetadata } from '../application/use-cases/generate-spec-metadata.js'
@@ -57,7 +54,8 @@ import { UpdateSpecMetadata } from '../application/use-cases/update-spec-metadat
 import { UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
 import { GetProjectMetadata } from '../application/use-cases/get-project-metadata.js'
 import { ListWorkspaces } from '../application/use-cases/list-workspaces.js'
-import { buildSchema } from '../domain/services/build-schema.js'
+import { GetProjectSummary } from '../application/use-cases/get-project-summary.js'
+import { createGetProjectSummary } from './use-cases/get-project-summary.js'
 import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
@@ -76,193 +74,105 @@ import {
 } from './kernel-registries.js'
 import { LazySchemaProvider } from './lazy-schema-provider.js'
 import { createSpecWorkspaceRoutes } from './spec-workspace-routes.js'
+import { buildCompileContextConfig } from './build-compile-context-config.js'
 import { createDefaultLogger } from '../infrastructure/logging/pino-logger.js'
 import { VcsImplementationDetector } from '../infrastructure/vcs/vcs-implementation-detector.js'
+import { buildSchema } from '../domain/services/build-schema.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
- *
- * Delivery mechanisms (`@specd/cli`, `@specd/mcp`) receive a `Kernel` from
- * `createKernel()` and invoke individual use cases via `kernel.changes.*`,
- * `kernel.specs.*`, or `kernel.project.*`. Config-derived inputs (e.g.
- * `schemaRef`, `schemaRepositories`) are injected at construction time.
  */
 export interface Kernel {
-  /** Final merged registry view exposed to consumers and builders. */
   registry: KernelRegistryView
-  /** The schema registry for resolving arbitrary schema references. */
   schemas: SchemaRegistry
-  /** Use cases that operate on changes. */
   changes: {
-    /** The change repository — exposes existence checks for artifacts and deltas. */
     repo: ChangeRepository
-    /** Creates a new change. */
     create: CreateChange
-    /** Reports the current lifecycle state and artifact statuses. */
     status: GetStatus
-    /** Loads tracked artifact content and optimistic-concurrency hash. */
     getArtifact: GetChangeArtifact
-    /** Loads tracked artifact content for a {@link ReadOnlyChangeView} (draft, discarded, archived). */
     getReadOnlyChangeArtifact: GetReadOnlyChangeArtifact
-    /** Saves tracked artifact content with revision and drift reconciliation. */
     saveArtifact: SaveChangeArtifact
-    /** Performs a lifecycle state transition with approval-gate routing. */
     transition: TransitionChange
-    /** Shelves a change to `drafts/`. */
     draft: DraftChange
-    /** Recovers a drafted change back to `changes/`. */
     restore: RestoreChange
-    /** Permanently abandons a change. */
     discard: DiscardChange
-    /** Finalises a change: merges deltas, moves to archive, fires hooks. */
     archive: ArchiveChange
-    /** Validates artifact files against the active schema. */
     validate: ValidateArtifacts
-    /** Validates a change by walking the schema artifact DAG (batch / `--all`). */
     validateBatch: ValidateChangeBatch
-    /** Assembles the instruction block for the current lifecycle step. */
     compile: CompileContext
-    /** Lists all active (non-drafted, non-discarded) changes. */
     list: ListChanges
-    /** Lists all drafted (shelved) changes. */
     listDrafts: ListDrafts
-    /** Loads a drafted change by name. */
     getDraft: GetDraft
-    /** Lists all discarded changes. */
     listDiscarded: ListDiscarded
-    /** Loads a discarded change by name. */
     getDiscarded: GetDiscarded
-    /** Edits the spec scope of an existing change. */
     edit: EditChange
-    /** Manual targeted invalidation of artifacts. */
     invalidate: InvalidateChange
-    /** Explicitly skips an optional artifact on a change. */
     skipArtifact: SkipArtifact
-    /** Updates declared dependencies for a spec within a change. */
     updateSpecDeps: UpdateSpecDeps
-    /** Lists all archived changes. */
     listArchived: ListArchived
-    /** Retrieves a single archived change by name. */
     getArchived: GetArchivedChange
-    /** Executes `run:` hooks for a workflow step and phase. */
     runStepHooks: RunStepHooks
-    /** Returns `instruction:` hook text for a workflow step and phase. */
     getHookInstructions: GetHookInstructions
-    /** Returns artifact-specific instructions, rules, and delta guidance. */
     getArtifactInstruction: GetArtifactInstruction
-    /** Applies add/remove/ignore/resolve mutations to implementation tracking. */
     updateImplementationTracking: UpdateImplementationTracking
-    /** Refreshes tracked implementation files from VCS-backed autodetection. */
     refreshImplementationTracking: RefreshImplementationTracking
-    /** Returns raw implementation-tracking review projection. */
     getImplementationReview: GetImplementationReview
-    /** Detects specs targeted by multiple active changes. */
     detectOverlap: DetectOverlap
-    /** Previews a spec with deltas applied from a change. */
     preview: PreviewSpec
-    /** Outlines one change-directory artifact (saved or draft content). */
     outlineArtifact: OutlineChangeArtifact
-  }
-  /** Use cases that operate on specs and approval gates. */
-  specs: {
-    /** Spec repositories keyed by workspace name — exposes path resolution. */
-    repos: ReadonlyMap<string, SpecRepository>
-    /** Records a spec approval and transitions to `spec-approved`. */
     approveSpec: ApproveSpec
-    /** Records a sign-off and transitions to `signed-off`. */
     approveSignoff: ApproveSignoff
-    /** Lists all specs across all configured workspaces. */
+  }
+  specs: {
+    repos: ReadonlyMap<string, SpecRepository>
     list: ListSpecs
-    /** Searches spec content across all configured workspaces. */
     search: SearchSpecs
-    /** Loads a spec and all of its artifact files. */
     get: GetSpec
-    /** Retrieves the navigable structure (outline) of a spec artifact. */
     getOutline: GetSpecOutline
-    /** Writes metadata for a spec. */
     saveMetadata: SaveSpecMetadata
-    /** Invalidates a spec's metadata by removing its contentHashes. */
     invalidateMetadata: InvalidateSpecMetadata
-    /** Resolves and returns the active schema for the project. */
     getActiveSchema: GetActiveSchema
-    /** Validates a schema (project resolved, project raw, or external file). */
+    resolve: ResolveSchema
     validateSchema: ValidateSchema
-    /** Validates spec artifacts against the active schema's structural rules. */
     validate: ValidateSpecs
-    /** Generates deterministic metadata from schema-declared extraction rules. */
     generateMetadata: GenerateSpecMetadata
-    /** Updates metadata for a single spec. */
     updateMetadata: UpdateSpecMetadata
-    /** Builds structured context entries for a spec with optional dependency traversal. */
     getContext: GetSpecContext
   }
-  /** Use cases that operate on the project configuration. */
   project: {
-    /** Initialises a new specd project. */
-    init: InitProject
-    /** Adds or updates one plugin declaration in `specd.yaml`. */
-    addPlugin: AddPlugin
-    /** Removes one plugin declaration from `specd.yaml`. */
-    removePlugin: RemovePlugin
-    /** Lists declared plugins from `specd.yaml`. */
-    listPlugins: ListPlugins
-    /** Lists configured project workspaces. */
     listWorkspaces: ListWorkspaces
-    /** Compiles the project-level context block without a specific change or step. */
+    getProjectSummary: GetProjectSummary
     getProjectContext: GetProjectContext
-    /** Reads deterministic project metadata, when present. */
+    getConfig: GetConfig
     getMetadata: GetProjectMetadata
-    /** Updates deterministic project metadata. */
     updateMetadata: UpdateProjectMetadata
   }
-  /** In-memory log readback when a {@link LogRingBuffer} was wired at bootstrap. */
   readonly logs?: {
-    /** Returns recent entries from the in-memory ring (no file reads). */
     read: ReadLog
   }
 }
 
 /** Options for {@link createKernel}. */
 export interface KernelOptions extends KernelRegistryInput {
-  /**
-   * Additional `node_modules` directories appended to the schema search path,
-   * after the project's own `node_modules`. Pass the CLI installation's
-   * `node_modules` here so that globally-installed schema packages are found
-   * even when the project has no local copy.
-   */
   readonly extraNodeModulesPaths?: readonly string[]
-  /** Selected graph-store backend id for code-graph composition. */
   readonly graphStoreId?: string
-  /** Additional logging destinations registered by delivery adapters (for example CLI). */
   readonly additionalDestinations?: readonly LogDestination[]
-  /**
-   * When set, registers a callback destination that feeds this buffer and exposes
-   * {@link Kernel.logs.read}.
-   */
   readonly logRing?: LogRingBuffer
-  /** Shared pretty formatter for console and {@link ReadLog}; defaults to {@link createLogFormatter}. */
   readonly logFormatter?: LogFormatter
 }
 
 /**
- * Constructs all use cases from the fully-resolved project configuration and
- * returns them grouped into a {@link Kernel}.
+ * Factory function that creates and wires a new {@link Kernel} instance.
  *
- * Shared adapter instances (repositories, git adapter, hook runner, etc.) are
- * built once via {@link createKernelInternals} and reused across all use cases,
- * avoiding redundant construction of identical adapters.
- *
- * @param config - The fully-resolved project configuration from `ConfigLoader`
- * @param options - Optional kernel construction options
- * @returns A fully-wired kernel with all use cases
+ * @param config - Resolved project configuration
+ * @param options - Optional kernel options
+ * @returns The fully-wired specd kernel
  */
 export async function createKernel(config: SpecdConfig, options?: KernelOptions): Promise<Kernel> {
   const registry = createKernelRegistryView(createBuiltinKernelRegistry(), options)
-  if (options?.graphStoreId !== undefined && !registry.graphStores.has(options.graphStoreId)) {
-    throw new Error(`graph store '${options.graphStoreId}' is not registered`)
-  }
   const i = await createKernelInternals(config, registry, options)
   const workspaceRoutes = createSpecWorkspaceRoutes(config.workspaces)
+  const defaultCompileContextConfig = buildCompileContextConfig(config)
 
   const logDir = path.join(config.configPath, 'log')
   const logFilePath = path.join(logDir, 'specd.log')
@@ -289,7 +199,6 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   }
   Logger.setImplementation(createDefaultLogger(destinations, { formatter: logFormatter }))
 
-  // Shared ResolveSchema + LazySchemaProvider — resolves once with plugins and overrides
   const resolveSchema = new ResolveSchema(
     i.schemas,
     i.schemaRef,
@@ -297,8 +206,6 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     i.schemaOverrides,
   )
   const schemaProvider = new LazySchemaProvider(resolveSchema)
-
-  // Shared RunStepHooks instance — used by TransitionChange, ArchiveChange, and exposed directly
   const runStepHooks = new RunStepHooks(
     i.changes,
     i.archive,
@@ -307,11 +214,18 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     schemaProvider,
   )
 
-  // PreviewSpec — used by CompileContext and exposed as changes.preview
   const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
   const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
   const implementationDetector = new VcsImplementationDetector(config.projectRoot, i.vcs)
   const listWorkspaces = new ListWorkspaces(config, i.specs)
+  const refreshImplementationTracking = new RefreshImplementationTracking(
+    i.changes,
+    i.archive,
+    implementationDetector,
+    i.files,
+    config.projectRoot,
+  )
+
   const generateMetadata = new GenerateSpecMetadata(
     listWorkspaces,
     schemaProvider,
@@ -320,6 +234,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     i.registry.extractorTransforms,
     workspaceRoutes,
   )
+
   const saveMetadata = new SaveSpecMetadata(i.specs)
   const updateSpecMetadata = new UpdateSpecMetadata(generateMetadata, saveMetadata)
   const updateProjectMetadata = new UpdateProjectMetadata(
@@ -331,6 +246,14 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     i.hasher,
   )
   const getProjectMetadata = new GetProjectMetadata(config, i.files)
+
+  const getActiveSchema = new GetActiveSchema(
+    resolveSchema,
+    i.schemas,
+    buildSchema,
+    config.schemaRef,
+  )
+  const detectOverlap = new DetectOverlap(i.changes)
   const validateArtifacts = new ValidateArtifacts(
     i.changes,
     listWorkspaces,
@@ -348,10 +271,23 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     schemas: i.schemas,
     changes: {
       repo: i.changes,
-      create: new CreateChange(i.changes, listWorkspaces, i.actor),
+      create: new CreateChange(i.changes, listWorkspaces, i.actor, getActiveSchema, detectOverlap),
       status: new GetStatus(
         i.changes,
         schemaProvider,
+        {
+          spec: config.approvals.spec,
+          signoff: config.approvals.signoff,
+        },
+        refreshImplementationTracking,
+        lifecycle,
+      ),
+      transition: new TransitionChange(
+        i.changes,
+        i.actor,
+        schemaProvider,
+        runStepHooks,
+        refreshImplementationTracking,
         {
           spec: config.approvals.spec,
           signoff: config.approvals.signoff,
@@ -361,7 +297,6 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       getArtifact: new GetChangeArtifact(i.changes),
       getReadOnlyChangeArtifact: new GetReadOnlyChangeArtifact(i.changes, i.archive),
       saveArtifact: new SaveChangeArtifact(i.changes, schemaProvider, i.hasher),
-      transition: new TransitionChange(i.changes, i.actor, schemaProvider, runStepHooks, lifecycle),
       draft: new DraftChange(i.changes, i.actor),
       restore: new RestoreChange(i.changes, i.actor),
       discard: new DiscardChange(i.changes, i.actor),
@@ -392,6 +327,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.registry.extractorTransforms,
         workspaceRoutes,
         lifecycle,
+        defaultCompileContextConfig,
       ),
       list: new ListChanges(i.changes),
       listDrafts: new ListDrafts(i.changes),
@@ -411,14 +347,15 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         schemaProvider,
         i.expander,
       ),
-      detectOverlap: new DetectOverlap(i.changes),
+      detectOverlap,
       preview: previewSpec,
       outlineArtifact: new OutlineChangeArtifact(i.changes, i.parsers),
-      updateImplementationTracking: new UpdateImplementationTracking(i.changes),
-      refreshImplementationTracking: new RefreshImplementationTracking(
+      updateImplementationTracking: new UpdateImplementationTracking(
         i.changes,
-        implementationDetector,
+        i.files,
+        config.projectRoot,
       ),
+      refreshImplementationTracking,
       getImplementationReview: new GetImplementationReview(i.changes),
       getArtifactInstruction: new GetArtifactInstruction(
         i.changes,
@@ -428,18 +365,25 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.expander,
         lifecycle,
       ),
+      approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher, {
+        spec: config.approvals.spec,
+        signoff: config.approvals.signoff,
+      }),
+      approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher, {
+        spec: config.approvals.spec,
+        signoff: config.approvals.signoff,
+      }),
     },
     specs: {
       repos: i.specs,
-      approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher),
-      approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher),
       list: new ListSpecs(listWorkspaces, i.hasher, i.yaml),
       search: new SearchSpecs(listWorkspaces, i.hasher, i.yaml),
       get: new GetSpec(i.specs),
       getOutline: new GetSpecOutline(i.specs, schemaProvider, i.parsers),
       saveMetadata,
       invalidateMetadata: new InvalidateSpecMetadata(i.specs),
-      getActiveSchema: new GetActiveSchema(resolveSchema, i.schemas, buildSchema, config.schemaRef),
+      getActiveSchema,
+      resolve: resolveSchema,
       validateSchema: new ValidateSchema(i.schemas, config.schemaRef, buildSchema, resolveSchema),
       validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
       generateMetadata,
@@ -447,11 +391,8 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       getContext: new GetSpecContext(listWorkspaces, i.hasher),
     },
     project: {
-      init: new InitProject(i.configWriter),
-      addPlugin: new AddPlugin(i.configWriter),
-      removePlugin: new RemovePlugin(i.configWriter),
-      listPlugins: new ListPlugins(i.configWriter),
       listWorkspaces,
+      getProjectSummary: createGetProjectSummary(config),
       getProjectContext: new GetProjectContext(
         listWorkspaces,
         schemaProvider,
@@ -460,7 +401,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         i.hasher,
         i.registry.extractorTransforms,
         workspaceRoutes,
+        defaultCompileContextConfig,
       ),
+      getConfig: new GetConfig(config),
       getMetadata: getProjectMetadata,
       updateMetadata: updateProjectMetadata,
     },

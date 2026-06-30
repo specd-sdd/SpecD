@@ -1,4 +1,5 @@
-import { type CodeGraphProvider } from '@specd/code-graph'
+import { type CodeGraphProvider } from '@specd/sdk'
+import { CliValidationError } from '../../errors/index.js'
 import { relative, isAbsolute } from 'node:path'
 
 /** A file resolved from a selector with its canonical path and workspace. */
@@ -43,7 +44,7 @@ async function resolveOne(
 ): Promise<ResolvedFile> {
   const trimmed = raw.trim()
   if (trimmed.length === 0) {
-    throw new Error(`empty file selector`)
+    throw new CliValidationError(`empty file selector`)
   }
 
   const colonIdx = trimmed.indexOf(':')
@@ -58,12 +59,14 @@ async function resolveOne(
     const rel = normalizeRelativePath(relative(projectRoot, trimmed))
     const byCrp = await provider.findFilesByConfigRelativePath(rel)
     if (byCrp.length === 0) {
-      throw new Error(`no indexed file matches absolute path "${trimmed}" (resolved to "${rel}")`)
+      throw new CliValidationError(
+        `no indexed file matches absolute path "${trimmed}" (resolved to "${rel}")`,
+      )
     }
     if (byCrp.length === 1) {
       return { path: byCrp[0]!.path, workspace: byCrp[0]!.workspace }
     }
-    throw new Error(
+    throw new CliValidationError(
       `ambiguous absolute path "${trimmed}": matches ${String(byCrp.length)} files across workspaces`,
     )
   }
@@ -75,12 +78,12 @@ async function resolveOne(
 
   const byCrp = await provider.findFilesByConfigRelativePath(normalizeRelativePath(trimmed))
   if (byCrp.length === 0) {
-    throw new Error(`no indexed file matches "${trimmed}"`)
+    throw new CliValidationError(`no indexed file matches "${trimmed}"`)
   }
   if (byCrp.length === 1) {
     return { path: byCrp[0]!.path, workspace: byCrp[0]!.workspace }
   }
-  throw new Error(
+  throw new CliValidationError(
     `ambiguous selector "${trimmed}": matches ${String(byCrp.length)} files across workspaces`,
   )
 }

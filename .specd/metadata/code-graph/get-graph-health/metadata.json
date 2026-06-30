@@ -1,0 +1,160 @@
+{
+  "title": "GetGraphHealth",
+  "description": "Hosts (`graph stats`, `project status --graph`, SDK snapshot builders) need graph statistics plus VCS staleness and derivation-fingerprint diagnostics without reimplementing orchestration in each adapter. `GetGraphHealth` centralizes lock assertion, statistics retrieval, VCS ref resolution, and fingerprint comparison into one application use case that operates on an already-open `CodeGraphProvider`.",
+  "dependsOn": [
+    "code-graph:composition",
+    "code-graph:staleness-detection",
+    "core:config",
+    "core:list-workspaces"
+  ],
+  "context": [
+    "Hosts (`graph stats`, `project status --graph`, SDK snapshot builders) need graph statistics plus VCS staleness and derivation-fingerprint diagnostics without reimplementing orchestration in each adapter. `GetGraphHealth` centralizes lock assertion, statistics retrieval, VCS ref resolution, and fingerprint comparison into one application use case that operates on an already-open `CodeGraphProvider`."
+  ],
+  "rules": [
+    {
+      "requirement": "Returns enriched graph health",
+      "rules": [
+        "`GetGraphHealth.execute(input)` MUST return `GetGraphHealthResult` containing all `GraphStatistics` fields plus:\n\n- `stale: boolean | null` — VCS staleness per `code-graph:staleness-detection`\n- `currentRef: string | null` — current VCS ref from `createVcsAdapter(config.projectRoot)`, or `null` when unavailable\n- `fingerprintMismatch: boolean | null` — derivation mismatch when workspaces and `codeGraphVersion` allow comparison, else `null`"
+      ]
+    },
+    {
+      "requirement": "Asserts indexing lock before statistics",
+      "rules": [
+        "When `input.assertUnlocked` is `true` (default), `GetGraphHealth` MUST call `provider.assertGraphIndexUnlocked()` before reading statistics. When `false`, lock assertion is skipped (for hosts that already checked)."
+      ]
+    },
+    {
+      "requirement": "Computes VCS staleness",
+      "rules": [
+        "`GetGraphHealth` MUST resolve the current VCS ref via `createVcsAdapter` and apply `isGraphStale(lastIndexedRef, currentRef)` from staleness detection. Unknown staleness (`lastIndexedRef` is `null`) MUST yield `stale: null`, not `true`."
+      ]
+    },
+    {
+      "requirement": "Computes derivation fingerprint mismatch",
+      "rules": [
+        "When `input.workspaces` is provided and `stats.graphFingerprint` is not `null`, `GetGraphHealth` MUST parse the stored fingerprint map, build the effective graph config from `input.config`, and call `detectFingerprintMismatch` with `input.codeGraphVersion`, `config.projectRoot`, workspaces, and graph config. When comparison cannot run, `fingerprintMismatch` MUST be `null`."
+      ]
+    },
+    {
+      "requirement": "Accepts open provider and project inputs",
+      "rules": [
+        "`GetGraphHealthInput` MUST include:\n\n- `config: SpecdConfig`\n- `provider: CodeGraphProvider` (already opened)\n- `codeGraphVersion: string`\n- optional `workspaces` for fingerprint comparison\n- optional `assertUnlocked: boolean` (default `true`)\n\nThe use case MUST NOT open or close the provider."
+      ]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "rules": [
+        "`createGetGraphHealth()` in composition MUST return a stateless `GetGraphHealth` instance with no config capture — all inputs arrive per `execute()` call."
+      ]
+    }
+  ],
+  "constraints": [
+    "MUST NOT mutate the graph store or trigger indexing.",
+    "MUST NOT load change entities or compile project context.",
+    "Delegates statistics to provider.getStatistics() only."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Returns enriched graph health",
+      "name": "Fresh graph with matching fingerprint",
+      "given": [
+        "an opened provider with indexed data at the current VCS ref and matching derivation fingerprint"
+      ],
+      "when": ["GetGraphHealth.execute() is called with workspaces and codeGraphVersion"],
+      "then": [
+        "the result includes all GraphStatistics fields",
+        "AND stale is false",
+        "AND fingerprintMismatch is false"
+      ]
+    },
+    {
+      "requirement": "Returns enriched graph health",
+      "name": "Unknown staleness when no indexed ref",
+      "given": ["statistics with lastIndexedRef: null"],
+      "when": ["GetGraphHealth.execute() runs"],
+      "then": ["stale is null"]
+    },
+    {
+      "requirement": "Asserts indexing lock before statistics",
+      "name": "Lock held and assertUnlocked true",
+      "given": ["the graph indexing lock is held"],
+      "when": ["GetGraphHealth.execute({ assertUnlocked: true }) runs"],
+      "then": ["it throws before calling getStatistics()"]
+    },
+    {
+      "requirement": "Asserts indexing lock before statistics",
+      "name": "Lock held and assertUnlocked false",
+      "given": ["the graph indexing lock is held"],
+      "when": ["GetGraphHealth.execute({ assertUnlocked: false }) runs"],
+      "then": ["it proceeds to getStatistics() without asserting the lock"]
+    },
+    {
+      "requirement": "Computes VCS staleness",
+      "name": "Stale by VCS ref drift",
+      "given": ["lastIndexedRef differs from the current VCS ref"],
+      "when": ["GetGraphHealth.execute() runs"],
+      "then": ["stale is true", "AND currentRef matches the adapter ref"]
+    },
+    {
+      "requirement": "Computes derivation fingerprint mismatch",
+      "name": "Mismatch detected",
+      "given": ["stored graphFingerprint differs from current workspace layout"],
+      "when": ["workspaces and codeGraphVersion are provided"],
+      "then": ["fingerprintMismatch is true"]
+    },
+    {
+      "requirement": "Computes derivation fingerprint mismatch",
+      "name": "Comparison skipped without workspaces",
+      "given": ["workspaces is omitted"],
+      "when": ["GetGraphHealth.execute() runs"],
+      "then": ["fingerprintMismatch is null"]
+    },
+    {
+      "requirement": "Accepts open provider and project inputs",
+      "name": "Does not open or close provider",
+      "given": ["a mock provider with spied open and close"],
+      "when": ["GetGraphHealth.execute() runs"],
+      "then": ["open and close are not called"]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "name": "Factory returns stateless instance",
+      "when": ["createGetGraphHealth() is called twice"],
+      "then": ["each call returns a new GetGraphHealth instance with no captured config"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:get-graph-health",
+        "file": "code-graph:src/application/use-cases/get-graph-health.ts",
+        "symbol": "GetGraphHealth"
+      },
+      {
+        "specId": "code-graph:get-graph-health",
+        "file": "code-graph:src/application/use-cases/get-graph-health.ts",
+        "symbol": "GetGraphHealthInput"
+      },
+      {
+        "specId": "code-graph:get-graph-health",
+        "file": "code-graph:src/application/use-cases/get-graph-health.ts",
+        "symbol": "GetGraphHealthResult"
+      },
+      {
+        "specId": "code-graph:get-graph-health",
+        "file": "code-graph:src/composition/use-cases/get-graph-health.ts",
+        "symbol": "createGetGraphHealth"
+      },
+      {
+        "specId": "code-graph:get-graph-health",
+        "file": "code-graph:src/application/ports/code-graph-host-port.ts",
+        "symbol": "CodeGraphHostPort"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:3188e8f0d14ef9f944e54e18ddd05235bca4e61d4565acf80190a72a5a8b5ae0",
+    "verify.md": "sha256:bc44336bced2c20b11e1d10984bb60439def3d770c6be3d744b0748792f1de00"
+  },
+  "generatedBy": "core"
+}

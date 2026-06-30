@@ -25,6 +25,7 @@
     "@specd/api": "workspace:*",
     "@specd/code-graph": "workspace:*",
     "@specd/core": "workspace:*",
+    "@specd/sdk": "workspace:*",
     "@specd/plugin-agent-claude": "workspace:*",
     "@specd/plugin-agent-codex": "workspace:*",
     "@specd/plugin-agent-copilot": "workspace:*",
@@ -42,8 +43,6 @@
     "yaml": "^2.0.0"
   },
   "devDependencies": {
-    "@specd/plugin-ui-studio": "workspace:*",
-    "@specd/studio-web": "workspace:*",
     "@types/diff": "^8.0.0",
     "@types/figlet": "^1.7.0"
   }

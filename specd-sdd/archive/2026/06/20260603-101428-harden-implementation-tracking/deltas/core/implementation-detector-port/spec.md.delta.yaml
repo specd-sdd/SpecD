@@ -1,0 +1,30 @@
+- op: modified
+  description: 'Extend the detector contract with exclusion options for specd-managed directories.'
+  selector:
+    type: section
+    matches: '^Requirement: Detector interface$'
+  content: |
+    The implementation detector SHALL expose an operation that returns modified implementation-file candidates for a change.
+
+    ```typescript
+    interface ImplementationDetectorOptions {
+      readonly excludePaths?: readonly string[]
+    }
+    ```
+
+    - `detectModifiedFiles(change, options?)` MUST return project-relative file paths representing files changed for the supplied change context
+    - when `options.excludePaths` is provided, the detector MUST exclude any returned path that falls under one of those project-relative portable directory prefixes
+
+    The detector itself owns baseline-resolution policy for that change context. Callers provide the change; they do not compute or pass a raw VCS baseline reference themselves.
+
+    The returned paths are candidate inputs for tracked implementation review. The detector does not itself classify files as linked, resolved, or ignored.
+- op: modified
+  description: 'Document exclusion-path normalization constraints.'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - Returned paths MUST be forward-slash-normalized.
+    - Returned paths MUST be relative to the project root.
+    - The detector MUST NOT assign workspace identities to returned paths.
+    - `excludePaths` entries MUST be interpreted as forward-slash-normalized project-relative paths.

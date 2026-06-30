@@ -3,5 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "core:config"]
+  "dependsOn": ["default:_global/architecture", "core:config"],
+  "implementation": [
+    {
+      "file": "core:src/composition/config-writer.ts",
+      "symbols": ["createConfigWriter"]
+    }
+  ]
 }

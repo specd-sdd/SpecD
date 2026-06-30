@@ -13,9 +13,15 @@
       ]
     },
     {
+      "requirement": "Delegates gate state to kernel",
+      "rules": [
+        "The CLI MUST NOT pass `approvalsSpec` or `approvalsSignoff` to `ApproveSpec.execute` or `ApproveSignoff.execute`.\n\nGate enablement is determined by `config.approvals` baked into the kernel's approve use cases at construction. The CLI passes only `name` and `reason`.\n\nThe CLI MUST invoke `kernel.changes.approveSpec` and `kernel.changes.approveSignoff` — not `kernel.specs.*`."
+      ]
+    },
+    {
       "requirement": "Artifact hash computation",
       "rules": [
-        "Before invoking the use case, the CLI computes the current hash of each artifact file on disk (applying `preHashCleanup` if declared in the schema) and passes the resulting `artifactHashes` map to the use case. The user never supplies artifact hashes."
+        "The CLI MUST NOT compute artifact hashes. Hash computation is owned by `ApproveSpec` and `ApproveSignoff` internally from on-disk artifact content using schema-defined pre-hash cleanup rules.\n\nThe user never supplies artifact hashes."
       ]
     },
     {
@@ -63,13 +69,53 @@
       "then": ["the command exits with code 1 and prints a usage error to stderr"]
     },
     {
+      "requirement": "Delegates gate state to kernel",
+      "name": "Approve spec omits gate flag",
+      "when": ["specd change approve spec my-change --reason \"ok\" is run"],
+      "then": [
+        "ApproveSpec.execute is called with { name, reason } only",
+        "AND approvalsSpec is not passed on the input object",
+        "AND the call is routed through kernel.changes.approveSpec"
+      ]
+    },
+    {
+      "requirement": "Delegates gate state to kernel",
+      "name": "Approve signoff omits gate flag",
+      "when": ["specd change approve signoff my-change --reason \"done\" is run"],
+      "then": [
+        "ApproveSignoff.execute is called with { name, reason } only",
+        "AND approvalsSignoff is not passed on the input object",
+        "AND the call is routed through kernel.changes.approveSignoff"
+      ]
+    },
+    {
+      "requirement": "Delegates gate state to kernel",
+      "name": "Approve spec execute call shape",
+      "given": ["the change approve spec command succeeds"],
+      "when": ["the handler invokes the kernel use case"],
+      "then": [
+        "kernel.changes.approveSpec.execute receives an object with exactly name and reason",
+        "AND kernel.specs.approveSpec is not invoked"
+      ]
+    },
+    {
+      "requirement": "Delegates gate state to kernel",
+      "name": "Approve signoff execute call shape",
+      "given": ["the change approve signoff command succeeds"],
+      "when": ["the handler invokes the kernel use case"],
+      "then": [
+        "kernel.changes.approveSignoff.execute receives an object with exactly name and reason",
+        "AND kernel.specs.approveSignoff is not invoked"
+      ]
+    },
+    {
       "requirement": "Artifact hash computation",
-      "name": "Hashes computed from disk",
+      "name": "Hashes computed by use case from disk",
       "given": ["artifact files exist on disk for the change"],
       "when": ["specd change approve spec my-change --reason \"ok\" is run"],
       "then": [
-        "the approval event in history contains artifactHashes computed from the current file content on disk",
-        "AND the user did not supply any hash values"
+        "the approval event in history contains artifactHashes computed by ApproveSpec from current file content on disk",
+        "AND the CLI did not compute or pass hash values"
       ]
     },
     {
@@ -118,9 +164,17 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-approve",
+        "file": "cli:src/commands/change/approve.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:37bdcd0c7adc37fd85523df2ae6d159c00de23dfb2825c62ee1174b85875443c",
-    "verify.md": "sha256:04928df9713e67a726b487e5a9d309a95d076a04b87318218be79f857445e075"
+    "spec.md": "sha256:838e9a5f4809baa00e24f8be594226be7cabc837b579decf15ca84cf90698d0a",
+    "verify.md": "sha256:a87129285f7ad4cf414c0d47431cf0f10436c3913a2f01321e331fdc73115720"
   },
   "generatedBy": "core"
 }

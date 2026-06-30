@@ -1,21 +1,6 @@
 import Handlebars from 'handlebars'
 import { stringify } from 'yaml'
-import type {
-  SkillTemplateContext,
-  SkillTemplateScalar,
-  SkillTemplateValue,
-} from '../../domain/template-context.js'
-
-const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g
-const FRONTMATTER_TOKEN = '{{{frontmatter}}}'
-
-/**
- * Sentinel mapping used to restore unresolved placeholders after rendering.
- */
-interface PreservedPlaceholder {
-  readonly sentinel: string
-  readonly source: string
-}
+import type { SkillTemplateContext, SkillTemplateValue } from '../../domain/template-context.js'
 
 /**
  * Input used by `TemplateRenderer.render()`.
@@ -54,19 +39,13 @@ export class TemplateRenderer {
         ? this.composeFrontmatterFromContext(input.context.variables?.['frontmatter'])
         : undefined
 
-    const { source, placeholders } = this.preserveMissingSimpleVariables(
-      input.templateSource,
-      input.context.variables ?? {},
-    )
-    const template = Handlebars.compile(source, { noEscape: true })
-    const rendered = template({
+    const template = Handlebars.compile(input.templateSource, { noEscape: true })
+    return template({
       ...(input.context.variables ?? {}),
       variables: input.context.variables ?? {},
       capabilities: capabilityMap,
       frontmatter,
     })
-
-    return this.restorePreservedPlaceholders(rendered, placeholders)
   }
 
   /**
@@ -133,92 +112,6 @@ export class TemplateRenderer {
   }
 
   /**
-   * Replaces missing simple variables with sentinels before Handlebars rendering.
-   *
-   * @param source - Raw template source.
-   * @param variables - Recursive variable map.
-   * @returns Rewritten source plus placeholder restore metadata.
-   */
-  private preserveMissingSimpleVariables(
-    source: string,
-    variables: Readonly<Record<string, SkillTemplateValue>>,
-  ): { source: string; placeholders: readonly PreservedPlaceholder[] } {
-    const placeholders: PreservedPlaceholder[] = []
-    const rewritten = source.replaceAll(PLACEHOLDER_PATTERN, (match, key: string) => {
-      if (match === FRONTMATTER_TOKEN || key === 'else') {
-        return match
-      }
-
-      const value = this.lookupVariable(variables, key)
-      if (value === undefined) {
-        const sentinel = `@@SPECD_PLACEHOLDER_${placeholders.length}@@`
-        placeholders.push({ sentinel, source: match })
-        return sentinel
-      }
-
-      if (Array.isArray(value) || this.isTemplateObject(value)) {
-        return match
-      }
-
-      if (!this.isScalar(value)) {
-        return match
-      }
-
-      return this.stringifyScalar(value)
-    })
-
-    return { source: rewritten, placeholders }
-  }
-
-  /**
-   * Restores preserved placeholders after Handlebars completes rendering.
-   *
-   * @param rendered - Handlebars output.
-   * @param placeholders - Sentinel-to-source mapping.
-   * @returns Output with unresolved placeholders restored.
-   */
-  private restorePreservedPlaceholders(
-    rendered: string,
-    placeholders: readonly PreservedPlaceholder[],
-  ): string {
-    let output = rendered
-    for (const placeholder of placeholders) {
-      output = output.replaceAll(placeholder.sentinel, placeholder.source)
-    }
-    return output
-  }
-
-  /**
-   * Looks up a nested variable path within the recursive variable map.
-   *
-   * @param variables - Recursive variables object.
-   * @param key - Dot-separated lookup path.
-   * @returns Resolved value, or `undefined` when absent.
-   */
-  private lookupVariable(
-    variables: Readonly<Record<string, SkillTemplateValue>>,
-    key: string,
-  ): SkillTemplateValue | undefined {
-    const segments = key.split('.')
-    let current: SkillTemplateValue | Readonly<Record<string, SkillTemplateValue>> | undefined =
-      variables
-
-    for (const segment of segments) {
-      if (
-        current === undefined ||
-        Array.isArray(current) ||
-        this.isScalar(current) ||
-        !this.isTemplateObject(current)
-      ) {
-        return undefined
-      }
-      current = current[segment]
-    }
-
-    return current
-  }
-
-  /**
    * Converts recursive template values to plain JS values for YAML serialization.
    *
    * @param value - Recursive template value.
@@ -247,22 +140,8 @@ export class TemplateRenderer {
    * @param value - Candidate value.
    * @returns `true` when the value is a scalar.
    */
-  private isScalar(value: SkillTemplateValue): value is SkillTemplateScalar {
+  private isScalar(value: SkillTemplateValue): value is string | number | boolean {
     return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
-  }
-
-  /**
-   * Serializes a scalar template value without falling back to object stringification.
-   *
-   * @param value - Scalar template value.
-   * @returns String form safe for placeholder preservation.
-   */
-  private stringifyScalar(value: SkillTemplateScalar): string {
-    if (typeof value === 'string') {
-      return value
-    }
-
-    return value.toString()
   }
 
   /**

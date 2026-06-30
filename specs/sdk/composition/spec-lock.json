@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "code-graph:composition",
+    "cli:host-context"
+  ],
+  "implementation": [
+    {
+      "file": "sdk:src/index.ts",
+      "symbols": ["openSpecdHost", "createGetStatus"]
+    }
+  ]
+}

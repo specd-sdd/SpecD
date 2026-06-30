@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:schema-format", "core:composition", "core:kernel"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/approve-signoff.ts",
+      "symbols": ["ApproveSignoff"]
+    }
+  ]
+}

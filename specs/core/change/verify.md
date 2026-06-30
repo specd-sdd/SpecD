@@ -363,6 +363,26 @@
 - **WHEN** the change is persisted and reloaded
 - **THEN** the tracked file state is restored separately from the confirmed link set
 
+#### Scenario: Change persists removed tracked files explicitly
+
+- **GIVEN** a change tracks `packages/core/src/deleted.ts` with state `removed`
+- **WHEN** the change is persisted and reloaded
+- **THEN** that tracked file still exists in `trackedImplementationFiles`
+- **AND** its state remains `removed`
+
+#### Scenario: Removed file does not return to resolved directly
+
+- **GIVEN** a tracked implementation file is in `removed` state
+- **WHEN** review state changes are requested without a refresh proving the file exists again
+- **THEN** the file does not move directly to `resolved`
+
+#### Scenario: Refresh-driven resurrection returns removed file to open
+
+- **GIVEN** a tracked implementation file is in `removed` state
+- **AND** refresh later confirms the file exists again
+- **WHEN** implementation tracking is updated from that refresh result
+- **THEN** the file state returns to `open`
+
 #### Scenario: Symbol-level refinement does not create a duplicate file-level peer
 
 - **GIVEN** a confirmed `spec + file` implementation link already exists

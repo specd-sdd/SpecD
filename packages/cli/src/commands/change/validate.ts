@@ -232,8 +232,8 @@ JSON/TOON output schema:
  * @param requestedArtifactScope - Optional scope for the requested artifact
  */
 async function executeSingle(
-  kernel: import('@specd/core').Kernel,
-  config: import('@specd/core').SpecdConfig,
+  kernel: import('@specd/sdk').Kernel,
+  config: import('@specd/sdk').SpecdConfig,
   name: string,
   specPath: string,
   opts: { format: string; artifact?: string },
@@ -320,7 +320,7 @@ async function executeSingle(
  * @param requestedArtifactScope - Optional scope for the requested artifact
  */
 async function executeBatch(
-  kernel: import('@specd/core').Kernel,
+  kernel: import('@specd/sdk').Kernel,
   name: string,
   opts: { format: string; artifact?: string },
   requestedArtifactScope?: ArtifactScope,

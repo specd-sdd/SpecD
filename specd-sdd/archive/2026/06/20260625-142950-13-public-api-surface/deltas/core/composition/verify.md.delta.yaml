@@ -1,0 +1,64 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: @specd/sdk orchestrates cross-package host bootstrap'
+  content: |
+    ### Requirement: Public barrel entry points
+
+    #### Scenario: package.json exports map public and internal
+
+    - **WHEN** `packages/core/package.json` `exports` is inspected
+    - **THEN** `"."`, `"./ports"`, `"./extensions"`, and `"./internal"` entry points exist
+
+    #### Scenario: Public root exports createArchiveChange factory
+
+    - **WHEN** importing from `@specd/core` `"."`
+    - **THEN** `createArchiveChange` is available at compile time
+
+    #### Scenario: Public root exports createSpecRepository factory
+
+    - **WHEN** importing from `@specd/core` `"."`
+    - **THEN** `createSpecRepository` is available at compile time
+
+    #### Scenario: Public root does not export FsSpecRepository class
+
+    - **WHEN** importing from `@specd/core` `"."`
+    - **THEN** `FsSpecRepository` is not available at compile time
+
+    ### Requirement: Kernel-mounted use case surface
+
+    #### Scenario: GetStatus types and factory exported from public root
+
+    - **WHEN** importing from `@specd/core` `"."`
+    - **THEN** `GetStatus`, `GetStatusInput`, `GetStatusResult`, and `createGetStatus` are available
+
+    #### Scenario: Use case callable without kernel via factory
+
+    - **GIVEN** a loaded `SpecdConfig`
+    - **WHEN** `createGetStatus(config).execute({ name })` is called
+    - **THEN** a `GetStatusResult` is returned without calling `createKernel`
+
+    ### Requirement: Repository factories on public root
+
+    #### Scenario: Default spec repository without kernel
+
+    - **GIVEN** a loaded `SpecdConfig` and workspace context
+    - **WHEN** `createSpecRepository('fs', context, options)` is called from `@specd/core` `"."`
+    - **THEN** a `SpecRepository` is returned without calling `createKernel`
+
+    ### Requirement: Extension registration surface
+
+    #### Scenario: ChangeStorageFactory exported from extensions subpath
+
+    - **WHEN** importing from `@specd/core/extensions`
+    - **THEN** `ChangeStorageFactory` and `createKernelBuilder` are available
+
+    #### Scenario: Builtin FS storage factory markers stay internal
+
+    - **WHEN** importing from `@specd/core/internal`
+    - **THEN** builtin `FS_*` storage factory markers are not required on `"."` or `"./extensions"`
+    - **AND** `FS_CHANGE_STORAGE_FACTORY` is not exported from `"."`

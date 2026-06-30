@@ -35,7 +35,7 @@ describe('UpdateSpecMetadata', () => {
     expect(saveMetadata.execute).toHaveBeenCalledWith({
       workspace: 'default',
       specPath: expect.any(SpecPath),
-      content: expect.stringContaining('"optimizedDescription":"AI Description"'),
+      content: expect.stringContaining('"optimizedDescription": "AI Description"'),
       force: true,
     })
 

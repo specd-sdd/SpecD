@@ -1,7 +1,13 @@
 {
   "title": "project status command",
   "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.",
-  "dependsOn": ["core:list-workspaces", "core:list-drafts", "core:list-changes"],
+  "dependsOn": [
+    "core:list-workspaces",
+    "core:get-project-summary",
+    "core:get-project-context",
+    "sdk:build-project-status-snapshot",
+    "sdk:host-context"
+  ],
   "context": [
     "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information."
   ],
@@ -21,13 +27,13 @@
     {
       "requirement": "includes spec counts",
       "rules": [
-        "The command output MUST include spec counts obtained efficiently through the `SpecRepository.count()` method for each orchestrated workspace:\n\n- Total spec count across all workspaces\n- Spec count per workspace\n\nThe command SHALL NOT load full spec metadata or artifacts to perform this count."
+        "The command output MUST include spec counts obtained via `kernel.project.getProjectSummary.execute()`:\n\n- Total spec count across all workspaces (sum of `specsByWorkspace` values)\n- Spec count per workspace (`specsByWorkspace` map)\n\nThe command SHALL NOT load full spec metadata or artifacts to perform this count.\nThe command MUST NOT call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting."
       ]
     },
     {
       "requirement": "includes change counts",
       "rules": [
-        "The command output MUST include:\n\n- Number of active changes\n- Number of drafts\n- Number of discarded changes"
+        "The command output MUST obtain change counts via `kernel.project.getProjectSummary.execute()`:\n\n- Number of active changes (`activeCount`)\n- Number of drafts (`draftCount`)\n- Number of discarded changes (`discardedCount`)\n- Number of archived changes (`archivedCount`)\n\nThe command MUST NOT call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting."
       ]
     },
     {
@@ -39,13 +45,13 @@
     {
       "requirement": "includes graph freshness (always)",
       "rules": [
-        "The command output MUST always include:\n\n- Whether the code graph is stale (boolean)\n- Last indexed timestamp (or null if never indexed)\n\nThis is included by default, not behind a flag."
+        "The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with `{ includeGraph: true }`:\n\n- Whether the code graph is stale (boolean)\n- Last indexed timestamp (or null if never indexed)\n\nThe command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.\n\nGraph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.\n\nThis is included by default, not behind a flag."
       ]
     },
     {
       "requirement": "supports --graph flag",
       "rules": [
-        "When `--graph` flag is provided, the command MUST include extended graph statistics:\n\n- Number of indexed files\n- Number of indexed symbols\n- Hotspots (if available)"
+        "When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }` and include extended graph statistics from the snapshot:\n\n- Number of indexed files (`graphHealth.fileCount`)\n- Number of indexed symbols (`graphHealth.symbolCount`)\n- Hotspots (from snapshot `hotspots` when available)\n\nPresenter formatting (text/json/toon) remains in the CLI command handler."
       ]
     },
     {
@@ -57,7 +63,13 @@
     {
       "requirement": "supports --context flag",
       "rules": [
-        "When `--context` flag is provided, the output MUST include project context references:\n\n- Instruction entries (the directive text without reading files)\n- File entries (which files should be read without content)\n- Spec entries (which specs should be read without content)"
+        "When `--context` flag is provided, the output MUST include project context references.\n\nIn `text` mode:\n\n- The command MUST display the **full** project context (not truncated).\n- If `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedContext` from `project-metadata.json` if it is fresh.\n- If `llmOptimizedContext` is enabled but optimized context is missing or stale, the command MUST fall back to raw context entries and emit a `stale-optimization` warning.\n- The warning MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\".\n\nIn `json`/`toon` mode, the output MUST include:\n\n- Instruction entries (the directive text without reading files)\n- File entries (which files should be read without content)\n- Spec entries (which specs should be read without content)\n- `optimizedContext` (optional string, included if fresh and enabled)\n\nWhen assembling context references for `--context`, the command MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. It MUST invoke the kernel-wired `GetProjectContext` use case, which carries yaml-derived defaults from composition time.\n\nThe command MUST call `GetProjectContext.execute` with runtime overrides only:\n\n- `execute({})` for the primary context assembly (baked yaml defaults)\n- `execute({ llmOptimizedContext: false })` when it needs the raw spec catalogue alongside fresh optimized project context (for example to populate spec reference lists without optimized spec bodies)\n\nSection-filtered optimization bypass behaviour is enforced by `GetProjectContext` / `CompileContext` from forwarded `sections` when applicable; this command does not recompute `llmOptimizedContext` from section flags."
+      ]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "rules": [
+        "The command MUST emit a `stale-optimization` warning to stderr when `llmOptimizedContext` is enabled but optimized project context is missing or stale."
       ]
     },
     {
@@ -68,6 +80,12 @@
       "requirement": "supports json and toon formats",
       "rules": [
         "When `--format json` is provided, output MUST be valid JSON.\nWhen `--format toon` is provided, output MUST be TOON-formatted."
+      ]
+    },
+    {
+      "requirement": "SDK host bootstrap",
+      "rules": [
+        "The command MUST obtain host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`). Project summary, approval flags, and graph snapshot orchestration MUST use the returned `SdkHostContext`."
       ]
     }
   ],
@@ -96,19 +114,31 @@
     },
     {
       "requirement": "includes spec counts",
-      "name": "Spec counts use efficient repository counting",
+      "name": "Spec counts use GetProjectSummary",
       "when": ["specd project status calculates spec counts"],
       "then": [
-        "it calls SpecRepository.count() for each workspace",
+        "it calls kernel.project.getProjectSummary.execute()",
+        "AND it does not call SpecRepository.count() directly or orchestrate ListWorkspaces for counting",
         "AND it does not perform full metadata extraction"
       ]
     },
     {
       "requirement": "includes change counts",
-      "name": "Output includes active changes, drafts, and discarded counts",
-      "given": ["a project with changes, drafts, and discarded changes"],
+      "name": "Output includes active changes, drafts, discarded, and archived counts",
+      "given": ["a project with changes, drafts, discarded changes, and archived changes"],
       "when": ["specd project status is run"],
-      "then": ["output includes counts for each category"]
+      "then": [
+        "output includes counts for active changes, drafts, discarded changes, and archived changes"
+      ]
+    },
+    {
+      "requirement": "includes change counts",
+      "name": "Counts obtained via GetProjectSummary",
+      "when": ["specd project status calculates change counts"],
+      "then": [
+        "it calls kernel.project.getProjectSummary.execute()",
+        "AND it does not call kernel.changes.list, listDrafts, or listDiscarded directly for counting"
+      ]
     },
     {
       "requirement": "includes approval gates",
@@ -122,14 +152,21 @@
       "name": "Graph freshness included by default",
       "given": ["a project with an indexed code graph"],
       "when": ["specd project status runs without --graph flag"],
-      "then": ["graph staleness and last indexed timestamp are included"]
+      "then": [
+        "graph staleness and last indexed timestamp are included",
+        "AND the command obtains them via buildProjectStatusSnapshot with { includeGraph: true }",
+        "AND graph data comes exclusively from @specd/sdk"
+      ]
     },
     {
       "requirement": "supports --graph flag",
       "name": "Extended graph stats with --graph flag",
       "given": ["a project with indexed code"],
       "when": ["specd project status --graph runs"],
-      "then": ["indexed files count, symbols count, and hotspots are included"]
+      "then": [
+        "indexed files count, symbols count, and hotspots are included",
+        "AND the command calls buildProjectStatusSnapshot with { includeGraph: true, includeHotspots: true }"
+      ]
     },
     {
       "requirement": "supports --context flag",
@@ -137,6 +174,48 @@
       "given": ["a project with context configured"],
       "when": ["specd project status --context runs"],
       "then": ["context references (instructions, files, specs) are included"]
+    },
+    {
+      "requirement": "supports --context flag",
+      "name": "Prefers optimized project context when fresh",
+      "given": ["llmOptimizedContext is enabled", "AND project-level optimized context is fresh"],
+      "when": ["specd project status --context is run"],
+      "then": ["it displays the optimized context content"]
+    },
+    {
+      "requirement": "supports --context flag",
+      "name": "CLI does not build CompileContextConfig inline for --context",
+      "when": ["specd project status --context is run"],
+      "then": [
+        "the command does not construct a CompileContextConfig object from SpecdConfig",
+        "AND it invokes GetProjectContext.execute with runtime overrides only"
+      ]
+    },
+    {
+      "requirement": "supports --context flag",
+      "name": "Primary context call uses baked defaults",
+      "given": ["specd project status --context is executed"],
+      "when": ["the handler loads project context"],
+      "then": ["it calls GetProjectContext.execute({}) first"]
+    },
+    {
+      "requirement": "supports --context flag",
+      "name": "Raw spec catalogue uses llmOptimizedContext override when optimized context is fresh",
+      "given": ["llmOptimizedContext is enabled and optimized project context is fresh"],
+      "when": ["specd project status --context is executed"],
+      "then": [
+        "it calls GetProjectContext.execute({ llmOptimizedContext: false }) to obtain the raw spec id list"
+      ]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "name": "Displays warning when project cache is stale",
+      "given": ["llmOptimizedContext: true", "AND project metadata is stale"],
+      "when": ["specd project status --context is run"],
+      "then": [
+        "a stale-optimization warning is emitted",
+        "AND the message mentions specd-project-context-optimizer"
+      ]
     },
     {
       "requirement": "includes config flags (always)",
@@ -166,19 +245,28 @@
       "name": "TOON output is formatted",
       "when": ["specd project status --format toon runs"],
       "then": ["output is TOON-formatted"]
+    },
+    {
+      "requirement": "SDK host bootstrap",
+      "name": "Host context from openSpecdHost",
+      "when": ["specd project status is executed"],
+      "then": [
+        "it obtains host context via openSpecdHost from @specd/sdk (directly or through resolveCliContext)"
+      ]
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:project-status",
-        "file": "cli:src/commands/project/status.ts"
+        "file": "cli:src/commands/project/status.ts",
+        "symbol": "registerProjectStatus"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8b189fad179f6cc5aec12a3736834a8e2e7954e508747678b584bf4551da7c36",
-    "verify.md": "sha256:884c6455704ee7c66581c8eb12b2343f1b0a29485be33c041fc17c1c05c7d46c"
+    "spec.md": "sha256:24de611cdd4adeea683dcbf678934d8bb3bc2702e8cf0f3755299c6193ee2954",
+    "verify.md": "sha256:129e4a10a498bce796003315453c869a8328589a29471821965cbea6f89c0678"
   },
   "generatedBy": "core"
 }

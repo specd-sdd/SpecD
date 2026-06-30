@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "core:change", "core:spec-id-format"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/create.ts",
+      "symbols": ["registerChangeCreate"]
+    },
+    {
+      "file": "cli:test/commands/change-create.spec.ts",
+      "symbols": ["Integration (real kernel)"]
+    }
+  ]
+}

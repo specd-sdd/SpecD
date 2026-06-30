@@ -1,0 +1,53 @@
+- op: modified
+  description: Project group excludes config mutation entries
+  selector:
+    type: section
+    matches: 'Requirement: Kernel interface groups use cases by domain area'
+  content: |
+    #### Scenario: Use cases are nested under domain groups
+
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** the returned object has exactly three top-level keys: `changes`, `specs`, `project`
+    - **AND** each key contains an object with use case entries — not use cases at the root level
+
+    #### Scenario: Changes group contains all change use cases
+
+    - **WHEN** `kernel.changes` is inspected
+    - **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
+    - **AND** it contains `repo` as the underlying `ChangeRepository`
+
+    #### Scenario: Specs group contains all spec use cases
+
+    - **WHEN** `kernel.specs` is inspected
+    - **THEN** it contains entries for: `approveSpec`, `approveSignoff`, `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+    - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
+
+    #### Scenario: Project group contains query use cases only
+
+    - **WHEN** `kernel.project` is inspected
+    - **THEN** it contains entries for: `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
+    - **AND** it does not contain `init`, `addPlugin`, `removePlugin`, or `listPlugins`
+
+- op: added
+  description: Verify config mutation excluded from kernel
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Plugin declarations are not a kernel use case'
+  content: |
+    ### Requirement: Config mutation is not a kernel use case
+
+    #### Scenario: kernel.project does not expose config mutation entries
+
+    - **WHEN** `kernel.project` is inspected after `createKernel(config)`
+    - **THEN** it does not contain `init`, `addPlugin`, or `removePlugin`
+    - **AND** `'init' in kernel.project`, `'addPlugin' in kernel.project`, and `'removePlugin' in kernel.project` are all false
+
+    #### Scenario: InitProject use case is not exported
+
+    - **WHEN** `@specd/core` public exports are inspected
+    - **THEN** `InitProject`, `AddPlugin`, `RemovePlugin`, `createInitProject`, `createAddPlugin`, and `createRemovePlugin` are not among them
+    - **AND** `createConfigWriter` is exported

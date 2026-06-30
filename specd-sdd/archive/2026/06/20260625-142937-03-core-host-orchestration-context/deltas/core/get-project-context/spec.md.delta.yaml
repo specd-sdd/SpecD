@@ -1,0 +1,34 @@
+- op: modified
+  description: Drop config from GetProjectContextInput; add runtime overrides
+  selector:
+    type: section
+    matches: 'Requirement: Accepts GetProjectContextInput as input'
+  content: |
+    `execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:
+
+    - `contextMode` (`'list' | 'summary' | 'full' | 'hybrid'`, optional) — runtime override for display mode. When absent, the baked default from construction is used.
+    - `llmOptimizedContext` (boolean, optional) — runtime override for whether optimized context is preferred. When absent, the baked default from construction is used.
+    - `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.
+    - `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.
+    - `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`"rules"`, `"constraints"`, `"scenarios"`). It has no effect for list-mode or summary-mode entries.
+
+    `GetProjectContextInput` MUST NOT include a `config` field.
+
+- op: modified
+  description: Bake default CompileContextConfig at construction
+  selector:
+    type: section
+    matches: 'Requirement: Construction dependencies'
+  content: |
+    `GetProjectContext` depends on the following ports/services injected via constructor:
+
+    - `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces
+    - `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema
+    - `files` (`FileReader`) — for reading context entry files from disk
+    - `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
+    - `hasher` (`ContentHasher`) — for comparing content hashes against metadata
+    - `defaultConfig` (`CompileContextConfig`) — yaml-derived project context configuration snapshot baked at kernel composition time
+
+    All dependencies are injected at construction time. The schema is resolved lazily on first access.
+
+    At the start of `execute`, `GetProjectContext` MUST build the effective `CompileContextConfig` by shallow-merging `defaultConfig` with any runtime overrides (`contextMode`, `llmOptimizedContext`) present on the input. Hosts MUST NOT pass yaml-derived configuration on each call.

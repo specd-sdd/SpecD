@@ -1,5 +1,7 @@
 # Use Cases
 
+> **Audience:** plugin authors and `@specd/core` consumers. Delivery hosts should use [`@specd/sdk`](../sdk/index.md) instead of wiring use cases directly.
+
 Use cases are the entry points to `@specd/core`'s business logic. Each use case is a class with an `execute(input)` method. You construct them once — injecting the ports and sub-use-cases they need — and call `execute` for each operation.
 
 All use case classes and their associated input/result types are exported from `@specd/core`.
@@ -16,12 +18,16 @@ import {
   type SchemaProvider,
 } from '@specd/core'
 
-const createChange = new CreateChange(changeRepo, specs, actor)
+const createChange = new CreateChange(
+  changeRepo,
+  listWorkspaces,
+  actor,
+  getActiveSchema,
+  detectOverlap,
+)
 const result = await createChange.execute({
   name: 'add-oauth-login',
   specIds: ['default:auth/oauth'],
-  schemaName: 'specd-std',
-  schemaVersion: 1,
 })
 // result.change — the Change entity
 // result.changePath — absolute path to the change directory
@@ -37,17 +43,20 @@ Use cases are stateless between calls. Constructing one instance and reusing it 
 
 Creates a new change and persists it to the repository. Scaffolds the change directory with any relevant spec artifacts. The initial history contains a single `created` event.
 
-**Constructor:** `new CreateChange(changes: ChangeRepository, specs: ReadonlyMap<string, SpecRepository>, actor: ActorResolver)`
+When `schemaName` and `schemaVersion` are omitted, the use case resolves the project's active schema internally via `GetActiveSchema`. Hosts such as the CLI do not need to resolve schema identity before calling `execute`.
+
+**Constructor:** `new CreateChange(changes: ChangeRepository, listWorkspaces: ListWorkspaces, actor: ActorResolver, getActiveSchema: GetActiveSchema, detectOverlap: DetectOverlap)`
 
 **Input:**
 
-| Field           | Type                | Required | Description                                   |
-| --------------- | ------------------- | -------- | --------------------------------------------- |
-| `name`          | `string`            | yes      | Unique slug name (e.g. `'add-oauth-login'`).  |
-| `description`   | `string`            | no       | Optional free-text description of the change. |
-| `specIds`       | `readonly string[]` | yes      | Spec paths being created or modified.         |
-| `schemaName`    | `string`            | yes      | Schema name from the active config.           |
-| `schemaVersion` | `number`            | yes      | Schema version number from the active config. |
+| Field                 | Type                | Required | Description                                                                  |
+| --------------------- | ------------------- | -------- | ---------------------------------------------------------------------------- |
+| `name`                | `string`            | yes      | Unique slug name (e.g. `'add-oauth-login'`).                                 |
+| `description`         | `string`            | no       | Optional free-text description of the change.                                |
+| `specIds`             | `readonly string[]` | yes      | Spec paths being created or modified.                                        |
+| `schemaName`          | `string`            | no       | Explicit schema name override. When omitted, resolved from active schema.    |
+| `schemaVersion`       | `number`            | no       | Explicit schema version override. When omitted, resolved from active schema. |
+| `includeOverlapCheck` | `boolean`           | no       | When `true` and `specIds` is non-empty, include overlap report on result.    |
 
 **Returns:** `Promise<CreateChangeResult>`
 
@@ -55,28 +64,31 @@ Creates a new change and persists it to the repository. Scaffolds the change dir
 interface CreateChangeResult {
   change: Change // the newly created change entity
   changePath: string // absolute filesystem path to the change directory
+  overlapReport?: OverlapReport // present when includeOverlapCheck was requested and detection succeeded
 }
 ```
 
 **Throws:**
 
-| Error                      | Condition                                    |
-| -------------------------- | -------------------------------------------- |
-| `ChangeAlreadyExistsError` | A change with the given name already exists. |
+| Error                           | Condition                                                 |
+| ------------------------------- | --------------------------------------------------------- |
+| `ChangeAlreadyExistsError`      | A change with the given name already exists.              |
+| `InvalidCreateChangeInputError` | Only one of `schemaName` or `schemaVersion` was provided. |
 
 ---
 
 ### GetStatus
 
-Loads a change and reports its current lifecycle state, artifact statuses, and pre-computed lifecycle context including available transitions and blockers.
+Loads a change and reports its current lifecycle state, artifact statuses, and pre-computed lifecycle context including available transitions and blockers. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before loading status.
 
-**Constructor:** `new GetStatus(changes: ChangeRepository, schemaProvider: SchemaProvider, approvals: { spec: boolean; signoff: boolean })`
+**Constructor:** `new GetStatus(changes: ChangeRepository, schemaProvider: SchemaProvider, approvals: { spec: boolean; signoff: boolean }, refreshImplementationTracking: RefreshImplementationTracking)`
 
 **Input:**
 
-| Field  | Type     | Required | Description                 |
-| ------ | -------- | -------- | --------------------------- |
-| `name` | `string` | yes      | The change name to look up. |
+| Field                           | Type      | Required | Description                                                                             |
+| ------------------------------- | --------- | -------- | --------------------------------------------------------------------------------------- |
+| `name`                          | `string`  | yes      | The change name to look up.                                                             |
+| `refreshImplementationTracking` | `boolean` | no       | When omitted or `true`, refresh active changes before load. When `false`, skip refresh. |
 
 **Returns:** `Promise<GetStatusResult>`
 
@@ -126,7 +138,7 @@ interface TransitionBlocker {
 
 ### TransitionChange
 
-Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating (via `requiresTaskCompletion`), and executes `run:` hooks at step boundaries.
+Performs a lifecycle state transition on a change. Enforces approval-gate routing, workflow `requires`, task completion gating (via `requiresTaskCompletion`), and executes `run:` hooks at step boundaries. For active changes, refreshes implementation tracking by default via `RefreshImplementationTracking` before lifecycle evaluation.
 
 The final persisted lifecycle update is applied through `ChangeRepository.mutate(...)` so hook execution and routing stay outside the lock while the manifest mutation runs against fresh state.
 
@@ -145,17 +157,18 @@ not attempt to synthesize a forward transition. Instead, it throws
 This keeps redesign available while giving adapters enough context to explain why
 normal progression is blocked.
 
-**Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, runStepHooks: RunStepHooks)`
+**Constructor:** `new TransitionChange(changes: ChangeRepository, actor: ActorResolver, schemaProvider: SchemaProvider, runStepHooks: RunStepHooks, refreshImplementationTracking: RefreshImplementationTracking)`
 
 **Input:**
 
-| Field              | Type                             | Required | Description                                                                                                   |
-| ------------------ | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
-| `name`             | `string`                         | yes      | The change to transition.                                                                                     |
-| `to`               | `ChangeState`                    | yes      | The requested target state.                                                                                   |
-| `approvalsSpec`    | `boolean`                        | yes      | Whether the spec approval gate is enabled.                                                                    |
-| `approvalsSignoff` | `boolean`                        | yes      | Whether the signoff gate is enabled.                                                                          |
-| `skipHookPhases`   | `ReadonlySet<HookPhaseSelector>` | no       | Hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. |
+| Field                                 | Type                             | Required | Description                                                                                                   |
+| ------------------------------------- | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `name`                                | `string`                         | yes      | The change to transition.                                                                                     |
+| `to`                                  | `ChangeState`                    | yes      | The requested target state.                                                                                   |
+| `approvalsSpec`                       | `boolean`                        | yes      | Whether the spec approval gate is enabled.                                                                    |
+| `approvalsSignoff`                    | `boolean`                        | yes      | Whether the signoff gate is enabled.                                                                          |
+| `skipHookPhases`                      | `ReadonlySet<HookPhaseSelector>` | no       | Hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. |
+| `refreshImplementationTrackingBefore` | `boolean`                        | no       | When omitted or `true`, refresh active changes before transition. When `false`, skip refresh.                 |
 
 **Returns:** `Promise<TransitionChangeResult>`
 
@@ -999,27 +1012,37 @@ Artifact instructions and hook instructions are separate concerns handled by `Ge
 
 **Constructor:**
 
+Yaml-derived defaults are baked at construction time via `defaultConfig: CompileContextConfig`
+(produced by the composition-internal `buildCompileContextConfig` helper from `SpecdConfig`).
+Hosts pass only runtime overrides on `execute`.
+
 ```typescript
 new CompileContext(
   changes: ChangeRepository,
-  specs: ReadonlyMap<string, SpecRepository>,
+  listWorkspaces: ListWorkspaces,
   schemaProvider: SchemaProvider,
   files: FileReader,
   parsers: ArtifactParserRegistry,
   hasher: ContentHasher,
+  previewSpec: PreviewSpec,
+  extractorTransforms: ExtractorTransformRegistry,
+  workspaceRoutes: readonly WorkspaceRoute[],
+  lifecycleEngine: LifecycleEngine,
+  defaultConfig: CompileContextConfig,
 )
 ```
 
 **Input:**
 
-| Field        | Type                         | Required | Description                                                                                         |
-| ------------ | ---------------------------- | -------- | --------------------------------------------------------------------------------------------------- |
-| `name`       | `string`                     | yes      | The change name to compile context for.                                                             |
-| `step`       | `string`                     | yes      | The lifecycle step being entered (e.g. `'designing'`, `'implementing'`).                            |
-| `config`     | `CompileContextConfig`       | yes      | Resolved project configuration subset.                                                              |
-| `followDeps` | `boolean`                    | no       | When `true`, performs the `dependsOn` transitive traversal (step 5).                                |
-| `depth`      | `number`                     | no       | Limits `dependsOn` traversal depth. Only meaningful with `followDeps`.                              |
-| `sections`   | `ReadonlyArray<SpecSection>` | no       | Restricts metadata sections rendered per full-mode spec: `'rules'`, `'constraints'`, `'scenarios'`. |
+| Field                 | Type                                        | Required | Description                                                                                         |
+| --------------------- | ------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `name`                | `string`                                    | yes      | The change name to compile context for.                                                             |
+| `step`                | `string`                                    | yes      | The lifecycle step being entered (e.g. `'designing'`, `'implementing'`).                            |
+| `contextMode`         | `'list' \| 'summary' \| 'full' \| 'hybrid'` | no       | Runtime override for display mode; falls back to construction-time default.                         |
+| `llmOptimizedContext` | `boolean`                                   | no       | Runtime override for optimized-context preference; falls back to construction-time default.         |
+| `followDeps`          | `boolean`                                   | no       | When `true`, performs the `dependsOn` transitive traversal (step 5).                                |
+| `depth`               | `number`                                    | no       | Limits `dependsOn` traversal depth. Only meaningful with `followDeps`.                              |
+| `sections`            | `ReadonlyArray<SpecSection>`                | no       | Restricts metadata sections rendered per full-mode spec: `'rules'`, `'constraints'`, `'scenarios'`. |
 
 **`CompileContextConfig`:**
 
@@ -1028,7 +1051,8 @@ interface CompileContextConfig {
   context?: Array<{ instruction: string } | { file: string }>
   contextIncludeSpecs?: string[]
   contextExcludeSpecs?: string[]
-  contextMode?: 'full' | 'lazy' // default: 'lazy'
+  contextMode?: 'list' | 'summary' | 'full' | 'hybrid' // default: 'summary'
+  llmOptimizedContext?: boolean
   workspaces?: Record<
     string,
     {
@@ -1039,7 +1063,7 @@ interface CompileContextConfig {
 }
 ```
 
-In `'lazy'` mode, specs from `specIds` and `specDependsOn` are rendered in full; all other matched specs are rendered as summaries (title and description only). In `'full'` mode, all specs are rendered with full content.
+In `'summary'` mode, specs from `specIds` and `specDependsOn` are rendered in full when `contextMode` is `'hybrid'`; all other matched specs are rendered as summaries (title and description only). In `'full'` mode, all specs are rendered with full content.
 
 **Returns:** `Promise<CompileContextResult>`
 
@@ -1085,30 +1109,75 @@ interface AvailableStep {
 
 ---
 
+### GetProjectSummary
+
+Returns consolidated project-level counts (active/draft/discarded/archived changes and specs per workspace) without loading change entities, spec metadata, graph statistics, or compiled context.
+
+**Constructor:**
+
+```typescript
+new GetProjectSummary(
+  listChanges: ListChanges,
+  listDrafts: ListDrafts,
+  listDiscarded: ListDiscarded,
+  listArchived: ListArchived,
+  listWorkspaces: ListWorkspaces,
+)
+```
+
+**Input:** none — `execute()` accepts no parameters.
+
+**Returns:** `Promise<GetProjectSummaryResult>`
+
+```typescript
+interface GetProjectSummaryResult {
+  activeCount: number
+  draftCount: number
+  discardedCount: number
+  archivedCount: number
+  specsByWorkspace: Readonly<Record<string, number>>
+  workspaceCount: number
+}
+```
+
+Change counts derive from `ListChanges`, `ListDrafts`, and `ListDiscarded` result lengths. `archivedCount` uses `ListArchived.execute().meta.total` (not `items.length`, because archive listing may paginate). Spec counts call `SpecRepository.count()` on each workspace from `ListWorkspaces`.
+
+**Composition factory:** `createGetProjectSummary(config: SpecdConfig)` wires the five list use cases from a resolved project configuration.
+
+**Kernel:** `kernel.project.getProjectSummary`
+
+---
+
 ### GetProjectContext
 
 Compiles the project-level context block without a specific change or lifecycle step. Performs steps 1–4 of the context pipeline (project `context:` entries, project-level and workspace-level include/exclude patterns) with all configured workspaces treated as active. Step 5 (dependsOn traversal from a change's `specIds`) is not performed.
 
 **Constructor:**
 
+Yaml-derived defaults are baked at construction time via `defaultConfig: CompileContextConfig`.
+
 ```typescript
 new GetProjectContext(
-  specs: ReadonlyMap<string, SpecRepository>,
+  listWorkspaces: ListWorkspaces,
   schemaProvider: SchemaProvider,
   files: FileReader,
   parsers: ArtifactParserRegistry,
   hasher: ContentHasher,
+  extractorTransforms: ExtractorTransformRegistry,
+  workspaceRoutes: readonly WorkspaceRoute[],
+  defaultConfig: CompileContextConfig,
 )
 ```
 
 **Input:**
 
-| Field        | Type                         | Required | Description                                                            |
-| ------------ | ---------------------------- | -------- | ---------------------------------------------------------------------- |
-| `config`     | `CompileContextConfig`       | yes      | Resolved project configuration.                                        |
-| `followDeps` | `boolean`                    | no       | Follows `dependsOn` links from included specs. Default: `false`.       |
-| `depth`      | `number`                     | no       | Limits traversal depth. Only meaningful with `followDeps`.             |
-| `sections`   | `ReadonlyArray<SpecSection>` | no       | Restricts sections rendered per spec. Same values as `CompileContext`. |
+| Field                 | Type                                        | Required | Description                                                                 |
+| --------------------- | ------------------------------------------- | -------- | --------------------------------------------------------------------------- |
+| `contextMode`         | `'list' \| 'summary' \| 'full' \| 'hybrid'` | no       | Runtime override for display mode; falls back to construction-time default. |
+| `llmOptimizedContext` | `boolean`                                   | no       | Runtime override for optimized-context preference.                          |
+| `followDeps`          | `boolean`                                   | no       | Follows `dependsOn` links from included specs. Default: `false`.            |
+| `depth`               | `number`                                    | no       | Limits traversal depth. Only meaningful with `followDeps`.                  |
+| `sections`            | `ReadonlyArray<SpecSection>`                | no       | Restricts sections rendered per spec. Same values as `CompileContext`.      |
 
 **Returns:** `Promise<GetProjectContextResult>`
 
@@ -1288,72 +1357,109 @@ interface GetHookInstructionsResult {
 
 ---
 
-## Project initialisation
+## Project configuration writes
 
-### InitProject
+Config mutation (`initProject`, `addPlugin`, `removePlugin`) is delivered through the `ConfigWriter` port via `createConfigWriter()` — not through kernel use cases.
 
-Initialises a new specd project by writing `specd.yaml`, creating storage directories, and updating `.gitignore`. Delegates all filesystem operations to the `ConfigWriter` port.
+```typescript
+import { createConfigWriter } from '@specd/core'
 
-**Constructor:** `new InitProject(writer: ConfigWriter)`
+const writer = createConfigWriter()
+await writer.initProject({
+  projectRoot: '/abs/project',
+  schemaRef: '@specd/schema-std',
+  workspaceId: 'default',
+  specsPath: 'specs/',
+})
+```
+
+See [config-writer.md](./config-writer.md) for method contracts and error conditions.
+
+---
+
+## Implementation tracking
+
+### RefreshImplementationTracking
+
+Runs targeted VCS-backed implementation autodetection, merges new paths, sweeps for deleted files, and performs automatic link cleanup for a change. Executes inside one serialized `ChangeRepository.mutate(...)` call.
+
+The refresh algorithm has four phases:
+
+1. **Collect exclusions** — internal specd storage roots from `ChangeRepository.internalPaths()` and `ArchiveRepository.internalPaths()` are converted into portable project-relative prefixes.
+2. **Detect candidates** — the detector is invoked with exclusion prefixes; newly detected files are merged as `open`, and previously `removed` files that reappear in detection are revived to `open`.
+3. **Existence sweep** — every non-ignored tracked file is probed for on-disk existence via `FileReader.read(...)`.
+4. **Transition and cleanup** — missing files become `removed` with their implementation links cleared; re-appeared `removed` files are resurrected to `open`.
+
+**Constructor:**
+
+```typescript
+new RefreshImplementationTracking(
+  changes: ChangeRepository,
+  archives: ArchiveRepository,
+  implementationDetector: ImplementationDetector,
+  files: FileReader,
+  projectRoot: string,
+)
+```
 
 **Input:**
 
-| Field         | Type      | Required | Description                                                    |
-| ------------- | --------- | -------- | -------------------------------------------------------------- |
-| `projectRoot` | `string`  | yes      | The directory to initialise (absolute path).                   |
-| `schemaRef`   | `string`  | yes      | Schema reference string (e.g. `'@specd/schema-std'`).          |
-| `workspaceId` | `string`  | yes      | The default workspace name (e.g. `'default'`).                 |
-| `specsPath`   | `string`  | yes      | Relative path for the specs directory (e.g. `'specs/'`).       |
-| `force`       | `boolean` | no       | When `true`, overwrite an existing `specd.yaml` without error. |
+| Field  | Type     | Required | Description                 |
+| ------ | -------- | -------- | --------------------------- |
+| `name` | `string` | yes      | The change name to refresh. |
 
-**Returns:** `Promise<InitProjectResult>`
+**Returns:** `Promise<RefreshImplementationTrackingResult>`
 
 ```typescript
-interface InitProjectResult {
-  configPath: string // absolute path to the created specd.yaml
-  schemaRef: string
-  workspaces: readonly string[]
+interface RefreshImplementationTrackingResult {
+  implementationTracking: ImplementationTrackingProjection
 }
 ```
 
 **Throws:**
 
-| Error                     | Condition                                           |
-| ------------------------- | --------------------------------------------------- |
-| `AlreadyInitialisedError` | `specd.yaml` already exists and `force` is not set. |
+| Error                 | Condition                             |
+| --------------------- | ------------------------------------- |
+| `ChangeNotFoundError` | No change with the given name exists. |
 
 ---
 
-## Skills
+### UpdateImplementationTracking
 
-### GetSkillsManifest
+Applies one implementation-tracking mutation to a change: `add`, `remove`, `ignore`, `resolve`, or `unresolve`.
 
-Reads the installed skills manifest from `specd.yaml`.
+File-existence validation is enforced in the core use case, not in the CLI layer:
 
-**Constructor:** `new GetSkillsManifest(writer: ConfigWriter)`
+- `add` requires the target file to exist on disk.
+- `resolve` requires the target file to exist on disk.
+- `unresolve` requires the target file to exist on disk and refuses to reopen files in the `removed` state (only refresh-driven resurrection can restore those).
+- `ignore` allows missing files only when they are already tracked; untracked missing files are rejected.
+- `remove` does not require the file to exist on disk.
 
-**Input:**
-
-| Field        | Type     | Required | Description                                |
-| ------------ | -------- | -------- | ------------------------------------------ |
-| `configPath` | `string` | yes      | Absolute path to the `specd.yaml` to read. |
-
-**Returns:** `Promise<Record<string, string[]>>` — a map of agent name to installed skill names.
-
----
-
-### RecordSkillInstall
-
-Records that a set of skills was installed for an agent by merging the skill names into the `skills` key of `specd.yaml`.
-
-**Constructor:** `new RecordSkillInstall(writer: ConfigWriter)`
+**Constructor:** `new UpdateImplementationTracking(changes: ChangeRepository, files: FileReader, projectRoot: string)`
 
 **Input:**
 
-| Field        | Type                | Required | Description                                  |
-| ------------ | ------------------- | -------- | -------------------------------------------- |
-| `configPath` | `string`            | yes      | Absolute path to the `specd.yaml` to update. |
-| `agent`      | `string`            | yes      | The agent name (e.g. `'claude'`).            |
-| `skillNames` | `readonly string[]` | yes      | The skill names to record.                   |
+| Field     | Type                                                        | Required | Description                                 |
+| --------- | ----------------------------------------------------------- | -------- | ------------------------------------------- |
+| `name`    | `string`                                                    | yes      | The change to mutate.                       |
+| `action`  | `'add' \| 'remove' \| 'ignore' \| 'resolve' \| 'unresolve'` | yes      | Mutation kind.                              |
+| `file`    | `string`                                                    | yes      | Raw project-relative file path.             |
+| `specId`  | `string`                                                    | no       | Canonical spec ID for link mutations.       |
+| `symbols` | `readonly string[]`                                         | no       | Optional symbol refinements for add/remove. |
 
-**Returns:** `Promise<void>`
+**Returns:** `Promise<UpdateImplementationTrackingResult>`
+
+```typescript
+interface UpdateImplementationTrackingResult {
+  implementationTracking: ImplementationTrackingProjection
+}
+```
+
+**Throws:**
+
+| Error                             | Condition                                                          |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `ChangeNotFoundError`             | No change with the given name exists.                              |
+| `ImplementationFileNotFoundError` | A file-required action targets a file that does not exist on disk. |
+| `ImplementationLinksExistError`   | `ignore` targets a file that still has live implementation links.  |

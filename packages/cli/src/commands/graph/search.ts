@@ -1,12 +1,13 @@
 import { Command, Option } from 'commander'
-import { type SearchOptions } from '@specd/code-graph'
+import { type SearchOptions, assertGraphIndexUnlocked } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { assertGraphIndexUnlocked } from './graph-index-lock.js'
 import { normalizeSnippet } from './normalize-snippet.js'
+
+import { warnGraphStale } from './warn-graph-staleness.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -16,6 +17,37 @@ import { normalizeSnippet } from './normalize-snippet.js'
  */
 function collect(value: string, previous: string[]): string[] {
   return [...previous, value]
+}
+
+/**
+ * Formats the compact match location shown for spec and document results.
+ *
+ * @param startLine - First 1-based line included in the match range.
+ * @param endLine - Last 1-based line included in the match range.
+ * @returns Human-readable line-range metadata for text output.
+ */
+function renderMatchLocation(startLine: number, endLine: number): string {
+  return `match @ L${String(startLine)}-L${String(endLine)}`
+}
+
+/**
+ * Appends a text-mode snippet block using the normalized CLI snippet format.
+ *
+ * @param lines - Mutable output line buffer.
+ * @param snippet - Raw snippet text from the graph provider.
+ * @param startLine - First 1-based line included in the snippet.
+ * @param endLine - Last 1-based line included in the snippet.
+ */
+function renderSnippetBlock(
+  lines: string[],
+  snippet: string,
+  startLine: number,
+  endLine: number,
+): void {
+  lines.push(`    snippet @ L${String(startLine)}-L${String(endLine)}:`)
+  lines.push('      >>>')
+  lines.push(normalizeSnippet(snippet, { margin: 6 }))
+  lines.push('      <<<')
 }
 
 /**
@@ -30,6 +62,7 @@ export function registerGraphSearch(parent: Command): void {
     .option('--symbols', 'search only symbols')
     .option('--specs', 'search only specs')
     .option('--documents', 'search only documents')
+    .option('--snippet', 'include snippet previews in text, json, and toon output')
     .addOption(new Option('--kind <kinds>', 'filter symbols by kind (comma-separated)'))
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
@@ -59,6 +92,9 @@ JSON/TOON output schema:
       workspace: string
       symbol: { id, name, kind, filePath, line, column, comment }
       score: number
+      startLine: number
+      endLine: number
+      snippet?: string
     }>
     specs: Array<{
       workspace: string
@@ -68,6 +104,18 @@ JSON/TOON output schema:
       description: string
       content?: string
       score: number
+      startLine: number
+      endLine: number
+      snippet?: string
+    }>
+    documents: Array<{
+      workspace: string
+      path: string
+      configRelativePath: string
+      score: number
+      startLine: number
+      endLine: number
+      snippet?: string
     }>
   }
 
@@ -84,6 +132,7 @@ Exclude examples:
           symbols?: boolean
           specs?: boolean
           documents?: boolean
+          snippet?: boolean
           kind?: string
           config?: string
           path?: string
@@ -115,7 +164,7 @@ Exclude examples:
             cliError(err instanceof Error ? err.message : 'invalid --kind value', opts.format, 1)
           }
         })()
-        const { config } = await resolveGraphCliContext({
+        const { config, kernel } = await resolveGraphCliContext({
           configPath: opts.config,
           repoPath: opts.path,
         }).catch((err: unknown) =>
@@ -128,6 +177,7 @@ Exclude examples:
         assertGraphIndexUnlocked(config)
 
         await withProvider(config, opts.format, async (provider) => {
+          await warnGraphStale(provider, config, kernel)
           const searchOptions: SearchOptions = {
             query,
             limit,
@@ -166,12 +216,9 @@ Exclude examples:
                 const ws = sepIndex !== -1 ? symbol.filePath.substring(0, sepIndex) : ''
                 const relPath = await toDisplayPath(symbol.filePath)
                 lines.push(`  [${ws}] ${symbol.kind} ${symbol.name}`)
-                lines.push(`    ${relPath}:${String(symbol.line)}`)
-                if (snippet) {
-                  lines.push(`    snippet @ L${String(startLine)}-L${String(endLine)}:`)
-                  lines.push('      >>>')
-                  lines.push(normalizeSnippet(snippet, { margin: 6 }))
-                  lines.push('      <<<')
+                lines.push(`    ${relPath}:${String(symbol.line)}:${String(symbol.column)}`)
+                if (opts.snippet && snippet) {
+                  renderSnippetBlock(lines, snippet, startLine, endLine)
                 }
               }
             }
@@ -181,11 +228,9 @@ Exclude examples:
               lines.push(`Specs (${String(specResults.length)} shown, limit ${String(limit)}):`)
               for (const { spec, snippet, startLine, endLine } of specResults) {
                 lines.push(`  [${spec.workspace}] ${spec.specId}`)
-                if (snippet) {
-                  lines.push(`    snippet @ L${String(startLine)}-L${String(endLine)}:`)
-                  lines.push('      >>>')
-                  lines.push(normalizeSnippet(snippet, { margin: 6 }))
-                  lines.push('      <<<')
+                lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
+                if (opts.snippet && snippet) {
+                  renderSnippetBlock(lines, snippet, startLine, endLine)
                 }
               }
             }
@@ -197,11 +242,9 @@ Exclude examples:
               )
               for (const { document, snippet, startLine, endLine } of documentResults) {
                 lines.push(`  [${document.workspace}] ${document.configRelativePath}`)
-                if (snippet) {
-                  lines.push(`    snippet @ L${String(startLine)}-L${String(endLine)}:`)
-                  lines.push('      >>>')
-                  lines.push(normalizeSnippet(snippet, { margin: 6 }))
-                  lines.push('      <<<')
+                lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
+                if (opts.snippet && snippet) {
+                  renderSnippetBlock(lines, snippet, startLine, endLine)
                 }
               }
             }
@@ -220,9 +263,9 @@ Exclude examples:
                     : '',
                   symbol,
                   score,
-                  snippet,
                   startLine,
                   endLine,
+                  ...(opts.snippet ? { snippet } : {}),
                 })),
                 specs: specResults.map(({ spec, score, snippet, startLine, endLine }) => ({
                   workspace: spec.workspace,
@@ -232,9 +275,9 @@ Exclude examples:
                   description: spec.description,
                   ...(opts.specContent ? { content: spec.content } : {}),
                   score,
-                  snippet,
                   startLine,
                   endLine,
+                  ...(opts.snippet ? { snippet } : {}),
                 })),
                 documents: documentResults.map(
                   ({ document, score, snippet, startLine, endLine }) => ({
@@ -242,9 +285,9 @@ Exclude examples:
                     path: document.path,
                     configRelativePath: document.configRelativePath,
                     score,
-                    snippet,
                     startLine,
                     endLine,
+                    ...(opts.snippet ? { snippet } : {}),
                   }),
                 ),
               },

@@ -64,16 +64,11 @@ JSON/TOON output schema:
 
           const specIds = parsedSpecs.map((p) => p.specId)
 
-          const result = await kernel.specs.getActiveSchema.execute()
-          if (result.raw) throw new Error('Unexpected raw result')
-          const schema = result.schema
-
-          const { change, changePath } = await kernel.changes.create.execute({
+          const { change, changePath, overlapReport } = await kernel.changes.create.execute({
             name,
             ...(opts.description !== undefined ? { description: opts.description } : {}),
             specIds,
-            schemaName: schema.name(),
-            schemaVersion: schema.version(),
+            ...(specIds.length > 0 ? { includeOverlapCheck: true } : {}),
             ...(config.invalidationPolicy !== undefined || opts.invalidationPolicy !== undefined
               ? {
                   invalidationPolicy:
@@ -83,25 +78,17 @@ JSON/TOON output schema:
               : {}),
           })
 
-          // Check for spec overlap and warn
-          if (specIds.length > 0) {
-            try {
-              const overlapReport = await kernel.changes.detectOverlap.execute({ name })
-              if (overlapReport.hasOverlap) {
-                const specList = overlapReport.entries
-                  .map(
-                    (e) =>
-                      `  ${e.specId} — also targeted by: ${e.changes
-                        .filter((c) => c.name !== name)
-                        .map((c) => `${c.name} (${c.state})`)
-                        .join(', ')}`,
-                  )
-                  .join('\n')
-                process.stderr.write(`warning: spec overlap detected:\n${specList}\n`)
-              }
-            } catch {
-              // Overlap detection is best-effort — don't fail create
-            }
+          if (overlapReport?.hasOverlap === true) {
+            const specList = overlapReport.entries
+              .map(
+                (e) =>
+                  `  ${e.specId} — also targeted by: ${e.changes
+                    .filter((c) => c.name !== name)
+                    .map((c) => `${c.name} (${c.state})`)
+                    .join(', ')}`,
+              )
+              .join('\n')
+            process.stderr.write(`warning: spec overlap detected:\n${specList}\n`)
           }
 
           const fmt = parseFormat(opts.format)

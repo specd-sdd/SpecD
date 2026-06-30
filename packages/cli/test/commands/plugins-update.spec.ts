@@ -52,14 +52,15 @@ vi.mock('@specd/plugin-manager', () => ({
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerPluginsUpdate } from '../../src/commands/plugins/update.js'
 
-function setup() {
+function setup(configOverrides: Parameters<typeof makeMockConfig>[0] = {}) {
   const kernel = makeMockKernel()
-  kernel.project.listPlugins.execute.mockResolvedValue([
-    { name: '@specd/plugin-agent-claude' },
-    { name: '@specd/plugin-agent-copilot' },
-  ])
   vi.mocked(resolveCliContext).mockResolvedValue({
-    config: makeMockConfig(),
+    config: makeMockConfig({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }, { name: '@specd/plugin-agent-copilot' }],
+      },
+      ...configOverrides,
+    }),
     configFilePath: '/project/specd.yaml',
     kernel,
   })

@@ -1,116 +1,42 @@
 {
   "title": "InitProject",
-  "description": "Before a project can use specd, it needs a valid `specd.yaml`, storage directories, and gitignore entries — bootstrapping that must happen through a single coordinated operation. `InitProject` is the use case that handles this by delegating to the `ConfigWriter` port to write `specd.yaml`, create required storage directories, and update `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch.",
+  "description": "**Retired.** The `InitProject` application use case is removed. Project initialisation requirements now live in [`core:config-writer-port`](../config-writer-port/spec.md) (`initProject` operation) and [`core:composition`](../composition/spec.md) (`createConfigWriter()` factory). Delivery mechanisms call `createConfigWriter().initProject(...)`.",
   "dependsOn": ["core:config", "default:_global/architecture"],
   "context": [
-    "Before a project can use specd, it needs a valid `specd.yaml`, storage directories, and gitignore entries — bootstrapping that must happen through a single coordinated operation. `InitProject` is the use case that handles this by delegating to the `ConfigWriter` port to write `specd.yaml`, create required storage directories, and update `.gitignore`. It is the entry point for `specd init` and the only use case that creates a project configuration from scratch."
+    "**Retired.** The `InitProject` application use case is removed. Project initialisation requirements now live in [`core:config-writer-port`](../config-writer-port/spec.md) (`initProject` operation) and [`core:composition`](../composition/spec.md) (`createConfigWriter()` factory). Delivery mechanisms call `createConfigWriter().initProject(...)`."
   ],
   "rules": [
     {
-      "requirement": "Accepts InitProjectOptions as input",
+      "requirement": "InitProject use case removed",
       "rules": [
-        "`execute(input)` MUST accept an `InitProjectOptions` object with the following fields:\n\n- `projectRoot` (string, required) — absolute path to the directory to initialise.\n- `schemaRef` (string, required) — schema reference string to write into `specd.yaml` (e.g. `\"@specd/schema-std\"`).\n- `workspaceId` (string, required) — the default workspace name (e.g. `\"default\"`).\n- `specsPath` (string, required) — relative path for the specs directory (e.g. `\"specs/\"`).\n- `force` (boolean, optional) — when `true`, overwrite an existing `specd.yaml` without error."
-      ]
-    },
-    {
-      "requirement": "Returns InitProjectResult on success",
-      "rules": [
-        "On successful execution, `execute` MUST return an `InitProjectResult` containing:\n\n- `configPath` — absolute path to the created `specd.yaml`.\n- `schemaRef` — the schema reference as written.\n- `workspaces` — array of workspace IDs created."
-      ]
-    },
-    {
-      "requirement": "Delegates entirely to ConfigWriter",
-      "rules": [
-        "The use case MUST delegate all filesystem operations to the `ConfigWriter.initProject` method. It SHALL NOT perform any filesystem I/O directly. The use case is a thin orchestration layer over the port."
-      ]
-    },
-    {
-      "requirement": "Throws AlreadyInitialisedError when config exists",
-      "rules": [
-        "When `specd.yaml` already exists at the target path and `force` is not `true`, the use case MUST propagate the `AlreadyInitialisedError` thrown by the `ConfigWriter` port."
-      ]
-    },
-    {
-      "requirement": "Side effects performed by the port",
-      "rules": [
-        "The `ConfigWriter.initProject` implementation MUST:\n\n- Write `specd.yaml` with the provided schema reference, workspace, and specs path.\n- Create standard storage directories (`changes/`, `drafts/`, `discarded/`, `archive/`).\n- Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore`."
+        "The `InitProject` application use case class MUST NOT be exported from `@specd/core`. Callers that previously used `createInitProject()` or `kernel.project.init` MUST migrate to `createConfigWriter().initProject(...)`."
       ]
     }
   ],
-  "constraints": [
-    "The use case has no business logic beyond delegation — it is a pass-through to the port.",
-    "InitProject is constructed with a single dependency: a ConfigWriter instance.",
-    "The use case is async — it returns Promise<InitProjectResult>."
-  ],
   "scenarios": [
     {
-      "requirement": "Accepts InitProjectOptions as input",
-      "name": "All required fields provided",
-      "when": ["execute is called with projectRoot, schemaRef, workspaceId, and specsPath"],
-      "then": ["the call succeeds and the options are forwarded to ConfigWriter.initProject"]
-    },
-    {
-      "requirement": "Returns InitProjectResult on success",
-      "name": "Successful initialisation returns result",
-      "when": ["execute is called with valid options and no existing config"],
+      "requirement": "InitProject use case removed",
+      "name": "InitProject class is not exported",
+      "when": ["@specd/core public exports are inspected"],
       "then": [
-        "the returned object contains configPath, schemaRef, and workspaces",
-        "AND configPath is an absolute path ending in specd.yaml",
-        "AND workspaces includes the provided workspaceId"
+        "InitProject, AddPlugin, RemovePlugin, createInitProject, createAddPlugin, and createRemovePlugin are not among them",
+        "AND createConfigWriter is exported"
       ]
     },
     {
-      "requirement": "Delegates entirely to ConfigWriter",
-      "name": "Port receives the input verbatim",
-      "when": ["execute is called with an InitProjectOptions object"],
+      "requirement": "InitProject use case removed",
+      "name": "Project init uses createConfigWriter instead",
+      "when": ["delivery code needs to initialise a project"],
       "then": [
-        "ConfigWriter.initProject is called exactly once with the same options object",
-        "AND the use case performs no other I/O"
-      ]
-    },
-    {
-      "requirement": "Throws AlreadyInitialisedError when config exists",
-      "name": "Config already exists without force flag",
-      "given": ["specd.yaml already exists at projectRoot"],
-      "when": ["execute is called with force absent or false"],
-      "then": ["an AlreadyInitialisedError is thrown"]
-    },
-    {
-      "requirement": "Throws AlreadyInitialisedError when config exists",
-      "name": "Config already exists with force flag",
-      "given": ["specd.yaml already exists at projectRoot"],
-      "when": ["execute is called with force: true"],
-      "then": ["the existing config is overwritten and a successful result is returned"]
-    },
-    {
-      "requirement": "Throws AlreadyInitialisedError when config exists",
-      "name": "Already initialised project propagates port error",
-      "given": ["the port throws AlreadyInitialisedError when checking existence"],
-      "when": ["execute is called"],
-      "then": ["execute propagates AlreadyInitialisedError from the port"]
-    },
-    {
-      "requirement": "Side effects performed by the port",
-      "name": "Storage directories created",
-      "when": ["execute completes successfully"],
-      "then": [
-        "the changes/, drafts/, discarded/, and archive/ directories exist under the storage path"
-      ]
-    },
-    {
-      "requirement": "Side effects performed by the port",
-      "name": "Gitignore entries added",
-      "when": ["execute completes successfully"],
-      "then": [
-        "specd.local.yaml is listed in the project's .gitignore",
-        "AND the specd.local.*.yaml local-variant pattern is also listed"
+        "it calls createConfigWriter().initProject(options)",
+        "AND it does not construct InitProject directly"
       ]
     }
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:cf1b0bacea14a47932fe1edd20a5c1fce4b96f61b6aabbe8490f944706002862",
-    "verify.md": "sha256:11e6a8239bb496ab5fcd58342465a2cc3318d3bd44a03b60e8c3b8767a2928ef"
+    "spec.md": "sha256:6472d21f5deaed9410551218bc9ff1f3670c5c3a1e6916cf8cdf006d741bc6f1",
+    "verify.md": "sha256:cb6fd1b11a57c6ad71b71242651900e17364dcbfdbd3ff5accddf499bcdc0abc"
   },
   "generatedBy": "core"
 }

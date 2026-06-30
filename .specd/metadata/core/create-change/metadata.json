@@ -1,7 +1,12 @@
 {
   "title": "CreateChange",
   "description": "Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry.",
-  "dependsOn": ["core:change", "default:_global/architecture"],
+  "dependsOn": [
+    "core:change",
+    "default:_global/architecture",
+    "core:get-active-schema",
+    "core:spec-overlap"
+  ],
   "context": [
     "Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry."
   ],
@@ -9,7 +14,19 @@
     {
       "requirement": "Input contract",
       "rules": [
-        "`CreateChange.execute` SHALL accept a `CreateChangeInput` with the following fields:\n\n- `name` (string, required) — unique slug name for the change (kebab-case)\n- `description` (string, optional) — free-text description of the change's purpose\n- `specIds` (readonly string\\[], required) — spec paths being created or modified\n- `schemaName` (string, required) — the active schema name from configuration\n- `schemaVersion` (number, required) — the active schema version from configuration"
+        "`CreateChange.execute` SHALL accept a `CreateChangeInput` with the following fields:\n\n- `name` (string, required) — unique slug name for the change (kebab-case)\n- `description` (string, optional) — free-text description of the change's purpose\n- `specIds` (readonly string\\[], required) — spec paths being created or modified\n- `schemaName` (string, optional) — explicit schema name override\n- `schemaVersion` (number, optional) — explicit schema version override\n- `invalidationPolicy` (optional) — initial invalidation policy for the new change\n- `includeOverlapCheck` (boolean, optional) — when `true` and `specIds` is non-empty, run overlap detection after persistence and include the report on the result\n\nWhen `schemaName` and `schemaVersion` are both absent, the use case MUST resolve the project's active schema via `GetActiveSchema.execute()` (project mode) and derive `schemaName` and `schemaVersion` from the returned `Schema`.\n\nWhen both `schemaName` and `schemaVersion` are provided, the use case MUST use them directly without calling `GetActiveSchema`.\n\nProviding only one of `schemaName` or `schemaVersion` MUST be rejected before persistence (the use case throws a validation error)."
+      ]
+    },
+    {
+      "requirement": "Active schema resolution",
+      "rules": [
+        "When `CreateChange.execute` is called without explicit `schemaName` and `schemaVersion`, the use case MUST call `GetActiveSchema.execute()` with no arguments.\n\nThe use case MUST extract `schemaName` from `schema.name()` and `schemaVersion` from `schema.version()` on the resolved `Schema` entity.\n\nThe use case MUST NOT implement schema resolution logic itself — it delegates entirely to `GetActiveSchema` for project-mode resolution.\n\nSchema resolution errors from `GetActiveSchema` (for example `SchemaNotFoundError`, `SchemaValidationError`) MUST propagate to the caller unchanged."
+      ]
+    },
+    {
+      "requirement": "Optional overlap check",
+      "rules": [
+        "When `includeOverlapCheck` is `true` and `specIds` contains at least one entry, `CreateChange` MUST invoke `DetectOverlap.execute({ name: input.name })` after the change is persisted and scaffolded.\n\nWhen overlap detection succeeds, the returned `OverlapReport` MUST be included on `CreateChangeResult` as `overlapReport`.\n\nWhen overlap detection throws, creation MUST still succeed and `overlapReport` MUST be omitted.\n\nWhen `includeOverlapCheck` is absent or `false`, or when `specIds` is empty, the use case MUST NOT call `DetectOverlap`."
       ]
     },
     {
@@ -33,7 +50,7 @@
     {
       "requirement": "Initial history contains a single created event",
       "rules": [
-        "The newly constructed `Change` MUST have a history containing exactly one event of type `created`. This event SHALL record:\n\n- `type`: `'created'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `specIds`: the input spec paths\n- `schemaName`: the input schema name\n- `schemaVersion`: the input schema version"
+        "The newly constructed `Change` MUST have a history containing exactly one event of type `created`. This event SHALL record:\n\n- `type`: `'created'`\n- `at`: the current timestamp\n- `by`: the resolved actor identity\n- `specIds`: the input spec paths\n- `schemaName`: the effective schema name (from input override or active schema resolution)\n- `schemaVersion`: the effective schema version (from input override or active schema resolution)"
       ]
     },
     {
@@ -51,13 +68,13 @@
     {
       "requirement": "Persistence and scaffolding",
       "rules": [
-        "After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks the `SpecRepository` map for each spec ID's workspace. Finally, the use case returns an object containing the newly created `Change` instance and the `changePath` (obtained via `ChangeRepository.changePath(change)`).\n\nThe return type is `{ change: Change; changePath: string }`."
+        "After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks workspace spec repositories via `ListWorkspaces`.\n\nWhen `includeOverlapCheck` is `true` and `specIds` is non-empty, after scaffolding the use case MUST call `DetectOverlap.execute({ name: input.name })` and include the returned `OverlapReport` on the result. When overlap detection throws, the use case MUST NOT fail creation — it omits `overlapReport` from the result.\n\nFinally, the use case returns an object containing the newly created `Change` instance, the `changePath` (obtained via `ChangeRepository.changePath(change)`), and optionally `overlapReport`.\n\nThe return type is `{ change: Change; changePath: string; overlapReport?: OverlapReport }`."
       ]
     },
     {
       "requirement": "Dependencies",
       "rules": [
-        "`CreateChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for existence checks, persistence, and scaffolding\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`"
+        "`CreateChange` depends on the following ports and use cases injected via constructor:\n\n- `ChangeRepository` — for existence checks, persistence, and scaffolding\n- `ListWorkspaces` — orchestrated workspace map for spec existence checks and persisted dependency seeding\n- `ActorResolver` — for resolving the current actor identity\n- `GetActiveSchema` — for resolving the project's active schema when `schemaName` / `schemaVersion` are not provided on input\n- `DetectOverlap` — for optional post-create overlap detection when `includeOverlapCheck` is `true`"
       ]
     }
   ],
@@ -96,8 +113,15 @@
       "then": [
         "change.history has length 1",
         "AND change.history[0].type === 'created'",
-        "AND the event contains specIds, schemaName, and schemaVersion matching the input"
+        "AND the event contains specIds, schemaName, and schemaVersion matching the effective schema identity"
       ]
+    },
+    {
+      "requirement": "Initial history contains a single created event",
+      "name": "Active schema identity recorded when not provided on input",
+      "given": ["GetActiveSchema.execute() returns a schema with name 'spec-driven' and version 1"],
+      "when": ["CreateChange.execute is called without schemaName or schemaVersion"],
+      "then": ["the created event records schemaName: 'spec-driven' and schemaVersion: 1"]
     },
     {
       "requirement": "Change construction",
@@ -148,18 +172,79 @@
     },
     {
       "requirement": "Input contract",
-      "name": "execute accepts CreateChangeInput",
-      "when": ["CreateChange.execute is called"],
-      "then": [
-        "it accepts CreateChangeInput with name, specIds, schemaName, schemaVersion (required)",
-        "AND description (optional)"
-      ]
+      "name": "execute accepts CreateChangeInput without schema fields",
+      "when": ["CreateChange.execute is called with name and specIds only"],
+      "then": ["it accepts the input without schemaName or schemaVersion"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "execute accepts explicit schema override",
+      "when": ["CreateChange.execute is called with schemaName and schemaVersion provided"],
+      "then": ["it uses the provided values without calling GetActiveSchema"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "Partial schema override is rejected",
+      "when": ["CreateChange.execute is called with only schemaName or only schemaVersion"],
+      "then": ["it throws before persisting the change"]
     },
     {
       "requirement": "Input contract",
       "name": "specIds are recorded in the created event",
       "when": ["CreateChange.execute is called with specIds: ['auth/login', 'auth/register']"],
       "then": ["the created event contains specIds: ['auth/login', 'auth/register']"]
+    },
+    {
+      "requirement": "Active schema resolution",
+      "name": "Delegates to GetActiveSchema in project mode",
+      "given": ["CreateChange.execute is called without schemaName or schemaVersion"],
+      "when": ["the use case resolves schema identity"],
+      "then": [
+        "it calls GetActiveSchema.execute() with no arguments",
+        "AND it does not implement resolution logic itself"
+      ]
+    },
+    {
+      "requirement": "Active schema resolution",
+      "name": "Schema resolution errors propagate",
+      "given": ["GetActiveSchema.execute() throws SchemaNotFoundError"],
+      "when": ["CreateChange.execute is called without explicit schema fields"],
+      "then": ["the error propagates to the caller", "AND no change is persisted"]
+    },
+    {
+      "requirement": "Optional overlap check",
+      "name": "Overlap report included when requested",
+      "given": [
+        "CreateChange.execute is called with includeOverlapCheck: true and non-empty specIds",
+        "AND DetectOverlap.execute({ name }) returns a report with hasOverlap: true"
+      ],
+      "when": ["creation completes"],
+      "then": ["the result includes overlapReport with the same entries"]
+    },
+    {
+      "requirement": "Optional overlap check",
+      "name": "Overlap detection failure does not fail creation",
+      "given": [
+        "CreateChange.execute is called with includeOverlapCheck: true",
+        "AND DetectOverlap.execute throws"
+      ],
+      "when": ["creation completes"],
+      "then": [
+        "the change is persisted successfully",
+        "AND overlapReport is omitted from the result"
+      ]
+    },
+    {
+      "requirement": "Optional overlap check",
+      "name": "Overlap check skipped when flag absent",
+      "when": ["CreateChange.execute is called without includeOverlapCheck"],
+      "then": ["DetectOverlap.execute is not called"]
+    },
+    {
+      "requirement": "Optional overlap check",
+      "name": "Overlap check skipped when specIds empty",
+      "when": ["CreateChange.execute is called with includeOverlapCheck: true and empty specIds"],
+      "then": ["DetectOverlap.execute is not called"]
     },
     {
       "requirement": "Initial invalidation policy",
@@ -186,7 +271,7 @@
     {
       "requirement": "Persistence and scaffolding",
       "name": "Scaffolding uses specExists callback",
-      "given": ["a specExists callback that checks workspace spec maps"],
+      "given": ["a specExists callback that checks workspace spec maps via ListWorkspaces"],
       "when": ["CreateChange.execute completes"],
       "then": ["ChangeRepository.scaffold is called with the specExists callback"]
     },
@@ -214,17 +299,66 @@
     },
     {
       "requirement": "Dependencies",
-      "name": "Uses spec repositories map for existence checks and dependency seeding",
+      "name": "Uses ListWorkspaces for spec existence and dependency seeding",
       "when": ["CreateChange is instantiated"],
-      "then": [
-        "it requires a ReadonlyMap<string, SpecRepository> for spec existence checks and persisted dependency seeding"
-      ]
+      "then": ["it requires a ListWorkspaces use case for workspace orchestration"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses GetActiveSchema for active schema resolution",
+      "when": ["CreateChange is instantiated"],
+      "then": ["it requires a GetActiveSchema use case in its constructor"]
+    },
+    {
+      "requirement": "Dependencies",
+      "name": "Uses DetectOverlap for optional overlap check",
+      "when": ["CreateChange is instantiated"],
+      "then": ["it requires a DetectOverlap use case in its constructor"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:create-change",
+        "file": "core:src/application/errors/index.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:create-change",
+        "file": "core:src/application/use-cases/create-change.ts",
+        "symbol": "CreateChange"
+      },
+      {
+        "specId": "core:create-change",
+        "file": "core:src/application/use-cases/create-change.ts",
+        "symbol": "CreateChangeInput"
+      },
+      {
+        "specId": "core:create-change",
+        "file": "core:src/application/use-cases/create-change.ts",
+        "symbol": "CreateChangeResult"
+      },
+      {
+        "specId": "core:create-change",
+        "file": "core:src/application/errors/invalid-create-change-input-error.ts",
+        "symbol": "InvalidCreateChangeInputError"
+      },
+      {
+        "specId": "core:create-change",
+        "file": "core:src/composition/use-cases/create-change.ts",
+        "symbol": "createCreateChange"
+      },
+      {
+        "specId": "core:create-change",
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:1780b0a4e8275fe8d47027f9af922cbfda33a47f8c5ecc40374b923940c2e7d2",
-    "verify.md": "sha256:a8aa41806413409cf71825e3792a5cf6c2669353d49c49b58a6eeab3b632e51e"
+    "spec.md": "sha256:3553561180922e149a5d0b35b697d5125744f7f3fb73223e51a3e338063606d2",
+    "verify.md": "sha256:0754576b02151e8cc1d9c7e8e87fe3e7656aae7b8f6c9dfd3a3743a26b3ff874"
   },
   "generatedBy": "core"
 }

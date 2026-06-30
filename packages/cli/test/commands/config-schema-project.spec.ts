@@ -11,18 +11,23 @@ import {
   captureStderr,
 } from './helpers.js'
 
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
+}))
+
 vi.mock('../../src/load-config.js', () => ({
   loadConfig: vi.fn(),
   resolveConfigPath: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
+
+import { loadConfig } from '../../src/load-config.js'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
 vi.mock('node:fs/promises', () => ({
   mkdir: vi.fn().mockResolvedValue(undefined),
   writeFile: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
 import { registerConfigShow } from '../../src/commands/config/show.js'
 import { registerSchemaShow } from '../../src/commands/schema/show.js'
 import { registerProjectContext } from '../../src/commands/project/context.js'
@@ -31,7 +36,7 @@ function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
   vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({ config, configFilePath: null, kernel })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -70,7 +75,6 @@ describe('config show', () => {
   it('shows approval settings', async () => {
     const config = makeMockConfig({ approvals: { spec: true, signoff: false } })
     vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
     const stdout = captureStdout()
     captureStderr()
 
@@ -123,7 +127,6 @@ describe('config show', () => {
       ],
     })
     vi.mocked(loadConfig).mockResolvedValue(config)
-    vi.mocked(createCliKernel).mockResolvedValue(makeMockKernel())
     const stdout = captureStdout()
     captureStderr()
     mockProcessExit()
@@ -423,7 +426,7 @@ describe('schema show', () => {
 describe('schema show — resolution failure', () => {
   it('exits 3 when schema cannot be resolved', async () => {
     const { kernel, stderr } = setup()
-    const { SchemaNotFoundError } = await import('@specd/core')
+    const { SchemaNotFoundError } = await import('@specd/sdk')
     kernel.specs.getActiveSchema.execute.mockRejectedValue(
       new SchemaNotFoundError('@specd/schema-missing'),
     )

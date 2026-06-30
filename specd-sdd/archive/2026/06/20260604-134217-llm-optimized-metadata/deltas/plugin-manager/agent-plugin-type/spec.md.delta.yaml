@@ -1,0 +1,47 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: AgentInstallOptions'
+  content: |
+    ```typescript
+    type TemplateVariable =
+      | string
+      | number
+      | boolean
+      | readonly TemplateVariable[]
+      | { readonly [key: string]: TemplateVariable }
+
+    interface AgentInstallOptions {
+      skills?: string[] // specific skill names; omit = all
+      agents?: string[] // specific agent names; omit = all
+      variables?: Record<string, TemplateVariable> // recursive template variables, including variables.frontmatter and variables.sharedFolder
+      capabilities?: string[] // capability identifiers supported by the target runtime
+    }
+    ```
+
+    `capabilities` MUST be supplied as a simple collection of capability identifiers by the agent plugin at install time. The initial required capability identifiers are `mcp`, `agents`, and `frontmatter`.
+
+    Their initial required meanings are:
+
+    - `mcp`: the target runtime supports MCP-oriented template branches
+    - `agents`: the target runtime supports delegated-agent-oriented template branches
+    - `frontmatter`: the target runtime expects frontmatter to be composed and inserted from `variables.frontmatter`
+
+    Frontmatter data MUST be passed through `variables.frontmatter`. Plugins MUST NOT pass a prebuilt YAML frontmatter document through `AgentInstallOptions`.
+
+    `variables.sharedFolder`, when provided, MUST be relative to the project root and is subject to normalization and validation by `@specd/skills`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: AgentInstallResult'
+  content: |
+    ### Requirement: Agent installation and fallback
+
+    When installing agents, the plugin SHALL determine the target directory based on the target runtime's conventions (e.g., `.claude/agents/`).
+
+    If the target runtime does NOT support specialized agents (i.e., the `agents` capability is missing), the plugin SHALL copy the agent template to the same directory as the shared context file (`shared.md`).

@@ -1,13 +1,10 @@
 import { Command } from 'commander'
-import { createVcsAdapter } from '@specd/core'
-import { parseFingerprintMap, detectFingerprintMismatch } from '@specd/code-graph'
+import { assertGraphIndexUnlocked, codeGraphVersion, createGetGraphHealth } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
-import { buildProjectGraphConfig } from './build-project-graph-config.js'
+import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { assertGraphIndexUnlocked } from './graph-index-lock.js'
-import { codeGraphVersion } from './code-graph-version.js'
 
 /**
  * Registers the `graph stats` command.
@@ -36,6 +33,7 @@ JSON/TOON output schema:
     lastIndexedRef?: string | null
     stale: boolean | null
     currentRef: string | null
+    fingerprintMismatch: boolean | null
   }
 `,
     )
@@ -54,91 +52,82 @@ JSON/TOON output schema:
           1,
         ),
       )
-      assertGraphIndexUnlocked(config)
 
-      await withProvider(config, opts.format, async (provider) => {
-        const stats = await provider.getStatistics()
+      const getGraphHealth = createGetGraphHealth()
 
-        let currentRef: string | null = null
-        try {
-          const vcs = await createVcsAdapter(config.projectRoot)
-          currentRef = await vcs.ref()
-        } catch {
-          // No VCS or ref() failed — staleness detection unavailable
-        }
+      try {
+        assertGraphIndexUnlocked(config)
+      } catch (err: unknown) {
+        cliError(err instanceof Error ? err.message : 'The code graph is locked', opts.format, 3)
+        return
+      }
 
-        const stale = computeStaleness(stats.lastIndexedRef, currentRef)
+      const host = await resolveSdkHostContext(config, kernel)
+      await withProvider(
+        config,
+        opts.format,
+        async (provider) => {
+          const workspaces =
+            kernel !== null
+              ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
+                  name: ws.name,
+                  prefix: ws.prefix,
+                  codeRoot: ws.codeRoot,
+                  specRepo: ws.specRepo,
+                  ownership: ws.ownership,
+                  isExternal: ws.isExternal,
+                }))
+              : undefined
 
-        let fingerprintMismatch: boolean | null = null
-        if (kernel !== null && stats.graphFingerprint !== null) {
-          try {
-            const workspaces = await kernel.project.listWorkspaces.execute()
-            const storedMap = parseFingerprintMap(stats.graphFingerprint)
-            const graphConfig = buildProjectGraphConfig(config)
+          const health = await getGraphHealth.execute({
+            config,
+            provider,
+            codeGraphVersion,
+            assertUnlocked: false,
+            ...(workspaces !== undefined ? { workspaces } : {}),
+          })
 
-            fingerprintMismatch = detectFingerprintMismatch(
-              storedMap,
-              codeGraphVersion,
-              config.projectRoot,
-              workspaces,
-              graphConfig,
-            )
-          } catch {
-            fingerprintMismatch = null
-          }
-        }
+          const { stale, currentRef, fingerprintMismatch, ...stats } = health
 
-        if (fmt === 'text') {
-          const lines = [
-            `Files:     ${String(stats.fileCount)}`,
-            `Documents: ${String(stats.documentCount)}`,
-            `Symbols:   ${String(stats.symbolCount)}`,
-            `Specs:     ${String(stats.specCount)}`,
-            `Languages: ${stats.languages.join(', ') || 'none'}`,
-          ]
+          if (fmt === 'text') {
+            const lines = [
+              `Files:     ${String(stats.fileCount)}`,
+              `Documents: ${String(stats.documentCount)}`,
+              `Symbols:   ${String(stats.symbolCount)}`,
+              `Specs:     ${String(stats.specCount)}`,
+              `Languages: ${stats.languages.join(', ') || 'none'}`,
+            ]
 
-          const relEntries = Object.entries(stats.relationCounts).filter(([, count]) => count > 0)
-          if (relEntries.length > 0) {
-            lines.push('Relations:')
-            for (const [type, count] of relEntries) {
-              lines.push(`  ${type}: ${String(count)}`)
+            const relEntries = Object.entries(stats.relationCounts).filter(([, count]) => count > 0)
+            if (relEntries.length > 0) {
+              lines.push('Relations:')
+              for (const [type, count] of relEntries) {
+                lines.push(`  ${type}: ${String(count)}`)
+              }
             }
-          }
 
-          if (stats.lastIndexedAt) {
-            lines.push(`Last indexed: ${stats.lastIndexedAt}`)
-          }
+            if (stats.lastIndexedAt) {
+              lines.push(`Last indexed: ${stats.lastIndexedAt}`)
+            }
 
-          if (stale === true && stats.lastIndexedRef !== null && currentRef !== null) {
-            lines.push(
-              `⚠ Graph is stale (indexed at ${stats.lastIndexedRef.slice(0, 7)}, current: ${currentRef.slice(0, 7)})`,
-            )
-          }
+            if (stale === true && stats.lastIndexedRef !== null && currentRef !== null) {
+              lines.push(
+                `⚠ Graph is stale (indexed at ${stats.lastIndexedRef.slice(0, 7)}, current: ${currentRef.slice(0, 7)})`,
+              )
+            }
 
-          if (fingerprintMismatch === true) {
-            lines.push(
-              '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index',
-            )
-          }
+            if (fingerprintMismatch === true) {
+              process.stderr.write(
+                '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index\n',
+              )
+            }
 
-          output(lines.join('\n'), 'text')
-        } else {
-          output({ ...stats, stale, currentRef, fingerprintMismatch }, fmt)
-        }
-      })
+            output(lines.join('\n'), 'text')
+          } else {
+            output({ ...stats, stale, currentRef, fingerprintMismatch }, fmt)
+          }
+        },
+        { host },
+      )
     })
-}
-
-/**
- * Determines staleness from stored and current VCS refs.
- * @param lastIndexedRef - The VCS ref stored at last index time, or `null`.
- * @param currentRef - The current VCS ref, or `null`.
- * @returns `true` if stale, `false` if fresh, `null` if unknown.
- */
-function computeStaleness(
-  lastIndexedRef: string | null,
-  currentRef: string | null,
-): boolean | null {
-  if (lastIndexedRef === null || currentRef === null) return null
-  return lastIndexedRef !== currentRef
 }

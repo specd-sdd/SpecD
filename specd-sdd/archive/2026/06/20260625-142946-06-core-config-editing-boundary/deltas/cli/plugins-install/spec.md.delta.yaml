@@ -1,0 +1,25 @@
+- op: modified
+  description: Persist via createConfigWriter instead of kernel
+  selector:
+    type: section
+    matches: 'Requirement: Installation workflow'
+  content: |
+    For each plugin name that is not already installed:
+
+    1. The command MUST call the `InstallPlugin` use case from `@specd/plugin-manager`.
+    2. On success, the command MUST call `createConfigWriter().addPlugin(configPath, type, name, config)` to record the plugin in `specd.yaml`.
+    3. On failure, the command MUST emit the error message and continue with the remaining plugins.
+
+    The command MUST NOT call `kernel.project.addPlugin`. It SHOULD construct a kernel only when subsequent domain operations require one.
+
+- op: modified
+  description: Add composition factory dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`plugin-manager:install-plugin-use-case`](../../plugin-manager/install-plugin-use-case/spec.md) — orchestrates plugin installation
+    - [`plugin-manager:load-plugin-use-case`](../../plugin-manager/load-plugin-use-case/spec.md) — validates plugin before installation
+    - [`core:composition`](../../core/composition/spec.md) — `createConfigWriter()` factory
+    - [`core:config-writer-port`](../../core/config-writer-port/spec.md) — persists plugin declarations via `addPlugin`
+    - [`core:get-config`](../../core/get-config/spec.md) — readonly `SpecdConfig` snapshot for declaration reads

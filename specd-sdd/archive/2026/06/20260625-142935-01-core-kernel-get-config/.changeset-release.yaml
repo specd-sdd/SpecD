@@ -1,0 +1,3 @@
+releases:
+  core:get-config: minor
+  core:kernel: minor

@@ -103,9 +103,15 @@ It:
 
 When symbols in the file participate in `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`, their hierarchy-derived impact MUST be reflected in the aggregate result.
 
+The provider also SHALL support multi-file impact analysis via `analyzeFilesImpact(store: GraphStore, filePaths: string[], direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<FileImpactResult>`. When given multiple file paths, it aggregates the individual file impact results:
+
+- Combines the lists of affected files and symbols.
+- Sums direct, indirect, and transitive dependents counts.
+- Computes the overall risk level as the maximum risk level among all analyzed files.
+
 ### Requirement: Spec impact
 
-`analyzeSpecImpact(store: GraphStore, specId: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<ImpactResult>` SHALL compute requirement-aware impact for one spec.
+`analyzeSpecImpact(store: GraphStore, specId: string, direction: 'upstream' | 'downstream' | 'both', maxDepth?: number): Promise<SpecImpactResult>` SHALL compute requirement-aware impact for one spec.
 
 It MUST treat the following relation families as first-class blast-radius inputs:
 
@@ -116,15 +122,15 @@ It MUST treat the following relation families as first-class blast-radius inputs
 In upstream/dependents mode, spec impact reports:
 
 - specs that depend on the target spec
-- files covered by the target spec
-- symbols covered by the target spec
+- files covered by the target spec and all transitively affected dependent specs
+- symbols covered by the target spec and all transitively affected dependent specs
 
 In downstream/dependencies mode, spec impact reports:
 
 - specs the target spec depends on
 - files and symbols reached through those downstream spec relationships where the traversal depth includes them
 
-The result shape remains `ImpactResult`, but the affected file and affected symbol sets are allowed to originate from requirement-aware relations rather than only code-structure traversal.
+The result shape remains `SpecImpactResult` (which extends `ImpactResult`), but the affected file and affected symbol sets are allowed to originate from requirement-aware relations rather than only code-structure traversal.
 
 ### Requirement: Change detection
 
@@ -132,17 +138,7 @@ The result shape remains `ImpactResult`, but the affected file and affected symb
 
 1. For each changed file, finds all symbols defined in it
 2. Runs upstream traversal on each symbol with the given `maxDepth`
-3. Aggregates affected symbols, files, and execution flows
-4. Computes an overall risk level
-
-`ChangeDetectionResult` contains:
-
-- **`changedFiles`** — the input file paths
-- **`changedSymbols`** — symbols defined in the changed files
-- **`affectedSymbols`** — symbols affected by the changes (upstream dependents)
-- **`affectedFiles`** — files containing affected symbols
-- **`riskLevel`** — maximum risk level across all changed symbols
-- **`summary`** — human-readable summary string
+3. Aggregates affected symbols, files, and computes the risk level and summary
 
 ### Requirement: Pure functions
 

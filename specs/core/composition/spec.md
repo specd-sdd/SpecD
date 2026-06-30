@@ -2,13 +2,15 @@
 
 ## Purpose
 
-Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing three levels of factory: use-case factories that wire ports internally, a kernel that builds all use cases from a resolved config object, and a config loader port that abstracts config sources. CLI, MCP, and plugin adapters interact exclusively with this layer.
+Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.
 
 ## Requirements
 
 ### Requirement: Use-case factories are the unit of composition
 
-The composition layer exposes one factory function per use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.
+The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.
+
+Config I/O is an exception: `createConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes.
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
@@ -21,7 +23,7 @@ Both signatures are public exports. The explicit form is used in tests and in sc
 
 ### Requirement: Internal ports are never exported
 
-Port implementations that have a single concrete class and no caller-visible configuration — `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader` — are constructed inside use-case factories and never appear in any public export. Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) are also internal to the composition layer.
+Port implementations that have a single concrete class and no caller-visible configuration are constructed inside composition factories and never appear on the `"."` public barrel. Port **contracts** (interfaces and abstract classes) are exported from `"./ports"` for plugin and custom-storage implementers. Repository and use-case **factories** on `"."` return port types — not concrete adapter classes.
 
 ### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
 
@@ -46,9 +48,12 @@ At least one of these should be provided; if neither is available, artifact sync
 const kernel = createKernel(config)
 kernel.changes.archive // ArchiveChange
 kernel.changes.create // CreateChange
-kernel.specs.approve // ApproveSpec
+kernel.changes.approveSpec // ApproveSpec — change lifecycle gate
+kernel.changes.approveSignoff // ApproveSignoff — change lifecycle gate
 // …
 ```
+
+Approval gate use cases belong to the change lifecycle group (`kernel.changes`), not `kernel.specs`, because they mutate `Change` state via `ChangeRepository`.
 
 The kernel is a convenience — it is not the mandatory entry point. Callers that need a single use case call its factory directly.
 
@@ -61,6 +66,21 @@ The builder is part of the public composition surface. It MUST NOT introduce a s
 ### Requirement: ConfigLoader is an application port
 
 `ConfigLoader` is defined in `application/ports/config-loader.ts` as an interface. It has a single method `load(): Promise<SpecdConfig>`. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`, with local values taking precedence. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer.
+
+### Requirement: ConfigWriter is an application port
+
+`ConfigWriter` is defined in `application/ports/config-writer.ts` as an interface. It exposes `initProject`, `addPlugin`, and `removePlugin` for mutating `specd.yaml`. The `FsConfigWriter` implementation performs filesystem and YAML I/O. Delivery mechanisms obtain a wired instance via `createConfigWriter()` — they MUST NOT construct `FsConfigWriter` directly.
+
+`createConfigWriter()` MUST support:
+
+- `createConfigWriter()` — constructs the default filesystem-backed writer
+- `createConfigWriter(options)` — accepts a pre-built `ConfigWriter` for tests
+
+Both signatures are public exports from `@specd/core`.
+
+### Requirement: Config mutation is not wired into createKernel
+
+`createKernel` MUST NOT instantiate `ConfigWriter`, `InitProject`, `AddPlugin`, or `RemovePlugin`. Config mutation operations are reached only through `createConfigWriter()`. The kernel groups domain use cases — not yaml editing.
 
 ### Requirement: SpecdConfig is a plain typed object
 
@@ -85,20 +105,64 @@ The fields `artifactRules` and `workflow` (project-level hook additions) are no 
 
 `createGetActiveSchema(config: SpecdConfig)` must construct `GetActiveSchema` with a `ResolveSchema` instance from `createResolveSchema(config)`.
 
+### Requirement: @specd/sdk orchestrates cross-package host bootstrap
+
+Delivery hosts (CLI, MCP, API, IPC) MUST bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.
+
+`@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration.
+
+`@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct runtime dependency on specd platform packages. Direct core/code-graph bootstrap imports in delivery hosts are permitted only in `@specd/sdk` itself and in tests.
+
+### Requirement: Public barrel entry points
+
+`@specd/core` MUST publish:
+
+- `src/public.ts` as the `"."` export — curated integrator surface
+- `src/ports.ts` as `"./ports"` — port interfaces and abstract classes
+- `src/extensions.ts` as `"./extensions"` — kernel registry and `*StorageFactory` types
+- `src/index.ts` as `"./internal"` — full barrel for monorepo development
+
+`package.json` `exports` MUST map these entry points. The `"."` barrel MUST NOT use `export *` from `domain/`, `application/`, or `composition/`.
+
+### Requirement: Kernel-mounted use case surface
+
+The `"."` public barrel MUST export the `Kernel` interface and, for every use case instance mounted on `kernel.changes`, `kernel.specs`, or `kernel.project`:
+
+- the use-case type
+- all public `*Input` and `*Result` types needed to call `execute()`
+- the public `createX` factory function(s) from `composition/use-cases/` that construct that use case without `createKernel`
+
+The `"."` barrel MUST export port **types** referenced on `Kernel` (`ChangeRepository`, `SpecRepository`, `SchemaRegistry`) for typing. Port implementations MUST NOT be exported from `"."`.
+
+### Requirement: Repository factories on public root
+
+The `"."` public barrel MUST export `createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, and `createSchemaRegistry`, plus their public option/config types (for example `FsSpecRepositoryOptions`).
+
+Each repository factory MUST accept an adapter id as its first argument. Builtin `'fs'` MUST be supported. Future plugin-registered adapter ids (for example `'db'`) are resolved through `*StorageFactory` registration on `./extensions`; full registry dispatch wiring in factories is out of scope for the initial barrel split but the public factory signatures MUST be designed to accept extensible adapter ids.
+
+Integrators MUST be able to obtain default filesystem storage (for example `createSpecRepository('fs', ...)`) without calling `createKernel`.
+
+### Requirement: Extension registration surface
+
+`"./extensions"` MUST export `SpecStorageFactory`, `ChangeStorageFactory`, `ArchiveStorageFactory`, `SchemaStorageFactory`, `KernelRegistryInput`, `KernelRegistryView`, `KernelBuilder`, `createKernelBuilder`, `ActorProvider`, `VcsProvider`, `ExternalHookRunner`, and `RegistryConflictError`. Builtin `FS_*` storage factory markers MUST remain internal.
+
+Plugin authors implement port contracts from `./ports`, expose a `*StorageFactory` from `./extensions`, and register it before calling repository factories with the matching adapter id or before `createKernel` / `createKernelBuilder`.
+
 ## Constraints
 
 - `composition/` is the only directory in `@specd/core` permitted to import from `infrastructure/`
-- Concrete adapter classes (`FsSpecRepository`, `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`, `FsSchemaRegistry`, etc.) must not appear in `src/index.ts` or any re-export chain
-- Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) must not appear in `src/index.ts`
-- Use-case factories and the kernel are the only composition exports in `src/index.ts`
-- `ConfigLoader` implementations live in `infrastructure/`; the port interface lives in `application/ports/`
+- Concrete adapter classes (`FsSpecRepository`, `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`, `FsSchemaRegistry`, etc.) must not appear on any public entry point (`"."`, `"./ports"`, `"./extensions"`)
+- Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, `createSchemaRegistry`) and standalone use-case `createX` factories for kernel-mounted use cases MUST appear on the `"."` public barrel
+- The `"."` barrel exports `createKernel`, `createConfigLoader`, `createConfigWriter`, `createVcsAdapter`, `Kernel`, all kernel-equivalent factories, kernel use-case I/O types, domain entities, and `SpecdError` hierarchy
+- `ConfigLoader` and `ConfigWriter` implementations live in `infrastructure/`; port interfaces live in `application/ports/` and are exported from `"./ports"`
 - The kernel groups use cases under domain-area namespaces — use cases are not properties at the top level of the kernel object
-- Both call signatures of every use-case factory must be public exports
+- Symbols only needed by monorepo composition internals (concrete adapters, `kernel-internals`, builtin `FS_*` markers) remain on `"./internal"` only
 
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
 - [`core:resolve-schema`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
+- [`core:config-writer-port`](../config-writer-port/spec.md) — `createConfigWriter` factory surface
 
 ## ADRs
 

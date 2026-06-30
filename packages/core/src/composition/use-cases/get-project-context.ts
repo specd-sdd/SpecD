@@ -14,6 +14,8 @@ import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.
 import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { buildCompileContextConfig } from '../build-compile-context-config.js'
+import { type CompileContextConfig } from '../../application/use-cases/compile-context.js'
 
 /** Filesystem adapter options for `createGetProjectContext(options)`. */
 export interface FsGetProjectContextOptions {
@@ -27,6 +29,8 @@ export interface FsGetProjectContextOptions {
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Workspace routing metadata for cross-workspace spec reference resolution. */
   readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
+  /** Yaml-derived context defaults for {@link GetProjectContext}. */
+  readonly defaultConfig: CompileContextConfig
 }
 
 /**
@@ -99,6 +103,7 @@ export function createGetProjectContext(
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
     const listWorkspaces = new ListWorkspaces(config, specRepos)
+    const defaultConfig = buildCompileContextConfig(config)
     return createGetProjectContext({
       listWorkspaces,
       nodeModulesPaths: [
@@ -109,6 +114,7 @@ export function createGetProjectContext(
       schemaRef: config.schemaRef,
       schemaRepositories: schemaRepos,
       workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
+      defaultConfig,
     })
   }
   const opts = configOrOptions
@@ -130,5 +136,6 @@ export function createGetProjectContext(
     hasher,
     createBuiltinExtractorTransforms(),
     opts.workspaceRoutes ?? [],
+    opts.defaultConfig,
   )
 }

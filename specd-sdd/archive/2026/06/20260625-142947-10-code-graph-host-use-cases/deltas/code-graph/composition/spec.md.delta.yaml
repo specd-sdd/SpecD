@@ -1,0 +1,57 @@
+- op: added
+  description: Document host use case layer above provider
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Dependency on @specd/core'
+  content: |
+    ### Requirement: Host use cases
+
+    `@specd/code-graph` SHALL expose application use cases for host orchestration above `CodeGraphProvider`:
+
+    - `GetGraphHealth` / `createGetGraphHealth` — statistics plus staleness and fingerprint diagnostics
+    - `IndexProjectGraph` / `createIndexProjectGraph` — project index execution with optional force recreate
+    - `GetSpecCoverage` / `createGetSpecCoverage` — single-spec implementation coverage
+    - `GetChangeSpecCoverage` / `createGetChangeSpecCoverage` — change-scoped coverage aggregation
+
+    Host use cases receive an already-open `CodeGraphProvider`. They MUST NOT replace direct provider methods for search, hotspots, impact, or traversal — those remain facade delegates.
+
+- op: modified
+  description: Export host use cases from package
+  selector:
+    type: section
+    matches: 'Requirement: Package exports'
+  content: |
+    The `@specd/code-graph` package SHALL export only:
+
+    - **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`
+    - **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`
+    - **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
+    - **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
+    - **Indexer & Discovery**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, `InMemoryIndexSession`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
+    - **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`
+    - **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`
+    - **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`
+    - **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`
+    - **Language Adapter**: `LanguageAdapter`
+    - **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`
+    - **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)
+
+- op: modified
+  description: Add host use case spec dependencies
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`code-graph:symbol-model`](../symbol-model/spec.md) — graph vocabulary
+    - [`code-graph:graph-store`](../graph-store/spec.md) — persistence contract
+    - [`code-graph:indexer`](../indexer/spec.md) — indexing pipeline
+    - [`code-graph:traversal`](../traversal/spec.md) — query-side traversal
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal layering
+    - [`code-graph:get-graph-health`](../get-graph-health/spec.md) — health orchestration use case
+    - [`code-graph:index-project-graph`](../index-project-graph/spec.md) — index orchestration use case
+    - [`code-graph:get-spec-coverage`](../get-spec-coverage/spec.md) — spec coverage use case
+    - [`code-graph:get-change-spec-coverage`](../get-change-spec-coverage/spec.md) — change coverage use case

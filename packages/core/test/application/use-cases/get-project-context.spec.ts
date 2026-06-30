@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { GetProjectContext } from '../../../src/application/use-cases/get-project-context.js'
+import {
+  GetProjectContext,
+  type GetProjectContextInput,
+  type GetProjectContextResult,
+} from '../../../src/application/use-cases/get-project-context.js'
+import { type CompileContextConfig } from '../../../src/application/use-cases/compile-context.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
@@ -17,6 +22,54 @@ import {
   makeListWorkspaces,
 } from './helpers.js'
 
+type LegacyGetProjectContextInput = GetProjectContextInput & { config?: CompileContextConfig }
+
+function makeGetProjectContext(
+  listWorkspaces: ReturnType<typeof makeListWorkspaces>,
+  schemaProvider: ReturnType<typeof makeSchemaProvider>,
+  files: ReturnType<typeof makeFileReader>,
+  parsers: ReturnType<typeof makeParsers>,
+  hasher: ReturnType<typeof makeContentHasher>,
+  extractorTransforms = createBuiltinExtractorTransforms(),
+  workspaceRoutes: readonly { workspace: string; prefixSegments: readonly string[] }[] = [],
+  defaultConfig: CompileContextConfig = {},
+): GetProjectContext & {
+  execute: (input: LegacyGetProjectContextInput) => Promise<GetProjectContextResult>
+} {
+  const uc = new GetProjectContext(
+    listWorkspaces,
+    schemaProvider,
+    files,
+    parsers,
+    hasher,
+    extractorTransforms,
+    workspaceRoutes,
+    defaultConfig,
+  )
+  const base = uc.execute.bind(uc)
+  const rebuild = (config: CompileContextConfig): GetProjectContext =>
+    new GetProjectContext(
+      listWorkspaces,
+      schemaProvider,
+      files,
+      parsers,
+      hasher,
+      extractorTransforms,
+      workspaceRoutes,
+      config,
+    )
+  uc.execute = ((input: LegacyGetProjectContextInput) => {
+    const { config, ...rest } = input
+    if (config !== undefined) {
+      return rebuild(config).execute(rest)
+    }
+    return base(rest)
+  }) as GetProjectContext['execute']
+  return uc as GetProjectContext & {
+    execute: (input: LegacyGetProjectContextInput) => Promise<GetProjectContextResult>
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -29,7 +82,7 @@ describe('GetProjectContext', () => {
       '/project/ARCHITECTURE.md': '# Architecture\nHexagonal design.',
     })
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       specRepos,
       makeSchemaProvider(schema),
       fileReader,
@@ -54,7 +107,7 @@ describe('GetProjectContext', () => {
   it('throws SchemaNotFoundError when schema not resolved', async () => {
     const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       specRepos,
       makeSchemaProvider(null),
       makeFileReader(),
@@ -84,7 +137,7 @@ describe('GetProjectContext', () => {
     })
     const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       specRepos,
       makeSchemaProvider(schema),
       makeFileReader(),
@@ -127,7 +180,7 @@ describe('GetProjectContext', () => {
     })
     const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       specRepos,
       makeSchemaProvider(schema),
       makeFileReader(),
@@ -165,7 +218,7 @@ describe('GetProjectContext', () => {
     })
     const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       specRepos,
       makeSchemaProvider(schema),
       makeFileReader(),
@@ -245,7 +298,7 @@ describe('GetProjectContext', () => {
           .join('\n'),
     })
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeFileReader(),
@@ -347,7 +400,7 @@ describe('GetProjectContext', () => {
           .join('\n'),
     })
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       makeListWorkspaces(
         new Map([
           ['core', coreRepo],
@@ -426,7 +479,7 @@ describe('GetProjectContext', () => {
           .join('\n'),
     })
 
-    const uc = new GetProjectContext(
+    const uc = makeGetProjectContext(
       makeListWorkspaces(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeFileReader(),
@@ -474,7 +527,7 @@ describe('GetProjectContext', () => {
         [configYamlPath]: 'config content',
       })
 
-      const uc = new GetProjectContext(
+      const uc = makeGetProjectContext(
         specRepos,
         makeSchemaProvider(schema),
         fileReader,
@@ -517,7 +570,7 @@ describe('GetProjectContext', () => {
         [configYamlPath]: 'NEW config content',
       })
 
-      const uc = new GetProjectContext(
+      const uc = makeGetProjectContext(
         specRepos,
         makeSchemaProvider(schema),
         fileReader,
@@ -579,7 +632,7 @@ describe('GetProjectContext', () => {
         [configYamlPath]: 'config',
       })
 
-      const uc = new GetProjectContext(
+      const uc = makeGetProjectContext(
         specRepos,
         makeSchemaProvider(schema),
         fileReader,
@@ -598,6 +651,57 @@ describe('GetProjectContext', () => {
 
       expect(result.warnings.some((w) => w.type === 'stale-optimization')).toBe(true)
       expect(result.specs).toHaveLength(1) // processed normally
+    })
+
+    it('warns when individual spec is missing optimizedContext field', async () => {
+      const specType = makeArtifactType('specs', {
+        scope: 'spec',
+        output: 'spec.md',
+        format: 'markdown',
+      })
+      const schema = makeSchema([specType])
+      const hasher = makeContentHasher()
+
+      const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const repo = makeSpecRepository({
+        specs: [spec],
+        artifacts: {
+          'auth/login/.specd-metadata.yaml': JSON.stringify({
+            title: 'Title',
+            description: 'Desc',
+            contentHashes: { 'spec.md': hasher.hash('# Content\n') },
+          }),
+          'auth/login/spec.md': '# Content\n',
+        },
+      })
+      const specRepos = makeListWorkspaces(new Map([['default', repo]]))
+
+      const fileReader = makeFileReader({
+        [configYamlPath]: 'config',
+      })
+
+      const uc = makeGetProjectContext(
+        specRepos,
+        makeSchemaProvider(schema),
+        fileReader,
+        makeParsers(),
+        hasher,
+      )
+
+      const result = await uc.execute({
+        config: {
+          projectRoot: '/project',
+          configPath,
+          llmOptimizedContext: true,
+          contextIncludeSpecs: ['*'],
+        },
+      })
+
+      expect(
+        result.warnings.some(
+          (w) => w.type === 'stale-optimization' && w.path === 'default:auth/login',
+        ),
+      ).toBe(true)
     })
   })
 })

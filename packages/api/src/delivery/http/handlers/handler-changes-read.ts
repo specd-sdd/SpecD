@@ -1,5 +1,4 @@
 import { ChangeNotFoundError, type Kernel } from '@specd/core'
-import { buildCompileContextConfig } from '../compile-config.js'
 import {
   formatCompiledContextMarkdown,
   resolveCompileContextStep,
@@ -339,7 +338,6 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       const result = await ctx.kernel.changes.compile.execute({
         name,
         step: query.step ?? resolveCompileContextStep(change.state),
-        config: buildCompileContextConfig(ctx.config),
         ...(includeChangeSpecs ? { includeChangeSpecs: true } : {}),
         ...(query.followDeps === 'true' ? { followDeps: true } : {}),
         ...(query.depth !== undefined ? { depth: Number(query.depth) } : {}),

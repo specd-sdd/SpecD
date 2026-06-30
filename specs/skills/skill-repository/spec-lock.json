@@ -6,16 +6,7 @@
   "dependsOn": ["skills:skill", "skills:skill-bundle", "skills:skill-templates-source"],
   "implementation": [
     {
-      "file": "skills:test/infrastructure/skill-repository.spec.ts",
-      "symbols": ["FsSkillRepository", "TemplateRenderer"]
-    },
-    {
-      "file": "skills:src/infrastructure/repository/skill-template-metadata-reader.ts",
-      "symbols": ["SkillTemplateMetadataReader"]
-    },
-    {
-      "file": "skills:src/infrastructure/repository/skill-repository.ts",
-      "symbols": ["FsSkillRepository"]
+      "file": "skills:src/infrastructure/repository/skill-repository.ts"
     }
   ]
 }

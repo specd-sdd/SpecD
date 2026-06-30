@@ -1,0 +1,5 @@
+releases:
+  cli:graph-search: minor
+  code-graph:graph-store: minor
+  code-graph:sqlite-graph-store: minor
+  code-graph:ladybug-graph-store: minor

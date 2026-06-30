@@ -3,7 +3,20 @@
   "compilerOptions": {
     "lib": ["ES2022"],
     "rootDir": "../..",
-    "types": ["node"]
+    "baseUrl": "../..",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "paths": {
+      "@specd/core": ["packages/core/src/public.ts"],
+      "@specd/core/internal": ["packages/core/src/index.ts"],
+      "@specd/core/ports": ["packages/core/src/ports.ts"],
+      "@specd/core/extensions": ["packages/core/src/extensions.ts"],
+      "@specd/code-graph": ["packages/code-graph/src/public.ts"]
+    }
   },
-  "include": ["../../packages/core/src/**/*.ts", "../../packages/cli/src/**/*.ts"]
+  "include": [
+    "../../packages/sdk/src/**/*.ts",
+    "../../packages/core/src/**/*.ts",
+    "../../packages/code-graph/src/**/*.ts"
+  ]
 }

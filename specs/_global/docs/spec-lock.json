@@ -6,7 +6,7 @@
   "dependsOn": ["default:_global/conventions"],
   "implementation": [
     {
-      "file": "default:docs/adr/0022-split-archive-index-and-detail-models.md"
+      "file": "default:docs/sdk/index.md"
     }
   ]
 }

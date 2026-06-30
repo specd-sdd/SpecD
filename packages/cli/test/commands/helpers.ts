@@ -1,14 +1,14 @@
 /**
  * Shared test helpers for CLI command tests.
  *
- * All command tests mock `loadConfig` and `createCliKernel`. This module
+ * All command tests mock `resolveCliContext` (or `loadConfig` for config show). This module
  * provides factory functions for minimal-valid mock objects so individual
  * test files stay focused on what they're testing.
  */
 import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
-import type { SpecdConfig, Kernel, SpecRepository, ChangeRepository } from '@specd/core'
+import type { SpecdConfig, Kernel, SpecRepository, ChangeRepository } from '@specd/sdk'
 
 /**
  * Mirrors the {@link Kernel} shape but with every `execute` replaced by a
@@ -160,7 +160,6 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     discard: { execute: vi.fn() },
     archive: { execute: vi.fn() },
     validate: { execute: vi.fn() },
-    validateBatch: { execute: vi.fn() },
     edit: { execute: vi.fn() },
     skipArtifact: { execute: vi.fn() },
     compile: { execute: vi.fn() },
@@ -180,6 +179,8 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
       execute: vi.fn().mockResolvedValue({ hasOverlap: false, entries: [] }),
     },
     preview: { execute: vi.fn() },
+    approveSpec: { execute: vi.fn() },
+    approveSignoff: { execute: vi.fn() },
   }
 
   const specs = {
@@ -189,8 +190,6 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
         { resolveFromPath: vi.fn().mockResolvedValue(null) } as unknown as SpecRepository,
       ],
     ]),
-    approveSpec: { execute: vi.fn() },
-    approveSignoff: { execute: vi.fn() },
     list: { execute: vi.fn().mockResolvedValue([]) },
     search: { execute: vi.fn().mockResolvedValue([]) },
     get: { execute: vi.fn() },
@@ -217,10 +216,6 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
   }
 
   const project = {
-    init: { execute: vi.fn() },
-    addPlugin: { execute: vi.fn() },
-    removePlugin: { execute: vi.fn() },
-    listPlugins: { execute: vi.fn().mockResolvedValue([]) },
     listWorkspaces: {
       execute: vi.fn().mockResolvedValue([
         {
@@ -232,9 +227,22 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
         },
       ]),
     },
+    getProjectSummary: {
+      execute: vi.fn().mockResolvedValue({
+        activeCount: 0,
+        draftCount: 0,
+        discardedCount: 0,
+        archivedCount: 0,
+        specsByWorkspace: { default: 0 },
+        workspaceCount: 1,
+      }),
+    },
     getProjectContext: {
       execute: vi.fn().mockResolvedValue({ contextEntries: [], specs: [], warnings: [] }),
     },
+    getConfig: { execute: vi.fn() },
+    getMetadata: { execute: vi.fn() },
+    updateMetadata: { execute: vi.fn() },
   }
 
   const schemas = {

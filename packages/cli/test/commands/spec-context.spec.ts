@@ -8,21 +8,22 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerSpecContext } from '../../src/commands/spec/context.js'
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
@@ -198,5 +199,45 @@ describe('spec context', () => {
 
     expect(stderr()).toContain('warning:')
     expect(stderr()).toContain('stale')
+  })
+
+  it('passes llmOptimizedContext as true by default when config says true, even with multiple flags', async () => {
+    const { kernel, config } = setup()
+    ;(config as any).llmOptimizedContext = true
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [{ spec: 'default:auth/login', stale: false }],
+      warnings: [],
+    })
+
+    const program = makeProgram()
+    registerSpecContext(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'context',
+      'auth/login',
+      '--rules',
+      '--constraints',
+    ])
+
+    const call = kernel.specs.getContext.execute.mock.calls[0]![0]
+    expect(call.llmOptimizedContext).toBe(true)
+  })
+
+  it('passes llmOptimizedContext as false when --no-optimized is provided', async () => {
+    const { kernel, config } = setup()
+    ;(config as any).llmOptimizedContext = true
+    kernel.specs.getContext.execute.mockResolvedValue({
+      entries: [{ spec: 'default:auth/login', stale: false }],
+      warnings: [],
+    })
+
+    const program = makeProgram()
+    registerSpecContext(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'context', 'auth/login', '--no-optimized'])
+
+    const call = kernel.specs.getContext.execute.mock.calls[0]![0]
+    expect(call.llmOptimizedContext).toBe(false)
   })
 })

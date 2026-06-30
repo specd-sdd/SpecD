@@ -1,0 +1,24 @@
+- op: removed
+  description: Remove CLI refresh scenarios
+  selector:
+    type: section
+    matches: 'Requirement: Implementation tracking refresh before status load'
+
+- op: added
+  description: Verify CLI delegates refresh to GetStatus
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    before:
+      type: section
+      matches: 'Requirement: Implementation section'
+  content: |
+    ### Requirement: Delegates refresh policy to GetStatus
+
+    #### Scenario: Status command does not call refresh directly
+
+    - **GIVEN** `specd change status <name>` is executed for an active change
+    - **WHEN** the command handler runs
+    - **THEN** it calls `GetStatus` without invoking `RefreshImplementationTracking` directly
+    - **AND** it does not invoke `ImplementationDetector` directly

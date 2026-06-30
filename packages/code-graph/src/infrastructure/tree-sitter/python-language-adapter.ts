@@ -1,6 +1,12 @@
 import { parse } from '@ast-grep/napi'
 import { type SgNode } from '@ast-grep/napi'
-import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import {
+  type LanguageAdapter,
+  type AdapterAnalyzeContext,
+  type ImportResolutionContext,
+  type ResolvedImports,
+  type RelationBuildContext,
+} from '../../domain/value-objects/language-adapter.js'
 import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type Relation, createRelation } from '../../domain/value-objects/relation.js'
 import { SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -12,6 +18,25 @@ import { BindingSourceKind, type BindingFact } from '../../domain/value-objects/
 import { CallForm, type CallFact } from '../../domain/value-objects/call-fact.js'
 import { type SourceLocation } from '../../domain/value-objects/source-location.js'
 import { ensureLanguagesRegistered } from './register-languages.js'
+import {
+  type FileAnalysisDraft,
+  type FileAnalysis,
+} from '../../domain/value-objects/file-analysis.js'
+import { type IndexSession } from '../../domain/value-objects/index-session.js'
+
+/**
+ * Determines whether an import declaration is file-only/side-effect only.
+ * @param declaration - The import declaration to test.
+ * @returns True if the import is file-only.
+ */
+function isFileOnlyImport(declaration: ImportDeclaration): boolean {
+  return (
+    declaration.kind === ImportDeclarationKind.SideEffect ||
+    declaration.kind === ImportDeclarationKind.Dynamic ||
+    declaration.kind === ImportDeclarationKind.Require ||
+    declaration.kind === ImportDeclarationKind.Blank
+  )
+}
 
 /**
  * Returns the string kind of an AST node.
@@ -106,10 +131,47 @@ interface PythonClassInfo {
 }
 
 /**
+ * Serialized Python class info for parser state.
+ */
+interface SerializedPythonClassInfo {
+  readonly name: string
+  readonly symbolId: string
+  readonly kind: 'class' | 'interface'
+  readonly baseNames: readonly string[]
+  readonly methodsByName: Record<string, string>
+}
+
+/**
+ * Parser state representation for Python.
+ */
+interface PythonParserState {
+  readonly kind: 'python'
+  readonly classes: readonly SerializedPythonClassInfo[]
+}
+
+/**
  * Language adapter for Python files using tree-sitter via ast-grep.
  * Extracts functions, classes, methods, and module-level assignments.
  */
 export class PythonLanguageAdapter implements LanguageAdapter {
+  /**
+   * Resolves a qualified name to a file path.
+   * @param _qualifiedName - Qualified name.
+   * @param _codeRoot - Code root.
+   * @param _repoRoot - Repo root.
+   * @returns The resolved file path, or undefined.
+   */
+  resolveQualifiedNameToPath(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _qualifiedName: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _codeRoot: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _repoRoot?: string,
+  ): string | undefined {
+    return undefined
+  }
+
   /**
    * Returns the language identifiers this adapter handles.
    * @returns An array containing 'python'.
@@ -127,16 +189,32 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts symbol nodes from Python source code.
-   * @param filePath - The file path.
-   * @param content - The source content.
-   * @returns An array of extracted symbol nodes.
+   * Analyzes a Python file.
+   * @param filePath - Path of the file.
+   * @param content - File content.
+   * @param context - The adapter analyze context.
+   * @returns Extracted file analysis draft.
    */
-  extractSymbols(filePath: string, content: string): SymbolNode[] {
+  analyzeFile(
+    filePath: string,
+    content: string,
+    context: AdapterAnalyzeContext,
+  ): FileAnalysisDraft {
     ensureLanguagesRegistered()
-    const root = parse('python', content).root()
+    const sgRoot = parse('python', content)
+    // Keep the parsed SgRoot instance alive in the session state to prevent
+    // V8 garbage collection from running its native Rust finalizer during
+    // event loop yields. This avoids a SIGSEGV segmentation fault caused
+    // by a native concurrency/double-free bug in @ast-grep/napi.
+    let keepAlive = context.session.getAdapterState<unknown[]>('napi-keepalive')
+    if (!keepAlive) {
+      keepAlive = []
+      context.session.setAdapterState('napi-keepalive', keepAlive)
+    }
+    keepAlive.push(sgRoot)
+    const root = sgRoot.root()
     const symbols: SymbolNode[] = []
-    const seen = new Set<string>()
+    const seenSymbol = new Set<string>()
 
     const addSymbol = (
       name: string,
@@ -147,8 +225,8 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
-      if (seen.has(key)) return
-      seen.add(key)
+      if (seenSymbol.has(key)) return
+      seenSymbol.add(key)
       symbols.push(
         createSymbolNode({
           name,
@@ -162,61 +240,271 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     }
 
     this.walk(root, addSymbol)
-    return symbols
+
+    // Extract imports
+    const imports: ImportDeclaration[] = []
+    const seenImport = new Set<string>()
+    const addImport = (declaration: ImportDeclaration): void => {
+      const key = `${declaration.kind ?? ImportDeclarationKind.Named}:${declaration.localName}:${declaration.originalName}:${declaration.specifier}`
+      if (seenImport.has(key)) return
+      seenImport.add(key)
+      imports.push(declaration)
+    }
+
+    for (const child of root.children()) {
+      const kind = nodeKind(child)
+
+      if (kind === 'import_statement') {
+        for (const nameChild of child.children()) {
+          if (nodeKind(nameChild) === 'dotted_name') {
+            const name = nameChild.text()
+            addImport({
+              originalName: name,
+              localName: name.split('.')[0] ?? name,
+              specifier: name,
+              isRelative: false,
+              kind: ImportDeclarationKind.Namespace,
+            })
+          } else if (nodeKind(nameChild) === 'aliased_import') {
+            const dottedName = nameChild.child(0)
+            const alias = nameChild.field('alias')
+            if (dottedName) {
+              const name = dottedName.text()
+              addImport({
+                originalName: name,
+                localName: alias ? alias.text() : name,
+                specifier: name,
+                isRelative: false,
+                kind: ImportDeclarationKind.Namespace,
+              })
+            }
+          }
+        }
+      } else if (kind === 'import_from_statement') {
+        const moduleNode = child.field('module_name')
+        const specifier = moduleNode ? moduleNode.text() : ''
+        const isRelative = specifier.startsWith('.')
+        const moduleNodeId = moduleNode?.id()
+
+        let seenImportKeyword = false
+        for (const nameChild of child.children()) {
+          if (!nameChild.isNamed() && nameChild.text() === 'import') {
+            seenImportKeyword = true
+            continue
+          }
+          if (nodeKind(nameChild) === 'dotted_name') {
+            if (!seenImportKeyword || nameChild.id() === moduleNodeId) continue
+            const name = nameChild.text()
+            addImport({
+              originalName: name,
+              localName: name,
+              specifier,
+              isRelative,
+              kind: ImportDeclarationKind.Named,
+            })
+          } else if (nodeKind(nameChild) === 'aliased_import') {
+            const dottedName = nameChild.child(0)
+            const alias = nameChild.field('alias')
+            if (dottedName) {
+              const name = dottedName.text()
+              addImport({
+                originalName: name,
+                localName: alias ? alias.text() : name,
+                specifier,
+                isRelative,
+                kind: ImportDeclarationKind.Named,
+              })
+            }
+          }
+        }
+      }
+    }
+
+    const literalDynamicImportPattern =
+      /\b(?:importlib\.import_module|__import__)\s*\(\s*(['"])([^'"]+)\1/g
+    for (const match of content.matchAll(literalDynamicImportPattern)) {
+      const specifier = match[2]
+      if (specifier !== undefined) {
+        addImport({
+          originalName: '',
+          localName: '',
+          specifier,
+          isRelative: specifier.startsWith('.'),
+          kind: ImportDeclarationKind.Dynamic,
+        })
+      }
+    }
+
+    const bindingFacts = this.extractBindingFactsFromData(filePath, content, symbols, imports)
+    const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
+
+    const classes = this.collectClassInfo(content, filePath, symbols)
+    const serializedClasses = classes.map((cls) => {
+      const methodsByName: Record<string, string> = {}
+      for (const [mName, mId] of cls.methodsByName.entries()) {
+        methodsByName[mName] = mId
+      }
+      return {
+        ...cls,
+        methodsByName,
+      }
+    })
+
+    return {
+      language: 'python',
+      symbols,
+      imports,
+      bindingFacts,
+      callFacts,
+      parserState: {
+        kind: 'python',
+        classes: serializedClasses,
+      },
+    }
   }
 
   /**
-   * Extracts relations from Python source code.
-   * @param filePath - The file path.
-   * @param content - The source content.
-   * @param symbols - Previously extracted symbols.
-   * @param importMap - Map of imported name to resolved symbol id.
-   * @returns An array of extracted relations.
+   * Resolves raw imports extracted in Pass 1 into symbol mappings and file dependencies.
    */
-  extractRelations(
+  /**
+   * Resolves Python imports.
+   * @param analysis - File analysis.
+   * @param context - Import resolution context.
+   * @returns Resolved imports.
+   */
+  resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports {
+    const importMap = new Map<string, string>()
+    const fileImports: string[] = []
+    const knownPackages = [...context.packageToWorkspace.keys()]
+    const { session, qualifiedNames, packageToWorkspace, codeRoot, repoRoot } = context
+
+    for (const imp of analysis.imports) {
+      if (isFileOnlyImport(imp)) {
+        const resolved = this.resolveFileImport(imp, analysis.filePath, session, codeRoot, repoRoot)
+        if (resolved !== undefined) {
+          fileImports.push(resolved)
+        }
+        continue
+      }
+
+      if (imp.isRelative) {
+        const resolved = this.resolveRelativeImportPath(analysis.filePath, imp.specifier)
+        const candidates = Array.isArray(resolved) ? resolved : [resolved]
+        for (const candidatePath of candidates) {
+          const target = session
+            .findSymbolsByFile(candidatePath)
+            .find((s) => s.name === imp.originalName)
+          if (target) {
+            importMap.set(imp.localName, target.id)
+            break
+          }
+        }
+      } else {
+        const qualifiedId = qualifiedNames.get(imp.specifier)
+        if (qualifiedId) {
+          importMap.set(imp.localName, qualifiedId)
+          continue
+        }
+
+        const pkgName = this.resolvePackageFromSpecifier(imp.specifier, knownPackages)
+        if (pkgName) {
+          const wsPrefix = packageToWorkspace.get(pkgName)
+          if (wsPrefix !== undefined) {
+            const candidates = session.findSymbolsByName(imp.originalName, wsPrefix + ':')
+            if (candidates.length > 0) {
+              importMap.set(imp.localName, candidates[0]!.id)
+            }
+          }
+        }
+
+        if (this.resolveQualifiedNameToPath && codeRoot) {
+          const resolvedPath = this.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
+          if (resolvedPath) {
+            fileImports.push(resolvedPath)
+            continue
+          }
+        }
+      }
+    }
+
+    return { importMap, fileImports }
+  }
+
+  /**
+   * Resolves a file import.
+   * @param imp - Import declaration.
+   * @param filePath - Path of the file.
+   * @param session - Index session.
+   * @param codeRoot - Code root.
+   * @param repoRoot - Repo root.
+   * @returns Resolved path, or undefined.
+   */
+  private resolveFileImport(
+    imp: ImportDeclaration,
     filePath: string,
-    content: string,
-    symbols: SymbolNode[],
-    importMap: Map<string, string>,
-  ): Relation[] {
-    ensureLanguagesRegistered()
-    const root = parse('python', content).root()
+    session: IndexSession,
+    codeRoot?: string,
+    repoRoot?: string,
+  ): string | undefined {
+    if (imp.isRelative) {
+      const resolved = this.resolveRelativeImportPath(filePath, imp.specifier)
+      const candidates = Array.isArray(resolved) ? resolved : [resolved]
+      return candidates.find((candidatePath) => session.findSymbolsByFile(candidatePath).length > 0)
+    }
+
+    if (!imp.isRelative && codeRoot) {
+      return this.resolveQualifiedNameToPath?.(imp.specifier, codeRoot, repoRoot)
+    }
+
+    return undefined
+  }
+
+  /**
+   * Builds Python relations.
+   * @param analysis - File analysis.
+   * @param context - Relation build context.
+   * @returns Array of relations.
+   */
+  buildRelations(analysis: FileAnalysis, context: RelationBuildContext): Relation[] {
     const relations: Relation[] = []
 
-    for (const symbol of symbols) {
+    for (const symbol of analysis.symbols) {
       relations.push(
-        createRelation({ source: filePath, target: symbol.id, type: RelationType.Defines }),
+        createRelation({
+          source: analysis.filePath,
+          target: symbol.id,
+          type: RelationType.Defines,
+        }),
       )
     }
 
-    this.extractImportRelations(root, filePath, relations)
-    this.extractHierarchyRelations(content, filePath, symbols, importMap, relations)
-    this.extractCallRelations(root, filePath, symbols, importMap, relations)
-    return relations
-  }
+    for (const imp of analysis.imports) {
+      if (imp.isRelative && imp.specifier.startsWith('.')) {
+        const resolved = this.resolveRelativeImportPath(analysis.filePath, imp.specifier)
+        const target = Array.isArray(resolved) ? resolved[0]! : resolved
+        if (target) {
+          relations.push(
+            createRelation({
+              source: analysis.filePath,
+              target,
+              type: RelationType.Imports,
+              metadata: { specifier: imp.specifier },
+            }),
+          )
+        }
+      }
+    }
 
-  /**
-   * Extracts deterministic hierarchy relations from Python class declarations.
-   * @param content - The source content.
-   * @param filePath - The current file path.
-   * @param symbols - Previously extracted symbols.
-   * @param importMap - Map of imported name to resolved symbol id.
-   * @param relations - Array to push relations into.
-   */
-  private extractHierarchyRelations(
-    content: string,
-    filePath: string,
-    symbols: SymbolNode[],
-    importMap: Map<string, string>,
-    relations: Relation[],
-  ): void {
-    const classes = this.collectClassInfo(content, filePath, symbols)
-    const classesByName = new Map(classes.map((entry) => [entry.name, entry]))
+    const pythonState = analysis.parserState as PythonParserState | undefined
+    const classes = pythonState?.classes ?? []
+    const classesByName = new Map<string, SerializedPythonClassInfo>(
+      classes.map((entry) => [entry.name, entry]),
+    )
     const seen = new Set<string>()
 
     for (const cls of classes) {
       for (const baseName of cls.baseNames) {
-        const importedId = importMap.get(baseName)
+        const importedId = context.resolvedImports.importMap.get(baseName)
         const localBase = classesByName.get(baseName)
         const targetId = importedId ?? localBase?.symbolId
         if (!targetId) continue
@@ -237,8 +525,8 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         }
 
         if (localBase) {
-          for (const [methodName, methodId] of cls.methodsByName.entries()) {
-            const targetMethodId = localBase.methodsByName.get(methodName)
+          for (const [methodName, methodId] of Object.entries(cls.methodsByName)) {
+            const targetMethodId = localBase.methodsByName[methodName]
             if (!targetMethodId) continue
             const overrideKey = `${methodId}:${RelationType.Overrides}:${targetMethodId}`
             if (seen.has(overrideKey)) continue
@@ -254,14 +542,88 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         }
       }
     }
+
+    const localSymbolsByName = new Map<string, SymbolNode[]>()
+    for (const s of analysis.symbols) {
+      const existing = localSymbolsByName.get(s.name)
+      if (existing) {
+        existing.push(s)
+      } else {
+        localSymbolsByName.set(s.name, [s])
+      }
+    }
+
+    for (const call of analysis.callFacts) {
+      if (call.callerSymbolId) {
+        const calleeName = call.name
+        const importedId = context.resolvedImports.importMap.get(calleeName)
+        const isAttributeCall = call.form === CallForm.Member
+        const calleeId =
+          importedId ??
+          this.resolveLocalCallee(
+            call.location.line,
+            calleeName,
+            localSymbolsByName,
+            isAttributeCall,
+          )
+
+        if (calleeId) {
+          const key = `${call.callerSymbolId}->${calleeId}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            relations.push(
+              createRelation({
+                source: call.callerSymbolId,
+                target: calleeId,
+                type: RelationType.Calls,
+              }),
+            )
+          }
+        }
+      }
+    }
+
+    return relations
   }
 
   /**
-   * Collects local Python class metadata needed for hierarchy extraction.
-   * @param content - The source content.
-   * @param filePath - The current file path.
-   * @param symbols - Previously extracted symbols.
-   * @returns Class declarations with bases and owned methods.
+   * Resolves local callee symbol ID.
+   * @param callLine - Line of the call.
+   * @param name - Name of the symbol.
+   * @param candidates - Map of candidates.
+   * @param isAttributeCall - True if it's an attribute call.
+   * @returns Callee ID, or undefined.
+   */
+  private resolveLocalCallee(
+    callLine: number,
+    name: string,
+    candidates: Map<string, SymbolNode[]>,
+    isAttributeCall: boolean,
+  ): string | undefined {
+    const allSyms = candidates.get(name)
+    if (!allSyms || allSyms.length === 0) return undefined
+
+    const syms = isAttributeCall ? allSyms : allSyms.filter((s) => s.kind !== 'method')
+    if (syms.length === 0) return undefined
+    if (syms.length === 1) return syms[0]!.id
+
+    let best: SymbolNode | undefined
+    for (const s of syms) {
+      if (s.line <= callLine) {
+        if (!best || s.line > best.line) {
+          best = s
+        }
+      }
+    }
+    return best?.id ?? syms[0]!.id
+  }
+
+  /**
+   * Collects class info from Python content.
+   * @param content - Python source content.
+   * @param filePath - Path of the file.
+   * @param symbols - Extracted symbols array.
+   * @returns Array of class info.
    */
   private collectClassInfo(
     content: string,
@@ -322,123 +684,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Parses Python import declarations from source code.
-   * @param _filePath - Path to the source file (unused — Python imports are not path-relative).
-   * @param content - The source file content.
-   * @returns An array of parsed import declarations.
+   * Extracts binding facts from Python content.
+   * @param filePath - Path of the file.
+   * @param content - Python source content.
+   * @param symbols - Extracted symbols array.
+   * @param imports - Extracted imports array.
+   * @returns Array of binding facts.
    */
-  extractImportedNames(_filePath: string, content: string): ImportDeclaration[] {
-    ensureLanguagesRegistered()
-    const root = parse('python', content).root()
-    const results: ImportDeclaration[] = []
-    const seen = new Set<string>()
-
-    const addImport = (declaration: ImportDeclaration): void => {
-      const key = `${declaration.kind ?? ImportDeclarationKind.Named}:${declaration.localName}:${declaration.originalName}:${declaration.specifier}`
-      if (seen.has(key)) return
-      seen.add(key)
-      results.push(declaration)
-    }
-
-    for (const child of root.children()) {
-      const kind = nodeKind(child)
-
-      if (kind === 'import_statement') {
-        // import os / import os.path
-        for (const nameChild of child.children()) {
-          if (nodeKind(nameChild) === 'dotted_name') {
-            const name = nameChild.text()
-            addImport({
-              originalName: name,
-              localName: name.split('.')[0] ?? name,
-              specifier: name,
-              isRelative: false,
-              kind: ImportDeclarationKind.Namespace,
-            })
-          } else if (nodeKind(nameChild) === 'aliased_import') {
-            const dottedName = nameChild.child(0)
-            const alias = nameChild.field('alias')
-            if (dottedName) {
-              const name = dottedName.text()
-              addImport({
-                originalName: name,
-                localName: alias ? alias.text() : name,
-                specifier: name,
-                isRelative: false,
-                kind: ImportDeclarationKind.Namespace,
-              })
-            }
-          }
-        }
-      } else if (kind === 'import_from_statement') {
-        // from pathlib import Path / from .utils import helper
-        const moduleNode = child.field('module_name')
-        const specifier = moduleNode ? moduleNode.text() : ''
-        const isRelative = specifier.startsWith('.')
-        const moduleNodeId = moduleNode?.id()
-
-        let seenImportKeyword = false
-        for (const nameChild of child.children()) {
-          // Track the 'import' keyword to distinguish module name from imported names
-          if (!nameChild.isNamed() && nameChild.text() === 'import') {
-            seenImportKeyword = true
-            continue
-          }
-          if (nodeKind(nameChild) === 'dotted_name') {
-            // Skip the module name (before 'import' keyword)
-            if (!seenImportKeyword || nameChild.id() === moduleNodeId) continue
-            const name = nameChild.text()
-            addImport({
-              originalName: name,
-              localName: name,
-              specifier,
-              isRelative,
-              kind: ImportDeclarationKind.Named,
-            })
-          } else if (nodeKind(nameChild) === 'aliased_import') {
-            const dottedName = nameChild.child(0)
-            const alias = nameChild.field('alias')
-            if (dottedName) {
-              const name = dottedName.text()
-              addImport({
-                originalName: name,
-                localName: alias ? alias.text() : name,
-                specifier,
-                isRelative,
-                kind: ImportDeclarationKind.Named,
-              })
-            }
-          }
-        }
-      }
-    }
-
-    const literalDynamicImportPattern =
-      /\b(?:importlib\.import_module|__import__)\s*\(\s*(['"])([^'"]+)\1/g
-    for (const match of content.matchAll(literalDynamicImportPattern)) {
-      const specifier = match[2]
-      if (specifier === undefined) continue
-      addImport({
-        originalName: '',
-        localName: '',
-        specifier,
-        isRelative: specifier.startsWith('.'),
-        kind: ImportDeclarationKind.Dynamic,
-      })
-    }
-
-    return results
-  }
-
-  /**
-   * Extracts deterministic Python binding facts for shared scoped resolution.
-   * @param filePath - Path to the source file.
-   * @param content - Source file content.
-   * @param symbols - Symbols extracted from the file.
-   * @param imports - Import declarations extracted from the file.
-   * @returns Binding facts for imports, receivers, annotations, and simple aliases.
-   */
-  extractBindingFacts(
+  private extractBindingFactsFromData(
     filePath: string,
     content: string,
     symbols: SymbolNode[],
@@ -560,13 +813,17 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Extracts normalized Python call facts for shared scoped resolution.
-   * @param filePath - Path to the source file.
-   * @param content - Source file content.
-   * @param symbols - Symbols extracted from the file.
-   * @returns Call facts for free, member, and constructor-like calls.
+   * Extracts call facts from Python content.
+   * @param filePath - Path of the file.
+   * @param content - Python source content.
+   * @param symbols - Extracted symbols array.
+   * @returns Array of call facts.
    */
-  extractCallFacts(filePath: string, content: string, symbols: SymbolNode[]): CallFact[] {
+  private extractCallFactsFromData(
+    filePath: string,
+    content: string,
+    symbols: SymbolNode[],
+  ): CallFact[] {
     const facts: CallFact[] = []
     const seen = new Set<string>()
 
@@ -678,178 +935,6 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   }
 
   /**
-   * Finds the enclosing function/method/class symbol for a given AST node.
-   * @param node - The AST node to find the enclosing symbol for.
-   * @param symbols - The extracted symbols for this file.
-   * @param filePath - The current file path.
-   * @returns The symbol id of the enclosing scope, or undefined if at module level.
-   */
-  private findEnclosingSymbolId(
-    node: SgNode,
-    symbols: SymbolNode[],
-    filePath: string,
-  ): string | undefined {
-    let current = node.parent()
-    while (current) {
-      const kind = nodeKind(current)
-      if (kind === 'function_definition' || kind === 'class_definition') {
-        const name = current.field('name')?.text()
-        if (name) {
-          const line = current.range().start.line + 1
-          return symbols.find((s) => s.name === name && s.line === line && s.filePath === filePath)
-            ?.id
-        }
-      }
-      current = current.parent()
-    }
-    return undefined
-  }
-
-  /**
-   * Extracts CALLS relations from Python function/method call expressions.
-   * @param root - The root AST node.
-   * @param filePath - The current file path.
-   * @param symbols - The extracted symbols for this file.
-   * @param importMap - Map of imported name to resolved symbol id.
-   * @param relations - Array to push relations into.
-   */
-  private extractCallRelations(
-    root: SgNode,
-    filePath: string,
-    symbols: SymbolNode[],
-    importMap: Map<string, string>,
-    relations: Relation[],
-  ): void {
-    // Maps symbol name → all candidate ids, grouped for scope-based disambiguation.
-    const localSymbolsByName = new Map<string, SymbolNode[]>()
-    for (const s of symbols) {
-      const existing = localSymbolsByName.get(s.name)
-      if (existing) {
-        existing.push(s)
-      } else {
-        localSymbolsByName.set(s.name, [s])
-      }
-    }
-
-    const seen = new Set<string>()
-
-    const walkCalls = (node: SgNode): void => {
-      for (const child of node.children()) {
-        if (nodeKind(child) === 'call') {
-          const funcNode = child.field('function')
-          if (funcNode) {
-            const calleeName =
-              nodeKind(funcNode) === 'identifier'
-                ? funcNode.text()
-                : nodeKind(funcNode) === 'attribute'
-                  ? funcNode.field('attribute')?.text()
-                  : undefined
-
-            if (calleeName) {
-              const importedId = importMap.get(calleeName)
-              // Unqualified calls (identifier) cannot resolve to methods in Python;
-              // only attribute calls (self.foo()) can. Pass the call type to filter candidates.
-              const isAttributeCall = nodeKind(funcNode) === 'attribute'
-              const calleeId =
-                importedId ??
-                this.resolveLocalCallee(child, calleeName, localSymbolsByName, isAttributeCall)
-              if (calleeId) {
-                const callerId = this.findEnclosingSymbolId(child, symbols, filePath)
-                if (callerId) {
-                  const key = `${callerId}->${calleeId}`
-                  if (!seen.has(key)) {
-                    seen.add(key)
-                    relations.push(
-                      createRelation({
-                        source: callerId,
-                        target: calleeId,
-                        type: RelationType.Calls,
-                      }),
-                    )
-                  }
-                }
-              }
-            }
-          }
-        }
-        walkCalls(child)
-      }
-    }
-
-    walkCalls(root)
-  }
-
-  /**
-   * Resolves a local callee name to the best-matching symbol id by scope proximity.
-   * When multiple symbols share a name (e.g. module-level function and a method),
-   * prefers the one whose line is closest to and before the call site.
-   * @param callNode - The call expression AST node.
-   * @param name - The callee name to resolve.
-   * @param candidates - Map of name → candidate symbols.
-   * @param isAttributeCall - Whether the call is an attribute access (e.g. self.foo()).
-   * @returns The best-matching symbol id, or undefined.
-   */
-  private resolveLocalCallee(
-    callNode: SgNode,
-    name: string,
-    candidates: Map<string, SymbolNode[]>,
-    isAttributeCall: boolean,
-  ): string | undefined {
-    const allSyms = candidates.get(name)
-    if (!allSyms || allSyms.length === 0) return undefined
-
-    // In Python, unqualified calls (e.g. `helper()`) resolve via LEGB scope,
-    // not to sibling methods. Only attribute calls (e.g. `self.helper()`) can
-    // resolve to methods. Filter candidates accordingly.
-    const syms = isAttributeCall ? allSyms : allSyms.filter((s) => s.kind !== 'method')
-    if (syms.length === 0) return undefined
-    if (syms.length === 1) return syms[0]!.id
-
-    // Fall back to the symbol defined closest before the call site
-    const callLine = callNode.range().start.line + 1
-    let best: SymbolNode | undefined
-    for (const s of syms) {
-      if (s.line <= callLine) {
-        if (!best || s.line > best.line) {
-          best = s
-        }
-      }
-    }
-    return best?.id ?? syms[0]!.id
-  }
-
-  /**
-   * Extracts import relations from Python import statements.
-   * @param root - The root AST node.
-   * @param filePath - The current file path.
-   * @param relations - Array to push relations into.
-   */
-  private extractImportRelations(root: SgNode, filePath: string, relations: Relation[]): void {
-    for (const child of root.children()) {
-      const kind = nodeKind(child)
-      if (kind === 'import_from_statement') {
-        const moduleNode = child.field('module_name')
-        if (!moduleNode) continue
-        const moduleName = moduleNode.text()
-        if (!moduleName.startsWith('.')) continue
-
-        const resolved = this.resolveRelativeImportPath(filePath, moduleName)
-        const target = Array.isArray(resolved) ? resolved[0]! : resolved
-        if (target) {
-          relations.push(
-            createRelation({
-              source: filePath,
-              target,
-              type: RelationType.Imports,
-              metadata: { specifier: moduleName },
-            }),
-          )
-        }
-      }
-    }
-  }
-
-  /**
    * Resolves a relative Python import to a file path.
    * @param fromFile - The importing file path.
    * @param specifier - The dot-prefixed module name.
@@ -886,8 +971,6 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     if (!modulePart) {
       return wsPrefix + segments.join('/') + '/__init__.py'
     }
-    // Without filesystem access we cannot distinguish module files from package
-    // directories (e.g. `from .sub import bar` could be `sub.py` or `sub/__init__.py`).
     const base = wsPrefix + segments.join('/')
     return [base + '.py', base + '/__init__.py']
   }

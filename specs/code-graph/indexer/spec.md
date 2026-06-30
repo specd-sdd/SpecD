@@ -93,21 +93,48 @@ Textual fallback SHALL decode document content using this policy:
 - **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically and applied with absolute priority.
 - **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer.
 
+### Requirement: Binary file filtering
+
+The indexer's discovery process SHALL filter out known binary and non-source file extensions by default (e.g., `.gif`, `.png`, `.jpg`, `.jpeg`, `.pdf`, `.sql`, `.zip`, `.tiff`, `.pack`). This prevents the engine from attempting to parse large binary payloads as text or document nodes, which causes CPU saturation and out-of-memory errors during hashing and extraction. This global binary filter runs before any document decoding heuristics are applied.
+
+### Requirement: Bounded analysis memory
+
+The indexer SHALL reduce repeated allocation pressure by reusing shared session lookups across passes and by storing compact per-file analysis results instead of re-deriving imports, bindings, and relations from raw content multiple times.
+
+The indexer MUST NOT retain parser ASTs, parse trees, or equivalent heavyweight parser objects across the full run. Pass 1 MAY allocate such structures transiently while analyzing an individual file, but the retained run-scoped state MUST be limited to compact normalized facts and common indexes that Pass 2 requires.
+
 ### Requirement: Two-pass extraction with in-memory index
 
-Extraction proceeds in two passes over the files, using an in-memory `SymbolIndex` rather than store queries during analysis:
+Extraction proceeds in two passes over the discovered files, using a shared in-memory `IndexSession` rather than repeated adapter extraction or graph-store lookups during analysis:
 
-- **Pass 1 (Extract symbols, per workspace)** — For each workspace, for each file in chunks: read content, extract symbols via the language adapter, and build `DEFINES` and `EXPORTS` relations. No store queries are needed during extraction.
-- **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — Resolve cross-file and cross-workspace relations using the `SymbolIndex`. Existing adapter `extractRelations()` output remains valid, but shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup.
+- **Pass 1 (Analyze files, per workspace)** — For each workspace, for each file in chunks: read content, derive a complete `FileAnalysis` through the language adapter, register the file analysis in the shared `IndexSession`, and emit `DEFINES` and `EXPORTS` relations from the registered symbols. The session owns common in-memory lookups for files, symbols, qualified names, and parser-emitted facts. No store queries are needed during extraction.
+- **Pass 2 (Resolve imports + scoped bindings + relations, all workspaces)** — For each analyzed file, resolve imports and cross-file targets from the facts stored in the `IndexSession`, then derive `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy, and other deterministic relations from the stored facts without re-parsing the file. Shared scoped resolution owns cross-language receiver, type-reference, constructor, and call-candidate lookup against the session indexes.
 - **Specs (per workspace)** — For each workspace: iterate through specs provided by the `SpecRepository`.
 - **Store commit** — After all passes complete, call `GraphStore.bulkLoad()` once.
 - **Search readiness** — After bulk load, call `GraphStore.rebuildFtsIndexes()`.
 
-This two-pass approach ensures all symbols exist in the index before import, binding, call, and hierarchy resolution, while avoiding store queries during analysis.
+This two-pass approach ensures all symbols exist in the shared session before import, binding, call, and hierarchy resolution, while avoiding store queries and repeated file analysis during indexing.
+
+### Requirement: Shared indexing session
+
+The indexer SHALL maintain a run-scoped in-memory `IndexSession` for the full indexing operation.
+
+The `IndexSession` MUST provide shared lookup and deduplication facilities for:
+
+- registered files and their stable run-local numeric IDs
+- registered file analyses keyed by file ID and workspace-prefixed file path
+- registered symbols keyed by file, name, and qualified name
+- registered documents, specs, and deterministic cross-entity lookups such as file-to-symbol and spec-to-symbol
+- deterministic parser-emitted facts required by Pass 2 relation building
+- deduplicated relations accumulated before the final store commit
+
+The `IndexSession` MUST expose a common API for all built-in adapters and indexer phases. Adapters MAY store compact run-scoped adapter cache state through that API, but they MUST NOT bypass the session with direct access to raw internal maps.
+
+The `IndexSession` SHALL remain an in-memory indexing primitive only. It MUST NOT change persisted graph-store schemas, persisted graph IDs, or final graph relation semantics.
 
 ### Requirement: Scoped binding environment resolution
 
-During Pass 2, the indexer SHALL build a per-file scoped binding environment from adapter-provided binding facts, call facts, symbols, import declarations, resolved import maps, namespace maps, and the in-memory `SymbolIndex`.
+During Pass 2, the indexer SHALL build a per-file scoped binding environment from adapter-provided binding facts, call facts, symbols, import declarations, resolved import maps, namespace maps, and the shared `IndexSession` lookups.
 
 The scoped binding environment builder SHALL be shared code-graph logic, not adapter-local full environment logic. It SHALL provide deterministic lookup for:
 
@@ -142,19 +169,25 @@ Implementations MAY spill intermediate indexing artifacts to disk instead of ret
 
 - 0-5%: File discovery and content hashing
 - 5-7%: Diff computation and cleanup of deleted/changed files
-- 7-50%: Pass 1 — symbol extraction (updates per file)
-- 50-80%: Pass 2 — import resolution and CALLS extraction (updates per file)
+- 7-50%: Pass 1 — file analysis and symbol registration (updates per file)
+- 50-80%: Pass 2 — import resolution and relation building from stored facts (updates per file)
 - 80-83%: Spec discovery
 - 83-95%: Bulk loading (updates per table and relation batch)
 - 100%: Done
 
 Progress updates include a detail string (e.g. `"150/460 files"`) for phases that process individual items.
 
+The indexer SHALL ensure progress callbacks are fired immediately when a phase finishes, before starting the next synchronous or heavy CPU-bound internal processing (such as session index finalization or relation aggregation), so the user interface does not display stale phase labels.
+
+### Requirement: Phase execution timing logging
+
+The indexer SHALL log the execution time of each major internal phase (e.g., File Discovery, Pass 1, Pass 2, Spec Indexing, Bulk Load) at the `debug` level to facilitate performance diagnostics and bottleneck detection without blocking or polluting standard output.
+
 ### Requirement: Cross-workspace package resolution
 
 Before Pass 2, the indexer builds a `packageName → workspaceName` map by calling `adapter.getPackageIdentity(codeRoot)` for each workspace. The indexer iterates over all registered adapters and the first one to return a non-`undefined` identity wins. This is language-agnostic — each adapter reads its own manifest format (`package.json`, `go.mod`, `pyproject.toml`, `composer.json`).
 
-For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the in-memory `SymbolIndex` for symbols with the imported name within the matching workspace's path prefix (`workspaceName + ':'`).
+For non-relative import specifiers (e.g. `@specd/core`), the indexer extracts the package name from the specifier, looks it up in the `packageName → workspaceName` map, and searches the shared `IndexSession` lookups for symbols with the imported name within the matching workspace scope.
 
 This works for both monorepo (workspaces in the same repo) and multirepo (workspaces in separate repos configured in `specd.yaml`) because the resolution depends only on the adapter reading each workspace's manifest — not on `pnpm-workspace.yaml` or any monorepo-specific tooling.
 

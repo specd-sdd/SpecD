@@ -16,7 +16,7 @@
     {
       "requirement": "Accepts GetProjectContextInput as input",
       "rules": [
-        "`execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:\n\n- `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, `contextExcludeSpecs`, and `contextMode`\n- `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.\n- `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.\n- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`\"rules\"`, `\"constraints\"`, `\"scenarios\"`). It has no effect for list-mode or summary-mode entries."
+        "`execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:\n\n- `contextMode` (`'list' | 'summary' | 'full' | 'hybrid'`, optional) — runtime override for display mode. When absent, the baked default from construction is used.\n- `llmOptimizedContext` (boolean, optional) — runtime override for whether optimized context is preferred. When absent, the baked default from construction is used.\n- `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.\n- `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.\n- `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`\"rules\"`, `\"constraints\"`, `\"scenarios\"`). It has no effect for list-mode or summary-mode entries.\n\n`GetProjectContextInput` MUST NOT include a `config` field."
       ]
     },
     {
@@ -70,13 +70,13 @@
     {
       "requirement": "Construction dependencies",
       "rules": [
-        "`GetProjectContext` depends on the following ports injected via constructor:\n\n- `specs` (`ReadonlyMap<string, SpecRepository>`) — per-workspace spec repositories\n- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema (replaces `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths`)\n- `files` (`FileReader`) — for reading context entry files from disk\n- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale\n- `hasher` (`ContentHasher`) — for comparing content hashes against metadata\n\nAll dependencies are injected at construction time. The schema is resolved lazily on first access."
+        "`GetProjectContext` depends on the following ports/services injected via constructor:\n\n- `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces\n- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema\n- `files` (`FileReader`) — for reading context entry files from disk\n- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale\n- `hasher` (`ContentHasher`) — for comparing content hashes against metadata\n- `defaultConfig` (`CompileContextConfig`) — yaml-derived project context configuration snapshot baked at kernel composition time\n\nAll dependencies are injected at construction time. The schema is resolved lazily on first access.\n\nAt the start of `execute`, `GetProjectContext` MUST build the effective `CompileContextConfig` by shallow-merging `defaultConfig` with any runtime overrides (`contextMode`, `llmOptimizedContext`) present on the input. Hosts MUST NOT pass yaml-derived configuration on each call."
       ]
     },
     {
       "requirement": "Project context optimization and invalidation",
       "rules": [
-        "If `llmOptimizedContext: true` is active, the use case SHALL attempt to load project-level metadata from `project-metadata.json`.\n\nIt SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:\n\n- `specd.yaml`\n- Referenced `contextFiles`\n- Metadata of included specs\n\nIf all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, it SHALL fall back to raw compilation and emit a signal for the caller to show a warning."
+        "When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.\n\nThe system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:\n\n- `specd.yaml`\n- Referenced `contextFiles`\n- Metadata of included specs\n\nIf all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.\n\nThe warning message MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\"."
       ]
     }
   ],
@@ -92,17 +92,21 @@
   "scenarios": [
     {
       "requirement": "Accepts GetProjectContextInput as input",
-      "name": "Minimal input with config only",
-      "when": ["execute is called with { config: { context: [], contextIncludeSpecs: [] } }"],
-      "then": [
-        "the call succeeds and returns a result with empty contextEntries, specs, and warnings"
-      ]
+      "name": "Minimal input with no overrides",
+      "given": ["GetProjectContext was constructed with a baked default configuration"],
+      "when": ["execute is called with {}"],
+      "then": ["the call succeeds using the baked default snapshot"]
     },
     {
       "requirement": "Accepts GetProjectContextInput as input",
       "name": "Full optional input supported",
-      "when": ["execute is called with followDeps: true, depth: 2, and sections: [\"rules\"]"],
-      "then": ["the call succeeds and respects all optional parameters"]
+      "when": [
+        "execute is called with followDeps: true, depth: 2, sections: [\"rules\"], and contextMode: \"full\""
+      ],
+      "then": [
+        "the call succeeds and respects all optional parameters",
+        "AND no config field is required"
+      ]
     },
     {
       "requirement": "Accepts GetProjectContextInput as input",
@@ -319,10 +323,10 @@
     },
     {
       "requirement": "Construction dependencies",
-      "name": "Constructor accepts all required ports",
-      "when": ["GetProjectContext is instantiated"],
+      "name": "Constructor accepts all required ports and default config",
+      "when": ["GetProjectContext is instantiated from a resolved SpecdConfig"],
       "then": [
-        "it requires specs (ReadonlyMap<string, SpecRepository>), schemaProvider (SchemaProvider), files (FileReader), parsers (ArtifactParserRegistry), and hasher (ContentHasher) in its constructor"
+        "it requires listWorkspaces, schemaProvider, files, parsers, hasher, and a yaml-derived CompileContextConfig default snapshot in its constructor"
       ]
     },
     {
@@ -339,25 +343,45 @@
       "requirement": "Project context optimization and invalidation",
       "name": "Falls back and warns when project context is stale",
       "given": [
-        "llmOptimizedContext: true",
-        "AND specd.yaml has changed (hash mismatch in project-metadata.json)"
+        "llmOptimizedContext is enabled",
+        "AND the project context cache is stale or missing (e.g. due to specd.yaml hash mismatch)"
       ],
-      "when": ["project context is retrieved"],
-      "then": ["it falls back to raw compilation", "AND emits a warning signal"]
+      "when": ["project context is compiled"],
+      "then": [
+        "it falls back to raw compilation",
+        "AND it emits a warning",
+        "AND the warning message mentions specd-project-context-optimizer"
+      ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:get-project-context",
+        "file": "core:test/application/use-cases/get-project-context.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:get-project-context",
         "file": "core:src/application/use-cases/get-project-context.ts",
         "symbol": "GetProjectContext"
+      },
+      {
+        "specId": "core:get-project-context",
+        "file": "core:src/application/use-cases/get-project-context.ts",
+        "symbol": "GetProjectContextInput"
+      },
+      {
+        "specId": "core:get-project-context",
+        "file": "core:src/composition/use-cases/get-project-context.ts",
+        "symbol": "createGetProjectContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e223af25e80cf208789bd7c801280e695669bd29f58b08f5bfd91d94ac8570ab",
-    "verify.md": "sha256:a1e40df46d80a1fce4684d1b348fcb024ad4e0810287d9df0fe34253b779fa22"
+    "spec.md": "sha256:30e3433270c6a1c799b28275537282e606b38df57b11f146f687cd20c8c3aa05",
+    "verify.md": "sha256:b57b051832b12b55098fad0f71e6379225b95c7735f3189627194294b4484cef"
   },
   "generatedBy": "core"
 }

@@ -1,10 +1,16 @@
 import { Command, Option } from 'commander'
-import { createCodeGraphProvider } from '@specd/code-graph'
+import {
+  createCodeGraphProvider,
+  assertGraphIndexUnlocked,
+  type FileImpactResult,
+  GraphSpecNotFoundError as SpecNotFoundError,
+  normalizeFileSelectorPath,
+} from '@specd/sdk'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
-import { assertGraphIndexUnlocked } from './graph-index-lock.js'
+import { warnGraphStale } from './warn-graph-staleness.js'
 
 /** Provider-supported graph impact traversal directions. */
 type ImpactDirection = 'upstream' | 'downstream' | 'both'
@@ -215,7 +221,7 @@ JSON/TOON output schema:
           cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
 
-        const { config } = await resolveGraphCliContext({
+        const { config, kernel } = await resolveGraphCliContext({
           configPath: opts.config,
           repoPath: opts.path,
         }).catch((err: unknown) =>
@@ -225,15 +231,28 @@ JSON/TOON output schema:
             1,
           ),
         )
-        assertGraphIndexUnlocked(config)
+        try {
+          assertGraphIndexUnlocked(config)
+        } catch (err: unknown) {
+          cliError(err instanceof Error ? err.message : 'The code graph is locked', opts.format, 3)
+          return
+        }
 
         await withProvider(config, opts.format, async (provider) => {
+          await warnGraphStale(provider, config, kernel)
           if (opts.symbol) {
             await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
           } else if (opts.spec) {
             await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt)
           } else if (opts.file) {
-            await handleFilesImpact(provider, opts.file, direction, maxDepth, fmt)
+            await handleFilesImpact(
+              provider,
+              opts.file,
+              direction,
+              maxDepth,
+              fmt,
+              config.projectRoot,
+            )
           }
         })
       },
@@ -247,6 +266,7 @@ JSON/TOON output schema:
  * @param direction - The traversal direction.
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
+ * @param projectRoot - Project root used to normalize file selectors in error messages.
  */
 async function handleFilesImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
@@ -254,12 +274,14 @@ async function handleFilesImpact(
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
+  projectRoot: string,
 ): Promise<void> {
   const resolved = []
   for (const rawSelector of rawSelectors) {
     const matches = await provider.resolveFileSelector(rawSelector)
     if (matches.length === 0) {
-      cliError(`no indexed file matches "${rawSelector}"`, fmt, 1)
+      const searchedPath = normalizeFileSelectorPath(rawSelector, projectRoot)
+      cliError(`no indexed file matches "${searchedPath}"`, fmt, 1)
     }
     if (matches.length > 1) {
       cliError(
@@ -325,6 +347,11 @@ async function handleFilesImpact(
           ...displayResult,
           canonicalPath: file.canonicalPath,
           displayPath: file.configRelativePath,
+          riskLevel: result.riskLevel,
+          directDepsCount: result.directDependents,
+          indirectDepsCount: result.indirectDependents,
+          transitiveDepsCount: result.transitiveDependents,
+          affectedFilesCount: result.affectedFiles.length,
         },
         fmt,
       )
@@ -332,29 +359,17 @@ async function handleFilesImpact(
     return
   }
 
-  const perFile = await Promise.all(
-    resolved.map(async (f) => {
-      const result = await provider.analyzeFileImpact(f.canonicalPath, direction, maxDepth)
-      return { file: f, result }
-    }),
+  const result = await provider.analyzeFilesImpact(
+    resolved.map((f) => f.canonicalPath),
+    direction,
+    maxDepth,
   )
 
-  const allAffectedFiles = new Set<string>()
-  let directDependents = 0
-  let indirectDependents = 0
-  let transitiveDependents = 0
-  let overallRisk: string = 'LOW'
-  const riskOrder = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const
-
-  for (const { result } of perFile) {
-    for (const f of result.affectedFiles) allAffectedFiles.add(f)
-    directDependents += result.directDependents
-    indirectDependents += result.indirectDependents
-    transitiveDependents += result.transitiveDependents
-    const ri = riskOrder.indexOf(result.riskLevel as (typeof riskOrder)[number])
-    const oi = riskOrder.indexOf(overallRisk as (typeof riskOrder)[number])
-    if (ri > oi) overallRisk = result.riskLevel
-  }
+  const individualResults = result.symbols as unknown as FileImpactResult[]
+  const perFile = resolved.map((f, i) => ({
+    file: f,
+    result: individualResults[i]!,
+  }))
 
   if (fmt === 'text') {
     const label =
@@ -364,17 +379,17 @@ async function handleFilesImpact(
     const lines = formatImpact(
       label,
       {
-        riskLevel: overallRisk,
-        directDependents,
-        indirectDependents,
-        transitiveDependents,
-        affectedFiles: [...allAffectedFiles],
+        riskLevel: result.riskLevel,
+        directDependents: result.directDependents,
+        indirectDependents: result.indirectDependents,
+        transitiveDependents: result.transitiveDependents,
+        affectedFiles: result.affectedFiles,
       },
       maxDepth,
     )
 
-    const allChangedSymbols = perFile.flatMap(({ file, result }) =>
-      result.symbols.map((s) => ({ file: file.configRelativePath, symbol: s })),
+    const allChangedSymbols = perFile.flatMap(({ file, result: r }) =>
+      r.symbols.map((s) => ({ file: file.configRelativePath, symbol: s })),
     )
     if (allChangedSymbols.length > 0) {
       lines.push('')
@@ -391,9 +406,9 @@ async function handleFilesImpact(
 
     lines.push('')
     lines.push('Per-file breakdown:')
-    for (const { file, result } of perFile) {
+    for (const { file, result: r } of perFile) {
       lines.push(
-        `  ${file.configRelativePath}  risk=${result.riskLevel} direct=${String(result.directDependents)} files=${String(result.affectedFiles.length)}`,
+        `  ${file.configRelativePath}  risk=${r.riskLevel} direct=${String(r.directDependents)} files=${String(r.affectedFiles.length)}`,
       )
     }
     output(lines.join('\n'), 'text')
@@ -402,25 +417,23 @@ async function handleFilesImpact(
       {
         targets: resolved.map((f) => f.canonicalPath),
         displayTargets: resolved.map((f) => f.configRelativePath),
-        riskLevel: overallRisk,
-        directDepsCount: directDependents,
-        indirectDepsCount: indirectDependents,
-        transitiveDepsCount: transitiveDependents,
-        affectedFilesCount: allAffectedFiles.size,
+        riskLevel: result.riskLevel,
+        directDepsCount: result.directDependents,
+        indirectDepsCount: result.indirectDependents,
+        transitiveDepsCount: result.transitiveDependents,
+        affectedFilesCount: result.affectedFiles.length,
         // Legacy fields for backward compatibility
-        directDependents,
-        indirectDependents,
-        transitiveDependents,
-        affectedFiles: [...allAffectedFiles],
+        directDependents: result.directDependents,
+        indirectDependents: result.indirectDependents,
+        transitiveDependents: result.transitiveDependents,
+        affectedFiles: result.affectedFiles,
         perFile: await Promise.all(
-          perFile.map(async ({ file, result }) => ({
+          perFile.map(async ({ file, result: r }) => ({
             file: file.canonicalPath,
             displayPath: file.configRelativePath,
             result: {
-              ...result,
-              affectedFiles: await Promise.all(
-                result.affectedFiles.map((path) => toDisplayPath(path)),
-              ),
+              ...r,
+              affectedFiles: await Promise.all(r.affectedFiles.map((path) => toDisplayPath(path))),
             },
           })),
         ),
@@ -578,12 +591,7 @@ async function handleSpecImpact(
 ): Promise<void> {
   const spec = await provider.getSpec(specId)
   if (spec === undefined) {
-    if (fmt === 'text') {
-      output(`No spec found matching "${specId}".`, 'text')
-    } else {
-      output({ error: 'not_found', spec: specId }, fmt)
-    }
-    return
+    throw new SpecNotFoundError(specId)
   }
 
   const result = await provider.analyzeSpecImpact(specId, direction, maxDepth)
@@ -597,6 +605,12 @@ async function handleSpecImpact(
   const displayResult = {
     ...result,
     affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
+    affectedSymbols: await Promise.all(
+      result.affectedSymbols.map(async (sym) => ({
+        ...sym,
+        filePath: await toDisplayPath(sym.filePath),
+      })),
+    ),
   }
   if (fmt === 'text') {
     output(formatSpecImpact(spec.specId, displayResult, maxDepth).join('\n'), 'text')

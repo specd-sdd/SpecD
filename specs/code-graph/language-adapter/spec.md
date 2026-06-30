@@ -12,14 +12,28 @@ Different programming languages have fundamentally different syntax for function
 
 - **`languages(): string[]`** — returns the language identifiers this adapter handles (e.g. `['typescript', 'tsx', 'javascript', 'jsx']`)
 - **`extensions(): Record<string, string>`** — returns the file extension to language ID mapping (e.g. `{ '.ts': 'typescript', '.tsx': 'tsx' }`). The adapter registry uses this to resolve files to adapters — no hardcoded extension map.
-- **`extractSymbols(filePath: string, content: string): SymbolNode[]`** — parses the file content and returns all symbols found
-- **`extractSymbolsWithNamespace?(filePath: string, content: string): { symbols: SymbolNode[]; namespace: string | undefined }`** — optional fast path for languages that can derive symbols and namespace from the same parse tree
-- **`extractImportedNames(filePath: string, content: string): ImportDeclaration[]`** — parses import statements and returns structured declarations without resolution
-- **`extractRelations(filePath: string, content: string, symbols: SymbolNode[], importMap: Map<string, string>): Relation[]`** — extracts relations (IMPORTS, CALLS, CONSTRUCTS, USES_TYPE, DEFINES, EXPORTS, DEPENDS_ON, EXTENDS, IMPLEMENTS, OVERRIDES) from the file. The `importMap` maps local import names to resolved symbol IDs, built by the indexer during Pass 2. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` is reserved for spec-level dependency edges in the persisted graph model.
-- **`extractBindingFacts?(filePath: string, content: string, symbols: SymbolNode[], imports: ImportDeclaration[]): BindingFact[]`** — optional pure extension point for extracting deterministic binding facts used by the shared scoped binding environment.
-- **`extractCallFacts?(filePath: string, content: string, symbols: SymbolNode[]): CallFact[]`** — optional pure extension point for extracting normalized call-form facts used by shared call resolution.
+- **`analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft`** — parses the file content once and returns the complete compact analysis required by indexing for that file, including symbols, imports, deterministic binding facts, deterministic call facts, namespace data when relevant, and optional compact parser-specific state.
+- **`resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports`** — resolves the file's previously extracted import declarations, qualified names, aliases, and deterministic file targets using the shared session lookups instead of re-reading or re-parsing file content.
+- **`buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]`** — builds deterministic graph relations for the file from the stored analysis facts and resolved import information. For code-file dependencies, adapters SHOULD emit concrete relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations) when targets are resolvable; `DEPENDS_ON` remains reserved for spec-level dependency edges.
+- **`getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined`** — optionally derives a package identity for the workspace.
+- **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — optionally maps an import specifier to a package identity.
+- **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — optionally maps a qualified name to a source file path for languages that support deterministic namespace resolution.
 
-All extraction methods MUST be synchronous and pure — they receive content as a string, not a file path to read. They produce no side effects.
+All adapter methods MUST be synchronous and deterministic with respect to the provided arguments and shared session context. They receive content as a string during analysis, not a file path to read, and they MUST NOT perform side effects outside the indexing session. Adapters MAY read and update compact run-scoped adapter cache state only through the `IndexSession` API exposed by the provided contexts.
+
+### Requirement: Full-file analysis contract
+
+Each built-in language adapter SHALL emit a complete compact `FileAnalysisDraft` for every indexed file in a single `analyzeFile` call.
+
+The draft MUST include every deterministic analysis fact the adapter needs later in the run for import resolution and relation building. Adapters MUST NOT require the indexer to call separate symbol, import, binding, or call extraction entry points for the same file.
+
+The draft MAY include compact per-file parser-specific state when that state avoids repeated deterministic work in Pass 2, but it MUST remain serializable in memory-friendly plain data structures and MUST NOT retain AST nodes, parser trees, or other heavyweight parser-runtime objects.
+
+### Requirement: Unified built-in adapter migration
+
+The built-in TypeScript/JavaScript, PHP, Python, and Go adapters SHALL all implement the unified `analyzeFile` / `resolveImports` / `buildRelations` contract within the same change.
+
+The code graph MUST NOT retain a parallel legacy adapter-extraction path once this contract is introduced. The indexer, adapter registry, provider wiring, and tests SHALL treat the unified contract as the only supported built-in adapter interface.
 
 ### Requirement: Language detection
 
@@ -36,7 +50,7 @@ The following extensions are declared by the built-in TypeScript adapter:
 
 ### Requirement: TypeScript adapter
 
-A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. It MUST extract:
+A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. Through the unified `analyzeFile` / `resolveImports` / `buildRelations` contract it MUST support:
 
 - **Symbols**: functions (named + arrow assigned to const), classes, methods, exported variables, type aliases, interfaces, enums
 - **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.
@@ -57,14 +71,14 @@ The adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:
 
 ### Requirement: Import declaration extraction
 
-`LanguageAdapter` SHALL provide `extractImportedNames(filePath: string, content: string): ImportDeclaration[]` — a synchronous, pure method that parses the file's import statements and returns structured declarations without any resolution.
+`LanguageAdapter.analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft` SHALL include structured import declarations for the analyzed file as part of the returned draft.
 
 `ImportDeclaration` is a value object with:
 
 - **`localName`** (`string`) — the name used locally in the importing file (may differ from original via aliasing)
 - **`originalName`** (`string`) — the name as declared in the source module
 - **`specifier`** (`string`) — the raw import specifier string (e.g. `'./utils.js'`, `'@specd/core'`, `'os'`)
-- **`isRelative`** (`boolean`) — true if the specifier is relative to the importing file (starts with `.` for all built-in adapters)
+- **`isRelative`** (`boolean`) — true if the specifier is relative to the importing file (starts with `.` for all built-in adapters that use relative imports)
 
 Each adapter parses imports using its language's syntax:
 
@@ -75,20 +89,20 @@ Each adapter parses imports using its language's syntax:
 | Go         | `import "pkg"`, `import alias "pkg"`    | always `false`  |
 | PHP        | `use Namespace\Class`                   | always `false`  |
 
-The adapter only parses syntax — specifier resolution is handled by the adapter's optional `resolveRelativeImportPath` and `resolvePackageFromSpecifier` methods, called by the indexer during Pass 2.
+The adapter only parses syntax during `analyzeFile` — specifier resolution is handled later by `resolveImports()` during Pass 2.
 
 ### Requirement: Call resolution
 
-For `CALLS` relations, the adapter MUST extract call expressions from the AST and resolve them:
+For `CALLS` relations, the adapter MUST extract deterministic call facts during `analyzeFile()` and convert them into persisted `CALLS` relations during `buildRelations()` using the resolved import information and shared session lookups.
 
 - **Caller**: the innermost enclosing function, method, or arrow function containing the call expression. Calls at module top level are silently dropped.
-- **Callee**: resolved via the import map passed to `extractRelations`. If the called identifier is in the import map, the callee is the resolved symbol. If the identifier matches a locally defined symbol, the callee is that local symbol.
+- **Callee**: resolved through deterministic local symbols, resolved imports, receiver bindings, or other statically known candidates available through the shared session and adapter facts.
 
-Calls to identifiers that cannot be resolved (e.g. global built-ins, member expressions like `obj.method()`, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
+Calls to identifiers that cannot be resolved deterministically (e.g. unresolved global built-ins, ambiguous member expressions, dynamic expressions) SHALL be silently dropped — no relation is created, no error is thrown.
 
 ### Requirement: Scoped binding fact extraction
 
-`LanguageAdapter` SHALL expose optional synchronous, pure extension points for extracting scoped binding facts and call facts from source content. Built-in adapters for TypeScript/TSX/JavaScript/JSX, Python, Go, and PHP MUST implement these extension points for the deterministic cases defined by this spec.
+`LanguageAdapter.analyzeFile()` SHALL expose deterministic scoped binding facts and call facts through the returned `FileAnalysisDraft`. Built-in adapters for TypeScript/TSX/JavaScript/JSX, Python, Go, and PHP MUST emit these facts for the deterministic cases defined by this spec.
 
 Adapter-owned fact extraction SHALL include language-specific syntax and semantics only. Shared scope lookup, shadowing, receiver binding, and cross-language candidate filtering belong to the common code-graph pipeline, not to adapter-local full environment implementations.
 
@@ -179,39 +193,17 @@ Unlike extraction methods, `getPackageIdentity` performs I/O (reads a manifest f
 
 ### Requirement: Import specifier resolution
 
-`LanguageAdapter` MAY provide optional methods for resolving import specifiers to file paths. This moves all language-specific resolution logic out of the indexer:
+Import and qualified-name resolution methods often need project-wide file and symbol existence checks.
 
-- **`resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`** — given a non-relative import specifier and the list of known package names, returns which package the specifier refers to. Each language has its own rules:
+Adapters SHALL resolve imports and dynamic file targets through the shared `IndexSession` indexes exposed by `ImportResolutionContext` rather than by scanning all symbols or re-reading the filesystem during Pass 2.
 
-| Language   | Specifier example                | Package extraction rule                               |
-| ---------- | -------------------------------- | ----------------------------------------------------- |
-| TypeScript | `@specd/core`                    | Scoped: first two segments. Bare: first segment.      |
-| Go         | `github.com/acme/auth/models`    | Longest matching prefix from known packages.          |
-| Python     | `acme_auth.models`               | First segment, normalized (hyphens ↔ underscores).    |
-| PHP        | (uses qualified names, not this) | Not applicable — PHP resolves via `extractNamespace`. |
+- `resolvePackageFromSpecifier` resolves package identity from a specifier.
+- `resolveQualifiedNameToPath` resolves qualified names (like PHP namespaces) to source file paths when the language supports deterministic mapping.
+- `resolveImports` combines raw import declarations, package identity, qualified-name lookup, and parser-specific deterministic rules into resolved import targets.
 
-- **`resolveRelativeImportPath?(fromFile: string, specifier: string): string | string[]`** — given the importing file path and a relative specifier, returns one or more candidate file paths. Returns multiple candidates when the specifier is ambiguous (e.g. could be a file or a directory with an index file). The indexer tries each candidate in order against the symbol index. Each language has its own rules for extension mapping and path resolution:
+Any metadata needed by `resolveQualifiedNameToPath` during Pass 2 (for example PSR-4 maps) MUST come from compact state already prepared during analysis or from deterministic run-scoped adapter cache state held in the session. Pass 2 MUST NOT probe the filesystem for per-import existence checks.
 
-| Language   | Resolution rules                                                                               |
-| ---------- | ---------------------------------------------------------------------------------------------- |
-| TypeScript | `.js` → `.ts`, extensionless → `[.ts, /index.ts]`, `.jsx` → `.tsx`, `../` traversal            |
-| Python     | `.` = current package, `..` = parent, module → `[.py, /__init__.py]`, bare dot → `__init__.py` |
-| Go         | Not applicable — Go imports are never relative                                                 |
-| PHP        | Not applicable — PHP imports are never relative                                                |
-
-- **`buildQualifiedName?(namespace: string, symbolName: string): string`** — builds a fully qualified name from a namespace and symbol name. Used by languages like PHP where imports are resolved via namespace-qualified names rather than package names.
-
-| Language | Example                                   |
-| -------- | ----------------------------------------- |
-| PHP      | `App\Models` + `User` → `App\Models\User` |
-
-- **`resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`** — given a fully qualified class/type name and the workspace's `codeRoot`, resolves it to an absolute file path by reading the language's autoloader configuration. This complements the in-memory qualified name map built from indexed symbols: it handles classes not present in the indexed codebase (e.g. library code excluded from indexing). Performs I/O (reads the autoloader manifest); the PSR-4 map SHOULD be cached per `codeRoot` to avoid repeated reads. Returns `undefined` if the qualified name cannot be resolved.
-
-| Language | Autoloader config                                       | Resolution rule                                                                              |
-| -------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| PHP      | `composer.json` `autoload.psr-4` + `autoload-dev.psr-4` | Longest-prefix match on namespace → directory; appends remaining segments as `ClassName.php` |
-
-When these methods are not implemented, the indexer skips the corresponding resolution step for that language. The indexer MUST NOT contain any language-specific resolution logic — all specifier parsing, path resolution, and qualified name construction is delegated to adapters.
+The PHP adapter in particular MUST use the shared session's common file and symbol lookups for CakePHP, CodeIgniter, and namespace-driven resolution so dynamic path resolution does not regress into O(N) scans of all workspace symbols.
 
 ### Requirement: PHP require/include dependencies
 
@@ -298,12 +290,12 @@ The TypeScript adapter MUST be registered by default when the registry is create
 ## Constraints
 
 - LanguageAdapter is an interface, not an abstract class — adapters are stateless
-- Extraction methods are synchronous and pure — they receive content, not file handles
-- `extractSymbolsWithNamespace()` is optional and, when implemented, follows the same synchronous and pure extraction rules
-- `extractBindingFacts?()` and `extractCallFacts?()` are optional for custom adapters, required for built-in adapters, and follow the same synchronous and pure extraction rules
-- getPackageIdentity and resolveQualifiedNameToPath? are the only methods that perform I/O — both are optional and search for a manifest file on disk
-- Resolution methods (resolvePackageFromSpecifier, resolveRelativeImportPath, buildQualifiedName) are synchronous and pure
-- resolveQualifiedNameToPath? SHOULD cache the parsed autoloader map per codeRoot to avoid repeated disk reads during a single indexing run
+- `analyzeFile`, `resolveImports`, and `buildRelations` are synchronous and deterministic
+- `analyzeFile` receives content, not file handles, and emits a complete `FileAnalysisDraft`
+- Per-file parser state and run-scoped adapter cache state MUST remain compact plain data
+- getPackageIdentity and resolveQualifiedNameToPath? are the only methods that may perform I/O, and Pass 2 import resolution must not probe the filesystem per candidate
+- Resolution methods (resolvePackageFromSpecifier, resolveQualifiedNameToPath, resolveImports) are synchronous and deterministic
+- resolveQualifiedNameToPath? SHOULD cache parsed autoloader/manifest metadata per codeRoot or session to avoid repeated disk reads during a single indexing run
 - The indexer MUST NOT contain language-specific resolution logic — all of it is delegated to adapters
 - Unrecognized file extensions are silently skipped
 - Unresolvable call targets are silently dropped

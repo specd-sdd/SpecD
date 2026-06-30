@@ -1,6 +1,8 @@
 import { readFileSync, statSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { type Spec } from '@specd/core'
+import { setImmediate } from 'node:timers'
+import { performance } from 'node:perf_hooks'
+import { type Spec, Logger } from '@specd/core'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
 import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
@@ -16,10 +18,8 @@ import {
   type WorkspaceIndexBreakdown,
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
-import { type ImportDeclaration } from '../../domain/value-objects/import-declaration.js'
-import { ImportDeclarationKind } from '../../domain/value-objects/import-declaration-kind.js'
-import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
-import { BindingScopeKind, type BindingScope } from '../../domain/value-objects/binding-fact.js'
+import { type ResolvedImports } from '../../domain/value-objects/language-adapter.js'
+import { type IndexSession } from '../../domain/value-objects/index-session.js'
 import {
   buildScopedBindingEnvironment,
   resolveDependencyFacts,
@@ -29,6 +29,7 @@ import {
 } from '../../domain/services/index.js'
 import { discoverFiles } from './discover-files.js'
 import { computeContentHash } from './compute-content-hash.js'
+import { InMemoryIndexSession } from './in-memory-index-session.js'
 import {
   computeWorkspaceFingerprint,
   computeRootFingerprint,
@@ -37,6 +38,7 @@ import {
   detectFingerprintMismatch,
 } from './_shared/compute-graph-fingerprint.js'
 import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
+import { readInstalledCodeGraphVersion } from './_shared/installed-code-graph-version.js'
 
 const DEFAULT_CHUNK_BYTES = 20 * 1024 * 1024
 
@@ -52,125 +54,6 @@ interface MutableWorkspaceIndexBreakdown {
   filesRemoved: number
   specsDiscovered: number
   specsIndexed: number
-}
-
-/**
- * In-memory symbol index for resolving imports without store queries.
- * Built incrementally during parsing, queried during import resolution.
- */
-class SymbolIndex {
-  private byFile = new Map<string, SymbolNode[]>()
-  private byName = new Map<string, SymbolNode[]>()
-
-  /**
-   * Registers symbols from a file.
-   * @param filePath - The file path to associate symbols with.
-   * @param symbols - The symbols extracted from the file.
-   */
-  addFile(filePath: string, symbols: SymbolNode[]): void {
-    this.byFile.set(filePath, symbols)
-    for (const s of symbols) {
-      const existing = this.byName.get(s.name)
-      if (existing) {
-        existing.push(s)
-      } else {
-        this.byName.set(s.name, [s])
-      }
-    }
-  }
-
-  /**
-   * Finds symbols by exact file path.
-   * @param filePath - The file path to look up.
-   * @returns The symbols associated with the file.
-   */
-  findByFile(filePath: string): SymbolNode[] {
-    return this.byFile.get(filePath) ?? []
-  }
-
-  /**
-   * Finds symbols by name, optionally filtered by file path prefix.
-   * @param name - The symbol name to search for.
-   * @param filePrefix - Optional file path prefix to filter results.
-   * @returns The matching symbols.
-   */
-  findByName(name: string, filePrefix?: string): SymbolNode[] {
-    const all = this.byName.get(name) ?? []
-    if (!filePrefix) return all
-    return all.filter((s) => s.filePath.startsWith(filePrefix))
-  }
-
-  /**
-   * Finds all symbols whose file path starts with the given prefix.
-   * @param filePrefix - The file path prefix to filter results.
-   * @returns Every matching symbol across indexed files.
-   */
-  findByFilePrefix(filePrefix: string): SymbolNode[] {
-    const matches: SymbolNode[] = []
-    for (const [filePath, symbols] of this.byFile.entries()) {
-      if (filePath.startsWith(filePrefix)) {
-        matches.push(...symbols)
-      }
-    }
-    return matches
-  }
-
-  /**
-   * Returns every file-to-symbol slice currently stored in the index.
-   * @returns Array of file path and symbol list pairs.
-   */
-  entries(): Array<[string, SymbolNode[]]> {
-    return [...this.byFile.entries()]
-  }
-}
-
-/**
- * Creates the domain-level symbol lookup adapter over the in-memory symbol index.
- * @param index - In-memory index populated during Pass 1.
- * @returns Symbol lookup used by scoped binding resolution.
- */
-function createSymbolLookup(index: SymbolIndex): SymbolLookup {
-  return {
-    findByName: (name, filePrefix) => index.findByName(name, filePrefix),
-    findByFile: (filePath) => index.findByFile(filePath),
-  }
-}
-
-/**
- * Returns whether an import declaration is file-only and must not populate importMap.
- * @param declaration - Import declaration to inspect.
- * @returns True for side-effect, dynamic, require, and blank import forms.
- */
-function isFileOnlyImport(declaration: ImportDeclaration): boolean {
-  return (
-    declaration.kind === ImportDeclarationKind.SideEffect ||
-    declaration.kind === ImportDeclarationKind.Dynamic ||
-    declaration.kind === ImportDeclarationKind.Require ||
-    declaration.kind === ImportDeclarationKind.Blank
-  )
-}
-
-/**
- * Creates the default file scope used when adapters do not expose richer scopes.
- * @param filePath - Workspace-prefixed file path.
- * @returns A root file scope for scoped lookup.
- */
-function createDefaultFileScope(filePath: string): BindingScope {
-  return {
-    id: filePath,
-    kind: BindingScopeKind.File,
-    filePath,
-    parentId: undefined,
-    ownerSymbolId: undefined,
-    start: {
-      filePath,
-      line: 1,
-      column: 0,
-      endLine: undefined,
-      endColumn: undefined,
-    },
-    end: undefined,
-  }
 }
 
 /**
@@ -452,7 +335,7 @@ export class IndexCodeGraph {
    * @returns A summary result with counts and any errors encountered.
    */
   async execute(options: IndexOptions): Promise<IndexResult> {
-    const start = Date.now()
+    const start = performance.now()
     const errors: IndexError[] = []
     const onProgress = options.onProgress ?? noop
     const chunkBudget = options.chunkBytes ?? DEFAULT_CHUNK_BYTES
@@ -464,6 +347,7 @@ export class IndexCodeGraph {
       }
 
       // ── Discovery (0-5%) ──
+      const discoveryStart = performance.now()
       progress(0, 'Discovering files')
       const allDiscoveredPaths: string[] = []
       const fileHashes = new Map<string, string>()
@@ -554,7 +438,7 @@ export class IndexCodeGraph {
       }
 
       // ── Fingerprint comparison ──
-      const version = options.codeGraphVersion ?? '0.0.0'
+      const version = options.codeGraphVersion ?? readInstalledCodeGraphVersion()
       const currentFingerprintMap = new Map<string, string>()
       for (const ws of options.workspaces) {
         currentFingerprintMap.set(
@@ -686,7 +570,13 @@ export class IndexCodeGraph {
           errors.push({ filePath, message: String(err) })
         }
       }
+      Logger.debug(
+        `[IndexCodeGraph] Discovery took ${Math.round(performance.now() - discoveryStart)}ms`,
+      )
+
       // ── Pass 1: Extract symbols (7-50%) ──
+      Logger.debug('[IndexCodeGraph] Code Indexing Phase 1 (analyze/register) started')
+      const pass1Start = performance.now()
       const fileTuples: Array<[string, string]> = filesToProcess.map((p) => [
         p,
         absolutePaths.get(p)!,
@@ -695,8 +585,7 @@ export class IndexCodeGraph {
       const totalToProcess = filesToProcess.length
       let filesIndexed = 0
       let documentsIndexed = 0
-      const qualifiedNames = new Map<string, string>()
-      const symbolIndex = new SymbolIndex()
+      const session = new InMemoryIndexSession()
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
       const packageToWorkspace = new Map<string, string>()
@@ -729,6 +618,8 @@ export class IndexCodeGraph {
       const changedTypeIds = new Set<string>()
       const seenOverrideKeys = new Set<string>()
 
+      progress(7, 'Analyzing files')
+
       let processed = 0
       for (const [chunkIndex, chunk] of chunks.entries()) {
         const chunkFiles: FileNode[] = []
@@ -738,12 +629,14 @@ export class IndexCodeGraph {
           processed++
           if (processed % 50 === 0 || processed === 1) {
             progress(
-              7 + Math.round((processed / totalToProcess) * 43),
-              'Parsing symbols',
+              7 + Math.round((processed / Math.max(totalToProcess, 1)) * 43),
+              'Analyzing files',
               `${String(processed)}/${String(totalToProcess)}`,
             )
           }
           try {
+            Logger.debug(`[IndexCodeGraph] Start processing file ${processed}: ${prefixedPath}`)
+            const fileStart = performance.now()
             const contentBuffer = readFileSync(absPath)
             const decodedContent = decodeTextualContent(contentBuffer)
             // Use the relative-to-codeRoot path for adapter matching (extension-based)
@@ -751,24 +644,36 @@ export class IndexCodeGraph {
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) {
               if (decodedContent === null) {
+                const elapsed = performance.now() - fileStart
+                if (elapsed > 500) {
+                  Logger.debug(
+                    `[IndexCodeGraph] File processing took ${Math.round(elapsed)}ms: ${prefixedPath} (skipped/binary)`,
+                  )
+                }
                 continue
               }
               const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
               const hash = fileHashes.get(prefixedPath) ?? computeContentHash(decodedContent)
-              chunkDocuments.push(
-                createDocumentNode({
-                  path: prefixedPath,
-                  configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
-                  contentHash: hash,
-                  content: decodedContent,
-                  workspace: wsName,
-                }),
-              )
+              const document = createDocumentNode({
+                path: prefixedPath,
+                configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+                contentHash: hash,
+                content: decodedContent,
+                workspace: wsName,
+              })
+              chunkDocuments.push(document)
+              session.registerDocument(document)
               documentsIndexed++
               const breakdown = wsBreakdowns.get(wsName)
               if (breakdown) {
                 breakdown.filesIndexed++
                 breakdown.documentsIndexed++
+              }
+              const elapsed = performance.now() - fileStart
+              if (elapsed > 500) {
+                Logger.debug(
+                  `[IndexCodeGraph] File processing took ${Math.round(elapsed)}ms: ${prefixedPath} (document)`,
+                )
               }
               continue
             }
@@ -776,20 +681,32 @@ export class IndexCodeGraph {
             const language = this.registry.getLanguageForFile(relPath) ?? 'unknown'
             const content = contentBuffer.toString('utf-8')
             const hash = fileHashes.get(prefixedPath) ?? computeContentHash(content)
-            const extracted = adapter.extractSymbolsWithNamespace?.(prefixedPath, content) ?? {
-              symbols: adapter.extractSymbols(prefixedPath, content),
-              namespace: adapter.extractNamespace?.(content),
-            }
             const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
-            const symbols = this.assignParentIds(extracted.symbols, language)
+            const ws = options.workspaces.find((w) => w.name === wsName)
 
-            if (adapter.buildQualifiedName && extracted.namespace) {
-              for (const s of symbols) {
-                qualifiedNames.set(adapter.buildQualifiedName(extracted.namespace, s.name), s.id)
-              }
-            }
+            const draft = adapter.analyzeFile(prefixedPath, content, {
+              session,
+              workspaceName: wsName,
+              ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
+              repoRoot: options.projectRoot,
+            })
 
-            symbolIndex.addFile(prefixedPath, symbols)
+            const symbols = this.assignParentIds(draft.symbols, language)
+            const finalDraft = { ...draft, symbols }
+
+            session.registerFile({
+              filePath: prefixedPath,
+              configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+              language,
+              contentHash: hash,
+              workspace: wsName,
+            })
+
+            session.registerAnalysis({
+              filePath: prefixedPath,
+              analysis: finalDraft,
+            })
+
             chunkFiles.push(
               createFileNode({
                 path: prefixedPath,
@@ -811,8 +728,21 @@ export class IndexCodeGraph {
 
             const breakdown = wsBreakdowns.get(wsName)
             if (breakdown) breakdown.filesIndexed++
+
+            const elapsed = performance.now() - fileStart
+            if (elapsed > 500) {
+              Logger.debug(
+                `[IndexCodeGraph] File processing took ${Math.round(elapsed)}ms: ${prefixedPath} (${language})`,
+              )
+            }
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+          }
+
+          if (processed % 50 === 0) {
+            Logger.debug(`[IndexCodeGraph] Yielding event loop at ${processed} files`)
+            await new Promise<void>((resolve) => setImmediate(resolve))
+            Logger.debug(`[IndexCodeGraph] Resuming from event loop yield at ${processed} files`)
           }
         }
         const stageFile = `pass1-${String(chunkIndex).padStart(5, '0')}.json`
@@ -826,34 +756,64 @@ export class IndexCodeGraph {
         stagedFileCount += chunkDocuments.length
         stagedSymbolCount += chunkSymbols.length
       }
-      // Populate SymbolIndex with existing symbols from unchanged files
+      // Populate session with existing symbols from unchanged files
       const processedPaths = new Set(filesToProcess)
       for (const prefixedPath of allDiscoveredPaths) {
         if (processedPaths.has(prefixedPath)) continue
         const existing = await this.store.findSymbols({ filePath: prefixedPath })
         if (existing.length > 0) {
-          symbolIndex.addFile(prefixedPath, existing)
+          session.registerFile({
+            filePath: prefixedPath,
+            configRelativePath: configRelativePaths.get(prefixedPath) ?? '',
+            language: fileLanguages.get(prefixedPath) ?? 'unknown',
+            contentHash: existingArtifactHashes.get(prefixedPath) ?? '',
+            workspace: prefixedPath.substring(0, prefixedPath.indexOf(':')),
+          })
+          session.registerAnalysis({
+            filePath: prefixedPath,
+            analysis: {
+              language: fileLanguages.get(prefixedPath) ?? 'unknown',
+              symbols: existing,
+              imports: [],
+              bindingFacts: [],
+              callFacts: [],
+            },
+          })
         }
       }
 
-      const ownershipIndex = this.buildMethodOwnershipIndex(symbolIndex)
-      const symbolLookup = createSymbolLookup(symbolIndex)
+      Logger.debug(
+        `[IndexCodeGraph] Code Indexing Phase 1 (analyze/register) completed in ${Math.round(performance.now() - pass1Start)}ms`,
+      )
+
+      Logger.debug('[IndexCodeGraph] Code Indexing Phase 2 (resolve/build) started')
+      const pass2Start = performance.now()
+      progress(50, 'Resolving imports')
+
+      const ownershipIndex = this.buildMethodOwnershipIndex(session)
+      const symbolLookup: SymbolLookup = {
+        findByName: (name, filePrefix) => session.findSymbolsByName(name, filePrefix),
+        findByFile: (filePath) => session.findSymbolsByFile(filePath),
+      }
 
       // ── Pass 2: Resolve imports + extract relations (50-80%) ──
-      processed = 0
+      let resolvedImportsProcessed = 0
+      let relationsProcessed = 0
       for (const [chunkIndex, chunk] of chunks.entries()) {
         const chunkRelations: Relation[] = []
-        for (const [prefixedPath, absPath] of chunk) {
-          processed++
-          if (processed % 50 === 0 || processed === 1) {
+        const resolvedImportsMap = new Map<string, ResolvedImports>()
+
+        // 1. Resolve imports first for all files in this chunk
+        for (const [prefixedPath] of chunk) {
+          resolvedImportsProcessed++
+          if (resolvedImportsProcessed % 50 === 0 || resolvedImportsProcessed === 1) {
             progress(
-              50 + Math.round((processed / totalToProcess) * 30),
+              50 + Math.round((resolvedImportsProcessed / Math.max(totalToProcess, 1)) * 15),
               'Resolving imports',
-              `${String(processed)}/${String(totalToProcess)}`,
+              `${String(resolvedImportsProcessed)}/${String(totalToProcess)}`,
             )
           }
           try {
-            const content = readFileSync(absPath, 'utf-8')
             const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) continue
@@ -861,45 +821,62 @@ export class IndexCodeGraph {
             const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
             const ws = options.workspaces.find((w) => w.name === wsName)
 
-            const symbols = symbolIndex.findByFile(prefixedPath)
-            const relationSymbols = adapter.languages().includes('php')
-              ? symbolIndex.findByFilePrefix(`${wsName}:`)
-              : symbols
-            const imports = adapter.extractImportedNames(prefixedPath, content)
-            const { importMap, fileImports } = this.resolveImports(
-              imports,
-              prefixedPath,
-              adapter,
-              symbolIndex,
-              qualifiedNames,
+            const analysis = session.getAnalysis(prefixedPath)
+            if (!analysis) continue
+
+            const resolvedImports = adapter.resolveImports(analysis, {
+              session,
+              qualifiedNames: session.getQualifiedNames(),
               packageToWorkspace,
-              ws?.codeRoot,
+              ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
+              repoRoot: options.projectRoot,
+            })
+            resolvedImportsMap.set(prefixedPath, resolvedImports)
+          } catch (err) {
+            errors.push({ filePath: prefixedPath, message: String(err) })
+          }
+        }
+
+        // 2. Build relations from stored facts plus session lookups
+        for (const [prefixedPath] of chunk) {
+          relationsProcessed++
+          if (relationsProcessed % 50 === 0 || relationsProcessed === 1) {
+            progress(
+              65 + Math.round((relationsProcessed / Math.max(totalToProcess, 1)) * 15),
+              'Building relations',
+              `${String(relationsProcessed)}/${String(totalToProcess)}`,
             )
-            const bindingFacts =
-              adapter.extractBindingFacts?.(prefixedPath, content, symbols, imports) ?? []
-            const callFacts = adapter.extractCallFacts?.(prefixedPath, content, symbols) ?? []
+          }
+          try {
+            const relPath = prefixedPath.substring(prefixedPath.indexOf(':') + 1)
+            const adapter = this.registry.getAdapterForFile(relPath)
+            if (!adapter) continue
+
+            const wsName = prefixedPath.substring(0, prefixedPath.indexOf(':'))
+            const ws = options.workspaces.find((w) => w.name === wsName)
+
+            const analysis = session.getAnalysis(prefixedPath)
+            if (!analysis) continue
+
+            const resolvedImports = resolvedImportsMap.get(prefixedPath)
+            if (!resolvedImports) continue
+
             const scopedEnvironment = buildScopedBindingEnvironment({
-              filePath: prefixedPath,
-              symbols,
-              imports,
-              importMap,
-              scopes: [createDefaultFileScope(prefixedPath)],
-              facts: bindingFacts,
+              analysis,
+              importMap: resolvedImports.importMap,
               symbolLookup,
             })
             const resolvedDependencies = resolveDependencyFacts({
               environment: scopedEnvironment,
-              bindingFacts,
-              callFacts,
-              symbols,
+              analysis,
               symbolLookup,
             })
-            const relations = adapter.extractRelations(
-              prefixedPath,
-              content,
-              relationSymbols,
-              importMap,
-            )
+            const relations = adapter.buildRelations(analysis, {
+              session,
+              resolvedImports,
+              ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
+              repoRoot: options.projectRoot,
+            })
 
             chunkRelations.push(...relations)
             for (const dependency of resolvedDependencies) {
@@ -916,7 +893,7 @@ export class IndexCodeGraph {
                 }),
               )
             }
-            for (const targetPath of fileImports) {
+            for (const targetPath of resolvedImports.fileImports) {
               chunkRelations.push(
                 createRelation({
                   source: prefixedPath,
@@ -929,6 +906,7 @@ export class IndexCodeGraph {
             errors.push({ filePath: prefixedPath, message: String(err) })
           }
         }
+
         for (const relation of chunkRelations) {
           if (relation.type === RelationType.Overrides) {
             seenOverrideKeys.add(`${relation.source}:${relation.type}:${relation.target}`)
@@ -940,29 +918,44 @@ export class IndexCodeGraph {
         pass2ChunkFiles.push(stageFile)
         stagedRelationCount += uniqueRelations.length
       }
+      Logger.debug(
+        `[IndexCodeGraph] Code Indexing Phase 2 (resolve/build) completed in ${Math.round(performance.now() - pass2Start)}ms`,
+      )
+      Logger.debug(
+        `[IndexCodeGraph] Heap used after Pass 2: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+      )
 
       // ── Specs (80-83%) ──
+      const specsStart = performance.now()
+      let specCleanupDuration = 0
+      let specGetAllSpecsDuration = 0
+      let specListDuration = 0
+      let specArtifactReadDuration = 0
+      let specMetadataReadDuration = 0
+
       progress(80, 'Discovering specs')
       let totalSpecsToProcess = 0
-      for (const ws of options.workspaces) {
-        totalSpecsToProcess += await ws.specRepo.count()
-      }
 
       let specsProcessed = 0
       let specsIndexed = 0
       const allSpecs: SpecNode[] = []
       const specRelations: Relation[] = []
 
+      const getAllSpecsStart = performance.now()
       const existingSpecs = await this.store.getAllSpecs()
       const existingSpecMap = new Map(existingSpecs.map((s) => [s.specId, s]))
+      specGetAllSpecsDuration = performance.now() - getAllSpecsStart
 
       // 1. Discovery & Global ID set (for relation resolution)
       const knownSpecIds = new Set(existingSpecs.map((s) => s.specId))
       const specsByWorkspace = new Map<string, Spec[]>()
 
+      const listStart = performance.now()
       for (const ws of options.workspaces) {
+        Logger.debug(`[IndexCodeGraph] listing specs in: ${ws.specRepo.specsPath}`)
         const repoSpecs = await ws.specRepo.list()
         specsByWorkspace.set(ws.name, repoSpecs)
+        totalSpecsToProcess += repoSpecs.length
 
         const wsBreakdown = wsBreakdowns.get(ws.name)
         if (wsBreakdown) wsBreakdown.specsDiscovered = repoSpecs.length
@@ -978,6 +971,7 @@ export class IndexCodeGraph {
           knownSpecIds.add(id)
         }
       }
+      specListDuration = performance.now() - listStart
 
       // 2. Individual Spec Indexing
       for (const ws of options.workspaces) {
@@ -1016,9 +1010,11 @@ export class IndexCodeGraph {
                 return a.localeCompare(b)
               })
 
+            const artifactStart = performance.now()
             const artifacts = await Promise.all(
               contentFilenames.map((f) => ws.specRepo.artifact(repoSpec, f)),
             )
+            specArtifactReadDuration += performance.now() - artifactStart
 
             let content = ''
             for (const artifact of artifacts) {
@@ -1034,9 +1030,11 @@ export class IndexCodeGraph {
               continue
             }
 
+            const metadataStart = performance.now()
             const metadata = await ws.specRepo.metadata(repoSpec)
             const dependsOn = await ws.specRepo.readPersistedDependsOn(repoSpec)
             const implementationLinks = await ws.specRepo.readPersistedImplementation(repoSpec)
+            specMetadataReadDuration += performance.now() - metadataStart
 
             const specNode = createSpecNode({
               specId,
@@ -1080,9 +1078,9 @@ export class IndexCodeGraph {
                   )
                 } else {
                   for (const symbolName of link.symbols) {
-                    const matchingSymbols = symbolIndex
-                      .findByFile(link.file)
-                      .filter((s) => s.name === symbolName)
+                    const matchingSymbols = session
+                      .findSymbolsByFile(link.file)
+                      .filter((s: SymbolNode) => s.name === symbolName)
                     for (const symbol of matchingSymbols) {
                       specRelations.push(
                         createRelation({
@@ -1106,13 +1104,17 @@ export class IndexCodeGraph {
         }
 
         if (specIdsToRemove.length > 0) {
+          const cleanupStart = performance.now()
           try {
             await this.store.removeSpecs([...new Set(specIdsToRemove)])
           } catch (err) {
             errors.push({ filePath: ws.name, message: String(err) })
           }
+          specCleanupDuration += performance.now() - cleanupStart
         }
       }
+
+      progress(83, 'Indexing specs', `${String(specsProcessed)}/${String(totalSpecsToProcess)}`)
 
       // Compute per-workspace skipped counts
       for (const filePath of skippedFiles) {
@@ -1121,7 +1123,20 @@ export class IndexCodeGraph {
         if (breakdown) breakdown.filesSkipped++
       }
 
+      const totalSpecPhaseDuration = performance.now() - specsStart
+      const specIndexingDuration = totalSpecPhaseDuration - specCleanupDuration
+
+      Logger.debug(`[IndexCodeGraph] Spec Indexing took ${Math.round(specIndexingDuration)}ms`)
+      Logger.debug(`[IndexCodeGraph]   - GetAllSpecs: ${Math.round(specGetAllSpecsDuration)}ms`)
+      Logger.debug(`[IndexCodeGraph]   - List: ${Math.round(specListDuration)}ms`)
+      Logger.debug(`[IndexCodeGraph]   - ArtifactRead: ${Math.round(specArtifactReadDuration)}ms`)
+      Logger.debug(`[IndexCodeGraph]   - MetadataRead: ${Math.round(specMetadataReadDuration)}ms`)
+      Logger.debug(
+        `[IndexCodeGraph] Obsolete Spec Cleanup took ${Math.round(specCleanupDuration)}ms`,
+      )
+
       // ── Bulk load everything (83-95%) ──
+      const bulkStart = performance.now()
       progress(
         83,
         'Bulk loading',
@@ -1193,6 +1208,9 @@ export class IndexCodeGraph {
         await this.store.addRelations(crossFileOverrides)
       }
 
+      Logger.debug(`[IndexCodeGraph] Bulk Load took ${Math.round(performance.now() - bulkStart)}ms`)
+      Logger.debug(`[IndexCodeGraph] Total Run took ${Math.round(performance.now() - start)}ms`)
+
       // Rebuild FTS indexes after data changes
       progress(96, 'Rebuilding search indexes')
       await this.store.rebuildFtsIndexes()
@@ -1227,6 +1245,7 @@ export class IndexCodeGraph {
         })
       }
 
+      session.setAdapterState('napi-keepalive', null)
       return {
         filesDiscovered: allDiscoveredPaths.length,
         filesIndexed: filesIndexed + documentsIndexed,
@@ -1236,7 +1255,7 @@ export class IndexCodeGraph {
         specsDiscovered: totalSpecsToProcess,
         specsIndexed,
         errors,
-        duration: Date.now() - start,
+        duration: performance.now() - start,
         workspaces,
         vcsRef: options.vcsRef ?? null,
         graphFingerprint: serializedFingerprintMap,
@@ -1248,130 +1267,15 @@ export class IndexCodeGraph {
   }
 
   /**
-   * Resolves import declarations to symbol ids using the in-memory symbol index.
-   * All language-specific resolution is delegated to the adapter.
-   * @param imports - Parsed import declarations.
-   * @param filePath - The importing file path (workspace-prefixed).
-   * @param adapter - The language adapter for this file.
-   * @param index - The in-memory symbol index.
-   * @param qualifiedNames - Map of qualified names to symbol ids.
-   * @param packageToWorkspace - Map of package names to workspace name prefixes.
-   * @param codeRoot - Optional absolute path to the workspace code root, used for PSR-4 fallback.
-   * @param repoRoot - Optional absolute path to the repository root, used for PSR-4 fallback.
-   * @returns An importMap of local import names to resolved symbol ids, and fileImports of resolved absolute paths.
-   */
-  private resolveImports(
-    imports: ImportDeclaration[],
-    filePath: string,
-    adapter: LanguageAdapter,
-    index: SymbolIndex,
-    qualifiedNames: Map<string, string>,
-    packageToWorkspace: Map<string, string>,
-    codeRoot?: string,
-    repoRoot?: string,
-  ): { importMap: Map<string, string>; fileImports: string[] } {
-    const importMap = new Map<string, string>()
-    const fileImports: string[] = []
-    const knownPackages = [...packageToWorkspace.keys()]
-
-    for (const imp of imports) {
-      if (isFileOnlyImport(imp)) {
-        const resolved = this.resolveFileImport(imp, filePath, adapter, index, codeRoot, repoRoot)
-        if (resolved !== undefined) {
-          fileImports.push(resolved)
-        }
-        continue
-      }
-
-      if (imp.isRelative) {
-        // Delegate path resolution to the adapter
-        if (adapter.resolveRelativeImportPath) {
-          const resolved = adapter.resolveRelativeImportPath(filePath, imp.specifier)
-          const candidates = Array.isArray(resolved) ? resolved : [resolved]
-          for (const candidatePath of candidates) {
-            const target = index.findByFile(candidatePath).find((s) => s.name === imp.originalName)
-            if (target) {
-              importMap.set(imp.localName, target.id)
-              break
-            }
-          }
-        }
-      } else {
-        // Qualified name resolution (e.g. PHP namespaces)
-        const qualifiedId = qualifiedNames.get(imp.specifier)
-        if (qualifiedId) {
-          importMap.set(imp.localName, qualifiedId)
-          continue
-        }
-
-        // Package resolution — delegate specifier parsing to the adapter
-        if (adapter.resolvePackageFromSpecifier) {
-          const pkgName = adapter.resolvePackageFromSpecifier(imp.specifier, knownPackages)
-          if (pkgName) {
-            const wsPrefix = packageToWorkspace.get(pkgName)
-            if (wsPrefix !== undefined) {
-              const candidates = index.findByName(imp.originalName, wsPrefix + ':')
-              if (candidates.length > 0) {
-                importMap.set(imp.localName, candidates[0]!.id)
-              }
-            }
-          }
-        }
-
-        // PSR-4 fallback for namespace-based imports not resolved via symbol index
-        if (adapter.resolveQualifiedNameToPath && codeRoot) {
-          const resolvedPath = adapter.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
-          if (resolvedPath) {
-            fileImports.push(resolvedPath)
-            continue
-          }
-        }
-      }
-    }
-
-    return { importMap, fileImports }
-  }
-
-  /**
-   * Resolves a file-only import declaration to a workspace file when deterministic.
-   * @param imp - Import declaration to resolve.
-   * @param filePath - Importing file path.
-   * @param adapter - Language adapter.
-   * @param index - In-memory symbol index.
-   * @param codeRoot - Optional workspace code root.
-   * @param repoRoot - Optional repository root.
-   * @returns Target file path, or undefined when unresolved.
-   */
-  private resolveFileImport(
-    imp: ImportDeclaration,
-    filePath: string,
-    adapter: LanguageAdapter,
-    index: SymbolIndex,
-    codeRoot?: string,
-    repoRoot?: string,
-  ): string | undefined {
-    if (imp.isRelative && adapter.resolveRelativeImportPath) {
-      const resolved = adapter.resolveRelativeImportPath(filePath, imp.specifier)
-      const candidates = Array.isArray(resolved) ? resolved : [resolved]
-      return candidates.find((candidatePath) => index.findByFile(candidatePath).length > 0)
-    }
-
-    if (!imp.isRelative && adapter.resolveQualifiedNameToPath && codeRoot) {
-      return adapter.resolveQualifiedNameToPath(imp.specifier, codeRoot, repoRoot)
-    }
-
-    return undefined
-  }
-
-  /**
-   * Builds a lightweight method-to-owner index from the extracted symbols.
-   * @param index - The in-memory symbol index.
+   * Builds a lightweight method-to-owner index from the extracted symbols in the session.
+   * @param session - The indexing session.
    * @returns Owner-to-method mapping for languages with class-scoped methods.
    */
-  private buildMethodOwnershipIndex(index: SymbolIndex): MethodOwnershipIndex {
+  private buildMethodOwnershipIndex(session: IndexSession): MethodOwnershipIndex {
     const methodsByOwnerId = new Map<string, Map<string, string[]>>()
 
-    for (const [, fileSymbols] of index.entries()) {
+    for (const filePath of session.getAllFilePaths()) {
+      const fileSymbols = session.findSymbolsByFile(filePath)
       for (const symbol of fileSymbols) {
         if (symbol.kind !== SymbolKind.Method || !symbol.parentId) continue
 

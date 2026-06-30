@@ -1,0 +1,6 @@
+{
+  "kind": "agent",
+  "supportedCapabilities": ["frontmatter"],
+  "requiredCapabilities": [],
+  "requiredSharedTemplates": []
+}

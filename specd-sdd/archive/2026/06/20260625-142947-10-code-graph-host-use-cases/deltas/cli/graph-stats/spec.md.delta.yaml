@@ -1,0 +1,22 @@
+- op: modified
+  description: Delegate health assembly to GetGraphHealth
+  selector:
+    type: section
+    matches: 'Requirement: Statistics retrieval'
+  content: |
+    The command resolves the graph context, opens the provider, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()`. It outputs the returned result fields, closes the provider, and exits.
+
+    The command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.
+
+- op: modified
+  description: Add GetGraphHealth dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md)
+    - [`core:config`](../../core/config/spec.md)
+    - [`code-graph:composition`](../../code-graph/composition/spec.md)
+    - [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md)
+    - [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration

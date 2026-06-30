@@ -3,8 +3,8 @@
   "description": "Before modifying code, developers and agents need to understand the blast radius — which other files and symbols depend on the change. The `specd graph impact` command runs impact analysis on a file, symbol, or set of changed files, reporting risk level, dependency counts, and affected files.",
   "dependsOn": [
     "cli:entrypoint",
+    "cli:graph-cli-context",
     "core:config",
-    "code-graph:composition",
     "code-graph:traversal",
     "code-graph:workspace-integration"
   ],
@@ -21,25 +21,25 @@
     {
       "requirement": "File impact analysis",
       "rules": [
-        "When `--file` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Resolves each requested file path to canonical graph files through the provider's selector normalization service. It MUST support absolute paths, project-relative paths, and workspace-prefixed paths.\n5. For a single resolved file, calls `analyzeFileImpact(file, direction)` and outputs the `FileImpactResult`\n6. For multiple resolved files, computes per-file file impact with the same semantics as single-file analysis, then aggregates changed symbols, affected symbols, affected files, and overall risk across the requested files\n7. Outputs the aggregated result including changed-symbol detail and per-file impact breakdown\n8. Closes the provider and exits"
+        "Single-file and multi-file impact analyses resolve selectors via `cli:graph-cli-context`, open the provider through `withProvider`, and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `CodeGraphProvider`.\n\nPlatform symbols MUST come from `@specd/sdk`."
       ]
     },
     {
       "requirement": "Symbol impact analysis",
       "rules": [
-        "When `--symbol` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Searches for symbols matching the name via `findSymbols({ name })`\n3. If no symbol is found, outputs `No symbol found matching \"<name>\".`\n4. If one symbol is found, calls `analyzeImpact(symbolId, direction)` and outputs the result\n5. If multiple symbols match, analyzes each one and outputs all results"
+        "When `--symbol` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)\n3. If no symbol matches, outputs `No symbol found matching \"<selector>\".` and exits with code 0\n4. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result\n5. If multiple symbols match, analyzes each one and outputs all results"
       ]
     },
     {
       "requirement": "Spec impact analysis",
       "rules": [
-        "When `--spec` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Calls `analyzeSpecImpact(specId, direction)`\n5. Outputs the resulting `ImpactResult`\n6. Closes the provider and exits\n\nSpec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:\n\n- `DEPENDS_ON` between specs\n- `COVERS_FILE` between specs and files\n- `COVERS_SYMBOL` between specs and symbols"
+        "When `--spec` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id\n5. Calls `analyzeSpecImpact(specId, direction)`\n6. Outputs the resulting `ImpactResult`\n7. Closes the provider and exits\n\nThe CLI SHALL let `SpecNotFoundError` propagate to the global error handler so the command fails with exit code 1 and a machine-readable `SPEC_NOT_FOUND` error code.\n\nSpec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:\n\n- `DEPENDS_ON` between specs\n- `COVERS_FILE` between specs and files\n- `COVERS_SYMBOL` between specs and symbols"
       ]
     },
     {
       "requirement": "Concurrent indexing guard",
       "rules": [
-        "Before attempting to open the provider or execute graph-backed analysis, `graph impact` SHALL check the shared graph indexing lock used by `graph index`.\n\nIf indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.\n\nThis guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph."
+        "Before attempting to open the provider, the command SHALL query the lock status from the provider. If indexing is currently in progress, it SHALL fail fast with a short user-facing retry-later message."
       ]
     },
     {
@@ -56,14 +56,9 @@
     }
   ],
   "constraints": [
-    "The CLI does not contain impact analysis logic — it delegates entirely to @specd/code-graph",
+    "The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates to the provider opened via @specd/sdk lifecycle helpers",
     "process.exit(0) is called explicitly after closing the provider",
-    "Canonical graph file identities are workspace-prefixed, but user-facing --file inputs MAY be workspace-prefixed, config-relative, or absolute",
-    "--direction applies to --file, --symbol, and --spec",
-    "--depth applies to all selectors",
-    "--depth must be a positive integer; invalid values exit with code 1",
-    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics",
-    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress"
+    "Output path formatting and console text/JSON formatting are managed by the CLI"
   ],
   "scenarios": [
     {
@@ -122,6 +117,15 @@
         "AND the analysis direction is upstream",
         "AND the default depth is 3",
         "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "File impact analysis",
+      "name": "Impact uses SDK graph context",
+      "when": ["specd graph impact --file <path> is executed"],
+      "then": [
+        "it resolves context via resolveGraphCliContext and opens via withProvider",
+        "AND platform symbols are sourced from @specd/sdk"
       ]
     },
     {
@@ -190,6 +194,16 @@
     },
     {
       "requirement": "Symbol impact analysis",
+      "name": "Full symbol id selector resolves directly",
+      "given": ["symbol packages/core/src/auth.ts:function:validate is indexed"],
+      "when": ["specd graph impact --symbol packages/core/src/auth.ts:function:validate is run"],
+      "then": [
+        "the command resolves the symbol through resolveSymbolSelector",
+        "AND analyzes impact for that exact symbol"
+      ]
+    },
+    {
+      "requirement": "Symbol impact analysis",
       "name": "Multiple symbol matches",
       "given": ["validate exists in 3 different files"],
       "when": ["specd graph impact --symbol validate is run"],
@@ -232,16 +246,6 @@
       "given": ["spec core:archive-change depends on core:spec-lock"],
       "when": ["specd graph impact --spec core:spec-lock --direction upstream is run"],
       "then": ["stdout shows core:archive-change as an impacted spec"]
-    },
-    {
-      "requirement": "Spec impact analysis",
-      "name": "Missing spec reports cleanly",
-      "given": ["spec missing:spec does not exist in the graph"],
-      "when": ["specd graph impact --spec missing:spec is run"],
-      "then": [
-        "stdout shows No spec found matching \"missing:spec\".",
-        "AND the process exits with code 0"
-      ]
     },
     {
       "requirement": "Concurrent indexing guard",
@@ -353,12 +357,6 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "cli:graph-impact",
-        "file": "cli:test/commands/graph-impact.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "cli:graph-impact",
@@ -368,8 +366,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c8a38d655845b350409d48738b1e8bfc86090c1412ae979ac0292ddcd6607cad",
-    "verify.md": "sha256:49a24eb65a442ab111f05a5d47236b0fbaedc30ab8a31c904c9d93d3432a8a5a"
+    "spec.md": "sha256:be517cc6da80ee7c9865c1932043c8ecb690557037c84fb1dbbbbc150d5ae1df",
+    "verify.md": "sha256:f97cbf5f14fa5d9500984a03406ab7a8166476aba2c449d026851a6cd02cdb0c"
   },
   "generatedBy": "core"
 }

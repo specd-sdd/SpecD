@@ -152,6 +152,18 @@ async function resolveDirectPath(
 }
 
 /**
+ * Normalizes a raw file selector to the config-relative path used for lookup.
+ * @param input - The raw selector string.
+ * @param projectRoot - The project root used for absolute selectors.
+ * @returns The normalized config-relative path, or the trimmed input when normalization is not possible.
+ */
+export function normalizeFileSelectorPath(input: string, projectRoot?: string): string {
+  const trimmed = input.trim()
+  const configRelativePath = toConfigRelativePath(trimmed, projectRoot)
+  return configRelativePath ?? trimmed
+}
+
+/**
  * Converts a raw path selector into a config-relative path when possible.
  * @param input - The raw selector string.
  * @param projectRoot - The project root used for absolute selectors.

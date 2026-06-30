@@ -32,6 +32,9 @@ import { analyzeFileImpact } from '../domain/services/analyze-file-impact.js'
 import { analyzeSpecImpact } from '../domain/services/analyze-spec-impact.js'
 import { detectChanges } from '../domain/services/detect-changes.js'
 import { computeHotspots } from '../domain/services/compute-hotspots.js'
+import { type SpecdConfig } from '@specd/core'
+import { analyzeFilesImpact } from '../domain/services/analyze-files-impact.js'
+import { assertGraphIndexUnlocked, acquireGraphIndexLock } from '../infrastructure/index-lock.js'
 
 /**
  * High-level facade for the code graph subsystem.
@@ -192,7 +195,7 @@ export class CodeGraphProvider {
    * @param filePath - Canonical file path.
    * @returns File coverage relations keyed by spec.
    */
-  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+  async getCoveringSpecsForFile(filePath: string): Promise<Relation[]> {
     return this.store.getCoveringSpecs(filePath)
   }
 
@@ -210,7 +213,7 @@ export class CodeGraphProvider {
    * @param symbolId - Canonical symbol identifier.
    * @returns Symbol coverage relations keyed by spec.
    */
-  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+  async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
     return this.store.getSymbolCoveringSpecs(symbolId)
   }
 
@@ -273,6 +276,21 @@ export class CodeGraphProvider {
   }
 
   /**
+   * Analyzes the aggregate impact (blast radius) of changes to multiple files.
+   * @param filePaths - The file paths to analyze.
+   * @param direction - Direction of impact analysis.
+   * @param maxDepth - Maximum traversal depth (default: 3).
+   * @returns The combined files impact result.
+   */
+  async analyzeFilesImpact(
+    filePaths: string[],
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<FileImpactResult> {
+    return analyzeFilesImpact(this.store, filePaths, direction, maxDepth)
+  }
+
+  /**
    * Analyzes requirement-aware impact for a spec.
    * @param specId - Spec identifier to analyze.
    * @param direction - Direction of impact analysis.
@@ -329,9 +347,7 @@ export class CodeGraphProvider {
    * @param options - Search options including query, limit, and filters.
    * @returns Matching symbols with BM25 scores, ordered by relevance.
    */
-  async searchSymbols(
-    options: SearchOptions,
-  ): Promise<
+  async searchSymbols(options: SearchOptions): Promise<
     Array<{
       symbol: SymbolNode
       score: number
@@ -363,9 +379,7 @@ export class CodeGraphProvider {
    * @param options - Search options including query, limit, and filters.
    * @returns Matching documents with scores and snippets, ordered by relevance.
    */
-  async searchDocuments(
-    options: SearchOptions,
-  ): Promise<
+  async searchDocuments(options: SearchOptions): Promise<
     Array<{
       document: DocumentNode
       score: number
@@ -375,5 +389,23 @@ export class CodeGraphProvider {
     }>
   > {
     return this.store.searchDocuments(options)
+  }
+
+  /**
+   * Asserts that the graph index is currently unlocked.
+   * @param config - The active project configuration.
+   * @throws {Error} If the indexing lock is currently held.
+   */
+  assertGraphIndexUnlocked(config: SpecdConfig): void {
+    assertGraphIndexUnlocked(config)
+  }
+
+  /**
+   * Acquires the indexing lock for the graph.
+   * @param config - The active project configuration.
+   * @returns A release function to release the lock.
+   */
+  acquireGraphIndexLock(config: SpecdConfig): () => void {
+    return acquireGraphIndexLock(config)
   }
 }

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import Database, { type Statement } from 'better-sqlite3'
 import { GraphStore } from '../../domain/ports/graph-store.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
+import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
 import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
@@ -33,6 +34,33 @@ interface RelationRow {
   readonly target: string
   readonly type: string
   readonly metadata_json: string | null
+}
+
+interface ExpandedIdentitySearchQuery {
+  readonly normalizedQuery: string
+  readonly rawTokens: readonly string[]
+  readonly expandedTokens: readonly string[]
+  readonly ftsQuery: string
+}
+
+interface IdentityRankingSqlOptions {
+  readonly canonicalExpr: string
+  readonly canonicalComponentsExpr: string
+  readonly alternateExpr?: string
+  readonly alternateComponentsExpr?: string
+  readonly normalizedQuery: string
+  readonly rawTokens: readonly string[]
+  readonly expandedTokens: readonly string[]
+}
+
+interface IdentityRankingSql {
+  readonly selectSql: string
+  readonly params: string[]
+}
+
+interface IdentityCandidatePredicateSql {
+  readonly sql: string
+  readonly params: string[]
 }
 
 /**
@@ -561,13 +589,49 @@ export class SQLiteGraphStore extends GraphStore {
       endLine: number
     }>
   > {
-    const query = sanitizeFtsQuery(options.query)
-    if (query.length === 0) return []
+    const query = prepareExpandedSearchQuery(options.query)
+    if (query.ftsQuery.length === 0) return []
 
-    const exactQuery = options.query.toLowerCase()
+    const ranking = buildIdentityRankingSql({
+      canonicalExpr: 'lower(s.id)',
+      canonicalComponentsExpr: buildIdentityComponentsExpr('lower(s.id)'),
+      alternateExpr: 'lower(s.name)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(s.name)'),
+      normalizedQuery: query.normalizedQuery,
+      rawTokens: query.rawTokens,
+      expandedTokens: query.expandedTokens,
+    })
+    const identityCandidates = buildIdentityCandidatePredicateSql({
+      canonicalExpr: 'lower(s.id)',
+      canonicalComponentsExpr: buildIdentityComponentsExpr('lower(s.id)'),
+      alternateExpr: 'lower(s.name)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(s.name)'),
+      expandedTokens: query.expandedTokens,
+    })
     const rows = this.ensureOpen()
       .prepare(
         `
+          WITH raw_candidates AS (
+            SELECT
+              s.id,
+              (-bm25(symbol_fts)) AS text_score
+            FROM symbol_fts
+            INNER JOIN symbols s ON s.id = symbol_fts.id
+            WHERE symbol_fts MATCH ?
+
+            UNION ALL
+
+            SELECT
+              s.id,
+              0.0 AS text_score
+            FROM symbols s
+            WHERE ${identityCandidates.sql}
+          ),
+          candidates AS (
+            SELECT id, max(text_score) AS text_score
+            FROM raw_candidates
+            GROUP BY id
+          )
           SELECT
             s.id,
             s.name,
@@ -577,22 +641,16 @@ export class SQLiteGraphStore extends GraphStore {
             s.line,
             s.column_number,
             s.comment,
-            f.content as file_content,
-            (
-              CASE
-                WHEN lower(s.id) = ? THEN 1000000
-                WHEN lower(s.name) = ? THEN 100000
-                ELSE 0
-              END
-            ) + (-bm25(symbol_fts)) AS score
-          FROM symbol_fts
-          INNER JOIN symbols s ON s.id = symbol_fts.id
+            f.content AS file_content,
+            ${ranking.selectSql},
+            c.text_score
+          FROM candidates c
+          INNER JOIN symbols s ON s.id = c.id
           LEFT JOIN files f ON s.file_path = f.path
-          WHERE symbol_fts MATCH ?
-          ORDER BY score DESC
+          ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC
         `,
       )
-      .all(exactQuery, exactQuery, query) as Array<{
+      .all(query.ftsQuery, ...identityCandidates.params, ...ranking.params) as Array<{
       id: string
       name: string
       kind: string
@@ -602,7 +660,10 @@ export class SQLiteGraphStore extends GraphStore {
       column_number: number
       comment: string | null
       file_content: string | null
-      score: number
+      identity_tier: number
+      identity_token_hits: number
+      identity_match_strength: number
+      text_score: number
     }>
 
     const filtered = rows.filter((row) => {
@@ -662,7 +723,12 @@ export class SQLiteGraphStore extends GraphStore {
 
       return {
         symbol: this.mapSymbolRow(row),
-        score: row.score,
+        score: composeIdentitySearchScore(
+          row.identity_tier,
+          row.identity_token_hits,
+          row.identity_match_strength,
+          row.text_score,
+        ),
         snippet,
         startLine,
         endLine,
@@ -675,10 +741,16 @@ export class SQLiteGraphStore extends GraphStore {
   ): Promise<
     Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
   > {
-    const query = sanitizeFtsQuery(options.query)
-    if (query.length === 0) return []
+    const query = prepareExpandedSearchQuery(options.query)
+    if (query.ftsQuery.length === 0) return []
 
-    const exactQuery = options.query.toLowerCase()
+    const ranking = buildIdentityRankingSql({
+      canonicalExpr: 'lower(s.spec_id)',
+      canonicalComponentsExpr: buildIdentityComponentsExpr('lower(s.spec_id)'),
+      normalizedQuery: query.normalizedQuery,
+      rawTokens: query.rawTokens,
+      expandedTokens: query.expandedTokens,
+    })
     const rows = this.ensureOpen()
       .prepare(
         `
@@ -691,20 +763,16 @@ export class SQLiteGraphStore extends GraphStore {
             s.content,
             s.depends_on_json,
             s.workspace,
-            (
-              CASE
-                WHEN lower(s.spec_id) = ? THEN 1000000
-                ELSE 0
-              END
-            ) + (-bm25(spec_fts)) AS score,
+            ${ranking.selectSql},
+            (-bm25(spec_fts)) AS text_score,
             snippet(spec_fts, 3, '', '', '...', 32) as snippet
           FROM spec_fts
           INNER JOIN specs s ON s.spec_id = spec_fts.spec_id
           WHERE spec_fts MATCH ?
-          ORDER BY score DESC
+          ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC
         `,
       )
-      .all(exactQuery, query) as Array<{
+      .all(...ranking.params, query.ftsQuery) as Array<{
       spec_id: string
       path: string
       title: string
@@ -713,7 +781,10 @@ export class SQLiteGraphStore extends GraphStore {
       content: string
       depends_on_json: string
       workspace: string
-      score: number
+      identity_tier: number
+      identity_token_hits: number
+      identity_match_strength: number
+      text_score: number
       snippet: string
     }>
 
@@ -727,7 +798,12 @@ export class SQLiteGraphStore extends GraphStore {
       const { startLine, endLine } = this.calculateLineRange(row.content, row.snippet)
       return {
         spec: this.mapSpecRow(row),
-        score: row.score,
+        score: composeIdentitySearchScore(
+          row.identity_tier,
+          row.identity_token_hits,
+          row.identity_match_strength,
+          row.text_score,
+        ),
         snippet: row.snippet,
         startLine,
         endLine,
@@ -744,10 +820,18 @@ export class SQLiteGraphStore extends GraphStore {
       endLine: number
     }>
   > {
-    const query = sanitizeFtsQuery(options.query)
-    if (query.length === 0) return []
+    const query = prepareExpandedSearchQuery(options.query)
+    if (query.ftsQuery.length === 0) return []
 
-    const exactQuery = options.query.toLowerCase()
+    const ranking = buildIdentityRankingSql({
+      canonicalExpr: 'lower(d.path)',
+      canonicalComponentsExpr: buildIdentityComponentsExpr('lower(d.path)'),
+      alternateExpr: 'lower(d.config_relative_path)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.config_relative_path)'),
+      normalizedQuery: query.normalizedQuery,
+      rawTokens: query.rawTokens,
+      expandedTokens: query.expandedTokens,
+    })
     const rows = this.ensureOpen()
       .prepare(
         `
@@ -757,27 +841,25 @@ export class SQLiteGraphStore extends GraphStore {
             d.content_hash,
             d.content,
             d.workspace,
-            (
-              CASE
-                WHEN lower(d.path) = ? THEN 1000000
-                WHEN lower(d.config_relative_path) = ? THEN 100000
-                ELSE 0
-              END
-            ) + (-bm25(document_fts)) AS score,
+            ${ranking.selectSql},
+            (-bm25(document_fts)) AS text_score,
             snippet(document_fts, 2, '', '', '...', 32) as snippet
           FROM document_fts
           INNER JOIN documents d ON d.path = document_fts.path
           WHERE document_fts MATCH ?
-          ORDER BY score DESC
+          ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC
         `,
       )
-      .all(exactQuery, exactQuery, query) as Array<{
+      .all(...ranking.params, query.ftsQuery) as Array<{
       path: string
       config_relative_path: string
       content_hash: string
       content: string
       workspace: string
-      score: number
+      identity_tier: number
+      identity_token_hits: number
+      identity_match_strength: number
+      text_score: number
       snippet: string
     }>
 
@@ -791,7 +873,12 @@ export class SQLiteGraphStore extends GraphStore {
       const { startLine, endLine } = this.calculateLineRange(row.content, row.snippet)
       return {
         document: this.mapDocumentRow(row),
-        score: row.score,
+        score: composeIdentitySearchScore(
+          row.identity_tier,
+          row.identity_token_hits,
+          row.identity_match_strength,
+          row.text_score,
+        ),
         snippet: row.snippet,
         startLine,
         endLine,
@@ -915,11 +1002,15 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   async recreate(): Promise<void> {
+    const wasOpen = this.db !== undefined
     await this.close()
     rmSync(this.graphDir, { recursive: true, force: true })
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
     this._graphFingerprint = null
+    if (wasOpen) {
+      await this.open()
+    }
   }
 
   private ensureOpen(): SqliteDatabase {
@@ -944,10 +1035,8 @@ export class SQLiteGraphStore extends GraphStore {
       } finally {
         if (db.open) db.close()
       }
-    } catch (error) {
-      if (shouldResetSQLiteDatabase(error)) {
-        rmSync(this.dbPath, { force: true })
-      }
+    } catch {
+      rmSync(this.dbPath, { force: true })
     }
   }
 
@@ -1408,26 +1497,286 @@ export class SQLiteGraphStore extends GraphStore {
   }
 }
 
-/**
- * Returns whether an sqlite open/probe failure means the on-disk database is unusable.
- *
- * @param error - Failure raised while probing the existing database.
- * @returns True when the database should be discarded and rebuilt.
- */
-function shouldResetSQLiteDatabase(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : ''
-  return (
-    message.includes('file is not a database') ||
-    message.includes('database disk image is malformed') ||
-    message.includes('unsupported file format') ||
-    message.includes('no such table: meta')
-  )
+function prepareExpandedSearchQuery(rawQuery: string): ExpandedIdentitySearchQuery {
+  const query = expandSearchQuery(rawQuery)
+  return {
+    ...query,
+    ftsQuery: sanitizeFtsQuery(query.expandedTokens),
+  }
 }
 
-function sanitizeFtsQuery(query: string): string {
-  const trimmed = query.trim()
-  if (trimmed.length === 0) return ''
-  const tokens = trimmed.split(/\s+/).filter((t) => t.length > 0)
+function buildIdentityRankingSql(options: IdentityRankingSqlOptions): IdentityRankingSql {
+  const baseTierParams: string[] = []
+  const baseTierClauses: string[] = [`WHEN ${options.canonicalExpr} = ? THEN 5`]
+  baseTierParams.push(options.normalizedQuery)
+
+  if (options.alternateExpr !== undefined) {
+    baseTierClauses.push(`WHEN ${options.alternateExpr} = ? THEN 4`)
+    baseTierParams.push(options.normalizedQuery)
+  }
+
+  if (options.rawTokens.length === 1 && options.normalizedQuery.length > 0) {
+    const prefixChecks = [`${options.canonicalExpr} LIKE ? ESCAPE '\\'`]
+    baseTierParams.push(toPrefixLikePattern(options.normalizedQuery))
+    if (options.alternateExpr !== undefined) {
+      prefixChecks.push(`${options.alternateExpr} LIKE ? ESCAPE '\\'`)
+      baseTierParams.push(toPrefixLikePattern(options.normalizedQuery))
+    }
+    baseTierClauses.push(`WHEN ${prefixChecks.join(' OR ')} THEN 3`)
+  }
+
+  const baseTierSql = `CASE ${baseTierClauses.join(' ')} ELSE 1 END`
+
+  const tierTokenHits = buildTokenHitsSql(options)
+  const scoreTokenHits = buildTokenHitsSql(options)
+  const matchStrength = buildMatchStrengthSql(options)
+
+  return {
+    selectSql: `
+      max(${baseTierSql}, CASE WHEN ${tierTokenHits.sql} > 0 THEN 2 ELSE 1 END) AS identity_tier,
+      ${scoreTokenHits.sql} AS identity_token_hits,
+      ${matchStrength.sql} AS identity_match_strength
+    `,
+    params: [
+      ...baseTierParams,
+      ...tierTokenHits.params,
+      ...scoreTokenHits.params,
+      ...matchStrength.params,
+    ],
+  }
+}
+
+function buildIdentityCandidatePredicateSql(options: {
+  canonicalExpr: string
+  canonicalComponentsExpr: string
+  alternateExpr?: string
+  alternateComponentsExpr?: string
+  expandedTokens: readonly string[]
+}): IdentityCandidatePredicateSql {
+  if (options.expandedTokens.length === 0) {
+    return { sql: '0', params: [] }
+  }
+
+  const clauses: string[] = []
+  const params: string[] = []
+  for (const token of options.expandedTokens) {
+    const predicate = buildIdentityCandidatePredicateForTokenSql(token, options)
+    clauses.push(`(${predicate.sql})`)
+    params.push(...predicate.params)
+  }
+
+  return {
+    sql: clauses.join(' OR '),
+    params,
+  }
+}
+
+function buildIdentityCandidatePredicateForTokenSql(
+  token: string,
+  options: {
+    canonicalExpr: string
+    canonicalComponentsExpr: string
+    alternateExpr?: string
+    alternateComponentsExpr?: string
+  },
+): IdentityCandidatePredicateSql {
+  const canonical = buildIdentityCandidatePredicateForIdentitySql(
+    token,
+    options.canonicalExpr,
+    options.canonicalComponentsExpr,
+  )
+  if (options.alternateExpr === undefined || options.alternateComponentsExpr === undefined) {
+    return canonical
+  }
+
+  const alternate = buildIdentityCandidatePredicateForIdentitySql(
+    token,
+    options.alternateExpr,
+    options.alternateComponentsExpr,
+  )
+  return {
+    sql: `${canonical.sql} OR ${alternate.sql}`,
+    params: [...canonical.params, ...alternate.params],
+  }
+}
+
+function buildIdentityCandidatePredicateForIdentitySql(
+  token: string,
+  identityExpr: string,
+  componentExpr: string,
+): IdentityCandidatePredicateSql {
+  return {
+    sql: `
+      ${identityExpr} = ?
+      OR ${identityExpr} LIKE ? ESCAPE '\\'
+      OR ${identityExpr} LIKE ? ESCAPE '\\'
+      OR instr(${componentExpr}, ?) > 0
+      OR ${identityExpr} LIKE ? ESCAPE '\\'
+    `,
+    params: [
+      token,
+      toPrefixLikePattern(token),
+      toSuffixLikePattern(token),
+      toComponentNeedle(token),
+      toSubstringLikePattern(token),
+    ],
+  }
+}
+
+function buildTokenHitsSql(options: IdentityRankingSqlOptions): { sql: string; params: string[] } {
+  if (options.expandedTokens.length === 0) {
+    return { sql: '0', params: [] }
+  }
+
+  const parts: string[] = []
+  const params: string[] = []
+  for (const token of options.expandedTokens) {
+    const strength = buildTokenStrengthSql(token, options)
+    parts.push(`CASE WHEN ${strength.sql} > 0 THEN 1 ELSE 0 END`)
+    params.push(...strength.params)
+  }
+
+  return {
+    sql: parts.join(' + '),
+    params,
+  }
+}
+
+function buildMatchStrengthSql(options: IdentityRankingSqlOptions): {
+  sql: string
+  params: string[]
+} {
+  if (options.expandedTokens.length === 0) {
+    return { sql: '0', params: [] }
+  }
+
+  const parts: string[] = []
+  const params: string[] = []
+  for (const token of options.expandedTokens) {
+    const strength = buildTokenStrengthSql(token, options)
+    parts.push(strength.sql)
+    params.push(...strength.params)
+  }
+
+  return {
+    sql: parts.join(' + '),
+    params,
+  }
+}
+
+function buildTokenStrengthSql(
+  token: string,
+  options: IdentityRankingSqlOptions,
+): { sql: string; params: string[] } {
+  const canonical = buildTokenStrengthForIdentitySql(
+    token,
+    options.canonicalExpr,
+    options.canonicalComponentsExpr,
+  )
+  if (options.alternateExpr === undefined || options.alternateComponentsExpr === undefined) {
+    return canonical
+  }
+
+  const alternate = buildTokenStrengthForIdentitySql(
+    token,
+    options.alternateExpr,
+    options.alternateComponentsExpr,
+  )
+  return {
+    sql: `max(${canonical.sql}, ${alternate.sql})`,
+    params: [...canonical.params, ...alternate.params],
+  }
+}
+
+function buildTokenStrengthForIdentitySql(
+  token: string,
+  identityExpr: string,
+  componentExpr: string,
+): { sql: string; params: string[] } {
+  return {
+    sql: `
+      CASE
+        WHEN ${identityExpr} = ? THEN 40
+        WHEN ${identityExpr} LIKE ? ESCAPE '\\' THEN 30
+        WHEN ${identityExpr} LIKE ? ESCAPE '\\' THEN 20
+        WHEN instr(${componentExpr}, ?) > 0 THEN 15
+        WHEN ${identityExpr} LIKE ? ESCAPE '\\' THEN 10
+        ELSE 0
+      END
+    `,
+    params: [
+      token,
+      toPrefixLikePattern(token),
+      toSuffixLikePattern(token),
+      toComponentNeedle(token),
+      toSubstringLikePattern(token),
+    ],
+  }
+}
+
+function buildIdentityComponentsExpr(identityExpr: string): string {
+  return `(' ' || replace(replace(replace(replace(replace(${identityExpr}, ':', ' '), '/', ' '), '_', ' '), '.', ' '), '-', ' ') || ' ')`
+}
+
+function composeIdentitySearchScore(
+  identityTier: number,
+  tokenHits: number,
+  matchStrength: number,
+  textScore: number,
+): number {
+  return identityTier * 1_000_000 + tokenHits * 10_000 + matchStrength * 100 + textScore
+}
+
+/**
+ * Normalizes raw string or token-array query input into non-empty tokens.
+ * @param query - Raw query text or expanded token list.
+ * @returns Lower-level FTS tokens with blanks removed.
+ */
+function normalizeSearchTokens(query: string | readonly string[]): readonly string[] {
+  if (typeof query !== 'string') {
+    const tokens: string[] = []
+    for (const token of query) {
+      if (token.trim().length > 0) {
+        tokens.push(token)
+      }
+    }
+    return tokens
+  }
+
+  const normalized = query.trim()
+  if (normalized.length === 0) {
+    return []
+  }
+  return normalized.split(/\s+/)
+}
+
+/**
+ * Sanitizes query tokens for SQLite FTS `OR` matching.
+ * @param query - Raw query text or expanded token list.
+ * @returns Quoted FTS query string.
+ */
+function sanitizeFtsQuery(query: string | readonly string[]): string {
+  const tokens = normalizeSearchTokens(query)
   if (tokens.length === 0) return ''
   return tokens.map((token) => '"' + token.replaceAll('"', '""') + '"').join(' OR ')
+}
+
+function toPrefixLikePattern(value: string): string {
+  return `${escapeLikePattern(value)}%`
+}
+
+function toSuffixLikePattern(value: string): string {
+  return `%${escapeLikePattern(value)}`
+}
+
+function toSubstringLikePattern(value: string): string {
+  return `%${escapeLikePattern(value)}%`
+}
+
+function toComponentNeedle(value: string): string {
+  return ` ${value} `
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
 }

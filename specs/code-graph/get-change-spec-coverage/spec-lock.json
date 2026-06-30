@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:get-spec-coverage",
+    "code-graph:composition",
+    "core:change-repository-port"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/application/use-cases/get-change-spec-coverage.ts",
+      "symbols": [
+        "GetChangeSpecCoverage",
+        "GetChangeSpecCoverageInput",
+        "GetChangeSpecCoverageResult"
+      ]
+    },
+    {
+      "file": "code-graph:src/composition/use-cases/get-change-spec-coverage.ts",
+      "symbols": ["createGetChangeSpecCoverage"]
+    }
+  ]
+}

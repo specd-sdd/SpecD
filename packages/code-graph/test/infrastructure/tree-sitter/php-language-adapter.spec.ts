@@ -1,15 +1,212 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
-import { join, resolve, dirname } from 'node:path'
+import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PhpLanguageAdapter } from '../../../src/infrastructure/tree-sitter/php-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
-import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
-import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
+import {
+  BindingSourceKind,
+  type BindingFact,
+} from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
+import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
+import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 
-const adapter = new PhpLanguageAdapter()
+interface TestAdapter {
+  languages(): string[]
+  extensions(): Record<string, string>
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
+  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
+  buildQualifiedName(namespace: string, symbolName: string): string
+  resolveQualifiedNameToPath(
+    qualifiedName: string,
+    codeRoot: string,
+    repoRoot?: string,
+  ): string | undefined
+  extractSymbols(filePath: string, content: string): SymbolNode[]
+  extractNamespace(content: string): string | undefined
+  extractImportedNames(filePath: string, content: string): ImportDeclaration[]
+  extractBindingFacts(
+    filePath: string,
+    content: string,
+    symbols: readonly SymbolNode[],
+    imports: readonly ImportDeclaration[],
+  ): BindingFact[]
+  extractCallFacts(filePath: string, content: string, symbols: readonly SymbolNode[]): CallFact[]
+  extractRelations(
+    filePath: string,
+    content: string,
+    relationSymbols: readonly SymbolNode[],
+    importMap?: ReadonlyMap<string, string>,
+    filePaths?: ReadonlySet<string>,
+  ): Relation[]
+}
+
+const baseAdapter = new PhpLanguageAdapter()
+const adapter = baseAdapter as unknown as TestAdapter
+
+adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'php',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.symbols as SymbolNode[]
+}
+
+adapter.extractNamespace = (content: string): string | undefined => {
+  const session = new InMemoryIndexSession()
+  const draft = baseAdapter.analyzeFile('dummy.php', content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.namespace
+}
+
+adapter.extractImportedNames = (filePath: string, content: string): ImportDeclaration[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'php',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.imports as ImportDeclaration[]
+}
+
+adapter.extractBindingFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+  imports: readonly ImportDeclaration[],
+): BindingFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'php',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.bindingFacts as BindingFact[]
+}
+
+adapter.extractCallFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+): CallFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'php',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.callFacts as CallFact[]
+}
+
+adapter.extractRelations = (
+  filePath: string,
+  content: string,
+  relationSymbols: readonly SymbolNode[],
+  importMap: ReadonlyMap<string, string> = new Map(),
+  filePaths: ReadonlySet<string> = new Set(),
+): Relation[] => {
+  const session = new InMemoryIndexSession()
+
+  // Register all filePaths in session
+  for (const fp of filePaths) {
+    session.registerFile({
+      filePath: fp,
+      configRelativePath: fp,
+      language: 'php',
+      contentHash: 'abc',
+      workspace: 'ws',
+    })
+  }
+
+  // Group and register relationSymbols by filePath
+  const symbolsByPath = new Map<string, SymbolNode[]>()
+  for (const s of relationSymbols) {
+    let list = symbolsByPath.get(s.filePath)
+    if (!list) {
+      list = []
+      symbolsByPath.set(s.filePath, list)
+    }
+    list.push(s)
+  }
+
+  for (const [path, syms] of symbolsByPath.entries()) {
+    if (path !== filePath) {
+      session.registerFile({
+        filePath: path,
+        configRelativePath: path,
+        language: 'php',
+        contentHash: 'abc',
+        workspace: 'ws',
+      })
+      session.registerAnalysis({
+        filePath: path,
+        analysis: {
+          language: 'php',
+          symbols: syms,
+          imports: [],
+          bindingFacts: [],
+          callFacts: [],
+        },
+      })
+    }
+  }
+
+  // Register target file
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'php',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  const analysis = session.registerAnalysis({
+    filePath,
+    analysis: draft,
+  })
+  const resolvedImports = { importMap, fileImports: [] }
+  return baseAdapter.buildRelations(analysis, {
+    session,
+    resolvedImports,
+  })
+}
 
 describe('PhpLanguageAdapter', () => {
   it('reports supported languages', () => {
@@ -20,52 +217,64 @@ describe('PhpLanguageAdapter', () => {
     it('extracts function definitions', () => {
       const code = '<?php\nfunction greet(string $name): string { return $name; }'
       const symbols = adapter.extractSymbols('main.php', code)
-      expect(symbols.some((s) => s.name === 'greet' && s.kind === SymbolKind.Function)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'greet' && s.kind === SymbolKind.Function),
+      ).toBe(true)
     })
 
     it('extracts class declarations', () => {
       const code = '<?php\nclass User {}'
       const symbols = adapter.extractSymbols('main.php', code)
-      expect(symbols.some((s) => s.name === 'User' && s.kind === SymbolKind.Class)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'User' && s.kind === SymbolKind.Class),
+      ).toBe(true)
     })
 
     it('extracts methods inside classes', () => {
       const code =
         '<?php\nclass User {\n  public function login(): void {}\n  public function logout(): void {}\n}'
       const symbols = adapter.extractSymbols('main.php', code)
-      const methods = symbols.filter((s) => s.kind === SymbolKind.Method)
+      const methods = symbols.filter((s: SymbolNode) => s.kind === SymbolKind.Method)
       expect(methods).toHaveLength(2)
     })
 
     it('extracts interface declarations', () => {
       const code = '<?php\ninterface Repo { public function find(): void; }'
       const symbols = adapter.extractSymbols('main.php', code)
-      expect(symbols.some((s) => s.name === 'Repo' && s.kind === SymbolKind.Interface)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Repo' && s.kind === SymbolKind.Interface),
+      ).toBe(true)
     })
 
     it('extracts enum declarations', () => {
       const code = '<?php\nenum Status { case Active; }'
       const symbols = adapter.extractSymbols('main.php', code)
-      expect(symbols.some((s) => s.name === 'Status' && s.kind === SymbolKind.Enum)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Status' && s.kind === SymbolKind.Enum),
+      ).toBe(true)
     })
 
     it('extracts trait declarations as type', () => {
       const code = '<?php\ntrait Loggable {}'
       const symbols = adapter.extractSymbols('main.php', code)
-      expect(symbols.some((s) => s.name === 'Loggable' && s.kind === SymbolKind.Type)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Loggable' && s.kind === SymbolKind.Type),
+      ).toBe(true)
     })
 
     it('extracts const declarations as variable', () => {
       const code = '<?php\nconst MAX = 10;'
       const symbols = adapter.extractSymbols('main.php', code)
-      expect(symbols.some((s) => s.name === 'MAX' && s.kind === SymbolKind.Variable)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'MAX' && s.kind === SymbolKind.Variable),
+      ).toBe(true)
     })
 
     it('extracts methods from interfaces', () => {
       const code =
         '<?php\ninterface Repo {\n  public function find(): void;\n  public function save(): void;\n}'
       const symbols = adapter.extractSymbols('main.php', code)
-      const methods = symbols.filter((s) => s.kind === SymbolKind.Method)
+      const methods = symbols.filter((s: SymbolNode) => s.kind === SymbolKind.Method)
       expect(methods).toHaveLength(2)
     })
   })
@@ -75,7 +284,7 @@ describe('PhpLanguageAdapter', () => {
       const code = '<?php\nfunction foo() {}\nfunction bar() {}'
       const symbols = adapter.extractSymbols('main.php', code)
       const relations = adapter.extractRelations('main.php', code, symbols, new Map())
-      const defines = relations.filter((r) => r.type === RelationType.Defines)
+      const defines = relations.filter((r: Relation) => r.type === RelationType.Defines)
       expect(defines).toHaveLength(symbols.length)
     })
 
@@ -94,13 +303,31 @@ class UserService extends BaseService implements Persistable {
 }`
       const symbols = adapter.extractSymbols('main.php', code)
       const relations = adapter.extractRelations('main.php', code, symbols, new Map())
-
-      expect(relations.some((relation) => relation.type === RelationType.Extends)).toBe(true)
-      expect(relations.some((relation) => relation.type === RelationType.Implements)).toBe(true)
-      expect(relations.some((relation) => relation.type === RelationType.Overrides)).toBe(true)
+      expect(relations.some((relation: Relation) => relation.type === RelationType.Extends)).toBe(
+        true,
+      )
+      expect(
+        relations.some((relation: Relation) => relation.type === RelationType.Implements),
+      ).toBe(true)
+      expect(relations.some((relation: Relation) => relation.type === RelationType.Overrides)).toBe(
+        true,
+      )
     })
 
-    it('creates EXTENDS for imported base classes', () => {
+    it('uses injected filePaths for existence checks in dynamic loaders', () => {
+      const code = '<?php $this->loadModel("User");'
+      const filePath = 'app/controllers/users_controller.php'
+      const targetPath = 'app/models/user.php'
+      const filePaths = new Set([targetPath])
+
+      const relations = adapter.extractRelations(filePath, code, [], new Map(), filePaths)
+
+      const imports = relations.filter((r: Relation) => r.type === RelationType.Imports)
+      expect(imports).toHaveLength(1)
+      expect(imports[0]?.target).toBe(targetPath)
+    })
+
+    it('creates EXTENDS for imported types', () => {
       const code = `<?php
 use App\\BaseService;
 
@@ -112,7 +339,9 @@ class UserService extends BaseService {}`
         symbols,
         new Map([['BaseService', 'src/BaseService.php:class:BaseService:1:0']]),
       )
-      const extendsRelation = relations.find((relation) => relation.type === RelationType.Extends)
+      const extendsRelation = relations.find(
+        (relation: Relation) => relation.type === RelationType.Extends,
+      )
       expect(extendsRelation?.target).toBe('src/BaseService.php:class:BaseService:1:0')
     })
   })
@@ -136,24 +365,29 @@ class ArticlesController {
       const bindingFacts = adapter.extractBindingFacts('Controller.php', code, symbols, imports)
       const callFacts = adapter.extractCallFacts('Controller.php', code, symbols)
 
-      expect(imports.some((item) => item.kind === ImportDeclarationKind.Require)).toBe(true)
+      expect(
+        imports.some((item: ImportDeclaration) => item.kind === ImportDeclarationKind.Require),
+      ).toBe(true)
       expect(
         bindingFacts.some(
-          (fact) => fact.sourceKind === BindingSourceKind.ImportedType && fact.name === 'Svc',
+          (fact: BindingFact) =>
+            fact.sourceKind === BindingSourceKind.ImportedType && fact.name === 'Svc',
         ),
       ).toBe(true)
       expect(
         bindingFacts.some(
-          (fact) =>
+          (fact: BindingFact) =>
             fact.sourceKind === BindingSourceKind.FrameworkManaged && fact.targetName === 'Article',
         ),
       ).toBe(true)
       expect(
-        callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'Svc'),
+        callFacts.some(
+          (fact: CallFact) => fact.form === CallForm.Constructor && fact.name === 'Svc',
+        ),
       ).toBe(true)
       expect(
         callFacts.some(
-          (fact) =>
+          (fact: CallFact) =>
             fact.form === CallForm.Member &&
             fact.receiverName === 'Article' &&
             fact.name === 'save',
@@ -203,7 +437,7 @@ class ArticlesController {
       const fileContent = '<?php\nnamespace App\\Models;\n\nclass User {}'
       const ns = adapter.extractNamespace(fileContent)
       const symbols = adapter.extractSymbols('src/Models/User.php', fileContent)
-      const userSymbol = symbols.find((s) => s.name === 'User')
+      const userSymbol = symbols.find((s: SymbolNode) => s.name === 'User')
 
       const importContent = '<?php\nuse App\\Models\\User;'
       const imports = adapter.extractImportedNames('main.php', importContent)
@@ -319,7 +553,7 @@ class ArticlesController {
       const filePath = '/var/www/app/controllers/PostsController.php'
       const content = `<?php\nrequire_once '../models/Post.php';`
       const relations = adapter.extractRelations(filePath, content, [], new Map())
-      const importsRels = relations.filter((r) => r.type === RelationType.Imports)
+      const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(importsRels).toHaveLength(1)
       // path.resolve('/var/www/app/controllers', '../models/Post.php') = '/var/www/app/models/Post.php'
       expect(importsRels[0]!.target).toBe('/var/www/app/models/Post.php')
@@ -329,7 +563,7 @@ class ArticlesController {
       const filePath = '/var/www/app/bootstrap.php'
       const content = `<?php\ninclude 'helpers/url_helper.php';`
       const relations = adapter.extractRelations(filePath, content, [], new Map())
-      const importsRels = relations.filter((r) => r.type === RelationType.Imports)
+      const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
       expect(importsRels).toHaveLength(1)
       expect(importsRels[0]!.target).toBe('/var/www/app/helpers/url_helper.php')
     })
@@ -337,13 +571,13 @@ class ArticlesController {
     it('require with variable is silently dropped', () => {
       const content = `<?php\nrequire_once $path;`
       const relations = adapter.extractRelations('ctrl.php', content, [], new Map())
-      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+      expect(relations.filter((r: Relation) => r.type === RelationType.Imports)).toHaveLength(0)
     })
 
     it('require with concatenation is silently dropped', () => {
       const content = `<?php\nrequire_once APPPATH . 'models/Post.php';`
       const relations = adapter.extractRelations('ctrl.php', content, [], new Map())
-      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+      expect(relations.filter((r: Relation) => r.type === RelationType.Imports)).toHaveLength(0)
     })
 
     it('require_once alongside use statements produces require relation', () => {
@@ -351,11 +585,11 @@ class ArticlesController {
       const content = `<?php\nuse App\\Models\\User;\nrequire_once 'bootstrap.php';`
       const importMap = new Map([['User', 'myws:src/Models/User.php:class:User:1']])
       const relations = adapter.extractRelations(filePath, content, [], importMap)
-      const importsRels = relations.filter((r) => r.type === RelationType.Imports)
-      expect(importsRels.some((r) => r.target === '/var/www/app/controllers/bootstrap.php')).toBe(
-        true,
-      )
-      expect(importsRels.some((r) => r.target === 'myws:src/Models/User.php')).toBe(true)
+      const importsRels = relations.filter((r: Relation) => r.type === RelationType.Imports)
+      expect(
+        importsRels.some((r: Relation) => r.target === '/var/www/app/controllers/bootstrap.php'),
+      ).toBe(true)
+      expect(importsRels.some((r: Relation) => r.target === 'myws:src/Models/User.php')).toBe(true)
     })
   })
 
@@ -453,13 +687,13 @@ class ArticlesController {
     it('dynamic variable argument is silently dropped', () => {
       const content = `<?php\nclass C { public function f() { $this->loadModel($modelName); } }`
       const relations = adapter.extractRelations('ctrl.php', content, [], new Map())
-      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+      expect(relations.filter((r: Relation) => r.type === RelationType.Imports)).toHaveLength(0)
     })
 
     it('unrelated ->get() is not detected', () => {
       const content = `<?php\nclass Foo {\n  public function bar() {\n    $this->get('someService');\n  }\n}`
       const relations = adapter.extractRelations('foo.php', content, [], new Map())
-      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(0)
+      expect(relations.filter((r: Relation) => r.type === RelationType.Imports)).toHaveLength(0)
     })
 
     it('multiple loaders in same file all detected', () => {
@@ -476,7 +710,7 @@ class ArticlesController {
         ),
       ]
       const relations = adapter.extractRelations(filePath, content, allSymbols, new Map())
-      expect(relations.filter((r) => r.type === RelationType.Imports)).toHaveLength(2)
+      expect(relations.filter((r: Relation) => r.type === RelationType.Imports)).toHaveLength(2)
     })
 
     it('uses() global function emits IMPORTS when target resolves', () => {
@@ -594,8 +828,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -628,8 +864,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -663,8 +901,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -698,8 +938,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -732,8 +974,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -766,8 +1010,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -800,8 +1046,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -835,8 +1083,10 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      const caller = controllerSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
-      const callee = targetSymbols.find((symbol) => symbol.kind === SymbolKind.Method)
+      const caller = controllerSymbols.find(
+        (symbol: SymbolNode) => symbol.kind === SymbolKind.Method,
+      )
+      const callee = targetSymbols.find((symbol: SymbolNode) => symbol.kind === SymbolKind.Method)
       expect(relations).toContainEqual(
         expect.objectContaining({
           source: caller?.id,
@@ -868,7 +1118,9 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
+      expect(
+        relations.filter((relation: Relation) => relation.type === RelationType.Calls),
+      ).toHaveLength(0)
     })
 
     it('does not propagate aliases across methods', () => {
@@ -895,7 +1147,9 @@ class ArticlesController {
         [...controllerSymbols, ...targetSymbols],
         new Map(),
       )
-      expect(relations.filter((relation) => relation.type === RelationType.Calls)).toHaveLength(0)
+      expect(
+        relations.filter((relation: Relation) => relation.type === RelationType.Calls),
+      ).toHaveLength(0)
     })
   })
 })

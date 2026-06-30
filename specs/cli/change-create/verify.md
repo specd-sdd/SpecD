@@ -67,11 +67,43 @@
 
 ### Requirement: Schema name and version
 
-#### Scenario: Schema resolved from active config
+#### Scenario: Schema resolved inside CreateChange
 
-- **GIVEN** the active `SpecdConfig` has `schema: "spec-driven"` and `schemaVersion: 1`
+- **GIVEN** the active project schema resolves to name `'spec-driven'` and version `1`
 - **WHEN** `specd change create my-change` is run
-- **THEN** the created change's manifest includes `schemaName: "spec-driven"` and `schemaVersion: 1`
+- **THEN** `getActiveSchema` is not called in the CLI handler
+- **AND** the created change's manifest includes `schemaName: 'spec-driven'` and `schemaVersion: 1`
+
+#### Scenario: Manifest still records effective schema identity
+
+- **GIVEN** the active project schema resolves to name `'spec-driven'` and version `1`
+- **WHEN** `specd change create my-change` is run
+- **THEN** the created change's manifest includes `schemaName: 'spec-driven'` and `schemaVersion: 1`
+
+### Requirement: Overlap warning delegation
+
+#### Scenario: CLI passes includeOverlapCheck when specs present
+
+- **GIVEN** `specd change create my-change --spec default:auth/login` is run
+- **WHEN** the CLI invokes `CreateChange.execute`
+- **THEN** the input includes `includeOverlapCheck: true`
+
+#### Scenario: Overlap warning emitted from result report
+
+- **GIVEN** another active change already targets `default:auth/login`
+- **WHEN** `specd change create my-change --spec default:auth/login` succeeds
+- **THEN** stderr contains `warning: spec overlap detected`
+- **AND** the process exits with code 0
+
+#### Scenario: CLI does not call detectOverlap directly
+
+- **WHEN** `specd change create my-change --spec default:auth/login` is run
+- **THEN** the CLI handler does not invoke `kernel.changes.detectOverlap.execute`
+
+#### Scenario: No overlap check when specIds empty
+
+- **WHEN** `specd change create my-change` is run with no `--spec` flags
+- **THEN** `includeOverlapCheck` is not passed as `true`
 
 ### Requirement: Output on success
 

@@ -6,7 +6,8 @@
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-repository",
-    "skills:resolve-bundle"
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "context": [
     "Claude agent plugin implementation. Exports `create(): AgentPlugin` that provides skill installation by declaring Claude-supported capabilities and frontmatter source values to `@specd/skills`, which renders the final installed markdown for Claude Code."
@@ -33,7 +34,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST have an `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills`\n2. Resolve Claude frontmatter source values for each skill\n3. Declare only the Claude-supported capability identifiers for each install\n4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. Pass `variables.sharedFolder` only when overriding the default shared path contract\n6. Install files not marked as shared to `.claude/skills/<skill-name>/` relative to the `projectRoot` found in `SpecdConfig`\n7. Install files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT assemble the final YAML frontmatter document itself after bundle resolution.\nThe plugin MUST NOT normalize capability objects on behalf of `@specd/skills`.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
+        "The application layer MUST have an `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills`\n2. Resolve Claude frontmatter source values for each skill\n3. Declare only the Claude-supported capability identifiers for each install (`['mcp', 'agents', 'frontmatter']`)\n4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. Pass `variables.sharedFolder` only when overriding the default shared path contract\n6. Install files not marked as shared to categorized directories relative to `projectRoot`:\n   - Skills to `.claude/skills/<skill-name>/`\n   - Agents to `.claude/agents/<agent-name>/` (only when `agents` capability is supported)\n7. Install files marked as shared to the rendered `sharedFolder` location under the project root\n8. Fallback: If `agents` capability is missing, install agents into the same directory as the shared context file.\n9. Sub-agent Mapping: When installing an agent, the plugin MUST:\n   - Map `allowedTools` list into a single comma-separated string for the `tools` YAML key.\n   - Map the preferred model from `specd-agent.meta.json` to the `model` YAML key if present.\n   - Prepend the rendered system prompt with the generated YAML frontmatter.\n\nThe plugin MUST NOT assemble the final YAML frontmatter document itself for standard skills after bundle resolution.\nThe plugin MUST NOT normalize capability objects on behalf of `@specd/skills`.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.\nThe plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants."
       ]
     },
     {
@@ -45,13 +46,13 @@
     {
       "requirement": "Install location",
       "rules": [
-        "Skills MUST be installed to `.claude/skills/` in the project root.\n\nFor each skill, files not marked as shared MUST be installed under `.claude/skills/<skill-name>/`.\n\nFiles marked as shared MUST be installed under the rendered `sharedFolder` location within the project root. When no override is provided, that location MUST default to a relative path derived from the runtime config directory.\n\nThe resolved shared location MUST NOT contain a `SKILL.md` file."
+        "Skills MUST be installed to `.claude/skills/` in the project root.\nAgents MUST be installed to `.claude/agents/` in the project root (when `agents` capability is supported).\n\nFor each skill or agent, files not marked as shared MUST be installed under its respective categorized directory.\n\nFiles marked as shared MUST be installed under the rendered `sharedFolder` location within the project root. When no override is provided, that location MUST default to a relative path derived from the runtime config directory.\n\nThe resolved shared location MUST NOT contain a `SKILL.md` file."
       ]
     },
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.claude/skills/` that are not part of the specd-managed skill set."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` and agent files from `.claude/agents/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.claude/agents/`.\n\nWhen no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.claude/agents/`, and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.claude/skills/` or `.claude/agents/` that are not part of the specd-managed skill or agent set."
       ]
     }
   ],
@@ -116,6 +117,24 @@
       "then": ["that location does not contain a SKILL.md file"]
     },
     {
+      "requirement": "Install location",
+      "name": "Installs agents to categorized directory",
+      "given": ["a request to install an agent"],
+      "when": ["install(config, options) runs"],
+      "then": [
+        "it installs the agent files to the platform-specific agents/ directory",
+        "AND the YAML frontmatter contains tools as a comma-separated string",
+        "AND the YAML frontmatter contains model if specified in metadata"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Fallback to shared location when agents capability is missing",
+      "given": ["a runtime that does not support agents"],
+      "when": ["an agent is installed"],
+      "then": ["it is copied to the same directory as shared.md"]
+    },
+    {
       "requirement": "Uninstall behavior",
       "name": "Uninstall removes selected skill directories and keeps shared resources",
       "given": ["multiple skills are installed and share the resolved sharedFolder location"],
@@ -134,6 +153,22 @@
         "AND the resolved sharedFolder location is removed",
         "AND unrelated user skill directories remain"
       ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected agent files",
+      "given": ["multiple agents are installed"],
+      "when": ["uninstall(config, { agents: ['specd-project-context-optimizer'] }) is executed"],
+      "then": ["only .claude/agents/specd-project-context-optimizer.md is removed"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall without filter removes all specd-managed agents",
+      "given": [
+        "specd-managed agents and unrelated user agents are installed under .claude/agents/"
+      ],
+      "when": ["uninstall(config) is executed without filters"],
+      "then": ["all specd-managed agent files are removed", "AND unrelated user agent files remain"]
     },
     {
       "requirement": "Domain layer",
@@ -202,12 +237,17 @@
         "specId": "plugin-agent-claude:plugin-agent",
         "file": "plugin-agent-claude:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-claude:plugin-agent",
+        "file": "plugin-agent-claude:src/domain/frontmatter/index.ts",
+        "symbol": "agentFrontmatter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f4819875bf6a7ef6fa62d86c36918a7531936bb5135e7a3e47859a9661491dec",
-    "verify.md": "sha256:a98948ea228967b46ce56c7ebe9403bdff6d3888d6cf6c34d5ca826fdb2f1dd1"
+    "spec.md": "sha256:f3fbbf4a53504aa758d4f74c1eb8589dbe744a4d21df4e1abe2a3c24327a7a1a",
+    "verify.md": "sha256:3483fb85ce3ac3f3c4465f266ed9c38c6d0ccc127dab48a75135483c8e0c423a"
   },
   "generatedBy": "core"
 }

@@ -42,16 +42,14 @@ export {
   type ValidateSchemaInput,
   type ValidateSchemaResult,
 } from './validate-schema.js'
-export { type InitProject } from './init-project.js'
-export { type AddPlugin, type AddPluginInput } from './add-plugin.js'
-export { type RemovePlugin, type RemovePluginInput } from './remove-plugin.js'
-export { type ListPlugins, type ListPluginsInput, type ListPluginsEntry } from './list-plugins.js'
 export { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+export { GetProjectSummary, type GetProjectSummaryResult } from './get-project-summary.js'
 export {
   type GetProjectContext,
   type GetProjectContextInput,
   type GetProjectContextResult,
 } from './get-project-context.js'
+export { GetConfig } from './get-config.js'
 export { type CreateChange, type CreateChangeInput } from './create-change.js'
 export {
   type GetStatus,
@@ -63,21 +61,6 @@ export {
   type ReviewSummary,
   type ReviewOverlapEntry,
 } from './get-status.js'
-export {
-  type SaveChangeArtifact,
-  type SaveChangeArtifactInput,
-  type SaveChangeArtifactResult,
-} from './save-change-artifact.js'
-export {
-  type GetChangeArtifact,
-  type GetChangeArtifactInput,
-  type GetChangeArtifactResult,
-} from './get-change-artifact.js'
-export {
-  type GetReadOnlyChangeArtifact,
-  type GetReadOnlyChangeArtifactInput,
-  type GetReadOnlyChangeArtifactResult,
-} from './get-read-only-change-artifact.js'
 export { type ImplementationTrackingProjection } from './_shared/implementation-tracking.js'
 export {
   type GetImplementationReview,
@@ -115,6 +98,22 @@ export { type DiscardChange, type DiscardChangeInput } from './discard-change.js
 export { type ApproveSpec, type ApproveSpecInput } from './approve-spec.js'
 export { type ApproveSignoff, type ApproveSignoffInput } from './approve-signoff.js'
 export {
+  type GetChangeArtifact,
+  type GetChangeArtifactInput,
+  type GetChangeArtifactResult,
+} from './get-change-artifact.js'
+export {
+  type SaveChangeArtifact,
+  type SaveChangeArtifactInput,
+  type SaveChangeArtifactResult,
+} from './save-change-artifact.js'
+export {
+  type ValidateChangeBatch,
+  type ValidateChangeBatchInput,
+  type ValidateChangeBatchResult,
+  type ValidateChangeBatchStepResult,
+} from './validate-change-batch.js'
+export {
   type ArchiveHookPhaseSelector,
   type ArchiveChange,
   type ArchiveChangeInput,
@@ -130,12 +129,6 @@ export {
   type ValidationFileStatus,
   type ValidationWarning,
 } from './validate-artifacts.js'
-export {
-  type ValidateChangeBatch,
-  type ValidateChangeBatchInput,
-  type ValidateChangeBatchResult,
-  type ValidateChangeBatchStepResult,
-} from './validate-change-batch.js'
 export {
   type CompileContext,
   type CompileContextInput,
@@ -201,11 +194,25 @@ export {
   type PreviewSpecFileEntry,
 } from './preview-spec.js'
 export {
-  outlineArtifactContent,
-  type OutlineArtifactContentResult,
-} from './outline-artifact-content.js'
+  type InvalidateChange,
+  type InvalidateTargetInput,
+  type InvalidateChangeInput,
+  type AffectedArtifactFile,
+  type InvalidateChangeResult,
+} from './invalidate-change.js'
 export {
-  OutlineChangeArtifact,
-  type OutlineChangeArtifactInput,
-} from './outline-change-artifact.js'
-export { ReadLog, type ReadLogInput, type ReadLogResult, type ReadLogEntryDto } from './read-log.js'
+  type GetSpecOutline,
+  type GetSpecOutlineInput,
+  type SpecOutlineResult,
+} from './get-spec-outline.js'
+export {
+  type UpdateSpecMetadata,
+  type UpdateSpecMetadataInput,
+  type UpdateSpecMetadataResult,
+} from './update-spec-metadata.js'
+export { type GetProjectMetadata, type GetProjectMetadataResult } from './get-project-metadata.js'
+export {
+  type UpdateProjectMetadata,
+  type UpdateProjectMetadataInput,
+  type UpdateProjectMetadataResult,
+} from './update-project-metadata.js'

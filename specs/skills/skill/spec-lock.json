@@ -6,16 +6,12 @@
   "dependsOn": ["default:_global/error-handling-conventions"],
   "implementation": [
     {
-      "file": "skills:src/domain/errors/specd-skills-error.ts",
-      "symbols": ["SpecdSkillsError"]
-    },
-    {
-      "file": "skills:src/domain/errors/skill-not-found-error.ts",
-      "symbols": ["SkillNotFoundError"]
-    },
-    {
       "file": "skills:src/domain/skill.ts",
-      "symbols": ["Skill", "SkillTemplate"]
+      "symbols": ["Skill"]
+    },
+    {
+      "file": "skills:src/domain/skill-template-metadata.ts",
+      "symbols": ["SkillTemplateMetadata"]
     }
   ]
 }

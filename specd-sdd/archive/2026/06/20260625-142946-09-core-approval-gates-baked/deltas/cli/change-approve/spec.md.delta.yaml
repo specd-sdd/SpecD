@@ -1,0 +1,27 @@
+- op: added
+  description: CLI delegates gate state to kernel use cases
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Command signatures'
+  content: |
+    ### Requirement: Delegates gate state to kernel
+
+    The CLI MUST NOT pass `approvalsSpec` or `approvalsSignoff` to `ApproveSpec.execute` or `ApproveSignoff.execute`.
+
+    Gate enablement is determined by `config.approvals` baked into the kernel's approve use cases at construction. The CLI passes only `name` and `reason`.
+
+    The CLI MUST invoke `kernel.changes.approveSpec` and `kernel.changes.approveSignoff` — not `kernel.specs.*`.
+
+- op: modified
+  description: Hashes computed by use case not CLI
+  selector:
+    type: section
+    matches: 'Requirement: Artifact hash computation'
+  content: |
+    The CLI MUST NOT compute artifact hashes. Hash computation is owned by `ApproveSpec` and `ApproveSignoff` internally from on-disk artifact content using schema-defined pre-hash cleanup rules.
+
+    The user never supplies artifact hashes.

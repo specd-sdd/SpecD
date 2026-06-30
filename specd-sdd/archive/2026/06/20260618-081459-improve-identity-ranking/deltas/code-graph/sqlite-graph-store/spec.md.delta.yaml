@@ -1,0 +1,48 @@
+- op: modified
+  description: Require SQLite backend to keep FTS discovery while applying explicit token-aware identity ranking in SQL.
+  selector:
+    type: section
+    matches: '^Requirement: SQLite full-text search$'
+  content: |
+    `SQLiteGraphStore` SHALL implement symbol, spec, and document search using SQLite full-text search (FTS5).
+
+    The adapter MUST:
+
+    - provide full-text search over `Document` content and paths
+    - keep SQLite FTS candidate generation in place for `searchSymbols()`, `searchSpecs()`, and `searchDocuments()` using the existing `MATCH` query path
+    - sanitize and join multi-token queries using `OR` logic for broad discovery
+    - expand raw query tokens with the shared specd/code-aware lexical policy before applying identity-aware ranking
+    - supplement the FTS candidate set with identity-derived candidates when FTS tokenization alone would miss a strong identity hit required by the abstract contract
+    - compute identity-aware ranking in SQL with explicit ordering columns rather than relying on BM25 weights alone
+    - prioritize **exact canonical identity matches** (Spec ID, Symbol Name/ID, Document Path) by boosting results where the query matches the primary identity column exactly
+    - prioritize **strong non-exact identity matches** ahead of generic content-only matches, including:
+      - symbol declared-name equality when comment/body-only hits would otherwise rank higher
+      - spec-id prefix, suffix, substring, and real component matches
+      - document canonical-path or config-relative-path prefix, suffix, substring, and real component matches
+    - count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens
+    - use BM25 ranking for remaining textual matches across searchable columns after identity preference is applied
+    - sanitize and join multi-token queries using `OR` logic for broad discovery
+    - derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches
+
+    Observable SQLite ordering semantics MUST hold:
+
+    - exact canonical identity matches rank first
+    - identity-oriented non-exact hits rank ahead of body-only/comment-only/content-only hits
+    - exact token identity matches outrank prefix token matches
+    - prefix token matches outrank suffix token matches
+    - suffix token matches outrank arbitrary substring token matches
+    - real identity-component matches outrank arbitrary substring-only hits on the same identity field
+    - candidates matching more expanded identity tokens outrank candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
+    - generic term frequency in spec/document body content MUST NOT outrank a stronger spec-id, symbol-name, or document-path match for the same query intent
+
+    The SQLite FTS schema MUST include:
+
+    - **`symbol_fts`** virtual table covering `Symbol.name` and `Symbol.comment`
+    - **`spec_fts`** virtual table covering `Spec.title`, `Spec.description`, and `Spec.content`
+    - **`document_fts`** virtual table covering `Document.path` and `Document.content`
+
+    The implementation MAY use stemming, weighted BM25, identity boost unions, or other SQLite-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.
+
+    SQLite identity-aware ranking MUST be expressed through explicit SQL ordering logic over the discovered candidate set, such as computed rank columns or `CASE`-based ordering. Candidate discovery MAY combine FTS `MATCH` results with identity-derived candidates, but it MUST NOT replace FTS retrieval with plain whole-query `LIKE` filtering only.
+
+    Persisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change.

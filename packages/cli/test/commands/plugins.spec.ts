@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   captureStderr,
   captureStdout,
+  ExitSentinel,
   makeMockConfig,
   makeMockKernel,
   makeProgram,
@@ -9,6 +10,21 @@ import {
 } from './helpers.js'
 
 const mockInstall = vi.fn().mockResolvedValue({ success: true, message: 'ok' })
+const mockAddPlugin = vi.fn().mockResolvedValue(undefined)
+const mockRemovePlugin = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@specd/sdk')>()
+  return {
+    ...original,
+    createConfigWriter: vi.fn(() => ({
+      initProject: vi.fn(),
+      addPlugin: mockAddPlugin,
+      removePlugin: mockRemovePlugin,
+      listPlugins: vi.fn(),
+    })),
+  }
+})
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
@@ -62,10 +78,9 @@ import { registerPluginsList } from '../../src/commands/plugins/list.js'
 import { registerPluginsShow } from '../../src/commands/plugins/show.js'
 import { registerPluginsUninstall } from '../../src/commands/plugins/uninstall.js'
 
-function setup() {
+function setup(configOverrides: Parameters<typeof makeMockConfig>[0] = {}) {
   const kernel = makeMockKernel()
-  const config = makeMockConfig()
-  kernel.project.listPlugins.execute.mockResolvedValue([])
+  const config = makeMockConfig(configOverrides)
   vi.mocked(resolveCliContext).mockResolvedValue({
     config,
     configFilePath: '/project/specd.yaml',
@@ -81,7 +96,7 @@ afterEach(() => vi.clearAllMocks())
 
 describe('plugins install', () => {
   it('installs plugin and persists declaration', async () => {
-    const { kernel, config } = setup()
+    const { config } = setup()
     const program = makeProgram()
     registerPluginsInstall(program.command('plugins'))
 
@@ -93,17 +108,19 @@ describe('plugins install', () => {
         config,
       }),
     )
-    expect(kernel.project.addPlugin.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'agents',
-        name: '@specd/plugin-agent-claude',
-      }),
+    expect(mockAddPlugin).toHaveBeenCalledWith(
+      '/project/specd.yaml',
+      'agents',
+      '@specd/plugin-agent-claude',
     )
   })
 
   it('skips already-installed plugin with warning', async () => {
-    const { kernel, stderr } = setup()
-    kernel.project.listPlugins.execute.mockResolvedValue([{ name: '@specd/plugin-agent-claude' }])
+    const { stderr } = setup({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      },
+    })
 
     const program = makeProgram()
     registerPluginsInstall(program.command('plugins'))
@@ -112,12 +129,53 @@ describe('plugins install', () => {
     expect(stderr()).toContain('already installed')
     expect(stderr()).toContain('update')
   })
+
+  it('outputs machine-parseable JSON on install', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerPluginsInstall(program.command('plugins'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'plugins',
+      'install',
+      '@specd/plugin-agent-claude',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.plugins).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '@specd/plugin-agent-claude',
+          status: 'installed',
+        }),
+      ]),
+    )
+  })
+
+  it('exits 1 when any plugin install fails', async () => {
+    setup()
+    mockInstall.mockRejectedValueOnce(new Error('install failed'))
+
+    const program = makeProgram()
+    registerPluginsInstall(program.command('plugins'))
+
+    await expect(
+      program.parseAsync(['node', 'specd', 'plugins', 'install', '@specd/plugin-agent-claude']),
+    ).rejects.toThrow(ExitSentinel)
+  })
 })
 
 describe('plugins list/show/uninstall', () => {
   it('lists declared plugins with status', async () => {
-    const { kernel, stdout } = setup()
-    kernel.project.listPlugins.execute.mockResolvedValue([{ name: '@specd/plugin-agent-claude' }])
+    const { stdout } = setup({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      },
+    })
 
     const program = makeProgram()
     registerPluginsList(program.command('plugins'))
@@ -125,6 +183,29 @@ describe('plugins list/show/uninstall', () => {
 
     const parsed = JSON.parse(stdout())
     expect(parsed.plugins[0].status).toBe('installed')
+  })
+
+  it('returns empty output for unknown plugin type', async () => {
+    const { stdout } = setup({
+      plugins: {
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      },
+    })
+
+    const program = makeProgram()
+    registerPluginsList(program.command('plugins'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'plugins',
+      'list',
+      '--type',
+      'missing',
+      '--format',
+      'json',
+    ])
+
+    expect(JSON.parse(stdout())).toEqual({ plugins: [] })
   })
 
   it('shows plugin metadata', async () => {
@@ -147,7 +228,7 @@ describe('plugins list/show/uninstall', () => {
   })
 
   it('uninstalls plugin and removes declaration', async () => {
-    const { kernel } = setup()
+    setup()
     const program = makeProgram()
     registerPluginsUninstall(program.command('plugins'))
     await program.parseAsync([
@@ -158,11 +239,36 @@ describe('plugins list/show/uninstall', () => {
       '@specd/plugin-agent-claude',
     ])
 
-    expect(kernel.project.removePlugin.execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'agents',
-        name: '@specd/plugin-agent-claude',
-      }),
+    expect(mockRemovePlugin).toHaveBeenCalledWith(
+      '/project/specd.yaml',
+      'agents',
+      '@specd/plugin-agent-claude',
+    )
+  })
+
+  it('outputs machine-parseable JSON on uninstall', async () => {
+    const { stdout } = setup()
+    const program = makeProgram()
+    registerPluginsUninstall(program.command('plugins'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'plugins',
+      'uninstall',
+      '@specd/plugin-agent-claude',
+      '--format',
+      'json',
+    ])
+
+    const parsed = JSON.parse(stdout())
+    expect(parsed.plugins).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '@specd/plugin-agent-claude',
+          status: 'uninstalled',
+        }),
+      ]),
     )
   })
 })

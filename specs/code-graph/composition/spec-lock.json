@@ -6,18 +6,18 @@
   "dependsOn": [
     "code-graph:symbol-model",
     "code-graph:graph-store",
-    "code-graph:ladybug-graph-store",
-    "code-graph:sqlite-graph-store",
-    "code-graph:language-adapter",
     "code-graph:indexer",
     "code-graph:traversal",
     "default:_global/architecture",
-    "code-graph:document-model"
+    "code-graph:get-graph-health",
+    "code-graph:index-project-graph",
+    "code-graph:get-spec-coverage",
+    "code-graph:get-change-spec-coverage"
   ],
   "implementation": [
     {
-      "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": ["CodeGraphProvider"]
+      "file": "code-graph:src/public.ts",
+      "symbols": ["CODE_GRAPH_VERSION"]
     }
   ]
 }

@@ -10,7 +10,14 @@ Change lifecycle entry points need a backend-agnostic way to discover potentiall
 
 The implementation detector SHALL expose an operation that returns modified implementation-file candidates for a change.
 
-- `detectModifiedFiles(change)` MUST return project-relative file paths representing files changed for the supplied change context
+```typescript
+interface ImplementationDetectorOptions {
+  readonly excludePaths?: readonly string[]
+}
+```
+
+- `detectModifiedFiles(change, options?)` MUST return project-relative file paths representing files changed for the supplied change context
+- when `options.excludePaths` is provided, the detector MUST exclude any returned path that falls under one of those project-relative portable directory prefixes
 
 The detector itself owns baseline-resolution policy for that change context. Callers provide the change; they do not compute or pass a raw VCS baseline reference themselves.
 
@@ -37,6 +44,7 @@ VCS-backed detection is the first implementation, but future implementations MAY
 - Returned paths MUST be forward-slash-normalized.
 - Returned paths MUST be relative to the project root.
 - The detector MUST NOT assign workspace identities to returned paths.
+- `excludePaths` entries MUST be interpreted as forward-slash-normalized project-relative paths.
 
 ## Spec Dependencies
 

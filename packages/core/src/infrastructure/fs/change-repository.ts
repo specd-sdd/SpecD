@@ -549,6 +549,11 @@ export class FsChangeRepository extends ChangeRepository {
     }
 
     await fs.writeFile(filePath, artifact.content, 'utf8')
+
+    const target = trackedArtifactFile(change, artifact.filename)
+    if (target !== null) {
+      target.artifact.setFileStatus(target.file.key, 'in-progress')
+    }
   }
 
   /**
@@ -561,17 +566,22 @@ export class FsChangeRepository extends ChangeRepository {
   override async artifactExists(change: Change, filename: string): Promise<boolean> {
     const dir = await this._resolveDir(change.name)
     if (dir === null) return false
+
+    const filePath = resolveConfinedPath(dir, filename, trackedArtifactFilenames(change))
     try {
-      const filePath = resolveConfinedPath(dir, filename, trackedArtifactFilenames(change))
       await fs.lstat(filePath)
-      Logger.debug('FsChangeRepository checked tracked artifact presence', {
-        change: change.name,
-        filename: normalizeRelativePath(filename),
-      })
-      return true
-    } catch {
-      return false
+    } catch (err) {
+      if (isEnoent(err)) {
+        return false
+      }
+      throw err
     }
+
+    Logger.debug('FsChangeRepository checked tracked artifact presence', {
+      change: change.name,
+      filename: normalizeRelativePath(filename),
+    })
+    return true
   }
 
   /**
@@ -1375,6 +1385,16 @@ export class FsChangeRepository extends ChangeRepository {
     const currentHash = sha256(cleaned)
     return currentHash === file.validatedHash ? 'complete' : 'in-progress'
   }
+
+  /**
+   * Returns the absolute filesystem paths to the `changes/`, `drafts/`, and
+   * `discarded/` directories managed by this repository.
+   *
+   * @returns Absolute paths in stable order: changes, drafts, discarded
+   */
+  override internalPaths(): readonly string[] {
+    return [this._changesPath, this._draftsPath, this._discardedPath]
+  }
 }
 
 // ---- Serialization helpers ----
@@ -1749,6 +1769,28 @@ function trackedArtifactFilenames(change: Change): ReadonlySet<string> | undefin
     }
   }
   return allowed.size > 0 ? allowed : undefined
+}
+
+/**
+ * Finds the tracked artifact file entry for a normalized change filename.
+ *
+ * @param change - Change whose tracked artifacts should be searched
+ * @param filename - Raw change-directory filename
+ * @returns The matching artifact and file, or `null` when not tracked
+ */
+function trackedArtifactFile(
+  change: Change,
+  filename: string,
+): { artifact: ChangeArtifact; file: ArtifactFile } | null {
+  const normalized = normalizeRelativePath(filename)
+  for (const artifact of change.artifacts.values()) {
+    for (const file of artifact.files.values()) {
+      if (normalizeRelativePath(file.filename) === normalized) {
+        return { artifact, file }
+      }
+    }
+  }
+  return null
 }
 
 /**

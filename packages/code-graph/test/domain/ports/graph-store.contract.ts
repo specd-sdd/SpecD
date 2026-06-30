@@ -780,6 +780,165 @@ export function graphStoreContractTests(
       expect(documentHits[0]?.document.path).toBe(exactDocument.path)
       expect(documentHits[0]?.snippet).toBeDefined()
     })
+
+    it('expands specd-shaped tokens and prefers identity hits over content-only hits', async () => {
+      const specIdentity = createSpecNode({
+        specId: 'core:change',
+        path: 'change',
+        title: 'Change',
+        description: 'Identity target',
+        contentHash: 'sha256:spec-identity',
+        content: 'Implements change workflow',
+        workspace: 'core',
+      })
+      const specContentOnly = createSpecNode({
+        specId: 'core:workflow-history',
+        path: 'workflow-history',
+        title: 'Workflow history',
+        description: 'Discusses core change semantics',
+        contentHash: 'sha256:spec-content',
+        content: 'core change core change core change',
+        workspace: 'core',
+      })
+
+      await store.bulkLoad({
+        files: [],
+        documents: [],
+        symbols: [],
+        specs: [specIdentity, specContentOnly],
+        relations: [],
+      })
+
+      const hits = await store.searchSpecs({ query: 'core:change' })
+      expect(hits[0]?.spec.specId).toBe(specIdentity.specId)
+    })
+
+    it('expands CamelCase symbol queries and prefers declared names over comments', async () => {
+      const file = createFileNode({
+        path: 'core:src/archive-change.ts',
+        configRelativePath: 'packages/core/src/archive-change.ts',
+        language: 'typescript',
+        contentHash: 'sha256:camel-file',
+        content: 'export function ArchiveChange() {}\nexport function fallback() {}',
+        workspace: 'core',
+      })
+      const declared = createSymbolNode({
+        name: 'ArchiveChange',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      })
+      const commentOnly = createSymbolNode({
+        name: 'fallback',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 2,
+        column: 0,
+        comment: 'archive change archive change archive change',
+      })
+
+      await store.bulkLoad({
+        files: [file],
+        documents: [],
+        symbols: [declared, commentOnly],
+        specs: [],
+        relations: [],
+      })
+
+      const hits = await store.searchSymbols({ query: 'ArchiveChange' })
+      expect(hits[0]?.symbol.id).toBe(declared.id)
+    })
+
+    it('orders token strength as exact before prefix before suffix before substring', async () => {
+      const file = createFileNode({
+        path: 'core:src/repository.ts',
+        configRelativePath: 'packages/core/src/repository.ts',
+        language: 'typescript',
+        contentHash: 'sha256:token-strength',
+        content: [
+          'export function change() {}',
+          'export function changeLog() {}',
+          'export function prechange() {}',
+          'export function exchangeRate() {}',
+        ].join('\n'),
+        workspace: 'core',
+      })
+      const exact = createSymbolNode({
+        name: 'change',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 1,
+        column: 0,
+      })
+      const prefix = createSymbolNode({
+        name: 'changeLog',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 2,
+        column: 0,
+      })
+      const suffix = createSymbolNode({
+        name: 'prechange',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 3,
+        column: 0,
+      })
+      const substring = createSymbolNode({
+        name: 'exchangeRate',
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: 4,
+        column: 0,
+      })
+
+      await store.bulkLoad({
+        files: [file],
+        documents: [],
+        symbols: [exact, prefix, suffix, substring],
+        specs: [],
+        relations: [],
+      })
+
+      const hits = await store.searchSymbols({ query: 'change' })
+      expect(hits[0]?.symbol.id).toBe(exact.id)
+      expect(hits[1]?.symbol.id).toBe(prefix.id)
+      expect(hits[2]?.symbol.id).toBe(suffix.id)
+      expect(hits[3]?.symbol.id).toBe(substring.id)
+    })
+
+    it('prefers real identity components over arbitrary substrings', async () => {
+      const componentSpec = createSpecNode({
+        specId: 'core:change',
+        path: 'change',
+        title: 'Change',
+        description: 'Core change target',
+        contentHash: 'sha256:component',
+        content: 'Implements core change flow',
+        workspace: 'core',
+      })
+      const substringSpec = createSpecNode({
+        specId: 'core:scorekeeper',
+        path: 'scorekeeper',
+        title: 'Scorekeeper',
+        description: 'Contains core only as substring',
+        contentHash: 'sha256:substring',
+        content: 'score score score',
+        workspace: 'core',
+      })
+
+      await store.bulkLoad({
+        files: [],
+        documents: [],
+        symbols: [],
+        specs: [componentSpec, substringSpec],
+        relations: [],
+      })
+
+      const hits = await store.searchSpecs({ query: 'core' })
+      expect(hits[0]?.spec.specId).toBe(componentSpec.specId)
+    })
   })
 }
 

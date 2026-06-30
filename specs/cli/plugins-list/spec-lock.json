@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["plugin-manager:load-plugin-use-case", "core:get-config"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/plugins/get-declared-plugins.ts",
+      "symbols": ["getDeclaredPlugins", "DeclaredPluginEntry"]
+    },
+    {
+      "file": "cli:src/commands/plugins/list.ts",
+      "symbols": ["registerPluginsList"]
+    }
+  ]
+}

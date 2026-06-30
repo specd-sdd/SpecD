@@ -1,0 +1,8 @@
+releases:
+  sdk:composition: minor
+  sdk:host-context: minor
+  sdk:with-open-graph-provider: minor
+  sdk:build-project-status-snapshot: minor
+  sdk:run-index-project-graph: minor
+  core:composition: patch
+  core:kernel: patch

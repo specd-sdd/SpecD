@@ -56,7 +56,7 @@
     {
       "requirement": "Composition layer for use-case wiring",
       "rules": [
-        "Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes three levels of factory:\n\n- **Use-case factories** — one per use case; construct all required ports internally and return the pre-wired use case. Internal ports with a single concrete implementation are constructed here and never exported. Each factory supports two call signatures: `createX(config: SpecdConfig)` and `createX(context, options)`.\n- **Kernel** — `createKernel(config: SpecdConfig)` calls every use-case factory and returns all use cases grouped by domain area. It is a convenience, not a mandatory entry point.\n- **Config loader port** — `ConfigLoader` is defined in `application/ports/` and resolves a `SpecdConfig` from one or more sources. Implementations live in `infrastructure/`.\n\nConcrete adapter classes and repository-level factories are never exported from `index.ts`. Delivery mechanisms (CLI, MCP) import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors."
+        "Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:\n\n- **Kernel** — `createKernel(config: SpecdConfig)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.\n- **Config loader port** — `createConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.\n- **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml`. Delivery mechanisms call port methods on the returned instance.\n\nEvery capability mounted on `Kernel` MUST also be obtainable without `createKernel`: public `createX` use-case factories for each kernel-mounted use case, and public repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, `createSchemaRegistry`) for storage wired on the kernel. Repository factories accept an adapter id (for example `'fs'`; extensible to plugin-registered ids via `*StorageFactory` on `./extensions`). `createKernel` is the recommended full-bootstrap path, not the only path.\n\nConcrete adapter classes are never exported from public entry points. Delivery hosts (`@specd/cli`, `@specd/mcp`) that use both core and code-graph MUST import from `@specd/sdk` per the import policy in `sdk:composition`."
       ]
     },
     {
@@ -74,13 +74,13 @@
     {
       "requirement": "No circular dependencies between packages",
       "rules": [
-        "Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `core`. `mcp` → `core`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles."
+        "Package dependency direction is strictly one-way: `plugin-*` → `skills` → `core`. `cli` → `sdk`. `mcp` → `sdk`. `sdk` → `core`, `code-graph`. `schema-*` has no dependencies on other specd packages. Any new package must fit into this directed graph without introducing cycles."
       ]
     },
     {
-      "requirement": "SpecD Studio package graph",
+      "requirement": "Curated public package entry points",
       "rules": [
-        "SpecD Studio adds owned delivery and presentation packages:\n\n- **`@specd/api`** — HTTP server: handlers, presenters, DTOs, auth registry, composition. MUST delegate to `@specd/core` kernel use cases; MUST NOT duplicate lifecycle rules.\n- **`@specd/client`** — `SpecdDataPort`, transports, and adapters for HTTP and IPC. MUST NOT import `@specd/core`.\n- **`@specd/ui`** — React IDE shell and hooks. MUST consume `@specd/client` only; MUST NOT import `@specd/core`.\n- **`specd-studio-web`** / **`specd-studio-desktop`** — hosts that wire UI to remote HTTP or local IPC/kernel.\n\nDependency direction: `ui` → `client` → (HTTP | IPC) → `api` → `core`. CLI MAY start `api` via `specd serve` / `specd ui serve` but MUST NOT implement HTTP handlers itself."
+        "Packages with business logic (`@specd/core`, `@specd/code-graph`) and the host facade (`@specd/sdk`) MUST expose curated public barrels through `package.json` `exports`:\n\n- `\".\"` — integrator-facing surface (composition bootstrap, kernel types, kernel-equivalent factories, domain types, errors). MUST NOT export concrete adapter classes or infrastructure implementations.\n- `\"./ports\"` (`@specd/core` only) — port interfaces and abstract classes plus associated `*Config` / `*Result` types. MUST NOT export adapter implementations.\n- `\"./extensions\"` (`@specd/core` only) — kernel registry and storage-factory registration types (`*StorageFactory`, `KernelRegistryInput`, `KernelBuilder`, hook/VCS/actor providers). MUST NOT export builtin factory markers or infrastructure wiring.\n- `\"./internal\"` — full development barrel for monorepo tests and advanced callers only.\n\n`@specd/sdk` MUST additionally expose `\"./ports\"` and `\"./extensions\"` as re-exports of the corresponding `@specd/core` subpaths."
       ]
     }
   ],
@@ -89,14 +89,18 @@
     "In any package with business logic, application/ must not import from infrastructure/ or composition/",
     "In any package with business logic, infrastructure/ must not import from composition/",
     "Only composition/ may import from infrastructure/; concrete adapter classes and repository-level factories must not be exported from index.ts",
-    "Delivery mechanisms import only use-case factories, the kernel, and the config loader port — never ports, infrastructure classes, or use case constructors",
+    "Delivery mechanisms import use-case factories, the kernel, createConfigLoader, and createConfigWriter — they MAY call methods on the returned ConfigLoader and ConfigWriter port instances but MUST NOT import infrastructure adapters or construct use cases directly",
     "Use cases receive all dependencies via constructor — no module-level singletons, in any package",
     "Domain entities must throw typed errors (subclasses of SpecdError) for invalid operations",
     "Stateless domain operations must be plain functions, not classes",
     "Ports with invariant constructor arguments are abstract class, not interface",
     "All port methods are explicit methods — no property signatures",
     "No package may introduce a circular workspace:* dependency",
-    "Infrastructure adapters that read external YAML files must validate the parsed content with a schema validator before constructing any domain or application objects; unvalidated YAML must never reach domain or application code"
+    "Infrastructure adapters that read external YAML files must validate the parsed content with a schema validator before constructing any domain or application objects; unvalidated YAML must never reach domain or application code",
+    "Public \".\" barrels MUST NOT export concrete adapter classes or infrastructure implementations",
+    "Public \".\" barrels MUST export kernel-equivalent createX use-case factories and repository-level factories for every capability on Kernel",
+    "Port contracts live on @specd/core/ports (and @specd/sdk/ports); extension registration types live on @specd/core/extensions (and @specd/sdk/extensions)",
+    "Delivery hosts (cli, mcp) MUST NOT declare direct runtime dependencies on both @specd/core and @specd/code-graph when @specd/sdk covers their needs"
   ],
   "scenarios": [
     {
@@ -190,6 +194,34 @@
       "then": ["pnpm must reject it"]
     },
     {
+      "requirement": "Curated public package entry points",
+      "name": "FsConfigLoader not importable from core public root",
+      "when": ["a consumer imports from @specd/core \".\""],
+      "then": ["FsConfigLoader is not an export", "AND the import fails at compile time"]
+    },
+    {
+      "requirement": "Curated public package entry points",
+      "name": "Port contracts available from core ports subpath",
+      "when": ["a consumer imports ChangeRepository from @specd/core/ports"],
+      "then": [
+        "the type is available",
+        "AND no concrete FsChangeRepository is exported from that subpath"
+      ]
+    },
+    {
+      "requirement": "Curated public package entry points",
+      "name": "createSpecRepository available from core public root",
+      "when": ["a consumer imports createSpecRepository from @specd/core \".\""],
+      "then": ["the function is available", "AND FsSpecRepository is not an export"]
+    },
+    {
+      "requirement": "Curated public package entry points",
+      "name": "CLI depends on SDK not core",
+      "given": ["packages/cli/package.json"],
+      "when": ["runtime dependencies are inspected"],
+      "then": ["@specd/sdk is declared", "AND @specd/core and @specd/code-graph are absent"]
+    },
+    {
       "requirement": "Composition layer for use-case wiring",
       "name": "Dependency injection is manual and explicit",
       "when": ["a package wires its use cases"],
@@ -208,6 +240,25 @@
       ]
     },
     {
+      "requirement": "Composition layer for use-case wiring",
+      "name": "Delivery uses createConfigWriter for yaml mutation",
+      "when": ["a delivery mechanism in @specd/cli mutates specd.yaml"],
+      "then": [
+        "it obtains a ConfigWriter via createConfigWriter() from @specd/core",
+        "AND it does not import FsConfigWriter or construct use cases InitProject, AddPlugin, or RemovePlugin"
+      ]
+    },
+    {
+      "requirement": "Composition layer for use-case wiring",
+      "name": "Kernel use cases receive config at construction",
+      "given": ["a delivery mechanism has called createKernel(config) with a resolved SpecdConfig"],
+      "when": ["it invokes a kernel use case other than getConfig"],
+      "then": [
+        "it does not pass config or config-derived approval/plugin subtrees in the execute() input",
+        "AND it reads config from kernel.project.getConfig.execute() when a fresh snapshot is needed"
+      ]
+    },
+    {
       "requirement": "YAML inputs validated at the infrastructure boundary",
       "name": "External data is validated before use",
       "when": ["a system component reads external YAML or structured data"],
@@ -215,36 +266,13 @@
         "it must validate that data against a formal schema at the boundary",
         "AND no unvalidated external structure may leak into domain or application logic"
       ]
-    },
-    {
-      "requirement": "SpecD Studio package graph",
-      "name": "UI package does not import core",
-      "when": ["@specd/ui dependency graph is inspected"],
-      "then": ["it depends on @specd/client", "AND it does not import @specd/core"]
-    },
-    {
-      "requirement": "SpecD Studio package graph",
-      "name": "Client package does not import core",
-      "when": ["@specd/client is built"],
-      "then": [
-        "adapters call HTTP or IPC transports only",
-        "AND no direct kernel imports exist in client sources"
-      ]
-    },
-    {
-      "requirement": "SpecD Studio package graph",
-      "name": "API handlers delegate to kernel use cases",
-      "when": ["an HTTP handler serves a mutating route"],
-      "then": [
-        "handler invokes kernel use case via composition context",
-        "AND lifecycle rules are not reimplemented in api package"
-      ]
     }
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:df93de8c83e5ce76e52b30ac301b32b9842f28b45a8c3625633f3f705310ba99",
-    "verify.md": "sha256:bcef5d29accb1554f92aeb6f5d53c97efa61a22e0473fb2b417d8fb94be23f58"
+    "spec.md": "sha256:649d57e4de29513d1ffcb625c7d9f050a2c49db3c0cfdc9a9d9f27186ff025c4",
+    "verify.md": "sha256:9edab4eb2f6a8df8c14907618da2387a597408ace90188018f3c94c7a4352589"
   },
-  "generatedBy": "core"
+  "generatedBy": "core",
+  "dependsOn": []
 }

@@ -13,6 +13,7 @@ specd change context <name> <step>
   [--rules] [--constraints] [--scenarios]
   [--include-change-specs]
   [--follow-deps [--depth <n>]]
+  [--optimized] [--no-optimized]
   [--fingerprint <hash>]
   [--format text|json|toon]
 ```
@@ -25,6 +26,8 @@ specd change context <name> <step>
 - `--include-change-specs` — when present, directly includes the change's `specIds` in the collected context. By default, direct `specIds` inclusion is disabled; those specs may still appear if selected by include patterns or dependency traversal.
 - `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.
 - `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
+- `--optimized` — optional; force prefer optimized context
+- `--no-optimized` — optional; suppress preference for optimized context
 - `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: "unchanged"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
@@ -48,7 +51,24 @@ When `--fingerprint` short-circuits the command with an unchanged context respon
 
 ### Requirement: Behaviour
 
-The command invokes the `CompileContext` use case. The `CompileContextConfig`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.
+The command invokes the `CompileContext` use case.
+
+The CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `CompileContext` instance at composition time.
+
+The CLI MUST pass only runtime overrides to `CompileContext.execute`:
+
+- `name` and `step` from positional arguments
+- `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `hybrid` when yaml default is not `full`/`hybrid`)
+- `llmOptimizedContext` only when explicitly resolved via `--optimized` or `--no-optimized` and the resolved value differs from the yaml default (omit the field when it matches the baked default)
+- `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` from the corresponding CLI flags
+
+The effective `llmOptimizedContext` value for explicit CLI overrides is determined as follows:
+
+- If `--no-optimized` is passed, it is `false`.
+- If `--optimized` is passed, it is `true`.
+- Otherwise, the CLI does not pass `llmOptimizedContext` on `execute` — the baked yaml default applies.
+
+Optimization bypass when only a subset of sections is requested (for example `--rules` without `--constraints`) is enforced by `CompileContext` from the forwarded `sections` input and the baked `llmOptimizedContext` default. The CLI MUST NOT recompute or override `llmOptimizedContext` based on section flags.
 
 When `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.
 
@@ -102,6 +122,8 @@ Any warnings from the `CompileContext` use case (for example stale metadata, mis
 - `--include-change-specs` is opt-in; without the flag, `change.specIds` are not direct seeds
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
 - `availableSteps`, `stepAvailable`, and `blockingArtifacts` are rendered from `CompileContext` output; the CLI must not re-derive lifecycle readiness locally
+- Section flags override `llmOptimizedContext` to `false` unless the combination of requested sections includes both rules and constraints
+- Optimization warnings for missing or stale optimized fields are suppressed whenever the effective `llmOptimizedContext` is `false`
 
 ## Examples
 

@@ -1,0 +1,33 @@
+- op: modified
+  description: ConfigWriter is the single write contract for init and plugin mutation
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    Project initialisation and plugin declaration mutation must create and update `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — `initProject`, `addPlugin`, and `removePlugin` — complementing the read-only `ConfigLoader`. Delivery mechanisms obtain a wired instance via `createConfigWriter()` from the composition layer.
+
+- op: added
+  description: Document public access path for delivery
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: AddPlugin'
+  content: |
+    ### Requirement: RemovePlugin
+
+    The `removePlugin` method accepts three parameters:
+
+    1. `configPath: string` — absolute path to the `specd.yaml` to update
+    2. `type: string` — the plugin type (e.g. `"agents"`)
+    3. `name: string` — the plugin package name
+
+    It MUST return `Promise<void>`. The method MUST remove the named plugin from `plugins.<type>` in `specd.yaml`.
+
+    ### Requirement: Delivery access via createConfigWriter
+
+    Delivery mechanisms (CLI, MCP, plugins) MUST obtain a `ConfigWriter` instance through `createConfigWriter()` exported from `@specd/core`. They MAY call `initProject`, `addPlugin`, and `removePlugin` on that instance. They MUST NOT import `FsConfigWriter` or construct port implementations directly.
+
+    `listPlugins` on the port remains for infrastructure compatibility but delivery MUST NOT use it for declaration reads when a `SpecdConfig` snapshot is already available.

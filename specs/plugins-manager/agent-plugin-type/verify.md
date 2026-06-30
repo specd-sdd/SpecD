@@ -26,12 +26,12 @@
 
 ### Requirement: AgentInstallOptions
 
-#### Scenario: Options include skills filter, recursive variables, and capability identifiers
+#### Scenario: Options include skills and agents filter, recursive variables, and capability identifiers
 
-- **WHEN** `AgentInstallOptions` is used
-- **THEN** it accepts an optional `skills` array
-- **AND** it accepts optional recursive `variables`
-- **AND** it accepts optional `capabilities` as a list of strings
+- **GIVEN** a request to install specific skills and agents
+- **WHEN** `AgentInstallOptions` is provided
+- **THEN** it can filter by `skills` and `agents` arrays
+- **AND** it includes `variables` and `capabilities`
 
 #### Scenario: Initial capability identifiers are required by the contract
 
@@ -63,3 +63,17 @@
 - **WHEN** `AgentInstallResult` is returned
 - **THEN** it contains `installed` array with skill and path
 - **AND** `skipped` array with skill and reason
+
+### Requirement: Agent installation and fallback
+
+#### Scenario: Agent installed in agents directory
+
+- **GIVEN** a runtime supports `agents`
+- **WHEN** an agent is installed
+- **THEN** it is placed in the designated `agents/` directory of the coding agent
+
+#### Scenario: Agent fallback to shared directory
+
+- **GIVEN** a runtime DOES NOT support `agents`
+- **WHEN** an agent is installed
+- **THEN** it is copied to the same directory as `shared.md`

@@ -1,6 +1,22 @@
 /**
+ * Strips ANSI escape sequences and non-printable control characters from snippet text.
+ *
+ * Newlines and tabs are preserved so later formatting can still compute readable
+ * indentation and line boundaries.
+ *
+ * @param text - Raw snippet text from the graph provider.
+ * @returns Sanitized text safe for terminal rendering.
+ */
+function stripTerminalControlSequences(text: string): string {
+  return text
+    .replaceAll(/\u001B\[[0-?]*[ -/]*[@-~]/g, '')
+    .replaceAll(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
+}
+
+/**
  * Normalizes a code snippet for CLI display.
- * Expands tabs, removes common leading indentation, and applies an optional margin.
+ * Sanitizes terminal control sequences, expands tabs, removes common leading
+ * indentation, and applies an optional margin.
  *
  * @param text - The raw snippet text.
  * @param options - Normalization options.
@@ -15,13 +31,13 @@ export function normalizeSnippet(
   const tabWidth = options.tabWidth ?? 2
   const margin = ' '.repeat(options.margin ?? 0)
 
-  // 1. Expand tabs and split into lines
-  const lines = text
+  // 1. Sanitize terminal control content, expand tabs, and split into lines.
+  const lines = stripTerminalControlSequences(text)
     .replaceAll('\t', ' '.repeat(tabWidth))
     .split(/\r?\n/)
     .map((line) => line.trimEnd())
 
-  // 2. Identify minimum leading indentation across non-empty lines
+  // 2. Identify minimum leading indentation across non-empty lines.
   let minIndent = Infinity
   for (const line of lines) {
     if (line.trim().length === 0) continue
@@ -31,7 +47,7 @@ export function normalizeSnippet(
 
   if (minIndent === Infinity) minIndent = 0
 
-  // 3. Strip min indentation and apply margin
+  // 3. Strip min indentation and apply margin.
   return lines
     .map((line) => {
       if (line.trim().length === 0) return ''

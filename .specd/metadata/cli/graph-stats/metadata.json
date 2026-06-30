@@ -4,9 +4,11 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:config",
-    "code-graph:composition",
     "code-graph:staleness-detection",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "code-graph:get-graph-health",
+    "sdk:with-open-graph-provider",
+    "sdk:host-context"
   ],
   "context": [
     "Without a quick overview of the code graph's contents, users and agents cannot tell whether the graph is populated, how large it is, or when it was last updated. The `specd graph stats` command displays summary statistics from the code graph so users can assess coverage and freshness at a glance."
@@ -21,19 +23,19 @@
     {
       "requirement": "Statistics retrieval",
       "rules": [
-        "The command:\n\n1. Resolves graph context.\n2. In configured mode, obtains the orchestrated project structure via `ListWorkspaces`.\n3. Uses the orchestrated list together with the effective graph discovery configuration to determine the project fingerprint and compare it against the graph store's metadata.\n4. Creates, opens, and queries the `CodeGraphProvider`.\n5. Resolves the current VCS ref and compares it against `statistics.lastIndexedRef` to determine staleness.\n6. Outputs the statistics.\n7. Closes the provider and exits."
+        "The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through `withOpenGraphProvider(ctx, fn)`, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()` inside the callback. It outputs the returned result fields, closes the provider via the SDK lifecycle wrapper, and exits.\n\nThe command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.\n\nGraph context and provider lifecycle MUST go through `cli:graph-cli-context` and `@specd/sdk` symbols."
       ]
     },
     {
       "requirement": "Concurrent indexing guard",
       "rules": [
-        "Before attempting to open the provider, `graph stats` SHALL check the shared graph indexing lock used by `graph index`.\n\nIf indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.\n\nThis guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph."
+        "Before attempting to open the provider, `graph stats` SHALL query the lock status from the provider. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default), the output is a labelled summary:\n\n```text\nFiles:     459\nDocuments: 18\nSymbols:   1497\nSpecs:     122\nLanguages: javascript, typescript\nRelations:\n  IMPORTS: 1227\n  DEFINES: 1497\nLast indexed: 2026-03-14T10:38:30.178Z\n```\n\n- `Files`, `Documents`, `Symbols`, `Specs` show `fileCount`, `documentCount`, `symbolCount`, `specCount`\n- `Languages` shows the `languages` array joined by `, `\n- `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line\n- `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp\n\nIf the graph is stale, a warning line SHALL be appended after `Last indexed`:\n\n```text\n⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)\n```\n\nWhere `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.\n\nIn `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with three additional fields:\n\n- `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown\n- `currentRef: string | null` — the current VCS ref, or `null` if unavailable\n- `fingerprintMismatch: boolean | null` — `true` when the stored derivation fingerprint differs from the current effective graph configuration, `false` when it matches, `null` when the comparison cannot be computed"
+        "In `text` mode (default), the output is a labelled summary:\n\n```text\nFiles:     459\nDocuments: 18\nSymbols:   1497\nSpecs:     122\nLanguages: javascript, typescript\nRelations:\n  IMPORTS: 1227\n  DEFINES: 1497\nLast indexed: 2026-03-14T10:38:30.178Z\n```\n\n- `Files`, `Documents`, `Symbols`, `Specs` show `fileCount`, `documentCount`, `symbolCount`, `specCount`\n- `Languages` shows the `languages` array joined by `, `\n- `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line\n- `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp\n\nIf the graph is stale, a warning line SHALL be appended after `Last indexed`:\n\n```text\n⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)\n```\n\nWhere `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.\n\nIf the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration, a warning line SHALL be appended to stderr in text mode:\n\n```text\n⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index\n```\n\nThis warning is independent from the VCS staleness line. Both MAY appear when the graph is stale by ref and mismatched by derivation fingerprint.\n\nIn `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with three additional fields:\n\n- `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown\n- `currentRef: string | null` — the current VCS ref, or `null` if unavailable\n- `fingerprintMismatch: boolean | null` — `true` when the stored derivation fingerprint differs from the current effective graph configuration, `false` when it matches, `null` when the comparison cannot be computed"
       ]
     },
     {
@@ -44,11 +46,10 @@
     }
   ],
   "constraints": [
-    "The CLI does not compute statistics — it delegates entirely to @specd/code-graph",
-    "process.exit(0) is called explicitly after closing the provider",
+    "Health orchestration runs inside withOpenGraphProvider from @specd/sdk; the CLI does not manage provider lifecycle inline",
+    "process.exit(0) is called explicitly after the SDK wrapper closes the provider",
     "Zero-value relation counts are omitted from text output for readability",
-    "Context resolution SHALL use the shared graph CLI model rather than command-local path semantics",
-    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress"
+    "Bootstrap mode (--path) resolves host context through openSpecdHost with the appropriate config path input"
   ],
   "scenarios": [
     {
@@ -76,12 +77,28 @@
     },
     {
       "requirement": "Statistics retrieval",
+      "name": "Command delegates health to GetGraphHealth via SDK",
+      "when": ["specd graph stats is executed in configured mode with kernel available"],
+      "then": [
+        "it opens the provider via withOpenGraphProvider from @specd/sdk",
+        "AND it calls GetGraphHealth.execute() with workspaces from ListWorkspaces",
+        "AND graph context and lifecycle go through cli:graph-cli-context"
+      ]
+    },
+    {
+      "requirement": "Statistics retrieval",
       "name": "Command obtains orchestrated project structure",
       "when": ["specd graph stats is executed in configured mode"],
       "then": [
         "it calls ListWorkspaces to obtain the rich workspace list",
-        "AND it uses this list to compute the project fingerprint"
+        "AND it passes that list to GetGraphHealth for fingerprint comparison"
       ]
+    },
+    {
+      "requirement": "Statistics retrieval",
+      "name": "Host context from openSpecdHost",
+      "when": ["specd graph stats is executed"],
+      "then": ["it obtains host context via openSpecdHost from @specd/sdk"]
     },
     {
       "requirement": "Concurrent indexing guard",
@@ -115,6 +132,17 @@
       "given": ["lastIndexedRef is null"],
       "when": ["graph stats is run in text mode"],
       "then": ["no staleness line SHALL be shown"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output with derivation fingerprint mismatch",
+      "given": [
+        "the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration"
+      ],
+      "when": ["graph stats is run in text mode"],
+      "then": [
+        "stderr contains ⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index"
+      ]
     },
     {
       "requirement": "Output format",
@@ -154,20 +182,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:graph-stats",
-        "file": "cli:src/commands/graph/stats.ts"
-      },
-      {
-        "specId": "cli:graph-stats",
-        "file": "cli:test/commands/graph-stats.spec.ts"
+        "file": "cli:src/commands/graph/stats.ts",
+        "symbol": "registerGraphStats"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1e48b811cb58c8f4a35a688d81af0d16142ee4c1e365d06ca88a7741263bb9c0",
-    "verify.md": "sha256:617950380819cbbef91a4cd934602c82d69413c957563eba6527c0c9bf5481ad"
+    "spec.md": "sha256:2234b8b91d0ae1c4ba8a61c2ef807e82eeb00ef24ae2cbc4b921f9cf49af99b5",
+    "verify.md": "sha256:9fee4da117bce97f84d57a988126333af65ee03f5dec7d5c3ec72eb183d950d4"
   },
   "generatedBy": "core"
 }

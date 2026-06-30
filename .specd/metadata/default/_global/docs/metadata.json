@@ -45,7 +45,13 @@
     {
       "requirement": "Core documentation",
       "rules": [
-        "Public types, ports, and use cases in `@specd/core` are documented in `docs/core/` with their purpose, contracts, and usage examples."
+        "Public types, ports, and kernel use cases are documented in `docs/core/` as **`@specd/core` package reference** — semantics, contracts, and behaviour. That section is NOT an integrator import guide.\n\n**Integrators (hosts: cli, mcp, API, IPC) MUST import from `@specd/sdk` only.** Documentation MUST NOT present a pattern of mixing `@specd/core` and `@specd/code-graph` imports for the same host.\n\n`docs/core/index.md` and `docs/code-graph/index.md` MUST include a prominent callout: hosts start at `docs/sdk/` and import from `@specd/sdk`.\n\nWhere examples show `@specd/core` imports, they MUST be labeled **plugin / core-only** audience — not hosts. An optional footnote MAY note the symbol is also re-exported from `@specd/sdk`; it MUST NOT read as \"integrators may choose either package\".\n\nCore-only packages (`plugin-*`, `skills`) MAY use `@specd/core` as the primary import in examples.\n\nExamples in `docs/sdk/` MUST use `@specd/sdk` imports and document both assembly paths where relevant: `createKernel` + `kernel.*.execute()` and standalone `createX` / `create*Repository` factories."
+      ]
+    },
+    {
+      "requirement": "SDK documentation",
+      "rules": [
+        "`docs/sdk/` is the **only** integrator entry point in Docusaurus (sidebar category **SDK**, positioned before package-reference sections). It MUST document:\n\n- `@specd/sdk` as the **single** import surface for hosts — core, code-graph, and SDK orchestration on `\".\"`, `\"./ports\"`, and `\"./extensions\"`\n- Explicit rule: hosts do not declare parallel `@specd/core` + `@specd/code-graph` dependencies or mix imports across those packages\n- Host bootstrap (`openSpecdHost`, `createSdkContext`) and orchestration helpers\n- Kernel-equivalent assembly via `createKernel` or standalone `createX` / `create*Repository` factories (all from `@specd/sdk`)\n\nLegacy `docs/core/sdk.md` content MUST move into `docs/sdk/`. `docs/core/` and `docs/code-graph/` remain package-reference sections (sidebar label **Package reference** or nested under SDK) for plugin authors and symbol semantics — not parallel integrator paths.\n\nWhen public API reference content is generated for the website, generation entry points and landing copy MUST treat `@specd/sdk` as the integrator surface per `public-web:api-reference`."
       ]
     },
     {
@@ -149,6 +155,43 @@
       "then": ["a corresponding entry in docs/core/ must be created in the same change"]
     },
     {
+      "requirement": "SDK documentation",
+      "name": "docs/sdk is the only integrator entry point",
+      "when": ["the Docusaurus sidebar is inspected"],
+      "then": [
+        "SDK appears as the integrator category",
+        "AND docs/sdk/ contains the canonical host guide",
+        "AND docs/core/ and docs/code-graph/ are labeled or positioned as package reference, not peer integrator entry points"
+      ]
+    },
+    {
+      "requirement": "SDK documentation",
+      "name": "package-reference indexes redirect hosts to SDK",
+      "when": ["docs/core/index.md or docs/code-graph/index.md is read"],
+      "then": [
+        "a callout directs hosts to docs/sdk/ and @specd/sdk imports",
+        "AND the page does not instruct hosts to mix @specd/core and @specd/code-graph imports"
+      ]
+    },
+    {
+      "requirement": "SDK documentation",
+      "name": "sdk docs forbid mixed host imports",
+      "when": ["docs/sdk/ is read"],
+      "then": [
+        "it states hosts import from @specd/sdk only",
+        "AND it does not present @specd/core + @specd/code-graph as a combined host pattern"
+      ]
+    },
+    {
+      "requirement": "SDK documentation",
+      "name": "core use-cases label core-only audience",
+      "when": ["docs/core/use-cases.md shows @specd/core imports"],
+      "then": [
+        "examples are labeled for plugin / core-only consumers",
+        "AND host integrators are directed to docs/sdk/ for @specd/sdk examples"
+      ]
+    },
+    {
       "requirement": "JSDoc on all symbols",
       "name": "Exported function without JSDoc",
       "when": ["an exported function in @specd/core has no JSDoc block comment"],
@@ -165,13 +208,13 @@
     "files": [
       {
         "specId": "default:_global/docs",
-        "file": "default:docs/adr/0022-split-archive-index-and-detail-models.md"
+        "file": "default:docs/sdk/index.md"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:cf5977216e846311dd37f49660e134fa67ed1d85583b857289c86fb90da7cf2a",
-    "verify.md": "sha256:d231692473762a2bb54913270bda6814b425486c45f931f59009b0c1cfac8173"
+    "spec.md": "sha256:9e16b88d3ba014a2cf9b7e6ca5229860f9f5020f7566595a388a5f3976272340",
+    "verify.md": "sha256:9d2a97b836043ecc61b405946e634217529e12bf76f02b2d596ec675addfa6c9"
   },
   "generatedBy": "core"
 }

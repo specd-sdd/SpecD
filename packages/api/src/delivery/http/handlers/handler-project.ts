@@ -1,6 +1,5 @@
 import { createVcsAdapter } from '@specd/core'
 import { type FastifyInstance } from 'fastify'
-import { buildCompileContextConfig } from '../compile-config.js'
 import { apiHandler } from '../handler-utils.js'
 import { toProjectDto, toProjectStatusDto } from '../presenters/presenter-project.js'
 import {
@@ -101,7 +100,6 @@ export function registerProjectRoutes(app: FastifyInstance): void {
         depth?: string
       }
       const result = await ctx.kernel.project.getProjectContext.execute({
-        config: buildCompileContextConfig(ctx.config),
         ...(query.followDeps === 'true' ? { followDeps: true } : {}),
         ...(query.depth !== undefined ? { depth: Number(query.depth) } : {}),
       })

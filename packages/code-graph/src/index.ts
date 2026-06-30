@@ -1,6 +1,5 @@
 // Composition
 export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
-export { buildProjectGraphConfig } from './composition/build-project-graph-config.js'
 export {
   type CodeGraphFactoryOptions,
   type CodeGraphOptions,
@@ -8,6 +7,31 @@ export {
   type GraphStoreFactoryOptions,
 } from './composition/graph-store-factory.js'
 export type { CodeGraphProvider } from './composition/code-graph-provider.js'
+
+// Host use cases
+export {
+  GetGraphHealth,
+  type GetGraphHealthInput,
+  type GetGraphHealthResult,
+} from './application/use-cases/get-graph-health.js'
+export { createGetGraphHealth } from './composition/use-cases/get-graph-health.js'
+export {
+  IndexProjectGraph,
+  type IndexProjectGraphInput,
+} from './application/use-cases/index-project-graph.js'
+export { createIndexProjectGraph } from './composition/use-cases/index-project-graph.js'
+export {
+  GetSpecCoverage,
+  type GetSpecCoverageInput,
+  type GetSpecCoverageResult,
+} from './application/use-cases/get-spec-coverage.js'
+export { createGetSpecCoverage } from './composition/use-cases/get-spec-coverage.js'
+export {
+  GetChangeSpecCoverage,
+  type GetChangeSpecCoverageInput,
+  type GetChangeSpecCoverageResult,
+} from './application/use-cases/get-change-spec-coverage.js'
+export { createGetChangeSpecCoverage } from './composition/use-cases/get-change-spec-coverage.js'
 
 // Value objects
 export { type FileNode } from './domain/value-objects/file-node.js'
@@ -40,12 +64,20 @@ export {
   type IndexOptions,
   type IndexProgressCallback,
   type ProjectGraphConfig,
+  type WorkspaceIndexTarget,
+  type DiscoveredSpec,
 } from './domain/value-objects/index-options.js'
 export {
   type IndexResult,
   type IndexError,
   type WorkspaceIndexBreakdown,
 } from './domain/value-objects/index-result.js'
+export {
+  type IndexSession,
+  type RegisterFileInput,
+  type RegisterAnalysisInput,
+} from './domain/value-objects/index-session.js'
+export { InMemoryIndexSession } from './application/use-cases/in-memory-index-session.js'
 
 // Traversal types
 export { type TraversalOptions } from './domain/value-objects/traversal-options.js'
@@ -71,6 +103,10 @@ export {
 
 // Domain services
 export { expandSymbolName } from './domain/services/expand-symbol-name.js'
+export { expandSearchQuery, expandSearchToken } from './domain/services/expand-search-query.js'
+export { isGraphStale } from './domain/services/is-graph-stale.js'
+export { analyzeFilesImpact } from './domain/services/analyze-files-impact.js'
+export { normalizeFileSelectorPath } from './application/services/resolve-graph-selector.js'
 export {
   computeGraphFingerprint,
   computeRootFingerprint,
@@ -81,9 +117,25 @@ export {
   type GraphFingerprintInput,
 } from './application/use-cases/_shared/compute-graph-fingerprint.js'
 
+// Infrastructure
+export { acquireGraphIndexLock, assertGraphIndexUnlocked } from './infrastructure/index-lock.js'
+
+// Application services
+export { createBootstrapGraphConfig } from './application/services/bootstrap-graph-config.js'
+export {
+  buildProjectGraphConfig,
+  type GraphConfigOverrides,
+} from './application/services/build-project-graph-config.js'
+
 // Errors
 export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'
 export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
+import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/installed-code-graph-version.js'
+
+export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
+
+/** Installed version of `@specd/code-graph`. */
+export const CODE_GRAPH_VERSION: string = readInstalledCodeGraphVersion()

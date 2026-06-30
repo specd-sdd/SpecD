@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError } from '@specd/sdk'
 import {
   makeMockConfig,
   makeMockKernel,
@@ -9,14 +9,12 @@ import {
   captureStderr,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeContext } from '../../src/commands/change/context.js'
 
 const mockResult = {
@@ -57,8 +55,11 @@ function setup() {
     ],
   })
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   kernel.changes.compile.execute.mockResolvedValue({ ...mockResult })
   const stdout = captureStdout()
   const stderr = captureStderr()
@@ -440,5 +441,69 @@ describe('change context', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/error:/)
+  })
+
+  it('passes llmOptimizedContext as true by default when config says true, even with multiple flags', async () => {
+    const { kernel, config } = setup()
+    ;(config as any).llmOptimizedContext = true
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--rules',
+      '--constraints',
+    ])
+
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
+    expect(call).not.toHaveProperty('config')
+    expect(call).not.toHaveProperty('llmOptimizedContext')
+  })
+
+  it('passes llmOptimizedContext as false when --no-optimized is provided', async () => {
+    const { kernel, config } = setup()
+    ;(config as any).llmOptimizedContext = true
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--no-optimized',
+    ])
+
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
+    expect(call).not.toHaveProperty('config')
+    expect(call.llmOptimizedContext).toBe(false)
+  })
+
+  it('passes llmOptimizedContext true when --optimized overrides yaml false', async () => {
+    const { kernel, config } = setup()
+    ;(config as { llmOptimizedContext?: boolean }).llmOptimizedContext = false
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--optimized',
+    ])
+
+    const call = kernel.changes.compile.execute.mock.calls[0]![0]
+    expect(call).not.toHaveProperty('config')
+    expect(call.llmOptimizedContext).toBe(true)
   })
 })

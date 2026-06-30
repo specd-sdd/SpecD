@@ -1,0 +1,132 @@
+{
+  "title": "GetConfig",
+  "description": "Delivery hosts (CLI, SDK, API, MCP) that receive a wired `Kernel` need to read the project configuration snapshot the kernel was built from without maintaining a parallel `SpecdConfig` in host context. `GetConfig` exposes that snapshot as a host-facing, read-only view. It does not re-read `specd.yaml` from disk and does not replace internal use cases that retain the live configuration reference for composition wiring.",
+  "dependsOn": ["core:config", "default:_global/architecture"],
+  "context": [
+    "Delivery hosts (CLI, SDK, API, MCP) that receive a wired `Kernel` need to read the project configuration snapshot the kernel was built from without maintaining a parallel `SpecdConfig` in host context. `GetConfig` exposes that snapshot as a host-facing, read-only view. It does not re-read `specd.yaml` from disk and does not replace internal use cases that retain the live configuration reference for composition wiring."
+  ],
+  "rules": [
+    {
+      "requirement": "Constructor captures construction-time config",
+      "rules": [
+        "`GetConfig` MUST accept a `SpecdConfig` in its constructor — the same object passed to `createKernel` at kernel construction time.\n\nThe constructor MUST store `structuredClone(config)` as an internal snapshot. The live reference passed to other kernel use cases MUST NOT be returned from `execute()`."
+      ]
+    },
+    {
+      "requirement": "execute returns a parameterless host snapshot",
+      "rules": [
+        "`GetConfig.execute()` MUST accept no input parameters.\n\nOn success, `execute()` MUST return `Readonly<SpecdConfig>` representing the construction-time snapshot.\n\nThe returned object MUST be referentially identical across multiple `execute()` calls on the same `GetConfig` instance."
+      ]
+    },
+    {
+      "requirement": "No disk I/O",
+      "rules": [
+        "`GetConfig` MUST NOT read from the filesystem, invoke `ConfigLoader`, or invoke `ConfigWriter`.\n\nIf `specd.yaml` changes on disk after kernel creation, hosts MUST recreate the kernel to observe the new configuration."
+      ]
+    },
+    {
+      "requirement": "Host read path only",
+      "rules": [
+        "`GetConfig` is a host-facing read API. It MUST NOT be used by domain use cases to re-inject full project configuration into other use case `execute` inputs.\n\nPersisting configuration changes to `specd.yaml` MUST go through `ConfigWriter` composition factories, not through mutation of the object returned by `GetConfig`."
+      ]
+    },
+    {
+      "requirement": "Standalone factory",
+      "rules": [
+        "`createGetConfig(config: SpecdConfig)` in `composition/use-cases/` MUST construct and return a `GetConfig` instance without requiring a full kernel."
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case MUST NOT mutate the internal snapshot after construction.",
+    "The use case MUST NOT expose the live SpecdConfig reference used by internal kernel wiring (e.g. ListWorkspaces)."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Constructor captures construction-time config",
+      "name": "Internal snapshot is a clone",
+      "given": ["a SpecdConfig object passed to the GetConfig constructor"],
+      "when": ["GetConfig is constructed"],
+      "then": [
+        "the internal snapshot is not referentially equal to the constructor argument",
+        "AND the internal snapshot is deep-equal to the constructor argument"
+      ]
+    },
+    {
+      "requirement": "execute returns a parameterless host snapshot",
+      "name": "Returns cloned snapshot without input",
+      "when": ["getConfig.execute() is called on a wired GetConfig instance"],
+      "then": ["it returns a Readonly<SpecdConfig>", "AND no parameters are required"]
+    },
+    {
+      "requirement": "execute returns a parameterless host snapshot",
+      "name": "Stable reference across calls",
+      "when": ["execute() is called twice on the same GetConfig instance"],
+      "then": ["both return values are referentially identical"]
+    },
+    {
+      "requirement": "No disk I/O",
+      "name": "execute does not touch filesystem",
+      "given": ["a GetConfig instance constructed from a valid config snapshot"],
+      "when": ["execute() is called"],
+      "then": ["no filesystem reads or writes occur"]
+    },
+    {
+      "requirement": "Host read path only",
+      "name": "Host mutation does not affect kernel wiring",
+      "given": [
+        "a kernel constructed with createKernel(config)",
+        "AND const hostView = kernel.project.getConfig.execute()"
+      ],
+      "when": [
+        "a nested field on hostView is mutated (for example pushing into a workspaces array copy path)"
+      ],
+      "then": [
+        "a subsequent kernel.project.listWorkspaces.execute() result is unchanged",
+        "AND a second kernel.project.getConfig.execute() returns a value deep-equal to the pre-mutation snapshot"
+      ]
+    },
+    {
+      "requirement": "Host read path only",
+      "name": "Returned snapshot is not the live wiring reference",
+      "given": ["a kernel constructed with createKernel(config)"],
+      "when": [
+        "kernel.project.getConfig.execute() is compared to the original config object passed to createKernel"
+      ],
+      "then": ["they are deep-equal", "AND they are not referentially identical"]
+    },
+    {
+      "requirement": "Standalone factory",
+      "name": "Factory works without kernel",
+      "when": ["createGetConfig(config) is called with a valid SpecdConfig"],
+      "then": [
+        "it returns a GetConfig instance",
+        "AND execute() returns a readonly snapshot deep-equal to config"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-config",
+        "file": "core:src/application/use-cases/get-config.ts",
+        "symbol": "GetConfig"
+      },
+      {
+        "specId": "core:get-config",
+        "file": "core:src/composition/use-cases/get-config.ts",
+        "symbol": "createGetConfig"
+      },
+      {
+        "specId": "core:get-config",
+        "file": "core:src/composition/use-cases/get-config.ts",
+        "symbol": "GetConfigOptions"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:85f900139d34c4ff3d0884d895ce35d6076228a3bba5841f338c5d52f1bda58b",
+    "verify.md": "sha256:4120fc6197c1aeabef87868ef7ea4c1586026a065a6877156ed1f827309aaedd"
+  },
+  "generatedBy": "core"
+}

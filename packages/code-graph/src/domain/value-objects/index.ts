@@ -18,7 +18,14 @@ export {
   type ProjectGraphConfig,
 } from './index-options.js'
 export { type IndexResult, type IndexError, type WorkspaceIndexBreakdown } from './index-result.js'
-export { type LanguageAdapter } from './language-adapter.js'
+export {
+  type LanguageAdapter,
+  type AdapterAnalyzeContext,
+  type ImportResolutionContext,
+  type RelationBuildContext,
+  type ResolvedImports,
+} from './language-adapter.js'
+
 export { type ImportDeclaration } from './import-declaration.js'
 export { ImportDeclarationKind } from './import-declaration-kind.js'
 export { type SourceLocation } from './source-location.js'
@@ -29,3 +36,14 @@ export {
   type BindingFact,
 } from './binding-fact.js'
 export { CallForm, type CallFact, type ResolvedDependency } from './call-fact.js'
+export {
+  type FileAnalysisDraft,
+  type FileAnalysis,
+  type ParserState,
+  type AdapterSessionState,
+} from './file-analysis.js'
+export {
+  type IndexSession,
+  type RegisterFileInput,
+  type RegisterAnalysisInput,
+} from './index-session.js'

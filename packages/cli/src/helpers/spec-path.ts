@@ -1,4 +1,4 @@
-import { type SpecdConfig, InvalidSpecPathError } from '@specd/core'
+import { type SpecdConfig, InvalidSpecPathError } from '@specd/sdk'
 
 /** Result of parsing a spec ID string. */
 export interface ParsedSpecId {

@@ -26,4 +26,9 @@ export interface Frontmatter {
    * Optional metadata map.
    */
   readonly metadata?: Record<string, string>
+
+  /**
+   * Optional allowed tools list for agents (comma-separated).
+   */
+  readonly allowed_tools?: string
 }

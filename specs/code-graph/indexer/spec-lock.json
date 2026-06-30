@@ -15,8 +15,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/spec-node.ts",
-      "symbols": ["SpecNode", "createSpecNode"]
+      "file": "code-graph:src/application/use-cases/discover-files.ts",
+      "symbols": ["DEFAULT_BINARY_EXTENSIONS", "discoverFiles"]
     },
     {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",

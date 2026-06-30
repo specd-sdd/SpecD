@@ -1,6 +1,7 @@
 import { type Command } from 'commander'
 import { ListPlugins as ListRuntimePlugins, createPluginLoader } from '@specd/plugin-manager'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import { getDeclaredPlugins } from './get-declared-plugins.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 
@@ -36,10 +37,9 @@ export function registerPluginsList(parent: Command): void {
     .action(async (opts: { type?: string; format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath, kernel } = await resolveCliContext({
+        const { config } = await resolveCliContext({
           configPath: opts.config,
         })
-        const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const types = opts.type === undefined ? ['agents'] : [opts.type]
 
         const rows: PluginListRow[] = []
@@ -47,7 +47,7 @@ export function registerPluginsList(parent: Command): void {
         const listRuntime = new ListRuntimePlugins(loader)
 
         for (const type of types) {
-          const declared = await kernel.project.listPlugins.execute({ configPath, type })
+          const declared = getDeclaredPlugins(config, type)
           if (declared.length === 0) {
             continue
           }

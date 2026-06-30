@@ -24,11 +24,23 @@
 
 ### Requirement: Statistics retrieval
 
+#### Scenario: Command delegates health to GetGraphHealth via SDK
+
+- **WHEN** `specd graph stats` is executed in configured mode with kernel available
+- **THEN** it opens the provider via `withOpenGraphProvider` from `@specd/sdk`
+- **AND** it calls `GetGraphHealth.execute()` with workspaces from `ListWorkspaces`
+- **AND** graph context and lifecycle go through `cli:graph-cli-context`
+
 #### Scenario: Command obtains orchestrated project structure
 
 - **WHEN** `specd graph stats` is executed in configured mode
 - **THEN** it calls `ListWorkspaces` to obtain the rich workspace list
-- **AND** it uses this list to compute the project fingerprint
+- **AND** it passes that list to `GetGraphHealth` for fingerprint comparison
+
+#### Scenario: Host context from openSpecdHost
+
+- **WHEN** `specd graph stats` is executed
+- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
 
 ### Requirement: Concurrent indexing guard
 
@@ -58,6 +70,12 @@
 - **GIVEN** `lastIndexedRef` is `null`
 - **WHEN** `graph stats` is run in text mode
 - **THEN** no staleness line SHALL be shown
+
+#### Scenario: Text output with derivation fingerprint mismatch
+
+- **GIVEN** the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration
+- **WHEN** `graph stats` is run in text mode
+- **THEN** stderr contains `⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index`
 
 #### Scenario: Text output includes document counts
 

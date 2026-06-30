@@ -1,0 +1,16 @@
+- op: added
+  description: Verify SDK orchestration guidance on composition layer
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: ResolveSchema factory wiring'
+  content: |
+    ### Requirement: @specd/sdk orchestrates cross-package host bootstrap
+
+    #### Scenario: SDK package exists for host bootstrap
+
+    - **WHEN** a delivery host needs config, kernel, and graph provider wiring
+    - **THEN** `@specd/sdk` provides `openSpecdHost` and `createSdkContext` as the documented entry points

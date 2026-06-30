@@ -1,0 +1,17 @@
+- op: added
+  description: Verify health orchestration requirement
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Centralized index lock control'
+  content: |
+    ### Requirement: Health orchestration use case
+
+    #### Scenario: Hosts use GetGraphHealth for diagnostics assembly
+
+    - **GIVEN** a host needs graph statistics with staleness and fingerprint fields
+    - **WHEN** it assembles health output
+    - **THEN** it delegates to `GetGraphHealth` rather than calling `isGraphStale` and fingerprint helpers inline

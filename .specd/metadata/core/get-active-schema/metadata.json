@@ -189,6 +189,7 @@
       "then": ["both calls produce an equivalent Schema object"]
     }
   ],
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:1468b3c62f3505b7e7491ec9f3aa633ced4bd3c654d3275bd6208d0bc1b236a5",
     "verify.md": "sha256:10555b5b64c11507f2b1793a5d2455e152341b3390104c67857dcb6468a7db7e"

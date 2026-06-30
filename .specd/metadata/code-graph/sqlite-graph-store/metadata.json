@@ -56,7 +56,7 @@
     {
       "requirement": "SQLite full-text search",
       "rules": [
-        "`SQLiteGraphStore` SHALL implement symbol, spec, and document search using SQLite full-text search (FTS5).\n\nThe adapter MUST:\n\n- provide full-text search over `Document` content and paths\n- prioritize **exact identity matches** (Spec ID, Symbol Name/ID, Document Path) by boosting results where the query matches the primary identity column exactly\n- use BM25 ranking for remaining textual matches across all searchable columns\n- sanitize and join multi-token queries using `OR` logic for broad discovery\n- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches\n\nThe SQLite FTS schema MUST include:\n\n- **`symbol_fts`** virtual table covering `Symbol.name` and `Symbol.comment`\n- **`spec_fts`** virtual table covering `Spec.title`, `Spec.description`, and `Spec.content`\n- **`document_fts`** virtual table covering `Document.path` and `Document.content`\n\nThe implementation MAY use stemming or other SQLite-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.\n\nPersisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change."
+        "`SQLiteGraphStore` SHALL implement symbol, spec, and document search using SQLite full-text search (FTS5).\n\nThe adapter MUST:\n\n- provide full-text search over `Document` content and paths\n- keep SQLite FTS candidate generation in place for `searchSymbols()`, `searchSpecs()`, and `searchDocuments()` using the existing `MATCH` query path\n- sanitize and join multi-token queries using `OR` logic for broad discovery\n- expand raw query tokens with the shared specd/code-aware lexical policy before applying identity-aware ranking\n- supplement the FTS candidate set with identity-derived candidates when FTS tokenization alone would miss a strong identity hit required by the abstract contract\n- compute identity-aware ranking in SQL with explicit ordering columns rather than relying on BM25 weights alone\n- prioritize **exact canonical identity matches** (Spec ID, Symbol Name/ID, Document Path) by boosting results where the query matches the primary identity column exactly\n- prioritize **strong non-exact identity matches** ahead of generic content-only matches, including:\n  - symbol declared-name equality when comment/body-only hits would otherwise rank higher\n  - spec-id prefix, suffix, substring, and real component matches\n  - document canonical-path or config-relative-path prefix, suffix, substring, and real component matches\n- count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens\n- use BM25 ranking for remaining textual matches across searchable columns after identity preference is applied\n- sanitize and join multi-token queries using `OR` logic for broad discovery\n- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches\n\nObservable SQLite ordering semantics MUST hold:\n\n- exact canonical identity matches rank first\n- identity-oriented non-exact hits rank ahead of body-only/comment-only/content-only hits\n- exact token identity matches outrank prefix token matches\n- prefix token matches outrank suffix token matches\n- suffix token matches outrank arbitrary substring token matches\n- real identity-component matches outrank arbitrary substring-only hits on the same identity field\n- candidates matching more expanded identity tokens outrank candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing\n- generic term frequency in spec/document body content MUST NOT outrank a stronger spec-id, symbol-name, or document-path match for the same query intent\n\nThe SQLite FTS schema MUST include:\n\n- **`symbol_fts`** virtual table covering `Symbol.name` and `Symbol.comment`\n- **`spec_fts`** virtual table covering `Spec.title`, `Spec.description`, and `Spec.content`\n- **`document_fts`** virtual table covering `Document.path` and `Document.content`\n\nThe implementation MAY use stemming, weighted BM25, identity boost unions, or other SQLite-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.\n\nSQLite identity-aware ranking MUST be expressed through explicit SQL ordering logic over the discovered candidate set, such as computed rank columns or `CASE`-based ordering. Candidate discovery MAY combine FTS `MATCH` results with identity-derived candidates, but it MUST NOT replace FTS retrieval with plain whole-query `LIKE` filtering only.\n\nPersisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change."
       ]
     },
     {
@@ -257,6 +257,115 @@
       ]
     },
     {
+      "requirement": "SQLite full-text search",
+      "name": "Spec-id segment outranks content-only hit in SQLite",
+      "given": [
+        "a spec with ID default:_global/architecture",
+        "AND another spec contains architecture more times only in its body content"
+      ],
+      "when": ["searchSpecs({ query: 'architecture' }) is called on the SQLite backend"],
+      "then": ["default:_global/architecture is ranked ahead of the body-only hit"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "Symbol declared name outranks comment-only hit in SQLite",
+      "given": [
+        "one symbol is named SearchSpecs",
+        "AND another symbol contains search specs only in comment text"
+      ],
+      "when": ["searchSymbols({ query: 'SearchSpecs' }) is called on the SQLite backend"],
+      "then": ["the declared-name hit is ranked ahead of the comment-only hit"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "Config-relative document path participates in identity ranking",
+      "given": [
+        "a document whose canonical path or configRelativePath contains docs/cli/graph-search.md",
+        "AND another document mentions graph search only in body text"
+      ],
+      "when": ["searchDocuments({ query: 'graph-search' }) is called on the SQLite backend"],
+      "then": ["the document-path hit is ranked ahead of the body-only hit"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "SQLite expands specd-shaped tokens before identity ranking",
+      "given": [
+        "a spec with ID core:change",
+        "AND another spec mentions core change only in body content"
+      ],
+      "when": ["searchSpecs({ query: 'core:change' }) is called on the SQLite backend"],
+      "then": [
+        "the backend treats core:change, core, and change as usable identity-ranking tokens",
+        "AND the spec-id hit is ranked ahead of the body-only hit"
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "SQLite expands CamelCase tokens before identity ranking",
+      "given": [
+        "a symbol named ArchiveChange",
+        "AND another symbol contains archive change only in comment text"
+      ],
+      "when": ["searchSymbols({ query: 'ArchiveChange' }) is called on the SQLite backend"],
+      "then": [
+        "the backend treats archivechange, archive, and change as usable identity-ranking tokens",
+        "AND the declared-name hit is ranked ahead of the comment-only hit"
+      ]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "SQLite exact token match outranks prefix token match",
+      "given": [
+        "one candidate identity matches token change exactly",
+        "AND another candidate identity matches change only by prefix"
+      ],
+      "when": ["searchSymbols({ query: 'change' }) is called on the SQLite backend"],
+      "then": ["the exact-token hit is ranked ahead of the prefix-only hit"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "SQLite prefix token match outranks suffix token match",
+      "given": [
+        "one candidate identity matches token repo by prefix",
+        "AND another candidate identity matches repo only by suffix"
+      ],
+      "when": ["searchSymbols({ query: 'repo' }) is called on the SQLite backend"],
+      "then": ["the prefix-token hit is ranked ahead of the suffix-only hit"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "SQLite suffix token match outranks arbitrary substring token match",
+      "given": [
+        "one candidate identity matches token repository by suffix",
+        "AND another candidate identity matches repository only as an arbitrary substring"
+      ],
+      "when": ["searchDocuments({ query: 'repository' }) is called on the SQLite backend"],
+      "then": ["the suffix-token hit is ranked ahead of the arbitrary-substring hit"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "SQLite real component match outranks arbitrary substring match",
+      "given": [
+        "one spec ID is core:change",
+        "AND another spec ID contains substring core only inside a larger token such as score"
+      ],
+      "when": ["searchSpecs({ query: 'core' }) is called on the SQLite backend"],
+      "then": ["the real component match is ranked ahead of the arbitrary-substring hit"]
+    },
+    {
+      "requirement": "SQLite full-text search",
+      "name": "SQLite supplements FTS discovery for a strong suffix identity hit",
+      "given": [
+        "one symbol identity matches token change by suffix",
+        "AND SQLite FTS tokenization alone would not surface that symbol through the default MATCH candidate set"
+      ],
+      "when": ["searchSymbols({ query: 'change' }) is called on the SQLite backend"],
+      "then": [
+        "the backend still returns that symbol as a candidate",
+        "AND it is ordered by the same identity-strength ladder instead of being omitted for lack of FTS coverage"
+      ]
+    },
+    {
       "requirement": "Transactional mutation model",
       "name": "File upsert is all-or-nothing",
       "given": ["a file already has persisted graph state in SQLite"],
@@ -306,24 +415,31 @@
     "symbols": [
       {
         "specId": "code-graph:sqlite-graph-store",
-        "file": "code-graph:src/infrastructure/sqlite/schema.ts",
-        "symbol": "SQLITE_SCHEMA_VERSION"
-      },
-      {
-        "specId": "code-graph:sqlite-graph-store",
-        "file": "code-graph:src/infrastructure/sqlite/schema.ts",
-        "symbol": "SQLITE_SCHEMA_DDL"
+        "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+        "symbol": "SQLiteGraphStore"
       },
       {
         "specId": "code-graph:sqlite-graph-store",
         "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-        "symbol": "SQLiteGraphStore"
+        "symbol": "searchSymbols"
+      },
+      {
+        "specId": "code-graph:sqlite-graph-store",
+        "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+        "symbol": "searchSpecs"
+      },
+      {
+        "specId": "code-graph:sqlite-graph-store",
+        "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+        "symbol": "searchDocuments"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2da4f492a7f3d43cd25d8db531dbaf756ddc418ff29f775c0d9b2d26e33faa3d",
-    "verify.md": "sha256:0e09af711ef39247480cf262073c6a70b101c41c28b03b990638af803ab4ada1"
+    "spec.md": "sha256:3853b4bf3199b0c5863bafcf63901af9c93db158eaf20cd498d4d8f53561a53a",
+    "verify.md": "sha256:1a6579adeabcb20629c58d8521f9bb275516d6a9c77c78f4e150cbde645fe02a"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "SQLite-backed `GraphStore` adapter spec: default backend role, rooted layout, schema, FTS5/reranking, transactions, recreate, batching.",
+  "optimizedContext": "# SQLite Graph Store\n## Rules\n- `SQLiteGraphStore` implements `GraphStore` with backend id `sqlite`; adapter owns connection lifecycle, SQLite DDL, schema version, query/transaction/FTS translation.\n- Persistence roots derive from `configPath`: graph data under `{configPath}/graph`, scratch under `{configPath}/tmp`; create on demand.\n- `sqlite` is built-in default backend when no `graphStoreId` selected; must preserve full supported graph behavior previously expected from Ladybug-backed flows.\n- `recreate()` discards all SQLite-owned persisted graph state plus companion artifacts under graph root; callers never target backend filenames directly.\n- Adapter owns physical schema for `File`, `Symbol`, `Spec`, `Document`, `Meta`, relation storage, FTS structures, backend metadata.\n- Persist logical graph semantics: file content for symbol snippets; `Document` nodes with `path`, `configRelativePath`, `contentHash`, `content`, workspace; all required relation families including `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`.\n- `COVERS_SYMBOL` metadata must survive persistence and reload, including stale markers.\n- Search uses SQLite FTS5 with `symbol_fts`, `spec_fts`, `document_fts`; candidate discovery keeps `MATCH` path, joins tokens with `OR`, expands specd/code-shaped tokens, supplements FTS candidates with identity-derived candidates when needed.\n- Ranking uses explicit SQL ordering over discovered candidates: exact canonical identity first; strong non-exact identity before content-only; exact token > prefix > suffix > substring; real component > arbitrary substring; more matched identity tokens rank higher; BM25 handles remaining text relevance.\n- Search returns snippets plus 1-based line ranges. Persisted file content does not create separate file-search category.\n- Mutations use SQLite transactions. `upsertFile`, `removeFile`, `upsertSpec`, `removeSpec`, bulk indexing batches all preserve all-or-nothing semantics; failure leaves previous committed state intact.\n- Bulk indexing may use batching, prepared statements, temp tables, other SQLite-safe techniques; backend-owned scratch artifacts outside primary DB stay under `{configPath}/tmp` and clean after success.\n- Track backend schema version in metadata; incompatible versions may require destructive rebuild instead of migration.\n- SQLite may create WAL/shared-memory companion files under graph root as backend detail only.\n## Constraints\n- SQLite behavior here is backend-specific, not portable graph-store contract.\n- Stable backend selector is `sqlite`; built-in default unless explicit override.\n- All persisted and scratch artifacts stay rooted under `configPath`.\n- Storage-agnostic consumers and CLI flows depend on `code-graph:graph-store`, not SQLite schema details."
 }

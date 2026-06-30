@@ -1,18 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  captureStdout,
-  makeMockConfig,
-  makeMockKernel,
-  makeMockUseCase,
-  makeProgram,
-  mockProcessExit,
-} from './helpers.js'
+import { captureStdout, makeMockConfig, makeProgram, mockProcessExit } from './helpers.js'
 
-vi.mock('@specd/core', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@specd/core')>()
+const mockInitProject = vi.fn().mockResolvedValue({
+  configPath: '/project/specd.yaml',
+  schemaRef: '@specd/schema-std',
+  workspaces: ['default'],
+})
+
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@specd/sdk')>()
   return {
     ...original,
-    createInitProject: vi.fn(),
+    createConfigWriter: vi.fn(() => ({
+      initProject: mockInitProject,
+      addPlugin: vi.fn(),
+      removePlugin: vi.fn(),
+    })),
     createVcsAdapter: vi.fn().mockResolvedValue({
       rootDir: vi.fn().mockResolvedValue('/project'),
       branch: vi.fn().mockResolvedValue('main'),
@@ -31,20 +34,18 @@ vi.mock('../../src/commands/plugins/install.js', () => ({
   installPluginsWithKernel: vi.fn(),
 }))
 
-import { createInitProject } from '@specd/core'
+import { createConfigWriter } from '@specd/sdk'
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { installPluginsWithKernel } from '../../src/commands/plugins/install.js'
 import { registerProjectInit } from '../../src/commands/project/init.js'
+import { makeMockKernel } from './helpers.js'
 
 function setup() {
-  const initExecute = vi.fn().mockResolvedValue({
+  mockInitProject.mockResolvedValue({
     configPath: '/project/specd.yaml',
     schemaRef: '@specd/schema-std',
     workspaces: ['default'],
   })
-  vi.mocked(createInitProject).mockReturnValue(
-    makeMockUseCase<ReturnType<typeof createInitProject>>(initExecute),
-  )
   vi.mocked(resolveCliContext).mockResolvedValue({
     config: makeMockConfig(),
     configFilePath: '/project/specd.yaml',
@@ -56,14 +57,14 @@ function setup() {
   })
   const stdout = captureStdout()
   mockProcessExit()
-  return { initExecute, stdout }
+  return { stdout }
 }
 
 afterEach(() => vi.restoreAllMocks())
 
 describe('project init', () => {
   it('supports --plugin and installs selected plugins after init', async () => {
-    const { initExecute } = setup()
+    setup()
     const program = makeProgram()
     registerProjectInit(program.command('project'))
 
@@ -80,7 +81,7 @@ describe('project init', () => {
       '@specd/plugin-agent-claude',
     ])
 
-    expect(initExecute).toHaveBeenCalledOnce()
+    expect(mockInitProject).toHaveBeenCalledOnce()
     expect(installPluginsWithKernel).toHaveBeenCalledWith(
       expect.objectContaining({
         pluginNames: ['@specd/plugin-agent-claude'],
@@ -89,7 +90,7 @@ describe('project init', () => {
   })
 
   it('supports --plugin with @specd/plugin-agent-opencode', async () => {
-    const { initExecute } = setup()
+    setup()
     const program = makeProgram()
     registerProjectInit(program.command('project'))
 
@@ -106,7 +107,7 @@ describe('project init', () => {
       '@specd/plugin-agent-opencode',
     ])
 
-    expect(initExecute).toHaveBeenCalledOnce()
+    expect(mockInitProject).toHaveBeenCalledOnce()
     expect(installPluginsWithKernel).toHaveBeenCalledWith(
       expect.objectContaining({
         pluginNames: ['@specd/plugin-agent-opencode'],
@@ -146,8 +147,8 @@ describe('project init', () => {
   })
 
   describe('specd init (top-level alias)', () => {
-    it('exits 0 and calls InitProject with specd init', async () => {
-      const { initExecute } = setup()
+    it('exits 0 and calls createConfigWriter().initProject with specd init', async () => {
+      setup()
       const program = makeProgram()
       registerProjectInit(program)
 
@@ -161,8 +162,9 @@ describe('project init', () => {
         'specs/',
       ])
 
-      expect(initExecute).toHaveBeenCalledOnce()
-      expect(initExecute).toHaveBeenCalledWith(
+      expect(createConfigWriter).toHaveBeenCalled()
+      expect(mockInitProject).toHaveBeenCalledOnce()
+      expect(mockInitProject).toHaveBeenCalledWith(
         expect.objectContaining({
           schemaRef: '@specd/schema-std',
           workspaceId: 'default',
@@ -196,8 +198,8 @@ describe('project init', () => {
     })
 
     it('exits 1 when specd.yaml exists and --force is not given', async () => {
-      const { initExecute } = setup()
-      initExecute.mockRejectedValue(new Error('already exists'))
+      setup()
+      mockInitProject.mockRejectedValue(new Error('already exists'))
 
       const program = makeProgram()
       registerProjectInit(program)
@@ -213,11 +215,11 @@ describe('project init', () => {
           'specs/',
         ]),
       ).rejects.toThrow()
-      expect(initExecute).toHaveBeenCalledOnce()
+      expect(mockInitProject).toHaveBeenCalledOnce()
     })
 
     it('overwrites config with specd init --force', async () => {
-      const { initExecute } = setup()
+      setup()
 
       const program = makeProgram()
       registerProjectInit(program)
@@ -232,7 +234,7 @@ describe('project init', () => {
         '--force',
       ])
 
-      expect(initExecute).toHaveBeenCalledWith(expect.objectContaining({ force: true }))
+      expect(mockInitProject).toHaveBeenCalledWith(expect.objectContaining({ force: true }))
     })
 
     it('rejects excess positional arguments', async () => {

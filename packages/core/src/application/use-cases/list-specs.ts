@@ -126,6 +126,7 @@ export class ListSpecs {
   ): Promise<SpecListEntry> {
     let title: string | undefined
     let description: string | undefined
+    let optimizedDescription: string | undefined
     let contentHashes: Record<string, string> | undefined
     let hasMetadata = false
     let metadataValid = true
@@ -148,6 +149,12 @@ export class ListSpecs {
         if (meta.description !== undefined && meta.description.trim().length > 0) {
           description = meta.description.trim()
         }
+        if (
+          meta.optimizedDescription !== undefined &&
+          meta.optimizedDescription.trim().length > 0
+        ) {
+          optimizedDescription = meta.optimizedDescription.trim()
+        }
         if (includeMetadataStatus && meta.contentHashes !== undefined) {
           contentHashes = meta.contentHashes
         }
@@ -163,7 +170,9 @@ export class ListSpecs {
     // Summary resolution (only when requested)
     let summary: string | undefined
     if (includeSummary) {
-      if (description !== undefined) {
+      if (optimizedDescription !== undefined) {
+        summary = optimizedDescription
+      } else if (description !== undefined) {
         summary = description
       } else if (spec.filenames.includes('spec.md')) {
         try {

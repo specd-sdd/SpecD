@@ -9,19 +9,13 @@
     {
       "requirement": "File reading",
       "rules": [
-        "The infrastructure MUST use `node:fs/promises` to read template files from `packages/skills/templates/`."
+        "The infrastructure MUST use `node:fs/promises` to read template files from `packages/skills/templates/skills/` and `packages/skills/templates/agents/`."
       ]
     },
     {
       "requirement": "TemplateReader",
       "rules": [
-        "A `TemplateReader` component MUST read `.md` files from `packages/skills/templates/<skill-name>/` and return them as `SkillTemplate` objects with lazy content loading."
-      ]
-    },
-    {
-      "requirement": "Shared file scanning",
-      "rules": [
-        "The infrastructure MUST scan `templates/shared/` for `.meta.json` files containing:\n\n```json\n{\n  \"filename\": \"...\",\n  \"skills\": [\"skill1\", \"skill2\"]\n}\n```\n\nEach shared file's content is loaded on demand.\n\nWhen `getBundle()` adds a shared file to a skill bundle because the metadata lists the requested skill, the resulting `ResolvedFile` MUST be marked as shared. Skill-local template files read from `templates/<skill-name>/` MUST NOT be marked as shared."
+        "A `TemplateReader` component MUST read `.md.tpl` files from `packages/skills/templates/skills/<name>/` or `packages/skills/templates/agents/<name>/` and return them as `SkillTemplate` objects with lazy content loading."
       ]
     },
     {
@@ -38,18 +32,10 @@
   "scenarios": [
     {
       "requirement": "File reading",
-      "name": "Reads template files",
-      "when": ["getBundle is called"],
-      "then": ["template files are read from packages/skills/templates/"]
-    },
-    {
-      "requirement": "File reading",
-      "name": "Shared template entries are marked in resolved bundle files",
-      "given": ["templates/shared/*.meta.json associates shared.md to a skill"],
-      "when": ["getBundle resolves that skill"],
+      "name": "Reads template files from skills and agents subfolders",
+      "when": ["getBundle is called for a skill or an agent"],
       "then": [
-        "the resulting ResolvedFile for shared.md is marked as shared",
-        "AND files loaded from templates/<skill-name>/ are not marked as shared"
+        "it reads from packages/skills/templates/skills/ or packages/skills/templates/agents/ respectively"
       ]
     },
     {
@@ -60,28 +46,23 @@
     },
     {
       "requirement": "TemplateReader",
-      "name": "TemplateReader loads .md files lazily",
-      "given": ["a skill with templates in packages/skills/templates/<skill-name>/"],
-      "when": ["getBundle is called"],
-      "then": [
-        "the TemplateReader loads .md files as SkillTemplate objects",
-        "AND content is loaded lazily via getContent()"
-      ]
-    },
-    {
-      "requirement": "Shared file scanning",
-      "name": "Scans templates/shared/ for .meta.json files",
-      "when": ["getBundle is called for a skill that uses shared files"],
-      "then": [
-        "the infrastructure scans templates/shared/ for .meta.json files",
-        "AND shared file content is loaded on demand",
-        "AND ResolvedFile entries are marked as shared"
-      ]
+      "name": "TemplateReader loads .md.tpl files from categorized subfolders",
+      "when": ["templates are loaded"],
+      "then": ["the TemplateReader correctly resolves paths under skills/ or agents/"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "skills:skill-repository-infra",
+        "file": "skills:src/infrastructure/repository/skill-template-metadata-reader.ts",
+        "symbol": "SkillTemplateMetadataReader"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:f43745475b95e1c29b1ff6ded56e7af35d35f0b5e3a00b00f03d12af75b0f597",
-    "verify.md": "sha256:28338fff4bc1184f6fa4cc6fc02a412a04a55d7061731ee58638426b45cca09c"
+    "spec.md": "sha256:9c34bd6e2c7a577082a24ac7fd9c16ccdf6049cab2101b003b6fd950cb1eadf6",
+    "verify.md": "sha256:4eb8bdcbcf54a3663c6a1791d052a18979079d3ee961989ad5e3ac94072f4395"
   },
   "generatedBy": "core"
 }

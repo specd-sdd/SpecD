@@ -1,0 +1,58 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Template source location'
+  content: |
+    Template files MUST live in categorized subdirectories under `packages/skills/templates/`:
+    - `packages/skills/templates/skills/<skill-name>/` using the `SKILL.md.tpl` convention for standard skills.
+    - `packages/skills/templates/agents/<agent-name>/` using the `SPECD-AGENT.md.tpl` convention for specialized agents.
+
+    All template source files MUST use the `.md.tpl` extension.
+
+    Each skill or agent template directory MUST also contain a metadata file:
+    - `skill.meta.json` for skills.
+    - `specd-agent.meta.json` for agents.
+
+    Metadata files (`skill.meta.json` and `specd-agent.meta.json`) share the same schema and serve the same purpose: declaring required capabilities and shared template dependencies. The different filenames are used strictly as discriminators for internal discovery and categorization.
+
+    Installed files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Template migration'
+  content: |
+    The template directory structure SHALL be:
+
+    - `templates/skills/` — contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`.
+    - `templates/agents/` — contains specialized agents such as `specd-project-context-optimizer` and `specd-spec-context-optimizer`.
+    - `templates/shared/` — contains shared template source files like `shared.md.tpl`.
+
+    Each skill or agent directory contains its respective template file (`SKILL.md.tpl` or `SPECD-AGENT.md.tpl`) plus its metadata contract file.
+
+    The current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Skill template metadata contract'
+  rename: 'Requirement: Template metadata contract (skills and agents)'
+  content: |
+    Each skill or agent template directory MUST declare a metadata file (`skill.meta.json` or `specd-agent.meta.json`) with this shape:
+
+    ```json
+    {
+      "kind": "skill" | "agent",
+      "supportedCapabilities": ["mcp", "agents", "frontmatter"],
+      "requiredCapabilities": [],
+      "requiredSharedTemplates": ["shared.md"]
+    }
+    ```
+
+    `kind` (required) MUST categorize the template as a standard `skill` or a specialized `agent`. This value MUST match the parent directory name (`skills/` or `agents/`).
+
+    `supportedCapabilities` declares the capability identifiers that templates in that directory are allowed to reference.
+
+    `requiredCapabilities` declares the capability identifiers that MUST be present for the templates to be installable.
+
+    `requiredSharedTemplates` declares the shared template filenames required by the templates.

@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Summary resolution'
+    after:
+      type: section
+      matches: 'Scenario: Summary from metadata description'
+  content: |
+    #### Scenario: Summary from metadata optimizedDescription
+
+    - **GIVEN** `default:auth/login` has `.specd-metadata.yaml` with `optimizedDescription: "Terse login summary"`
+    - **WHEN** `specd spec list --summary` is run
+    - **THEN** the row for `default:auth/login` shows `Terse login summary` as its summary

@@ -1,0 +1,19 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: archivePath returns the absolute path for an archived change'
+  content: |
+    ### Requirement: internalPaths returns absolute storage paths
+
+    `internalPaths()` MUST return an array of absolute filesystem paths to internal specd management directories owned by the repository, or `undefined` when the concept does not apply.
+
+    Returning `undefined` signals that internal-path exclusion is not applicable (e.g. remote backends that do not manage local filesystem directories). Implementations MUST NOT return an empty array to signal inapplicability; an empty array means "no paths to exclude".
+
+    For `FsArchiveRepository`, this MUST include:
+    - the absolute path to the archive root directory
+
+    These paths are used by implementation discovery to avoid tracking specd's own metadata.

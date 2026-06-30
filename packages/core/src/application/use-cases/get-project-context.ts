@@ -26,11 +26,20 @@ import {
   type MetadataArtifactInput,
 } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+import { mergeCompileContextRuntimeOverrides } from './_shared/merge-compile-context-config.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
-  /** Resolved project configuration. */
-  readonly config: CompileContextConfig
+  /**
+   * Runtime override for display mode.
+   * When absent, the construction-time yaml default is used.
+   */
+  readonly contextMode?: CompileContextConfig['contextMode']
+  /**
+   * Runtime override for whether optimized context is preferred.
+   * When absent, the construction-time yaml default is used.
+   */
+  readonly llmOptimizedContext?: boolean
   /**
    * When `true`, follows `dependsOn` links from `metadata.json` transitively to
    * discover additional specs beyond those matched by include/exclude patterns.
@@ -76,6 +85,7 @@ export class GetProjectContext {
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
+  private readonly _defaultConfig: CompileContextConfig
 
   /**
    * Creates a new `GetProjectContext` use case instance.
@@ -87,6 +97,7 @@ export class GetProjectContext {
    * @param hasher - Content hasher for metadata freshness checks
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
+   * @param defaultConfig - Yaml-derived context configuration baked at composition time
    */
   constructor(
     listWorkspaces: ListWorkspaces,
@@ -96,6 +107,7 @@ export class GetProjectContext {
     hasher: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+    defaultConfig: CompileContextConfig = {},
   ) {
     this._listWorkspaces = listWorkspaces
     this._schemaProvider = schemaProvider
@@ -104,6 +116,7 @@ export class GetProjectContext {
     this._hasher = hasher
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
+    this._defaultConfig = defaultConfig
   }
 
   /**
@@ -114,6 +127,13 @@ export class GetProjectContext {
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
    */
   async execute(input: GetProjectContextInput): Promise<GetProjectContextResult> {
+    const config = mergeCompileContextRuntimeOverrides(this._defaultConfig, {
+      ...(input.contextMode !== undefined ? { contextMode: input.contextMode } : {}),
+      ...(input.llmOptimizedContext !== undefined
+        ? { llmOptimizedContext: input.llmOptimizedContext }
+        : {}),
+    })
+
     const schema = await this._schemaProvider.get()
 
     const warnings: ContextWarning[] = []
@@ -127,7 +147,7 @@ export class GetProjectContext {
       metadata: projectMeta,
       isFresh,
       warnings: optimizationWarnings,
-    } = await checkProjectMetadataFreshness(input.config, this._files, this._hasher, workspaceMap)
+    } = await checkProjectMetadataFreshness(config, this._files, this._hasher, workspaceMap)
 
     warnings.push(...optimizationWarnings)
 
@@ -141,7 +161,7 @@ export class GetProjectContext {
     }
 
     // Collect project-level context entries (labelled with their source)
-    for (const entry of input.config.context ?? []) {
+    for (const entry of config.context ?? []) {
       if ('instruction' in entry) {
         contextEntries.push(`**Source: instruction**\n\n${entry.instruction}`)
       } else {
@@ -162,7 +182,7 @@ export class GetProjectContext {
     const includedSpecs = new Map<string, ResolvedSpec>()
 
     // Step 1: Project-level include patterns (all workspaces, bare * = all)
-    for (const pattern of input.config.contextIncludeSpecs ?? []) {
+    for (const pattern of config.contextIncludeSpecs ?? []) {
       const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) {
         const key = `${spec.workspace}:${spec.capPath}`
@@ -172,7 +192,7 @@ export class GetProjectContext {
 
     // Step 2: Project-level exclude patterns
     const excludedKeys = new Set<string>()
-    for (const pattern of input.config.contextExcludeSpecs ?? []) {
+    for (const pattern of config.contextExcludeSpecs ?? []) {
       const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
       for (const spec of matches) excludedKeys.add(`${spec.workspace}:${spec.capPath}`)
     }
@@ -216,13 +236,13 @@ export class GetProjectContext {
 
     // Render entries for each included spec according to contextMode.
     const resolvedMode: ContextSpecEntry['mode'] =
-      input.config.contextMode === undefined
+      config.contextMode === undefined
         ? 'summary'
-        : input.config.contextMode === 'hybrid'
+        : config.contextMode === 'hybrid'
           ? 'full'
-          : input.config.contextMode
+          : config.contextMode
 
-    const sectionsFilter = input.sections
+    const sectionsFilter = input.sections ?? (['rules', 'constraints'] as const)
 
     const specs: ContextSpecEntry[] = []
     for (const { workspace, capPath } of includedSpecs.values()) {
@@ -250,6 +270,17 @@ export class GetProjectContext {
       const description = metadata?.description ?? ''
       const source: ContextSpecEntry['source'] = 'includePattern'
 
+      // Check for missing optimization if enabled
+      if (config.llmOptimizedContext && metadata !== null) {
+        if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
+          warnings.push({
+            type: 'stale-optimization',
+            path: specId,
+            message: `Spec '${specId}' is missing LLM-optimized context. Launch specd-spec-context-optimizer agent to refresh.`,
+          })
+        }
+      }
+
       if (resolvedMode === 'list') {
         specs.push({ specId, source, mode: 'list' })
         continue
@@ -263,11 +294,7 @@ export class GetProjectContext {
       let content: string
 
       if (isFresh && metadata !== null) {
-        content = this._renderFromMetadata(
-          metadata,
-          sectionsFilter,
-          input.config.llmOptimizedContext,
-        )
+        content = this._renderFromMetadata(metadata, sectionsFilter, config.llmOptimizedContext)
       } else {
         if (metadata !== null) {
           warnings.push({
@@ -283,21 +310,22 @@ export class GetProjectContext {
           })
         }
 
-        let fallbackParts: string[] = []
+        let contentFallback = ''
         const extraction = schema.metadataExtraction()
 
         if (extraction !== undefined) {
-          fallbackParts = await this._extractionFallback(
+          contentFallback = await this._extractionFallback(
             specRepo,
             spec,
             schema,
             extraction,
             workspaceMap,
             sectionsFilter,
+            config.llmOptimizedContext,
           )
         }
 
-        content = fallbackParts.join('\n\n')
+        content = contentFallback
       }
 
       specs.push({ specId, title, description, source, mode: 'full', content })
@@ -315,7 +343,8 @@ export class GetProjectContext {
    * @param extraction - The metadata extraction declarations from the schema
    * @param workspaces - Orchestrated workspace map
    * @param sectionsFilter - Optional filter to include only specific sections
-   * @returns Rendered context parts as strings
+   * @param llmOptimizedContext - Whether to prefer LLM optimized context
+   * @returns Rendered context string
    */
   private async _extractionFallback(
     specRepo: SpecRepository,
@@ -323,8 +352,9 @@ export class GetProjectContext {
     schema: Schema,
     extraction: import('../../domain/value-objects/metadata-extraction.js').MetadataExtraction,
     workspaces: Map<string, ProjectWorkspace>,
-    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
-  ): Promise<string[]> {
+    sectionsFilter: ReadonlyArray<SpecSection>,
+    llmOptimizedContext = false,
+  ): Promise<string> {
     const artifacts: MetadataArtifactInput[] = []
 
     for (const artifactType of schema.artifacts()) {
@@ -361,7 +391,7 @@ export class GetProjectContext {
       workspaceRoutes: this._workspaceRoutes,
     })
 
-    return this._metadataToParts(extracted.metadata, sectionsFilter, true) // fallback extraction can also use optimized fields if they came from extraction? actually no.
+    return this._renderFromMetadata(extracted.metadata, sectionsFilter, llmOptimizedContext)
   }
 
   /**
@@ -374,56 +404,46 @@ export class GetProjectContext {
    */
   private _renderFromMetadata(
     metadata: SpecMetadata,
-    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
+    sectionsFilter: ReadonlyArray<SpecSection>,
     llmOptimizedContext = false,
   ): string {
-    if (
-      llmOptimizedContext &&
-      metadata.optimizedContext !== undefined &&
-      metadata.optimizedContext !== ''
-    ) {
-      return metadata.optimizedContext
-    }
-    return this._metadataToParts(metadata, sectionsFilter, llmOptimizedContext).join('\n\n')
-  }
-
-  /**
-   * Converts metadata sections into an array of rendered strings.
-   *
-   * @param metadata - Spec metadata to convert
-   * @param sectionsFilter - Optional section filter
-   * @param llmOptimizedContext - Whether to prefer optimized fields
-   * @returns Array of rendered markdown strings
-   */
-  private _metadataToParts(
-    metadata: SpecMetadata,
-    sectionsFilter: ReadonlyArray<SpecSection> | undefined,
-    llmOptimizedContext = false,
-  ): string[] {
     const metaParts: string[] = []
 
-    // Preference for optimized description
+    // Description is always included in full mode as part of the content string
+    // if it exists in metadata (header persistence).
     const description =
       (llmOptimizedContext && metadata.optimizedDescription) || metadata.description
     if (description !== undefined && description !== '') {
       metaParts.push(`**Description:** ${description}`)
     }
 
-    const effectiveSections =
-      sectionsFilter === undefined || sectionsFilter.length === 0
-        ? (['rules', 'constraints'] as const)
-        : sectionsFilter
+    const hasRules = sectionsFilter.includes('rules')
+    const hasConstraints = sectionsFilter.includes('constraints')
+    const hasScenarios = sectionsFilter.includes('scenarios')
 
-    if (effectiveSections.includes('rules') && metadata.rules?.length) {
-      const rulesText = metadata.rules
-        .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
-        .join('\n\n')
-      metaParts.push(`#### Rules\n\n${rulesText}`)
+    const useOptimized =
+      llmOptimizedContext &&
+      metadata.optimizedContext !== undefined &&
+      metadata.optimizedContext !== '' &&
+      hasRules &&
+      hasConstraints
+
+    if (useOptimized) {
+      metaParts.push(metadata.optimizedContext)
+    } else {
+      if (hasRules && metadata.rules?.length) {
+        const rulesText = metadata.rules
+          .map((r) => `##### ${r.requirement}\n${r.rules.map((rule) => `- ${rule}`).join('\n')}`)
+          .join('\n\n')
+        metaParts.push(`#### Rules\n\n${rulesText}`)
+      }
+      if (hasConstraints && metadata.constraints?.length) {
+        const constraintsText = metadata.constraints.map((c) => `- ${c}`).join('\n')
+        metaParts.push(`#### Constraints\n\n${constraintsText}`)
+      }
     }
-    if (effectiveSections.includes('constraints') && metadata.constraints?.length) {
-      metaParts.push(`#### Constraints\n\n${metadata.constraints.map((c) => `- ${c}`).join('\n')}`)
-    }
-    if (effectiveSections.includes('scenarios') && metadata.scenarios?.length) {
+
+    if (hasScenarios && metadata.scenarios?.length) {
       const scenariosText = metadata.scenarios
         .map((s) => {
           const lines: string[] = [`##### Scenario: ${s.name}`, `*Requirement: ${s.requirement}*`]
@@ -435,7 +455,8 @@ export class GetProjectContext {
         .join('\n\n')
       metaParts.push(`#### Scenarios\n\n${scenariosText}`)
     }
-    return metaParts
+
+    return metaParts.join('\n\n')
   }
 
   /**

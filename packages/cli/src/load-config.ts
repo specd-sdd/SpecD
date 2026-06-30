@@ -1,4 +1,4 @@
-import { createConfigLoader, type SpecdConfig } from '@specd/core'
+import { createConfigLoader, type SpecdConfig } from '@specd/sdk'
 
 /**
  * Loads the project configuration using `createConfigLoader`.

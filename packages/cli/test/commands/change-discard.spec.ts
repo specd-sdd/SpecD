@@ -15,7 +15,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeDiscard } from '../../src/commands/change/discard.js'
-import { ChangeNotFoundError, HistoricalImplementationGuardError } from '@specd/core'
+import { ChangeNotFoundError, HistoricalImplementationGuardError } from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()

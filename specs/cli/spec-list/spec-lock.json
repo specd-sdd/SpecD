@@ -13,7 +13,7 @@
   "implementation": [
     {
       "file": "cli:src/commands/spec/list.ts",
-      "symbols": ["registerSpecList"]
+      "symbols": ["registerListSpecs"]
     }
   ]
 }

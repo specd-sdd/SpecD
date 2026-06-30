@@ -14,6 +14,12 @@ The command MUST accept an optional `--type` flag to filter by plugin type:
 specd plugins list [--type <type>]
 ```
 
+### Requirement: Declaration source
+
+The command MUST enumerate declared plugins from the loaded `SpecdConfig.plugins` field (via `loadConfig` or an equivalent config snapshot). It MUST NOT call `kernel.project.listPlugins` or re-read `specd.yaml` through `ConfigWriter.listPlugins` when a config snapshot is already available.
+
+When `--type` is omitted, the command MUST default to type `agents`. When `--type <type>` is provided, the command MUST read only `config.plugins.<type>` (or an empty list when that type is absent).
+
 ### Requirement: Plugin status detection
 
 For each plugin declared in `specd.yaml`:
@@ -39,5 +45,5 @@ The format MUST be machine-parseable when invoked with `--format json`.
 
 ## Spec Dependencies
 
-- [`plugin-manager:load-plugin-use-case`](../plugin-manager/load-plugin-use-case/spec.md) — loads and validates plugins
-- [`core:config-writer-port`](../core/config-writer-port/spec.md) — reads declared plugins
+- [`plugin-manager:load-plugin-use-case`](../../plugin-manager/load-plugin-use-case/spec.md) — runtime load status per declared plugin
+- [`core:get-config`](../../core/get-config/spec.md) — readonly `SpecdConfig` snapshot; `plugins` holds declarations

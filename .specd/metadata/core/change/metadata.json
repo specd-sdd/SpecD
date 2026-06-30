@@ -18,7 +18,7 @@
     {
       "requirement": "Identity",
       "rules": [
-        "A Change has a unique, user-defined slug name (e.g. `add-auth-flow`), a `createdAt` timestamp recorded at creation time, and an **`updatedAt`** revision timestamp loaded from the manifest. `name` and `createdAt` are immutable. `updatedAt` MUST satisfy `updatedAt >= createdAt`.\n\nIdentities in specd are represented by the `ActorIdentity` interface:\n\n- **`name`** — human-readable name of the actor\n- **`email`** — unique identifier (often a real email, but may be a hash or masked value)\n- **`provider`** — optional identifier of the identity source (e.g. 'git', 'ldap')\n- **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)\n- **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)"
+        "A Change has a unique, user-defined slug name (e.g. `add-auth-flow`) and a `createdAt` timestamp recorded at creation time. Both are immutable.\n\nIdentities in specd are represented by the `ActorIdentity` interface:\n\n- **`name`** — human-readable name of the actor\n- **`email`** — unique identifier (often a real email, but may be a hash or masked value)\n- **`provider`** — optional identifier of the identity source (e.g. 'git', 'ldap')\n- **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)\n- **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)"
       ]
     },
     {
@@ -48,7 +48,7 @@
     {
       "requirement": "Implementation tracking state",
       "rules": [
-        "A `Change` SHALL persist implementation-tracking state separately from artifact state.\n\nThis state MUST distinguish:\n\n- `trackedImplementationFiles` — tracked raw project-relative files under review for the change\n- `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols\n\nEach tracked implementation file MUST carry an explicit review state of `open`, `resolved`, or `ignored`.\n\n`implementationLinks` MUST support both:\n\n- file-level links (`spec -> file`)\n- symbol-level refinements (`spec -> file -> symbols`)\n\nA confirmed link's raw file path remains project-relative while the change is active. Canonical `workspace:path` normalization happens later during archive-time materialization."
+        "A `Change` SHALL persist implementation-tracking state separately from artifact state.\n\nThis state MUST distinguish:\n\n- `trackedImplementationFiles` — tracked raw project-relative files under review for the change\n- `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols\n\nEach tracked implementation file MUST carry an explicit review state of `open`, `resolved`, `ignored`, or `removed`.\n\n`removed` means the file remains part of the change's tracked review history, but refresh has confirmed that the file is no longer present on disk. A `removed` file is not implicitly untracked and is not manually reopened through `resolve`; it returns to `open` only when refresh confirms the file exists again.\n\n`implementationLinks` MUST support both:\n\n- file-level links (`spec -> file`)\n- symbol-level refinements (`spec -> file -> symbols`)\n\nA confirmed link's raw file path remains project-relative while the change is active. Canonical `workspace:path` normalization happens later during archive-time materialization."
       ]
     },
     {
@@ -132,7 +132,7 @@
     {
       "requirement": "Policy-aware invalidation",
       "rules": [
-        "`Change.invalidate()` SHALL accept:\n\n- a domain invalidation cause\n- a human-readable message\n- a focused `affectedArtifacts` payload identifying the concrete artifact/file entries that triggered invalidation\n- an optional `invalidationPolicyOverride`\n- a required `artifactDag: ArtifactDag` argument supplying schema-derived DAG structure for policy expansion\n\nThe effective invalidation policy is resolved from the override when present, otherwise from the change's persisted `invalidationPolicy`.\n\nRegardless of policy, invalidation SHALL append an `invalidated` history event and return the change to `designing` when the change was previously in another lifecycle state.\n\n**Idempotent artifact-drift:** When `cause === 'artifact-drift'`, the change is already in `designing`, the most recent `invalidated` event has `cause: 'artifact-drift'`, and the policy-expanded `affectedArtifacts` set is equivalent to that event's payload (artifact type IDs with sorted file keys per type), the call MUST NOT append a new `invalidated` or `transitioned` event. Focused drift files from the caller payload MAY still materialize `hasDrift`. This dedupe MUST NOT apply to other invalidation causes.\n\nArtifact/file-state consequences follow the effective policy:\n\n- `none` — no artifact/file enters a reopened review state solely because of invalidation\n- `surgical` — only the normalized affected target set is reopened\n- `downstream` — the normalized affected target set and all artifact ids returned by `artifactDag.descendantsOf()` for the normalized target artifact types are reopened\n- `global` — every artifact/file in the change is reopened\n\nThe entity SHALL deduplicate the final affected set before applying reopened state transitions.\n\n`Change` MUST NOT derive DAG edges from persisted artifact `requires` maps or private BFS helpers; downstream expansion MUST use the supplied `artifactDag`."
+        "`Change.invalidate()` SHALL accept:\n\n- a domain invalidation cause\n- a human-readable message\n- a focused `affectedArtifacts` payload identifying the concrete artifact/file entries that triggered invalidation\n- an optional `invalidationPolicyOverride`\n- a required `artifactDag: ArtifactDag` argument supplying schema-derived DAG structure for policy expansion\n\nThe effective invalidation policy is resolved from the override when present, otherwise from the change's persisted `invalidationPolicy`.\n\nRegardless of policy, invalidation SHALL append an `invalidated` history event and return the change to `designing` when the change was previously in another lifecycle state.\n\nArtifact/file-state consequences follow the effective policy:\n\n- `none` — no artifact/file enters a reopened review state solely because of invalidation\n- `surgical` — only the normalized affected target set is reopened\n- `downstream` — the normalized affected target set and all artifact ids returned by `artifactDag.descendantsOf()` for the normalized target artifact types are reopened\n- `global` — every artifact/file in the change is reopened\n\nThe entity SHALL deduplicate the final affected set before applying reopened state transitions.\n\n`Change` MUST NOT derive DAG edges from persisted artifact `requires` maps or private BFS helpers; downstream expansion MUST use the supplied `artifactDag`."
       ]
     },
     {
@@ -178,28 +178,6 @@
       "name": "Change name immutable after creation",
       "when": ["a Change is created with name add-auth-flow"],
       "then": ["the name cannot be changed by any subsequent operation"]
-    },
-    {
-      "requirement": "Identity",
-      "name": "updatedAt invariant on load",
-      "when": ["a Change is loaded from manifest"],
-      "then": ["updatedAt is present", "AND updatedAt >= createdAt"]
-    },
-    {
-      "requirement": "Identity",
-      "name": "Factory rejects updatedAt before createdAt",
-      "when": ["manifest load supplies updatedAt earlier than createdAt"],
-      "then": ["Change construction fails", "AND error explains invalid revision clock"]
-    },
-    {
-      "requirement": "Identity",
-      "name": "Identity fields remain immutable except revision",
-      "given": ["an existing Change entity"],
-      "when": ["caller attempts to mutate name or createdAt"],
-      "then": [
-        "mutation is rejected or ignored per entity rules",
-        "AND updatedAt updates only via repository save paths"
-      ]
     },
     {
       "requirement": "Workspaces and specs",
@@ -489,53 +467,6 @@
       ]
     },
     {
-      "requirement": "Policy-aware invalidation",
-      "name": "Repeated artifact-drift invalidation in designing is deduped",
-      "given": [
-        "a change already in designing",
-        "AND its most recent history event is invalidated with cause: 'artifact-drift' and affected set { specs: [core:change] }"
-      ],
-      "when": [
-        "Change.invalidate() is called again with cause: 'artifact-drift' and the same policy-expanded affected set while drift persists"
-      ],
-      "then": [
-        "no new invalidated event is appended",
-        "AND no new transitioned event is appended",
-        "AND history length is unchanged"
-      ]
-    },
-    {
-      "requirement": "Policy-aware invalidation",
-      "name": "Deduped artifact-drift still materializes drift flags",
-      "given": ["a deduped artifact-drift invalidation as above"],
-      "when": ["the focused payload names a drifted file key"],
-      "then": [
-        "that file's hasDrift signal is materialized",
-        "AND history length remains unchanged"
-      ]
-    },
-    {
-      "requirement": "Policy-aware invalidation",
-      "name": "Manual invalidation is never deduped",
-      "given": ["a change already in designing with a prior invalidated event for artifact-drift"],
-      "when": ["Change.invalidate() is called with cause: 'artifact-review-required'"],
-      "then": ["a new invalidated event is appended", "AND history length increases"]
-    },
-    {
-      "requirement": "Policy-aware invalidation",
-      "name": "Artifact-drift with expanded affected set is not deduped",
-      "given": [
-        "a change in designing with a prior artifact-drift invalidation affecting { specs: [core:change] }"
-      ],
-      "when": [
-        "Change.invalidate() is called with artifact-drift and policy expansion yields an additional drifted file key"
-      ],
-      "then": [
-        "a new invalidated event is appended",
-        "AND the new event records the updated affected set"
-      ]
-    },
-    {
       "requirement": "Per-file drift tracking",
       "name": "Artifact-drift sets hasDrift on only the affected files",
       "given": [
@@ -636,6 +567,35 @@
       ],
       "when": ["the change is persisted and reloaded"],
       "then": ["the tracked file state is restored separately from the confirmed link set"]
+    },
+    {
+      "requirement": "Implementation tracking state",
+      "name": "Change persists removed tracked files explicitly",
+      "given": ["a change tracks packages/core/src/deleted.ts with state removed"],
+      "when": ["the change is persisted and reloaded"],
+      "then": [
+        "that tracked file still exists in trackedImplementationFiles",
+        "AND its state remains removed"
+      ]
+    },
+    {
+      "requirement": "Implementation tracking state",
+      "name": "Removed file does not return to resolved directly",
+      "given": ["a tracked implementation file is in removed state"],
+      "when": [
+        "review state changes are requested without a refresh proving the file exists again"
+      ],
+      "then": ["the file does not move directly to resolved"]
+    },
+    {
+      "requirement": "Implementation tracking state",
+      "name": "Refresh-driven resurrection returns removed file to open",
+      "given": [
+        "a tracked implementation file is in removed state",
+        "AND refresh later confirms the file exists again"
+      ],
+      "when": ["implementation tracking is updated from that refresh result"],
+      "then": ["the file state returns to open"]
     },
     {
       "requirement": "Implementation tracking state",
@@ -920,23 +880,10 @@
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "Change"
-      },
-      {
-        "specId": "core:change",
-        "file": "core:src/domain/entities/change.ts",
-        "symbol": "ChangeProps"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:326fcb190fa9658bc44b42851e5edfdca3b4d64a4149afc810a74fb2df4798eb",
-    "verify.md": "sha256:465deee9a45e9cd9caf5f9ac58d7bf08c1e5cbd7947a83efd0c398379da0b5fa"
+    "spec.md": "sha256:bdd3ac56325be9013d1db8ce1ce1d8654e004b6d373a6d47fdbd587399c6a978",
+    "verify.md": "sha256:b4bd0657eb06ca54d13381487efdedb83e3519e1305ce10ced11a3d4040907a3"
   },
   "generatedBy": "core"
 }

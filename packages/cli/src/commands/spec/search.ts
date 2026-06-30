@@ -1,6 +1,6 @@
 import { type Command } from 'commander'
-import { createCodeGraphProvider } from '@specd/code-graph'
-import { type SpecSearchEntry } from '@specd/core'
+import { createCodeGraphProvider } from '@specd/sdk'
+import { type SpecSearchEntry } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError, handleError } from '../../handle-error.js'

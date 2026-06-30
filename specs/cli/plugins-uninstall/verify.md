@@ -24,7 +24,8 @@
 - **WHEN** `specd plugins uninstall @specd/plugin-agent-claude` is invoked
 - **THEN** the plugin is loaded via `LoadPlugin` use case
 - **AND** the plugin's `uninstall()` method is called
-- **AND** `ConfigWriter.removePlugin()` removes the plugin from `specd.yaml`
+- **AND** `createConfigWriter().removePlugin` is called to remove the plugin from `specd.yaml`
+- **AND** `kernel.project.removePlugin` is not called
 
 ### Requirement: Output
 

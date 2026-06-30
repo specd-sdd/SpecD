@@ -1,0 +1,29 @@
+- op: modified
+  description: Missing spec fails with SpecNotFoundError and exit code 1
+  selector:
+    type: section
+    matches: 'Missing spec reports cleanly'
+  rename: 'Missing spec fails with not-found error'
+  content: |
+    - **GIVEN** spec `missing:spec` does not exist in the graph
+    - **WHEN** `specd graph impact --spec missing:spec` is run
+    - **THEN** stderr contains a not-found error for `missing:spec`
+    - **AND** the error uses machine-readable code `SPEC_NOT_FOUND`
+    - **AND** the process exits with code 1
+
+- op: added
+  description: Advanced symbol selector resolution
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Symbol impact analysis'
+    after:
+      type: section
+      matches: 'Scenario: Single symbol match'
+  content: |
+    #### Scenario: Full symbol id selector resolves directly
+
+    - **GIVEN** symbol `packages/core/src/auth.ts:function:validate` is indexed
+    - **WHEN** `specd graph impact --symbol packages/core/src/auth.ts:function:validate` is run
+    - **THEN** the command resolves the symbol through `resolveSymbolSelector`
+    - **AND** analyzes impact for that exact symbol

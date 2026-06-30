@@ -4,13 +4,13 @@
   "dependsOn": [
     "code-graph:symbol-model",
     "code-graph:graph-store",
-    "code-graph:ladybug-graph-store",
-    "code-graph:sqlite-graph-store",
-    "code-graph:language-adapter",
     "code-graph:indexer",
     "code-graph:traversal",
     "default:_global/architecture",
-    "code-graph:document-model"
+    "code-graph:get-graph-health",
+    "code-graph:index-project-graph",
+    "code-graph:get-spec-coverage",
+    "code-graph:get-change-spec-coverage"
   ],
   "context": [
     "Consumers of `@specd/code-graph` should not need to know how the store, indexer, adapters, and traversal functions are wired together. The composition layer provides a single facade and factory function that assembles all internal components, manages lifecycle, and defines the package's public API surface."
@@ -19,7 +19,7 @@
     {
       "requirement": "CodeGraphProvider facade",
       "rules": [
-        "`CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality. It exposes:\n\n- **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`\n- **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`\n- **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`\n- **Maintenance**: `clear(): Promise<void>` — removes all data from the store (for full re-index)\n- **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions\n- **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)` — delegates to impact functions\n- **Selector Normalization**: `resolveFileSelector(selector: string): Promise<string | string[]>`, `resolveSymbolSelector(selector: string): Promise<string | string[]>` — resolves project-relative or absolute paths to canonical graph identities\n- **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection\n\nThe provider SHALL provide a unified entry point for normalization so that CLI commands and other adapters do not need to implement path resolution logic.\n\n`CodeGraphProvider` is a thin orchestration layer — it holds no domain logic. All methods delegate to the appropriate domain service or use case."
+        "`CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality. It exposes:\n\n- **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`\n- **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getDocument(path)`, `findFilesByConfigRelativePath(configRelativePath)`, `findDocumentsByConfigRelativePath(configRelativePath)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`\n- **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`\n- **Maintenance**: `clear(): Promise<void>`, `recreate(): Promise<void>` — removes all data or recreates store\n- **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions\n- **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeFilesImpact(filePaths, direction, maxDepth)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)`, `getHotspots(options?)` — delegates to impact/traversal functions\n- **Selector Normalization**: `resolveFileSelector(selector: string): Promise<ResolvedFileSelector[]>`, `resolveSymbolSelector(selector: string): Promise<ResolvedSymbolSelector[]>` — resolves project-relative or absolute paths to canonical graph identities\n- **Lock Management**: `assertGraphIndexUnlocked()`, `acquireGraphIndexLock()` — checks or holds the indexing process mutex lock\n- **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection\n\n`getSpec(specId)` returns `undefined` when the spec is not indexed. Callers that require a spec to exist (for example CLI spec impact) SHALL throw `SpecNotFoundError` after checking the result."
       ]
     },
     {
@@ -31,7 +31,13 @@
     {
       "requirement": "Package exports",
       "rules": [
-        "The `@specd/code-graph` package SHALL export only:\n\n- `createCodeGraphProvider` — factory function\n- `CodeGraphProvider` — type only (for type annotations, not construction)\n- `CodeGraphOptions` — options type for the legacy factory overload\n- `CodeGraphFactoryOptions` — options type for the `SpecdConfig` overload, including additive graph-store registrations and optional `graphStoreId`\n- `GraphStoreFactory` — factory contract used by additive graph-store registrations\n- `IndexOptions`, `IndexResult`, `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, `DiscoveredSpec` — indexer types. `IndexOptions` includes `workspaces` (required array of `WorkspaceIndexTarget`), `projectRoot` (required), `onProgress` (optional callback), and `chunkBytes` (optional chunk size budget, default 20 MB).\n- `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult` — traversal/impact types\n- `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType` — model types\n- `SymbolQuery`, `GraphStatistics` — query types\n- `LanguageAdapter` — interface for custom adapters\n- `CodeGraphError` and subclasses — error types\n\nInternal components (`LadybugGraphStore`, `SQLiteGraphStore`, `AdapterRegistry`, built-in language adapters, `IndexCodeGraph`, traversal functions) MUST NOT be exported from the package entry point."
+        "The `@specd/code-graph` `\".\"` public barrel SHALL export only:\n\n- **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`\n- **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`\n- **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`\n- **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`\n- **Indexer & Discovery (public types only)**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`\n- **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`\n- **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`\n- **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`\n- **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`\n- **Language Adapter**: `LanguageAdapter`\n- **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`\n- **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)\n- **Version**: `CODE_GRAPH_VERSION`\n\nThe following MUST be exported only from `\"./internal\"`, not from `\".\"`: `InMemoryIndexSession`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, concrete graph-store adapter classes, and indexer implementation modules."
+      ]
+    },
+    {
+      "requirement": "Public and internal entry points",
+      "rules": [
+        "`@specd/code-graph` MUST publish:\n\n- `src/public.ts` (or equivalent) as `\".\"` — curated public surface aligned with **Package exports** below\n- `src/index.ts` as `\"./internal\"` — full barrel including indexer internals, store adapter symbols, and `InMemoryIndexSession`\n\n`package.json` `exports` MUST map these entry points. The `\".\"` barrel MUST NOT use unrestricted `export *` of infrastructure modules."
       ]
     },
     {
@@ -45,12 +51,18 @@
       "rules": [
         "`@specd/code-graph` depends on `@specd/core` as a runtime dependency. It uses types (`SpecdConfig`, `SpecdWorkspaceConfig`) and may use domain services (e.g. `parseMetadata`, `SpecRepository`) for spec resolution. The primary factory function accepts `SpecdConfig` to derive `storagePath` only — the provider is stateless and does not cache the config. Workspace targets and spec sources are built by the caller and passed via `IndexOptions` at each `index()` call."
       ]
+    },
+    {
+      "requirement": "Host use cases",
+      "rules": [
+        "`@specd/code-graph` SHALL expose application use cases for host orchestration above `CodeGraphProvider`:\n\n- `GetGraphHealth` / `createGetGraphHealth` — statistics plus staleness and fingerprint diagnostics\n- `IndexProjectGraph` / `createIndexProjectGraph` — project index execution with optional force recreate\n- `GetSpecCoverage` / `createGetSpecCoverage` — single-spec implementation coverage\n- `GetChangeSpecCoverage` / `createGetChangeSpecCoverage` — change-scoped coverage aggregation\n\nHost use cases receive an already-open `CodeGraphProvider`. They MUST NOT replace direct provider methods for search, hotspots, impact, or traversal — those remain facade delegates."
+      ]
     }
   ],
   "constraints": [
     "createCodeGraphProvider is the only construction path — CodeGraphProvider constructor is not exported",
-    "Internal components are not re-exported from the package",
-    "The LanguageAdapter interface is exported so consumers can write custom adapters",
+    "Internal components and store adapter implementations are exported only from \"./internal\"",
+    "The LanguageAdapter interface is exported from \".\" so consumers can write custom adapters",
     "Graph-store backend selection is registry-driven and internal to composition; it is not a specd.yaml setting",
     "The provider builds exactly one active GraphStore per construction path, selected by backend id from the merged graph-store registry",
     "CodeGraphProvider holds no domain logic — it only delegates",
@@ -95,6 +107,16 @@
       ]
     },
     {
+      "requirement": "Factory function",
+      "name": "Factory resolves storage root from SpecdConfig.configPath",
+      "given": ["a valid SpecdConfig with configPath set"],
+      "when": ["createCodeGraphProvider(config) is called"],
+      "then": [
+        "the provider storage root is derived from config.configPath",
+        "AND the provider can be opened, used for indexing and queries, and closed without error"
+      ]
+    },
+    {
       "requirement": "Package exports",
       "name": "Internal components not exported",
       "when": ["a consumer imports from @specd/code-graph"],
@@ -133,6 +155,30 @@
       ]
     },
     {
+      "requirement": "Package exports",
+      "name": "SpecNotFoundError is exported",
+      "when": ["a consumer imports from @specd/code-graph"],
+      "then": [
+        "SpecNotFoundError is available as an import",
+        "AND thrown instances expose machine-readable code SPEC_NOT_FOUND and the requested spec id"
+      ]
+    },
+    {
+      "requirement": "Public and internal entry points",
+      "name": "package.json exports public and internal",
+      "when": ["packages/code-graph/package.json exports is inspected"],
+      "then": ["\".\" and \"./internal\" entry points exist"]
+    },
+    {
+      "requirement": "Public and internal entry points",
+      "name": "InMemoryIndexSession only on internal entry",
+      "when": ["importing from @specd/code-graph \".\""],
+      "then": [
+        "InMemoryIndexSession is not available at compile time",
+        "AND importing from @specd/code-graph/internal succeeds"
+      ]
+    },
+    {
       "requirement": "Lifecycle management",
       "name": "Method before open throws",
       "given": ["a CodeGraphProvider created but not opened"],
@@ -161,20 +207,28 @@
         "its package.json has a dependency on @specd/core",
         "AND the primary factory accepts SpecdConfig from @specd/core"
       ]
+    },
+    {
+      "requirement": "Host use cases",
+      "name": "Package exports host use case factories",
+      "when": ["@specd/code-graph is imported"],
+      "then": [
+        "createGetGraphHealth, createIndexProjectGraph, createGetSpecCoverage, and createGetChangeSpecCoverage are available as named exports"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "code-graph:composition",
-        "file": "code-graph:src/composition/code-graph-provider.ts",
-        "symbol": "CodeGraphProvider"
+        "file": "code-graph:src/public.ts",
+        "symbol": "CODE_GRAPH_VERSION"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c5d2fc1875b7df6027c8f1f478ab626ddf02e5c48010050463dbcabd27963836",
-    "verify.md": "sha256:0cbc946a259a02c6257f57f36b10945c079e345eddef57913e10c27fc1d7636a"
+    "spec.md": "sha256:77861164992a8f5010f9f2867995eca75793f3131a9ac94164f83fc8c74c99d1",
+    "verify.md": "sha256:b5b379d01ea2e4befac841783f08acfe898a2dbf1409bd4a3fe0f79dcb6ae3f7"
   },
   "generatedBy": "core"
 }

@@ -1,6 +1,6 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
-import { type Change } from '@specd/core'
+import { type Change } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'

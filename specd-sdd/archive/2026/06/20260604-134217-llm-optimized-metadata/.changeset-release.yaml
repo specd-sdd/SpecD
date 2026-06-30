@@ -1,0 +1,20 @@
+releases:
+  skills:workflow-automation: minor
+  skills:agents: minor
+  skills:skill: minor
+  skills:skill-repository: minor
+  skills:skill-repository-infra: minor
+  skills:skill-templates-source: minor
+  plugin-manager:agent-plugin-type: minor
+  plugin-agent-claude:plugin-agent: minor
+  plugin-agent-copilot:plugin-agent: minor
+  plugin-agent-codex:plugin-agent: minor
+  plugin-agent-opencode:plugin-agent: minor
+  plugin-agent-standard:plugin-agent: minor
+  cli:spec-context: minor
+  core:compile-context: minor
+  core:get-project-context: minor
+  cli:project-context: minor
+  cli:spec-list: minor
+  cli:project-status: minor
+  cli:change-context: minor

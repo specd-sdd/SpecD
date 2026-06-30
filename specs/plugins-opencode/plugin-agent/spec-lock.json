@@ -7,8 +7,9 @@
     "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
-    "skills:skill-templates-source",
-    "skills:resolve-bundle"
+    "skills:skill-repository",
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "implementation": [
     {
@@ -17,6 +18,10 @@
     },
     {
       "file": "plugin-agent-opencode:test/install-skills.spec.ts"
+    },
+    {
+      "file": "plugin-agent-opencode:src/domain/frontmatter/index.ts",
+      "symbols": ["agentFrontmatter"]
     }
   ]
 }

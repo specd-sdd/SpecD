@@ -1,5 +1,3 @@
-/* eslint-disable */
-import { stat } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   captureStderr,
@@ -11,10 +9,6 @@ import {
   ExitSentinel,
 } from './helpers.js'
 
-vi.mock('node:fs/promises', () => ({
-  stat: vi.fn(),
-}))
-
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
 }))
@@ -23,6 +17,7 @@ vi.mock('../../src/commands/change/_implementation-tracking.js', () => ({
   enrichImplementationTracking: vi.fn(),
 }))
 
+import { ImplementationFileNotFoundError } from '@specd/sdk'
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { enrichImplementationTracking } from '../../src/commands/change/_implementation-tracking.js'
 import { registerChangeImplementation } from '../../src/commands/change/implementation.js'
@@ -86,7 +81,9 @@ describe('change implementation', () => {
       configFilePath: null,
       kernel,
     })
-    vi.mocked(stat).mockRejectedValue(new Error('ENOENT'))
+    kernel.changes.updateImplementationTracking.execute.mockRejectedValue(
+      new ImplementationFileNotFoundError('missing.ts'),
+    )
     mockProcessExit()
     const stderr = captureStderr()
 
@@ -112,7 +109,6 @@ describe('change implementation', () => {
     }
 
     expect(stderr()).toContain('error: Implementation file not found at: missing.ts')
-    expect(kernel.changes.updateImplementationTracking.execute).not.toHaveBeenCalled()
   })
 
   it('resolve supports comma-separated file lists', async () => {
@@ -122,7 +118,6 @@ describe('change implementation', () => {
       configFilePath: null,
       kernel,
     })
-    vi.mocked(stat).mockResolvedValue({} as any)
 
     const program = makeProgram()
     registerChangeImplementation(program.command('change'))
@@ -147,18 +142,16 @@ describe('change implementation', () => {
     )
   })
 
-  it('ignore fails when any file in a comma-separated list is missing', async () => {
+  it('ignore fails when any file in a comma-separated list is missing and untracked', async () => {
     const kernel = makeMockKernel()
     vi.mocked(resolveCliContext).mockResolvedValue({
       config: makeMockConfig(),
       configFilePath: null,
       kernel,
     })
-    vi.mocked(stat).mockImplementation(async (filePath: any) => {
-      if (String(filePath).endsWith('missing.ts')) throw new Error('ENOENT')
-
-      return {} as any
-    })
+    kernel.changes.updateImplementationTracking.execute
+      .mockResolvedValueOnce({ implementationTracking: { trackedFiles: [], links: [] } })
+      .mockRejectedValueOnce(new ImplementationFileNotFoundError('missing.ts'))
     mockProcessExit()
     const stderr = captureStderr()
 
@@ -181,6 +174,76 @@ describe('change implementation', () => {
     }
 
     expect(stderr()).toContain('error: Implementation file not found at: missing.ts')
-    expect(kernel.changes.updateImplementationTracking.execute).not.toHaveBeenCalled()
+  })
+
+  it('review displays removed tracked files', async () => {
+    const kernel = makeMockKernel()
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: makeMockConfig(),
+      configFilePath: null,
+      kernel,
+    })
+    kernel.changes.getImplementationReview.execute.mockResolvedValue({
+      specIds: [],
+      implementationTracking: {
+        trackedFiles: [
+          { file: 'src/active.ts', state: 'open' },
+          { file: 'src/deleted.ts', state: 'removed' },
+        ],
+        links: [],
+      },
+    })
+    vi.mocked(enrichImplementationTracking).mockResolvedValue({
+      trackedFiles: [
+        { file: 'src/active.ts', state: 'open' },
+        { file: 'src/deleted.ts', state: 'removed' },
+      ],
+      graphHint: {
+        status: 'fresh',
+        message: 'Code graph is fresh.',
+      },
+      links: [],
+    })
+    const stdout = captureStdout()
+
+    const program = makeProgram()
+    registerChangeImplementation(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'implementation', 'review', 'my-change'])
+
+    const out = stdout()
+    expect(out).toContain('removed')
+    expect(out).toContain('src/deleted.ts')
+  })
+
+  it('unresolve calls updateImplementationTracking with unresolve action', async () => {
+    const kernel = makeMockKernel()
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: makeMockConfig(),
+      configFilePath: null,
+      kernel,
+    })
+    kernel.changes.updateImplementationTracking.execute.mockResolvedValue({
+      implementationTracking: {
+        trackedFiles: [{ file: 'src/foo.ts', state: 'open' }],
+        links: [],
+      },
+    })
+
+    const program = makeProgram()
+    registerChangeImplementation(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'implementation',
+      'unresolve',
+      'my-change',
+      '--file',
+      'src/foo.ts',
+    ])
+
+    expect(kernel.changes.updateImplementationTracking.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'unresolve', file: 'src/foo.ts' }),
+    )
   })
 })

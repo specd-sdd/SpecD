@@ -381,6 +381,27 @@ export class FsArchiveRepository extends ArchiveRepository {
     return archivedChange
   }
 
+  /** @inheritdoc */
+  override async artifact(change: ArchivedChange, filename: string): Promise<SpecArtifact | null> {
+    const dir = this.archivePath(change)
+    const allowed = new Set<string>()
+    for (const artifact of change.artifacts.values()) {
+      for (const file of artifact.files.values()) {
+        allowed.add(normalizeRelativePath(file.filename))
+      }
+    }
+    const filePath = resolveConfinedPath(dir, filename, allowed.size > 0 ? allowed : undefined)
+    let content: string
+    try {
+      content = await fs.readFile(filePath, 'utf8')
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    return new SpecArtifact(filename, content, sha256(content))
+  }
+
   /**
    * Rebuilds `index.jsonl` by scanning the archive directory for all
    * manifests with an `archivedAt` field, sorting by `archivedAt`, and
@@ -417,27 +438,6 @@ export class FsArchiveRepository extends ArchiveRepository {
       entry.workspaces[0] ?? 'default',
     )
     return resolveArchiveDirPathSync(this._archivePath, relPath)
-  }
-
-  /** @inheritdoc */
-  override async artifact(change: ArchivedChange, filename: string): Promise<SpecArtifact | null> {
-    const dir = this.archivePath(change)
-    const allowed = new Set<string>()
-    for (const artifact of change.artifacts.values()) {
-      for (const file of artifact.files.values()) {
-        allowed.add(normalizeRelativePath(file.filename))
-      }
-    }
-    const filePath = resolveConfinedPath(dir, filename, allowed.size > 0 ? allowed : undefined)
-    let content: string
-    try {
-      content = await fs.readFile(filePath, 'utf8')
-    } catch (err) {
-      if (isEnoent(err)) return null
-      throw err
-    }
-
-    return new SpecArtifact(filename, content, sha256(content))
   }
 
   // ---- Private helpers ----
@@ -1013,6 +1013,15 @@ export class FsArchiveRepository extends ArchiveRepository {
 
       await this._collectManifests(fullPath, results)
     }
+  }
+
+  /**
+   * Returns the absolute filesystem path to the archive root.
+   *
+   * @returns Single-element array containing the archive root path
+   */
+  override internalPaths(): readonly string[] {
+    return [this._archivePath]
   }
 }
 

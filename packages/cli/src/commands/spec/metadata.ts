@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { SpecPath, checkMetadataFreshness, NodeContentHasher } from '@specd/core'
+import { SpecPath, checkMetadataFreshness, NodeContentHasher } from '@specd/sdk'
 
 const hasher = new NodeContentHasher()
 import { resolveCliContext } from '../../helpers/cli-context.js'

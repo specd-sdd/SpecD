@@ -96,5 +96,7 @@
     "spec.md": "sha256:693742077c5c7ca4b493b8d82937703af0d8b51f462c6ddc86d2509837b600d0",
     "verify.md": "sha256:37de401fb74c8735b759e8c3c8ec935b77ff6a00c72287a01fd3ee76142c12ef"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "The project configuration defines workspaces as isolated units of specs, code, and ownership, but consumers need a unified way to discover and…",
+  "optimizedContext": "# List Workspaces\n\n## Rules\n- Orchestrate workspaces with repositories: ListWorkspaces.execute() SHALL iterate through all workspaces defined in the project configuration and pair each one with its corresponding SpecRepository instance.\n- ProjectWorkspace entity properties: Each ProjectWorkspace entity MUST include the following immutable properties derived from the project configuration and kernel internals: - name — the unique workspace identifier…\n- Handle all configured workspaces: The use case MUST include every workspace declared in the specd.yaml (or its local overrides).\n- Dependencies: core:config, core:workspace, core:spec-repository-port\n\n## Constraints\n- The use case MUST NOT modify the configuration or the repository states.\n- The ProjectWorkspace entity SHALL be considered a read-only view of the project structure for high-level orchestration.\n- The use case SHALL NOT pre-load any spec content or metadata; it only provides access to the repository ports.\n"
 }

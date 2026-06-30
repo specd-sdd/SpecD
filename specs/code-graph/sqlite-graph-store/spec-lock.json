@@ -11,12 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/sqlite/schema.ts",
-      "symbols": ["SQLITE_SCHEMA_VERSION", "SQLITE_SCHEMA_DDL"]
-    },
-    {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "symbols": ["SQLiteGraphStore"]
+      "symbols": ["SQLiteGraphStore", "searchSymbols", "searchSpecs", "searchDocuments"]
     },
     {
       "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"

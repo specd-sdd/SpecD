@@ -1,0 +1,142 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Two-pass extraction with in-memory index'
+  content: |
+    #### Scenario: Symbols from all workspaces are available before relation resolution
+
+    - **GIVEN** two workspaces contain symbols that import or call each other
+    - **WHEN** Pass 2 runs
+    - **THEN** cross-workspace relations are resolved from the previously registered in-memory analysis data
+    - **AND** no graph-store query is needed during extraction or relation building
+
+    #### Scenario: Each file is analyzed once before later relation work
+
+    - **GIVEN** a built-in adapter returns imports, symbols, binding facts, and call facts from `analyzeFile()`
+    - **WHEN** the same file reaches Pass 2
+    - **THEN** the indexer reuses the stored `FileAnalysis`
+    - **AND** it does not call back into the adapter to re-parse the same file content
+
+    #### Scenario: Unresolved qualified names may still become file imports
+
+    - **GIVEN** a PHP file imports `App\Services\Mailer`
+    - **AND** no registered symbol has that qualified name
+    - **AND** the adapter can deterministically map the qualified name to a source file path
+    - **WHEN** Pass 2 resolves imports from the stored analysis
+    - **THEN** a file-to-file `IMPORTS` relation is emitted to that resolved file target
+
+    #### Scenario: Unresolvable imports are dropped without aborting the run
+
+    - **GIVEN** an analyzed file contains an import that cannot be resolved through shared session lookups or deterministic adapter rules
+    - **WHEN** Pass 2 runs
+    - **THEN** no relation is emitted for that import
+    - **AND** indexing continues without throwing
+
+    #### Scenario: Shared scoped resolution runs after import resolution
+
+    - **GIVEN** a file analysis contains imported type names and deterministic binding facts that reference those names
+    - **WHEN** Pass 2 runs
+    - **THEN** import resolution completes before shared scoped binding resolution consumes those candidates
+    - **AND** derived `USES_TYPE`, `CONSTRUCTS`, or `CALLS` relations are emitted from the stored facts
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Two-pass extraction with in-memory index'
+  content: |
+    ### Requirement: Shared indexing session
+
+    #### Scenario: Adapters and pass logic share the same run-scoped session
+
+    - **GIVEN** Pass 1 has registered files, symbols, and per-file analyses in the `IndexSession`
+    - **WHEN** Pass 2 resolves imports and builds relations
+    - **THEN** it reads those registrations from the same session instance
+    - **AND** it does not rebuild equivalent per-file lookup structures from scratch
+
+    #### Scenario: Run-scoped adapter cache state stays behind the common session API
+
+    - **GIVEN** a built-in adapter stores compact run-scoped cache state for later deterministic resolution
+    - **WHEN** the state is consumed in Pass 2
+    - **THEN** access goes through the `IndexSession` API
+    - **AND** the adapter does not mutate raw internal lookup maps owned by the session
+
+    #### Scenario: Shared session also serves later spec and document lookups
+
+    - **GIVEN** the indexing run has already registered documents, specs, and covered symbols
+    - **WHEN** a later indexing phase needs a spec-to-symbol or symbol-to-spec lookup
+    - **THEN** it reads that relationship from the same run-scoped session
+    - **AND** it does not rebuild a parallel cross-entity cache outside the session
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Progress reporting'
+  content: |
+    #### Scenario: Progress callback receives pass labels aligned to the new pipeline
+
+    - **GIVEN** an `onProgress` callback is provided in `IndexOptions`
+    - **WHEN** indexing runs
+    - **THEN** the callback reports progress across discovery, pass 1 file analysis, pass 2 relation building, and bulk loading
+    - **AND** per-file phases include detail strings such as `"150/460 files"`
+
+    #### Scenario: Progress callback fires before blocking processing
+
+    - **WHEN** a phase like discovery or pass 1 finishes
+    - **THEN** the progress callback is fired immediately with the next phase label
+    - **AND** this happens before synchronous heavy work begins, such as session index finalization or relation aggregation
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Progress reporting'
+  content: |
+    ### Requirement: Phase execution timing logging
+
+    #### Scenario: Debug logs record phase duration
+
+    - **WHEN** indexing completes
+    - **THEN** debug logs contain execution times for discovery, pass 1, pass 2, and bulk loading
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Multi-workspace file discovery'
+  content: |
+    ### Requirement: Binary file filtering
+
+    #### Scenario: Known binary extensions are skipped before decoding
+
+    - **GIVEN** a workspace contains `image.png`, `document.pdf`, and `archive.zip`
+    - **WHEN** file discovery runs
+    - **THEN** those files are excluded before any text decoding heuristics are applied
+    - **AND** they do not appear in the discovered source-file set
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Binary file filtering'
+  content: |
+    ### Requirement: Bounded analysis memory
+
+    #### Scenario: Retained analysis state excludes parser runtime objects
+
+    - **GIVEN** Pass 1 has completed for a large project
+    - **WHEN** retained run-scoped analysis state is inspected
+    - **THEN** it contains compact facts and shared lookup indexes needed for Pass 2
+    - **AND** it does not retain AST nodes, parser trees, or equivalent heavyweight parser-runtime objects

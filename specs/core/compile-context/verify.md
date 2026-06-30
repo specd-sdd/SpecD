@@ -272,17 +272,38 @@
 
 ### Requirement: Ports and constructor
 
-#### Scenario: CompileContext is constructed with LifecycleEngine
+#### Scenario: CompileContext is constructed with LifecycleEngine and default config
 
-- **WHEN** `CompileContext` is assembled
-- **THEN** it receives `PreviewSpec` and `LifecycleEngine` alongside its existing repositories and utilities
+- **WHEN** `CompileContext` is assembled from a resolved `SpecdConfig`
+- **THEN** it receives `PreviewSpec`, `LifecycleEngine`, and a yaml-derived `CompileContextConfig` default snapshot alongside its existing repositories and utilities
 
 ### Requirement: Input
 
-#### Scenario: Input includes step, config, and optional traversal controls
+#### Scenario: Input accepts runtime overrides without config
 
 - **WHEN** `CompileContext.execute` is called
-- **THEN** it accepts the change name, target step, resolved config, and optional flags such as `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+- **THEN** it accepts the change name, target step, and optional runtime overrides such as `contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint`
+- **AND** it does not accept a `config` field
+
+#### Scenario: Runtime contextMode overrides baked default
+
+- **GIVEN** `CompileContext` was constructed with `contextMode: 'summary'` in its default snapshot
+- **WHEN** `execute` is called with `contextMode: 'full'`
+- **THEN** specs are rendered using full mode
+
+### Requirement: Baked default configuration merge
+
+#### Scenario: Yaml-derived fields come from construction default
+
+- **GIVEN** `CompileContext` was constructed with project-level include patterns in its default snapshot
+- **WHEN** `execute` is called without `contextMode` or `llmOptimizedContext` overrides
+- **THEN** context collection uses the baked include/exclude patterns and yaml `contextMode`
+
+#### Scenario: llmOptimizedContext runtime override wins over baked default
+
+- **GIVEN** the baked default has `llmOptimizedContext: false`
+- **WHEN** `execute` is called with `llmOptimizedContext: true`
+- **THEN** optimized context is preferred when available
 
 ### Requirement: Caller-owned implementation tracking refresh
 
@@ -368,12 +389,35 @@
 - **WHEN** context is compiled
 - **THEN** the rendered output for that spec uses the standard `context`
 
+#### Scenario: Optimization bypassed when only rules requested
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec has fresh optimized metadata
+- **WHEN** context is compiled with `sections: ["rules"]`
+- **THEN** it displays the raw rules instead of optimized context
+- **AND** it emits no `stale-optimization` warnings
+
+#### Scenario: Warnings suppressed when optimization is bypassed by section flags
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec is missing optimized context
+- **WHEN** context is compiled with `sections: ["rules"]`
+- **THEN** it emits no `stale-optimization` warning for that spec
+
+#### Scenario: Scenarios are appended to optimized context when both are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec has fresh optimized metadata AND scenarios
+- **WHEN** context is compiled with `sections: ["rules", "constraints", "scenarios"]`
+- **THEN** it displays the optimized content
+- **AND** it appends the rendered scenarios
+
 ### Requirement: Optimization warning signal
 
 #### Scenario: Emits warning for missing spec optimization
 
-- **GIVEN** `llmOptimizedContext: true`
-- **AND** a spec in the context is missing its `optimizedContext` field
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec is missing optimized context
 - **WHEN** context is compiled
-- **THEN** a warning is emitted for that spec
-- **AND** it includes remediation instructions
+- **THEN** it emits a `stale-optimization` warning
+- **AND** the message mentions `specd-spec-context-optimizer`

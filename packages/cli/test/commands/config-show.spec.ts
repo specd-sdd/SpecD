@@ -13,7 +13,7 @@ vi.mock('../../src/load-config.js', () => ({
 }))
 
 import { loadConfig } from '../../src/load-config.js'
-import { ConfigValidationError } from '@specd/core'
+import { ConfigValidationError } from '@specd/sdk'
 import { registerConfigShow } from '../../src/commands/config/show.js'
 
 function setup() {

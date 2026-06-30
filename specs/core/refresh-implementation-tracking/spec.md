@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without coupling that side effect to read-only or transition use cases. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, merges new candidate paths into `trackedImplementationFiles`, and persists the result. Callers that need fresh tracking invoke this use case explicitly; use cases such as `GetStatus`, `TransitionChange`, and `CompileContext` project persisted state only.
+Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without duplicating detection merge logic across hosts. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result.
+
+`GetStatus` and `TransitionChange` invoke this use case by default for active changes. Hosts MAY still call `RefreshImplementationTracking` explicitly when they need a standalone refresh. Other read-only use cases such as `CompileContext` project persisted state only unless a future change adds orchestration there.
 
 ## Requirements
 
@@ -11,6 +13,12 @@ Delivery adapters need a single application-layer operation to refresh a change'
 `RefreshImplementationTracking.execute` MUST accept:
 
 - `name` — the change name to refresh
+
+### Requirement: Default orchestration by host use cases
+
+`GetStatus` and `TransitionChange` MUST delegate pre-read and pre-transition refresh to `RefreshImplementationTracking` rather than invoking `ImplementationDetector` directly.
+
+`RefreshImplementationTracking` remains the standalone primitive for explicit refresh operations (for example `specd change implementation refresh`).
 
 ### Requirement: Historical implementing guard
 
@@ -22,11 +30,41 @@ When the guard is satisfied, the use case MUST run targeted detection and MAY pe
 
 When detection runs, the use case MUST:
 
-1. Call `ImplementationDetector.detectModifiedFiles(change)` with the loaded change context.
+1. Call `ImplementationDetector.detectModifiedFiles(change, options)` with the loaded change context and internal paths as exclusions.
 2. For each returned project-relative path not already present in `trackedImplementationFiles`, call `Change.trackImplementationFile(file, 'open')`.
-3. Leave existing tracked entries and confirmed implementation links unchanged.
+3. For each project-relative path returned by the detector that IS already tracked, preserve its existing review state, unless the file was in the `removed` state (see resurrections below).
 
-The use case MUST NOT remove tracked files, rewrite link state, or mark files `resolved` or `ignored`.
+The use case MUST NOT mark files `resolved` or `ignored` during the merge pass of newly detected files.
+
+### Requirement: Deletion and removal semantics
+
+When detection runs, the use case MUST identify tracked implementation files that have been physically removed from the project.
+
+For every file in `trackedImplementationFiles` that is not in the `ignored` state, the use case MUST verify its existence on disk. If the file is missing, the use case MUST:
+
+1. Call `Change.trackImplementationFile(file, 'removed')` to update its review state.
+2. Remove all `implementationLinks` (both file-level and symbol-level) that reference the missing file.
+
+### Requirement: Resurrections and re-appearances
+
+When detection runs, the use case MUST handle files that were previously marked as `removed` but are found to exist again on disk.
+
+A file SHALL be transitioned from `removed` to `open` when:
+
+- It is returned by the `ImplementationDetector` as a modified file.
+- It is found to exist on disk during the existence check pass for tracked files.
+
+Returning a file to `open` ensures that it is reviewed again, as its content or purpose may have changed since it was last tracked.
+
+### Requirement: Internal directory filtering
+
+To prevent internal specd metadata and archived changes from being discovered as implementation, the use case MUST collect internal directory paths before detection.
+
+The use case MUST:
+
+1. Query `ChangeRepository.internalPaths()` and `ArchiveRepository.internalPaths()`.
+2. Normalize these absolute paths to project-relative portable paths.
+3. Pass the normalized paths as `excludePaths` to `ImplementationDetector.detectModifiedFiles`.
 
 ### Requirement: Persistence
 
@@ -51,7 +89,8 @@ If no change with the given name exists, the use case MUST throw `ChangeNotFound
 
 `RefreshImplementationTracking` MUST accept:
 
-- `changes: ChangeRepository` — for loading and persisting the change
+- `changes: ChangeRepository` — for loading, persisting, and internal path discovery
+- `archives: ArchiveRepository` — for internal path discovery
 - `implementationDetector: ImplementationDetector` — for targeted candidate discovery
 
 ### Requirement: Delivery-agnostic boundary
@@ -71,3 +110,4 @@ It exposes only the VCS-backed refresh contract. Other adapters MAY update track
 - [`core:change`](../change/spec.md) — historical implementing guard and tracked-file semantics
 - [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — `ImplementationDetector` port
 - [`core:storage`](../storage/spec.md) — `ChangeRepository` persistence
+- [`core:archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` for internal path discovery

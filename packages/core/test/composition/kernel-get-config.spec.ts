@@ -1,0 +1,175 @@
+import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { afterEach, describe, expect, it } from 'vitest'
+import { GetProjectSummary } from '../../src/application/use-cases/get-project-summary.js'
+import { ApproveSpec } from '../../src/application/use-cases/approve-spec.js'
+import { ApproveSignoff } from '../../src/application/use-cases/approve-signoff.js'
+import { createKernel } from '../../src/composition/kernel.js'
+import { GetConfig } from '../../src/application/use-cases/get-config.js'
+import { type SpecdConfig } from '../../src/application/specd-config.js'
+
+let tmpDir: string | undefined
+
+afterEach(async () => {
+  if (tmpDir !== undefined) {
+    await fs.rm(tmpDir, { recursive: true, force: true })
+    tmpDir = undefined
+  }
+})
+
+/**
+ * Creates a minimal fs-backed config for kernel getConfig tests.
+ *
+ * @returns A resolved {@link SpecdConfig}
+ */
+async function makeConfig(): Promise<SpecdConfig> {
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-kernel-get-config-'))
+  const specsPath = path.join(tmpDir, 'specs')
+  const changesPath = path.join(tmpDir, '.specd', 'changes')
+  const draftsPath = path.join(tmpDir, '.specd', 'drafts')
+  const discardedPath = path.join(tmpDir, '.specd', 'discarded')
+  const archivePath = path.join(tmpDir, '.specd', 'archive')
+  await Promise.all([
+    fs.mkdir(specsPath, { recursive: true }),
+    fs.mkdir(changesPath, { recursive: true }),
+    fs.mkdir(draftsPath, { recursive: true }),
+    fs.mkdir(discardedPath, { recursive: true }),
+    fs.mkdir(archivePath, { recursive: true }),
+  ])
+
+  return {
+    projectRoot: tmpDir,
+    configPath: path.join(tmpDir, 'specd.yaml'),
+    schemaRef: '@specd/schema-std',
+    workspaces: [
+      {
+        name: 'default',
+        specsPath,
+        specsAdapter: { adapter: 'fs', config: { path: specsPath } },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: tmpDir,
+        ownership: 'owned',
+        isExternal: false,
+      },
+    ],
+    storage: {
+      changesPath,
+      changesAdapter: { adapter: 'fs', config: { path: changesPath } },
+      draftsPath,
+      draftsAdapter: { adapter: 'fs', config: { path: draftsPath } },
+      discardedPath,
+      discardedAdapter: { adapter: 'fs', config: { path: discardedPath } },
+      archivePath,
+      archiveAdapter: { adapter: 'fs', config: { path: archivePath } },
+    },
+    approvals: { spec: false, signoff: false },
+  }
+}
+
+describe('createKernel project.getConfig', () => {
+  describe('given a wired kernel', () => {
+    it('exposes GetConfig and returns a detached snapshot', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.project.getConfig).toBeInstanceOf(GetConfig)
+
+      const snapshot = kernel.project.getConfig.execute()
+      expect(snapshot).toEqual(config)
+      expect(snapshot).not.toBe(config)
+    })
+
+    it('exposes GetProjectSummary on kernel.project', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.project.getProjectSummary).toBeInstanceOf(GetProjectSummary)
+    })
+
+    it('exposes approveSpec and approveSignoff on kernel.changes', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.changes.approveSpec).toBeInstanceOf(ApproveSpec)
+      expect(kernel.changes.approveSignoff).toBeInstanceOf(ApproveSignoff)
+      expect(kernel.specs).not.toHaveProperty('approveSpec')
+      expect(kernel.specs).not.toHaveProperty('approveSignoff')
+    })
+
+    it('does not expose listPlugins on kernel.project', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect('listPlugins' in kernel.project).toBe(false)
+    })
+
+    it('does not expose config mutation entries on kernel.project', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.project).not.toHaveProperty('init')
+      expect(kernel.project).not.toHaveProperty('addPlugin')
+      expect(kernel.project).not.toHaveProperty('removePlugin')
+    })
+
+    it('does not expose skills manifest entries on kernel.project', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel.project).not.toHaveProperty('recordSkillInstall')
+      expect(kernel.project).not.toHaveProperty('getSkillsManifest')
+      expect('recordSkillInstall' in kernel.project).toBe(false)
+      expect('getSkillsManifest' in kernel.project).toBe(false)
+    })
+
+    it('does not expose configWriter on the kernel object', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      expect(kernel).not.toHaveProperty('configWriter')
+    })
+
+    it('includes plugins on the getConfig snapshot', async () => {
+      const config = await makeConfig()
+      const configWithPlugins: SpecdConfig = {
+        ...config,
+        plugins: {
+          agents: [{ name: '@specd/plugin-agent-claude' }],
+        },
+      }
+      const kernel = await createKernel(configWithPlugins)
+
+      expect(kernel.project.getConfig.execute().plugins).toEqual({
+        agents: [{ name: '@specd/plugin-agent-claude' }],
+      })
+    })
+
+    it('keeps listWorkspaces stable when the host mutates the returned snapshot', async () => {
+      const config = await makeConfig()
+      const kernel = await createKernel(config)
+
+      const before = await kernel.project.listWorkspaces.execute()
+      const hostView = kernel.project.getConfig.execute()
+
+      const workspaces = hostView.workspaces as SpecdConfig['workspaces'] & {
+        push: (v: unknown) => number
+      }
+      workspaces.push({
+        name: 'injected',
+        specsPath: '/tmp/injected/specs',
+        specsAdapter: { adapter: 'fs', config: { path: '/tmp/injected/specs' } },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: '/tmp/injected',
+        ownership: 'owned',
+        isExternal: false,
+      })
+
+      const after = await kernel.project.listWorkspaces.execute()
+      expect(after).toEqual(before)
+      expect(config.workspaces).toHaveLength(1)
+    })
+  })
+})

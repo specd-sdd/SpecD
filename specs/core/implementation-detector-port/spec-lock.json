@@ -4,5 +4,14 @@
     "version": 1
   },
   "dependsOn": ["core:change", "core:refresh-implementation-tracking"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/application/ports/implementation-detector.ts",
+      "symbols": ["ImplementationDetectorOptions", "ImplementationDetector"]
+    },
+    {
+      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "symbols": ["VcsImplementationDetector"]
+    }
+  ]
 }

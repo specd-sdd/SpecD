@@ -9,6 +9,7 @@ import { type GraphStatistics } from '../../src/domain/value-objects/graph-stati
 import { RelationType } from '../../src/domain/value-objects/relation-type.js'
 import { type SearchOptions } from '../../src/domain/value-objects/search-options.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
+import { expandSearchQuery } from '../../src/domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../src/domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../src/domain/services/matches-exclude.js'
 
@@ -439,9 +440,7 @@ export class InMemoryGraphStore extends GraphStore {
     return [...this.specs.values()]
   }
 
-  async searchSymbols(
-    options: SearchOptions,
-  ): Promise<
+  async searchSymbols(options: SearchOptions): Promise<
     Array<{
       symbol: SymbolNode
       score: number
@@ -451,8 +450,7 @@ export class InMemoryGraphStore extends GraphStore {
     }>
   > {
     this.ensureOpen()
-    const rawQuery = options.query.trim().toLowerCase()
-    const terms = options.query.toLowerCase().split(/\s+/)
+    const query = expandSearchQuery(options.query)
     const results: Array<{
       symbol: SymbolNode
       score: number
@@ -462,7 +460,8 @@ export class InMemoryGraphStore extends GraphStore {
     }> = []
     for (const sym of this.symbols.values()) {
       const text = `${expandSymbolName(sym.name)} ${sym.comment ?? ''}`.toLowerCase()
-      if (!terms.some((t) => text.includes(t))) continue
+      const contentScore = countContentTokenHits(text, query.expandedTokens)
+      if (contentScore === 0) continue
       if (options.kinds && options.kinds.length > 0 && !options.kinds.includes(sym.kind)) continue
       if (options.filePattern) {
         const regex = new RegExp(
@@ -473,10 +472,15 @@ export class InMemoryGraphStore extends GraphStore {
       }
       if (options.workspace && !sym.filePath.startsWith(options.workspace + ':')) continue
       if (matchesExclude(sym.filePath, options.excludePaths, options.excludeWorkspaces)) continue
-      const score =
-        1 +
-        (sym.id.toLowerCase() === rawQuery ? 1_000_000 : 0) +
-        (sym.name.toLowerCase() === rawQuery ? 1_000 : 0)
+      const ranking = rankIdentityMatch({
+        normalizedQuery: query.normalizedQuery,
+        rawTokens: query.rawTokens,
+        expandedTokens: query.expandedTokens,
+        canonicalIdentity: sym.id,
+        alternateIdentity: sym.name,
+        contentScore,
+      })
+      const score = composeRankingScore(ranking)
       results.push({ symbol: sym, score, snippet: '', startLine: 1, endLine: 1 })
     }
     return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
@@ -488,8 +492,7 @@ export class InMemoryGraphStore extends GraphStore {
     Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
   > {
     this.ensureOpen()
-    const rawQuery = options.query.trim().toLowerCase()
-    const terms = options.query.toLowerCase().split(/\s+/)
+    const query = expandSearchQuery(options.query)
     const results: Array<{
       spec: SpecNode
       score: number
@@ -499,19 +502,25 @@ export class InMemoryGraphStore extends GraphStore {
     }> = []
     for (const spec of this.specs.values()) {
       const text = `${spec.specId} ${spec.title} ${spec.description} ${spec.content}`.toLowerCase()
-      if (!terms.some((t) => text.includes(t))) continue
+      const contentScore = countContentTokenHits(text, query.expandedTokens)
+      if (contentScore === 0) continue
       if (options.workspace && spec.workspace !== options.workspace) continue
       if (matchesExclude(spec.path, options.excludePaths, options.excludeWorkspaces)) continue
       if (options.excludeWorkspaces && options.excludeWorkspaces.includes(spec.workspace)) continue
-      const score = 1 + (spec.specId.toLowerCase() === rawQuery ? 1_000_000 : 0)
+      const ranking = rankIdentityMatch({
+        normalizedQuery: query.normalizedQuery,
+        rawTokens: query.rawTokens,
+        expandedTokens: query.expandedTokens,
+        canonicalIdentity: spec.specId,
+        contentScore,
+      })
+      const score = composeRankingScore(ranking)
       results.push({ spec, score, snippet: '', startLine: 1, endLine: 1 })
     }
     return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
   }
 
-  async searchDocuments(
-    options: SearchOptions,
-  ): Promise<
+  async searchDocuments(options: SearchOptions): Promise<
     Array<{
       document: DocumentNode
       score: number
@@ -521,8 +530,7 @@ export class InMemoryGraphStore extends GraphStore {
     }>
   > {
     this.ensureOpen()
-    const rawQuery = options.query.trim().toLowerCase()
-    const terms = options.query.toLowerCase().split(/\s+/)
+    const query = expandSearchQuery(options.query)
     const results: Array<{
       document: DocumentNode
       score: number
@@ -533,16 +541,22 @@ export class InMemoryGraphStore extends GraphStore {
     for (const document of this.documents.values()) {
       const text =
         `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
-      if (!terms.some((t) => text.includes(t))) continue
+      const contentScore = countContentTokenHits(text, query.expandedTokens)
+      if (contentScore === 0) continue
       if (options.workspace && document.workspace !== options.workspace) continue
       if (matchesExclude(document.path, options.excludePaths, options.excludeWorkspaces)) continue
       if (options.excludeWorkspaces && options.excludeWorkspaces.includes(document.workspace)) {
         continue
       }
-      const score =
-        1 +
-        (document.path.toLowerCase() === rawQuery ? 1_000_000 : 0) +
-        (document.configRelativePath.toLowerCase() === rawQuery ? 1_000 : 0)
+      const ranking = rankIdentityMatch({
+        normalizedQuery: query.normalizedQuery,
+        rawTokens: query.rawTokens,
+        expandedTokens: query.expandedTokens,
+        canonicalIdentity: document.path,
+        alternateIdentity: document.configRelativePath,
+        contentScore,
+      })
+      const score = composeRankingScore(ranking)
       results.push({ document, score, snippet: '', startLine: 1, endLine: 1 })
     }
     return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 20)
@@ -601,4 +615,110 @@ export class InMemoryGraphStore extends GraphStore {
     this._lastIndexedRef = null
     this._graphFingerprint = null
   }
+}
+
+interface IdentityRankingInput {
+  readonly normalizedQuery: string
+  readonly rawTokens: readonly string[]
+  readonly expandedTokens: readonly string[]
+  readonly canonicalIdentity: string
+  readonly alternateIdentity?: string
+  readonly contentScore: number
+}
+
+interface IdentityRanking {
+  readonly tier: number
+  readonly tokenHits: number
+  readonly matchStrength: number
+  readonly contentScore: number
+}
+
+function composeRankingScore(ranking: IdentityRanking): number {
+  return (
+    ranking.tier * 1_000_000 +
+    ranking.tokenHits * 10_000 +
+    ranking.matchStrength * 100 +
+    ranking.contentScore
+  )
+}
+
+function rankIdentityMatch(input: IdentityRankingInput): IdentityRanking {
+  const canonical = input.canonicalIdentity.toLowerCase()
+  const alternate = input.alternateIdentity?.toLowerCase()
+
+  let tier = 1
+  if (canonical === input.normalizedQuery) {
+    tier = 5
+  } else if (alternate === input.normalizedQuery) {
+    tier = 4
+  } else if (
+    input.rawTokens.length === 1 &&
+    (canonical.startsWith(input.normalizedQuery) ||
+      alternate?.startsWith(input.normalizedQuery) === true)
+  ) {
+    tier = 3
+  }
+
+  let tokenHits = 0
+  let matchStrength = 0
+  for (const token of input.expandedTokens) {
+    const tokenStrength = Math.max(
+      strongestTokenMatch(token, canonical),
+      alternate === undefined ? 0 : strongestTokenMatch(token, alternate),
+    )
+    if (tokenStrength > 0) {
+      tokenHits++
+      matchStrength += tokenStrength
+      if (tier < 2) {
+        tier = 2
+      }
+    }
+  }
+
+  return {
+    tier,
+    tokenHits,
+    matchStrength,
+    contentScore: input.contentScore,
+  }
+}
+
+function strongestTokenMatch(token: string, identity: string): number {
+  if (identity === token) {
+    return 40
+  }
+  if (identity.startsWith(token)) {
+    return 30
+  }
+  if (identity.endsWith(token)) {
+    return 20
+  }
+
+  const components = splitIdentityComponents(identity)
+  if (components.includes(token)) {
+    return 15
+  }
+
+  if (identity.includes(token)) {
+    return 10
+  }
+
+  return 0
+}
+
+function splitIdentityComponents(identity: string): string[] {
+  return identity
+    .split(/[:/_.-]+/)
+    .map((component) => component.trim())
+    .filter((component) => component.length > 0)
+}
+
+function countContentTokenHits(text: string, tokens: readonly string[]): number {
+  let hits = 0
+  for (const token of tokens) {
+    if (text.includes(token)) {
+      hits++
+    }
+  }
+  return hits
 }

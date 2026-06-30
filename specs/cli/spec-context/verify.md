@@ -47,6 +47,34 @@
 - **WHEN** `specd spec context <spec-id> --follow-deps` is run
 - **THEN** output contains root and dependency entries in `full` mode
 
+#### Scenario: Prefers optimized content when enabled
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **AND** a spec has fresh optimized metadata
+- **WHEN** `specd specs context <path>` is run
+- **THEN** it displays the optimized content instead of raw sections
+
+#### Scenario: --no-optimized forces raw sections
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **WHEN** `specd specs context <path> --no-optimized` is run
+- **THEN** it displays the raw sections
+- **AND** it emits no optimization warnings
+
+#### Scenario: Section flags do not override optimization when both rules and constraints are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **AND** a spec has fresh optimized metadata
+- **WHEN** `specd specs context <path> --rules --constraints` is run
+- **THEN** it displays the optimized content
+
+#### Scenario: Section flags override optimization when only rules are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **WHEN** `specd specs context <path> --rules` is run
+- **THEN** it displays the raw rules
+- **AND** it emits no optimization warnings
+
 ### Requirement: Output
 
 #### Scenario: Text output includes explicit mode label

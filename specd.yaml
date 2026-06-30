@@ -87,12 +87,12 @@ workspaces:
     codeRoot: packages/code-graph
     ownership: owned
 
-  code-graph-electron:
+  sdk:
     specs:
       adapter: fs
       fs:
-        path: specs/code-graph-electron
-    codeRoot: packages/code-graph-electron
+        path: specs/sdk
+    codeRoot: packages/sdk
     ownership: owned
 
   skills:
@@ -170,54 +170,6 @@ workspaces:
       excludePaths:
         - '*'
 
-  api:
-    specs:
-      adapter: fs
-      fs:
-        path: specs/api
-    codeRoot: packages/api
-    ownership: owned
-
-  client:
-    specs:
-      adapter: fs
-      fs:
-        path: specs/client
-    codeRoot: packages/client
-    ownership: owned
-
-  ui:
-    specs:
-      adapter: fs
-      fs:
-        path: specs/ui
-    codeRoot: packages/ui
-    ownership: owned
-
-  studio-web:
-    specs:
-      adapter: fs
-      fs:
-        path: specs/studio-web
-    codeRoot: apps/specd-studio-web
-    ownership: owned
-
-  plugin-ui-studio:
-    specs:
-      adapter: fs
-      fs:
-        path: specs/plugin-ui-studio
-    codeRoot: packages/plugin-ui-studio
-    ownership: owned
-
-  studio-desktop:
-    specs:
-      adapter: fs
-      fs:
-        path: specs/studio-desktop
-    codeRoot: apps/specd-studio-desktop
-    ownership: owned
-
 storage:
   changes:
     adapter: fs
@@ -241,8 +193,6 @@ approvals:
   spec: false
   signoff: false
 
-invalidationPolicy: none
-
 # Global constraints always in context regardless of change scope
 contextIncludeSpecs:
   - 'default:*'
@@ -250,7 +200,7 @@ contextIncludeSpecs:
 contextExcludeSpecs:
   - 'default:_global/commits'
 
-llmOptimizedContext: false
+llmOptimizedContext: true
 
 schemaOverrides:
   append:
@@ -393,11 +343,3 @@ plugins:
     - name: '@specd/plugin-agent-copilot'
     - name: '@specd/plugin-agent-opencode'
     - name: '@specd/plugin-agent-standard'
-  ui:
-    - name: '@specd/studio-web'
-
-api:
-  cors:
-    origins:
-      - 'http://127.0.0.1:5174'
-      - 'http://localhost:5174'

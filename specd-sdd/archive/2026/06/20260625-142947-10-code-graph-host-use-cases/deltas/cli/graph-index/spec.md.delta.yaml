@@ -1,0 +1,32 @@
+- op: modified
+  description: Delegate index body to IndexProjectGraph
+  selector:
+    type: section
+    matches: 'Requirement: Indexing behaviour'
+  content: |
+    The command obtains workspace targets and spec sources from the project configuration.
+    It delegates effective project graph config merging and index execution to `IndexProjectGraph.execute()` inside the worker process (or current process when worker bypass is active).
+
+    The command SHALL retain CLI-only concerns:
+
+    - shared graph indexing lock acquisition in the parent process before spawning a worker
+    - worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`
+    - `onProgress` callback wiring for text-mode progress output
+    - `provider.recreate()` for `--force` is triggered by passing `force: true` to `IndexProjectGraph`
+
+    Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `IndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
+
+    When `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests.
+
+- op: modified
+  description: Add IndexProjectGraph dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider, IndexResult
+    - [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract recreation semantics used by `--force`
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration
+    - [`code-graph:index-project-graph`](../../code-graph/index-project-graph/spec.md) — index execution use case

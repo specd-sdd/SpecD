@@ -1,0 +1,116 @@
+{
+  "title": "GetChangeSpecCoverage",
+  "description": "Change review surfaces (Studio, future API) need per-spec implementation coverage for every spec in a change's scope. Callers should not manually load a change, iterate `specIds`, and invoke coverage queries. `GetChangeSpecCoverage` loads the change via `ChangeRepository` and aggregates `GetSpecCoverage` results.",
+  "dependsOn": [
+    "code-graph:get-spec-coverage",
+    "code-graph:composition",
+    "core:change-repository-port"
+  ],
+  "context": [
+    "Change review surfaces (Studio, future API) need per-spec implementation coverage for every spec in a change's scope. Callers should not manually load a change, iterate `specIds`, and invoke coverage queries. `GetChangeSpecCoverage` loads the change via `ChangeRepository` and aggregates `GetSpecCoverage` results."
+  ],
+  "rules": [
+    {
+      "requirement": "Returns change-level coverage",
+      "rules": [
+        "`GetChangeSpecCoverage.execute(input)` MUST return `GetChangeSpecCoverageResult` with:\n\n- `changeName: string`\n- `specs: GetSpecCoverageResult[]` — one entry per `specId` on the change, in manifest declaration order"
+      ]
+    },
+    {
+      "requirement": "Resolves change by name",
+      "rules": [
+        "`GetChangeSpecCoverage` MUST load the change via `input.changes.get(input.changeName)`. When the change does not exist, it MUST throw `ChangeNotFoundError` from `@specd/core`."
+      ]
+    },
+    {
+      "requirement": "Delegates per-spec coverage",
+      "rules": [
+        "For each `specId` on the loaded change, `GetChangeSpecCoverage` MUST delegate to `GetSpecCoverage.execute({ provider, specId })`."
+      ]
+    },
+    {
+      "requirement": "Accepts repository and provider",
+      "rules": [
+        "`GetChangeSpecCoverageInput` MUST include:\n\n- `provider: CodeGraphProvider` (already opened)\n- `changes: ChangeRepository`\n- `changeName: string`\n\nThe use case MUST NOT open or close the provider or mutate the change."
+      ]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "rules": [
+        "`createGetChangeSpecCoverage(getSpecCoverage: GetSpecCoverage)` in composition MUST inject `GetSpecCoverage` as a constructor dependency."
+      ]
+    }
+  ],
+  "constraints": [
+    "MUST NOT load change artifact content beyond what ChangeRepository.get returns for specIds.",
+    "MUST NOT modify graph data."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Returns change-level coverage",
+      "name": "Change with multiple specs",
+      "given": ["a change with specIds [A, B] in declaration order"],
+      "when": ["GetChangeSpecCoverage.execute({ changeName }) runs"],
+      "then": [
+        "specs has two entries in [A, B] order",
+        "AND each entry matches GetSpecCoverage output for that spec"
+      ]
+    },
+    {
+      "requirement": "Resolves change by name",
+      "name": "Missing change",
+      "given": ["no change named missing"],
+      "when": ["GetChangeSpecCoverage.execute({ changeName: 'missing' }) runs"],
+      "then": ["ChangeNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Delegates per-spec coverage",
+      "name": "Uses injected GetSpecCoverage",
+      "given": ["a mock GetSpecCoverage"],
+      "when": ["change coverage runs for two specs"],
+      "then": ["GetSpecCoverage.execute is called once per specId"]
+    },
+    {
+      "requirement": "Accepts repository and provider",
+      "name": "Does not mutate change or graph",
+      "given": ["a loaded change and open provider"],
+      "when": ["GetChangeSpecCoverage.execute() runs"],
+      "then": ["it only reads via ChangeRepository.get and provider queries"]
+    },
+    {
+      "requirement": "Factory wires dependencies",
+      "name": "Injects GetSpecCoverage",
+      "when": ["createGetChangeSpecCoverage(getSpecCoverage) is called"],
+      "then": ["the returned instance delegates per-spec work to the injected use case"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "code-graph:get-change-spec-coverage",
+        "file": "code-graph:src/application/use-cases/get-change-spec-coverage.ts",
+        "symbol": "GetChangeSpecCoverage"
+      },
+      {
+        "specId": "code-graph:get-change-spec-coverage",
+        "file": "code-graph:src/application/use-cases/get-change-spec-coverage.ts",
+        "symbol": "GetChangeSpecCoverageInput"
+      },
+      {
+        "specId": "code-graph:get-change-spec-coverage",
+        "file": "code-graph:src/application/use-cases/get-change-spec-coverage.ts",
+        "symbol": "GetChangeSpecCoverageResult"
+      },
+      {
+        "specId": "code-graph:get-change-spec-coverage",
+        "file": "code-graph:src/composition/use-cases/get-change-spec-coverage.ts",
+        "symbol": "createGetChangeSpecCoverage"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:cdb7ff3afb185e8c744a8a3187272525c443783ffcc10d89675a3d308bafd717",
+    "verify.md": "sha256:946ed8fda6df02bae52e02a0245ddd7fcabd63b9c2313decac5bbe99cef84484"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,5579 @@
+{
+  "name": "llm-optimized-metadata",
+  "createdAt": "2026-06-04T13:42:17.444Z",
+  "description": "Introduced support for LLM-optimized metadata fields (optimizedDescription and optimizedContext) in the CLI context commands, list commands, and project status output. Refactored the skills repository and templates directory structure to support specialized optimizer agents (specd-spec-context-optimizer and specd-project-context-optimizer) and platform-specific categorized installation. Simplified all agent plugins by removing redundant capability helpers and adding direct capability literal configurations.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "skills:workflow-automation",
+    "skills:agents",
+    "skills:skill",
+    "skills:skill-repository",
+    "skills:skill-repository-infra",
+    "skills:skill-templates-source",
+    "plugin-manager:agent-plugin-type",
+    "plugin-agent-claude:plugin-agent",
+    "plugin-agent-copilot:plugin-agent",
+    "plugin-agent-codex:plugin-agent",
+    "plugin-agent-opencode:plugin-agent",
+    "plugin-agent-standard:plugin-agent",
+    "cli:spec-context",
+    "core:compile-context",
+    "core:get-project-context",
+    "cli:project-context",
+    "cli:spec-list",
+    "cli:project-status",
+    "cli:change-context"
+  ],
+  "specDependsOn": {
+    "skills:workflow-automation": ["cli:command-resource-naming", "skills:agents"],
+    "skills:agents": ["skills:skill", "skills:workflow-automation"],
+    "skills:skill": ["default:_global/error-handling-conventions"],
+    "skills:skill-repository": [
+      "skills:skill",
+      "skills:skill-bundle",
+      "skills:skill-templates-source"
+    ],
+    "skills:skill-repository-infra": ["skills:skill-repository-port"],
+    "skills:skill-templates-source": ["skills:skill"],
+    "plugin-manager:agent-plugin-type": ["core:config", "plugin-manager:specd-plugin-type"],
+    "plugin-agent-claude:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository",
+      "skills:resolve-bundle",
+      "skills:agents"
+    ],
+    "plugin-agent-copilot:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source",
+      "skills:resolve-bundle",
+      "skills:agents"
+    ],
+    "plugin-agent-codex:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-templates-source",
+      "skills:resolve-bundle",
+      "skills:agents"
+    ],
+    "plugin-agent-opencode:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository",
+      "skills:resolve-bundle",
+      "skills:agents"
+    ],
+    "plugin-agent-standard:plugin-agent": [
+      "core:config",
+      "plugin-manager:agent-plugin-type",
+      "skills:skill-bundle",
+      "skills:skill-repository",
+      "skills:resolve-bundle",
+      "skills:agents"
+    ],
+    "cli:spec-context": ["cli:entrypoint", "core:config", "core:get-spec-context"],
+    "core:compile-context": [
+      "core:change",
+      "core:config",
+      "core:spec-metadata",
+      "core:schema-format",
+      "core:delta-format",
+      "core:selector-model",
+      "core:spec-id-format",
+      "core:workspace",
+      "core:get-artifact-instruction",
+      "core:get-hook-instructions",
+      "core:preview-spec",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:core/project-metadata"
+    ],
+    "core:get-project-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:core/project-metadata"
+    ],
+    "cli:project-context": [
+      "cli:entrypoint",
+      "core:get-project-context",
+      "core:compile-context",
+      "core:config"
+    ],
+    "cli:spec-list": [
+      "cli:entrypoint",
+      "core:spec",
+      "cli:command-resource-naming",
+      "cli:spec-search",
+      "core:list-workspaces"
+    ],
+    "cli:project-status": ["core:list-workspaces", "core:list-drafts", "core:list-changes"],
+    "cli:change-context": [
+      "cli:entrypoint",
+      "cli:change-spec-preview",
+      "core:compile-context",
+      "core:config",
+      "core:get-artifact-instruction",
+      "core:get-hook-instructions",
+      "core:refresh-implementation-tracking"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/cli/change-implementation/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/cli/change-implementation/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/archive-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/archive-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/change-manifest/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/change-manifest/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/change-repository-port/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/change-repository-port/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/refresh-implementation-tracking/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/deltas/core/refresh-implementation-tracking/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260603-101428-harden-implementation-tracking/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/spec-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/spec-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/core/compile-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/core/compile-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/core/get-project-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/core/get-project-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-standard/plugin-agent/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-agent-standard/plugin-agent/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill-repository-infra/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill-repository-infra/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill-repository/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill-repository/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill-templates-source/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill-templates-source/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/skill/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/workflow-automation/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/skills/workflow-automation/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/specs/skills/agents/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/specs/skills/agents/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/skill.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/skill-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/skill-template-metadata-reader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-manager/src/domain/types/agent-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/project-metadata-freshness.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/infrastructure/skill-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents/specd-project-context-optimizer/SPECD-AGENT.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents/specd-project-context-optimizer/specd-agent.meta.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer/SPECD-AGENT.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer/specd-agent.meta.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-archive/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-archive/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-compliance/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-compliance/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-design/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-design/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-implement/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-implement/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-metadata/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-metadata/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-new/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-new/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-verify/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-verify/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd/SKILL.md.tpl",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd/skill.meta.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/domain/skill-template-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/project-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/project-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/schema.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/project-status/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/project-status/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/spec-list/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/spec-list/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/change-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/graph-impact/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/document-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/graph-store/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/indexer/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/ladybug-graph-store/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/language-adapter/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/sqlite-graph-store/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/staleness-detection/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/symbol-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/traversal/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/workspace-integration/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/conventions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/error-handling-conventions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260605-090405-graph-change-context/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260605-090405-graph-change-context/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-spec-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/application/use-cases/uninstall-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/src/application/ports/skill-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/use-cases/get-skill.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/use-cases/list-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/use-cases/resolve-bundle.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260605-115152/specs-compliance-change-llm-optimized-metadata-20260605-115152.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/resolve-bundle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/domain/types/frontmatter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd-sdd/changes/20260607-192116-file-impact-covering-specs/.specd-exploration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260607-192116-file-impact-covering-specs/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "approval-system-notes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/infrastructure/repository/template-renderer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/:memory:/tmp/index-stage-1780917851122/pass1-00000.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/:memory:/tmp/index-stage-1780917851122/pass2-00000.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-implementation/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-manifest/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/refresh-implementation-tracking/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/command-resource-naming/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-search/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/compile-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/delta-format/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-artifact-instruction/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-hook-instructions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/lifecycle-engine/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-changes/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-drafts/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-workspaces/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/preview-spec/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-format/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/selector-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-id-format/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/workspace/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/commits/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-agent-opencode/plugin-agent/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/agent-plugin-type/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/specd-plugin-type/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/resolve-bundle/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-bundle/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-templates-source/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/workflow-automation/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/change-context/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/deltas/cli/change-context/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/change/context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-spec-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260614-194817/_partial-cli.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260614-194817/_partial-core.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260614-194817/_partial-plugins.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260614-194817/_partial-skills.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260614-194817/specs-compliance-change-llm-optimized-metadata-20260614-194817.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/domain/types/agent-standard-plugin.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/test/domain/skill.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260615-102400/_partial-cli.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260615-102400/_partial-core.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260615-102400/_partial-plugins.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260615-102400/_partial-skills.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260615-102400/specs-compliance-change-llm-optimized-metadata-20260615-102400.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/domain/types/frontmatter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/ports/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "PHP_RESOLUTION_REPORT.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/discover-files.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-workspaces.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/scoped-binding-environment.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-workspaces.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260616-optimize-graph-index-performance-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260616-optimize-graph-index-performance.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0023-unified-adapter-analysis-session.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/file-analysis.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/scoped-binding-environment.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/.changeset-release.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/deltas/code-graph/indexer/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/deltas/code-graph/indexer/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/deltas/code-graph/language-adapter/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/deltas/code-graph/language-adapter/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/deltas/code-graph/symbol-model/spec.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/deltas/code-graph/symbol-model/verify.md.delta.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/manifest.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/reports/20260616-122220/_partial-indexer.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/reports/20260616-122220/_partial-language-adapter.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/reports/20260616-122220/_partial-symbol-model.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/reports/20260616-122220/specs-compliance-change-optimize-graph-index-performance-20260616-122220.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/tasks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "parallel-indexing-design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260616-130852/_partial-cli-core.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260616-130852/_partial-plugins.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260616-130852/_partial-skills.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/changes/20260604-134217-llm-optimized-metadata/reports/20260616-130852/specs-compliance-change-llm-optimized-metadata-20260616-130852.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-sdd/archive/2026/06/20260615-102415-optimize-graph-index-performance/.specd-exploration.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "skills:skill",
+      "file": "packages/skills/src/domain/skill.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["Skill"]
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/agents",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-repository",
+      "file": "packages/skills/src/infrastructure/repository/skill-repository.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-repository-infra",
+      "file": "packages/skills/src/infrastructure/repository/skill-template-metadata-reader.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["SkillTemplateMetadataReader"]
+    },
+    {
+      "specId": "plugin-manager:agent-plugin-type",
+      "file": "packages/plugin-manager/src/domain/types/agent-plugin.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["AgentInstallOptions"]
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/src/application/use-cases/install-skills.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["InstallSkills"]
+    },
+    {
+      "specId": "cli:spec-context",
+      "file": "packages/cli/src/commands/spec/context.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["registerSpecContext"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/application/use-cases/_shared/project-metadata-freshness.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:workflow-automation",
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:agents",
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer/specd-agent.meta.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-context",
+      "file": "packages/cli/src/commands/project/context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectContext"]
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectStatus"]
+    },
+    {
+      "specId": "skills:skill",
+      "file": "packages/skills/src/domain/skill-template-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SkillTemplateMetadata"]
+    },
+    {
+      "specId": "skills:agents",
+      "file": "packages/skills/templates/agents/specd-project-context-optimizer/SPECD-AGENT.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:agents",
+      "file": "packages/skills/templates/agents/specd-project-context-optimizer/specd-agent.meta.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:agents",
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer/SPECD-AGENT.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "plugin-agent-claude:plugin-agent",
+      "file": "packages/plugin-agent-claude/src/domain/frontmatter/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["agentFrontmatter"]
+    },
+    {
+      "specId": "plugin-agent-codex:plugin-agent",
+      "file": "packages/plugin-agent-codex/src/domain/frontmatter/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["agentFrontmatter"]
+    },
+    {
+      "specId": "plugin-agent-opencode:plugin-agent",
+      "file": "packages/plugin-agent-opencode/src/domain/frontmatter/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["agentFrontmatter"]
+    },
+    {
+      "specId": "plugin-agent-copilot:plugin-agent",
+      "file": "packages/plugin-agent-copilot/src/domain/frontmatter/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["agentFrontmatter"]
+    },
+    {
+      "specId": "plugin-agent-standard:plugin-agent",
+      "file": "packages/plugin-agent-standard/src/domain/frontmatter/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["agentFrontmatter"]
+    },
+    {
+      "specId": "cli:spec-list",
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerListSpecs"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:8b2faecfe3d9a824780e44e3ad3f7dd6c6fbf03af17e7ccf6adf7516e2d90893"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:80ebe254a6ad04e184c80a784b65d03bd36a5af0be85c38cb196085202ee3618"
+        },
+        {
+          "key": "skills:agents",
+          "filename": "specs/skills/agents/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:23d5969d8ac85e1062275a549fb6403af53e0eedf043b671b4471341b118b2a7"
+        },
+        {
+          "key": "skills:skill",
+          "filename": "deltas/skills/skill/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9c71f923cd8fc17d092b291107e1d97c82b89e79450f9fd6eed26f2b7aeefbf6"
+        },
+        {
+          "key": "skills:skill-repository",
+          "filename": "deltas/skills/skill-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:16c46175df2ff4d9993bfb3b802b6e0776c8d1520970ec07d339b229d5405543"
+        },
+        {
+          "key": "skills:skill-repository-infra",
+          "filename": "deltas/skills/skill-repository-infra/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7a703ec7e2d712b770a6a0e370ef3ffaa2e683d5edd4c3c29ed095b43081c167"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e5ecefe0429886320730cf56d7f38d7a5f1cc6cec2861f3347844405b66babe8"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:100f63fa6e1965da5dd010cb2daee71baaa7e10bf4f16e5e7635835c9dd49d9f"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cf8951d80d13ca521e0e548fd612ff38fec9d790453ec6ffdea021a538a41f5e"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:336228974e505b3b6b58a29edf20b2f5621a1a1b8abf399561986f483a86f366"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3f3510f7243b3677320cf04c81a916f7452cbede0f175587393c0b57351dfa51"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:91615870f743c39f32bef29e9db7333716d0536fd49df01c971e5417ec3ec92b"
+        },
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "deltas/plugin-agent-standard/plugin-agent/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:898d8d2585a361a42f02efe544e13be4c53cf2ad1f39236721197278e53c0ffa"
+        },
+        {
+          "key": "cli:spec-context",
+          "filename": "deltas/cli/spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:27a1d4758c7a35130c0acdb130148815fd5d5c7e3eaca27f2bd4b0d7f00a26b1"
+        },
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:95018b5eae8353a9f4c7ad66edc49c5e1c1be74096bc89e4b06b2675df77caf1"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3f22db88212bcb8db779e031b1aaf37e3681e1e59e2ffeb6cf62d505ba823be0"
+        },
+        {
+          "key": "cli:project-context",
+          "filename": "deltas/cli/project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2956928dbb339b8d30a8875c1103860d042c03f916163836c6c03ca74eb1bd38"
+        },
+        {
+          "key": "cli:spec-list",
+          "filename": "deltas/cli/spec-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f88d9f720fadb0d6efbb981eb8f23cf421ed0e1a9eda9228c432c7a27c132895"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ba37ea03f392ee5e17751e23a4579d603ecd9709c420d231f6c8b758c7fb01e7"
+        },
+        {
+          "key": "cli:change-context",
+          "filename": "deltas/cli/change-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9a28da691e789f28c4c389eaf55c9eb6fc07bab12829a5978809562155c61580"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:72a93569441add43c52e72b3cb8d7874e01f8ad949c688004c222db7092888ab"
+        },
+        {
+          "key": "skills:agents",
+          "filename": "specs/skills/agents/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:302d362aeb51e4d7962c6681ac57b957a7ef06a3219ad7fe7a39bb1917919eb1"
+        },
+        {
+          "key": "skills:skill",
+          "filename": "deltas/skills/skill/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ebcd49febef1ec01e0b16e35cbb808db1a00ce8afe8475768c3bbc49db539784"
+        },
+        {
+          "key": "skills:skill-repository",
+          "filename": "deltas/skills/skill-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4adc5f70372b27d757eeeb8a47eb175ef695ca4e905568ce2889473aa85bad1f"
+        },
+        {
+          "key": "skills:skill-repository-infra",
+          "filename": "deltas/skills/skill-repository-infra/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:66718a8a1ca4b50ddeee9a6b719a0e9248946456354b32e72bc609d664b50625"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f9c40d6281a83eb64c2e86c0e3222d621e44cf0f9ba78319e92c700680b9998e"
+        },
+        {
+          "key": "plugin-manager:agent-plugin-type",
+          "filename": "deltas/plugin-manager/agent-plugin-type/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:546c2e0380cdc8f5b6a3a04ffb845397eb50c67d011ed1b1159bcd57c6ebcb62"
+        },
+        {
+          "key": "plugin-agent-claude:plugin-agent",
+          "filename": "deltas/plugin-agent-claude/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9b149a74a70e313dfc2bb6c4c6959c69a65e54b995f8d08dd83e636ae686b07e"
+        },
+        {
+          "key": "plugin-agent-copilot:plugin-agent",
+          "filename": "deltas/plugin-agent-copilot/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8b8650fde9ddd9a2b3b8f62a4cb7f166599577eb0b04b6fdd102508ec5fb33ac"
+        },
+        {
+          "key": "plugin-agent-codex:plugin-agent",
+          "filename": "deltas/plugin-agent-codex/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b9b9a0ba7d94a5b532be61d04445c32ae779bdcb7881088fe17435df64284d5e"
+        },
+        {
+          "key": "plugin-agent-opencode:plugin-agent",
+          "filename": "deltas/plugin-agent-opencode/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:69fd6864a9dc049e9d82d5a8fc47da33fef393f3060945a566208168c9f54fd6"
+        },
+        {
+          "key": "plugin-agent-standard:plugin-agent",
+          "filename": "deltas/plugin-agent-standard/plugin-agent/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cc7a0206cbb2ed7496c183fb6247bf93ae66c94c64b69b8d1d156f478f0add1d"
+        },
+        {
+          "key": "cli:spec-context",
+          "filename": "deltas/cli/spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0f12d1d822dd2b3739fb4e41662a84be0d5352589b018cfbd64aa55faf5d1b18"
+        },
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5964e28fa6624ff69c2e3a784c1461377ba0909be2a6bcffcab971456448cdc9"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b09a076879f470edccae3c461a18d194de4d69cdcb0aafe7ef33afda2f4779e9"
+        },
+        {
+          "key": "cli:project-context",
+          "filename": "deltas/cli/project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bdd2888df0ad327114af1bbbc83051e1102c73c63759d6b6ba901884cfa3a42f"
+        },
+        {
+          "key": "cli:spec-list",
+          "filename": "deltas/cli/spec-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9fc83a92b324833c9e9032e189e9139344bb907836006c160c5ea9815624ff51"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:031a2ff6ef72a8d3491d941935ff799eb2189ee5d75944bdfd7e5750a281ccd5"
+        },
+        {
+          "key": "cli:change-context",
+          "filename": "deltas/cli/change-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:33743bca80c99fd93701774f42d1d173ad847e5076b95abcaa1f700e5e461cd2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:789d140d5792304a4db79d9b635f57a6962b65794b2a3d0bb7a4c3c529ae46ce"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:f7714871280e84eb5f3862be90d5e0844b3612d2490f13f10bb2736757bd0b46"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-04T13:42:17.444Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T13:42:17.457Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T13:46:32.254Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T13:47:45.565Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T13:47:45.569Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T13:54:53.646Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:spec-metadata", "skills:workflow-automation"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:spec-metadata", "skills:workflow-automation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T13:54:53.694Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:spec-metadata", "skills:workflow-automation"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:spec-metadata", "skills:workflow-automation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T13:54:53.702Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:agents"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-repository-infra"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:agent-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "skills:agents"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-repository-infra"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:agent-plugin-type"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T14:02:56.251Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [plugin-manager:agent-plugin-type]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["plugin-manager:agent-plugin-type"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T14:07:36.585Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:14:24.927Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:spec-metadata",
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:spec-metadata",
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T15:14:24.927Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:21:59.752Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:spec-metadata",
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:spec-metadata",
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:21:59.799Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:spec-metadata",
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:spec-metadata",
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T15:21:59.803Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-metadata"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:36:02.848Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:36:02.897Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T15:36:02.902Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-agent-standard:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-claude:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-copilot:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-codex:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-opencode:plugin-agent"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-agent-standard:plugin-agent"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:38:13.163Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:41:30.686Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:52:19.710Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T15:52:19.764Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T15:52:19.769Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T16:03:24.209Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T16:09:07.315Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T16:09:07.374Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T16:09:07.379Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T16:31:26.034Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T16:48:24.899Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T16:48:24.899Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T16:58:43.190Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:04:39.367Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [skills:skill-templates-source]; verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:05:23.793Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:08:20.195Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:08:36.820Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:10:45.286Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:12:49.453Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:15:32.383Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:35:08.229Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T17:39:00.735Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T17:39:37.069Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T17:40:28.525Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T18:13:52.921Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T21:09:43.290Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T21:11:09.479Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T21:11:47.213Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T21:12:23.652Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-04T21:12:23.652Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-04T21:12:23.709Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-04T21:12:23.715Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:project-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T06:20:19.236Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T06:22:13.943Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T06:22:15.182Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-05T06:41:30.250Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T06:41:30.250Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-05T06:45:17.893Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-05T06:45:17.903Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:spec-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T07:38:28.278Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T07:38:29.805Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T08:15:24.558Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-05T11:00:37.892Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T11:00:37.892Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-05T11:53:46.879Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:agents]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T11:59:00.896Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T12:05:51.902Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-05T15:28:13.650Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T15:28:13.650Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T21:02:32.058Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T21:02:33.733Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-07T19:37:28.423Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-07T19:37:28.423Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-08T10:35:37.675Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-08T10:45:23.558Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-08T10:45:24.889Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-08T11:17:45.272Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-08T11:17:45.272Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-08T11:21:05.435Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-08T11:21:06.735Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T16:24:20.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T16:24:20.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T16:24:24.529Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-14T16:24:24.532Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:change-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T16:28:56.476Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T16:29:26.867Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T16:48:05.777Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T17:01:58.520Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T17:35:21.045Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T17:35:21.045Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T17:41:20.518Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T17:43:15.647Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:project-context, cli:spec-context]; verify [cli:project-context, cli:spec-context]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-context", "cli:spec-context"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-context", "cli:spec-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T17:43:15.647Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T17:43:44.073Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T17:46:04.554Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T17:47:52.585Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T18:08:07.452Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T18:08:07.452Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T19:22:22.360Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T19:23:09.649Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T19:34:26.456Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T19:34:26.456Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-14T20:01:21.130Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [skills:skill-repository-infra]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-repository-infra"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T20:02:56.396Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-14T20:04:46.296Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T06:04:22.532Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-15T07:42:15.200Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T07:42:15.200Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T07:43:35.014Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T07:43:37.852Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T07:52:52.284Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-15T08:15:11.466Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-agent-copilot:plugin-agent]; verify [plugin-agent-copilot:plugin-agent]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["plugin-agent-copilot:plugin-agent"]
+        },
+        {
+          "type": "verify",
+          "files": ["plugin-agent-copilot:plugin-agent"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T08:15:11.466Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T08:35:19.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-15T11:11:03.138Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-agent-claude:plugin-agent, plugin-agent-codex:plugin-agent, plugin-agent-opencode:plugin-agent]; verify [plugin-agent-claude:plugin-agent, plugin-agent-codex:plugin-agent, plugin-agent-copilot:plugin-agent, plugin-agent-opencode:plugin-agent]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-opencode:plugin-agent"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T11:19:19.609Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T11:19:41.231Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-15T13:28:58.058Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:10:13.447Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:10:24.881Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-16T11:36:11.158Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:compile-context]; verify [core:compile-context]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:compile-context"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:compile-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:36:11.158Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:41:38.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:41:55.942Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:43:13.294Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:43:15.655Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T11:43:17.097Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T11:56:45.735Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"llm-optimized-metadata\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T12:01:22.903Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"llm-optimized-metadata\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T12:11:14.555Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"llm-optimized-metadata\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T12:14:46.443Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"llm-optimized-metadata\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:01:04.047Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"llm-optimized-metadata\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:11:04.407Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"llm-optimized-metadata\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:13:23.901Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:spec-list\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:18:26.694Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:spec-list\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:18:57.743Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:spec-list\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:25:29.102Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'plugin-agent-opencode:plugin-agent': extracted dependencies [core:config, plugin-manager:agent-plugin-type, skills:skill-bundle, skills:skill-repository, skills:resolve-bundle, skills:agents] do not match persisted dependencies [core:config, plugin-manager:agent-plugin-type, skills:skill-bundle, skills:skill-templates-source, skills:resolve-bundle, skills:agents]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:27:41.718Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"llm-optimized-metadata\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:28:54.939Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'plugin-agent-opencode:plugin-agent': extracted dependencies [core:config, plugin-manager:agent-plugin-type, skills:skill-bundle, skills:skill-repository, skills:resolve-bundle, skills:agents] do not match persisted dependencies [core:config, plugin-manager:agent-plugin-type, skills:skill-bundle, skills:skill-templates-source, skills:resolve-bundle, skills:agents]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:31:12.367Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'plugin-agent-standard:plugin-agent': extracted dependencies [core:config, plugin-manager:agent-plugin-type, skills:skill-bundle, skills:skill-repository, skills:resolve-bundle, skills:agents] do not match persisted dependencies [plugin-agent-opencode:plugin-agent, default:_global/commits, skills:resolve-bundle, skills:agents]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-16T13:35:43.309Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'plugin-agent-standard:plugin-agent': extracted dependencies [core:config, plugin-manager:agent-plugin-type, skills:skill-bundle, skills:skill-repository, skills:resolve-bundle, skills:agents] do not match persisted dependencies [plugin-agent-opencode:plugin-agent, default:_global/commits, skills:resolve-bundle, skills:agents]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-16T13:52:46.561Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T13:52:46.561Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T13:56:46.541Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-16T13:58:31.582Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [plugin-agent-codex:plugin-agent, plugin-agent-copilot:plugin-agent, plugin-agent-opencode:plugin-agent, plugin-agent-standard:plugin-agent, skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "skills:skill-templates-source"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T13:58:31.582Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-16T14:00:42.019Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-context]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:spec-context"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "skills:workflow-automation",
+            "skills:agents",
+            "skills:skill",
+            "skills:skill-repository",
+            "skills:skill-repository-infra",
+            "skills:skill-templates-source",
+            "plugin-manager:agent-plugin-type",
+            "plugin-agent-claude:plugin-agent",
+            "plugin-agent-copilot:plugin-agent",
+            "plugin-agent-codex:plugin-agent",
+            "plugin-agent-opencode:plugin-agent",
+            "plugin-agent-standard:plugin-agent",
+            "cli:spec-context",
+            "core:compile-context",
+            "core:get-project-context",
+            "cli:project-context",
+            "cli:spec-list",
+            "cli:project-status",
+            "cli:change-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T14:23:44.522Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T14:24:04.467Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T14:25:05.883Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T14:25:13.024Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T14:25:22.932Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-06-16T14:28:11.300Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Introduced support for LLM-optimized metadata fields (optimizedDescription and optimizedContext) in the CLI context commands, list commands, and project status output. Refactored the skills repository and templates directory structure to support specialized optimizer agents (specd-spec-context-optimizer and specd-project-context-optimizer) and platform-specific categorized installation. Simplified all agent plugins by removing redundant capability helpers and adding direct capability literal configurations."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-16T14:28:14.893Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-16T14:28:15.100Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -6,7 +6,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
 import { renderBanner } from '../../banner.js'
-import { CLI_VERSION, CORE_VERSION } from '../../version.js'
+import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../../version.js'
 
 /** Width of each stat column box. */
 const COL_WIDTH = 28
@@ -153,7 +153,12 @@ JSON/TOON output schema:
 
         // ── Banner ────────────────────────────────────────────────────────────
         process.stdout.write(
-          renderBanner({ cliVersion: CLI_VERSION, coreVersion: CORE_VERSION }) + '\n\n',
+          renderBanner({
+            cliVersion: CLI_VERSION,
+            sdkVersion: SDK_VERSION,
+            coreVersion: CORE_VERSION,
+            codeGraphVersion: CODE_GRAPH_VERSION,
+          }) + '\n\n',
         )
 
         // ── "Using config:" line ──────────────────────────────────────────────

@@ -1,0 +1,28 @@
+- op: modified
+  description: CLI passes runtime overrides only; delegate section optimization to core
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    The command invokes the `CompileContext` use case.
+
+    The CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `CompileContext` instance at composition time.
+
+    The CLI MUST pass only runtime overrides to `CompileContext.execute`:
+
+    - `name` and `step` from positional arguments
+    - `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `hybrid` when yaml default is not `full`/`hybrid`)
+    - `llmOptimizedContext` only when explicitly resolved via `--optimized` or `--no-optimized` and the resolved value differs from the yaml default (omit the field when it matches the baked default)
+    - `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` from the corresponding CLI flags
+
+    The effective `llmOptimizedContext` value for explicit CLI overrides is determined as follows:
+
+    - If `--no-optimized` is passed, it is `false`.
+    - If `--optimized` is passed, it is `true`.
+    - Otherwise, the CLI does not pass `llmOptimizedContext` on `execute` — the baked yaml default applies.
+
+    Optimization bypass when only a subset of sections is requested (for example `--rules` without `--constraints`) is enforced by `CompileContext` from the forwarded `sections` input and the baked `llmOptimizedContext` default. The CLI MUST NOT recompute or override `llmOptimizedContext` based on section flags.
+
+    When `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.
+
+    When `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint.

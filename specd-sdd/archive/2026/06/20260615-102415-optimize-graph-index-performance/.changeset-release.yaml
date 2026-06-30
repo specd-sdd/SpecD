@@ -1,0 +1,4 @@
+releases:
+  code-graph:indexer: minor
+  code-graph:language-adapter: minor
+  code-graph:symbol-model: minor

@@ -48,6 +48,12 @@
 - **AND** the default depth is 3
 - **AND** the process exits with code 0
 
+#### Scenario: Impact uses SDK graph context
+
+- **WHEN** `specd graph impact --file <path>` is executed
+- **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
+- **AND** platform symbols are sourced from `@specd/sdk`
+
 #### Scenario: Unprefixed relative file resolves through configRelativePath
 
 - **GIVEN** file `core:src/auth.ts` is indexed with `configRelativePath` `packages/core/src/auth.ts`
@@ -90,6 +96,13 @@
 - **WHEN** `specd graph impact --symbol createKernel` is run
 - **THEN** stdout shows `Impact analysis for function createKernel (...)` with risk level and affected files
 
+#### Scenario: Full symbol id selector resolves directly
+
+- **GIVEN** symbol `packages/core/src/auth.ts:function:validate` is indexed
+- **WHEN** `specd graph impact --symbol packages/core/src/auth.ts:function:validate` is run
+- **THEN** the command resolves the symbol through `resolveSymbolSelector`
+- **AND** analyzes impact for that exact symbol
+
 #### Scenario: Multiple symbol matches
 
 - **GIVEN** `validate` exists in 3 different files
@@ -124,12 +137,13 @@
 - **WHEN** `specd graph impact --spec core:spec-lock --direction upstream` is run
 - **THEN** stdout shows `core:archive-change` as an impacted spec
 
-#### Scenario: Missing spec reports cleanly
+#### Missing spec fails with not-found error
 
 - **GIVEN** spec `missing:spec` does not exist in the graph
 - **WHEN** `specd graph impact --spec missing:spec` is run
-- **THEN** stdout shows `No spec found matching "missing:spec".`
-- **AND** the process exits with code 0
+- **THEN** stderr contains a not-found error for `missing:spec`
+- **AND** the error uses machine-readable code `SPEC_NOT_FOUND`
+- **AND** the process exits with code 1
 
 ### Requirement: Concurrent indexing guard
 

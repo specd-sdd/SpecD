@@ -53,7 +53,7 @@ describe('ResolveBundle', () => {
     const repository: SkillRepository = {
       list: vi.fn(),
       get: vi.fn(),
-      getBundle: vi.fn((name: string) => makeMockBundle(name)),
+      getBundle: vi.fn(async (name: string) => makeMockBundle(name)),
       listSharedFiles: vi.fn(),
     }
 
@@ -79,7 +79,7 @@ describe('ResolveBundle', () => {
     const repository: SkillRepository = {
       list: vi.fn(),
       get: vi.fn(),
-      getBundle: vi.fn((name: string) => makeMockBundle(name)),
+      getBundle: vi.fn(async (name: string) => makeMockBundle(name)),
       listSharedFiles: vi.fn(),
     }
 
@@ -110,7 +110,7 @@ describe('ResolveBundle', () => {
     const repository: SkillRepository = {
       list: vi.fn(),
       get: vi.fn(),
-      getBundle: vi.fn((name: string, context?: SkillTemplateContext) => {
+      getBundle: vi.fn(async (name: string, context?: SkillTemplateContext) => {
         expect(context?.variables?.['frontmatter']).toEqual({
           name: 'specd',
           metadata: { owner: 'specd' },
@@ -138,7 +138,7 @@ describe('ResolveBundle', () => {
     const repository: SkillRepository = {
       list: vi.fn(),
       get: vi.fn(),
-      getBundle: vi.fn((name: string) => makeMockBundle(name)),
+      getBundle: vi.fn(async (name: string) => makeMockBundle(name)),
       listSharedFiles: vi.fn(),
     }
 
@@ -156,7 +156,7 @@ describe('ResolveBundle', () => {
     const repository: SkillRepository = {
       list: vi.fn(),
       get: vi.fn(),
-      getBundle: vi.fn((name: string) => makeMockBundle(name)),
+      getBundle: vi.fn(async (name: string) => makeMockBundle(name)),
       listSharedFiles: vi.fn(),
     }
 
@@ -185,7 +185,7 @@ describe('ResolveBundle', () => {
     const repository: SkillRepository = {
       list: vi.fn(),
       get: vi.fn(),
-      getBundle: vi.fn((name: string) => makeMockBundle(name)),
+      getBundle: vi.fn(async (name: string) => makeMockBundle(name)),
       listSharedFiles: vi.fn(),
     }
 
@@ -208,7 +208,7 @@ describe('ResolveBundle', () => {
     const repository: SkillRepository = {
       list: vi.fn(),
       get: vi.fn(),
-      getBundle: vi.fn((name: string) => makeMockBundle(name)),
+      getBundle: vi.fn(async (name: string) => makeMockBundle(name)),
       listSharedFiles: vi.fn(),
     }
 

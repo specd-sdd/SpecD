@@ -9,7 +9,7 @@
     {
       "requirement": "Gate guard",
       "rules": [
-        "The gate guard sequence is:\n\n1. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.\n2. Assert the change is in `ready` state. If not, throw `InvalidStateTransitionError`.\n3. Resolve the current actor identity via `ActorResolver`.\n4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.\n5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`."
+        "The gate guard sequence is:\n\n1. If `approvals.spec` is `false` (baked at construction), throw `ApprovalGateDisabledError` with gate `'spec'`. No repository access occurs.\n2. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.\n3. Resolve the current actor identity via `ActorResolver`.\n4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.\n5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`."
       ]
     },
     {
@@ -39,21 +39,28 @@
     {
       "requirement": "Input contract",
       "rules": [
-        "The `ApproveSpecInput` interface MUST include:\n\n- `name` (string) -- the change slug identifying the target change.\n- `reason` (string) -- free-text rationale recorded in the approval event.\n- `approvalsSpec` (boolean) -- whether the spec approval gate is enabled in the active configuration.\n\nAll fields are required and readonly."
+        "The `ApproveSpecInput` interface MUST include:\n\n- `name` (string) — the change slug identifying the target change.\n- `reason` (string) — free-text rationale recorded in the approval event.\n\nAll fields are required and readonly. Approval gate state MUST NOT appear on the input."
+      ]
+    },
+    {
+      "requirement": "Approval gate baked at construction",
+      "rules": [
+        "`ApproveSpec` SHALL accept approval gate configuration at construction time:\n\n```typescript\ntype ApprovalGates = { readonly spec: boolean; readonly signoff: boolean }\n```\n\nThe constructor MUST receive `approvals: ApprovalGates`. `createApproveSpec(config)` and kernel wiring MUST pass `config.approvals`.\n\n`ApproveSpec.execute` MUST evaluate the spec gate using `approvals.spec` from construction. Callers MUST NOT supply gate flags per invocation."
       ]
     }
   ],
   "constraints": [
-    "The gate check MUST be the first validation step -- no I/O occurs if the gate is disabled.",
+    "The gate check MUST be the first validation step — no I/O occurs if the gate is disabled.",
     "Artifact hashes are computed from on-disk content at approval time, not from cached or in-memory state.",
-    "The use case does not validate artifact content beyond hashing it -- content validation is a separate concern.",
-    "The use case does not determine whether the gate should be enabled; the caller passes that decision as approvalsSpec."
+    "The use case does not validate artifact content beyond hashing it — content validation is a separate concern.",
+    "The use case does not determine whether the gate should be enabled at execute time; gate state is fixed at construction from project configuration."
   ],
   "scenarios": [
     {
       "requirement": "Gate guard",
       "name": "Spec approval gate is disabled",
-      "when": ["execute() is called with approvalsSpec: false"],
+      "given": ["ApproveSpec is constructed with approvals.spec: false"],
+      "when": ["execute() is called with { name, reason }"],
       "then": [
         "an ApprovalGateDisabledError is thrown with gate 'spec'",
         "AND no repository access occurs"
@@ -125,14 +132,49 @@
     },
     {
       "requirement": "Input contract",
-      "name": "All input fields are required",
+      "name": "Input fields are name and reason only",
       "when": ["ApproveSpecInput is constructed"],
-      "then": ["name, reason, and approvalsSpec are all required", "AND all fields are readonly"]
+      "then": ["name and reason are required", "AND approval gate state is not part of the input"]
+    },
+    {
+      "requirement": "Approval gate baked at construction",
+      "name": "Factory passes config.approvals",
+      "when": ["createApproveSpec(config) constructs the use case"],
+      "then": ["the instance receives config.approvals as its baked gate configuration"]
+    },
+    {
+      "requirement": "Approval gate baked at construction",
+      "name": "Enabled gate allows execute with name and reason",
+      "given": [
+        "ApproveSpec is constructed with approvals.spec: true",
+        "the change is in pending-spec-approval state"
+      ],
+      "when": ["execute({ name, reason }) is called"],
+      "then": ["the change transitions to spec-approved"]
+    },
+    {
+      "requirement": "Approval gate baked at construction",
+      "name": "Schema mismatch fails in gate guard",
+      "given": [
+        "ApproveSpec is constructed with approvals.spec: true",
+        "the active schema name differs from the change schemaName"
+      ],
+      "when": ["execute({ name, reason }) is called"],
+      "then": ["a SchemaMismatchError is thrown before mutate is invoked"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:approve-spec",
+        "file": "core:src/application/use-cases/approve-spec.ts",
+        "symbol": "ApproveSpec"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:6d74c38cc20b93bb7e022cfbda8b1733c5bd9846892d7090d08d2272025b25ab",
-    "verify.md": "sha256:ca449f0e2a4a933bdc5b4145c9a73d3786b6efd114734bab8669a696a19a0c7c"
+    "spec.md": "sha256:0ba4314c33dbbfb05ce491eb6dcf462e757339e3345f0498454a16d41b9d82df",
+    "verify.md": "sha256:88b139901c3adcd452eab7a53ca64070a14387097a5cf0a8a8b9ae2c9e97185c"
   },
   "generatedBy": "core"
 }

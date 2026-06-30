@@ -1,0 +1,15 @@
+- op: added
+  description: Verify approve gates are grouped under changes namespace
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Kernel builds all use cases from SpecdConfig'
+    after:
+      type: section
+      matches: 'Scenario: Kernel is not the mandatory entry point'
+  content: |
+    #### Scenario: Approval gate use cases are grouped under changes
+
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** `kernel.changes.approveSpec` and `kernel.changes.approveSignoff` are defined
+    - **AND** `kernel.specs.approveSpec` and `kernel.specs.approveSignoff` are not defined

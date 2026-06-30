@@ -9,7 +9,7 @@ export interface ImplementationLinkDto {
 /** Tracked implementation file with review state. */
 export interface TrackedImplementationFileDto {
   readonly file: string
-  readonly state: 'open' | 'resolved' | 'ignored'
+  readonly state: 'open' | 'resolved' | 'ignored' | 'removed'
 }
 
 /** Manifest implementation-tracking projection. */

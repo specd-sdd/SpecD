@@ -1,0 +1,38 @@
+- op: modified
+  description: Obtain change counts via GetProjectSummary including archived
+  selector:
+    type: section
+    matches: 'Requirement: includes change counts'
+  content: |
+    The command output MUST obtain change counts via `kernel.project.getProjectSummary.execute()`:
+
+    - Number of active changes (`activeCount`)
+    - Number of drafts (`draftCount`)
+    - Number of discarded changes (`discardedCount`)
+    - Number of archived changes (`archivedCount`)
+
+    The command MUST NOT call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting.
+
+- op: modified
+  description: Obtain spec counts via GetProjectSummary
+  selector:
+    type: section
+    matches: 'Requirement: includes spec counts'
+  content: |
+    The command output MUST include spec counts obtained via `kernel.project.getProjectSummary.execute()`:
+
+    - Total spec count across all workspaces (sum of `specsByWorkspace` values)
+    - Spec count per workspace (`specsByWorkspace` map)
+
+    The command SHALL NOT load full spec metadata or artifacts to perform this count.
+    The command MUST NOT call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting.
+
+- op: modified
+  description: Update spec dependencies for GetProjectSummary
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure in workspace output
+    - [`core:get-project-summary`](../../core/get-project-summary/spec.md) — consolidated change and spec counts
+    - [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly

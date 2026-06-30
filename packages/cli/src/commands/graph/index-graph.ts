@@ -1,14 +1,10 @@
 import { Command, Option } from 'commander'
-import { type IndexOptions, type IndexResult } from '@specd/code-graph'
+import { acquireGraphIndexLock, runIndexProjectGraph, type IndexResult } from '@specd/sdk'
 import { spawn } from 'node:child_process'
-import * as core from '@specd/core'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
-import { buildProjectGraphConfig } from './build-project-graph-config.js'
+import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
-import { withProvider } from './with-provider.js'
-import { acquireGraphIndexLock } from './graph-index-lock.js'
-import { codeGraphVersion } from './code-graph-version.js'
 
 const GRAPH_INDEX_WORKER_ENV = 'SPECD_GRAPH_INDEX_WORKER'
 const GRAPH_INDEX_LOCK_HELD_ENV = 'SPECD_GRAPH_INDEX_LOCK_HELD'
@@ -24,13 +20,6 @@ export function registerGraphIndex(parent: Command): void {
     .allowExcessArguments(false)
     .description('Build or update the code graph index for the project.')
     .option('--force', 'rebuild the entire index from scratch', false)
-    .option('--concurrency <n>', 'max concurrent indexing tasks', '4')
-    .addOption(
-      new Option(
-        '--include-path <glob...>',
-        'one or more global paths to include in the index',
-      ).argParser((val, prev: string[]) => (prev ?? []).concat(val.split(','))),
-    )
     .addOption(
       new Option(
         '--exclude-path <glob...>',
@@ -40,11 +29,30 @@ export function registerGraphIndex(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    filesDiscovered: number
+    filesIndexed: number
+    documentsIndexed: number
+    filesSkipped: number
+    filesRemoved: number
+    specsDiscovered: number
+    specsIndexed: number
+    errors: Array<{ filePath, message }>
+    duration: number
+    workspaces: Array<{ name, filesDiscovered, filesIndexed, documentsIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }>
+    vcsRef: string | null
+    graphFingerprint: string
+    fullRebuildReason: string | null
+  }
+`,
+    )
     .action(
       async (opts: {
         force: boolean
-        concurrency: string
-        includePath?: string[]
         excludePath?: string[]
         config?: string
         path?: string
@@ -76,8 +84,17 @@ export function registerGraphIndex(parent: Command): void {
 
         const { config, kernel } = context
 
-        // Only the main process acquires the lock.
-        const lockRelease = !isWorker && !lockHeld ? acquireGraphIndexLock(config) : null
+        let lockRelease: (() => void) | null = null
+        try {
+          lockRelease = !isWorker && !lockHeld ? acquireGraphIndexLock(config) : null
+        } catch (err: unknown) {
+          cliError(
+            err instanceof Error ? err.message : 'failed to acquire indexing lock',
+            opts.format,
+            3,
+          )
+          return
+        }
 
         try {
           if (!isWorker && !noWorker) {
@@ -93,72 +110,46 @@ export function registerGraphIndex(parent: Command): void {
               env: workerEnv,
             })
 
-            worker.on('exit', (code) => {
+            const forwardSignal = (sig: NodeJS.Signals): void => {
+              worker.kill(sig)
+            }
+            process.on('SIGINT', forwardSignal)
+            process.on('SIGTERM', forwardSignal)
+
+            worker.on('exit', (code, signal) => {
+              process.removeListener('SIGINT', forwardSignal)
+              process.removeListener('SIGTERM', forwardSignal)
               if (lockRelease) lockRelease()
-              process.exit(code ?? 0)
+              if (code !== 0 || signal) {
+                process.stderr.write(`Worker exited with code ${code} and signal ${signal}\n`)
+                process.exit(code ?? 1)
+              }
+              process.exit(0)
             })
           } else {
-            if (kernel === null) {
-              cliError('Kernel not available in worker', opts.format, 1)
-              return
-            }
-
-            await withProvider(
-              config,
-              opts.format,
-              async (provider) => {
-                const workspaces = await kernel.project.listWorkspaces.execute()
-                const projectRoot = config.projectRoot
-
-                const vcs = await Promise.resolve(core.createVcsAdapter(projectRoot)).catch(
-                  () => null,
-                )
-                const vcsRef = (await vcs?.ref()) ?? undefined
-
-                const graphConfig = buildProjectGraphConfig(config, {
-                  ...(opts.includePath !== undefined ? { includePaths: opts.includePath } : {}),
-                  ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
-                })
-
-                const indexOptions: IndexOptions = {
-                  projectRoot,
-                  workspaces: workspaces.map((ws) => ({
-                    name: ws.name,
-                    codeRoot: ws.codeRoot,
-                    specRepo: ws.specRepo,
-                    ownership: ws.ownership,
-                    isExternal: ws.isExternal,
-                  })),
-                  graphConfig,
-                  codeGraphVersion,
-                  ...(vcsRef !== undefined ? { vcsRef } : {}),
-                  onProgress: (percent, phase) => {
-                    if (fmt === 'text') {
-                      const pct = Math.round(percent)
-                      process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
-                    }
-                  },
-                }
-
-                const result = await provider.index(indexOptions)
-
+            const host = await resolveSdkHostContext(config, kernel)
+            const result = await runIndexProjectGraph(host, {
+              force: opts.force,
+              ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
+              onProgress: (percent, phase) => {
                 if (fmt === 'text') {
-                  process.stdout.write('\n')
-                  output(formatTextIndexResult(result), 'text')
-                } else {
-                  output(result, fmt)
+                  const pct = Math.round(percent)
+                  process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
                 }
               },
-              opts.force
-                ? {
-                    beforeOpen: async (provider) => provider.recreate(),
-                  }
-                : undefined,
-            )
+            })
+
+            if (fmt === 'text') {
+              process.stdout.write('\n')
+              output(formatTextIndexResult(result), 'text')
+            } else {
+              output(result, fmt)
+            }
+            process.exit(0)
           }
         } catch (err) {
           if (lockRelease) lockRelease()
-          cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 1)
+          cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 3)
         }
       },
     )

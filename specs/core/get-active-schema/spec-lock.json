@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:resolve-schema",
+    "core:config",
+    "core:schema-format",
+    "core:schema-registry-port",
+    "core:build-schema",
+    "default:_global/architecture"
+  ],
+  "implementation": []
+}

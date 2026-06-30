@@ -155,5 +155,7 @@
     "spec.md": "sha256:8174fe783ff1706233deaabc6b13912965c41ec23beb94fdb5dd8733388b58c1",
     "verify.md": "sha256:1a8d7685ac70ea053a87df158c2546bd3d75ef5495f8a279a3aef0c8b3fb3f69"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Use case for resolving a skill bundle with structured install-time rendering and privacy-safe template variable exposure.",
+  "optimizedContext": "# skills:resolve-bundle\n\n## Rules\n- Output: The output MUST contain:\n- Behavior: The use case MUST: 1.\n- Input: The input MUST contain: context defaults to an empty render context.\n- Dependencies: core:config, skills:skill-bundle, skills:skill-repository-port\n\n## Constraints\n- Install-time rendering context is passed at invocation time.\n- Built-in values are injected from SpecdConfig when provided.\n- projectRoot MUST NOT be exposed as a template variable.\n- The repository does not invent capability or frontmatter values that are absent from the provided context.\n- variables.frontmatter alone does not trigger frontmatter emission; the frontmatter capability controls that gate.\n- variables.sharedFolder MUST remain relative in rendered output even when internal validation uses an absolute path.\n"
 }

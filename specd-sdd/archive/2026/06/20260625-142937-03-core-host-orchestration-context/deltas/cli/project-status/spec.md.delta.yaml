@@ -1,0 +1,28 @@
+- op: added
+  description: Host orchestration for --context via baked GetProjectContext defaults
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: supports --context flag'
+    after:
+      type: section
+      matches: 'Requirement: supports --context flag'
+  content: |
+
+    When assembling context references for `--context`, the command MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. It MUST invoke the kernel-wired `GetProjectContext` use case, which carries yaml-derived defaults from composition time.
+
+    The command MUST call `GetProjectContext.execute` with runtime overrides only:
+
+    - `execute({})` for the primary context assembly (baked yaml defaults)
+    - `execute({ llmOptimizedContext: false })` when it needs the raw spec catalogue alongside fresh optimized project context (for example to populate spec reference lists without optimized spec bodies)
+
+    Section-filtered optimization bypass behaviour is enforced by `GetProjectContext` / `CompileContext` from forwarded `sections` when applicable; this command does not recompute `llmOptimizedContext` from section flags.
+
+- op: added
+  description: Declare dependency on get-project-context host pattern
+  position:
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    - [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly

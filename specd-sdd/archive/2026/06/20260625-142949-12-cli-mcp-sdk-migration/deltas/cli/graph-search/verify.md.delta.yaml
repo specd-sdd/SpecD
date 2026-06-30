@@ -1,0 +1,15 @@
+- op: added
+  description: Verify SDK-backed search context
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Search behaviour'
+    after:
+      type: section
+      matches: 'Scenario: Real identity component outranks arbitrary substring in rendered results'
+  content: |
+    #### Scenario: Search uses SDK graph context
+
+    - **WHEN** `specd graph search` is executed
+    - **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
+    - **AND** platform symbols are sourced from `@specd/sdk`

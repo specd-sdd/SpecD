@@ -6,32 +6,13 @@
   "dependsOn": ["skills:skill"],
   "implementation": [
     {
-      "file": "skills:README.md"
-    },
-    {
-      "file": "skills:src/domain/skill-template-metadata.ts",
-      "symbols": ["SkillTemplateMetadata"]
-    },
-    {
-      "file": "skills:templates/specd/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:templates/specd-verify/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:templates/specd-archive/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:templates/specd-implement/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:templates/specd-design/SKILL.md.tpl"
-    },
-    {
       "file": "skills:templates/shared/shared.md.tpl"
     },
     {
-      "file": "skills:templates/specd-new/SKILL.md.tpl"
+      "file": "skills:templates/skills/specd-design/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/skills/specd-new/SKILL.md.tpl"
     }
   ]
 }

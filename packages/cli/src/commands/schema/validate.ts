@@ -1,6 +1,6 @@
 import { type Command } from 'commander'
 import { resolve } from 'node:path'
-import { type ValidateSchemaResult } from '@specd/core'
+import { type ValidateSchemaResult } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError, handleError } from '../../handle-error.js'

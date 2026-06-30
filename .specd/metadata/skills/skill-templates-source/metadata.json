@@ -9,19 +9,19 @@
     {
       "requirement": "Template source location",
       "rules": [
-        "Template files MUST live in `packages/skills/templates/<skill-name>/` using the `.md.tpl` extension.\n\nEach skill template directory MUST also contain a `skill.meta.json` file.\n\nInstalled skill files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix."
+        "Template files MUST live in categorized subdirectories under `packages/skills/templates/`:\n\n- `packages/skills/templates/skills/<skill-name>/` using the `SKILL.md.tpl` convention for standard skills.\n- `packages/skills/templates/agents/<agent-name>/` using the `SPECD-AGENT.md.tpl` convention for specialized agents.\n\nAll template source files MUST use the `.md.tpl` extension.\n\nEach skill or agent template directory MUST also contain a metadata file:\n\n- `skill.meta.json` for skills.\n- `specd-agent.meta.json` for agents.\n\nMetadata files (`skill.meta.json` and `specd-agent.meta.json`) share the same schema and serve the same purpose: declaring required capabilities and shared template dependencies. The different filenames are used strictly as discriminators for internal discovery and categorization.\n\nInstalled files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix."
       ]
     },
     {
       "requirement": "Template migration",
       "rules": [
-        "The template directory MUST contain:\n\n- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories\n- a `shared/` directory for shared template source files\n\nEach skill directory contains template files ending in `.md.tpl` plus a `skill.meta.json` file that declares the skill's template contract.\n\nThe current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates."
+        "The template directory structure SHALL be:\n\n- `templates/skills/` — contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`.\n- `templates/agents/` — contains specialized agents such as `specd-project-context-optimizer` and `specd-spec-context-optimizer`.\n- `templates/shared/` — contains shared template source files like `shared.md.tpl`.\n\nEach skill or agent directory contains its respective template file (`SKILL.md.tpl` or `SPECD-AGENT.md.tpl`) plus its metadata contract file.\n\nThe current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates."
       ]
     },
     {
-      "requirement": "Skill template metadata contract",
+      "requirement": "Template metadata contract (skills and agents)",
       "rules": [
-        "Each skill template directory MUST declare a `skill.meta.json` file with this shape:\n\n```json\n{\n  \"supportedCapabilities\": [\"mcp\", \"agents\", \"frontmatter\"],\n  \"requiredCapabilities\": [],\n  \"requiredSharedTemplates\": [\"shared.md\"]\n}\n```\n\n`supportedCapabilities` declares the capability identifiers that templates in that skill directory are allowed to reference.\n\n`requiredCapabilities` declares the capability identifiers that MUST be present for the skill's templates to be installable.\n\n`requiredSharedTemplates` declares the shared template filenames that the skill requires.\n\nThe initial required capability identifiers that the system MUST recognize are:\n\n- `mcp`\n- `agents`\n- `frontmatter`"
+        "Each skill or agent template directory MUST declare a metadata file (`skill.meta.json` or `specd-agent.meta.json`) with this shape:\n\n```json\n{\n  \"kind\": \"skill\" | \"agent\",\n  \"supportedCapabilities\": [\"mcp\", \"agents\", \"frontmatter\"],\n  \"requiredCapabilities\": [],\n  \"requiredSharedTemplates\": [\"shared.md\"]\n}\n```\n\n`kind` (required) MUST categorize the template as a standard `skill` or a specialized `agent`. This value MUST match the parent directory name (`skills/` or `agents/`).\n\n`supportedCapabilities` declares the capability identifiers that templates in that directory are allowed to reference.\n\n`requiredCapabilities` declares the capability identifiers that MUST be present for the templates to be installable.\n\n`requiredSharedTemplates` declares the shared template filenames required by the templates."
       ]
     },
     {
@@ -34,6 +34,12 @@
       "requirement": "Graph impact terminology in workflow templates",
       "rules": [
         "Workflow skill templates that instruct agents to run `specd graph impact` SHALL use clear user-facing terminology for impact direction and selector semantics:\n\n- **dependents** — symbols and files that depend on the target; implemented by `--direction dependents`, with `--direction upstream` as a compatibility value\n- **dependencies** — symbols and files the target depends on; implemented by `--direction dependencies`, with `--direction downstream` as a compatibility value\n- **both** — combined dependents and dependencies analysis; implemented by `--direction both`\n- **file selectors** — blast-radius queries over files use `--file`, including multiple file inputs when needed; templates MUST NOT instruct agents to use `--changes`\n\nTemplates MUST NOT ask for \"downstream dependents\" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents. When a workflow needs the blast radius of several files, it SHALL use `specd graph impact --file <path1> <path2> ...` rather than a separate change-detection selector."
+      ]
+    },
+    {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "rules": [
+        "Workflow skill templates that instruct agents to run `specd graph search` SHALL describe snippet previews as opt-in output.\n\nSpecifically:\n\n- templates MUST NOT imply that `specd graph search` always returns visible snippet content by default\n- when a workflow example or instruction depends on reading preview text, the template SHALL include `--snippet`\n- when a workflow only needs identifiers, locations, or structured metadata, templates SHOULD omit `--snippet`\n- workflow guidance that mentions `json` or `toon` output SHALL describe the `snippet` field as omitted unless `--snippet` is passed"
       ]
     },
     {
@@ -108,7 +114,8 @@
       "name": "Migrated template tree is complete",
       "when": ["the template source directory is validated"],
       "then": [
-        "it contains specd/, specd-archive/, specd-design/, specd-implement/, specd-new/, specd-metadata/, specd-compliance/, and specd-verify/",
+        "it contains skills/ (using SKILL.md.tpl and skill.meta.json)",
+        "AND it contains agents/ (using SPECD-AGENT.md.tpl and specd-agent.meta.json)",
         "AND it contains shared/ for shared template source files"
       ]
     },
@@ -121,19 +128,18 @@
       ]
     },
     {
-      "requirement": "Skill template metadata contract",
-      "name": "skill.meta.json declares supported, required, and shared requirements",
-      "when": ["a skill.meta.json file is inspected"],
+      "requirement": "Template metadata contract (skills and agents)",
+      "name": "Metadata files declare kind and requirements",
+      "when": ["a skill.meta.json or specd-agent.meta.json file is inspected"],
       "then": [
-        "it declares supportedCapabilities",
-        "AND it declares requiredCapabilities",
-        "AND it declares requiredSharedTemplates"
+        "it declares kind (skill or agent)",
+        "AND it declares supportedCapabilities, requiredCapabilities, and requiredSharedTemplates"
       ]
     },
     {
-      "requirement": "Skill template metadata contract",
+      "requirement": "Template metadata contract (skills and agents)",
       "name": "Initial capability catalogue is declared by the contract",
-      "when": ["the skill metadata contract is reviewed"],
+      "when": ["the template metadata contract is reviewed"],
       "then": ["the initial required capability identifiers are mcp, agents, and frontmatter"]
     },
     {
@@ -207,6 +213,28 @@
       ]
     },
     {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "name": "Workflow templates do not assume snippet-by-default text output",
+      "when": [
+        "workflow skill templates show a specd graph search example for ordinary lookup or metadata gathering"
+      ],
+      "then": ["the example does not imply that a visible snippet block is returned by default"]
+    },
+    {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "name": "Workflow templates add --snippet when preview text is required",
+      "when": [
+        "a workflow skill template instructs an agent to inspect preview text from a graph-search result"
+      ],
+      "then": ["the command example includes --snippet"]
+    },
+    {
+      "requirement": "Graph search snippet guidance in workflow templates",
+      "name": "Workflow templates describe structured snippet output as opt-in",
+      "when": ["a workflow skill template references json or toon graph-search output"],
+      "then": ["it describes the snippet field as omitted unless --snippet is passed"]
+    },
+    {
       "requirement": "Frontmatter source",
       "name": "Runtime metadata is sourced from canonical contracts",
       "when": ["plugin frontmatter models are reviewed"],
@@ -274,48 +302,21 @@
     "files": [
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:README.md"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-verify/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-archive/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-implement/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-design/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
         "file": "skills:templates/shared/shared.md.tpl"
       },
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:templates/specd-new/SKILL.md.tpl"
-      }
-    ],
-    "symbols": [
+        "file": "skills:templates/skills/specd-design/SKILL.md.tpl"
+      },
       {
         "specId": "skills:skill-templates-source",
-        "file": "skills:src/domain/skill-template-metadata.ts",
-        "symbol": "SkillTemplateMetadata"
+        "file": "skills:templates/skills/specd-new/SKILL.md.tpl"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3a51bd2dd4039d85019b6d6c58ba1bf66d7617628049ee258a4716ab6e011286",
-    "verify.md": "sha256:4e25373faff1eb1b75b4b530d12d8d2fbd407b4ad31262d31074d39a52fe2fa5"
+    "spec.md": "sha256:887f1c12bdf5c2da82ccc88d91d4c27b8da46697cb34a869b2ecc8544cb20b00",
+    "verify.md": "sha256:61b6a6de6ba232461b9645e9a4c995741a91f977571c8f19818f6591c1513249"
   },
   "generatedBy": "core"
 }

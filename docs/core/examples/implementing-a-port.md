@@ -506,14 +506,24 @@ Each factory also accepts an explicit context and options object — useful for 
 import { createCreateChange } from '@specd/core'
 
 const createChange = createCreateChange(
-  { workspace: 'default', ownership: 'owned', isExternal: false },
+  {
+    workspace: 'default',
+    ownership: 'owned',
+    isExternal: false,
+    configPath: '/project/specd.yaml',
+  },
   {
     changesPath: '/tmp/test/changes',
     draftsPath: '/tmp/test/drafts',
     discardedPath: '/tmp/test/discarded',
+    listWorkspaces,
+    getActiveSchema,
+    detectOverlap,
   },
 )
 ```
+
+`listWorkspaces`, `getActiveSchema`, and `detectOverlap` are the orchestration dependencies required by `CreateChange` — wire them explicitly when bypassing the `SpecdConfig` overload.
 
 ### Custom adapters without the kernel
 
@@ -526,5 +536,11 @@ import { MyActorResolver } from './my-actor-resolver.js'
 
 const changeRepo = new MyDbChangeRepository(…)
 const actor = new MyActorResolver()
-const createChange = new CreateChange(changeRepo, new Map(), actor)
+const createChange = new CreateChange(
+  changeRepo,
+  listWorkspaces,
+  actor,
+  getActiveSchema,
+  detectOverlap,
+)
 ```

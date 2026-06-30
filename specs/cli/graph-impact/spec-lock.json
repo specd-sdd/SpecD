@@ -5,8 +5,8 @@
   },
   "dependsOn": [
     "cli:entrypoint",
+    "cli:graph-cli-context",
     "core:config",
-    "code-graph:composition",
     "code-graph:traversal",
     "code-graph:workspace-integration"
   ],
@@ -14,9 +14,6 @@
     {
       "file": "cli:src/commands/graph/impact.ts",
       "symbols": ["registerGraphImpact"]
-    },
-    {
-      "file": "cli:test/commands/graph-impact.spec.ts"
     }
   ]
 }

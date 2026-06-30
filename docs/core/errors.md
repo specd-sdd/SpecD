@@ -68,6 +68,22 @@ import { ChangeAlreadyExistsError } from '@specd/core'
 
 ---
 
+### InvalidCreateChangeInputError
+
+**Code:** `'INVALID_CREATE_CHANGE_INPUT'`
+
+Thrown when `CreateChange` receives only one of `schemaName` or `schemaVersion`. Both fields must be provided together as an explicit override, or both omitted so the use case resolves the active schema internally.
+
+```typescript
+import { InvalidCreateChangeInputError } from '@specd/core'
+
+// Message: "schemaName and schemaVersion must both be provided or both omitted"
+```
+
+**Thrown by:** `CreateChange`.
+
+---
+
 ### ApprovalGateDisabledError
 
 **Code:** `'APPROVAL_GATE_DISABLED'`
@@ -105,7 +121,7 @@ import { SchemaNotFoundError } from '@specd/core'
 
 **Code:** `'ALREADY_INITIALISED'`
 
-Thrown when `InitProject` is called but a `specd.yaml` already exists at the target path and `force` is not set.
+Thrown when `ConfigWriter.initProject` is called but a `specd.yaml` already exists at the target path and `force` is not set.
 
 ```typescript
 import { AlreadyInitialisedError } from '@specd/core'
@@ -113,7 +129,7 @@ import { AlreadyInitialisedError } from '@specd/core'
 // Message: "Project already initialised at '<configPath>'"
 ```
 
-**Thrown by:** `InitProject`.
+**Thrown by:** `ConfigWriter.initProject` (`FsConfigWriter`).
 
 ---
 
@@ -666,35 +682,36 @@ import { ArtifactParseError } from '@specd/core'
 
 ## Error codes reference
 
-| Code                        | Class                          | Layer       |
-| --------------------------- | ------------------------------ | ----------- |
-| `CHANGE_NOT_FOUND`          | `ChangeNotFoundError`          | Application |
-| `CHANGE_ALREADY_EXISTS`     | `ChangeAlreadyExistsError`     | Application |
-| `APPROVAL_GATE_DISABLED`    | `ApprovalGateDisabledError`    | Application |
-| `SCHEMA_NOT_FOUND`          | `SchemaNotFoundError`          | Application |
-| `ALREADY_INITIALISED`       | `AlreadyInitialisedError`      | Application |
-| `ARTIFACT_NOT_FOUND`        | `ArtifactNotFoundError`        | Application |
-| `PARSER_NOT_REGISTERED`     | `ParserNotRegisteredError`     | Application |
-| `SPEC_NOT_IN_CHANGE`        | `SpecNotInChangeError`         | Application |
-| `SCHEMA_MISMATCH`           | `SchemaMismatchError`          | Application |
-| `SPEC_NOT_FOUND`            | `SpecNotFoundError`            | Application |
-| `WORKSPACE_NOT_FOUND`       | `WorkspaceNotFoundError`       | Application |
-| `INVALID_STATE_TRANSITION`  | `InvalidStateTransitionError`  | Domain      |
-| `APPROVAL_REQUIRED`         | `ApprovalRequiredError`        | Domain      |
-| `HOOK_FAILED`               | `HookFailedError`              | Domain      |
-| `ARTIFACT_CONFLICT`         | `ArtifactConflictError`        | Domain      |
-| `DELTA_APPLICATION`         | `DeltaApplicationError`        | Domain      |
-| `INVALID_SPEC_PATH`         | `InvalidSpecPathError`         | Domain      |
-| `INVALID_CHANGE`            | `InvalidChangeError`           | Domain      |
-| `ARTIFACT_NOT_OPTIONAL`     | `ArtifactNotOptionalError`     | Domain      |
-| `SCHEMA_VALIDATION_ERROR`   | `SchemaValidationError`        | Domain      |
-| `CONFIG_VALIDATION_ERROR`   | `ConfigValidationError`        | Domain      |
-| `CORRUPTED_MANIFEST`        | `CorruptedManifestError`       | Domain      |
-| `METADATA_VALIDATION_ERROR` | `MetadataValidationError`      | Domain      |
-| `DEPENDS_ON_OVERWRITE`      | `DependsOnOverwriteError`      | Domain      |
-| `HOOK_NOT_FOUND`            | `HookNotFoundError`            | Domain      |
-| `STEP_NOT_VALID`            | `StepNotValidError`            | Domain      |
-| `PATH_TRAVERSAL`            | `PathTraversalError`           | Domain      |
-| `UNSUPPORTED_PATTERN_ERROR` | `UnsupportedPatternError`      | Domain      |
-| `MISSING_DEFAULT_WORKSPACE` | `MissingDefaultWorkspaceError` | Domain      |
-| `ARTIFACT_PARSE_ERROR`      | `ArtifactParseError`           | Domain      |
+| Code                          | Class                           | Layer       |
+| ----------------------------- | ------------------------------- | ----------- |
+| `CHANGE_NOT_FOUND`            | `ChangeNotFoundError`           | Application |
+| `CHANGE_ALREADY_EXISTS`       | `ChangeAlreadyExistsError`      | Application |
+| `INVALID_CREATE_CHANGE_INPUT` | `InvalidCreateChangeInputError` | Application |
+| `APPROVAL_GATE_DISABLED`      | `ApprovalGateDisabledError`     | Application |
+| `SCHEMA_NOT_FOUND`            | `SchemaNotFoundError`           | Application |
+| `ALREADY_INITIALISED`         | `AlreadyInitialisedError`       | Application |
+| `ARTIFACT_NOT_FOUND`          | `ArtifactNotFoundError`         | Application |
+| `PARSER_NOT_REGISTERED`       | `ParserNotRegisteredError`      | Application |
+| `SPEC_NOT_IN_CHANGE`          | `SpecNotInChangeError`          | Application |
+| `SCHEMA_MISMATCH`             | `SchemaMismatchError`           | Application |
+| `SPEC_NOT_FOUND`              | `SpecNotFoundError`             | Application |
+| `WORKSPACE_NOT_FOUND`         | `WorkspaceNotFoundError`        | Application |
+| `INVALID_STATE_TRANSITION`    | `InvalidStateTransitionError`   | Domain      |
+| `APPROVAL_REQUIRED`           | `ApprovalRequiredError`         | Domain      |
+| `HOOK_FAILED`                 | `HookFailedError`               | Domain      |
+| `ARTIFACT_CONFLICT`           | `ArtifactConflictError`         | Domain      |
+| `DELTA_APPLICATION`           | `DeltaApplicationError`         | Domain      |
+| `INVALID_SPEC_PATH`           | `InvalidSpecPathError`          | Domain      |
+| `INVALID_CHANGE`              | `InvalidChangeError`            | Domain      |
+| `ARTIFACT_NOT_OPTIONAL`       | `ArtifactNotOptionalError`      | Domain      |
+| `SCHEMA_VALIDATION_ERROR`     | `SchemaValidationError`         | Domain      |
+| `CONFIG_VALIDATION_ERROR`     | `ConfigValidationError`         | Domain      |
+| `CORRUPTED_MANIFEST`          | `CorruptedManifestError`        | Domain      |
+| `METADATA_VALIDATION_ERROR`   | `MetadataValidationError`       | Domain      |
+| `DEPENDS_ON_OVERWRITE`        | `DependsOnOverwriteError`       | Domain      |
+| `HOOK_NOT_FOUND`              | `HookNotFoundError`             | Domain      |
+| `STEP_NOT_VALID`              | `StepNotValidError`             | Domain      |
+| `PATH_TRAVERSAL`              | `PathTraversalError`            | Domain      |
+| `UNSUPPORTED_PATTERN_ERROR`   | `UnsupportedPatternError`       | Domain      |
+| `MISSING_DEFAULT_WORKSPACE`   | `MissingDefaultWorkspaceError`  | Domain      |
+| `ARTIFACT_PARSE_ERROR`        | `ArtifactParseError`            | Domain      |

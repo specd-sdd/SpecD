@@ -1,6 +1,7 @@
 import * as path from 'node:path'
 import { TransitionChange } from '../../application/use-cases/transition-change.js'
 import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
+import { RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
@@ -15,6 +16,9 @@ import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
 import { Logger } from '../../application/logger.js'
 import { TemplateExpander } from '../../application/template-expander.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
+import { GitVcsAdapter } from '../../infrastructure/git/vcs-adapter.js'
+import { VcsImplementationDetector } from '../../infrastructure/vcs/vcs-implementation-detector.js'
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
  */
@@ -52,6 +56,8 @@ export interface FsTransitionChangeOptions {
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
   /** Absolute path to the project root. */
   readonly projectRoot: string
+  /** Approval gate configuration from project config. */
+  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
 }
 
 /**
@@ -132,6 +138,7 @@ export function createTransitionChange(
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
         projectRoot: config.projectRoot,
+        approvals: config.approvals,
       },
     )
   }
@@ -158,11 +165,25 @@ export function createTransitionChange(
   const hooks = new NodeHookRunner(expander)
   const actor = createVcsActorResolver()
   const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)
+  const files = new FsFileReader()
+  const implementationDetector = new VcsImplementationDetector(
+    opts.projectRoot,
+    new GitVcsAdapter(opts.projectRoot),
+  )
+  const refreshImplementationTracking = new RefreshImplementationTracking(
+    changeRepo,
+    archiveRepo,
+    implementationDetector,
+    files,
+    opts.projectRoot,
+  )
   return new TransitionChange(
     changeRepo,
     actor,
     schemaProvider,
     runStepHooks,
+    refreshImplementationTracking,
+    opts.approvals,
     new LifecycleEngine(Logger.debug.bind(Logger)),
   )
 }

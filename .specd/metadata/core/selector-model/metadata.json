@@ -163,5 +163,7 @@
     "spec.md": "sha256:fd399e6049f16e21379b6bdc6d8636ef7081d3ef6dd26debfe5bd1ae8e0e6454",
     "verify.md": "sha256:d0dad66cc0f04dd5414429cb4fe87121a1ef452ee24b4b93d200f28d3a606f52"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Delta entries, validation rules, and metadata extraction all need to identify specific nodes in an artifact AST, and each mechanism would…",
+  "optimizedContext": "# Selector Model\n\n## Rules\n- Selector fields: A selector is a YAML object with the following fields: - type (string, required) — the node type; must be one of the values returned by ArtifactParser.nodeTypes() for the target…\n- Node types by file format: All adapters normalize to the AST format defined in core:artifact-ast.\n- Multi-match behaviour: When multiple nodes match a selector, the outcome depends on the calling context: - In delta entries (modified, removed) — apply must reject with a DeltaApplicationError;…\n- No-match behaviour: When a selector matches zero nodes: - In delta entries — apply must reject with a DeltaApplicationError for selector on modified and removed entries.\n- Dependencies: core:artifact-ast\n\n## Constraints\n- selector.index and selector.where are mutually exclusive\n- type must be one of the node types produced by ArtifactParser.nodeTypes() for the target file format; unknown types are a validation error at parse time\n- where values are matched as case-insensitive regular expressions — the same semantics as matches\n- parent is recursive — it is itself a full selector, including optional parent, enabling multi-level ancestry constraints\n"
 }

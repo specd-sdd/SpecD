@@ -1,12 +1,7 @@
 {
   "title": "Change Status",
   "description": "Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change.",
-  "dependsOn": [
-    "cli:entrypoint",
-    "core:change",
-    "core:get-status",
-    "core:refresh-implementation-tracking"
-  ],
+  "dependsOn": ["cli:entrypoint", "core:change", "core:get-status"],
   "context": [
     "Users and agents need a quick way to see where a change stands — its lifecycle state and which artifacts are done, in progress, or missing. `specd change status <name>` reports the current lifecycle state and artifact statuses of a named change."
   ],
@@ -60,9 +55,9 @@
       ]
     },
     {
-      "requirement": "Implementation tracking refresh before status load",
+      "requirement": "Delegates refresh policy to GetStatus",
       "rules": [
-        "Before invoking `GetStatus`, the command MUST call `RefreshImplementationTracking` for the same change name.\n\nThe CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.\n\nAfter refresh, the command MUST call `GetStatus` and serialize its result, including implementation-tracking projection when requested."
+        "The command MUST invoke `GetStatus` directly and MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector` itself.\n\nDefault `GetStatus` refresh behaviour applies unless a future CLI flag explicitly opts out."
       ]
     },
     {
@@ -340,18 +335,13 @@
       ]
     },
     {
-      "requirement": "Implementation tracking refresh before status load",
-      "name": "Status command refreshes before GetStatus",
-      "given": ["specd change status <name> is executed"],
+      "requirement": "Delegates refresh policy to GetStatus",
+      "name": "Status command does not call refresh directly",
+      "given": ["specd change status <name> is executed for an active change"],
       "when": ["the command handler runs"],
-      "then": ["it calls RefreshImplementationTracking before GetStatus"]
-    },
-    {
-      "requirement": "Implementation tracking refresh before status load",
-      "name": "Status command does not call detector directly",
-      "when": ["specd change status <name> runs"],
       "then": [
-        "the CLI does not invoke ImplementationDetector outside RefreshImplementationTracking"
+        "it calls GetStatus without invoking RefreshImplementationTracking directly",
+        "AND it does not invoke ImplementationDetector directly"
       ]
     },
     {
@@ -487,8 +477,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ed0e7e69fb0bd509d77e30152bc39ed43840a3bc35204902fc0f1d0ddc1519ae",
-    "verify.md": "sha256:a6bf20e677b6989e2a31b320d82948d81fa5cbfd15647ff810dc2adaddc6999a"
+    "spec.md": "sha256:46dd2990fde7e4cfde1efafb18597cf0a854c00b23a30d592c96d061c97a5b8b",
+    "verify.md": "sha256:e4646ce8110357d45286902da1806f485ae380e594e04005ff55266460933b3a"
   },
   "generatedBy": "core"
 }

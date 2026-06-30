@@ -1,7 +1,7 @@
 {
   "title": "cli:plugins-update",
   "description": "Defines the CLI contract for updating installed plugins. The command reinstalls plugins to pick up new versions or configuration changes.",
-  "dependsOn": ["plugin-manager:update-plugin-use-case", "core:config-writer-port"],
+  "dependsOn": ["plugin-manager:update-plugin-use-case", "core:get-config"],
   "context": [
     "Defines the CLI contract for updating installed plugins. The command reinstalls plugins to pick up new versions or configuration changes."
   ],
@@ -10,6 +10,12 @@
       "requirement": "Command signature",
       "rules": [
         "The command MUST accept optional plugin names as positional arguments:\n\n```bash\nspecd plugins update [<plugin>...]\n```"
+      ]
+    },
+    {
+      "requirement": "Declaration source",
+      "rules": [
+        "The command MUST enumerate declared plugins from the loaded `SpecdConfig.plugins` field (via `loadConfig` or an equivalent config snapshot). It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.\n\nWhen no plugin names are provided, the command MUST derive the update set from `config.plugins.agents` (or the appropriate declared type buckets)."
       ]
     },
     {
@@ -47,6 +53,23 @@
       "then": ["only the specified plugin is updated"]
     },
     {
+      "requirement": "Declaration source",
+      "name": "Update-all uses config.plugins.agents",
+      "given": ["multiple plugins are declared under plugins.agents in the loaded config"],
+      "when": ["specd plugins update is invoked with no arguments"],
+      "then": [
+        "all plugins from config.plugins.agents are selected for update",
+        "AND the command does not call kernel.project.listPlugins"
+      ]
+    },
+    {
+      "requirement": "Declaration source",
+      "name": "Declaration read does not use ConfigWriter.listPlugins",
+      "given": ["a loaded SpecdConfig snapshot is available"],
+      "when": ["specd plugins update resolves the declared plugin set"],
+      "then": ["it reads config.plugins in memory", "AND it does not call ConfigWriter.listPlugins"]
+    },
+    {
       "requirement": "Exit code",
       "name": "Update failure",
       "when": ["any plugin fails to update"],
@@ -75,9 +98,33 @@
       "then": ["output is machine-parseable JSON with plugin names and status"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:plugins-update",
+        "file": "cli:src/commands/plugins/get-declared-plugins.ts",
+        "symbol": "getDeclaredPlugins"
+      },
+      {
+        "specId": "cli:plugins-update",
+        "file": "cli:src/commands/project/update.ts",
+        "symbol": "registerProjectUpdate"
+      },
+      {
+        "specId": "cli:plugins-update",
+        "file": "cli:src/commands/plugins/update.ts",
+        "symbol": "updatePluginsWithKernel"
+      },
+      {
+        "specId": "cli:plugins-update",
+        "file": "cli:src/commands/plugins/update.ts",
+        "symbol": "registerPluginsUpdate"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:1ac372c8f7c79d790bdf7fb1c84a80ba9a3082f3557d2326f9c1944837ea1179",
-    "verify.md": "sha256:8b424d9aa8856ee1600dd235137d2b141a6c71a12c04d421e18c67e5e3eafb6c"
+    "spec.md": "sha256:ebab0228dbc104363352f701cab90b6d20667c99bb83921e47f55f2dbb9072d7",
+    "verify.md": "sha256:be71410fdab03fbe7cf7cb7bb51f1bf4ab9a3b1a3178784d477caa30ea841547"
   },
   "generatedBy": "core"
 }

@@ -1,0 +1,16 @@
+- op: added
+  description: Verify delivery does not thread config through execute inputs
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Composition layer for use-case wiring'
+  content: |
+    #### Scenario: Kernel use cases receive config at construction
+
+    - **GIVEN** a delivery mechanism has called `createKernel(config)` with a resolved `SpecdConfig`
+    - **WHEN** it invokes a kernel use case other than `getConfig`
+    - **THEN** it does not pass `config` or config-derived approval/plugin subtrees in the `execute()` input
+    - **AND** it reads config from `kernel.project.getConfig.execute()` when a fresh snapshot is needed

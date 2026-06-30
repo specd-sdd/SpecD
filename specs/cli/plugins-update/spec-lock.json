@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["plugin-manager:update-plugin-use-case", "core:get-config"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/plugins/get-declared-plugins.ts",
+      "symbols": ["getDeclaredPlugins"]
+    },
+    {
+      "file": "cli:src/commands/project/update.ts",
+      "symbols": ["registerProjectUpdate"]
+    },
+    {
+      "file": "cli:src/commands/plugins/update.ts",
+      "symbols": ["updatePluginsWithKernel", "registerPluginsUpdate"]
+    }
+  ]
+}

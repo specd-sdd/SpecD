@@ -36,18 +36,26 @@ Unknown fields MUST NOT be represented in the structured value collection for ge
 
 ### Requirement: Application layer
 
-The application layer MUST include an `InstallSkills` use case that:
+The application layer MUST have an `InstallSkills` use case that orchestrates:
 
-1. reads skills from `@specd/skills`
-2. resolves the per-skill frontmatter source value collection
-3. declares only the Open Code-supported capability identifiers
-4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
-5. passes `variables.sharedFolder` only when overriding the default shared path contract
-6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`
-7. writes files marked as shared to the rendered `sharedFolder` location under the project root
+1. Get skills via `@specd/skills`
+2. Resolve Open Code frontmatter source values for each skill
+3. Declare only the Open Code supported capability identifiers (`['mcp', 'agents', 'frontmatter']`)
+4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
+5. Pass `variables.sharedFolder` only when overriding the default shared path contract
+6. Install files not marked as shared to categorized directories relative to `projectRoot`:
+   - Skills to `.opencode/skills/<skill-name>/`
+   - Agents to `.opencode/agents/<agent-name>/`
+7. Install files marked as shared to the rendered `sharedFolder` location under the project root
+8. Fallback: If `agents` capability is missing, install agents into the same directory as the shared context file.
+9. Sub-agent Mapping: When installing an agent, the plugin MUST:
+   - Set `mode: "subagent"` in the YAML frontmatter.
+   - Transform `allowedTools` (e.g., `Bash`, `Read`) into a YAML permissions list (e.g., `- bash: allow`, `- read: allow`).
+   - Prepend the rendered system prompt with the generated YAML frontmatter.
 
-The plugin MUST NOT prepend YAML frontmatter after bundle resolution.
+The plugin MUST NOT prepend YAML frontmatter for standard skills after bundle resolution.
 The plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.
+The plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants.
 
 ### Requirement: Frontmatter injection
 
@@ -75,13 +83,15 @@ The `@specd/specd` meta package MUST declare `@specd/plugin-agent-opencode` as a
 
 ### Requirement: Uninstall behavior
 
-`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.
+`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` and agent files from `.opencode/agents/` relative to `config.projectRoot`.
 
 When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
 
-When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.
+When `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.opencode/agents/`.
 
-Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` that are not part of the specd-managed skill set.
+When no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.opencode/agents/`, and the resolved sharedFolder location.
+
+Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` or `.opencode/agents/` that are not part of the specd-managed skill or agent set.
 
 ## Constraints
 
@@ -94,7 +104,8 @@ Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills
 ## Spec Dependencies
 
 - [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
-- [`plugin-manager:agent-plugin-type`](../../plugins-manager/agent-plugin-type/spec.md) — defines the `AgentPlugin` install/uninstall contract
-- [`skills:skill-bundle`](../../skills/skill-bundle/spec.md) — shared bundle file routing contract
-- [`skills:skill-templates-source`](../../skills/skill-templates-source/spec.md) — defines template source and plugin-side frontmatter injection responsibility
-- [`skills:resolve-bundle`](../../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
+- [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
+- [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
+- [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.

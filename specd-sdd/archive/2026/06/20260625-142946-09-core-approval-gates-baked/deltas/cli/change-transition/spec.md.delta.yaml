@@ -1,0 +1,14 @@
+- op: modified
+  description: CLI no longer passes approval flags to TransitionChange
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing'
+  content: |
+    The CLI MUST NOT pass approval gate flags to `TransitionChange.execute`. Approval routing uses gate state baked into the kernel's `TransitionChange` instance from `config.approvals` at kernel construction.
+
+    The use case, via `LifecycleEngine`, applies smart routing:
+
+    - When the change is in `ready` and `config.approvals.spec` is `true`, `implementing` is silently routed to `pending-spec-approval`
+    - When the change is in `done` and `config.approvals.signoff` is `true`, `archivable` is silently routed to `pending-signoff`
+
+    The user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target.

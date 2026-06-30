@@ -13,19 +13,21 @@
 #### Scenario: Changes group contains all change use cases
 
 - **WHEN** `kernel.changes` is inspected
-- **THEN** it contains entries for: `create`, `status`, `transition`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
+- **THEN** it contains entries for: `create`, `status`, `transition`, `approveSpec`, `approveSignoff`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
 - **AND** it contains `repo` as the underlying `ChangeRepository`
 
 #### Scenario: Specs group contains all spec use cases
 
 - **WHEN** `kernel.specs` is inspected
-- **THEN** it contains entries for: `approveSpec`, `approveSignoff`, `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+- **THEN** it contains entries for: `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+- **AND** it does not contain `approveSpec` or `approveSignoff`
 - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
 
-#### Scenario: Project group contains all project use cases
+#### Scenario: Project group contains query use cases only
 
 - **WHEN** `kernel.project` is inspected
-- **THEN** it contains entries for: `init`, `recordSkillInstall`, `getSkillsManifest`, `getProjectContext`
+- **THEN** it contains entries for: `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
+- **AND** it does not contain `init`, `addPlugin`, `removePlugin`, `listPlugins`, `recordSkillInstall`, or `getSkillsManifest`
 
 ### Requirement: Every exported use case must have a kernel entry
 
@@ -59,6 +61,80 @@
 - **GIVEN** a new use case is wired into `createKernel` under `kernel.changes.newUseCase`
 - **WHEN** the kernel spec is reviewed
 - **THEN** the entry mapping table must include the new path — omitting it is a spec violation
+
+#### Scenario: getConfig is wired as GetConfig
+
+- **WHEN** `kernel.project.getConfig` is inspected after `createKernel(config)`
+- **THEN** it is an instance of `GetConfig`
+- **AND** `kernel.project.getConfig.execute()` returns a `Readonly<SpecdConfig>`
+
+### Requirement: Plugin declarations are not a kernel use case
+
+#### Scenario: kernel.project does not expose listPlugins
+
+- **WHEN** `kernel.project` is inspected after `createKernel(config)`
+- **THEN** it does not contain a `listPlugins` entry
+- **AND** `'listPlugins' in kernel.project` is false
+
+#### Scenario: Plugin declarations available on getConfig snapshot
+
+- **GIVEN** `specd.yaml` declares plugins under `plugins.agents`
+- **WHEN** `kernel.project.getConfig.execute()` is called
+- **THEN** the returned `SpecdConfig` includes a `plugins` field with the declared agent plugins
+- **AND** no additional disk read through `ConfigWriter.listPlugins` is required to obtain those declarations
+
+### Requirement: Config mutation is not a kernel use case
+
+#### Scenario: kernel.project does not expose config mutation entries
+
+- **WHEN** `kernel.project` is inspected after `createKernel(config)`
+- **THEN** it does not contain `init`, `addPlugin`, or `removePlugin`
+- **AND** `'init' in kernel.project`, `'addPlugin' in kernel.project`, and `'removePlugin' in kernel.project` are all false
+
+#### Scenario: InitProject use case is not exported
+
+- **WHEN** `@specd/core` public exports are inspected
+- **THEN** `InitProject`, `AddPlugin`, `RemovePlugin`, `createInitProject`, `createAddPlugin`, and `createRemovePlugin` are not among them
+- **AND** `createConfigWriter` is exported
+
+### Requirement: Skills manifest use cases are not a kernel use case
+
+#### Scenario: kernel.project does not expose skills manifest entries
+
+- **WHEN** `kernel.project` is inspected after `createKernel(config)`
+- **THEN** it does not contain `recordSkillInstall` or `getSkillsManifest`
+- **AND** `'recordSkillInstall' in kernel.project` and `'getSkillsManifest' in kernel.project` are both false
+
+#### Scenario: Skills manifest use cases are not exported
+
+- **WHEN** `@specd/core` public exports are inspected
+- **THEN** `RecordSkillInstall`, `GetSkillsManifest`, `createRecordSkillInstall`, and `createGetSkillsManifest` are not among them
+
+### Requirement: Kernel use case execute inputs must not re-pass construction-time config
+
+#### Scenario: CompileContext input has no config field
+
+- **WHEN** `CompileContextInput` is inspected
+- **THEN** it does not declare a `config` property
+
+#### Scenario: GetProjectContext input has no config field
+
+- **WHEN** `GetProjectContextInput` is inspected
+- **THEN** it does not declare a `config` property
+
+#### Scenario: GetConfig returns construction-time snapshot without input
+
+- **WHEN** `kernel.project.getConfig.execute()` is called
+- **THEN** it requires no execute input
+- **AND** it returns the `SpecdConfig` baked at `createKernel` time
+
+### Requirement: Allowed runtime override inputs
+
+#### Scenario: CompileContext permits documented override fields only
+
+- **WHEN** `CompileContextInput` is inspected
+- **THEN** its optional fields are limited to the documented override set (`contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint`) plus required per-call identifiers (`name`, `step`)
+- **AND** it does not declare `config` or approval gate fields
 
 ### Requirement: Kernel entries must match use case types
 

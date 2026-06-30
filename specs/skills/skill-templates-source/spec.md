@@ -8,46 +8,54 @@ Defines how skill templates are sourced, stored, rendered, and linked to shared 
 
 ### Requirement: Template source location
 
-Template files MUST live in `packages/skills/templates/<skill-name>/` using the `.md.tpl` extension.
+Template files MUST live in categorized subdirectories under `packages/skills/templates/`:
 
-Each skill template directory MUST also contain a `skill.meta.json` file.
+- `packages/skills/templates/skills/<skill-name>/` using the `SKILL.md.tpl` convention for standard skills.
+- `packages/skills/templates/agents/<agent-name>/` using the `SPECD-AGENT.md.tpl` convention for specialized agents.
 
-Installed skill files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix.
+All template source files MUST use the `.md.tpl` extension.
+
+Each skill or agent template directory MUST also contain a metadata file:
+
+- `skill.meta.json` for skills.
+- `specd-agent.meta.json` for agents.
+
+Metadata files (`skill.meta.json` and `specd-agent.meta.json`) share the same schema and serve the same purpose: declaring required capabilities and shared template dependencies. The different filenames are used strictly as discriminators for internal discovery and categorization.
+
+Installed files rendered from those templates MUST be emitted as `.md` files after removing the trailing `.tpl` suffix.
 
 ### Requirement: Template migration
 
-The template directory MUST contain:
+The template directory structure SHALL be:
 
-- `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, `specd-verify/` directories
-- a `shared/` directory for shared template source files
+- `templates/skills/` — contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`.
+- `templates/agents/` — contains specialized agents such as `specd-project-context-optimizer` and `specd-spec-context-optimizer`.
+- `templates/shared/` — contains shared template source files like `shared.md.tpl`.
 
-Each skill directory contains template files ending in `.md.tpl` plus a `skill.meta.json` file that declares the skill's template contract.
+Each skill or agent directory contains its respective template file (`SKILL.md.tpl` or `SPECD-AGENT.md.tpl`) plus its metadata contract file.
 
 The current inverse consumer index model in `shared.meta.json` MUST NOT remain the source of truth for which skills consume shared templates.
 
-### Requirement: Skill template metadata contract
+### Requirement: Template metadata contract (skills and agents)
 
-Each skill template directory MUST declare a `skill.meta.json` file with this shape:
+Each skill or agent template directory MUST declare a metadata file (`skill.meta.json` or `specd-agent.meta.json`) with this shape:
 
 ```json
 {
+  "kind": "skill" | "agent",
   "supportedCapabilities": ["mcp", "agents", "frontmatter"],
   "requiredCapabilities": [],
   "requiredSharedTemplates": ["shared.md"]
 }
 ```
 
-`supportedCapabilities` declares the capability identifiers that templates in that skill directory are allowed to reference.
+`kind` (required) MUST categorize the template as a standard `skill` or a specialized `agent`. This value MUST match the parent directory name (`skills/` or `agents/`).
 
-`requiredCapabilities` declares the capability identifiers that MUST be present for the skill's templates to be installable.
+`supportedCapabilities` declares the capability identifiers that templates in that directory are allowed to reference.
 
-`requiredSharedTemplates` declares the shared template filenames that the skill requires.
+`requiredCapabilities` declares the capability identifiers that MUST be present for the templates to be installable.
 
-The initial required capability identifiers that the system MUST recognize are:
-
-- `mcp`
-- `agents`
-- `frontmatter`
+`requiredSharedTemplates` declares the shared template filenames required by the templates.
 
 ### Requirement: Capability-aware install-time rendering
 
@@ -77,6 +85,17 @@ Workflow skill templates that instruct agents to run `specd graph impact` SHALL 
 - **file selectors** — blast-radius queries over files use `--file`, including multiple file inputs when needed; templates MUST NOT instruct agents to use `--changes`
 
 Templates MUST NOT ask for "downstream dependents" or otherwise describe `downstream` as dependents. When a skill needs the blast radius of changing a symbol or file, it SHALL use `--direction dependents` or describe the query as dependents. When a workflow needs the blast radius of several files, it SHALL use `specd graph impact --file <path1> <path2> ...` rather than a separate change-detection selector.
+
+### Requirement: Graph search snippet guidance in workflow templates
+
+Workflow skill templates that instruct agents to run `specd graph search` SHALL describe snippet previews as opt-in output.
+
+Specifically:
+
+- templates MUST NOT imply that `specd graph search` always returns visible snippet content by default
+- when a workflow example or instruction depends on reading preview text, the template SHALL include `--snippet`
+- when a workflow only needs identifiers, locations, or structured metadata, templates SHOULD omit `--snippet`
+- workflow guidance that mentions `json` or `toon` output SHALL describe the `snippet` field as omitted unless `--snippet` is passed
 
 ### Requirement: Frontmatter source
 

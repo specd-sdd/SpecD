@@ -4,7 +4,10 @@ import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
+import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
+import { type ApprovalGates } from './transition-change.js'
 
 /** Input for the {@link ApproveSignoff} use case. */
 export interface ApproveSignoffInput {
@@ -12,8 +15,6 @@ export interface ApproveSignoffInput {
   readonly name: string
   /** Free-text rationale recorded in the signoff event. */
   readonly reason: string
-  /** Whether the signoff gate is enabled in the active configuration. */
-  readonly approvalsSignoff: boolean
 }
 
 /**
@@ -28,6 +29,7 @@ export class ApproveSignoff {
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
   private readonly _hasher: ContentHasher
+  private readonly _approvals: ApprovalGates
 
   /**
    * Creates a new `ApproveSignoff` use case instance.
@@ -36,17 +38,20 @@ export class ApproveSignoff {
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param hasher - Content hasher for computing artifact hashes
+   * @param approvals - Whether approval gates are active in the project configuration
    */
   constructor(
     changes: ChangeRepository,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
     hasher: ContentHasher,
+    approvals: ApprovalGates,
   ) {
     this._changes = changes
     this._actor = actor
     this._schemaProvider = schemaProvider
     this._hasher = hasher
+    this._approvals = approvals
   }
 
   /**
@@ -57,18 +62,29 @@ export class ApproveSignoff {
    * @throws {ApprovalGateDisabledError} If the signoff gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {InvalidStateTransitionError} If the change is not in `pending-signoff` state
+   * @throws {SchemaMismatchError} If the change schema differs from the active schema
    */
   async execute(input: ApproveSignoffInput): Promise<Change> {
-    if (!input.approvalsSignoff) {
+    if (!this._approvals.signoff) {
       throw new ApprovalGateDisabledError('signoff')
     }
 
+    const change = await this._changes.get(input.name)
+    if (change === null) {
+      throw new ChangeNotFoundError(input.name)
+    }
+
     const actor = await this._actor.identity()
-    return this._changes.mutate(input.name, async (change) => {
-      const artifactHashes = await this._computeArtifactHashes(change)
-      change.recordSignoff(input.reason, artifactHashes, actor)
-      change.transition('signed-off', actor)
-      return change
+    const schema = await this._schemaProvider.get()
+    if (schema.name() !== change.schemaName) {
+      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    }
+
+    return this._changes.mutate(input.name, async (freshChange) => {
+      const artifactHashes = await this._computeArtifactHashes(freshChange)
+      freshChange.recordSignoff(input.reason, artifactHashes, actor)
+      freshChange.transition('signed-off', actor)
+      return freshChange
     })
   }
 

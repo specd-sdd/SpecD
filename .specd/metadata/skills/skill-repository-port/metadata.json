@@ -60,5 +60,7 @@
     "spec.md": "sha256:f15f4aa3d875deebcb8255847c09c903b1359b075be2681d35d1217d77a68629",
     "verify.md": "sha256:d7812b57a78f408a8e1116092c0a62419b1beb74ed68f85a06787031cb0c6da2"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Abstract interface for skill storage.",
+  "optimizedContext": "# skills:skill-repository-port\n\n## Rules\n- SkillRepositoryPort interface: SkillRepositoryPort MUST define the same interface as SkillRepository: - list(): Skill[] - get(name: string): Skill | undefined - getBundle(name: string, variables?:…\n- Port abstraction: The port is an abstract interface.\n- Dependencies: core:config, skills:skill, skills:skill-bundle\n\n## Constraints\n- The port interface MUST NOT contain any I/O code.\n"
 }

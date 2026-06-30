@@ -15,13 +15,19 @@
     {
       "requirement": "AgentInstallOptions",
       "rules": [
-        "```typescript\ntype TemplateVariable =\n  | string\n  | number\n  | boolean\n  | readonly TemplateVariable[]\n  | { readonly [key: string]: TemplateVariable }\n\ninterface AgentInstallOptions {\n  skills?: string[] // specific skill names; omit = all\n  variables?: Record<string, TemplateVariable> // recursive template variables, including variables.frontmatter and variables.sharedFolder\n  capabilities?: string[] // capability identifiers supported by the target runtime\n}\n```\n\n`capabilities` MUST be supplied as a simple collection of capability identifiers by the agent plugin at install time. The initial required capability identifiers are `mcp`, `agents`, and `frontmatter`.\n\nTheir initial required meanings are:\n\n- `mcp`: the target runtime supports MCP-oriented template branches\n- `agents`: the target runtime supports delegated-agent-oriented template branches\n- `frontmatter`: the target runtime expects frontmatter to be composed and inserted from `variables.frontmatter`\n\nFrontmatter data MUST be passed through `variables.frontmatter`. Plugins MUST NOT pass a prebuilt YAML frontmatter document through `AgentInstallOptions`.\n\n`variables.sharedFolder`, when provided, MUST be relative to the project root and is subject to normalization and validation by `@specd/skills`."
+        "```typescript\ntype TemplateVariable =\n  | string\n  | number\n  | boolean\n  | readonly TemplateVariable[]\n  | { readonly [key: string]: TemplateVariable }\n\ninterface AgentInstallOptions {\n  skills?: string[] // specific skill names; omit = all\n  agents?: string[] // specific agent names; omit = all\n  variables?: Record<string, TemplateVariable> // recursive template variables, including variables.frontmatter and variables.sharedFolder\n  capabilities?: string[] // capability identifiers supported by the target runtime\n}\n```\n\n`capabilities` MUST be supplied as a simple collection of capability identifiers by the agent plugin at install time. The initial required capability identifiers are `mcp`, `agents`, and `frontmatter`.\n\nTheir initial required meanings are:\n\n- `mcp`: the target runtime supports MCP-oriented template branches\n- `agents`: the target runtime supports delegated-agent-oriented template branches\n- `frontmatter`: the target runtime expects frontmatter to be composed and inserted from `variables.frontmatter`\n\nFrontmatter data MUST be passed through `variables.frontmatter`. Plugins MUST NOT pass a prebuilt YAML frontmatter document through `AgentInstallOptions`.\n\n`variables.sharedFolder`, when provided, MUST be relative to the project root and is subject to normalization and validation by `@specd/skills`."
       ]
     },
     {
       "requirement": "AgentInstallResult",
       "rules": [
         "```typescript\ninterface AgentInstallResult {\n  installed: Array<{ skill: string; path: string }>\n  skipped: Array<{ skill: string; reason: string }>\n}\n```"
+      ]
+    },
+    {
+      "requirement": "Agent installation and fallback",
+      "rules": [
+        "When installing agents, the plugin SHALL determine the target directory based on the target runtime's conventions (e.g., `.claude/agents/`).\n\nIf the target runtime does NOT support specialized agents (i.e., the `agents` capability is missing), the plugin SHALL copy the agent template to the same directory as the shared context file (`shared.md`)."
       ]
     },
     {
@@ -63,12 +69,12 @@
     },
     {
       "requirement": "AgentInstallOptions",
-      "name": "Options include skills filter, recursive variables, and capability identifiers",
-      "when": ["AgentInstallOptions is used"],
+      "name": "Options include skills and agents filter, recursive variables, and capability identifiers",
+      "given": ["a request to install specific skills and agents"],
+      "when": ["AgentInstallOptions is provided"],
       "then": [
-        "it accepts an optional skills array",
-        "AND it accepts optional recursive variables",
-        "AND it accepts optional capabilities as a list of strings"
+        "it can filter by skills and agents arrays",
+        "AND it includes variables and capabilities"
       ]
     },
     {
@@ -114,15 +120,23 @@
         "it contains installed array with skill and path",
         "AND skipped array with skill and reason"
       ]
+    },
+    {
+      "requirement": "Agent installation and fallback",
+      "name": "Agent installed in agents directory",
+      "given": ["a runtime supports agents"],
+      "when": ["an agent is installed"],
+      "then": ["it is placed in the designated agents/ directory of the coding agent"]
+    },
+    {
+      "requirement": "Agent installation and fallback",
+      "name": "Agent fallback to shared directory",
+      "given": ["a runtime DOES NOT support agents"],
+      "when": ["an agent is installed"],
+      "then": ["it is copied to the same directory as shared.md"]
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "plugin-manager:agent-plugin-type",
-        "file": "plugin-manager:test/domain/types/is-agent-plugin.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "plugin-manager:agent-plugin-type",
@@ -132,8 +146,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:fe1d85c237ee0bd7f81257a778987c74ea9cffdad6c62c9aeee214cb04477887",
-    "verify.md": "sha256:e00ad11eece5e0e376156b03029a4ac9bba2bb609efb0d4f69208f6efc16914e"
+    "spec.md": "sha256:31f7942db1a5e5d33a7c354b1324cf4c97da0e475d6eefdde89478c3586e3bbc",
+    "verify.md": "sha256:f4bc738d25fec0cdccbc07b2da688159e5f5c6043b66984c3d3ef4f52e8efcf4"
   },
   "generatedBy": "core"
 }

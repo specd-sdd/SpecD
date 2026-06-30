@@ -72,9 +72,9 @@
       ]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "rules": [
-        "`GraphStore` SHALL provide:\n\n- **`searchSymbols(options: SearchOptions)`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order\n- **`searchSpecs(options: SearchOptions)`** — search spec title, description, and content, returning results ranked by relevance in descending order\n- **`searchDocuments(options: SearchOptions)`** — search document paths and textual content, returning results ranked by relevance in descending order\n- **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes\n\nSearch results MUST return match-aware **snippets** and the corresponding 1-based **line range** (`startLine` to `endLine`) from the source content.\n\nWhen a query exactly matches a canonical identity (Spec ID, Symbol Name/ID, Document Path), the store MUST prioritize that exact match at the top of the results, regardless of generic relevance scores.\n\n- **Exact Spec ID match**: prioritized first in Spec search.\n- **Exact Symbol Name/ID match**: prioritized first in Symbol search.\n- **Exact Document Path match**: prioritized first in Document search.\n\n`SearchOptions` is a value object with:\n\n- **query** — the search query string (required)\n- **limit** — maximum results to return (default 20)\n- **kind** — filter symbols by `SymbolKind` (symbols only)\n- **filePattern** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)\n- **workspace** — filter results to a single workspace\n- **excludePaths** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)\n- **excludeWorkspaces** — array of workspace names to exclude\n\nAll filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns.\n\nGeneric text matching (BM25 or equivalent) SHALL be used to rank the remaining hits."
+        "`GraphStore` SHALL provide:\n\n- **`searchSymbols(options: SearchOptions)`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order\n- **`searchSpecs(options: SearchOptions)`** — search spec title, description, and content, returning results ranked by relevance in descending order\n- **`searchDocuments(options: SearchOptions)`** — search document paths and textual content, returning results ranked by relevance in descending order\n- **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes\n\nSearch results MUST return match-aware **snippets** and the corresponding 1-based **line range** (`startLine` to `endLine`) from the source content.\n\nPrimary identity fields are:\n\n- **specs** — canonical `specId`\n- **symbols** — declared symbol `name` and canonical symbol `id`\n- **documents** — canonical `path`, and any persisted alternate path identity such as `configRelativePath` when the backend exposes it to search\n\nSearch ranking MUST prioritize primary-identity matches ahead of generic content-only matches, but MUST NOT narrow candidate retrieval to identity fields only. Generic text matching across the backend's searchable fields remains part of discovery.\n\nImplementations MAY supplement their backend-native full-text candidate set with additional identity-derived candidates when the backend tokenizer would otherwise miss a strong identity hit required by this contract. Identity-aware logic may therefore affect both candidate coverage and final ordering, as long as generic text retrieval remains available.\n\nImplementations MUST expand query tokens with a shared specd/code-aware lexical policy before applying identity-aware ranking. That expansion is lexical only — it does not classify user intent as “symbol”, “spec”, or “document”.\n\nRequired expansion behavior:\n\n- preserve each normalized original token\n- split on whitespace\n- split useful specd/code separators such as `:`, `/`, `_`, `.`, and `-`\n- split CamelCase and PascalCase boundaries\n\nExamples:\n\n- `core:change` expands to tokens including `core:change`, `core`, and `change`\n- `ArchiveChange` expands to tokens including `archivechange`, `archive`, and `change`\n\nRequired observable ordering:\n\n- **Exact canonical identity match** — prioritized first in its category.\n- **Exact primary-name or alternate identity match** — prioritized ahead of body-only/comment-only/content-only matches.\n- **Primary-identity prefix, suffix, or substring token match** — prioritized ahead of results whose relevance comes only from generic description, comment, or body-content frequency.\n- **Structured identity component or path-component match** — prioritized ahead of arbitrary substring-only matches on the same identity field.\n\nWhen a backend compares expanded query tokens against selected identity fields, token-strength MUST follow this order:\n\n1. exact token match: `x`\n2. prefix token match: `x%`\n3. suffix token match: `%x`\n4. substring token match: `%x%`\n\nFor structured identities such as spec ids and paths, a real component match (for example `core` in `core:change`) MUST rank above an arbitrary substring match (for example `core` in `score`).\n\nWhen multiple expanded query tokens match the same candidate's selected identity fields, that higher token coverage MUST improve ranking ahead of candidates matching fewer identity tokens.\n\nThis means, for example:\n\n- a spec whose `specId` contains the queried capability path MUST outrank unrelated specs that match only because the same word appears many times in their content\n- a symbol whose declared name matches the query intent MUST outrank symbols that match only through attached comments\n- a document whose path identity matches the query intent MUST outrank documents that match only through body text\n\n`SearchOptions` is a value object with:\n\n- **`query`** — the search query string (required)\n- **`limit`** — maximum results to return (default `20`)\n- **`kind`** — filter symbols by `SymbolKind` (symbols only)\n- **`filePattern`** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)\n- **`workspace`** — filter results to a single workspace\n- **`excludePaths`** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)\n- **`excludeWorkspaces`** — array of workspace names to exclude\n\nAll filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns.\n\nGeneric text matching (BM25 or equivalent) SHALL still participate in retrieval and SHALL rank the remaining hits after primary-identity preference is applied."
       ]
     },
     {
@@ -268,21 +268,21 @@
       ]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Symbol search matches normalized compound names",
       "given": ["symbols createUser, deleteUser, and listOrders are indexed"],
       "when": ["searchSymbols({ query: 'user' }) is called"],
       "then": ["createUser and deleteUser are returned ahead of unrelated symbols"]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Symbol search includes comments",
       "given": ["a symbol with comment text containing Validates the user's authentication token"],
       "when": ["searchSymbols({ query: 'authentication token' }) is called"],
       "then": ["that symbol is returned"]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Symbol search result includes file-backed snippet",
       "given": ["a matching symbol with a persisted source file and recorded location"],
       "when": ["searchSymbols(...) returns that symbol"],
@@ -291,7 +291,7 @@
       ]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Spec search matches description and content",
       "given": [
         "a spec whose description mentions adapter parsing",
@@ -301,27 +301,27 @@
       "then": ["the matching spec is returned in each case with a relevance score"]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Spec search result includes snippet",
       "when": ["searchSpecs(...) returns a matching spec"],
       "then": ["each result includes a snippet preview explaining the hit"]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Exact Spec ID match is prioritized first",
       "given": ["a spec with ID core:change", "AND a search query core:change"],
       "when": ["the spec search is executed"],
       "then": ["the spec core:change appears as the first result"]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Exact Document Path match is prioritized first",
       "given": ["a document with path root:package.json", "AND a search query root:package.json"],
       "when": ["the document search is executed"],
       "then": ["the document root:package.json appears as the first result"]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Filters are applied before limiting results",
       "given": ["more than 20 matching symbols exist across multiple workspaces"],
       "when": ["searchSymbols({ query: 'hook', workspace: 'core', limit: 5 }) is called"],
@@ -331,14 +331,14 @@
       ]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Search indexes can be rebuilt explicitly",
       "given": ["a backend whose search indexes are not auto-maintained during bulk writes"],
       "when": ["rebuildFtsIndexes() is called after bulk data changes"],
       "then": ["subsequent abstract search queries see the new symbols and specs"]
     },
     {
-      "requirement": "Search with exact-match prioritization",
+      "requirement": "Search with primary-identity prioritization",
       "name": "Persisted file content does not introduce file search surface",
       "given": ["a backend persists file source content for symbol snippet extraction"],
       "when": ["consumers use the abstract search contract"],
@@ -346,6 +346,115 @@
         "the contract exposes search across symbols, specs, and documents only",
         "AND no separate file full-text search category is implied by persisted file content"
       ]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Spec-id segment outranks content-only hit",
+      "given": [
+        "a spec with ID default:_global/architecture",
+        "AND another spec contains architecture repeatedly only in its body content"
+      ],
+      "when": ["searchSpecs({ query: 'architecture' }) is executed"],
+      "then": ["the spec-id hit appears ahead of the content-only hit"]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Symbol declared name outranks comment-only hit",
+      "given": [
+        "a symbol whose declared name is SearchSpecs",
+        "AND another symbol contains search specs only in its comment text"
+      ],
+      "when": ["searchSymbols({ query: 'SearchSpecs' }) is executed"],
+      "then": ["the declared-name hit appears ahead of the comment-only hit"]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Document path component outranks body-only hit",
+      "given": [
+        "a document whose canonical path contains graph-search",
+        "AND another document contains graph search only in its body content"
+      ],
+      "when": ["searchDocuments({ query: 'graph-search' }) is executed"],
+      "then": ["the path-identity hit appears ahead of the body-only hit"]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Search expands specd-shaped tokens before identity ranking",
+      "given": [
+        "a spec with ID core:change",
+        "AND another spec mentions core change only in body content"
+      ],
+      "when": ["searchSpecs({ query: 'core:change' }) is executed"],
+      "then": [
+        "the backend may use tokens including core:change, core, and change",
+        "AND the spec-id hit appears ahead of the body-only hit"
+      ]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Strong identity hit may be discovered outside backend-native FTS tokenization",
+      "given": [
+        "a backend whose native tokenizer does not surface every suffix or substring identity hit through its default full-text candidate set",
+        "AND one candidate still has the strongest observable identity evidence required by this contract"
+      ],
+      "when": ["searchSymbols(...), searchSpecs(...), or searchDocuments(...) is executed"],
+      "then": [
+        "that strong identity hit is still returned",
+        "AND it is ordered according to the required identity-strength ladder rather than being dropped for lack of native tokenizer coverage"
+      ]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Search expands CamelCase tokens before identity ranking",
+      "given": [
+        "a symbol named ArchiveChange",
+        "AND another symbol contains archive change only in comment text"
+      ],
+      "when": ["searchSymbols({ query: 'ArchiveChange' }) is executed"],
+      "then": [
+        "the backend may use tokens including archivechange, archive, and change",
+        "AND the declared-name hit appears ahead of the comment-only hit"
+      ]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Exact token match outranks prefix token match",
+      "given": [
+        "one candidate identity matches token change exactly",
+        "AND another candidate identity matches change only by prefix"
+      ],
+      "when": ["searchSymbols({ query: 'change' }) is executed"],
+      "then": ["the exact-token hit appears ahead of the prefix-only hit"]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Prefix token match outranks suffix token match",
+      "given": [
+        "one candidate identity matches token repo by prefix",
+        "AND another candidate identity matches repo only by suffix"
+      ],
+      "when": ["searchSymbols({ query: 'repo' }) is executed"],
+      "then": ["the prefix-token hit appears ahead of the suffix-only hit"]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Suffix token match outranks arbitrary substring token match",
+      "given": [
+        "one candidate identity matches token repository by suffix",
+        "AND another candidate identity matches repository only as an arbitrary substring"
+      ],
+      "when": ["searchDocuments({ query: 'repository' }) is executed"],
+      "then": ["the suffix-token hit appears ahead of the arbitrary-substring hit"]
+    },
+    {
+      "requirement": "Search with primary-identity prioritization",
+      "name": "Real identity component outranks arbitrary substring match",
+      "given": [
+        "one spec ID is core:change",
+        "AND another spec ID contains substring core only inside a larger token such as score"
+      ],
+      "when": ["searchSpecs({ query: 'core' }) is executed"],
+      "then": ["the real component match appears ahead of the arbitrary-substring hit"]
     },
     {
       "requirement": "Query methods",
@@ -465,20 +574,45 @@
     "files": [
       {
         "specId": "code-graph:graph-store",
-        "file": "code-graph:test/helpers/in-memory-graph-store.ts"
+        "file": "code-graph:test/domain/ports/graph-store.contract.ts"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/domain/services/expand-search-query.ts"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/index.ts"
       }
     ],
     "symbols": [
       {
         "specId": "code-graph:graph-store",
-        "file": "code-graph:src/domain/ports/graph-store.ts",
-        "symbol": "GraphStore"
+        "file": "code-graph:test/helpers/in-memory-graph-store.ts",
+        "symbol": "InMemoryGraphStore"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:test/helpers/in-memory-graph-store.ts",
+        "symbol": "searchSymbols"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:test/helpers/in-memory-graph-store.ts",
+        "symbol": "searchSpecs"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:test/helpers/in-memory-graph-store.ts",
+        "symbol": "searchDocuments"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3fa6f4907a82ed47b18af78ecd26cc47ad360659308d79fb71d1520bb969a7c8",
-    "verify.md": "sha256:26490d339391c88fa2f6d25acdf50440f90bf1c464228b57479bbce3ca4c5005"
+    "spec.md": "sha256:8582856c5cb16bbf0d0096bda70aee0e4bc9b5cb7fe608ad6bcd45162ac9b1ac",
+    "verify.md": "sha256:b8789fa1695a0c1a672455eaaeb09bb26bbc6848c40adc572644f11847686426"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Abstract durable graph persistence contract: atomic mutations, traversal/query APIs, search, stats, docs, backend-agnostic semantics.",
+  "optimizedContext": "# Graph Store\n## Rules\n- `GraphStore` abstract class in `domain/ports/`; ctor `storagePath`; concrete backend owns schema, layout, engine details.\n- Persist minimum semantics: `FileNode`, `SymbolNode`, `SpecNode`, `DocumentNode`, full file `content`, metadata `lastIndexedAt`, `lastIndexedRef`, graph fingerprint.\n- Persist relation families: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`.\n- `COVERS_FILE` links spec->file. `COVERS_SYMBOL` links spec->symbol and may carry `metadata.stale`.\n- Lifecycle explicit: `open()` and `close()`. Any query/mutation outside open lifecycle throws `StoreNotOpenError`.\n- `recreate()` performs destructive backend reset. Callers use this, never backend file deletion.\n- `upsertFile(file, symbols, relations)` atomically replaces file-local graph state. Failure preserves previous state.\n- `addRelations(relations)` additive only; used for cross-file relations.\n- `removeFile(filePath)` atomically removes file, owned symbols, all incident relations.\n- Query surface includes file/symbol/spec lookup, config-relative file lookup, callers/callees, imports, extends/implements/overrides, spec dependency/coverage traversal, `findSymbols(query)`.\n- Search surface includes `searchSymbols`, `searchSpecs`, `searchDocuments`, `rebuildFtsIndexes()`; results include snippet plus 1-based `startLine`/`endLine`.\n- Search ranking expands whitespace, `:`, `/`, `_`, `.`, `-`, CamelCase/PascalCase tokens; rank exact canonical identity first, then exact primary identity, prefix, suffix, substring, real component, then generic text. More identity-token coverage ranks higher.\n- `getStatistics()` returns file/symbol/spec counts, relation counts, languages, `lastIndexedAt`, `lastIndexedRef`, `graphFingerprint`.\n- Spec ops: `upsertSpec(spec, relations)`, `removeSpec(specId)`. Bulk ops: `clear()`, `getAllFiles()`, `getAllSpecs()`.\n## Constraints\n- Abstract port, not backend schema contract.\n- Atomic file/spec mutation semantics; no partial committed state.\n- Persisted file content exists for symbol snippets; no separate file search category implied.\n- `recreate()` owns destructive reset boundary.\n- No `@specd/core` dependency; store errors extend `CodeGraphError`."
 }

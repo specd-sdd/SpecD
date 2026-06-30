@@ -43,18 +43,6 @@
 - **THEN** the result includes a `blockers` array
 - **AND** it contains at least one entry with `code: 'ARTIFACT_DRIFT'`
 
-### Requirement: Read paths do not amplify artifact-drift invalidation
-
-Repeated status polls with unchanged drift scope MUST NOT append additional `invalidated` history or rewrite manifests.
-
-#### Scenario: Repeated GetStatus with unchanged drift does not grow history
-
-- **GIVEN** a change in `designing` with a persisted `artifact-drift` invalidation
-- **AND** on-disk artifact content still reflects the same drift scope
-- **WHEN** `GetStatus.execute()` is called twice in succession for the same change name
-- **THEN** the history length after the second call equals the history length after the first call
-- **AND** the change remains in `designing`
-
 #### Scenario: Result includes specDependsOn
 
 - **GIVEN** a change with declared spec dependencies in its manifest
@@ -114,14 +102,32 @@ Repeated status polls with unchanged drift scope MUST NOT append additional `inv
 - **THEN** the result includes tracked implementation files with review state
 - **AND** confirmed implementation links including file-level links and symbol-level refinements
 
-### Requirement: Read-only implementation tracking
+### Requirement: Optional pre-read implementation tracking refresh
 
-#### Scenario: GetStatus does not invoke detector
+#### Scenario: GetStatus does not invoke detector directly
 
 - **GIVEN** a change has entered `implementing` at least once
 - **WHEN** `GetStatus.execute()` is called
-- **THEN** it does not invoke `ImplementationDetector`
-- **AND** it does not mutate tracked implementation files
+- **THEN** it does not invoke `ImplementationDetector` directly
+- **AND** it does not duplicate refresh merge logic
+
+#### Scenario: Active change refreshes by default
+
+- **GIVEN** an active change exists in `changes/` storage
+- **WHEN** `GetStatus.execute({ name })` is called without `refreshImplementationTracking`
+- **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before loading status
+
+#### Scenario: Draft-only read skips refresh
+
+- **GIVEN** a change exists only under `drafts/` storage
+- **WHEN** `GetStatus.execute({ name })` is called
+- **THEN** it does not invoke `RefreshImplementationTracking`
+
+#### Scenario: Explicit opt-out skips refresh
+
+- **GIVEN** an active change exists in `changes/` storage
+- **WHEN** `GetStatus.execute({ name, refreshImplementationTracking: false })` is called
+- **THEN** it does not invoke `RefreshImplementationTracking`
 
 ### Requirement: Drift-aware display status
 
@@ -291,49 +297,11 @@ Repeated status polls with unchanged drift scope MUST NOT append additional `inv
 - **WHEN** `GetStatus.execute({ name: 'add-login' })` is called
 - **THEN** the use case resolves the named change from the repository
 
-### Requirement: Optional ifModifiedSince short-circuit
+#### Scenario: refreshImplementationTracking defaults to enabled
 
-#### Scenario: Matching revision returns unchanged
-
-- **GIVEN** change `foo` has `updatedAt` `2026-05-25T10:00:00.000Z`
-- **WHEN** `GetStatus` runs with `ifModifiedSince` equal to that timestamp
-- **THEN** result includes `unchanged: true`
-- **AND** full artifact DAG is not built
-
-#### Scenario: Newer change returns full status
-
-- **GIVEN** disk manifest `updatedAt` is newer than client `ifModifiedSince`
-- **WHEN** `GetStatus` executes
-- **THEN** `unchanged` is false or omitted
-- **AND** full status payload including artifact DAG is returned
-
-#### Scenario: Omitted ifModifiedSince always builds DAG
-
-- **WHEN** `GetStatus` runs without `ifModifiedSince`
-- **THEN** full status is computed
-- **AND** `unchanged` is not set to true
-
-### Requirement: Exposes updatedAt
-
-#### Scenario: Status projection includes updatedAt
-
-- **WHEN** `GetStatus` returns a full status payload
-- **THEN** change projection includes ISO `updatedAt`
-- **AND** value matches manifest revision clock
-
-#### Scenario: Short-circuit still returns updatedAt
-
-- **GIVEN** `ifModifiedSince` matches current revision
-- **WHEN** short-circuit path runs
-- **THEN** result still includes `updatedAt`
-- **AND** client can store it for next poll
-
-#### Scenario: API presenter forwards updatedAt unchanged
-
-- **GIVEN** kernel status includes `updatedAt`
-- **WHEN** API maps to change status DTO
-- **THEN** DTO `updatedAt` equals kernel value
-- **AND** Studio tab poll can compare revisions
+- **GIVEN** an active change exists
+- **WHEN** `GetStatus.execute({ name })` is called without `refreshImplementationTracking`
+- **THEN** refresh runs before status projection
 
 ### Requirement: Constructor dependencies
 
@@ -341,7 +309,7 @@ Repeated status polls with unchanged drift scope MUST NOT append additional `inv
 
 - **GIVEN** `GetStatus` is assembled by the kernel
 - **WHEN** the use case is constructed
-- **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, and `LifecycleEngine`
+- **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, `LifecycleEngine`, and `RefreshImplementationTracking`
 
 ### Requirement: Identifies blockers
 

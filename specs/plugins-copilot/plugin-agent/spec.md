@@ -24,7 +24,7 @@ The implementation MUST return a valid `AgentPlugin` that:
 
 ### Requirement: Skill installation and frontmatter injection
 
-The plugin MUST install skills from `@specd/skills` and pass Copilot-compatible capability identifiers plus frontmatter source values into markdown skill rendering during install.
+The plugin MUST install skills from `@specd/skills` and pass Copilot-compatible capability identifiers (`['frontmatter', 'agents']`) plus frontmatter source values into markdown skill rendering during install.
 
 Installation flow MUST:
 
@@ -34,11 +34,19 @@ Installation flow MUST:
 4. resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
 5. pass `variables.sharedFolder` only when overriding the default shared path contract
 6. write files marked as shared to the rendered `sharedFolder` location under the project root
-7. write files not marked as shared to the installed skill directory
-8. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files
-9. return an `InstallResult` with installed and skipped entries
+7. write files not marked as shared to categorized directories relative to `projectRoot`:
+   - Skills to `.github/skills/<skill-name>/`
+   - Agents to `.github/agents/<agent-name>.agent.md`
+8. Sub-agent Mapping: When installing an agent, the plugin MUST:
+   - Use the `.agent.md` suffix.
+   - Emit `tools` as a YAML list of strings.
+   - Prepend the rendered system prompt with the generated YAML frontmatter.
+9. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files
+10. return an `InstallResult` with installed and skipped entries
 
+The plugin MUST NOT prepend YAML frontmatter for standard skills after bundle resolution.
 The plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.
+The plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants.
 
 ### Requirement: Frontmatter field contract
 
@@ -62,13 +70,15 @@ The resolved shared location MUST NOT contain a `SKILL.md` file.
 
 ### Requirement: Uninstall behavior
 
-`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.github/skills/` relative to `config.projectRoot`.
+`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.github/skills/` and agent profiles from `.github/agents/` relative to `config.projectRoot`.
 
 When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
 
-When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.
+When `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.github/agents/`.
 
-Uninstall MUST NOT remove unrelated directories or files under `.github/skills/` that are not part of the specd-managed skill set.
+When no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.github/agents/`, and the resolved sharedFolder location.
+
+Uninstall MUST NOT remove unrelated directories or files under `.github/skills/` or `.github/agents/` that are not part of the specd-managed set.
 
 ## Constraints
 
@@ -84,3 +94,4 @@ Uninstall MUST NOT remove unrelated directories or files under `.github/skills/`
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — frontmatter injection responsibility and template source contract
 - [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.

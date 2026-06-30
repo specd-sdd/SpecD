@@ -4,10 +4,11 @@
 
 ### Requirement: list() method
 
-#### Scenario: List returns skills
+#### Scenario: List returns skills and agents with correct kind
 
 - **WHEN** `repository.list()` is called
-- **THEN** an array of Skill objects is returned
+- **THEN** it returns both skills and agents
+- **AND** each object has the correct `kind` property based on its source folder
 
 ### Requirement: get() method
 

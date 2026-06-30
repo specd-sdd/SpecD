@@ -6,14 +6,19 @@
 
 #### Scenario: Use case constructed via factory
 
-- **WHEN** a caller imports `createArchiveChange` from `@specd/core`
-- **THEN** calling it returns an `ArchiveChange` instance ready to execute
-- **AND** no port constructor (`FsChangeRepository`, `NodeHookRunner`, etc.) is imported by the caller
+- **WHEN** `createArchiveChange(config)` is called
+- **THEN** it returns a pre-wired `ArchiveChange` instance with all ports constructed internally
 
 #### Scenario: Use case constructors not exported
 
-- **WHEN** a caller attempts to import `ArchiveChange` class constructor from `@specd/core`
-- **THEN** the import is not available — `ArchiveChange` is not a named export of `index.ts`
+- **WHEN** `@specd/core` public exports are inspected
+- **THEN** use case class constructors are not among them — only factory functions
+
+#### Scenario: Config I/O factories return ports directly
+
+- **WHEN** `createConfigLoader()` or `createConfigWriter()` is called
+- **THEN** each returns a port instance (`ConfigLoader` or `ConfigWriter`)
+- **AND** neither wraps the port in a pass-through use-case class
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
@@ -65,6 +70,12 @@
 - **WHEN** a caller needs only `CreateChange`
 - **THEN** calling `createCreateChange(config)` directly returns a ready use case without requiring the full kernel
 
+#### Scenario: Approval gate use cases are grouped under changes
+
+- **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+- **THEN** `kernel.changes.approveSpec` and `kernel.changes.approveSignoff` are defined
+- **AND** `kernel.specs.approveSpec` and `kernel.specs.approveSignoff` are not defined
+
 ### Requirement: Composition layer exposes a kernel builder
 
 #### Scenario: Builder is a public alternative to createKernel
@@ -91,6 +102,27 @@
 
 - **WHEN** both `specd.yaml` and `specd.local.yaml` are present
 - **THEN** values in `specd.local.yaml` take precedence over values in `specd.yaml`
+
+### Requirement: ConfigWriter is an application port
+
+#### Scenario: createConfigWriter returns FsConfigWriter by default
+
+- **WHEN** `createConfigWriter()` is called without options
+- **THEN** it returns a `ConfigWriter` instance that can call `initProject`, `addPlugin`, and `removePlugin`
+
+#### Scenario: createConfigWriter accepts injected writer for tests
+
+- **GIVEN** a mock `ConfigWriter` passed via options
+- **WHEN** `createConfigWriter({ configWriter: mock })` is called
+- **THEN** the returned instance is the mock
+
+### Requirement: Config mutation is not wired into createKernel
+
+#### Scenario: Kernel does not expose config writer
+
+- **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+- **THEN** the returned kernel has no `configWriter` property
+- **AND** `kernel.project` has no `init`, `addPlugin`, or `removePlugin` entries
 
 ### Requirement: SpecdConfig is a plain typed object
 
@@ -119,3 +151,72 @@
 
 - **WHEN** `createKernel` is called
 - **THEN** `ResolveSchema` use case is available via `kernel.specs.resolve`
+
+### Requirement: @specd/sdk orchestrates cross-package host bootstrap
+
+#### Scenario: SDK package exists for host bootstrap
+
+- **WHEN** a delivery host needs config, kernel, and graph provider wiring
+- **THEN** `@specd/sdk` provides `openSpecdHost` and `createSdkContext` as the documented entry points
+
+#### Scenario: CLI and MCP declare SDK as platform dependency
+
+- **WHEN** `@specd/cli` or `@specd/mcp` package dependencies are inspected
+- **THEN** `@specd/sdk` is the sole direct workspace dependency on specd platform packages
+- **AND** host bootstrap flows through `@specd/sdk`
+
+### Requirement: Public barrel entry points
+
+#### Scenario: package.json exports map public and internal
+
+- **WHEN** `packages/core/package.json` `exports` is inspected
+- **THEN** `"."`, `"./ports"`, `"./extensions"`, and `"./internal"` entry points exist
+
+#### Scenario: Public root exports createArchiveChange factory
+
+- **WHEN** importing from `@specd/core` `"."`
+- **THEN** `createArchiveChange` is available at compile time
+
+#### Scenario: Public root exports createSpecRepository factory
+
+- **WHEN** importing from `@specd/core` `"."`
+- **THEN** `createSpecRepository` is available at compile time
+
+#### Scenario: Public root does not export FsSpecRepository class
+
+- **WHEN** importing from `@specd/core` `"."`
+- **THEN** `FsSpecRepository` is not available at compile time
+
+### Requirement: Kernel-mounted use case surface
+
+#### Scenario: GetStatus types and factory exported from public root
+
+- **WHEN** importing from `@specd/core` `"."`
+- **THEN** `GetStatus`, `GetStatusInput`, `GetStatusResult`, and `createGetStatus` are available
+
+#### Scenario: Use case callable without kernel via factory
+
+- **GIVEN** a loaded `SpecdConfig`
+- **WHEN** `createGetStatus(config).execute({ name })` is called
+- **THEN** a `GetStatusResult` is returned without calling `createKernel`
+
+### Requirement: Repository factories on public root
+
+#### Scenario: Default spec repository without kernel
+
+- **GIVEN** a loaded `SpecdConfig` and workspace context
+- **WHEN** `createSpecRepository('fs', context, options)` is called from `@specd/core` `"."`
+- **THEN** a `SpecRepository` is returned without calling `createKernel`
+
+### Requirement: Extension registration surface
+
+#### Scenario: ChangeStorageFactory exported from extensions subpath
+
+- **WHEN** importing from `@specd/core/extensions`
+- **THEN** `ChangeStorageFactory` and `createKernelBuilder` are available
+
+#### Scenario: Builtin FS storage factory markers stay internal
+
+- **WHEN** importing from `@specd/core/internal`
+- **THEN** builtin `FS_*` storage factory markers are not required on `"."` or `"./extensions"`
+- **AND** `FS_CHANGE_STORAGE_FACTORY` is not exported from `"."`

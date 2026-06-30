@@ -1,0 +1,439 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: LanguageAdapter interface'
+  content: |
+    #### Scenario: Adapter declares supported language identifiers
+
+    - **WHEN** `languages()` is called on the TypeScript adapter
+    - **THEN** it returns `['typescript', 'tsx', 'javascript', 'jsx']`
+
+    #### Scenario: Adapter declares extension map
+
+    - **WHEN** `extensions()` is called on the TypeScript adapter
+    - **THEN** it returns mappings for `.ts`, `.tsx`, `.js`, and `.jsx`
+
+    #### Scenario: File analysis is complete and pure
+
+    - **GIVEN** a built-in adapter is called twice with the same `filePath`, `content`, and analyze context
+    - **WHEN** `analyzeFile()` is executed
+    - **THEN** it returns equivalent symbols, imports, deterministic facts, and namespace data both times
+    - **AND** it performs no side effects outside the provided session context
+
+    #### Scenario: Import resolution uses stored analysis rather than raw content
+
+    - **GIVEN** a registered `FileAnalysis` already exists for a file
+    - **WHEN** `resolveImports()` is called
+    - **THEN** the adapter resolves targets from the stored analysis facts and shared session lookups
+    - **AND** it does not require the original file content to be parsed again
+
+    #### Scenario: Relation building consumes stored facts
+
+    - **GIVEN** a file analysis contains deterministic imports, binding facts, and call facts
+    - **WHEN** `buildRelations()` is called
+    - **THEN** the result may include `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations
+    - **AND** those relations are derived from the stored analysis facts and resolved imports
+
+    #### Scenario: Adapter may update only compact run-scoped cache state
+
+    - **GIVEN** an adapter needs a shared run-scoped cache such as parsed package metadata
+    - **WHEN** it updates that cache during analysis or resolution
+    - **THEN** the update happens only through the `IndexSession` API provided in context
+    - **AND** no side effect escapes the indexing session
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: TypeScript adapter'
+  content: |
+    #### Scenario: Function declaration is present in file analysis
+
+    - **GIVEN** content containing `function createUser(name: string) { ... }`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned `FileAnalysisDraft.symbols` include a `SymbolNode` with `name: 'createUser'`, `kind: 'function'`
+
+    #### Scenario: Arrow function assigned to const is present in file analysis
+
+    - **GIVEN** content containing `export const validate = (input: string) => { ... }`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned `FileAnalysisDraft.symbols` include a `SymbolNode` with `name: 'validate'`, `kind: 'function'`
+
+    #### Scenario: Class and method are captured separately
+
+    - **GIVEN** content containing `class AuthService { login() { ... } }`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned symbols include one `class` named `AuthService` and one `method` named `login`
+
+    #### Scenario: JSDoc comment is retained with the symbol
+
+    - **GIVEN** content containing a JSDoc block immediately before a declaration
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the corresponding symbol contains the raw comment text in `comment`
+
+    #### Scenario: Exported symbol yields an EXPORTS relation during relation building
+
+    - **GIVEN** a file analysis from content containing `export function createUser() { ... }`
+    - **WHEN** `buildRelations()` is called for that analysis
+    - **THEN** an `EXPORTS` relation from the file to the `createUser` symbol is returned
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Import specifier resolution'
+  content: |
+    #### Scenario: TypeScript scoped package specifier
+
+    - **GIVEN** known packages `['@specd/core', '@specd/cli']`
+    - **WHEN** `resolvePackageFromSpecifier('@specd/core', knownPackages)` is called on the TypeScript adapter
+    - **THEN** it returns `'@specd/core'`
+
+    #### Scenario: TypeScript bare package specifier
+
+    - **GIVEN** known packages `['lodash']`
+    - **WHEN** `resolvePackageFromSpecifier('lodash/fp', knownPackages)` is called on the TypeScript adapter
+    - **THEN** it returns `'lodash'`
+
+    #### Scenario: Go module specifier resolved by longest prefix
+
+    - **GIVEN** known packages `['github.com/acme/auth']`
+    - **WHEN** `resolvePackageFromSpecifier('github.com/acme/auth/models', knownPackages)` is called on the Go adapter
+    - **THEN** it returns `'github.com/acme/auth'`
+
+    #### Scenario: Python package specifier with hyphen normalization
+
+    - **GIVEN** known packages `['acme-auth']`
+    - **WHEN** `resolvePackageFromSpecifier('acme_auth.models', knownPackages)` is called on the Python adapter
+    - **THEN** it returns `'acme-auth'`
+
+    #### Scenario: Unknown specifier returns undefined
+
+    - **GIVEN** known packages `['@specd/core']`
+    - **WHEN** `resolvePackageFromSpecifier('express', knownPackages)` is called
+    - **THEN** it returns `undefined`
+
+    #### Scenario: PSR-4 resolves qualified name to file path
+
+    - **GIVEN** a `codeRoot` containing `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
+    - **WHEN** `resolveQualifiedNameToPath('App\\Models\\User', codeRoot)` is called on the PHP adapter
+    - **THEN** it returns the absolute path `{codeRoot}/src/Models/User.php`
+
+    #### Scenario: Qualified name with no matching prefix returns undefined
+
+    - **GIVEN** `composer.json` with `autoload.psr-4: { "App\\": "src/" }`
+    - **WHEN** `resolveQualifiedNameToPath('Vendor\\Lib\\Foo', codeRoot)` is called
+    - **THEN** it returns `undefined`
+
+    #### Scenario: Session lookups drive PHP import resolution
+
+    - **GIVEN** the PHP adapter is resolving imports for a file that uses CakePHP, CodeIgniter, or namespace-based conventions
+    - **AND** the shared session already knows the discovered files and registered symbols
+    - **WHEN** `resolveImports()` is called
+    - **THEN** the adapter uses those shared lookups to test candidates
+    - **AND** it does not scan every workspace symbol or hit the filesystem for each candidate
+
+    #### Scenario: Pass 2 uses precomputed package metadata instead of filesystem probes
+
+    - **GIVEN** the PHP adapter needs PSR-4 metadata to resolve a qualified import during Pass 2
+    - **AND** that metadata was already prepared as compact per-file or run-scoped adapter state
+    - **WHEN** `resolveImports()` runs
+    - **THEN** the adapter resolves the import from that retained metadata and shared session lookups
+    - **AND** it does not probe the filesystem for each import candidate
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Import declaration extraction'
+  content: |
+    #### Scenario: TypeScript named imports appear in file analysis
+
+    - **GIVEN** content containing `import { createUser, type Config } from '@specd/core'`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned draft includes two import declarations: `createUser` and `Config`, both with specifier `'@specd/core'` and `isRelative: false`
+
+    #### Scenario: Relative import is marked relative
+
+    - **GIVEN** content containing `import { helper } from './utils.js'`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned draft includes one import declaration with `isRelative: true` and specifier `'./utils.js'`
+
+    #### Scenario: Aliased import preserves both names
+
+    - **GIVEN** content containing `import { foo as bar } from './mod.js'`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the import declaration has `originalName: 'foo'` and `localName: 'bar'`
+
+    #### Scenario: Python relative import is represented in the draft
+
+    - **GIVEN** content containing `from .utils import helper`
+    - **WHEN** `analyzeFile()` is called on a Python adapter
+    - **THEN** the returned import declaration has `isRelative: true`
+
+    #### Scenario: Go imports are never relative
+
+    - **GIVEN** content containing `import "fmt"`
+    - **WHEN** `analyzeFile()` is called on a Go adapter
+    - **THEN** the returned import declaration has `isRelative: false`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Call resolution'
+  content: |
+    #### Scenario: Call is resolved via stored imports and facts
+
+    - **GIVEN** a function `processOrder` that calls `validateUser()`
+    - **AND** `validateUser` was imported from `./auth.ts`
+    - **WHEN** `buildRelations()` is called with resolved imports for the file analysis
+    - **THEN** a `CALLS` relation from `processOrder` to `validateUser` is returned
+
+    #### Scenario: Unresolvable call is silently dropped
+
+    - **GIVEN** a function that calls `console.log()` (a global built-in)
+    - **WHEN** `buildRelations()` is called
+    - **THEN** no `CALLS` relation is created for that call and no error is thrown
+
+    #### Scenario: Top-level call is silently dropped
+
+    - **GIVEN** a call expression `init()` at module top level (not inside any function or class)
+    - **WHEN** `analyzeFile()` extracts call facts and `buildRelations()` runs
+    - **THEN** no `CALLS` relation is created for that call
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Scoped binding fact extraction'
+  content: |
+    #### Scenario: TypeScript constructor parameter type becomes binding fact
+
+    - **GIVEN** TypeScript content containing `constructor(expander: TemplateExpander) {}`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned binding facts associate `expander` with target type `TemplateExpander`
+    - **AND** no graph relation is emitted directly during fact extraction
+
+    #### Scenario: Receiver binding fact is extracted
+
+    - **GIVEN** a class method containing `this.repository.save()`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the returned facts identify `this` as the enclosing class receiver
+    - **AND** the member call is represented as a call fact for shared resolution
+
+    #### Scenario: Runtime-only binding is dropped
+
+    - **GIVEN** source content fetches a service by a non-literal runtime identifier
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** no binding fact is emitted for that service target
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Built-in multi-language dependency coverage'
+  content: |
+    #### Scenario: TypeScript dynamic and CommonJS imports are represented in file analysis
+
+    - **GIVEN** TypeScript content containing `import('./plugin.js')`, `require('./legacy.js')`, and `import './polyfill.js'`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** import declarations are returned for all three deterministic specifiers
+
+    #### Scenario: TypeScript constructor injection and construction are detectable
+
+    - **GIVEN** TypeScript content containing `constructor(expander: TemplateExpander)` and `new TemplateExpander(builtins)`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** facts identify the constructor-injected `TemplateExpander` dependency as a `USES_TYPE` candidate
+    - **AND** facts identify the constructor call as a `CONSTRUCTS` candidate
+
+    #### Scenario: Python literal dynamic import is represented in file analysis
+
+    - **GIVEN** Python content containing `importlib.import_module("acme.plugins.mailer")`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** a deterministic import declaration is returned for `acme.plugins.mailer`
+
+    #### Scenario: Go selector call is represented for shared resolution
+
+    - **GIVEN** Go content importing `models "github.com/acme/auth/models"` and calling `models.NewUser()`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the import alias and selector call facts are available to shared resolution
+    - **AND** constructor-like/composite literal facts identify `CONSTRUCTS` candidates when present
+
+    #### Scenario: PHP framework-managed binding feeds shared facts
+
+    - **GIVEN** PHP content declaring `var $uses = array('Article')` and calling `$this->Article->save()`
+    - **WHEN** `analyzeFile()` is called
+    - **THEN** the framework-managed `Article` receiver and member call are represented as shared facts
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Hierarchy extraction'
+  content: |
+    #### Scenario: Class inheritance emits EXTENDS
+
+    - **GIVEN** a supported language file declaring a type that inherits from a resolvable base type
+    - **WHEN** `buildRelations()` is called
+    - **THEN** an `EXTENDS` relation is emitted
+
+    #### Scenario: Interface or contract fulfillment emits IMPLEMENTS
+
+    - **GIVEN** a supported language file declaring a type that fulfills a resolvable contract-like type
+    - **WHEN** `buildRelations()` is called
+    - **THEN** an `IMPLEMENTS` relation is emitted
+
+    #### Scenario: Overriding method emits OVERRIDES
+
+    - **GIVEN** a supported language file declaring a method that can be matched deterministically to an inherited or contract method
+    - **WHEN** `buildRelations()` is called
+    - **THEN** an `OVERRIDES` relation is emitted
+
+    #### Scenario: Normalizable inheritance-adjacent construct maps to the base model
+
+    - **GIVEN** a supported language construct that is not classical inheritance but preserves useful semantics when normalized
+    - **WHEN** `buildRelations()` is called
+    - **THEN** the emitted relation uses one of `EXTENDS`, `IMPLEMENTS`, or `OVERRIDES`
+
+    #### Scenario: Unresolvable hierarchy target is silently dropped
+
+    - **GIVEN** a hierarchy declaration whose target cannot be resolved deterministically
+    - **WHEN** `buildRelations()` is called
+    - **THEN** no hierarchy relation is emitted
+    - **AND** no error is thrown
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: PHP require/include dependencies'
+  content: |
+    #### Scenario: require_once with relative string literal emits IMPORTS
+
+    - **GIVEN** a PHP file at `app/controllers/PostsController.php` containing `require_once '../models/Post.php'`
+    - **WHEN** `buildRelations()` is called from the stored file analysis
+    - **THEN** an `IMPORTS` relation is returned from `app/controllers/PostsController.php` to `app/models/Post.php`
+
+    #### Scenario: include with relative path emits IMPORTS
+
+    - **GIVEN** a PHP file containing `include 'helpers/url_helper.php'`
+    - **WHEN** `buildRelations()` is called from the stored file analysis
+    - **THEN** an `IMPORTS` relation is returned pointing to `helpers/url_helper.php` relative to the file's directory
+
+    #### Scenario: require with PHP constant expression is silently dropped
+
+    - **GIVEN** a PHP file containing `require_once APPPATH . 'models/Post.php'`
+    - **WHEN** `buildRelations()` is called
+    - **THEN** no `IMPORTS` relation is created for that expression and no error is thrown
+
+    #### Scenario: require with variable is silently dropped
+
+    - **GIVEN** a PHP file containing `require_once $path`
+    - **WHEN** `buildRelations()` is called
+    - **THEN** no relation is created for that expression and no error is thrown
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: PHP dynamic loader dependencies'
+  content: |
+    #### Scenario: loadModel emits IMPORTS when target resolves
+
+    - **GIVEN** a PHP file analysis containing `$this->loadModel('User')`
+    - **AND** resolver rules can map `User` to a concrete file
+    - **WHEN** `buildRelations()` is called
+    - **THEN** an `IMPORTS` relation is returned to that target file
+
+    #### Scenario: CodeIgniter load->model emits IMPORTS when target resolves
+
+    - **GIVEN** a PHP file analysis containing `$this->load->model('User_model')`
+    - **AND** resolver rules can map `User_model` to a concrete file
+    - **WHEN** `buildRelations()` is called
+    - **THEN** an `IMPORTS` relation is returned
+
+    #### Scenario: CakePHP uses property emits IMPORTS when literals resolve
+
+    - **GIVEN** a controller class declaring `var $uses = array('Article', 'Category')`
+    - **AND** resolver rules can map both entries to concrete files
+    - **WHEN** `buildRelations()` is called
+    - **THEN** `IMPORTS` relations are returned for both resolved targets
+
+    #### Scenario: Dynamic argument is silently dropped
+
+    - **GIVEN** a PHP file containing `$this->loadModel($modelName)`
+    - **WHEN** `buildRelations()` is called
+    - **THEN** no relation is created for that call and no error is thrown
+
+    #### Scenario: Unresolvable target is silently dropped
+
+    - **GIVEN** a PHP file containing a known loader call with literal argument
+    - **AND** resolver rules cannot map it to a target file
+    - **WHEN** `buildRelations()` is called
+    - **THEN** no relation is created for that call and no error is thrown
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: PHP loaded-instance call extraction'
+  content: |
+    #### Scenario: Member call on loaded alias emits CALLS
+
+    - **GIVEN** a method containing `loadModel('Article')` and later `$this->Article->save()`
+    - **WHEN** `buildRelations()` runs with resolvable caller and callee symbols
+    - **THEN** a `CALLS` relation is emitted from caller symbol to callee symbol
+
+    #### Scenario: Local variable alias emits CALLS
+
+    - **GIVEN** a method containing `$model = $this->Article` and later `$model->find()`
+    - **WHEN** both symbols are resolvable
+    - **THEN** a `CALLS` relation is emitted
+
+    #### Scenario: CakePHP uses property makes framework-managed alias available to methods
+
+    - **GIVEN** a class declaring `var $uses = array('Article')`
+    - **AND** one of its methods calls `$this->Article->save()`
+    - **WHEN** caller and callee symbols are resolvable
+    - **THEN** a `CALLS` relation is emitted from that method to `Article::save`
+
+    #### Scenario: Runtime-only service identifier is not promoted to CALLS
+
+    - **GIVEN** a method fetches a service using only a runtime string identifier
+    - **AND** no deterministic class target can be resolved
+    - **WHEN** a method call is later made on the fetched value
+    - **THEN** no `CALLS` relation is emitted from that dynamic lookup
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: LanguageAdapter interface'
+  content: |
+    ### Requirement: Full-file analysis contract
+
+    #### Scenario: Adapter emits all deterministic facts in one pass
+
+    - **GIVEN** a file contains symbols, import declarations, typed bindings, and deterministic call sites
+    - **WHEN** `analyzeFile()` runs
+    - **THEN** the returned `FileAnalysisDraft` contains all of those facts together
+    - **AND** the indexer does not need separate adapter entry points to gather them later
+
+    #### Scenario: Parser-specific state remains compact
+
+    - **GIVEN** an adapter wants to retain parser-specific state for later deterministic resolution
+    - **WHEN** it returns that state in `FileAnalysisDraft`
+    - **THEN** the retained state uses plain compact data structures
+    - **AND** it does not retain AST nodes or parser-runtime objects
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Full-file analysis contract'
+  content: |
+    ### Requirement: Unified built-in adapter migration
+
+    #### Scenario: All built-in adapters implement the unified contract
+
+    - **GIVEN** the built-in TypeScript/JavaScript, PHP, Python, and Go adapters are registered
+    - **WHEN** the indexer executes Pass 1 and Pass 2
+    - **THEN** each built-in adapter participates through `analyzeFile()`, `resolveImports()`, and `buildRelations()`
+    - **AND** no legacy built-in extraction path is required

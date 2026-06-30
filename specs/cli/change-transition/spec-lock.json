@@ -8,7 +8,7 @@
     "core:change",
     "core:transition-change",
     "core:hook-execution-model",
-    "core:refresh-implementation-tracking"
+    "core:get-status"
   ],
   "implementation": [
     {

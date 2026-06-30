@@ -1,9 +1,15 @@
-import { type SpecdConfig } from '@specd/core'
-import { createCodeGraphProvider } from '@specd/code-graph'
+import {
+  createSdkContext,
+  withOpenGraphProvider,
+  type CodeGraphProvider,
+  type SdkHostContext,
+  type SpecdConfig,
+} from '@specd/sdk'
 import { handleError } from '../../handle-error.js'
+import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 
 /** The CodeGraphProvider instance type. */
-type Provider = ReturnType<typeof createCodeGraphProvider>
+type Provider = CodeGraphProvider
 
 /**
  * Runs a callback with an opened CodeGraphProvider, ensuring cleanup on
@@ -16,6 +22,7 @@ type Provider = ReturnType<typeof createCodeGraphProvider>
  * @param fn - The async callback receiving the opened provider.
  * @param options - Optional lifecycle hooks around provider open.
  * @param options.beforeOpen - Optional callback invoked after provider creation but before open().
+ * @param options.host - Optional pre-built SDK host context.
  */
 export async function withProvider(
   config: SpecdConfig,
@@ -23,11 +30,11 @@ export async function withProvider(
   fn: (provider: Provider) => Promise<void>,
   options?: {
     readonly beforeOpen?: (provider: Provider) => Promise<void>
+    readonly host?: SdkHostContext
   },
 ): Promise<void> {
-  const provider = createCodeGraphProvider(config)
+  const ctx = options?.host ?? (await createSdkContext(config, buildCliKernelOptions()))
 
-  // Force exit on signals — don't wait for LadybugDB close which can block
   const forceExit = (): void => {
     process.exit(130)
   }
@@ -35,27 +42,15 @@ export async function withProvider(
   process.on('SIGTERM', forceExit)
 
   try {
-    await options?.beforeOpen?.(provider)
-    await provider.open()
-    await fn(provider)
+    await withOpenGraphProvider(ctx, fn, {
+      ...(options?.beforeOpen !== undefined ? { beforeOpen: options.beforeOpen } : {}),
+    })
   } catch (err) {
-    try {
-      await provider.close()
-    } catch {
-      /* ignore */
-    }
     process.removeListener('SIGINT', forceExit)
     process.removeListener('SIGTERM', forceExit)
     handleError(err, format)
   }
 
-  try {
-    await provider.close()
-  } catch (err) {
-    process.removeListener('SIGINT', forceExit)
-    process.removeListener('SIGTERM', forceExit)
-    handleError(err, format)
-  }
   process.removeListener('SIGINT', forceExit)
   process.removeListener('SIGTERM', forceExit)
   process.exit(0)

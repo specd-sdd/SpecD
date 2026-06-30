@@ -1,4 +1,6 @@
 import { CreateChange } from '../../application/use-cases/create-change.js'
+import { type GetActiveSchema } from '../../application/use-cases/get-active-schema.js'
+import { type DetectOverlap } from '../../application/use-cases/detect-overlap.js'
 import * as path from 'node:path'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
@@ -6,6 +8,8 @@ import { createChangeRepository } from '../change-repository.js'
 import { createVcsActorResolver } from '../actor-resolver.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { createGetActiveSchema } from './get-active-schema.js'
+import { createDetectOverlap } from './detect-overlap.js'
 
 /**
  * Domain context for a `ChangeRepository` bound to a single workspace.
@@ -35,6 +39,10 @@ export interface FsCreateChangeOptions {
   readonly discardedPath: string
   /** The project orchestrator. */
   readonly listWorkspaces: ListWorkspaces
+  /** Resolves the project's active schema for create orchestration. */
+  readonly getActiveSchema: GetActiveSchema
+  /** Detects spec overlap across active changes. */
+  readonly detectOverlap: DetectOverlap
 }
 
 /**
@@ -48,7 +56,7 @@ export function createCreateChange(config: SpecdConfig): CreateChange
  * Constructs a `CreateChange` use case with explicit context and fs paths.
  *
  * @param context - Workspace domain context
- * @param options - Filesystem adapter paths
+ * @param options - Filesystem adapter paths and orchestration dependencies
  * @returns The pre-wired use case instance
  */
 export function createCreateChange(
@@ -103,9 +111,18 @@ export function createCreateChange(
       ]),
     )
     const actor = createVcsActorResolver()
-    return new CreateChange(changeRepo, new ListWorkspaces(config, specRepos), actor)
+    const listWorkspaces = new ListWorkspaces(config, specRepos)
+    const getActiveSchema = createGetActiveSchema(config)
+    const detectOverlap = createDetectOverlap(config)
+    return new CreateChange(changeRepo, listWorkspaces, actor, getActiveSchema, detectOverlap)
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
   const actor = createVcsActorResolver()
-  return new CreateChange(changeRepo, options!.listWorkspaces, actor)
+  return new CreateChange(
+    changeRepo,
+    options!.listWorkspaces,
+    actor,
+    options!.getActiveSchema,
+    options!.detectOverlap,
+  )
 }

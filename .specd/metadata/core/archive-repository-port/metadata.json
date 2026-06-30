@@ -8,8 +8,8 @@
     "core:storage",
     "core:archive-change",
     "default:_global/logging",
-    "core:archived-change-index-entry",
-    "core:read-only-change-view"
+    "core:read-only-change-view",
+    "core:archived-change-index-entry"
   ],
   "context": [
     "Archiving completed changes must be decoupled from their active-change storage so the archive can enforce its own append-only semantics and indexing strategy independently. `ArchiveRepository` is the application-layer port for archiving and querying archived changes within a single workspace, extending the shared `Repository` base class. The archive is append-only — once a change is archived it is never mutated — and an `index.jsonl` file at the archive root provides O(1) appends and fast lookup without scanning the filesystem."
@@ -79,6 +79,12 @@
       "requirement": "archivePath returns the absolute path for an archived change",
       "rules": [
         "`archivePath(entry)` MUST accept either a full `ArchivedChange` or an `ArchivedChangeIndexEntry` and return the absolute filesystem path to the archived directory.\n\nThis mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.\n\nThis method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes."
+      ]
+    },
+    {
+      "requirement": "internalPaths returns absolute storage paths",
+      "rules": [
+        "`internalPaths()` MUST return an array of absolute filesystem paths to internal specd management directories owned by the repository, or `undefined` when the concept does not apply.\n\nReturning `undefined` signals that internal-path exclusion is not applicable (e.g. remote backends that do not manage local filesystem directories). Implementations MUST NOT return an empty array to signal inapplicability; an empty array means \"no paths to exclude\".\n\nFor `FsArchiveRepository`, this MUST include:\n\n- the absolute path to the archive root directory\n\nThese paths are used by implementation discovery to avoid tracking specd's own metadata."
       ]
     },
     {
@@ -318,6 +324,20 @@
       "then": ["the returned path matches the archiveDirPath that was returned by archive()"]
     },
     {
+      "requirement": "internalPaths returns absolute storage paths",
+      "name": "FsArchiveRepository returns archive root",
+      "given": ["FsArchiveRepository is configured with an archive root path"],
+      "when": ["internalPaths() is called"],
+      "then": ["it returns an array containing the absolute path to the archive root"]
+    },
+    {
+      "requirement": "internalPaths returns absolute storage paths",
+      "name": "Non-filesystem implementation returns undefined",
+      "given": ["an ArchiveRepository implementation that does not manage local directories"],
+      "when": ["internalPaths() is called"],
+      "then": ["it returns undefined"]
+    },
+    {
       "requirement": "reindex rebuilds the archive index",
       "name": "Corrupted index is rebuilt",
       "given": ["an index.jsonl with missing or extra entries"],
@@ -365,43 +385,18 @@
       {
         "specId": "core:archive-repository-port",
         "file": "core:src/application/ports/archive-repository.ts",
-        "symbol": "ArchiveListOptions"
-      },
-      {
-        "specId": "core:archive-repository-port",
-        "file": "core:src/application/ports/archive-repository.ts",
-        "symbol": "ArchiveListResult"
-      },
-      {
-        "specId": "core:archive-repository-port",
-        "file": "core:src/application/ports/archive-repository.ts",
         "symbol": "ArchiveRepository"
       },
       {
         "specId": "core:archive-repository-port",
         "file": "core:src/infrastructure/fs/archive-repository.ts",
         "symbol": "FsArchiveRepository"
-      },
-      {
-        "specId": "core:archive-repository-port",
-        "file": "core:src/infrastructure/fs/archive-repository.ts",
-        "symbol": "_updateMetaCount"
-      },
-      {
-        "specId": "core:archive-repository-port",
-        "file": "core:src/infrastructure/fs/archive-repository.ts",
-        "symbol": "_readMetaCount"
-      },
-      {
-        "specId": "core:archive-repository-port",
-        "file": "core:src/infrastructure/fs/archive-repository.ts",
-        "symbol": "_writeMetaCount"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:200cf94479e0f4fb75a2b69f55e615925cf9598b9e2b1369914665a6c890ae50",
-    "verify.md": "sha256:df5f4d92ce072ff9c3571c5bbb83f0618d597984ef70d54207e99d075fd4c118"
+    "spec.md": "sha256:b147f8de3fd94c35774ae7af8a25edfbec6a2c26a00dbf6b1a9a160d08b0676c",
+    "verify.md": "sha256:01684eb5a59ffd5d6d9f9660e1c06f24a2a592ba96630613edb96c1f2136e169"
   },
   "generatedBy": "core"
 }

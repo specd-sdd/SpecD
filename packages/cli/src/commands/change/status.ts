@@ -2,18 +2,18 @@ import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
-import { ArtifactDag, type ArtifactStatusEntry, type ArtifactType } from '@specd/core'
+import { ArtifactDag, type ArtifactStatusEntry, type ArtifactType } from '@specd/sdk'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
 
 /** Resolved active schema from the kernel. */
 type ActiveSchemaResult = Awaited<
-  ReturnType<import('@specd/core').Kernel['specs']['getActiveSchema']['execute']>
+  ReturnType<import('@specd/sdk').Kernel['specs']['getActiveSchema']['execute']>
 >
 
 /** Schema metadata attached to lifecycle evaluation. */
 type LifecycleSchemaInfo = NonNullable<
   Awaited<
-    ReturnType<import('@specd/core').Kernel['changes']['status']['execute']>
+    ReturnType<import('@specd/sdk').Kernel['changes']['status']['execute']>
   >['lifecycle']['schemaInfo']
 >
 
@@ -96,10 +96,6 @@ JSON/TOON output schema:
       async (name: string, opts: { format: string; implementation?: boolean; config?: string }) => {
         try {
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-          const active = await kernel.changes.repo.get(name)
-          if (active !== null) {
-            await kernel.changes.refreshImplementationTracking.execute({ name })
-          }
           const statusResult = await kernel.changes.status.execute({
             name,
           })

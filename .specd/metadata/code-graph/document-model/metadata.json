@@ -122,5 +122,7 @@
     "spec.md": "sha256:cb309381cecabf114094161697570e9bb4d25144bee9aaf77487935c79f5f27a",
     "verify.md": "sha256:d6d3bb4716e06362946f9846cf3af24ea4aabb599143f4e17788fcb2c1ceb67e"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "DocumentModel: DocumentNode type for textual non-code resources with reserved root: namespace for project-global files.",
+  "optimizedContext": "# Document Model\n\n## Rules\n\n- `DocumentNode` SHALL represent textual non-code project resource. MUST include: `path` (unique ID, e.g. `core:docs/adr/0001.md` or `root:package.json`), `configRelativePath`, `contentHash` (SHA-256), `content` (raw text for FTS), `workspace` (owning workspace or `root`).\n- Graph SHALL support reserved `root:` prefix for node identities. Used for files discovered via project-global `graph.includePaths` not owned by specific workspace. Form: `root:<project-relative-path>`.\n- During indexing: file not matching any language adapter classified as `DocumentNode` if textual. Binary files skipped — no node created.\n- Filesystem-backed spec directories exposed by repository `specsPath` excluded from file/document discovery. Spec artifacts enter graph only via spec indexing.\n- Document category SHALL be first-class in graph search API. MUST support filter to include/exclude `DocumentNode` results.\n\n## Constraints\n\n- `DocumentNode` SHALL NOT produce symbol nodes or structural relations (CALLS, DEPENDS_ON) by default\n- Path of `DocumentNode` MUST NOT collide with any `FileNode` path in same workspace\n- `root` is reserved workspace name for graph — cannot be used by normal spec workspaces\n- File already owned by workspace `codeRoot` MUST NOT also be indexed as `root:` document"
 }

@@ -1,15 +1,26 @@
 {
   "title": "RefreshImplementationTracking",
-  "description": "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without coupling that side effect to read-only or transition use cases. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, merges new candidate paths into `trackedImplementationFiles`, and persists the result. Callers that need fresh tracking invoke this use case explicitly; use cases such as `GetStatus`, `TransitionChange`, and `CompileContext` project persisted state only.",
-  "dependsOn": ["core:change", "core:implementation-detector-port", "core:storage"],
+  "description": "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without duplicating detection merge logic across hosts. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result.\n\n`GetStatus` and `TransitionChange` invoke this use case by default for active changes. Hosts MAY still call `RefreshImplementationTracking` explicitly when they need a standalone refresh. Other read-only use cases such as `CompileContext` project persisted state only unless a future change adds orchestration there.",
+  "dependsOn": [
+    "core:change",
+    "core:implementation-detector-port",
+    "core:storage",
+    "core:archive-repository-port"
+  ],
   "context": [
-    "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without coupling that side effect to read-only or transition use cases. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, merges new candidate paths into `trackedImplementationFiles`, and persists the result. Callers that need fresh tracking invoke this use case explicitly; use cases such as `GetStatus`, `TransitionChange`, and `CompileContext` project persisted state only."
+    "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without duplicating detection merge logic across hosts. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result.\n\n`GetStatus` and `TransitionChange` invoke this use case by default for active changes. Hosts MAY still call `RefreshImplementationTracking` explicitly when they need a standalone refresh. Other read-only use cases such as `CompileContext` project persisted state only unless a future change adds orchestration there."
   ],
   "rules": [
     {
       "requirement": "Input contract",
       "rules": [
         "`RefreshImplementationTracking.execute` MUST accept:\n\n- `name` — the change name to refresh"
+      ]
+    },
+    {
+      "requirement": "Default orchestration by host use cases",
+      "rules": [
+        "`GetStatus` and `TransitionChange` MUST delegate pre-read and pre-transition refresh to `RefreshImplementationTracking` rather than invoking `ImplementationDetector` directly.\n\n`RefreshImplementationTracking` remains the standalone primitive for explicit refresh operations (for example `specd change implementation refresh`)."
       ]
     },
     {
@@ -21,7 +32,25 @@
     {
       "requirement": "Detection merge semantics",
       "rules": [
-        "When detection runs, the use case MUST:\n\n1. Call `ImplementationDetector.detectModifiedFiles(change)` with the loaded change context.\n2. For each returned project-relative path not already present in `trackedImplementationFiles`, call `Change.trackImplementationFile(file, 'open')`.\n3. Leave existing tracked entries and confirmed implementation links unchanged.\n\nThe use case MUST NOT remove tracked files, rewrite link state, or mark files `resolved` or `ignored`."
+        "When detection runs, the use case MUST:\n\n1. Call `ImplementationDetector.detectModifiedFiles(change, options)` with the loaded change context and internal paths as exclusions.\n2. For each returned project-relative path not already present in `trackedImplementationFiles`, call `Change.trackImplementationFile(file, 'open')`.\n3. For each project-relative path returned by the detector that IS already tracked, preserve its existing review state, unless the file was in the `removed` state (see resurrections below).\n\nThe use case MUST NOT mark files `resolved` or `ignored` during the merge pass of newly detected files."
+      ]
+    },
+    {
+      "requirement": "Deletion and removal semantics",
+      "rules": [
+        "When detection runs, the use case MUST identify tracked implementation files that have been physically removed from the project.\n\nFor every file in `trackedImplementationFiles` that is not in the `ignored` state, the use case MUST verify its existence on disk. If the file is missing, the use case MUST:\n\n1. Call `Change.trackImplementationFile(file, 'removed')` to update its review state.\n2. Remove all `implementationLinks` (both file-level and symbol-level) that reference the missing file."
+      ]
+    },
+    {
+      "requirement": "Resurrections and re-appearances",
+      "rules": [
+        "When detection runs, the use case MUST handle files that were previously marked as `removed` but are found to exist again on disk.\n\nA file SHALL be transitioned from `removed` to `open` when:\n\n- It is returned by the `ImplementationDetector` as a modified file.\n- It is found to exist on disk during the existence check pass for tracked files.\n\nReturning a file to `open` ensures that it is reviewed again, as its content or purpose may have changed since it was last tracked."
+      ]
+    },
+    {
+      "requirement": "Internal directory filtering",
+      "rules": [
+        "To prevent internal specd metadata and archived changes from being discovered as implementation, the use case MUST collect internal directory paths before detection.\n\nThe use case MUST:\n\n1. Query `ChangeRepository.internalPaths()` and `ArchiveRepository.internalPaths()`.\n2. Normalize these absolute paths to project-relative portable paths.\n3. Pass the normalized paths as `excludePaths` to `ImplementationDetector.detectModifiedFiles`."
       ]
     },
     {
@@ -45,7 +74,7 @@
     {
       "requirement": "Constructor dependencies",
       "rules": [
-        "`RefreshImplementationTracking` MUST accept:\n\n- `changes: ChangeRepository` — for loading and persisting the change\n- `implementationDetector: ImplementationDetector` — for targeted candidate discovery"
+        "`RefreshImplementationTracking` MUST accept:\n\n- `changes: ChangeRepository` — for loading, persisting, and internal path discovery\n- `archives: ArchiveRepository` — for internal path discovery\n- `implementationDetector: ImplementationDetector` — for targeted candidate discovery"
       ]
     },
     {
@@ -66,6 +95,24 @@
       "name": "Execute accepts change name",
       "when": ["RefreshImplementationTracking.execute({ name }) is called with an existing change"],
       "then": ["the use case loads that change by name"]
+    },
+    {
+      "requirement": "Default orchestration by host use cases",
+      "name": "GetStatus delegates to RefreshImplementationTracking",
+      "given": ["GetStatus is configured with a RefreshImplementationTracking collaborator"],
+      "when": ["GetStatus performs a default active-change status load"],
+      "then": [
+        "it calls RefreshImplementationTracking.execute({ name }) rather than ImplementationDetector directly"
+      ]
+    },
+    {
+      "requirement": "Default orchestration by host use cases",
+      "name": "TransitionChange delegates to RefreshImplementationTracking",
+      "given": ["TransitionChange is configured with a RefreshImplementationTracking collaborator"],
+      "when": ["TransitionChange performs a default active-change transition"],
+      "then": [
+        "it calls RefreshImplementationTracking.execute({ name }) rather than ImplementationDetector directly"
+      ]
     },
     {
       "requirement": "Historical implementing guard",
@@ -99,6 +146,57 @@
       "then": ["the tracked entry keeps its existing review state"]
     },
     {
+      "requirement": "Deletion and removal semantics",
+      "name": "Missing tracked files are marked removed",
+      "given": [
+        "packages/core/src/deleted.ts is tracked as open",
+        "AND the file no longer exists on disk"
+      ],
+      "when": ["refresh runs"],
+      "then": ["its state transitions to removed"]
+    },
+    {
+      "requirement": "Deletion and removal semantics",
+      "name": "Links for missing files are cleaned up",
+      "given": [
+        "packages/core/src/deleted.ts is tracked as open",
+        "AND a confirmed link exists for this file",
+        "AND the file no longer exists on disk"
+      ],
+      "when": ["refresh runs"],
+      "then": ["the link is removed from implementationLinks"]
+    },
+    {
+      "requirement": "Resurrections and re-appearances",
+      "name": "Removed file reappearing via detector becomes open",
+      "given": [
+        "packages/core/src/resurrected.ts is tracked as removed",
+        "AND the detector identifies it as modified"
+      ],
+      "when": ["refresh runs"],
+      "then": ["its state transitions back to open"]
+    },
+    {
+      "requirement": "Resurrections and re-appearances",
+      "name": "Removed file found on disk becomes open",
+      "given": [
+        "packages/core/src/resurrected.ts is tracked as removed",
+        "AND the file exists on disk during the existence check"
+      ],
+      "when": ["refresh runs"],
+      "then": ["its state transitions back to open"]
+    },
+    {
+      "requirement": "Internal directory filtering",
+      "name": "Use case excludes internal repository paths",
+      "given": [
+        "ChangeRepository returns changes/ and drafts/ as internal paths",
+        "AND ArchiveRepository returns archive/"
+      ],
+      "when": ["refresh runs"],
+      "then": ["it passes these paths as excludePaths to the detector"]
+    },
+    {
       "requirement": "Persistence",
       "name": "Refresh persists through ChangeRepository.mutate",
       "given": ["detection adds a new tracked file"],
@@ -119,10 +217,10 @@
     },
     {
       "requirement": "Constructor dependencies",
-      "name": "Use case receives repository and detector",
+      "name": "Use case receives repositories and detector",
       "given": ["RefreshImplementationTracking is assembled by the kernel"],
       "when": ["the use case is constructed"],
-      "then": ["it receives ChangeRepository and ImplementationDetector"]
+      "then": ["it receives ChangeRepository, ArchiveRepository, and ImplementationDetector"]
     },
     {
       "requirement": "Delivery-agnostic boundary",
@@ -134,36 +232,17 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/composition/kernel.ts"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/index.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-        "symbol": "RefreshImplementationTracking"
-      },
-      {
-        "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-        "symbol": "RefreshImplementationTracking.execute"
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:245019a3a47520afa04ba5c050626842494918cf54229f4a3899500c193ffb8e",
-    "verify.md": "sha256:11553943543162853ca1f7d8d72dda289a84a9217d7a8c7c673c598afc1eebd7"
+    "spec.md": "sha256:cf52142a918f3e30f83c4dd960532345ee8e5ea9f0fedfc7e4ae984f5597a8bb",
+    "verify.md": "sha256:921fb6ddff3a9b05581fbf5926dadbda6d9eff3d663a68a2045a73a1a644f358"
   },
   "generatedBy": "core"
 }

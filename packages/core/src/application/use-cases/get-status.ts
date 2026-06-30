@@ -18,11 +18,17 @@ import {
   type ImplementationTrackingProjection,
   projectImplementationTracking,
 } from './_shared/implementation-tracking.js'
+import { RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 
 /** Input for the {@link GetStatus} use case. */
 export interface GetStatusInput {
   /** The change name to look up. */
   readonly name: string
+  /**
+   * When omitted or `true`, refresh tracked implementation files before loading
+   * status for active changes only. When `false`, skip refresh.
+   */
+  readonly refreshImplementationTracking?: boolean
   /** When set and still current, returns a short-circuit unchanged payload. */
   readonly ifModifiedSince?: string
 }
@@ -221,6 +227,7 @@ export class GetStatus {
   private readonly _changes: ChangeRepository
   private readonly _schemaProvider: SchemaProvider
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
+  private readonly _refresh: RefreshImplementationTracking
   private readonly _lifecycle: LifecycleEngine
 
   /**
@@ -231,28 +238,41 @@ export class GetStatus {
    * @param approvals - Whether approval gates are active
    * @param approvals.spec - Whether the spec approval gate is enabled
    * @param approvals.signoff - Whether the signoff gate is enabled
+   * @param refreshImplementationTracking - Primitive for optional pre-read refresh
    * @param lifecycle - Shared lifecycle interpreter
    */
   constructor(
     changes: ChangeRepository,
     schemaProvider: SchemaProvider,
     approvals: { readonly spec: boolean; readonly signoff: boolean },
+    refreshImplementationTracking: RefreshImplementationTracking,
     lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
   ) {
     this._changes = changes
     this._schemaProvider = schemaProvider
     this._approvals = approvals
+    this._refresh = refreshImplementationTracking
     this._lifecycle = lifecycle
   }
 
   /**
    * Executes the use case.
    *
+   * When `refreshImplementationTracking` is not `false`, active changes are
+   * refreshed before status projection.
+   *
    * @param input - Query parameters
    * @returns The change and its artifact statuses
    * @throws {ChangeNotFoundError} If no change with the given name exists
    */
   async execute(input: GetStatusInput): Promise<GetStatusResult> {
+    if (input.refreshImplementationTracking !== false) {
+      const active = await this._changes.get(input.name)
+      if (active !== null) {
+        await this._refresh.execute({ name: input.name })
+      }
+    }
+
     const change = await this._changes.get(input.name)
     if (change === null) {
       const draftView = await this._changes.getDraft(input.name)
@@ -263,7 +283,10 @@ export class GetStatus {
     }
 
     const changePath = this._changes.changePath(change)
-    const specDependsOn = this._projectSpecDependsOn(change.specDependsOn)
+    const specDependsOn: Record<string, string[]> = {}
+    for (const [specId, deps] of change.specDependsOn) {
+      specDependsOn[specId] = [...deps]
+    }
 
     if (input.ifModifiedSince !== undefined) {
       const clientRevision = Date.parse(input.ifModifiedSince)
@@ -300,6 +323,7 @@ export class GetStatus {
         }
       }
     }
+
     const artifactStatuses: ArtifactStatusEntry[] = []
     let schemaInfo: LifecycleContext['schemaInfo'] = null
     let review: ReviewSummary = {
@@ -511,10 +535,15 @@ export class GetStatus {
       },
     }
 
+    const specDependsOn: Record<string, string[]> = {}
+    for (const [specId, deps] of draftView.specDependsOn) {
+      specDependsOn[specId] = [...deps]
+    }
+
     return {
       draftView,
       artifactStatuses,
-      specDependsOn: this._projectSpecDependsOn(draftView.specDependsOn),
+      specDependsOn,
       lifecycle,
       implementationTracking: { trackedFiles: [], links: [] },
       review: {
@@ -532,22 +561,6 @@ export class GetStatus {
         command: null,
       },
     }
-  }
-
-  /**
-   * Clones manifest spec-dependency declarations into a serializable result object.
-   *
-   * @param specDependsOn - Persisted dependency map from a change or drafted view
-   * @returns Plain object copy of declared spec dependencies
-   */
-  private _projectSpecDependsOn(
-    specDependsOn: ReadonlyMap<string, readonly string[]>,
-  ): Record<string, string[]> {
-    const projected: Record<string, string[]> = {}
-    for (const [specId, deps] of specDependsOn) {
-      projected[specId] = [...deps]
-    }
-    return projected
   }
 
   /**

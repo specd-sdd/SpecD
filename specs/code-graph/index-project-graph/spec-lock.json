@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:composition",
+    "code-graph:indexer",
+    "code-graph:graph-store",
+    "core:config"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/application/use-cases/index-project-graph.ts",
+      "symbols": ["IndexProjectGraph", "IndexProjectGraphInput"]
+    },
+    {
+      "file": "code-graph:src/composition/use-cases/index-project-graph.ts",
+      "symbols": ["createIndexProjectGraph"]
+    }
+  ]
+}

@@ -35,6 +35,13 @@
 - **THEN** the graph storage root is derived from `config.configPath`
 - **AND** the returned provider can be opened, used for indexing and queries, and closed without error
 
+#### Scenario: Factory resolves storage root from SpecdConfig.configPath
+
+- **GIVEN** a valid `SpecdConfig` with `configPath` set
+- **WHEN** `createCodeGraphProvider(config)` is called
+- **THEN** the provider storage root is derived from `config.configPath`
+- **AND** the provider can be opened, used for indexing and queries, and closed without error
+
 ### Requirement: Package exports
 
 #### Scenario: Internal components not exported
@@ -61,6 +68,25 @@
 
 - **WHEN** a consumer needs to build workspace targets
 - **THEN** `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, and `DiscoveredSpec` are available as imports
+
+#### Scenario: SpecNotFoundError is exported
+
+- **WHEN** a consumer imports from `@specd/code-graph`
+- **THEN** `SpecNotFoundError` is available as an import
+- **AND** thrown instances expose machine-readable code `SPEC_NOT_FOUND` and the requested spec id
+
+### Requirement: Public and internal entry points
+
+#### Scenario: package.json exports public and internal
+
+- **WHEN** `packages/code-graph/package.json` `exports` is inspected
+- **THEN** `"."` and `"./internal"` entry points exist
+
+#### Scenario: InMemoryIndexSession only on internal entry
+
+- **WHEN** importing from `@specd/code-graph` `"."`
+- **THEN** `InMemoryIndexSession` is not available at compile time
+- **AND** importing from `@specd/code-graph/internal` succeeds
 
 ### Requirement: Lifecycle management
 
@@ -89,3 +115,10 @@
 - **WHEN** the `@specd/code-graph` package is inspected
 - **THEN** its `package.json` has a dependency on `@specd/core`
 - **AND** the primary factory accepts `SpecdConfig` from `@specd/core`
+
+### Requirement: Host use cases
+
+#### Scenario: Package exports host use case factories
+
+- **WHEN** `@specd/code-graph` is imported
+- **THEN** `createGetGraphHealth`, `createIndexProjectGraph`, `createGetSpecCoverage`, and `createGetChangeSpecCoverage` are available as named exports

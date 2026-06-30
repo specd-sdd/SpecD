@@ -2,9 +2,12 @@
   "title": "plugin-agent-standard:plugin-agent",
   "description": "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's metadata contract while relying on `@specd/skills` to render the final installed markdown.",
   "dependsOn": [
-    "plugin-agent-opencode:plugin-agent",
-    "default:_global/commits",
-    "skills:resolve-bundle"
+    "core:config",
+    "plugin-manager:agent-plugin-type",
+    "skills:skill-bundle",
+    "skills:skill-repository",
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "context": [
     "The Agent Skills open standard (agentskills.io) is adopted by a growing number of agent clients (Gemini CLI, Cursor, Amp, Roo Code, etc.). specd needs a vendor-neutral plugin that installs skills using this standard's metadata contract while relying on `@specd/skills` to render the final installed markdown."
@@ -31,7 +34,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter source value collection\n3. declares only the Agent Skills standard-supported capability identifiers\n4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. passes `variables.sharedFolder` only when overriding the default shared path contract\n6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n7. writes files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
+        "The application layer MUST have an `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills`\n2. Resolve standard frontmatter source values for each skill\n3. Declare only the Standard agent supported capability identifiers (`['frontmatter']`)\n4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. Pass `variables.sharedFolder` only when overriding the default shared path contract\n6. Install files not marked as shared to categorized directories relative to `projectRoot`:\n   - Skills to `.agents/skills/<skill-name>/`\n   - Agents to the same directory as the shared context file (since `agents` capability is not supported)\n7. Install files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.\nThe plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants."
       ]
     },
     {
@@ -168,6 +171,15 @@
       "then": ["that location does not contain a SKILL.md file"]
     },
     {
+      "requirement": "Install location",
+      "name": "Fallback to shared location for agents",
+      "given": ["a request to install an agent"],
+      "when": ["install(config, options) runs"],
+      "then": [
+        "it copies the agent to the same directory as shared.md (since agents capability is not supported)"
+      ]
+    },
+    {
       "requirement": "allowed-tools configuration",
       "name": "Each skill has appropriate tool declarations",
       "when": ["the per-skill frontmatter map is inspected"],
@@ -252,12 +264,17 @@
         "specId": "plugin-agent-standard:plugin-agent",
         "file": "plugin-agent-standard:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-standard:plugin-agent",
+        "file": "plugin-agent-standard:src/domain/frontmatter/index.ts",
+        "symbol": "agentFrontmatter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4676a5ad489064611bfb036b593425be1ad4d0611c1f4193f831e8105229f5f6",
-    "verify.md": "sha256:fbb28c75efa6c4b8a65b42a125830e31dd151fedd7590a5ea4e1c44dc15bc8a9"
+    "spec.md": "sha256:233ce9936b16d56cbcb0a1192aa21b8d5b290512a53fe2ac0d6972dcf5429586",
+    "verify.md": "sha256:b67aac61380878215e71ebdd1e9f2f89a0f117aec604a220f716fb5e2374b39e"
   },
   "generatedBy": "core"
 }

@@ -20,13 +20,25 @@
   },
   "exports": {
     ".": {
+      "import": "./dist/public.js",
+      "types": "./dist/public.d.ts"
+    },
+    "./ports": {
+      "import": "./dist/ports.js",
+      "types": "./dist/ports.d.ts"
+    },
+    "./extensions": {
+      "import": "./dist/extensions.js",
+      "types": "./dist/extensions.d.ts"
+    },
+    "./internal": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "build": "tsup src/public.ts src/ports.ts src/extensions.ts src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/public.ts src/ports.ts src/extensions.ts src/index.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "release:publish": "pnpm publish --access public",

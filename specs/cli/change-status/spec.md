@@ -101,13 +101,11 @@ When the CLI has resolved the active `Schema` instance, structured and text DAG 
 
 This allows design/implement skills to replace `schema show` calls.
 
-### Requirement: Implementation tracking refresh before status load
+### Requirement: Delegates refresh policy to GetStatus
 
-Before invoking `GetStatus`, the command MUST call `RefreshImplementationTracking` for the same change name.
+The command MUST invoke `GetStatus` directly and MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector` itself.
 
-The CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.
-
-After refresh, the command MUST call `GetStatus` and serialize its result, including implementation-tracking projection when requested.
+Default `GetStatus` refresh behaviour applies unless a future CLI flag explicitly opts out.
 
 ### Requirement: Implementation section
 
@@ -187,5 +185,4 @@ blockers:
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
 - [`core:change`](../../core/change/spec.md) — change and artifact state model
-- [`core:get-status`](../../core/get-status/spec.md) — status payload returned by core
-- [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before status load
+- [`core:get-status`](../../core/get-status/spec.md) — status payload and default refresh orchestration

@@ -1,14 +1,14 @@
 import { type Command } from 'commander'
-import type { Kernel, SpecdConfig } from '@specd/core'
+import type { SpecdConfig } from '@specd/sdk'
+import { createConfigWriter } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat, type OutputFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
+import { getDeclaredPlugins } from './get-declared-plugins.js'
 import {
   InstallPlugin,
-  InstallUiPlugin,
   LoadPlugin,
   createPluginLoader,
-  isUiPlugin,
   type InstallPluginOutput,
 } from '@specd/plugin-manager'
 
@@ -38,22 +38,22 @@ export interface PluginInstallBatchResult {
  * Orchestrates plugin installation and config persistence.
  *
  * @param input - Installation input.
- * @param input.kernel - CLI kernel.
  * @param input.config - Fully-resolved project configuration.
  * @param input.configPath - Absolute path to `specd.yaml`.
  * @param input.pluginNames - Plugin package names to process.
  * @returns Batch result entries and aggregate error state.
  */
 export async function installPluginsWithKernel(input: {
-  readonly kernel: Kernel
   readonly config: SpecdConfig
   readonly configPath: string
   readonly pluginNames: readonly string[]
 }): Promise<PluginInstallBatchResult> {
   const loader = createPluginLoader({ config: input.config })
-  const installAgent = new InstallPlugin(loader)
-  const installUi = new InstallUiPlugin(loader)
+  const install = new InstallPlugin(loader)
   const load = new LoadPlugin(loader)
+  const writer = createConfigWriter()
+  const declared = getDeclaredPlugins(input.config, 'agents')
+  const declaredSet = new Set(declared.map((entry) => entry.name))
 
   const plugins: PluginInstallEntry[] = []
   let hasErrors = false
@@ -69,35 +69,26 @@ export async function installPluginsWithKernel(input: {
       continue
     }
 
+    if (declaredSet.has(pluginName)) {
+      const detail = `${pluginName} already installed; use update to reinstall`
+      process.stderr.write(`warning: ${detail}\n`)
+      plugins.push({
+        name: pluginName,
+        status: 'skipped',
+        detail,
+      })
+      continue
+    }
+
     try {
       const loaded = await load.execute({ pluginName })
+      const installResult: InstallPluginOutput = await install.execute({
+        pluginName,
+        config: input.config,
+      })
       const pluginBucket = toPluginBucket(loaded.plugin.type)
-      const declared = await input.kernel.project.listPlugins.execute({
-        configPath: input.configPath,
-        type: pluginBucket,
-      })
-      if (declared.some((entry) => entry.name === pluginName)) {
-        const detail = `${pluginName} already installed; use update to reinstall`
-        process.stderr.write(`warning: ${detail}\n`)
-        plugins.push({
-          name: pluginName,
-          status: 'skipped',
-          detail,
-        })
-        continue
-      }
-
-      const installResult: InstallPluginOutput = isUiPlugin(loaded.plugin)
-        ? await installUi.execute({ pluginName, config: input.config })
-        : await installAgent.execute({
-            pluginName,
-            config: input.config,
-          })
-      await input.kernel.project.addPlugin.execute({
-        configPath: input.configPath,
-        type: pluginBucket,
-        name: pluginName,
-      })
+      await writer.addPlugin(input.configPath, pluginBucket, pluginName)
+      declaredSet.add(pluginName)
       plugins.push({
         name: pluginName,
         status: 'installed',
@@ -131,12 +122,11 @@ export function registerPluginsInstall(parent: Command): void {
     .action(async (pluginNames: string[], opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath, kernel } = await resolveCliContext({
+        const { config, configFilePath } = await resolveCliContext({
           configPath: opts.config,
         })
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await installPluginsWithKernel({
-          kernel,
           config,
           configPath,
           pluginNames,
@@ -176,9 +166,7 @@ function renderInstallOutput(result: PluginInstallBatchResult, format: OutputFor
  * @returns Config bucket name under `plugins`.
  */
 function toPluginBucket(pluginType: string): string {
-  if (pluginType === 'agent') return 'agents'
-  if (pluginType === 'ui') return 'ui'
-  return `${pluginType}s`
+  return pluginType === 'agent' ? 'agents' : `${pluginType}s`
 }
 
 /**

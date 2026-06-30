@@ -1,4 +1,4 @@
-import { SymbolKind, type SymbolKind as SymbolKindValue } from '@specd/code-graph'
+import { SymbolKind, type SymbolKind as SymbolKindValue } from '@specd/sdk'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 
 const VALID_SYMBOL_KINDS = new Set<SymbolKindValue>(Object.values(SymbolKind))

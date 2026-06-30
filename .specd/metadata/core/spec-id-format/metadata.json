@@ -137,5 +137,7 @@
     "spec.md": "sha256:2d1cedb994fda0e4439c76a3aa860a17a85c3fbf790bf15616a6d8785734e34c",
     "verify.md": "sha256:f9023f0a7de7d50e232e3a5d07456bc5ad2a86f29167e5ec10017e490d9d989a"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Without a single canonical format for referencing specs, workspace prefixes and capability path segments become ambiguous — different…",
+  "optimizedContext": "# Spec ID Format\n\n## Rules\n- Canonical format: The canonical spec ID format SHALL be workspace:capabilityPath, where: - workspace is the workspace name (e.g.\n- Bare path shorthand: When no : is present, the spec ID SHALL be interpreted as a capability path in the default workspace.\n- Unknown workspace rejection: When a colon-qualified spec ID specifies a workspace name that does not exist in the project configuration, the parser SHALL reject the input with an error.\n- Parsing rules: Parsing a spec ID string SHALL follow these steps: 1.\n- Normalization: Functions that accept spec IDs SHOULD normalize bare paths to fully-qualified form (default:capPath) at the system boundary.\n- specDependsOn format: The specDependsOn map in the change manifest MUST use fully-qualified spec IDs (workspace:capabilityPath).\n- Dependencies: core:change, core:change-manifest, core:spec-metadata, core:compile-context, core:workspace\n\n## Constraints\n- Workspace names MUST NOT contain / or : characters\n- Capability paths MUST NOT contain : characters\n- The separator is always : (colon) — / is never a workspace separator\n- The default workspace is implicit when no colon is present\n"
 }

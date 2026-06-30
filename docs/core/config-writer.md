@@ -7,6 +7,25 @@ Location:
 - `packages/core/src/application/ports/config-writer.ts`
 - filesystem adapter: `packages/core/src/infrastructure/fs/config-writer.ts`
 
+## Delivery
+
+Hosts obtain a `ConfigWriter` through the composition factory:
+
+```typescript
+import { createConfigWriter } from '@specd/core'
+
+const writer = createConfigWriter()
+await writer.initProject({ projectRoot, schemaRef, workspaceId, specsPath })
+await writer.addPlugin(configPath, 'agents', '@specd/plugin-agent-claude')
+await writer.removePlugin(configPath, 'agents', '@specd/plugin-agent-claude')
+```
+
+Pass a pre-built writer for tests:
+
+```typescript
+const writer = createConfigWriter({ configWriter: stubWriter })
+```
+
 ## Methods
 
 ### `initProject(options)`

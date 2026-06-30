@@ -1,9 +1,9 @@
 {
   "title": "ConfigWriter Port",
-  "description": "Project initialisation and skill installation must create and mutate `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — initialising a project, recording skill installations, and reading the skills manifest — complementing the read-only `ConfigLoader`.",
+  "description": "Project initialisation and plugin declaration mutation must create and update `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — `initProject`, `addPlugin`, and `removePlugin` — complementing the read-only `ConfigLoader`. Delivery mechanisms obtain a wired instance via `createConfigWriter()` from the composition layer.",
   "dependsOn": ["default:_global/architecture", "core:config"],
   "context": [
-    "Project initialisation and skill installation must create and mutate `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — initialising a project, recording skill installations, and reading the skills manifest — complementing the read-only `ConfigLoader`."
+    "Project initialisation and plugin declaration mutation must create and update `specd.yaml`, but the application layer cannot depend on filesystem or YAML libraries directly. `ConfigWriter` is the application-layer port that defines the contract for these write operations — `initProject`, `addPlugin`, and `removePlugin` — complementing the read-only `ConfigLoader`. Delivery mechanisms obtain a wired instance via `createConfigWriter()` from the composition layer."
   ],
   "rules": [
     {
@@ -46,6 +46,18 @@
       "requirement": "AddPlugin",
       "rules": [
         "The `addPlugin` method accepts four parameters:\n\n1. `configPath: string` — absolute path to the `specd.yaml` to update\n2. `type: string` — the plugin type (e.g. `\"agents\"`)\n3. `name: string` — the plugin package name (e.g. `\"@specd/plugin-agent-claude\"`)\n4. `config?: Record<string, unknown>` — optional plugin configuration (e.g. `{ commandsDir: '.claude/commands' }`)\n\nIt MUST return `Promise<void>`. The method MUST add the plugin to the `plugins.<type>` array in `specd.yaml`. If the plugin is already present, the method MUST NOT duplicate it. When `config` is provided, it MUST be written alongside the `name` in the plugin entry."
+      ]
+    },
+    {
+      "requirement": "RemovePlugin",
+      "rules": [
+        "The `removePlugin` method accepts three parameters:\n\n1. `configPath: string` — absolute path to the `specd.yaml` to update\n2. `type: string` — the plugin type (e.g. `\"agents\"`)\n3. `name: string` — the plugin package name\n\nIt MUST return `Promise<void>`. The method MUST remove the named plugin from `plugins.<type>` in `specd.yaml`."
+      ]
+    },
+    {
+      "requirement": "Delivery access via createConfigWriter",
+      "rules": [
+        "Delivery mechanisms (CLI, MCP, plugins) MUST obtain a `ConfigWriter` instance through `createConfigWriter()` exported from `@specd/core`. They MAY call `initProject`, `addPlugin`, and `removePlugin` on that instance. They MUST NOT import `FsConfigWriter` or construct port implementations directly.\n\n`listPlugins` on the port remains for infrastructure compatibility but delivery MUST NOT use it for declaration reads when a `SpecdConfig` snapshot is already available."
       ]
     }
   ],
@@ -109,6 +121,28 @@
       "then": ["the existing entry is updated"]
     },
     {
+      "requirement": "RemovePlugin",
+      "name": "Removes plugin from agents array",
+      "given": ["specd.yaml with plugins: { agents: [{ name: '@specd/plugin-agent-claude' }] }"],
+      "when": ["removePlugin(configPath, 'agents', '@specd/plugin-agent-claude') is called"],
+      "then": ["the plugin is removed from plugins.agents"]
+    },
+    {
+      "requirement": "Delivery access via createConfigWriter",
+      "name": "Delivery obtains writer via composition factory",
+      "when": ["a CLI command needs to mutate specd.yaml"],
+      "then": [
+        "it calls createConfigWriter() from @specd/core",
+        "AND it invokes initProject, addPlugin, or removePlugin on the returned instance"
+      ]
+    },
+    {
+      "requirement": "Delivery access via createConfigWriter",
+      "name": "Delivery does not construct FsConfigWriter directly",
+      "when": ["@specd/cli imports from @specd/core for config mutation"],
+      "then": ["it imports createConfigWriter — not FsConfigWriter"]
+    },
+    {
       "requirement": "InitProject method signature",
       "name": "initProject accepts InitProjectOptions",
       "when": ["initProject is called"],
@@ -133,10 +167,18 @@
       "then": ["it contains configPath: string, schemaRef: string, workspaces: readonly string[]"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:config-writer-port",
+        "file": "core:src/composition/config-writer.ts",
+        "symbol": "createConfigWriter"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:c91f0505b79fbc85bf3fd4c883aa6fbb48034c8a2af7a80a6755cd7202861e62",
-    "verify.md": "sha256:f044cfa976b359c4ab2734bf2c3f84c68dd4da0eb3afb3dfeaf3f2318a9e31ae"
+    "spec.md": "sha256:c2fa70a7da672911bff2fa71c6ae429399fbc88ed58ac21e0550b5ccc5d447d7",
+    "verify.md": "sha256:a70289394d9ddf8a358f1cd44b5719368f333f7b19d8c660f6471e5b0029adda"
   },
   "generatedBy": "core"
 }

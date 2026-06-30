@@ -237,11 +237,10 @@ describe('computeHotspots', () => {
 
     const result = await computeHotspots(store)
 
-    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'interface', 'method', 'function'])
+    expect(DEFAULT_HOTSPOT_KINDS).toEqual(['class', 'method', 'function'])
     expect(result.entries.map((entry) => entry.symbol.kind).sort()).toEqual([
       SymbolKind.Class,
       SymbolKind.Function,
-      SymbolKind.Interface,
       SymbolKind.Method,
     ])
   })
@@ -373,7 +372,11 @@ describe('computeHotspots', () => {
       [createRelation({ source: impl.id, target: contract.id, type: RelationType.Implements })],
     )
 
-    const result = await computeHotspots(store, { minRisk: 'LOW', minScore: 0 })
+    const result = await computeHotspots(store, {
+      minRisk: 'LOW',
+      minScore: 0,
+      kinds: [SymbolKind.Interface],
+    })
     const entry = result.entries.find((candidate) => candidate.symbol.id === contract.id)
 
     expect(entry).toBeDefined()

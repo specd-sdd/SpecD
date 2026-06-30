@@ -1,0 +1,37 @@
+- op: added
+  description: Verify CLI does not build CompileContextConfig inline
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Behaviour'
+    before:
+      type: section
+      matches: 'Scenario: Context entries rendered first'
+  content: |
+    #### Scenario: CLI does not build CompileContextConfig inline
+
+    - **WHEN** `specd project context` is run
+    - **THEN** the command does not construct a `CompileContextConfig` object from `SpecdConfig`
+    - **AND** it invokes `GetProjectContext.execute` with runtime overrides only
+
+- op: added
+  description: Verify runtime override forwarding for optimization flags
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Behaviour'
+    after:
+      type: section
+      matches: 'Scenario: --no-optimized forces raw sections'
+  content: |
+    #### Scenario: --no-optimized passed as runtime override
+
+    - **GIVEN** `llmOptimizedContext: true` in configuration
+    - **WHEN** `specd project context --no-optimized` is executed
+    - **THEN** the CLI passes `llmOptimizedContext: false` on `GetProjectContext.execute`
+
+    #### Scenario: --mode passed as runtime override
+
+    - **GIVEN** yaml `contextMode: 'summary'`
+    - **WHEN** `specd project context --mode full` is executed
+    - **THEN** the CLI passes `contextMode: 'full'` on `GetProjectContext.execute`

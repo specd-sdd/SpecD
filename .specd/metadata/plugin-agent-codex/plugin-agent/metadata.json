@@ -6,7 +6,8 @@
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-templates-source",
-    "skills:resolve-bundle"
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "context": [
     "This spec defines the Codex agent plugin contract for install/uninstall behavior, install target directory, and exact metadata value support so `@specd/skills` can render deterministic installed skill files for Codex."
@@ -27,7 +28,7 @@
     {
       "requirement": "Skill installation and frontmatter injection",
       "rules": [
-        "The plugin MUST install skills from `@specd/skills` and pass Codex-compatible capability identifiers plus frontmatter source values into markdown skill rendering during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve structured frontmatter source values for each skill\n3. declare only the Codex-supported capability identifiers for each skill\n4. resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. pass `variables.sharedFolder` only when overriding the default shared path contract\n6. write files marked as shared to the rendered `sharedFolder` location under the project root\n7. write files not marked as shared to the installed skill directory\n8. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files\n9. return an `InstallResult` with installed and skipped entries\n\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
+        "The plugin MUST install skills from `@specd/skills` and pass Codex-compatible capability identifiers (`['mcp', 'agents', 'frontmatter']`) plus frontmatter source values into markdown skill rendering during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve structured frontmatter source values for each skill\n3. declare only the Codex-supported capability identifiers for each skill\n4. resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. pass `variables.sharedFolder` only when overriding the default shared path contract\n6. write files marked as shared to the rendered `sharedFolder` location under the project root\n7. write files not marked as shared to categorized directories relative to `projectRoot`:\n   - Skills to `.codex/skills/<skill-name>/`\n   - Agents to `.codex/agents/<agent-name>.toml`\n8. Sub-agent Mapping: When installing an agent, the plugin MUST:\n   - Generate a TOML file instead of Markdown.\n   - Map `name` and `description` to TOML keys.\n   - Wrap the rendered system prompt in a multi-line string (`\"\"\"`) and map it to the `developer_instructions` TOML key.\n   - Ensure the instructions are correctly escaped for TOML.\n9. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files\n10. return an `InstallResult` with installed and skipped entries\n11. Fallback: If `agents` capability is missing, install agents into the same directory as the shared context file.\n\nThe plugin MUST NOT prepend YAML frontmatter for standard skills after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.\nThe plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants."
       ]
     },
     {
@@ -45,7 +46,7 @@
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.codex/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.codex/skills/` that are not part of the specd-managed skill set."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.codex/skills/` and agent files from `.codex/agents/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.codex/agents/`.\n\nWhen no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.codex/agents/`, and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.codex/skills/` or `.codex/agents/` that are not part of the specd-managed skill or agent set."
       ]
     }
   ],
@@ -153,6 +154,25 @@
       "then": ["that location does not contain a SKILL.md file"]
     },
     {
+      "requirement": "Install location",
+      "name": "Installs agents to categorized directory",
+      "given": ["a request to install an agent"],
+      "when": ["install(config, options) runs"],
+      "then": [
+        "it installs the agent files to .codex/agents/",
+        "AND the files use the .toml extension",
+        "AND the content contains the developer_instructions TOML key",
+        "AND the instructions are wrapped in a multi-line string"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Fallback to shared location when agents capability is missing",
+      "given": ["a runtime that does not support agents"],
+      "when": ["an agent is installed"],
+      "then": ["it is copied to the same directory as shared.md"]
+    },
+    {
       "requirement": "Uninstall behavior",
       "name": "Uninstall removes selected skill directories and keeps shared resources",
       "given": ["multiple skills are installed and share the resolved sharedFolder location"],
@@ -171,6 +191,22 @@
         "AND the resolved sharedFolder location is removed",
         "AND unrelated user skill directories remain"
       ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected agent files",
+      "given": ["multiple agents are installed"],
+      "when": ["uninstall(config, { agents: ['specd-project-context-optimizer'] }) is executed"],
+      "then": ["only .codex/agents/specd-project-context-optimizer.toml is removed"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall without filter removes all specd-managed agents",
+      "given": [
+        "specd-managed agents and unrelated user agents are installed under .codex/agents/"
+      ],
+      "when": ["uninstall(config) is executed without filters"],
+      "then": ["all specd-managed agent files are removed", "AND unrelated user agent files remain"]
     }
   ],
   "implementation": {
@@ -185,12 +221,17 @@
         "specId": "plugin-agent-codex:plugin-agent",
         "file": "plugin-agent-codex:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-codex:plugin-agent",
+        "file": "plugin-agent-codex:src/domain/frontmatter/index.ts",
+        "symbol": "agentFrontmatter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:07239742490a82ca3c1d503df9a8e5189de8d6954b926c211640d59d928ea7e6",
-    "verify.md": "sha256:9a9591cf38dcb7e6fa6e7f14b305594635f10c2126f8bcd84ede90bd29071229"
+    "spec.md": "sha256:b047d50b8bad9a6eae781b61a51fa0782a321ef3f8b72b77a0c02ad58f183587",
+    "verify.md": "sha256:a4712f997cf0adcb7b403254d908817501c38508cab97cc1be446b0e334738c4"
   },
   "generatedBy": "core"
 }

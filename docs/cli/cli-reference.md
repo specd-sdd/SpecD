@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `specd` CLI is the primary interface for managing the spec-driven development workflow. It provides commands for creating and progressing changes, browsing specs, inspecting configuration and schemas, managing plugins, and running SpecD Studio (`specd ui serve`).
+The `specd` CLI is the primary interface for managing the spec-driven development workflow. It provides commands for creating and progressing changes, browsing specs, inspecting configuration and schemas, and managing plugins.
 
 ## Invocation
 
@@ -322,7 +322,7 @@ to inspect merged full content for a specific spec in this change.
 
 If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode still prints `Context Fingerprint: <sha256...>` first and then `Context unchanged since last call.`. Structured output keeps the fingerprint plus the current step availability, available steps, and warnings, while omitting the full context body.
 
-`change status` also renders implementation tracking when the change has tracked files or confirmed links. The implementation block shows tracked files grouped by `open`, `resolved`, and `ignored`, then confirmed links and any stale symbol diagnostics available from the current code graph. When the graph is not indexed or stale, the command prints a graph-state hint instead of failing.
+`change status` also renders implementation tracking when the change has tracked files or confirmed links. The implementation block shows tracked files grouped by `open`, `resolved`, `ignored`, and `removed`, then confirmed links and any stale symbol diagnostics available from the current code graph. When the graph is not indexed or stale, the command prints a graph-state hint instead of failing.
 
 ### change implementation
 
@@ -338,8 +338,17 @@ Available subcommands:
 - `review` — show tracked files, confirmed links, stale symbol diagnostics, and out-of-scope sidecar preview
 - `add` — create or enrich a confirmed implementation link
 - `remove` — remove a file-level link or specific symbols
-- `ignore` — mark a tracked file as ignored
+- `ignore` — mark a tracked file as ignored (already-tracked missing files may be ignored)
 - `resolve` — mark a tracked file as reviewed/resolved
+- `unresolve` — reopen a resolved file back to `open`
+
+Tracked file states: `open`, `resolved`, `ignored`, `removed`. The `removed` state is assigned automatically by `refresh` when a tracked file no longer exists on disk; it cannot be set manually. Files in the `removed` state are excluded from `unresolve` — only a subsequent `refresh` can restore them to `open` if they reappear.
+
+File existence validation is performed by the core use case, not the CLI. The CLI delegates all validation and rejects operations with appropriate errors (`ImplementationFileNotFoundError`) when the target file does not exist on disk.
+
+`resolve` and `unresolve` operate on tracked-file review state only. They do not create new tracked entries, and `resolve` cannot be used to promote an untracked file directly to `resolved`.
+
+The `ignore` action is an exception: files that are already tracked (including those missing from disk) may be ignored without an existence check. Untracked files must exist on disk before they can be ignored.
 
 Examples:
 
@@ -348,6 +357,7 @@ specd changes implementation list my-change
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts --symbol Change.transition
 specd changes implementation resolve my-change --file packages/core/src/domain/entities/change.ts
+specd changes implementation unresolve my-change --file packages/core/src/domain/entities/change.ts
 ```
 
 ### change artifacts
@@ -786,6 +796,8 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 | `--scenarios`               | Include scenarios extracted from spec metadata (full-mode only).   |
 | `--follow-deps`             | Follow `dependsOn` links and include transitive specs.             |
 | `--depth <n>`               | Maximum depth for dependency traversal. Used with `--follow-deps`. |
+| `--optimized`               | Force prefer optimized content (when available and fresh).         |
+| `--no-optimized`            | Suppress preference for optimized content; show raw sections.      |
 | `--format text\|json\|toon` | Output format.                                                     |
 | `--config <path>`           | Config file path.                                                  |
 
@@ -947,6 +959,8 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 | `--scenarios`               | Include scenarios from project-level specs (full-mode only).   |
 | `--follow-deps`             | Follow `dependsOn` links and include transitive specs.         |
 | `--depth <n>`               | Maximum depth for dependency traversal.                        |
+| `--optimized`               | Force prefer optimized context (when available and fresh).     |
+| `--no-optimized`            | Suppress preference for optimized context; show raw contents.  |
 | `--format text\|json\|toon` | Output format.                                                 |
 | `--config <path>`           | Config file path.                                              |
 
@@ -1124,6 +1138,7 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--symbols`                  | Search only symbols.                                                            |
 | `--specs`                    | Search only specs.                                                              |
 | `--documents`                | Search only documents.                                                          |
+| `--snippet`                  | Include snippet previews. Without it, output stays compact and location-first.  |
 | `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.     |
 | `--config <path>`            | Config file path. Mutually exclusive with `--path`.                             |
 | `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                  |
@@ -1135,6 +1150,16 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--spec-content`             | Include full spec content in `json` or `toon` output.                           |
 | `--format text\|json\|toon`  | Output format.                                                                  |
 
+By default, text output shows a compact identity block plus location metadata:
+
+- symbols show `path:line:column`
+- specs show `match @ L<start>-L<end>`
+- documents show `match @ L<start>-L<end>`
+
+Pass `--snippet` when you want preview text. In `json` and `toon`, the `snippet` field
+is omitted unless `--snippet` is passed. `--spec-content` remains independent and only
+controls whether full spec content is included in structured output.
+
 Exact identifier matches are ranked ahead of fuzzy matches:
 
 - spec search boosts exact `specId` matches such as `core:change`
@@ -1142,6 +1167,20 @@ Exact identifier matches are ranked ahead of fuzzy matches:
 - document search boosts exact canonical paths and exact project-relative paths
 
 Text output renders file-bearing results using paths relative to `projectRoot`.
+
+#### Examples
+
+Search for references to "SpecRepository" (symbols only, including snippets):
+
+```
+specd graph search "SpecRepository" --symbols --snippet
+```
+
+Search for "archive" across specs:
+
+```
+specd graph search "archive" --specs
+```
 
 ---
 
@@ -1170,11 +1209,25 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                                              |
 | `--format text\|json\|toon`  | Output format.                                                                                              |
 
-By default, `graph hotspots` shows only `class`, `interface`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, and excludes importer-only symbols that have no direct callers.
+By default, `graph hotspots` shows only `class`, `method`, and `function` symbols, applies `min-score=1`, `min-risk=MEDIUM`, and `limit=20`, and excludes importer-only symbols that have no direct callers.
 
 `--kind` accepts a single comma-separated list and validates every token against the supported symbol kinds. Invalid values fail the command before querying the graph. When you pass `--kind`, that list fully replaces the default kind set instead of merging with it.
 
 Overriding `--min-risk`, `--limit`, or `--min-score` does not disable the other defaults. Use `--include-importer-only` when you explicitly want importer-only symbols to appear.
+
+#### Examples
+
+List top 10 hotspots with HIGH or CRITICAL risk:
+
+```
+specd graph hotspots --limit 10 --min-risk HIGH
+```
+
+List class or method hotspots inside the `core` workspace:
+
+```
+specd graph hotspots --kind class,method --workspace core
+```
 
 ---
 
@@ -1193,6 +1246,14 @@ If a graph index is currently running, this command fails fast with: `The code g
 | `--config <path>`           | Config file path. Mutually exclusive with `--path`.            |
 | `--path <path>`             | Repository root bootstrap path. Ignores any discovered config. |
 | `--format text\|json\|toon` | Output format.                                                 |
+
+#### Examples
+
+Print graph stats in TOON format:
+
+```
+specd graph stats --format toon
+```
 
 ---
 
@@ -1399,65 +1460,6 @@ specd schema validate --raw
 
 ---
 
-## serve
-
-Start the SpecD Studio **HTTP API only** (no UI). Default listen address: `http://127.0.0.1:4450`, API base path `/v1`.
-
-```
-specd serve [options]
-```
-
-| Option          | Description                      |
-| --------------- | -------------------------------- |
-| `-p, --port`    | Listen port (default `4450`).    |
-| `-h, --host`    | Bind host (default `127.0.0.1`). |
-| `-c, --config`  | Path to `specd.yaml`.            |
-| `--auth <type>` | v1 supports only `disabled`.     |
-
-See [serve](./serve.md) and [Configuration: `api`](../config/config-reference.md#api).
-
----
-
-## ui
-
-SpecD Studio UI commands.
-
-### ui serve
-
-Start the Studio **API and active UI plugin** from `plugins.ui`.
-
-```
-specd ui serve [options]
-```
-
-| Option          | Description                              |
-| --------------- | ---------------------------------------- |
-| `-p, --port`    | API listen port (default `4450`).        |
-| `-h, --host`    | API bind host (default `127.0.0.1`).     |
-| `-c, --config`  | Path to `specd.yaml`.                    |
-| `--auth <type>` | v1 supports only `disabled`.             |
-| `-o, --open`    | Open the IDE URL in the default browser. |
-
-Requires a UI plugin installed via `specd plugins install` (for example `@specd/plugin-ui-studio` or `@specd/studio-web`).
-
-See [ui serve](./ui-serve.md) and [Studio documentation](../studio/index.md).
-
----
-
-## plugins
-
-Install, list, show, update, and uninstall SpecD plugins (`agents` and `ui` buckets in `specd.yaml`).
-
-Dedicated pages:
-
-- [plugins install](./plugins-install.md)
-- [plugins list](./plugins-list.md)
-- [plugins show](./plugins-show.md)
-- [plugins update](./plugins-update.md)
-- [plugins uninstall](./plugins-uninstall.md)
-
----
-
 ## Common workflows
 
 ### Start a new change
@@ -1520,8 +1522,5 @@ specd project init --schema @specd/schema-std --agent claude --agent copilot
 
 ## Related documentation
 
-- [SpecD Studio](../studio/index.md) — IDE packages, getting started, architecture
-- [Studio HTTP API](../api/index.md) — `/v1` REST reference
-- [Studio client](../client/index.md) — `@specd/client` and `SpecdDataPort`
-- [Configuration reference](../config/config-reference.md) — `specd.yaml` fields, file discovery, workspace configuration, hooks, `api`, `plugins.ui`
+- [Configuration reference](../config/config-reference.md) — `specd.yaml` fields, file discovery, workspace configuration, hooks
 - [Schema format reference](../schemas/schema-format.md) — artifact definitions, lifecycle steps, validation rules, delta files

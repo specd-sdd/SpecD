@@ -85,6 +85,16 @@ JSON/TOON output schema:
 
 This ensures programmatic consumers (agents, scripts, CI pipelines) can discover the output shape without reading source code or running the command.
 
+### Requirement: Host package SDK dependency boundary
+
+Delivery host packages `@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct workspace dependency on specd platform packages (`@specd/core`, `@specd/code-graph`, `@specd/sdk`). Plugin, schema, and third-party dependencies are unaffected.
+
+`@specd/mcp` declares `@specd/sdk` as its specd platform dependency even when the package contains no MCP tools yet.
+
+### Requirement: Banner version labels
+
+When the root help banner renders version labels, it MUST show installed versions for `@specd/cli`, `@specd/sdk`, the `@specd/core` version obtained through `@specd/sdk` re-exports (`CORE_VERSION`), and the `@specd/code-graph` version obtained through `@specd/sdk` re-exports (`codeGraphVersion`).
+
 ### Requirement: Excess arguments rejected
 
 Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored.

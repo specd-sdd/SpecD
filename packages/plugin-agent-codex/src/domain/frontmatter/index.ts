@@ -37,3 +37,17 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     description: 'Verify implementation against spec scenarios for a change.',
   },
 }
+
+/**
+ * Frontmatter map keyed by agent id.
+ */
+export const agentFrontmatter: Readonly<Record<string, Frontmatter>> = {
+  'specd-project-context-optimizer': {
+    name: 'specd-project-context-optimizer',
+    description: 'Generates a high-density, token-efficient version of project-level context.',
+  },
+  'specd-spec-context-optimizer': {
+    name: 'specd-spec-context-optimizer',
+    description: 'Generates a high-density, token-efficient version of spec-level metadata.',
+  },
+}

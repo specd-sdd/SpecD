@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { output, parseFormat } from '../src/formatter.js'
+import { InvalidFormatError } from '../src/errors/index.js'
 
 describe('parseFormat', () => {
   it('accepts text', () => {
@@ -20,6 +21,16 @@ describe('parseFormat', () => {
 
   it('error message lists valid formats', () => {
     expect(() => parseFormat('csv')).toThrow(/text, json, toon/)
+  })
+
+  it('throws InvalidFormatError with INVALID_FORMAT code', () => {
+    try {
+      parseFormat('xml')
+      expect.fail('expected parseFormat to throw')
+    } catch (err) {
+      expect(err).toBeInstanceOf(InvalidFormatError)
+      expect((err as InvalidFormatError).code).toBe('INVALID_FORMAT')
+    }
   })
 })
 

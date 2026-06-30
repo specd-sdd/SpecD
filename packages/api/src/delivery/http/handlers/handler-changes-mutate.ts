@@ -136,8 +136,6 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
       const result = await ctx.kernel.changes.transition.execute({
         name,
         to: body.to as import('@specd/core').ChangeState,
-        approvalsSpec: ctx.config.approvals.spec,
-        approvalsSignoff: ctx.config.approvals.signoff,
         ...(body.skipHookPhases !== undefined
           ? {
               skipHookPhases: new Set(
@@ -220,10 +218,9 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { reason?: string }
-      const change = await ctx.kernel.specs.approveSpec.execute({
+      const change = await ctx.kernel.changes.approveSpec.execute({
         name,
         reason: body.reason ?? '',
-        approvalsSpec: ctx.config.approvals.spec,
       })
       return toChangeDetailDto(change)
     }),
@@ -241,10 +238,9 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
     apiHandler(async (ctx, req) => {
       const { name } = req.params as { name: string }
       const body = (req.body ?? {}) as { reason?: string }
-      const change = await ctx.kernel.specs.approveSignoff.execute({
+      const change = await ctx.kernel.changes.approveSignoff.execute({
         name,
         reason: body.reason ?? '',
-        approvalsSignoff: ctx.config.approvals.signoff,
       })
       return toChangeDetailDto(change)
     }),

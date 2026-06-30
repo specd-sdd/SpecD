@@ -1,0 +1,7 @@
+releases:
+  cli:cli/graph-index: patch
+  cli:cli/graph-stats: patch
+  cli:cli/graph-impact: patch
+  code-graph:code-graph/traversal: patch
+  code-graph:code-graph/staleness-detection: patch
+  code-graph:code-graph/composition: patch

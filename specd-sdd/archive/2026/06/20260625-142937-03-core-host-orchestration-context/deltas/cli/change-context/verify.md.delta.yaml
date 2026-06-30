@@ -1,0 +1,43 @@
+- op: modified
+  description: CLI forwards runtime overrides only; section optimization verified in core
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    #### Scenario: CLI does not build CompileContextConfig inline
+
+    - **WHEN** `specd change context` is run
+    - **THEN** the command does not construct a `CompileContextConfig` object from `SpecdConfig`
+    - **AND** it invokes `CompileContext.execute` with runtime overrides only
+
+    #### Scenario: CLI forwards traversal and fingerprint options to CompileContext
+
+    - **WHEN** `specd change context` is run with flags such as `--include-change-specs`, `--follow-deps`, `--depth`, or `--fingerprint`
+    - **THEN** the command forwards those options into the `CompileContext.execute` input
+
+    #### Scenario: --no-optimized suppresses preference for optimized context
+
+    - **GIVEN** `llmOptimizedContext: true` in configuration
+    - **WHEN** `specd change context my-change designing --no-optimized` is executed
+    - **THEN** the CLI passes `llmOptimizedContext: false` as a runtime override on `CompileContext.execute`
+
+    #### Scenario: --optimized forces preference for optimized context
+
+    - **GIVEN** `llmOptimizedContext: false` in configuration
+    - **WHEN** `specd change context my-change designing --optimized` is executed
+    - **THEN** the CLI passes `llmOptimizedContext: true` as a runtime override on `CompileContext.execute`
+
+    #### Scenario: Section flags forwarded without CLI llmOptimizedContext override
+
+    - **GIVEN** `llmOptimizedContext: true` in configuration
+    - **WHEN** `specd change context my-change designing --rules` is executed
+    - **THEN** the CLI forwards `sections: ['rules']` on `CompileContext.execute`
+    - **AND** the CLI does not pass `llmOptimizedContext` when it matches the yaml default
+    - **AND** optimization bypass behaviour is verified by `core:compile-context` (see "Optimization bypassed when only rules requested")
+
+    #### Scenario: Blocking artifacts come from CompileContext output
+
+    - **GIVEN** `CompileContext` returns `stepAvailable: false` and `blockingArtifacts: ['tasks']`
+    - **WHEN** `specd change context my-change implementing` is run
+    - **THEN** stderr names `tasks` as the blocking artifact
+    - **AND** the CLI does not recompute a different blocking set locally

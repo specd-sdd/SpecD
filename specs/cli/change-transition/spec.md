@@ -39,20 +39,24 @@ After resolving the target, the command MUST execute the normal `TransitionChang
 - `pending-signoff` — waiting for human signoff
 - `archivable` — the next action is archive execution, not another lifecycle transition
 
-### Requirement: Implementation tracking refresh before transition
+### Requirement: Delegates refresh policy to TransitionChange
 
-Before invoking `TransitionChange`, the command MUST call `RefreshImplementationTracking` for the same change name.
+The command MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector` directly.
 
-The CLI MUST NOT invoke `ImplementationDetector` directly and MUST NOT duplicate detection merge logic.
+Pre-transition status reads MUST call `GetStatus` with `refreshImplementationTracking: false` because `TransitionChange` performs the refresh.
 
-When the command fetches `GetStatus` after a failed transition to render a repair guide, it MUST NOT call `RefreshImplementationTracking` again solely for that diagnostic read unless the repair flow explicitly requires a second refresh.
+`TransitionChange` MUST be invoked with default `refreshImplementationTrackingBefore` behaviour unless a future CLI flag explicitly opts out.
+
+When rendering a repair guide after a failed transition, the command MUST call `GetStatus` with `refreshImplementationTracking: false` and MUST NOT trigger a second refresh solely for diagnostics.
 
 ### Requirement: Approval-gate routing
 
-The CLI passes the `approvalsSpec` and `approvalsSignoff` flags from the loaded `SpecdConfig` to the `TransitionChange` use case. The use case, via `LifecycleEngine`, applies smart routing:
+The CLI MUST NOT pass approval gate flags to `TransitionChange.execute`. Approval routing uses gate state baked into the kernel's `TransitionChange` instance from `config.approvals` at kernel construction.
 
-- When the change is in `ready` and `approvalsSpec: true`, `implementing` is silently routed to `pending-spec-approval`
-- When the change is in `done` and `approvalsSignoff: true`, `archivable` is silently routed to `pending-signoff`
+The use case, via `LifecycleEngine`, applies smart routing:
+
+- When the change is in `ready` and `config.approvals.spec` is `true`, `implementing` is silently routed to `pending-spec-approval`
+- When the change is in `done` and `config.approvals.signoff` is `true`, `archivable` is silently routed to `pending-signoff`
 
 The user always specifies the logical target state; routing is transparent, and the CLI must not duplicate routing logic beyond choosing the requested target or `--next` target.
 
@@ -136,7 +140,7 @@ specd change transition add-login --skip-hooks all
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
-- [`core:change`](../../core/change/spec.md) — lifecycle states and transitions
-- [`core:transition-change`](../../core/transition-change/spec.md) — transition execution, hooks, and requires enforcement
-- [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — `--skip-hooks` semantics
-- [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before transition
+- [`core:change`](../../core/change/spec.md) — change lifecycle state model
+- [`core:transition-change`](../../core/transition-change/spec.md) — transition execution and default refresh orchestration
+- [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook ordering and failure semantics
+- [`core:get-status`](../../core/get-status/spec.md) — pre-transition and repair-guide status reads

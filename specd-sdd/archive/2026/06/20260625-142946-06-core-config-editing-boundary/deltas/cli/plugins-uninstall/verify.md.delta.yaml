@@ -1,0 +1,23 @@
+- op: removed
+  description: Replace uninstall workflow scenario
+  selector:
+    type: section
+    matches: 'Scenario: Uninstall calls plugin hook and removes from config'
+    parent:
+      type: section
+      matches: 'Requirement: Uninstall workflow'
+
+- op: added
+  description: Uninstall persists via createConfigWriter
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Uninstall workflow'
+  content: |
+    #### Scenario: Uninstall calls plugin hook and removes from config
+
+    - **WHEN** `specd plugins uninstall @specd/plugin-agent-claude` is invoked
+    - **THEN** the plugin is loaded via `LoadPlugin` use case
+    - **AND** the plugin's `uninstall()` method is called
+    - **AND** `createConfigWriter().removePlugin` is called to remove the plugin from `specd.yaml`
+    - **AND** `kernel.project.removePlugin` is not called

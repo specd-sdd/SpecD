@@ -12,6 +12,7 @@ Defines the core domain models for skills: `Skill` and `SkillTemplate`. These ar
 
 - `name: string` — unique identifier for the skill
 - `description: string` — human-readable description of what the skill does
+- `kind: 'skill' | 'agent'` — categorizes the template as a standard skill or a specialized agent
 - `templates: SkillTemplate[]` — template files associated with this skill
 
 ### Requirement: SkillTemplate interface

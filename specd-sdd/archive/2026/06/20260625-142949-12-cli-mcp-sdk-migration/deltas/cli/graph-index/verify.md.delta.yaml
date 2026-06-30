@@ -1,0 +1,36 @@
+- op: modified
+  description: Progress callback targets runIndexProjectGraph
+  selector:
+    type: section
+    matches: 'Scenario: Command passes progress callback in text mode'
+  content: |
+    - **WHEN** `specd graph index` is run in text mode
+    - **THEN** the command passes an `onProgress` callback to `runIndexProjectGraph`
+    - **AND** when the callback is invoked, it prints the progress percentage and phase to stdout
+
+- op: modified
+  description: Worker delegates to runIndexProjectGraph
+  selector:
+    type: section
+    matches: 'Scenario: Worker uses IndexProjectGraph'
+  rename: 'Scenario: Worker uses runIndexProjectGraph'
+  content: |
+    - **GIVEN** the worker process is indexing
+    - **WHEN** index execution runs
+    - **THEN** it calls `runIndexProjectGraph(ctx, input)` in the worker process
+
+- op: added
+  description: Host context from SDK
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Indexing behaviour'
+    after:
+      type: section
+      matches: 'Scenario: Worker subprocess performs indexing in isolation'
+  content: |
+    #### Scenario: Host context from openSpecdHost
+
+    - **WHEN** `specd graph index` executes in the worker
+    - **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
+    - **AND** platform symbols come from `@specd/sdk`

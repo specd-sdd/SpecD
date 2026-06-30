@@ -235,6 +235,24 @@ describe('Traversal services', () => {
       expect(interfaceUpstream.levels.get(1)?.map((symbol) => symbol.name)).toContain('UserService')
       expect(methodUpstream.levels.get(1)?.map((symbol) => symbol.name)).toContain('save')
     })
+
+    it('supports includeFiles to traverse file importers', async () => {
+      const target = sym('target', 'y.ts', 1)
+      const importerSym = sym('importerSym', 'x.ts', 1)
+
+      await store.upsertFile(file('y.ts'), [target], [])
+      await store.upsertFile(
+        file('x.ts'),
+        [importerSym],
+        [createRelation({ source: 'x.ts', target: 'y.ts', type: RelationType.Imports })],
+      )
+
+      const resultWithFiles = await getUpstream(store, target.id, { includeFiles: true })
+      expect(resultWithFiles.levels.get(1)?.map((s) => s.name)).toContain('importerSym')
+
+      const resultWithoutFiles = await getUpstream(store, target.id, { includeFiles: false })
+      expect(resultWithoutFiles.totalCount).toBe(0)
+    })
   })
 
   describe('getDownstream', () => {
@@ -319,6 +337,28 @@ describe('Traversal services', () => {
 
       const result = await getDownstream(store, childClass.id)
       expect(result.levels.get(1)?.map((symbol) => symbol.name)).toContain('BaseService')
+    })
+
+    it('supports includeFiles to traverse file importees', async () => {
+      const source = sym('source', 'x.ts', 1)
+      const importeeSym = sym('importeeSym', 'y.ts', 1)
+
+      await store.upsertFile(
+        file('y.ts'),
+        [importeeSym],
+        [createRelation({ source: 'y.ts', target: importeeSym.id, type: RelationType.Exports })],
+      )
+      await store.upsertFile(
+        file('x.ts'),
+        [source],
+        [createRelation({ source: 'x.ts', target: 'y.ts', type: RelationType.Imports })],
+      )
+
+      const resultWithFiles = await getDownstream(store, source.id, { includeFiles: true })
+      expect(resultWithFiles.levels.get(1)?.map((s) => s.name)).toContain('importeeSym')
+
+      const resultWithoutFiles = await getDownstream(store, source.id, { includeFiles: false })
+      expect(resultWithoutFiles.totalCount).toBe(0)
     })
   })
 
@@ -599,6 +639,79 @@ describe('Traversal services', () => {
       expect(result.affectedFiles).toEqual(['core:src/change.ts', 'core:src/status.ts'])
       expect(result.affectedSymbols.map((symbol) => symbol.name)).toEqual(['transition'])
       expect(result.directDependents).toBe(1)
+    })
+  })
+
+  describe('analyzeImpact risk thresholds', () => {
+    async function indexTargetWithCallers(
+      count: number,
+      prefix = 'caller',
+    ): Promise<ReturnType<typeof sym>> {
+      const target = sym('target', 'target.ts', 1)
+      await store.upsertFile(file('target.ts'), [target], [])
+      for (let i = 0; i < count; i++) {
+        const caller = sym(`${prefix}${i}`, `${prefix}${i}.ts`, 1)
+        await store.upsertFile(
+          file(`${prefix}${i}.ts`),
+          [caller],
+          [createRelation({ source: caller.id, target: target.id, type: RelationType.Calls })],
+        )
+      }
+      return target
+    }
+
+    it('maps no dependents to LOW', async () => {
+      const target = sym('target', 'a.ts', 1)
+      await store.upsertFile(file('a.ts'), [target], [])
+      const result = await analyzeImpact(store, target.id, 'upstream')
+      expect(result.riskLevel).toBe('LOW')
+      expect(result.directDependents).toBe(0)
+    })
+
+    it('maps four direct dependents to MEDIUM', async () => {
+      const target = await indexTargetWithCallers(4)
+      const result = await analyzeImpact(store, target.id, 'upstream')
+      expect(result.riskLevel).toBe('MEDIUM')
+      expect(result.directDependents).toBe(4)
+    })
+
+    it('maps eight direct dependents to HIGH', async () => {
+      const target = await indexTargetWithCallers(8)
+      const result = await analyzeImpact(store, target.id, 'upstream')
+      expect(result.riskLevel).toBe('HIGH')
+      expect(result.directDependents).toBe(8)
+    })
+
+    it('maps twenty-five total dependents to CRITICAL', async () => {
+      const target = await indexTargetWithCallers(25)
+      const result = await analyzeImpact(store, target.id, 'upstream')
+      expect(result.riskLevel).toBe('CRITICAL')
+      expect(result.directDependents).toBe(25)
+    })
+  })
+
+  describe('Immutability checks', () => {
+    it('does not mutate the store when running traversals', async () => {
+      const target = sym('target', 'a.ts', 1)
+      const caller = sym('caller', 'b.ts', 1)
+
+      await store.upsertFile(file('a.ts'), [target], [])
+      await store.upsertFile(
+        file('b.ts'),
+        [caller],
+        [createRelation({ source: caller.id, target: target.id, type: RelationType.Calls })],
+      )
+
+      const statsBefore = await store.getStatistics()
+
+      await getUpstream(store, target.id)
+      await getDownstream(store, caller.id)
+      await analyzeImpact(store, target.id, 'upstream')
+
+      const statsAfter = await store.getStatistics()
+      expect(statsAfter.fileCount).toBe(statsBefore.fileCount)
+      expect(statsAfter.symbolCount).toBe(statsBefore.symbolCount)
+      expect(statsAfter.specCount).toBe(statsBefore.specCount)
     })
   })
 })

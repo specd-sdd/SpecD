@@ -10,10 +10,13 @@ Tooling sometimes needs the project's compiled spec context without an active ch
 
 `execute(input)` MUST accept a `GetProjectContextInput` object with the following fields:
 
-- `config` (`CompileContextConfig`, required) — the resolved project configuration containing `context` entries, `contextIncludeSpecs`, `contextExcludeSpecs`, and `contextMode`
+- `contextMode` (`'list' | 'summary' | 'full' | 'hybrid'`, optional) — runtime override for display mode. When absent, the baked default from construction is used.
+- `llmOptimizedContext` (boolean, optional) — runtime override for whether optimized context is preferred. When absent, the baked default from construction is used.
 - `followDeps` (boolean, optional) — when `true`, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. When `false` or absent, traversal is not performed.
 - `depth` (number, optional) — limits `dependsOn` traversal depth. Only meaningful when `followDeps` is `true`. `1` means direct dependencies only; absent means unlimited.
 - `sections` (`ReadonlyArray<SpecSection>`, optional) — restricts which metadata sections are rendered per full-mode spec (`"rules"`, `"constraints"`, `"scenarios"`). It has no effect for list-mode or summary-mode entries.
+
+`GetProjectContextInput` MUST NOT include a `config` field.
 
 ### Requirement: Returns GetProjectContextResult on success
 
@@ -82,27 +85,32 @@ If extraction finds values for transformed fields but transform execution cannot
 
 ### Requirement: Construction dependencies
 
-`GetProjectContext` depends on the following ports injected via constructor:
+`GetProjectContext` depends on the following ports/services injected via constructor:
 
-- `specs` (`ReadonlyMap<string, SpecRepository>`) — per-workspace spec repositories
-- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema (replaces `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths`)
+- `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces
+- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema
 - `files` (`FileReader`) — for reading context entry files from disk
 - `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
 - `hasher` (`ContentHasher`) — for comparing content hashes against metadata
+- `defaultConfig` (`CompileContextConfig`) — yaml-derived project context configuration snapshot baked at kernel composition time
 
 All dependencies are injected at construction time. The schema is resolved lazily on first access.
 
+At the start of `execute`, `GetProjectContext` MUST build the effective `CompileContextConfig` by shallow-merging `defaultConfig` with any runtime overrides (`contextMode`, `llmOptimizedContext`) present on the input. Hosts MUST NOT pass yaml-derived configuration on each call.
+
 ### Requirement: Project context optimization and invalidation
 
-If `llmOptimizedContext: true` is active, the use case SHALL attempt to load project-level metadata from `project-metadata.json`.
+When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.
 
-It SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
+The system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
 
 - `specd.yaml`
 - Referenced `contextFiles`
 - Metadata of included specs
 
-If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, it SHALL fall back to raw compilation and emit a signal for the caller to show a warning.
+If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.
+
+The warning message MUST include remediation instructions: "Launch specd-project-context-optimizer agent to generate it".
 
 ## Constraints
 

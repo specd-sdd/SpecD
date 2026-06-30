@@ -1,15 +1,44 @@
-import { type SymbolNode } from './symbol-node.js'
 import { type Relation } from './relation.js'
-import { type ImportDeclaration } from './import-declaration.js'
-import { type BindingFact } from './binding-fact.js'
-import { type CallFact } from './call-fact.js'
+import { type IndexSession } from './index-session.js'
+import { type FileAnalysisDraft, type FileAnalysis } from './file-analysis.js'
 
 /**
- * Result shape for adapters that can extract symbols and namespace in one pass.
+ * Exposes the shared run context available while analyzing a single file.
  */
-export interface ExtractedSymbolsWithNamespace {
-  readonly symbols: SymbolNode[]
-  readonly namespace: string | undefined
+export interface AdapterAnalyzeContext {
+  readonly session: IndexSession
+  readonly workspaceName: string
+  readonly codeRoot?: string
+  readonly repoRoot?: string
+}
+
+/**
+ * Provides the shared lookup inputs required to resolve extracted imports into symbol IDs or file imports.
+ */
+export interface ImportResolutionContext {
+  readonly session: IndexSession
+  readonly qualifiedNames: ReadonlyMap<string, string>
+  readonly packageToWorkspace: ReadonlyMap<string, string>
+  readonly codeRoot?: string
+  readonly repoRoot?: string
+}
+
+/**
+ * Normalizes import resolution output across all languages.
+ */
+export interface ResolvedImports {
+  readonly importMap: ReadonlyMap<string, string>
+  readonly fileImports: readonly string[]
+}
+
+/**
+ * Provides the resolved import data and shared session lookups required to build relations.
+ */
+export interface RelationBuildContext {
+  readonly session: IndexSession
+  readonly resolvedImports: ResolvedImports
+  readonly codeRoot?: string
+  readonly repoRoot?: string
 }
 
 /**
@@ -31,81 +60,20 @@ export interface LanguageAdapter {
   extensions(): Record<string, string>
 
   /**
-   * Extracts symbol nodes from a source file's content.
-   * @param filePath - The path of the source file.
-   * @param content - The source file content.
-   * @returns An array of extracted symbol nodes.
+   * Analyzes a single file and extracts its symbols, imports, binding/call facts,
+   * namespace, and any optional parser-specific state.
    */
-  extractSymbols(filePath: string, content: string): SymbolNode[]
+  analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft
 
   /**
-   * Extracts symbols and an optional namespace in one pass when the language can
-   * provide both from the same parse tree.
-   * @param filePath - The path of the source file.
-   * @param content - The source file content.
-   * @returns Symbols plus the discovered namespace.
+   * Resolves raw imports extracted in Pass 1 into symbol mappings and file dependencies.
    */
-  extractSymbolsWithNamespace?(filePath: string, content: string): ExtractedSymbolsWithNamespace
+  resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports
 
   /**
-   * Extracts relations between symbols from a source file's content.
-   * @param filePath - The path of the source file.
-   * @param content - The source file content.
-   * @param symbols - The symbols already extracted from this file.
-   * @param importMap - A map of locally imported names to their resolved symbol ids.
-   * @returns An array of extracted relations.
+   * Builds relations between symbols or files from the analyzed facts and resolved imports.
    */
-  extractRelations(
-    filePath: string,
-    content: string,
-    symbols: SymbolNode[],
-    importMap: Map<string, string>,
-  ): Relation[]
-
-  /**
-   * Parses import declarations from source code.
-   * Returns syntactic import information without any resolution — the indexer
-   * is responsible for resolving specifiers to files and symbol ids.
-   * @param filePath - The path of the source file.
-   * @param content - The source file content.
-   * @returns An array of parsed import declarations.
-   */
-  extractImportedNames(filePath: string, content: string): ImportDeclaration[]
-
-  /**
-   * Extracts deterministic scoped binding facts from source content.
-   * Custom adapters may omit this optional extension point.
-   * @param filePath - The path of the source file.
-   * @param content - The source file content.
-   * @param symbols - The symbols already extracted from this file.
-   * @param imports - The import declarations already extracted from this file.
-   * @returns Binding facts for shared scoped resolution.
-   */
-  extractBindingFacts?(
-    filePath: string,
-    content: string,
-    symbols: SymbolNode[],
-    imports: ImportDeclaration[],
-  ): BindingFact[]
-
-  /**
-   * Extracts normalized call facts from source content.
-   * Custom adapters may omit this optional extension point.
-   * @param filePath - The path of the source file.
-   * @param content - The source file content.
-   * @param symbols - The symbols already extracted from this file.
-   * @returns Call facts for shared scoped resolution.
-   */
-  extractCallFacts?(filePath: string, content: string, symbols: SymbolNode[]): CallFact[]
-
-  /**
-   * Extracts the namespace declaration from source code, if applicable.
-   * Used by languages like PHP where imports are resolved via fully qualified names.
-   * Returns undefined for languages without namespace declarations.
-   * @param content - The source file content.
-   * @returns The namespace string (e.g. 'App\Models'), or undefined.
-   */
-  extractNamespace?(content: string): string | undefined
+  buildRelations(analysis: FileAnalysis, context: RelationBuildContext): Relation[]
 
   /**
    * Returns the package identity for a workspace root by reading the

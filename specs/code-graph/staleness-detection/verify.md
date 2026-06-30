@@ -113,3 +113,56 @@
 
 - **WHEN** `graph stats --format json` is run
 - **THEN** the output SHALL include `stale` (boolean or null) and `currentRef` (string or null) fields
+
+### Requirement: Centralized index lock control
+
+#### Scenario: Assert unlocked passes when no lock file exists
+
+- **GIVEN** no index.lock file exists in `.specd/config/graph/`
+- **WHEN** `assertGraphIndexUnlocked()` is called
+- **THEN** it completes without throwing
+
+#### Scenario: Assert unlocked throws when lock file exists
+
+- **GIVEN** an index.lock file exists in `.specd/config/graph/`
+- **WHEN** `assertGraphIndexUnlocked()` is called
+- **THEN** it throws an error indicating the graph is being indexed
+
+#### Scenario: Lock acquisition and release lifecycle
+
+- **GIVEN** no lock file exists
+- **WHEN** `acquireGraphIndexLock()` is called
+- **THEN** the lock file is created containing the current process PID
+- **AND** calling the returned release callback removes the lock file
+
+### Requirement: Health orchestration use case
+
+#### Scenario: Hosts use GetGraphHealth for diagnostics assembly
+
+- **GIVEN** a host needs graph statistics with staleness and fingerprint fields
+- **WHEN** it assembles health output
+- **THEN** it delegates to `GetGraphHealth` rather than calling `isGraphStale` and fingerprint helpers inline
+
+### Requirement: Effective configuration building
+
+#### Scenario: Effective configuration merges overrides
+
+- **GIVEN** project config with `excludePaths: ["foo"]`
+- **WHEN** `buildProjectGraphConfig` is called with overrides `excludePaths: ["bar"]`
+- **THEN** the returned effective configuration's `excludePaths` contains both `"foo"` and `"bar"`
+
+### Requirement: Bootstrap fallback configuration
+
+#### Scenario: Bootstrap fallback config has synthetic single default workspace
+
+- **GIVEN** a directory with no `specd.yaml` config file
+- **WHEN** bootstrap configuration is requested for `/tmp/project`
+- **THEN** it returns a `SpecdConfig` where `workspaces` contains exactly one workspace named `"default"`
+- **AND** `workspaces[0].codeRoot` is `/tmp/project`
+
+#### Scenario: createBootstrapGraphConfig is unit tested
+
+- **GIVEN** `createBootstrapGraphConfig` is called with `{ projectRoot: '/tmp/project', vcsRoot: '/tmp/project' }`
+- **WHEN** the returned config is inspected
+- **THEN** `workspaces` contains exactly one workspace named `default`
+- **AND** `workspaces[0].codeRoot` is `/tmp/project`

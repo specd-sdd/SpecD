@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises'
 import { type Command } from 'commander'
-import { SpecPath } from '@specd/core'
+import { SpecPath } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'

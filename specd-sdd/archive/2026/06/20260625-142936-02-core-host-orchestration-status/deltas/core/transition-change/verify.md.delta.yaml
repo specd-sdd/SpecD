@@ -1,0 +1,43 @@
+- op: modified
+  description: Update scenarios for baked pre-transition refresh
+  selector:
+    type: section
+    matches: 'Requirement: Caller-owned implementation tracking refresh'
+  rename: 'Requirement: Optional pre-transition implementation tracking refresh'
+  content: |
+    #### Scenario: TransitionChange does not invoke detector directly
+
+    - **GIVEN** a change has entered `implementing` at least once
+    - **WHEN** `TransitionChange.execute()` runs
+    - **THEN** it does not invoke `ImplementationDetector` directly
+    - **AND** it does not duplicate refresh merge logic
+
+    #### Scenario: Active change refreshes by default
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **WHEN** `TransitionChange.execute({ name, to, approvalsSpec, approvalsSignoff })` is called without `refreshImplementationTrackingBefore`
+    - **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation
+
+    #### Scenario: Explicit opt-out skips refresh
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **WHEN** `TransitionChange.execute({ name, to, approvalsSpec, approvalsSignoff, refreshImplementationTrackingBefore: false })` is called
+    - **THEN** it does not invoke `RefreshImplementationTracking`
+
+- op: removed
+  description: Replace dependency scenario with refresh-aware version
+  selector:
+    type: section
+    matches: 'Scenario: TransitionChange depends on LifecycleEngine and RunStepHooks'
+
+- op: added
+  description: Verify RefreshImplementationTracking constructor dependency
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Dependencies'
+  content: |
+    #### Scenario: TransitionChange depends on LifecycleEngine and RunStepHooks
+
+    - **WHEN** `TransitionChange` is assembled
+    - **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`

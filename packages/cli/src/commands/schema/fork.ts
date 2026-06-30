@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { type Command } from 'commander'
-import { type SchemaRawResult } from '@specd/core'
+import { type SchemaRawResult } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { cliError, handleError } from '../../handle-error.js'
 

@@ -17,7 +17,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd change context <name> <step>\n  [--rules] [--constraints] [--scenarios]\n  [--include-change-specs]\n  [--follow-deps [--depth <n>]]\n  [--fingerprint <hash>]\n  [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to compile context for\n- `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)\n- `--rules` — when present, includes only the rules sections of full-mode spec content in the output\n- `--constraints` — when present, includes only the constraints sections of full-mode spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of full-mode spec content in the output\n- `--include-change-specs` — when present, directly includes the change's `specIds` in the collected context. By default, direct `specIds` inclusion is disabled; those specs may still appear if selected by include patterns or dependency traversal.\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: \"unchanged\"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available full-mode sections are included. When one or more are passed, only those sections appear in each full-mode spec's content block. Section flags have no effect on list-mode or summary-mode entries."
+        "```\nspecd change context <name> <step>\n  [--rules] [--constraints] [--scenarios]\n  [--include-change-specs]\n  [--follow-deps [--depth <n>]]\n  [--optimized] [--no-optimized]\n  [--fingerprint <hash>]\n  [--format text|json|toon]\n```\n\n- `<name>` — required positional; the name of the change to compile context for\n- `<step>` — required positional; the lifecycle step being entered (e.g. `designing`, `implementing`, `verifying`)\n- `--rules` — when present, includes only the rules sections of full-mode spec content in the output\n- `--constraints` — when present, includes only the constraints sections of full-mode spec content in the output\n- `--scenarios` — when present, includes only the scenarios sections of full-mode spec content in the output\n- `--include-change-specs` — when present, directly includes the change's `specIds` in the collected context. By default, direct `specIds` inclusion is disabled; those specs may still appear if selected by include patterns or dependency traversal.\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs. By default (without this flag) `dependsOn` traversal is **not** performed.\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--optimized` — optional; force prefer optimized context\n- `--no-optimized` — optional; suppress preference for optimized context\n- `--fingerprint <hash>` — optional; when provided, the CLI compares this value against the current context fingerprint. If the fingerprint matches, returns `status: \"unchanged\"` without the full context. If omitted or the fingerprint does not match, returns the full context with the new fingerprint.\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available full-mode sections are included. When one or more are passed, only those sections appear in each full-mode spec's content block. Section flags have no effect on list-mode or summary-mode entries."
       ]
     },
     {
@@ -35,7 +35,7 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command invokes the `CompileContext` use case. The `CompileContextConfig`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` fields are populated from the loaded `SpecdConfig` and the corresponding CLI flags.\n\nWhen `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.\n\nWhen `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint."
+        "The command invokes the `CompileContext` use case.\n\nThe CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `CompileContext` instance at composition time.\n\nThe CLI MUST pass only runtime overrides to `CompileContext.execute`:\n\n- `name` and `step` from positional arguments\n- `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `hybrid` when yaml default is not `full`/`hybrid`)\n- `llmOptimizedContext` only when explicitly resolved via `--optimized` or `--no-optimized` and the resolved value differs from the yaml default (omit the field when it matches the baked default)\n- `includeChangeSpecs`, `followDeps`, `depth`, `sections`, and `fingerprint` from the corresponding CLI flags\n\nThe effective `llmOptimizedContext` value for explicit CLI overrides is determined as follows:\n\n- If `--no-optimized` is passed, it is `false`.\n- If `--optimized` is passed, it is `true`.\n- Otherwise, the CLI does not pass `llmOptimizedContext` on `execute` — the baked yaml default applies.\n\nOptimization bypass when only a subset of sections is requested (for example `--rules` without `--constraints`) is enforced by `CompileContext` from the forwarded `sections` input and the baked `llmOptimizedContext` default. The CLI MUST NOT recompute or override `llmOptimizedContext` based on section flags.\n\nWhen `--include-change-specs` is omitted, the command passes `includeChangeSpecs: false`; the use case does not directly seed `change.specIds`, but those specs may still be included by include patterns or dependency traversal.\n\nWhen `--fingerprint` is provided, the CLI first checks whether the provided fingerprint matches the current context fingerprint calculated by `CompileContext`. If they match, the CLI returns a minimal response indicating unchanged status without the full context. If they do not match (or `--fingerprint` is omitted), the CLI returns the full context with the new fingerprint."
       ]
     },
     {
@@ -74,7 +74,9 @@
     "dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed",
     "--include-change-specs is opt-in; without the flag, change.specIds are not direct seeds",
     "--depth without --follow-deps is a CLI usage error (exit code 1)",
-    "availableSteps, stepAvailable, and blockingArtifacts are rendered from CompileContext output; the CLI must not re-derive lifecycle readiness locally"
+    "availableSteps, stepAvailable, and blockingArtifacts are rendered from CompileContext output; the CLI must not re-derive lifecycle readiness locally",
+    "Section flags override llmOptimizedContext to false unless the combination of requested sections includes both rules and constraints",
+    "Optimization warnings for missing or stale optimized fields are suppressed whenever the effective llmOptimizedContext is false"
   ],
   "scenarios": [
     {
@@ -106,6 +108,18 @@
       "name": "--include-change-specs flag accepted",
       "when": ["specd change context my-change designing --include-change-specs is run"],
       "then": ["the command proceeds normally and requests direct change-spec seeding"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--optimized and --no-optimized flags accepted",
+      "when": [
+        "specd change context my-change designing --optimized is run",
+        "specd change context my-change designing --no-optimized is run"
+      ],
+      "then": [
+        "the command proceeds normally and forces optimization preference",
+        "the command proceeds normally and suppresses optimization preference"
+      ]
     },
     {
       "requirement": "Implementation tracking refresh before context compilation",
@@ -243,11 +257,49 @@
     },
     {
       "requirement": "Behaviour",
+      "name": "CLI does not build CompileContextConfig inline",
+      "when": ["specd change context is run"],
+      "then": [
+        "the command does not construct a CompileContextConfig object from SpecdConfig",
+        "AND it invokes CompileContext.execute with runtime overrides only"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
       "name": "CLI forwards traversal and fingerprint options to CompileContext",
       "when": [
         "specd change context is run with flags such as --include-change-specs, --follow-deps, --depth, or --fingerprint"
       ],
-      "then": ["the command forwards those options into the CompileContext request"]
+      "then": ["the command forwards those options into the CompileContext.execute input"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "--no-optimized suppresses preference for optimized context",
+      "given": ["llmOptimizedContext: true in configuration"],
+      "when": ["specd change context my-change designing --no-optimized is executed"],
+      "then": [
+        "the CLI passes llmOptimizedContext: false as a runtime override on CompileContext.execute"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "--optimized forces preference for optimized context",
+      "given": ["llmOptimizedContext: false in configuration"],
+      "when": ["specd change context my-change designing --optimized is executed"],
+      "then": [
+        "the CLI passes llmOptimizedContext: true as a runtime override on CompileContext.execute"
+      ]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags forwarded without CLI llmOptimizedContext override",
+      "given": ["llmOptimizedContext: true in configuration"],
+      "when": ["specd change context my-change designing --rules is executed"],
+      "then": [
+        "the CLI forwards sections: ['rules'] on CompileContext.execute",
+        "AND the CLI does not pass llmOptimizedContext when it matches the yaml default",
+        "AND optimization bypass behaviour is verified by core:compile-context (see \"Optimization bypassed when only rules requested\")"
+      ]
     },
     {
       "requirement": "Behaviour",
@@ -271,20 +323,34 @@
         "standard CLI warnings are emitted",
         "AND they include remediation instructions for the agent"
       ]
+    },
+    {
+      "requirement": "Optimization warning signal",
+      "name": "Warnings suppressed when raw sections or --no-optimized are requested",
+      "given": ["llmOptimizedContext: true", "AND some specs are missing optimization"],
+      "when": [
+        "specd change context my-change designing --no-optimized or specd change context my-change designing --rules is executed"
+      ],
+      "then": [
+        "stale-optimization warnings for missing or stale spec optimized fields are suppressed"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:change-context",
-        "file": "cli:src/commands/change/context.ts",
-        "symbol": "registerChangeContext"
+        "file": "cli:src/commands/change/context.ts"
+      },
+      {
+        "specId": "cli:change-context",
+        "file": "cli:test/commands/change-context.spec.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c3b02c691094d0967d22074047ff3cfaeed6deb77620ac929248e8ab419dc11f",
-    "verify.md": "sha256:3a0f3f5da27b5027f7f882de2d8d72c44e2944427749f5e8bbdb8bdc8ffc1bba"
+    "spec.md": "sha256:c1dd2a90552f228157fe9cff4bae86bf55cb48d01acd43b4fb506a29f6d8f0d2",
+    "verify.md": "sha256:2ff476d8d23bbd8d7493f786695b12678fce53e911acb0933d096e8cd2251533"
   },
   "generatedBy": "core"
 }

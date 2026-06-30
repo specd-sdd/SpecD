@@ -36,16 +36,14 @@
     "core:validate-specs",
     "core:generate-metadata",
     "core:get-spec-context",
-    "core:init-project",
-    "core:record-skill-install",
-    "core:get-skills-manifest",
+    "core:config-writer-port",
+    "core:list-workspaces",
     "core:get-project-context",
+    "core:get-config",
+    "core:project-metadata",
+    "core:update-project-metadata",
     "core:resolve-schema",
     "core:spec-overlap"
   ],
-  "implementation": [
-    {
-      "file": "core:test/application/use-cases/get-status.spec.ts"
-    }
-  ]
+  "implementation": []
 }

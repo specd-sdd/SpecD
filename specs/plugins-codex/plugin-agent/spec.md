@@ -24,7 +24,7 @@ The implementation MUST return a valid `AgentPlugin` that:
 
 ### Requirement: Skill installation and frontmatter injection
 
-The plugin MUST install skills from `@specd/skills` and pass Codex-compatible capability identifiers plus frontmatter source values into markdown skill rendering during install.
+The plugin MUST install skills from `@specd/skills` and pass Codex-compatible capability identifiers (`['mcp', 'agents', 'frontmatter']`) plus frontmatter source values into markdown skill rendering during install.
 
 Installation flow MUST:
 
@@ -34,11 +34,21 @@ Installation flow MUST:
 4. resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`
 5. pass `variables.sharedFolder` only when overriding the default shared path contract
 6. write files marked as shared to the rendered `sharedFolder` location under the project root
-7. write files not marked as shared to the installed skill directory
-8. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files
-9. return an `InstallResult` with installed and skipped entries
+7. write files not marked as shared to categorized directories relative to `projectRoot`:
+   - Skills to `.codex/skills/<skill-name>/`
+   - Agents to `.codex/agents/<agent-name>.toml`
+8. Sub-agent Mapping: When installing an agent, the plugin MUST:
+   - Generate a TOML file instead of Markdown.
+   - Map `name` and `description` to TOML keys.
+   - Wrap the rendered system prompt in a multi-line string (`"""`) and map it to the `developer_instructions` TOML key.
+   - Ensure the instructions are correctly escaped for TOML.
+9. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files
+10. return an `InstallResult` with installed and skipped entries
+11. Fallback: If `agents` capability is missing, install agents into the same directory as the shared context file.
 
+The plugin MUST NOT prepend YAML frontmatter for standard skills after bundle resolution.
 The plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.
+The plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants.
 
 ### Requirement: Frontmatter field contract
 
@@ -61,13 +71,15 @@ The resolved shared location MUST NOT contain a `SKILL.md` file.
 
 ### Requirement: Uninstall behavior
 
-`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.codex/skills/` relative to `config.projectRoot`.
+`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.codex/skills/` and agent files from `.codex/agents/` relative to `config.projectRoot`.
 
 When `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.
 
-When `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.
+When `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.codex/agents/`.
 
-Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/` that are not part of the specd-managed skill set.
+When no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.codex/agents/`, and the resolved sharedFolder location.
+
+Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/` or `.codex/agents/` that are not part of the specd-managed skill or agent set.
 
 ## Constraints
 
@@ -83,3 +95,4 @@ Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/` 
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — frontmatter injection responsibility and template source contract
 - [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.

@@ -1,0 +1,523 @@
+{
+  "name": "04-core-host-orchestration-create",
+  "createdAt": "2026-06-25T14:29:44.282Z",
+  "description": "P1b: CreateChange resolves active schema internally; CLI drops getActiveSchema prelude",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:create-change", "core:get-active-schema", "cli:change-create"],
+  "specDependsOn": {
+    "core:create-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:get-active-schema",
+      "core:spec-overlap"
+    ],
+    "core:get-active-schema": [
+      "core:resolve-schema",
+      "core:config",
+      "core:schema-format",
+      "core:schema-registry-port",
+      "core:build-schema",
+      "default:_global/architecture"
+    ],
+    "cli:change-create": ["cli:entrypoint", "core:change", "core:spec-id-format"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/invalid-create-change-input-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/create-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/create.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/change-create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "approval-system-notes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/errors.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/examples/implementing-a-port.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CreateChange", "CreateChangeInput", "CreateChangeResult"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/application/errors/invalid-create-change-input-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidCreateChangeInputError"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/composition/use-cases/create-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createCreateChange"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createKernel"]
+    },
+    {
+      "specId": "cli:change-create",
+      "file": "packages/cli/src/commands/change/create.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeCreate"]
+    },
+    {
+      "specId": "cli:change-create",
+      "file": "packages/cli/test/commands/change-create.spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Integration (real kernel)"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/application/errors/index.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:c7fa6eee1a5bd76fbf630011bef3fce192da2fef32364f36e2c6098283aab4df"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e7292c3772de75b66ca4623d74deaf50dfb4810ec54568fe7d537e85fe019e3c"
+        },
+        {
+          "key": "core:get-active-schema",
+          "filename": "deltas/core/get-active-schema/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8e542d1108297475abed8358ca9be7214565dd71208732d5a662865904197da8"
+        },
+        {
+          "key": "cli:change-create",
+          "filename": "deltas/cli/change-create/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a2bec94c3200bfd39be486ff1f2a0c7f1b6c7ec54c13748183d13df1a8b39ed"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:19cbeadcb62b7afc02b400e77b608919b29abd9dd8d6e2a6121177ea2603faa8"
+        },
+        {
+          "key": "core:get-active-schema",
+          "filename": "deltas/core/get-active-schema/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:42e0d6b7cf2e264d1242518a975c79858c5df303d54b22dac882f19e90a47681"
+        },
+        {
+          "key": "cli:change-create",
+          "filename": "deltas/cli/change-create/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:953a51acf17b1d78154218b8fdeea75808d25e52b669a782b46a8dd30fbb1054"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:50f3e5ff9f90645d201cf6a4912591bff2410906b73e8c0b1f62045257a017a4"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:8150913779a92f51b665844d0d87aaa01f33291878dee3ef6ba80f884fa5e665"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-25T14:29:44.282Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:create-change", "core:get-active-schema", "cli:change-create"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-25T14:29:44.301Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:create-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-active-schema"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-create"
+        },
+        {
+          "type": "verify",
+          "key": "core:create-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-active-schema"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-create"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:56:08.304Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:02:12.644Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:07:03.708Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:15:46.197Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:24:16.706Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T07:25:45.452Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:25:45.452Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:38:23.725Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:39:07.218Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:39:48.918Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:43:45.550Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T07:44:39.191Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T07:44:39.191Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:13:01.928Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:13:03.115Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:13:46.341Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:17:30.421Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:17:33.373Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-26T08:19:26.316Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:create-change': extracted dependencies [core:change, core:get-active-schema, core:spec-overlap, default:_global/architecture] do not match persisted dependencies [core:change, default:_global/architecture, core:get-active-schema,core:spec-overlap]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:20:04.536Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-26T08:20:04.630Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

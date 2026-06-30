@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "core:resolve-schema", "core:config-writer-port"],
+  "implementation": [
+    {
+      "file": "core:src/public.ts",
+      "symbols": ["createKernel", "createGetStatus", "createSpecRepository"]
+    },
+    {
+      "file": "core:src/ports.ts"
+    },
+    {
+      "file": "core:src/extensions.ts",
+      "symbols": ["createKernelBuilder"]
+    }
+  ]
+}

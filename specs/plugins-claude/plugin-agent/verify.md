@@ -47,6 +47,20 @@
 - **WHEN** install writes shared files to the resolved shared location
 - **THEN** that location does not contain a `SKILL.md` file
 
+#### Scenario: Installs agents to categorized directory
+
+- **GIVEN** a request to install an agent
+- **WHEN** `install(config, options)` runs
+- **THEN** it installs the agent files to the platform-specific `agents/` directory
+- **AND** the YAML frontmatter contains `tools` as a comma-separated string
+- **AND** the YAML frontmatter contains `model` if specified in metadata
+
+#### Scenario: Fallback to shared location when agents capability is missing
+
+- **GIVEN** a runtime that does not support `agents`
+- **WHEN** an agent is installed
+- **THEN** it is copied to the same directory as `shared.md`
+
 ### Requirement: Uninstall behavior
 
 #### Scenario: Uninstall removes selected skill directories and keeps shared resources
@@ -63,6 +77,19 @@
 - **THEN** all specd-managed skill directories are removed
 - **AND** the resolved sharedFolder location is removed
 - **AND** unrelated user skill directories remain
+
+#### Scenario: Uninstall removes selected agent files
+
+- **GIVEN** multiple agents are installed
+- **WHEN** `uninstall(config, { agents: ['specd-project-context-optimizer'] })` is executed
+- **THEN** only `.claude/agents/specd-project-context-optimizer.md` is removed
+
+#### Scenario: Uninstall without filter removes all specd-managed agents
+
+- **GIVEN** specd-managed agents and unrelated user agents are installed under `.claude/agents/`
+- **WHEN** `uninstall(config)` is executed without filters
+- **THEN** all specd-managed agent files are removed
+- **AND** unrelated user agent files remain
 
 ### Requirement: Domain layer
 

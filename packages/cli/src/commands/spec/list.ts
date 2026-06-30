@@ -1,6 +1,11 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
-import { type SpecListEntry, type SpecMetadataStatus } from '@specd/core'
+import {
+  type SpecListEntry,
+  type SpecMetadataStatus,
+  type ProjectWorkspace,
+  type SpecRepository,
+} from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -68,7 +73,7 @@ function computeGlobalWidths(
  * Renders one workspace group using the globally fixed column widths.
  * An empty workspace shows the workspace name followed by `  (none)`.
  *
- * @param workspace - Workspace name used as the table title.
+ * @param workspaceObj - Workspace details used as the table title.
  * @param specs - Entries belonging to this workspace.
  * @param includeMetadataStatus - Whether to include a STATUS column.
  * @param includeSummary - Whether to include a SUMMARY column.
@@ -76,7 +81,7 @@ function computeGlobalWidths(
  * @returns Formatted block for this workspace group.
  */
 function renderWorkspaceGroup(
-  workspace: string,
+  workspaceObj: ProjectWorkspace,
   specs: SpecListEntry[],
   includeMetadataStatus: boolean,
   includeSummary: boolean,
@@ -86,7 +91,17 @@ function renderWorkspaceGroup(
   let innerWidth = widths.pathW + 2 + widths.titleW
   if (includeMetadataStatus) innerWidth += 2 + widths.metadataStatusW
   if (includeSummary) innerWidth += 2 + widths.summaryW
-  const wsLabel = 'workspace: ' + workspace
+
+  let wsLabel = `workspace: ${workspaceObj.name}`
+  const flags: string[] = []
+  if (workspaceObj.ownership === 'readOnly') flags.push('read-only')
+  else if (workspaceObj.ownership === 'shared') flags.push('shared')
+  if (workspaceObj.isExternal) flags.push('external')
+  if (flags.length > 0) {
+    wsLabel += ` [${flags.join(', ')}]`
+  }
+  wsLabel += ` (root: ${workspaceObj.codeRoot})`
+
   const wsHeader = chalk.inverse.bold(
     '  ' + wsLabel + ' '.repeat(Math.max(0, innerWidth - wsLabel.length)) + '  ',
   )
@@ -108,7 +123,7 @@ function renderWorkspaceGroup(
     null,
     columns,
     specs.map((s) => {
-      const row = [`${workspace}:${s.path}`, s.title]
+      const row = [`${workspaceObj.name}:${s.path}`, s.title]
       if (includeMetadataStatus) row.push(s.metadataStatus ?? '')
       if (includeSummary) row.push(s.summary ?? '')
       return row
@@ -202,16 +217,25 @@ JSON/TOON output schema:
             for (const name of visibleWorkspaces) byWorkspace.set(name, [])
             for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
 
+            const workspaceMap = new Map(workspaces.map((w) => [w.name, w]))
             const widths = computeGlobalWidths(entries, includeMetadataStatus, includeSummary)
-            const groups = visibleWorkspaces.map((name) =>
-              renderWorkspaceGroup(
+            const groups = visibleWorkspaces.map((name) => {
+              const wsObj: ProjectWorkspace = workspaceMap.get(name) ?? {
                 name,
+                prefix: null,
+                ownership: 'owned' as const,
+                isExternal: false,
+                codeRoot: '',
+                specRepo: null as unknown as SpecRepository,
+              }
+              return renderWorkspaceGroup(
+                wsObj,
                 byWorkspace.get(name) ?? [],
                 includeMetadataStatus,
                 includeSummary,
                 widths,
-              ),
-            )
+              )
+            })
             output(groups.join('\n\n'), 'text')
           } else {
             const byWorkspace = new Map<string, SpecListEntry[]>()

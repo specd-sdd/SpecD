@@ -27,7 +27,13 @@
     {
       "requirement": "Schema name and version",
       "rules": [
-        "`schemaName` and `schemaVersion` are resolved from the active `SpecdConfig` at command time and passed to the `CreateChange` use case. The user does not specify these values."
+        "The CLI MUST NOT call `getActiveSchema` before `CreateChange`. Schema name and version are resolved inside the `CreateChange` use case from the project's active configuration.\n\nThe CLI MUST invoke `kernel.changes.create.execute` without `schemaName` or `schemaVersion` unless a future flag explicitly requests an override (none in this change).\n\nThe created change's manifest MUST still record the effective `schemaName` and `schemaVersion` from the `created` event produced by `CreateChange`."
+      ]
+    },
+    {
+      "requirement": "Overlap warning delegation",
+      "rules": [
+        "When `specIds` is non-empty, the CLI MUST pass `includeOverlapCheck: true` to `CreateChange.execute`.\n\nWhen `result.overlapReport?.hasOverlap` is `true`, the CLI MUST format and write the same stderr warning as today:\n\n```text\nwarning: spec overlap detected:\n  <specId> — also targeted by: <change-name> (<state>), ...\n```\n\nThe CLI MUST NOT call `kernel.changes.detectOverlap` directly in the create command handler.\n\nOverlap warning emission MUST NOT cause a non-zero exit code."
       ]
     },
     {
@@ -59,7 +65,8 @@
     "--spec is optional; when omitted, the change is created with an empty specIds list",
     "The change name must be a valid kebab-case slug; the CLI validates the format before invoking the use case",
     "The workspace prefix in --spec defaults to default when omitted; workspace IDs are never a separate flag",
-    "Specs targeting readOnly workspaces are rejected before the use case is invoked"
+    "Specs targeting readOnly workspaces are rejected before the use case is invoked",
+    "The CLI does not resolve or pass schema identity — CreateChange owns active schema resolution"
   ],
   "scenarios": [
     {
@@ -138,12 +145,51 @@
     },
     {
       "requirement": "Schema name and version",
-      "name": "Schema resolved from active config",
-      "given": ["the active SpecdConfig has schema: \"spec-driven\" and schemaVersion: 1"],
+      "name": "Schema resolved inside CreateChange",
+      "given": ["the active project schema resolves to name 'spec-driven' and version 1"],
       "when": ["specd change create my-change is run"],
       "then": [
-        "the created change's manifest includes schemaName: \"spec-driven\" and schemaVersion: 1"
+        "getActiveSchema is not called in the CLI handler",
+        "AND the created change's manifest includes schemaName: 'spec-driven' and schemaVersion: 1"
       ]
+    },
+    {
+      "requirement": "Schema name and version",
+      "name": "Manifest still records effective schema identity",
+      "given": ["the active project schema resolves to name 'spec-driven' and version 1"],
+      "when": ["specd change create my-change is run"],
+      "then": [
+        "the created change's manifest includes schemaName: 'spec-driven' and schemaVersion: 1"
+      ]
+    },
+    {
+      "requirement": "Overlap warning delegation",
+      "name": "CLI passes includeOverlapCheck when specs present",
+      "given": ["specd change create my-change --spec default:auth/login is run"],
+      "when": ["the CLI invokes CreateChange.execute"],
+      "then": ["the input includes includeOverlapCheck: true"]
+    },
+    {
+      "requirement": "Overlap warning delegation",
+      "name": "Overlap warning emitted from result report",
+      "given": ["another active change already targets default:auth/login"],
+      "when": ["specd change create my-change --spec default:auth/login succeeds"],
+      "then": [
+        "stderr contains warning: spec overlap detected",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Overlap warning delegation",
+      "name": "CLI does not call detectOverlap directly",
+      "when": ["specd change create my-change --spec default:auth/login is run"],
+      "then": ["the CLI handler does not invoke kernel.changes.detectOverlap.execute"]
+    },
+    {
+      "requirement": "Overlap warning delegation",
+      "name": "No overlap check when specIds empty",
+      "when": ["specd change create my-change is run with no --spec flags"],
+      "then": ["includeOverlapCheck is not passed as true"]
     },
     {
       "requirement": "Output on success",
@@ -185,9 +231,23 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:change-create",
+        "file": "cli:src/commands/change/create.ts",
+        "symbol": "registerChangeCreate"
+      },
+      {
+        "specId": "cli:change-create",
+        "file": "cli:test/commands/change-create.spec.ts",
+        "symbol": "Integration (real kernel)"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:4153e90cab5cc231f4bf086bf34401b30a649ccd2f42ea2a94cfbd5a749bdafa",
-    "verify.md": "sha256:65090a3b7942dd5bb66866698f1b517c3518508f95a0b762a34d455b824d7060"
+    "spec.md": "sha256:b7a63119df6ec17d837aa869697c69641c483e9a07fc071acacb60111587f542",
+    "verify.md": "sha256:a002b3153bc71756fcaef2699dd3dc3bede21c13a8ebcd1c33b1ca302a5a3e04"
   },
   "generatedBy": "core"
 }

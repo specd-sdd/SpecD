@@ -6,10 +6,153 @@ import { GoLanguageAdapter } from '../../../src/infrastructure/tree-sitter/go-la
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { ImportDeclarationKind } from '../../../src/domain/value-objects/import-declaration-kind.js'
-import { BindingSourceKind } from '../../../src/domain/value-objects/binding-fact.js'
-import { CallForm } from '../../../src/domain/value-objects/call-fact.js'
+import {
+  BindingSourceKind,
+  type BindingFact,
+} from '../../../src/domain/value-objects/binding-fact.js'
+import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
+import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type Relation } from '../../../src/domain/value-objects/relation.js'
+import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
+import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
 
-const adapter = new GoLanguageAdapter()
+interface TestAdapter {
+  languages(): string[]
+  extensions(): Record<string, string>
+  getPackageIdentity(codeRoot: string, repoRoot?: string): string | undefined
+  resolvePackageFromSpecifier(specifier: string, knownPackages: string[]): string | undefined
+  extractSymbols(filePath: string, content: string): SymbolNode[]
+  extractImportedNames(filePath: string, content: string): ImportDeclaration[]
+  extractBindingFacts(
+    filePath: string,
+    content: string,
+    symbols: readonly SymbolNode[],
+    imports: readonly ImportDeclaration[],
+  ): BindingFact[]
+  extractCallFacts(filePath: string, content: string, symbols: readonly SymbolNode[]): CallFact[]
+  extractRelations(
+    filePath: string,
+    content: string,
+    relationSymbols: readonly SymbolNode[],
+    importMap?: ReadonlyMap<string, string>,
+    filePaths?: ReadonlySet<string>,
+  ): Relation[]
+}
+
+const baseAdapter = new GoLanguageAdapter()
+const adapter = baseAdapter as unknown as TestAdapter
+
+adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'go',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.symbols as SymbolNode[]
+}
+
+adapter.extractImportedNames = (filePath: string, content: string): ImportDeclaration[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'go',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.imports as ImportDeclaration[]
+}
+
+adapter.extractBindingFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+  imports: readonly ImportDeclaration[],
+): BindingFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'go',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.bindingFacts as BindingFact[]
+}
+
+adapter.extractCallFacts = (
+  filePath: string,
+  content: string,
+  symbols: readonly SymbolNode[],
+): CallFact[] => {
+  const session = new InMemoryIndexSession()
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'go',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  return draft.callFacts as CallFact[]
+}
+
+adapter.extractRelations = (
+  filePath: string,
+  content: string,
+  relationSymbols: readonly SymbolNode[],
+  importMap: ReadonlyMap<string, string> = new Map(),
+  filePaths: ReadonlySet<string> = new Set(),
+): Relation[] => {
+  const session = new InMemoryIndexSession()
+  for (const fp of filePaths) {
+    session.registerFile({
+      filePath: fp,
+      configRelativePath: fp,
+      language: 'go',
+      contentHash: 'abc',
+      workspace: 'ws',
+    })
+  }
+  session.registerFile({
+    filePath,
+    configRelativePath: filePath,
+    language: 'go',
+    contentHash: 'abc',
+    workspace: 'ws',
+  })
+  const draft = baseAdapter.analyzeFile(filePath, content, {
+    session,
+    workspaceName: 'ws',
+  })
+  const analysis = session.registerAnalysis({
+    filePath,
+    analysis: draft,
+  })
+  const resolvedImports = { importMap, fileImports: [] }
+  return baseAdapter.buildRelations(analysis, {
+    session,
+    resolvedImports,
+  })
+}
 
 describe('GoLanguageAdapter', () => {
   it('reports supported languages', () => {
@@ -20,51 +163,63 @@ describe('GoLanguageAdapter', () => {
     it('extracts function declarations', () => {
       const code = 'package main\n\nfunc greet(name string) string {\n    return name\n}'
       const symbols = adapter.extractSymbols('main.go', code)
-      expect(symbols.some((s) => s.name === 'greet' && s.kind === SymbolKind.Function)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'greet' && s.kind === SymbolKind.Function),
+      ).toBe(true)
     })
 
     it('extracts method declarations', () => {
       const code = 'package main\n\nfunc (u *User) Login() string {\n    return "ok"\n}'
       const symbols = adapter.extractSymbols('main.go', code)
-      expect(symbols.some((s) => s.name === 'Login' && s.kind === SymbolKind.Method)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Login' && s.kind === SymbolKind.Method),
+      ).toBe(true)
     })
 
     it('extracts struct types as class', () => {
       const code = 'package main\n\ntype User struct {\n    Name string\n}'
       const symbols = adapter.extractSymbols('main.go', code)
-      expect(symbols.some((s) => s.name === 'User' && s.kind === SymbolKind.Class)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'User' && s.kind === SymbolKind.Class),
+      ).toBe(true)
     })
 
     it('extracts interface types', () => {
       const code = 'package main\n\ntype Greeter interface {\n    Greet()\n}'
       const symbols = adapter.extractSymbols('main.go', code)
-      expect(symbols.some((s) => s.name === 'Greeter' && s.kind === SymbolKind.Interface)).toBe(
-        true,
-      )
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'Greeter' && s.kind === SymbolKind.Interface),
+      ).toBe(true)
     })
 
     it('extracts type aliases as type', () => {
       const code = 'package main\n\ntype ID = string'
       const symbols = adapter.extractSymbols('main.go', code)
-      expect(symbols.some((s) => s.name === 'ID' && s.kind === SymbolKind.Type)).toBe(true)
+      expect(symbols.some((s: SymbolNode) => s.name === 'ID' && s.kind === SymbolKind.Type)).toBe(
+        true,
+      )
     })
 
     it('extracts var declarations', () => {
       const code = 'package main\n\nvar MAX = 10'
       const symbols = adapter.extractSymbols('main.go', code)
-      expect(symbols.some((s) => s.name === 'MAX' && s.kind === SymbolKind.Variable)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'MAX' && s.kind === SymbolKind.Variable),
+      ).toBe(true)
     })
 
     it('extracts const declarations', () => {
       const code = 'package main\n\nconst PI = 3.14'
       const symbols = adapter.extractSymbols('main.go', code)
-      expect(symbols.some((s) => s.name === 'PI' && s.kind === SymbolKind.Variable)).toBe(true)
+      expect(
+        symbols.some((s: SymbolNode) => s.name === 'PI' && s.kind === SymbolKind.Variable),
+      ).toBe(true)
     })
 
     it('extracts comment from preceding line', () => {
       const code = 'package main\n\n// Greets someone.\nfunc greet() {}'
       const symbols = adapter.extractSymbols('main.go', code)
-      const greet = symbols.find((s) => s.name === 'greet')
+      const greet = symbols.find((s: SymbolNode) => s.name === 'greet')
       expect(greet?.comment).toBe('// Greets someone.')
     })
   })
@@ -74,7 +229,7 @@ describe('GoLanguageAdapter', () => {
       const code = 'package main\n\nfunc foo() {}\nfunc bar() {}'
       const symbols = adapter.extractSymbols('main.go', code)
       const relations = adapter.extractRelations('main.go', code, symbols, new Map())
-      const defines = relations.filter((r) => r.type === RelationType.Defines)
+      const defines = relations.filter((r: Relation) => r.type === RelationType.Defines)
       expect(defines).toHaveLength(symbols.length)
     })
 
@@ -93,7 +248,9 @@ type ReadWriter interface {
       `
       const symbols = adapter.extractSymbols('main.go', code)
       const relations = adapter.extractRelations('main.go', code, symbols, new Map())
-      expect(relations.some((relation) => relation.type === RelationType.Extends)).toBe(true)
+      expect(relations.some((relation: Relation) => relation.type === RelationType.Extends)).toBe(
+        true,
+      )
     })
 
     it('creates IMPLEMENTS when a struct satisfies a local interface by method set', () => {
@@ -110,7 +267,9 @@ func (f *FileReader) Read() {}
       `
       const symbols = adapter.extractSymbols('main.go', code)
       const relations = adapter.extractRelations('main.go', code, symbols, new Map())
-      expect(relations.some((relation) => relation.type === RelationType.Implements)).toBe(true)
+      expect(
+        relations.some((relation: Relation) => relation.type === RelationType.Implements),
+      ).toBe(true)
     })
   })
 
@@ -123,8 +282,8 @@ import (
   _ "github.com/acme/auth/driver"
 )`
       const imports = adapter.extractImportedNames('main.go', code)
-      expect(imports.map((item) => item.localName)).toEqual(['models', '.', ''])
-      expect(imports.map((item) => item.kind)).toEqual([
+      expect(imports.map((item: ImportDeclaration) => item.localName)).toEqual(['models', '.', ''])
+      expect(imports.map((item: ImportDeclaration) => item.kind)).toEqual([
         ImportDeclarationKind.Named,
         ImportDeclarationKind.Namespace,
         ImportDeclarationKind.Blank,
@@ -146,20 +305,22 @@ func New(repo UserRepo) UserRepo {
 
       expect(
         bindingFacts.some(
-          (fact) =>
+          (fact: BindingFact) =>
             fact.sourceKind === BindingSourceKind.Property && fact.targetName === 'UserRepo',
         ),
       ).toBe(true)
       expect(
         callFacts.some(
-          (fact) =>
+          (fact: CallFact) =>
             fact.form === CallForm.Static &&
             fact.receiverName === 'models' &&
             fact.name === 'NewUser',
         ),
       ).toBe(true)
       expect(
-        callFacts.some((fact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo'),
+        callFacts.some(
+          (fact: CallFact) => fact.form === CallForm.Constructor && fact.name === 'UserRepo',
+        ),
       ).toBe(true)
     })
 
@@ -172,9 +333,10 @@ type HandlerFn func(event Event) Result`
       const facts = adapter.extractBindingFacts('main.go', code, symbols, imports)
 
       const registryFacts = facts.filter(
-        (f) => f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
+        (f: BindingFact) =>
+          f.name === 'ParserRegistry' && f.sourceKind === BindingSourceKind.ImportedType,
       )
-      expect(registryFacts.some((f) => f.targetName === 'ArtifactParser')).toBe(true)
+      expect(registryFacts.some((f: BindingFact) => f.targetName === 'ArtifactParser')).toBe(true)
     })
   })
 

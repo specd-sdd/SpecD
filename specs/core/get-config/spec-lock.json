@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:config", "default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-config.ts",
+      "symbols": ["GetConfig"]
+    },
+    {
+      "file": "core:src/composition/use-cases/get-config.ts",
+      "symbols": ["createGetConfig", "GetConfigOptions"]
+    }
+  ]
+}

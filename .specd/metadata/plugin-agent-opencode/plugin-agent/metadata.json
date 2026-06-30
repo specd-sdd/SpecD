@@ -5,8 +5,9 @@
     "core:config",
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
-    "skills:skill-templates-source",
-    "skills:resolve-bundle"
+    "skills:skill-repository",
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "context": [
     "Open Code support is required to keep agent-plugin behavior consistent across the ecosystem and avoid a Claude-only installation path. This spec defines the Open Code plugin contract for skill install/uninstall, target install directory, and metadata value handling so `@specd/skills` can render the final installed markdown predictably."
@@ -33,7 +34,7 @@
     {
       "requirement": "Application layer",
       "rules": [
-        "The application layer MUST include an `InstallSkills` use case that:\n\n1. reads skills from `@specd/skills`\n2. resolves the per-skill frontmatter source value collection\n3. declares only the Open Code-supported capability identifiers\n4. resolves bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. passes `variables.sharedFolder` only when overriding the default shared path contract\n6. writes files not marked as shared to the installed skill directory under the `projectRoot` provided in `SpecdConfig`\n7. writes files marked as shared to the rendered `sharedFolder` location under the project root\n\nThe plugin MUST NOT prepend YAML frontmatter after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
+        "The application layer MUST have an `InstallSkills` use case that orchestrates:\n\n1. Get skills via `@specd/skills`\n2. Resolve Open Code frontmatter source values for each skill\n3. Declare only the Open Code supported capability identifiers (`['mcp', 'agents', 'frontmatter']`)\n4. Resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. Pass `variables.sharedFolder` only when overriding the default shared path contract\n6. Install files not marked as shared to categorized directories relative to `projectRoot`:\n   - Skills to `.opencode/skills/<skill-name>/`\n   - Agents to `.opencode/agents/<agent-name>/`\n7. Install files marked as shared to the rendered `sharedFolder` location under the project root\n8. Fallback: If `agents` capability is missing, install agents into the same directory as the shared context file.\n9. Sub-agent Mapping: When installing an agent, the plugin MUST:\n   - Set `mode: \"subagent\"` in the YAML frontmatter.\n   - Transform `allowedTools` (e.g., `Bash`, `Read`) into a YAML permissions list (e.g., `- bash: allow`, `- read: allow`).\n   - Prepend the rendered system prompt with the generated YAML frontmatter.\n\nThe plugin MUST NOT prepend YAML frontmatter for standard skills after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.\nThe plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants."
       ]
     },
     {
@@ -63,7 +64,7 @@
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` that are not part of the specd-managed skill set."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.opencode/skills/` and agent files from `.opencode/agents/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.opencode/agents/`.\n\nWhen no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.opencode/agents/`, and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` or `.opencode/agents/` that are not part of the specd-managed skill or agent set."
       ]
     }
   ],
@@ -160,6 +161,24 @@
       "then": ["that location does not contain a SKILL.md file"]
     },
     {
+      "requirement": "Install location",
+      "name": "Installs agents to categorized directory",
+      "given": ["a request to install an agent"],
+      "when": ["install(config, options) runs"],
+      "then": [
+        "it installs the agent files to .opencode/agents/",
+        "AND the YAML frontmatter contains mode: subagent",
+        "AND the YAML frontmatter contains permissions mapped from allowedTools"
+      ]
+    },
+    {
+      "requirement": "Install location",
+      "name": "Fallback to shared location when agents capability is missing",
+      "given": ["a runtime that does not support agents"],
+      "when": ["an agent is installed"],
+      "then": ["it is copied to the same directory as shared.md"]
+    },
+    {
       "requirement": "Project init wizard integration",
       "name": "Wizard exposes Open Code plugin option",
       "when": ["interactive specd project init renders plugin choices"],
@@ -193,6 +212,22 @@
         "AND the resolved sharedFolder location is removed",
         "AND unrelated user skill directories remain"
       ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected agent files",
+      "given": ["multiple agents are installed"],
+      "when": ["uninstall(config, { agents: ['specd-project-context-optimizer'] }) is executed"],
+      "then": ["only .opencode/agents/specd-project-context-optimizer.md is removed"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall without filter removes all specd-managed agents",
+      "given": [
+        "specd-managed agents and unrelated user agents are installed under .opencode/agents/"
+      ],
+      "when": ["uninstall(config) is executed without filters"],
+      "then": ["all specd-managed agent files are removed", "AND unrelated user agent files remain"]
     },
     {
       "requirement": "Application layer",
@@ -235,12 +270,17 @@
         "specId": "plugin-agent-opencode:plugin-agent",
         "file": "plugin-agent-opencode:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-opencode:plugin-agent",
+        "file": "plugin-agent-opencode:src/domain/frontmatter/index.ts",
+        "symbol": "agentFrontmatter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:141ad42d9bac64348cb1e206f4e79f9b1ad4ad1d9937b1938670eb7c229c05f7",
-    "verify.md": "sha256:ba573ba8bf3fb0757905789fc689b602f3c996837a18466470afce465de074c2"
+    "spec.md": "sha256:9398be5050b5cab1930dafc0ee7c34fc821cd6a5199c0d8960fcbf3744ae58b1",
+    "verify.md": "sha256:b7174445aa98a9b4f8a98948a709d8f43df2e1c45d01768e535cba50e5c7ca63"
   },
   "generatedBy": "core"
 }

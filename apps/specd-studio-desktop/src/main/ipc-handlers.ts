@@ -37,7 +37,6 @@ import {
   type Change,
   type ChangeEvent,
   type ChangeState,
-  type CompileContextConfig,
   type CompileContextResult,
   type GetArtifactInstructionResult,
   type GetChangeArtifactResult,
@@ -119,34 +118,6 @@ function toValidateBatchResultDto(result: ValidateChangeBatchResult): ValidateBa
       warnings: step.warnings.map((w) => w.description),
       files: step.files.map((f) => f.filename),
     })),
-  }
-}
-
-/**
- * Maps project config to the compile-context input shape.
- *
- * @param config - Resolved project config.
- * @returns Compile context configuration.
- */
-function toCompileContextConfig(config: SpecdConfig): CompileContextConfig {
-  return {
-    projectRoot: config.projectRoot,
-    configPath: config.configPath,
-    llmOptimizedContext: config.llmOptimizedContext,
-    ...(config.context !== undefined
-      ? {
-          context: config.context.map((e) =>
-            'file' in e ? { file: e.file } : { instruction: e.instruction },
-          ),
-        }
-      : {}),
-    ...(config.contextIncludeSpecs !== undefined
-      ? { contextIncludeSpecs: [...config.contextIncludeSpecs] }
-      : {}),
-    ...(config.contextExcludeSpecs !== undefined
-      ? { contextExcludeSpecs: [...config.contextExcludeSpecs] }
-      : {}),
-    ...(config.contextMode !== undefined ? { contextMode: config.contextMode } : {}),
   }
 }
 
@@ -1899,12 +1870,10 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       const [name, query = {}] = params as [string, ChangeContextQuery?]
       const status = await kernel.changes.status.execute({ name })
       const currentStep = status.change?.state ?? 'designing'
-      const config = await getConfig()
 
       const context = await kernel.changes.compile.execute({
         name,
         step: (query.step as ChangeState) ?? currentStep,
-        config: toCompileContextConfig(config),
         followDeps: query.followDeps ?? true,
         depth: query.depth ?? 1,
         includeChangeSpecs: query.includeChangeSpecs ?? true,
@@ -1952,12 +1921,9 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     }
     case 'transitionChange': {
       const [name, input] = params as [string, TransitionChangeInput]
-      const config = await getConfig()
       const result = await kernel.changes.transition.execute({
         name,
         to: input.targetState as ChangeState,
-        approvalsSpec: config.approvals.spec,
-        approvalsSignoff: config.approvals.signoff,
         ...(input.skipHooks === 'all' ? { skipHookPhases: new Set(['all']) } : {}),
       })
       return createIpcSuccess(envelope.id, toChangeDetailDto(result.change))
@@ -1987,21 +1953,17 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     }
     case 'approveSpec': {
       const [name, input = {}] = params as [string, { reason?: string }?]
-      const config = await getConfig()
-      const result = await kernel.specs.approveSpec.execute({
+      const result = await kernel.changes.approveSpec.execute({
         name,
         reason: input.reason ?? 'Approved via Studio Desktop',
-        approvalsSpec: config.approvals.spec,
       })
       return createIpcSuccess(envelope.id, toChangeDetailDto(result))
     }
     case 'approveSignoff': {
       const [name, input = {}] = params as [string, { reason?: string }?]
-      const config = await getConfig()
-      const result = await kernel.specs.approveSignoff.execute({
+      const result = await kernel.changes.approveSignoff.execute({
         name,
         reason: input.reason ?? 'Signed off via Studio Desktop',
-        approvalsSignoff: config.approvals.signoff,
       })
       return createIpcSuccess(envelope.id, toChangeDetailDto(result))
     }

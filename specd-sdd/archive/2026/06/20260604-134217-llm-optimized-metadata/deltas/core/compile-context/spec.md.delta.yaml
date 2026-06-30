@@ -1,0 +1,91 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Prefer LLM-optimized context'
+  content: |
+    If `llmOptimizedContext: true` is active in the project configuration, the context compiler SHALL prefer `optimizedContext` for each spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`.
+
+    **Strict Bypass**: `optimizedContext` usage is strictly bypassed (forced to `false`) if `sections` is passed but does not include both `rules` and `constraints`. This is because the monolithic optimized context cannot be filtered by individual sections. If `scenarios` are requested while `optimizedContext` is active, the scenarios MUST still be extracted and appended to the result. `optimizedDescription` preference is unaffected by this bypass.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Optimization warning signal'
+  content: |
+    When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimization` warning for each spec that is missing fresh optimized context.
+
+    The warning message MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and `LifecycleEngine`.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        listWorkspaces: ListWorkspaces,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+        hasher: ContentHasher,
+        previewSpec: PreviewSpec,
+        lifecycle: LifecycleEngine,
+      )
+    }
+    ```
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+    `PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs. `LifecycleEngine` provides the schema-aware lifecycle interpretation needed for step availability and available-step diagnostics.
+
+    `CompileContext` MUST NOT accept `ImplementationDetector` or invoke implementation autodetection.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Workspace resolution for spec IDs'
+  content: |
+    Every spec ID handled by `CompileContext` carries an explicit or implicit workspace qualifier:
+
+    - **Explicit qualifier** (e.g. `billing:auth/login`) — the workspace name before `:` is used to look up the corresponding `SpecRepository` in the active workspaces list.
+    - **No qualifier** (e.g. `auth/login`) — the workspace is inferred from context:
+      - In include/exclude patterns at project level, an unqualified path resolves to `default`.
+      - In include/exclude patterns at workspace level, an unqualified path resolves to that workspace.
+      - In `dependsOn` entries from metadata, an unqualified path resolves to the same workspace as the spec that declared it.
+
+    If a pattern or `dependsOn` entry references a workspace name that has no entry in the active workspaces resolved via `ListWorkspaces`, `CompileContext` must emit a warning and skip that path. It must not throw.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Unknown workspace qualifiers emit a warning'
+  content: |
+    If a pattern or `dependsOn` entry references a workspace name that has no corresponding `SpecRepository` in the active workspaces resolved via `ListWorkspaces` (e.g. `billing:auth/*` when `billing` was not wired at bootstrap), `CompileContext` must emit a warning and skip the path. It must not throw.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Project `context` entries always appear first in `projectContext`, before spec entries
+    - Missing `file` references in `context` emit a warning and are skipped — no error
+    - Steps 1-4 (include/exclude patterns) are applied before `dependsOn` traversal (step 5)
+    - Specs added via `dependsOn` traversal are never removed by exclude rules
+    - A spec always appears at most once in the `specs` array, classified by its highest-priority source
+    - `CompileContext` MUST NOT perform direct filesystem reads — all file access goes through `SpecRepository` (for spec files and metadata) or `FileReader` (for `config.context` file entries)
+    - The caller resolves the config and constructs all `SpecRepository` and `FileReader` instances before calling the constructor
+    - The active workspaces resolved via `ListWorkspaces` must contain one entry per workspace declared in `specd.yaml`; workspaces missing from the active list produce a warning, not an error
+    - Artifact instructions, rules, and delta context are NOT part of the result — they are retrieved via `GetArtifactInstruction`
+    - `instruction:` hook entries are NOT part of the result — they are retrieved via `GetHookInstructions`
+    - `dependsOn` traversal is opt-in via `followDeps: true`; when absent or `false`, step 5 is skipped entirely
+    - `depth` is only meaningful when `followDeps: true`; it limits traversal levels (1 = direct deps only)
+    - `sections` applies only to full-mode spec content rendering; summary-mode specs, project context entries, and available steps are unaffected
+    - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
+    - Fresh metadata (via `SpecRepository.metadata()`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
+    - `contextMode` supports `list`, `summary`, `full`, and `hybrid`; when omitted, `summary` is used
+    - In `hybrid`, only direct `change.specIds` entries included via `includeChangeSpecs: true` are full; other collected specs remain summaries
+    - `PreviewSpec` errors MUST NOT block context compilation — `CompileContext` falls back to base content on any preview failure

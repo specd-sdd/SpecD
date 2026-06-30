@@ -1,0 +1,781 @@
+{
+  "name": "05-core-config-list-plugins",
+  "createdAt": "2026-06-25T14:29:45.307Z",
+  "description": "Removes kernel.project.listPlugins and the ListPlugins use case so plugin declarations are read from the in-memory SpecdConfig snapshot (getConfig or loadConfig). CLI plugins list, install, and update now use a local getDeclaredPlugins helper; kernel.project spec mapping is aligned with the implemented project surface.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:kernel", "cli:plugins-list", "cli:plugins-install", "cli:plugins-update"],
+  "specDependsOn": {
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:save-spec-metadata",
+      "core:invalidate-spec-metadata",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:get-spec-context",
+      "core:init-project",
+      "core:get-project-context",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-config",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:project-metadata",
+      "core:update-project-metadata"
+    ],
+    "cli:plugins-list": ["plugin-manager:load-plugin-use-case", "core:get-config"],
+    "cli:plugins-install": [
+      "plugin-manager:install-plugin-use-case",
+      "plugin-manager:load-plugin-use-case",
+      "core:config-writer-port",
+      "core:get-config"
+    ],
+    "cli:plugins-update": ["plugin-manager:update-plugin-use-case", "core:get-config"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/get-declared-plugins.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/plugins-list.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/get-config.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-update.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "approval-system-notes.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins/get-declared-plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-get-config.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Kernel", "createKernel"]
+    },
+    {
+      "specId": "cli:plugins-list",
+      "file": "packages/cli/src/commands/plugins/get-declared-plugins.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getDeclaredPlugins", "DeclaredPluginEntry"]
+    },
+    {
+      "specId": "cli:plugins-install",
+      "file": "packages/cli/src/commands/plugins/get-declared-plugins.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getDeclaredPlugins"]
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/src/commands/plugins/get-declared-plugins.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getDeclaredPlugins"]
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/src/commands/project/update.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectUpdate"]
+    },
+    {
+      "specId": "cli:plugins-list",
+      "file": "packages/cli/src/commands/plugins/list.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerPluginsList"]
+    },
+    {
+      "specId": "cli:plugins-install",
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["installPluginsWithKernel", "registerPluginsInstall"]
+    },
+    {
+      "specId": "cli:plugins-update",
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["updatePluginsWithKernel", "registerPluginsUpdate"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:91feb129ea5f8b4281a174cc9b2efe7e93cb88202995261e3c15522614691373"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a3c59aaaa313d84a77a2fe708e9c64e227c4c5824fbed98d5744c149f9158ec3"
+        },
+        {
+          "key": "cli:plugins-list",
+          "filename": "deltas/cli/plugins-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:daf316187e6b1d165a321f2292abd475e5c94ac1fc8227469d8a78de74ed4de3"
+        },
+        {
+          "key": "cli:plugins-install",
+          "filename": "deltas/cli/plugins-install/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dbba90adca8fe096c242ddbd8ba8d836a2f91cd99749944796d9aed0bf2afc59"
+        },
+        {
+          "key": "cli:plugins-update",
+          "filename": "deltas/cli/plugins-update/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:037c7c1c36de40b68e8d59a652b077c8bab0a55bceacd39008cb4b3cfc097410"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f0acf520a3e86e765ad0d05db63052bcb363d767c1ad402c03007ac63bd89e83"
+        },
+        {
+          "key": "cli:plugins-list",
+          "filename": "deltas/cli/plugins-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b8159839fa8bc21bd69fef3e7487d74840239cb5bb6a2b745182e79c731f67d3"
+        },
+        {
+          "key": "cli:plugins-install",
+          "filename": "deltas/cli/plugins-install/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5d7cc7221d5dac22e2c5a93cb807c57e3abad16a0d0850ca53fae127ff44c15b"
+        },
+        {
+          "key": "cli:plugins-update",
+          "filename": "deltas/cli/plugins-update/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c9c1778ea95ee5c10a46f625810932b148c362687270597ccc84f2ff71cccdbd"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:5765f5339dd944b09167b93439b9647cf3f05a5058b594686bd7a36b48214fe5"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:22e85228a7ec61e8f284943789e63dda1bedd9aa806eccab05cb15803ea0db51"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-25T14:29:45.307Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:kernel", "cli:plugins-list"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-25T14:29:45.324Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "specs",
+          "key": "cli:plugins-list"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-list"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-25T15:47:36.477Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '01-core-kernel-get-config' was archived with overlapping specs: core:kernel",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-25T15:47:36.477Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T08:51:08.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:kernel", "cli:plugins-list"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel", "cli:plugins-list"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:55:53.479Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T08:57:33.035Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:kernel", "cli:plugins-list"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel", "cli:plugins-list"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:57:33.035Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T08:57:37.982Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:kernel", "cli:plugins-list"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel", "cli:plugins-list"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-26T08:57:37.984Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-install"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-install"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T08:57:39.140Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:kernel", "cli:plugins-list", "cli:plugins-install"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel", "cli:plugins-list", "cli:plugins-install"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-26T08:57:39.144Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:plugins-update"
+        },
+        {
+          "type": "verify",
+          "key": "cli:plugins-update"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T08:59:03.641Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T09:00:45.138Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:05:21.569Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:05:50.498Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:05:59.859Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T10:19:07.662Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:kernel]; verify [core:kernel]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:19:07.662Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:37:23.458Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:37:31.613Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:37:32.759Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:37:33.927Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:37:35.053Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-06-26T10:39:17.725Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Removes kernel.project.listPlugins and the ListPlugins use case so plugin declarations are read from the in-memory SpecdConfig snapshot (getConfig or loadConfig). CLI plugins list, install, and update now use a local getDeclaredPlugins helper; kernel.project spec mapping is aligned with the implemented project surface."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-26T10:39:27.907Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:plugins-list\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-26T10:39:38.474Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:kernel': extracted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:init-project, core:config-writer-port, core:list-workspaces, core:get-project-context, core:get-config, core:project-metadata, core:update-project-metadata, core:resolve-schema, core:spec-overlap] do not match persisted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:init-project, core:record-skill-install, core:get-skills-manifest, core:get-project-context, core:resolve-schema, core:spec-overlap, core:get-config]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T10:39:56.809Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-26T10:39:56.892Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

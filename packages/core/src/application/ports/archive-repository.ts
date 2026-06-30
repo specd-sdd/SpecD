@@ -115,11 +115,11 @@ export abstract class ArchiveRepository extends Repository {
   abstract get(name: string): Promise<ArchivedChange | null>
 
   /**
-   * Loads the content of a tracked artifact file from an archived change.
+   * Loads the content of a single artifact file within an archived change.
    *
-   * @param change - The archived change snapshot containing the tracked artifact
+   * @param change - The archived change containing the artifact
    * @param filename - The artifact filename to load
-   * @returns The artifact with content and originalHash, or `null` if the file does not exist
+   * @returns The artifact with content and originalHash, or `null` if missing
    */
   abstract artifact(change: ArchivedChange, filename: string): Promise<SpecArtifact | null>
 
@@ -142,4 +142,19 @@ export abstract class ArchiveRepository extends Repository {
    * @returns The absolute path to the archived change's directory
    */
   abstract archivePath(entry: ArchivePathEntry): string
+
+  /**
+   * Returns the absolute filesystem paths to specd-managed internal directories
+   * (e.g. the archive root).
+   *
+   * Used by implementation discovery to exclude internal specd directories
+   * from detection results. Returns absolute paths in stable order.
+   *
+   * Implementations that do not manage local filesystem directories
+   * (e.g. remote backends) MUST return `undefined` instead of an empty array
+   * to signal that internal-path exclusion does not apply.
+   *
+   * @returns Absolute filesystem paths to internal storage roots, or `undefined`
+   */
+  abstract internalPaths(): readonly string[] | undefined
 }

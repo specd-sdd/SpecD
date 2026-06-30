@@ -8,25 +8,31 @@ import {
   mockProcessExit,
 } from './helpers.js'
 
-vi.mock('../../src/load-config.js', () => ({
-  loadConfig: vi.fn(),
-  resolveConfigPath: vi.fn().mockResolvedValue(null),
-}))
-vi.mock('../../src/kernel.js', () => ({ createCliKernel: vi.fn() }))
-vi.mock('@specd/code-graph', () => ({
-  createCodeGraphProvider: vi.fn(),
+vi.mock('../../src/helpers/cli-context.js', () => ({
+  resolveCliContext: vi.fn(),
+  buildCliKernelOptions: vi.fn(() => ({})),
 }))
 
-import { loadConfig } from '../../src/load-config.js'
-import { createCliKernel } from '../../src/kernel.js'
-import { createCodeGraphProvider } from '@specd/code-graph'
+import { resolveCliContext } from '../../src/helpers/cli-context.js'
+vi.mock('@specd/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
+  return {
+    ...actual,
+    createCodeGraphProvider: vi.fn(),
+  }
+})
+
+import { createCodeGraphProvider } from '@specd/sdk'
 import { registerSpecSearch } from '../../src/commands/spec/search.js'
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(loadConfig).mockResolvedValue(config)
-  vi.mocked(createCliKernel).mockResolvedValue(kernel)
+  vi.mocked(resolveCliContext).mockResolvedValue({
+    config: config,
+    configFilePath: null,
+    kernel: kernel,
+  })
   kernel.specs.search.execute.mockResolvedValue([])
   const stdout = captureStdout()
   const stderr = captureStderr()

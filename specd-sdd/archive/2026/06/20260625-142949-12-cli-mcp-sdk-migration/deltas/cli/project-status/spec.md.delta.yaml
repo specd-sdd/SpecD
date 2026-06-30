@@ -1,0 +1,56 @@
+- op: modified
+  description: Graph freshness via SDK snapshot orchestration
+  selector:
+    type: section
+    matches: 'Requirement: includes graph freshness \(always\)'
+  content: |
+    The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with `{ includeGraph: true }`:
+
+    - Whether the code graph is stale (boolean)
+    - Last indexed timestamp (or null if never indexed)
+
+    The command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.
+
+    Graph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.
+
+    This is included by default, not behind a flag.
+
+- op: modified
+  description: Extended graph stats via SDK snapshot
+  selector:
+    type: section
+    matches: 'Requirement: supports --graph flag'
+  content: |
+    When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }` and include extended graph statistics from the snapshot:
+
+    - Number of indexed files (`graphHealth.fileCount`)
+    - Number of indexed symbols (`graphHealth.symbolCount`)
+    - Hotspots (from snapshot `hotspots` when available)
+
+    Presenter formatting (text/json/toon) remains in the CLI command handler.
+
+- op: added
+  description: SDK host bootstrap requirement
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: supports json and toon formats'
+  content: |
+    ### Requirement: SDK host bootstrap
+
+    The command MUST obtain host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`). Project summary, approval flags, and graph snapshot orchestration MUST use the returned `SdkHostContext`.
+
+- op: modified
+  description: Add SDK snapshot dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure in workspace output
+    - [`core:get-project-summary`](../../core/get-project-summary/spec.md) — consolidated change and spec counts
+    - [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly
+    - [`sdk:build-project-status-snapshot`](../../sdk/build-project-status-snapshot/spec.md) — graph freshness and extended graph stats orchestration
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

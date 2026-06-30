@@ -1,0 +1,2298 @@
+{
+  "name": "12-cli-mcp-sdk-migration",
+  "createdAt": "2026-06-25T14:29:49.114Z",
+  "description": "A2b: migrate CLI/MCP to depend on @specd/sdk; delegate commands per refactor reparto table",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:project-status",
+    "cli:graph-index",
+    "cli:graph-stats",
+    "sdk:composition",
+    "core:composition",
+    "cli:entrypoint",
+    "cli:graph-search",
+    "cli:graph-hotspots",
+    "cli:graph-impact",
+    "cli:host-context",
+    "cli:graph-cli-context"
+  ],
+  "specDependsOn": {
+    "cli:project-status": [
+      "core:list-workspaces",
+      "core:get-project-summary",
+      "core:get-project-context",
+      "sdk:build-project-status-snapshot",
+      "sdk:host-context"
+    ],
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "core:list-workspaces",
+      "sdk:run-index-project-graph",
+      "sdk:host-context"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:staleness-detection",
+      "core:list-workspaces",
+      "code-graph:get-graph-health",
+      "sdk:with-open-graph-provider",
+      "sdk:host-context"
+    ],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context"
+    ],
+    "core:composition": [
+      "default:_global/architecture",
+      "core:resolve-schema",
+      "core:config-writer-port"
+    ],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
+    "cli:graph-search": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model",
+      "code-graph:graph-store",
+      "cli:graph-cli-context"
+    ],
+    "cli:graph-hotspots": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "cli:graph-cli-context"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "cli:graph-cli-context",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "cli:host-context": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
+    "cli:graph-cli-context": [
+      "cli:host-context",
+      "cli:entrypoint",
+      "core:config",
+      "sdk:with-open-graph-provider",
+      "sdk:composition"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/sdk-host.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context-types.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/mcp/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/sdk.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/archive.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/check-overlap.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/invalidate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/config/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/drafts/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/parse-graph-kinds.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/warn-graph-staleness.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/get-declared-plugins.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/install.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/uninstall.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/plugins/update.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/init.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/update-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/schema/extend.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/schema/fork.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/schema/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/schema/validate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/generate-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/invalidate-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/outline.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/write-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/errors/specd-cli-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/handle-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/spec-path.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/load-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/version.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/archive-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-approve.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-archive.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-artifact-instruction.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-check-overlap.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-create.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-deps.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-discard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-draft.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-edit.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-skip-artifact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-transition.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-invalidate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/change-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/spec-preview.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/config-schema-project.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/config-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/discarded-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/drafts-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/drafts-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/list-commands.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-dashboard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-init.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-extend.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-fork.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/schema-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-generate-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-outline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-resolve-path.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-show.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-write-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/entrypoint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/handle-error.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/spec-path.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "approval-system-notes.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts.bak",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/banner.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/dashboard.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/formatter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/hotspot-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/errors/invalid-format-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/formatter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/shared/code-graph-version.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-project-status-snapshot.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/version.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/installed-code-graph-version.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/staleness-detection.verify.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/expected-fingerprint-map.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/mcp/test/package.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/mcp/vitest.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/package-boundary.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "acquireGraphIndexLock",
+        "assertGraphIndexUnlocked",
+        "createGetGraphHealth",
+        "GetGraphHealthInput",
+        "GraphSpecNotFoundError"
+      ]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildCliKernelOptions", "resolveCliContext"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/sdk-host.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveSdkHostContext"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-context-types.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CliContext"]
+    },
+    {
+      "specId": "cli:graph-cli-context",
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveGraphCliContext"]
+    },
+    {
+      "specId": "cli:graph-cli-context",
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["withProvider"]
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectStatus"]
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphStats"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphIndex"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphSearch"]
+    },
+    {
+      "specId": "cli:graph-hotspots",
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphHotspots"]
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphImpact"]
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/package.json",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:70bbfc30635fccb8e0520fbaa94057800c3a5f5a9d75552ab4eea060320a35c1"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:22278a3d8c926d78133caffe2384c16e1b23e93e702897425767a0f349596851"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:496fdc72a711134e9be91a6bcb59a3e1e9a375019dd7a7e5a5aa9a4bbf384da3"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2be5e16f57efa8d5702a9b384b698c225cfb2eb322750b75f8e7da6c21185341"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aa942751d5789dab6c30f8f08ab19340fa63d1d252c4d88a59f6c59e8ffebd6b"
+        },
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ebf67fc665e3c52196c0c88a2fb55c230fa7ce0d164c5ad1dc2ff128f4a358c0"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6e8f4f6e1a3b8b84b8f3fab64e546b2356f83bbb2ddf16ab89dd945fa23e6f8f"
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f22d039306490e23a8e734e461647a1e30fd0ea7222b4284b0c9e8ebbcc9aa03"
+        },
+        {
+          "key": "cli:graph-hotspots",
+          "filename": "deltas/cli/graph-hotspots/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6eacc66be715db42f3805b0a7717cf11820515bab87c6d29c32e4240b6bb4a8a"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9e8df687b1e6658b0436b520047ad43a941381a72952104d6f179c4596309fac"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "specs/cli/host-context/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:da5cf666bf91a0ebca76f464a189d8c8f6dc8cffe7c69d722c1ae2ea0931070a"
+        },
+        {
+          "key": "cli:graph-cli-context",
+          "filename": "specs/cli/graph-cli-context/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:10dded5048103ea1a7972e2e9c91f7c814053921c4df1815d633e1a4d9c91303"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2d457952cb47d22458e86498d9c8b97781ffd26ea910e079bc321771e9ec6d7e"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:705f5489fa62ef970a822600500f78c7fde92cb82115855bf0dccef3816086d3"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9763807bc585627d2feaab23d0c44363a3626079e393f2b4d662b6803c3d7c4d"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:37d431bf1f41df9d40b51afaac06b447879a23dd19b595b464db97e1d5a21d90"
+        },
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c29394f932d8f9ee58b0acf7dfc367ffe8f2d00f6129c5fe48a5c6f3b6db65c2"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f6e964340200dc6118aa38b09a1140ef908bc27fe11ca3f8696881c16539fedb"
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6ffbe238b77b3a4d2867acff07a58767fd33c21d8d4dbc18968674e0b40dfa6e"
+        },
+        {
+          "key": "cli:graph-hotspots",
+          "filename": "deltas/cli/graph-hotspots/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1bd9d51caec40376aa55f01170c1d30de3622c9cce6126c2bc469da5f0f61168"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:922d2e8050e71173e36ed46b4a8a62ba033f938826a3b1491e841cd40a0ba6a4"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "specs/cli/host-context/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:b80b12fdf3382e7d166c20860102b8a4fe6a43d94eb3c742999e1975f207665a"
+        },
+        {
+          "key": "cli:graph-cli-context",
+          "filename": "specs/cli/graph-cli-context/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:d8d2c7b4204be8705f08fa12954a5d9374a832a44521e38b06f12113f63ab133"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:222e5c560937cbe77cc02ab90411f208143295a3d4bfb75a9fd2541939a0b655"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:a844278134212473ee9949c4d1d9a588e50ef1166296c8cd7aa5651fd9822ebe"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-25T14:29:49.114Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:project-status", "cli:graph-index", "cli:graph-stats"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-25T14:29:49.126Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T06:50:01.865Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '03-core-host-orchestration-context' was archived with overlapping specs: cli:project-status",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-26T06:50:01.865Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T06:50:16.174Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '03-core-host-orchestration-context' was archived with overlapping specs: cli:project-status",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T06:51:01.478Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '03-core-host-orchestration-context' was archived with overlapping specs: cli:project-status",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T23:13:08.117Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '08-core-project-summary' was archived with overlapping specs: cli:project-status",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T23:13:25.043Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '08-core-project-summary' was archived with overlapping specs: cli:project-status",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T23:13:47.660Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '08-core-project-summary' was archived with overlapping specs: cli:project-status",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-26T23:19:40.371Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '08-core-project-summary' was archived with overlapping specs: cli:project-status",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T17:37:32.256Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '10-code-graph-host-use-cases' was archived with overlapping specs: cli:graph-index, cli:graph-stats",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T17:37:53.888Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '10-code-graph-host-use-cases' was archived with overlapping specs: cli:graph-index, cli:graph-stats",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T17:38:01.278Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '10-code-graph-host-use-cases' was archived with overlapping specs: cli:graph-index, cli:graph-stats",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-27T17:38:17.057Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '10-code-graph-host-use-cases' was archived with overlapping specs: cli:graph-index, cli:graph-stats",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:47:49.328Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-28T08:52:14.158Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:project-status", "cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status", "cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:52:14.158Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-28T08:52:21.004Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:project-status", "cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-status", "cli:graph-index", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:52:21.016Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "core:composition"
+        },
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-cli-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:52:57.878Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:54:32.364Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:07.516Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:30.240Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:32.318Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:36.893Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:37.376Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:38.194Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:39.804Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:45.408Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:47.384Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:47.512Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:49.845Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:50.751Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:52.365Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:52.991Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:54.799Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:55.416Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:55:57.478Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-28T08:56:02.301Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:56:31.732Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-28T08:57:17.527Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:project-status",
+            "cli:graph-index",
+            "cli:graph-stats",
+            "sdk:composition",
+            "core:composition",
+            "cli:entrypoint",
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "cli:host-context",
+            "cli:graph-cli-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:project-status",
+            "cli:graph-index",
+            "cli:graph-stats",
+            "sdk:composition",
+            "core:composition",
+            "cli:entrypoint",
+            "cli:graph-search",
+            "cli:graph-hotspots",
+            "cli:graph-impact",
+            "cli:host-context",
+            "cli:graph-cli-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:57:17.527Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T08:59:49.978Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-28T19:50:39.131Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T07:37:49.277Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T07:37:49.277Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T07:40:38.938Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T07:40:46.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T07:41:14.446Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T07:59:41.423Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T08:05:54.089Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:entrypoint, cli:graph-cli-context, sdk:composition]; verify [cli:entrypoint, cli:graph-cli-context, sdk:composition]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:entrypoint", "cli:graph-cli-context", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:entrypoint", "cli:graph-cli-context", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T08:05:54.089Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T08:08:28.557Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:entrypoint]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:entrypoint"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T08:08:48.184Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T08:08:49.434Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T08:09:46.023Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T08:16:11.452Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:entrypoint]; verify [cli:entrypoint]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:entrypoint"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:entrypoint"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T08:16:11.452Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T10:49:06.030Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T10:49:49.432Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T10:49:54.998Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T10:49:56.154Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T10:50:13.585Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T10:55:47.125Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:02:01.110Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:entrypoint\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:02:33.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:composition\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:02:45.006Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"sdk:composition\" points outside workspace \"sdk\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:02:54.749Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:project-status': extracted dependencies [core:list-workspaces, core:get-project-summary, core:get-project-context, sdk:build-project-status-snapshot, sdk:host-context] do not match persisted dependencies [core:list-workspaces, core:list-drafts, core:list-changes, sdk:build-project-status-snapshot]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:03:28.588Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-index': extracted dependencies [cli:entrypoint, core:config, core:list-workspaces, sdk:run-index-project-graph, sdk:host-context] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:graph-store, core:list-workspaces, sdk:run-index-project-graph]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:03:37.295Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-index': extracted dependencies [cli:entrypoint, core:config, core:list-workspaces, sdk:run-index-project-graph, sdk:host-context] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:graph-store, core:list-workspaces, sdk:run-index-project-graph]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:03:46.743Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-index': extracted dependencies [cli:entrypoint, core:config, core:list-workspaces, sdk:run-index-project-graph, sdk:host-context] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:graph-store, core:list-workspaces, sdk:run-index-project-graph]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:03:48.982Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-stats': extracted dependencies [cli:entrypoint, core:config, code-graph:staleness-detection, core:list-workspaces, code-graph:get-graph-health, sdk:with-open-graph-provider, sdk:host-context] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:staleness-detection, core:list-workspaces, sdk:with-open-graph-provider,sdk:host-context]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:03:51.194Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:entrypoint': extracted dependencies [core:config, default:_global/error-handling-conventions] do not match persisted dependencies [core:config, default:_global/error-handling-conventions, cli:host-context]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-06-29T11:03:53.380Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-impact': extracted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:traversal, code-graph:workspace-integration] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:traversal, code-graph:workspace-integration, cli:graph-cli-context]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-29T11:03:55.828Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-06-29T11:03:55.975Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

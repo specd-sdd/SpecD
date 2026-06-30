@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as publicDocsConfig from '../../src/lib/public-docs-config'
 
 const {
+  apiPackageEntryPoints,
   generatedApiPath,
   initialApiEntryPoints,
   isApiReferenceEnabled,
@@ -43,7 +44,12 @@ describe('public docs config', () => {
 
   it('locks the initial API surface to the curated packages', () => {
     expect(generatedApiPath).toBe('.generated/api')
-    expect(initialApiEntryPoints).toEqual(['../../packages/core/src/index.ts'])
+    expect(apiPackageEntryPoints.map((entry) => entry.id)).toEqual(['sdk', 'core', 'code-graph'])
+    expect(initialApiEntryPoints).toEqual([
+      '../../packages/sdk/src/index.ts',
+      '../../packages/core/src/public.ts',
+      '../../packages/code-graph/src/public.ts',
+    ])
   })
 
   it('lets development disable the generated API plugin explicitly', () => {

@@ -9,6 +9,20 @@
 - **WHEN** `RefreshImplementationTracking.execute({ name })` is called with an existing change
 - **THEN** the use case loads that change by name
 
+### Requirement: Default orchestration by host use cases
+
+#### Scenario: GetStatus delegates to RefreshImplementationTracking
+
+- **GIVEN** `GetStatus` is configured with a `RefreshImplementationTracking` collaborator
+- **WHEN** `GetStatus` performs a default active-change status load
+- **THEN** it calls `RefreshImplementationTracking.execute({ name })` rather than `ImplementationDetector` directly
+
+#### Scenario: TransitionChange delegates to RefreshImplementationTracking
+
+- **GIVEN** `TransitionChange` is configured with a `RefreshImplementationTracking` collaborator
+- **WHEN** `TransitionChange` performs a default active-change transition
+- **THEN** it calls `RefreshImplementationTracking.execute({ name })` rather than `ImplementationDetector` directly
+
 ### Requirement: Historical implementing guard
 
 #### Scenario: Guard satisfied triggers detector
@@ -39,6 +53,48 @@
 - **WHEN** detection returns the same path again
 - **THEN** the tracked entry keeps its existing review state
 
+### Requirement: Deletion and removal semantics
+
+#### Scenario: Missing tracked files are marked removed
+
+- **GIVEN** `packages/core/src/deleted.ts` is tracked as `open`
+- **AND** the file no longer exists on disk
+- **WHEN** refresh runs
+- **THEN** its state transitions to `removed`
+
+#### Scenario: Links for missing files are cleaned up
+
+- **GIVEN** `packages/core/src/deleted.ts` is tracked as `open`
+- **AND** a confirmed link exists for this file
+- **AND** the file no longer exists on disk
+- **WHEN** refresh runs
+- **THEN** the link is removed from `implementationLinks`
+
+### Requirement: Resurrections and re-appearances
+
+#### Scenario: Removed file reappearing via detector becomes open
+
+- **GIVEN** `packages/core/src/resurrected.ts` is tracked as `removed`
+- **AND** the detector identifies it as modified
+- **WHEN** refresh runs
+- **THEN** its state transitions back to `open`
+
+#### Scenario: Removed file found on disk becomes open
+
+- **GIVEN** `packages/core/src/resurrected.ts` is tracked as `removed`
+- **AND** the file exists on disk during the existence check
+- **WHEN** refresh runs
+- **THEN** its state transitions back to `open`
+
+### Requirement: Internal directory filtering
+
+#### Scenario: Use case excludes internal repository paths
+
+- **GIVEN** `ChangeRepository` returns `changes/` and `drafts/` as internal paths
+- **AND** `ArchiveRepository` returns `archive/`
+- **WHEN** refresh runs
+- **THEN** it passes these paths as `excludePaths` to the detector
+
 ### Requirement: Persistence
 
 #### Scenario: Refresh persists through ChangeRepository.mutate
@@ -63,11 +119,11 @@
 
 ### Requirement: Constructor dependencies
 
-#### Scenario: Use case receives repository and detector
+#### Scenario: Use case receives repositories and detector
 
 - **GIVEN** `RefreshImplementationTracking` is assembled by the kernel
 - **WHEN** the use case is constructed
-- **THEN** it receives `ChangeRepository` and `ImplementationDetector`
+- **THEN** it receives `ChangeRepository`, `ArchiveRepository`, and `ImplementationDetector`
 
 ### Requirement: Delivery-agnostic boundary
 

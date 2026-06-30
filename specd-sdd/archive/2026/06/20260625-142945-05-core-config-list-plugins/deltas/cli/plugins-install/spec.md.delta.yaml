@@ -1,0 +1,26 @@
+- op: added
+  description: Declarations read from SpecdConfig.plugins for already-installed check
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: Declaration source
+
+    When the command needs the set of declared plugins (for example to detect already-installed plugins), it MUST read from the loaded `SpecdConfig.plugins` field. It MUST NOT call `kernel.project.listPlugins` or `ConfigWriter.listPlugins` when a config snapshot is already available.
+
+    For already-installed detection, the command MUST consult `config.plugins.agents` (or the appropriate type bucket).
+
+- op: modified
+  description: Add get-config to spec dependencies; keep config-writer for writes
+  selector:
+    type: section
+    matches: Spec Dependencies
+  content: |
+    - [`plugin-manager:install-plugin-use-case`](../../plugin-manager/install-plugin-use-case/spec.md) — orchestrates plugin installation
+    - [`plugin-manager:load-plugin-use-case`](../../plugin-manager/load-plugin-use-case/spec.md) — validates plugin before installation
+    - [`core:config-writer-port`](../../core/config-writer-port/spec.md) — persists plugin declarations via `addPlugin`
+    - [`core:get-config`](../../core/get-config/spec.md) — readonly `SpecdConfig` snapshot for declaration reads

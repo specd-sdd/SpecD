@@ -16,6 +16,12 @@
 
 ### Requirement: Behaviour
 
+#### Scenario: CLI does not build CompileContextConfig inline
+
+- **WHEN** `specd project context` is run
+- **THEN** the command does not construct a `CompileContextConfig` object from `SpecdConfig`
+- **AND** it invokes `GetProjectContext.execute` with runtime overrides only
+
 #### Scenario: Context entries rendered first
 
 - **GIVEN** `specd.yaml` has `context:` with `instruction: "Follow conventions."` and `contextIncludeSpecs: ["*"]`
@@ -57,6 +63,46 @@
 - **GIVEN** `contextMode` is list or summary
 - **WHEN** `specd project context --rules --constraints` is run
 - **THEN** output remains list/summary shaped
+
+#### Scenario: Prefers optimized content when enabled
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **AND** project-level optimized context is fresh
+- **WHEN** `specd project context` is run
+- **THEN** it displays the optimized project context
+
+#### Scenario: --no-optimized forces raw sections
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **WHEN** `specd project context --no-optimized` is run
+- **THEN** it displays the raw project instructions
+- **AND** it emits no optimization warnings
+
+#### Scenario: --no-optimized passed as runtime override
+
+- **GIVEN** `llmOptimizedContext: true` in configuration
+- **WHEN** `specd project context --no-optimized` is executed
+- **THEN** the CLI passes `llmOptimizedContext: false` on `GetProjectContext.execute`
+
+#### Scenario: --mode passed as runtime override
+
+- **GIVEN** yaml `contextMode: 'summary'`
+- **WHEN** `specd project context --mode full` is executed
+- **THEN** the CLI passes `contextMode: 'full'` on `GetProjectContext.execute`
+
+#### Scenario: Section flags do not override optimization when both rules and constraints are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **AND** project-level optimized context is fresh
+- **WHEN** `specd project context --rules --constraints` is run
+- **THEN** it displays the optimized project context
+
+#### Scenario: Section flags override optimization when only rules are requested
+
+- **GIVEN** `llmOptimizedContext` is enabled in config
+- **WHEN** `specd project context --rules` is run
+- **THEN** it displays the raw project rules
+- **AND** it emits no optimization warnings
 
 ### Requirement: Output
 

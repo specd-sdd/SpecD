@@ -35,6 +35,7 @@ export {
 } from './skip-artifact.js'
 export { createListSpecs, type FsListSpecsOptions } from './list-specs.js'
 export { createListWorkspaces, type FsListWorkspacesOptions } from './list-workspaces.js'
+export { createGetProjectSummary } from './get-project-summary.js'
 export { createSearchSpecs, type FsSearchSpecsOptions } from './search-specs.js'
 export { createGetSpec, type FsGetSpecOptions } from './get-spec.js'
 export { createSaveSpecMetadata, type FsSaveSpecMetadataOptions } from './save-spec-metadata.js'
@@ -43,11 +44,8 @@ export {
   type FsInvalidateSpecMetadataOptions,
 } from './invalidate-spec-metadata.js'
 export { createGetActiveSchema, type FsGetActiveSchemaOptions } from './get-active-schema.js'
-export { createInitProject, type FsInitProjectOptions } from './init-project.js'
-export { createAddPlugin, type FsAddPluginOptions } from './add-plugin.js'
-export { createRemovePlugin, type FsRemovePluginOptions } from './remove-plugin.js'
-export { createListPlugins, type FsListPluginsOptions } from './list-plugins.js'
 export { createGetProjectContext, type FsGetProjectContextOptions } from './get-project-context.js'
+export { createGetConfig, type GetConfigOptions } from './get-config.js'
 export {
   createCreateChange,
   type CreateChangeContext,
@@ -111,3 +109,63 @@ export {
   type PreviewSpecWorkspace,
   type FsPreviewSpecOptions,
 } from './preview-spec.js'
+export { createResolveSchema, type FsResolveSchemaOptions } from './resolve-schema.js'
+export {
+  createUpdateSpecDeps,
+  type UpdateSpecDepsContext,
+  type FsUpdateSpecDepsOptions,
+} from './update-spec-deps.js'
+export {
+  createInvalidateChange,
+  type InvalidateChangeContext,
+  type FsInvalidateChangeOptions,
+} from './invalidate-change.js'
+export {
+  createRunStepHooks,
+  type RunStepHooksContext,
+  type FsRunStepHooksOptions,
+} from './run-step-hooks.js'
+export {
+  createGetHookInstructions,
+  type GetHookInstructionsContext,
+  type FsGetHookInstructionsOptions,
+} from './get-hook-instructions.js'
+export {
+  createGetArtifactInstruction,
+  type GetArtifactInstructionContext,
+  type FsGetArtifactInstructionOptions,
+} from './get-artifact-instruction.js'
+export {
+  createUpdateImplementationTracking,
+  type UpdateImplementationTrackingContext,
+  type FsUpdateImplementationTrackingOptions,
+} from './update-implementation-tracking.js'
+export {
+  createRefreshImplementationTracking,
+  type RefreshImplementationTrackingContext,
+  type FsRefreshImplementationTrackingOptions,
+} from './refresh-implementation-tracking.js'
+export {
+  createGetImplementationReview,
+  type GetImplementationReviewContext,
+  type FsGetImplementationReviewOptions,
+} from './get-implementation-review.js'
+export { createGetSpecOutline, type FsGetSpecOutlineOptions } from './get-spec-outline.js'
+export { createValidateSchema, type FsValidateSchemaOptions } from './validate-schema.js'
+export { createGenerateSpecMetadata } from './generate-spec-metadata.js'
+export { createUpdateSpecMetadata } from './update-spec-metadata.js'
+export { createGetProjectMetadata } from './get-project-metadata.js'
+export { createUpdateProjectMetadata } from './update-project-metadata.js'
+export { createGetChangeArtifact } from './get-change-artifact.js'
+export {
+  createGetReadOnlyChangeArtifact,
+  type FsGetReadOnlyChangeArtifactOptions,
+} from './get-read-only-change-artifact.js'
+export {
+  createSaveChangeArtifact,
+  type SaveChangeArtifactContext,
+  type FsSaveChangeArtifactOptions,
+} from './save-change-artifact.js'
+export { createValidateChangeBatch } from './validate-change-batch.js'
+export { createOutlineChangeArtifact } from './outline-change-artifact.js'
+export { createReadLog } from './read-log.js'

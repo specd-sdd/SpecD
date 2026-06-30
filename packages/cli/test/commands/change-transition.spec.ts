@@ -15,7 +15,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerChangeTransition } from '../../src/commands/change/transition.js'
-import { InvalidStateTransitionError, HookFailedError, InvalidChangeError } from '@specd/core'
+import { InvalidStateTransitionError, HookFailedError, InvalidChangeError } from '@specd/sdk'
 
 function setup(configOverrides: Record<string, unknown> = {}) {
   const config = makeMockConfig(configOverrides)
@@ -68,11 +68,10 @@ describe('Command signature', () => {
     registerChangeTransition(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
 
-    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledBefore(
-      kernel.changes.status.execute,
-    )
-    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledWith({
+    expect(kernel.changes.refreshImplementationTracking.execute).not.toHaveBeenCalled()
+    expect(kernel.changes.status.execute).toHaveBeenCalledWith({
       name: 'my-change',
+      refreshImplementationTracking: false,
     })
     expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'designing' }),
@@ -142,7 +141,7 @@ describe('Approval-gate routing', () => {
     await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', '--next'])
 
     expect(kernel.changes.transition.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'implementing', approvalsSpec: true }),
+      expect.objectContaining({ to: 'implementing' }),
       expect.any(Function),
     )
     expect(stdout()).toContain('pending-spec-approval')
@@ -287,7 +286,15 @@ describe('Invalid transition error', () => {
     expect(err).toContain('target:  designing')
     expect(err).toContain('command: /specd-design')
     expect(err).toContain('reason:  Missing specs')
-    expect(kernel.changes.refreshImplementationTracking.execute).toHaveBeenCalledTimes(1)
+    expect(kernel.changes.refreshImplementationTracking.execute).not.toHaveBeenCalled()
+    expect(kernel.changes.status.execute).toHaveBeenNthCalledWith(1, {
+      name: 'my-change',
+      refreshImplementationTracking: false,
+    })
+    expect(kernel.changes.status.execute).toHaveBeenNthCalledWith(2, {
+      name: 'my-change',
+      refreshImplementationTracking: false,
+    })
   })
 
   it('surfaces approval-required message for blocked signoff transition', async () => {

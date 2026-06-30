@@ -1,0 +1,42 @@
+- op: removed
+  description: Replace spec counts scenarios for GetProjectSummary
+  selector:
+    type: section
+    matches: 'Requirement: includes spec counts'
+
+- op: added
+  description: Spec counts via GetProjectSummary scenario
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: includes workspace information'
+  content: |
+    ### Requirement: includes spec counts
+
+    #### Scenario: Spec counts use GetProjectSummary
+
+    - **WHEN** `specd project status` calculates spec counts
+    - **THEN** it calls `kernel.project.getProjectSummary.execute()`
+    - **AND** it does not call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting
+    - **AND** it does not perform full metadata extraction
+
+- op: modified
+  description: Change counts obtained via GetProjectSummary including archived
+  selector:
+    type: section
+    matches: 'Requirement: includes change counts'
+  content: |
+    #### Scenario: Output includes active changes, drafts, discarded, and archived counts
+
+    - **GIVEN** a project with changes, drafts, discarded changes, and archived changes
+    - **WHEN** `specd project status` is run
+    - **THEN** output includes counts for active changes, drafts, discarded changes, and archived changes
+
+    #### Scenario: Counts obtained via GetProjectSummary
+
+    - **WHEN** `specd project status` calculates change counts
+    - **THEN** it calls `kernel.project.getProjectSummary.execute()`
+    - **AND** it does not call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting

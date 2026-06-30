@@ -94,6 +94,60 @@
 - **WHEN** the symbol is extracted
 - **THEN** `comment` is `undefined`
 
+### Requirement: File analysis model
+
+#### Scenario: Registered file analysis retains compact normalized facts
+
+- **GIVEN** an adapter has analyzed a file containing symbols, imports, binding facts, and call facts
+- **WHEN** the indexer registers the result as `FileAnalysis`
+- **THEN** the runtime model records the file ID, workspace-prefixed path, language, content hash, and those compact facts together
+- **AND** optional namespace or parser state is retained only when present
+
+#### Scenario: File analysis remains separate from persisted graph entities
+
+- **GIVEN** a `FileAnalysis` has been registered in memory
+- **WHEN** the graph store is bulk-loaded
+- **THEN** persisted graph symbols and relations are derived from that analysis
+- **AND** the runtime analysis object itself is not persisted as a graph-store entity
+
+### Requirement: Shared indexing lookups
+
+#### Scenario: Relation resolution uses bounded common lookups
+
+- **GIVEN** the session has registered files and symbols from multiple workspaces
+- **WHEN** Pass 2 resolves a name, qualified name, or file target
+- **THEN** it uses the common lookup structures for file, symbol, and qualified-name access
+- **AND** it does not require a full scan of all registered symbols for every lookup
+
+#### Scenario: Cross-entity lookups include specs and covered symbols
+
+- **GIVEN** the session has registered specs and their covered symbols during the same indexing run
+- **WHEN** a later phase asks for symbols covered by a spec or specs covering a symbol
+- **THEN** the runtime lookup model answers through the shared cross-entity indexes
+- **AND** it does not recompute the mapping from persisted relations on demand
+
+#### Scenario: Relation deduplication happens before persistence
+
+- **GIVEN** multiple deterministic resolution paths derive the same relation
+- **WHEN** those relations are added to the run-scoped lookup model
+- **THEN** they collapse to one deduplicated relation before bulk loading
+
+### Requirement: Compact retained analysis state
+
+#### Scenario: Parser-specific retained state excludes heavyweight parser objects
+
+- **GIVEN** an adapter stores optional parser-specific state for later deterministic resolution
+- **WHEN** retained runtime analysis state is inspected after Pass 1
+- **THEN** that state uses plain compact data structures
+- **AND** it excludes AST nodes, parser trees, parser cursors, and equivalent heavyweight parser artifacts
+
+#### Scenario: Run-scoped adapter cache state also excludes heavyweight parser objects
+
+- **GIVEN** an adapter stores optional run-scoped cache state shared across multiple files
+- **WHEN** that retained state is inspected after Pass 1
+- **THEN** it uses plain compact data structures
+- **AND** it excludes AST nodes, parser trees, parser cursors, and equivalent heavyweight parser artifacts
+
 ### Requirement: SymbolKind enum
 
 #### Scenario: Invalid kind rejected
@@ -234,6 +288,14 @@
 - **GIVEN** a service lookup identified only by a runtime container string
 - **WHEN** binding facts are modeled
 - **THEN** no deterministic binding fact is created for that runtime-only lookup
+
+#### Scenario: Cycle detection breaks infinite parent traversal
+
+- **GIVEN** a malformed scope structure where scope A's parent is B and scope B's parent is A
+- **WHEN** shared binding lookup traverses parent links from scope A
+- **THEN** the traversal detects the cycle
+- **AND** it terminates without entering an infinite loop
+- **AND** it returns no resolution result for that lookup
 
 ### Requirement: Scoped binding relation output
 

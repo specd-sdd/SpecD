@@ -13,10 +13,5 @@
     "default:_global/logging",
     "core:implementation-detector-port"
   ],
-  "implementation": [
-    {
-      "file": "core:src/domain/entities/change.ts",
-      "symbols": ["Change", "ChangeProps"]
-    }
-  ]
+  "implementation": []
 }

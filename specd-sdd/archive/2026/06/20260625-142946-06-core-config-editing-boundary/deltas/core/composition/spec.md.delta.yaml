@@ -1,0 +1,76 @@
+- op: modified
+  description: Mention createConfigWriter alongside use-case factories and kernel
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.
+
+- op: modified
+  description: Clarify factory rule does not apply to config I/O port factories
+  selector:
+    type: section
+    matches: 'Requirement: Use-case factories are the unit of composition'
+  content: |
+    The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.
+
+    Config I/O is an exception: `createConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes.
+
+- op: added
+  description: ConfigWriter factory mirrors ConfigLoader
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: ConfigLoader is an application port'
+  content: |
+    ### Requirement: ConfigWriter is an application port
+
+    `ConfigWriter` is defined in `application/ports/config-writer.ts` as an interface. It exposes `initProject`, `addPlugin`, and `removePlugin` for mutating `specd.yaml`. The `FsConfigWriter` implementation performs filesystem and YAML I/O. Delivery mechanisms obtain a wired instance via `createConfigWriter()` — they MUST NOT construct `FsConfigWriter` directly.
+
+    `createConfigWriter()` MUST support:
+
+    - `createConfigWriter()` — constructs the default filesystem-backed writer
+    - `createConfigWriter(options)` — accepts a pre-built `ConfigWriter` for tests
+
+    Both signatures are public exports from `@specd/core`.
+
+- op: added
+  description: Config mutation stays off the kernel
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: ConfigWriter is an application port'
+  content: |
+    ### Requirement: Config mutation is not wired into createKernel
+
+    `createKernel` MUST NOT instantiate `ConfigWriter`, `InitProject`, `AddPlugin`, or `RemovePlugin`. Config mutation operations are reached only through `createConfigWriter()`. The kernel groups domain use cases — not yaml editing.
+
+- op: modified
+  description: Export createConfigWriter from public surface
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - `composition/` is the only directory in `@specd/core` permitted to import from `infrastructure/`
+    - Concrete adapter classes (`FsSpecRepository`, `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`, `FsSchemaRegistry`, etc.) must not appear in `src/index.ts` or any re-export chain
+    - Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`) must not appear in `src/index.ts`
+    - Use-case factories, `createConfigLoader`, `createConfigWriter`, and the kernel are the composition exports in `src/index.ts`
+    - `ConfigLoader` and `ConfigWriter` implementations live in `infrastructure/`; the port interfaces live in `application/ports/`
+    - The kernel groups use cases under domain-area namespaces — use cases are not properties at the top level of the kernel object
+    - Both call signatures of every use-case factory must be public exports
+
+- op: modified
+  description: Add config-writer-port dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:resolve-schema`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
+    - [`core:config-writer-port`](../config-writer-port/spec.md) — `createConfigWriter` factory surface

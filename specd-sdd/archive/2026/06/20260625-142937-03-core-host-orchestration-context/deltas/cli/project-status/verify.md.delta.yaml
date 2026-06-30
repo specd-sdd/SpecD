@@ -1,0 +1,27 @@
+- op: added
+  description: Verify project status uses baked GetProjectContext defaults
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: supports --context flag'
+    after:
+      type: section
+      matches: 'Scenario: Prefers optimized project context when fresh'
+  content: |
+    #### Scenario: CLI does not build CompileContextConfig inline for --context
+
+    - **WHEN** `specd project status --context` is run
+    - **THEN** the command does not construct a `CompileContextConfig` object from `SpecdConfig`
+    - **AND** it invokes `GetProjectContext.execute` with runtime overrides only
+
+    #### Scenario: Primary context call uses baked defaults
+
+    - **GIVEN** `specd project status --context` is executed
+    - **WHEN** the handler loads project context
+    - **THEN** it calls `GetProjectContext.execute({})` first
+
+    #### Scenario: Raw spec catalogue uses llmOptimizedContext override when optimized context is fresh
+
+    - **GIVEN** `llmOptimizedContext` is enabled and optimized project context is fresh
+    - **WHEN** `specd project status --context` is executed
+    - **THEN** it calls `GetProjectContext.execute({ llmOptimizedContext: false })` to obtain the raw spec id list

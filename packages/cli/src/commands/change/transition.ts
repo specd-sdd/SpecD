@@ -6,7 +6,7 @@ import {
   type OnTransitionProgress,
   VALID_TRANSITIONS,
   InvalidStateTransitionError,
-} from '@specd/core'
+} from '@specd/sdk'
 import { createSpinner, type Spinner } from 'nanospinner'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -215,13 +215,12 @@ JSON/TOON output schema:
               ? parseCommaSeparatedValues(opts.skipHooks, VALID_HOOK_PHASES, '--skip-hooks')
               : new Set<HookPhaseSelector>()
 
-          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
 
-          const active = await kernel.changes.repo.get(name)
-          if (active !== null) {
-            await kernel.changes.refreshImplementationTracking.execute({ name })
-          }
-          const statusResult = await kernel.changes.status.execute({ name })
+          const statusResult = await kernel.changes.status.execute({
+            name,
+            refreshImplementationTracking: false,
+          })
           const statusBefore = statusResult.change
           if (statusBefore === undefined) {
             cliError(`change '${name}' is drafted; restore it before transitioning`, opts.format)
@@ -241,8 +240,6 @@ JSON/TOON output schema:
               {
                 name,
                 to: requestedTarget,
-                approvalsSpec: config.approvals.spec,
-                approvalsSignoff: config.approvals.signoff,
                 skipHookPhases,
               },
               onProgress,
@@ -263,7 +260,10 @@ JSON/TOON output schema:
             }
           } catch (err) {
             if (err instanceof InvalidStateTransitionError) {
-              const status = await kernel.changes.status.execute({ name })
+              const status = await kernel.changes.status.execute({
+                name,
+                refreshImplementationTracking: false,
+              })
 
               if (fmt === 'text') {
                 process.stderr.write(`error: ${err.message}\n`)

@@ -4,9 +4,9 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:config",
-    "code-graph:composition",
-    "code-graph:graph-store",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "sdk:run-index-project-graph",
+    "sdk:host-context"
   ],
   "context": [
     "Without an up-to-date code graph, all graph-based queries return stale or empty results. The `specd graph index` command indexes the current workspace into the code graph, reporting what was discovered, indexed, skipped, and removed so users and agents can verify completeness."
@@ -21,7 +21,7 @@
     {
       "requirement": "Indexing behaviour",
       "rules": [
-        "The command uses the shared graph CLI context model together with `withProvider`, which manages the `CodeGraphProvider` lifecycle and registers `SIGINT`/`SIGTERM` signal handlers for graceful shutdown.\n\nThe command:\n\n1. Validates that `--config` and `--path` are not both present\n2. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n3. In configured mode, obtains the orchestrated project structure via `ListWorkspaces` and uses the rich `ProjectWorkspace[]` list to build `IndexOptions`\n4. In bootstrap mode, indexes the resolved repository root as a synthetic single `default` workspace whose `codeRoot` is the VCS root\n5. Acquires the shared graph indexing lock before opening the provider for mutation work\n6. If `--force` is passed, invokes the graph-store recreation capability before indexing\n7. In configured mode, builds the effective graph config from `SpecdConfig.graph`, including project-global `includePaths`, global `excludePaths`, workspace graph filters, and any synthetic spec-root exclusions. Patterns from `--exclude-path` flags are appended to the effective global exclusion set.\n8. Calls `index(options)` to perform the indexing. The indexer handles spec extraction and progress reporting using the injected repositories.\n9. Outputs the `IndexResult` with per-workspace breakdown\n10. Releases the shared graph indexing lock during normal shutdown and signal-driven shutdown paths\n11. Closes the provider\n12. Exits with `process.exit(0)`\n\nIn configured mode, indexing SHALL always cover the full configured project graph surface. The command MUST NOT offer a workspace-scoped partial indexing mode.\n\nProject-global discovery MUST NOT emit `root:` entries for files already owned by a configured workspace `codeRoot`.\n\nArchived spec implementation coverage and spec resolution SHALL be derived inside `@specd/code-graph`. The CLI SHALL NOT read `spec-lock.json` sidecars or manually construct extraction callbacks.\n\nWhen output is a TTY and format is `text`, progress is displayed on stderr using `\\r\\x1b[K` for in-place updates (overwriting the current line).\n\nThe indexing lock is a CLI-level coordination mechanism that prevents overlapping graph commands from reaching backend lock failures first. If another indexing run already holds the lock, `graph index` fails fast with a user-facing retry-later message instead of attempting to mutate the backend concurrently."
+        "Index execution MUST go through `runIndexProjectGraph(ctx, input)` inside `@specd/sdk`. The worker process (or current process when worker bypass is active) obtains host context via `openSpecdHost`.\n\nThe command SHALL retain CLI-only concerns:\n\n- shared graph indexing lock acquisition in the parent process before spawning a worker\n- worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`\n- `onProgress` callback wiring for text-mode progress output\n- passing `force: true` to `runIndexProjectGraph` when `--force` is set\n\nThe command handler invokes `runIndexProjectGraph` for index execution; workspace assembly and `IndexProjectGraph` orchestration live in `@specd/sdk`.\n\nUnless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `runIndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).\n\nWhen `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests."
       ]
     },
     {
@@ -33,7 +33,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "If the provider cannot be opened or indexing fails due to an infrastructure error (I/O, database), the command exits with code 3.\n\nPer-file indexing errors (parse failures, unsupported syntax) do not cause a non-zero exit — they are reported in the `errors` array of `IndexResult` and the command exits with code 0."
+        "If the provider cannot be opened or indexing fails due to an infrastructure error (I/O, database), the command exits with code 3.\n\nIf the shared graph indexing lock cannot be acquired because another indexing run is in progress, the command exits with code 3 after printing a user-facing retry-later message.\n\nPer-file indexing errors (parse failures, unsupported syntax) do not cause a non-zero exit — they are reported in the `errors` array of `IndexResult` and the command exits with code 0."
       ]
     },
     {
@@ -44,12 +44,12 @@
     }
   ],
   "constraints": [
-    "The CLI does not contain indexing logic — it delegates entirely to @specd/code-graph",
+    "Index execution orchestration lives in @specd/sdk — the CLI does not assemble workspace targets, VCS refs, or IndexProjectGraph inputs inline",
+    "Lock management and worker subprocess isolation remain CLI-only adapter concerns",
     "process.exit(0) is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive",
-    "--force delegates destructive backend recreation to the graph-store contract; the CLI does not delete backend-specific files directly",
-    "graph index owns the shared graph indexing lock and must release it on normal exit and signal-driven shutdown",
-    "The withProvider helper manages lifecycle and registers SIGINT/SIGTERM signal handlers",
-    "Workspace targets and spec sources are derived from SpecdConfig and Kernel, not from CLI arguments"
+    "--force is forwarded to runIndexProjectGraph input",
+    "Worker subprocess isolation keeps native graph-store threads out of the parent CLI process; tests bypass spawning via SPECD_GRAPH_INDEX_NO_WORKER",
+    "Platform symbols for the graph index handler come from @specd/sdk"
   ],
   "scenarios": [
     {
@@ -115,6 +115,13 @@
     },
     {
       "requirement": "Error cases",
+      "name": "Lock acquisition failure exits with code 3",
+      "given": ["another process currently holds the shared graph indexing lock"],
+      "when": ["specd graph index is run"],
+      "then": ["stderr contains a retry-later message", "AND the process exits with code 3"]
+    },
+    {
+      "requirement": "Error cases",
       "name": "Per-file errors do not cause non-zero exit",
       "given": ["indexing encounters parse failures in some files"],
       "when": ["specd graph index is run"],
@@ -141,41 +148,42 @@
     },
     {
       "requirement": "Indexing behaviour",
-      "name": "Command obtains orchestrated project structure",
-      "when": ["specd graph index is executed in configured mode"],
+      "name": "Command passes progress callback in text mode",
+      "when": ["specd graph index is run in text mode"],
       "then": [
-        "it calls ListWorkspaces to obtain the rich workspace list",
-        "AND it injects the resulting ProjectWorkspace entities into the indexer options"
+        "the command passes an onProgress callback to runIndexProjectGraph",
+        "AND when the callback is invoked, it prints the progress percentage and phase to stdout"
       ]
     },
     {
       "requirement": "Indexing behaviour",
-      "name": "Command builds effective graph discovery config",
-      "given": [
-        "configured global graph includes and excludes",
-        "AND one or more filesystem-backed spec repositories"
-      ],
-      "when": ["specd graph index is executed"],
+      "name": "Worker uses runIndexProjectGraph",
+      "given": ["the worker process is indexing"],
+      "when": ["index execution runs"],
+      "then": ["it calls runIndexProjectGraph(ctx, input) in the worker process"]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Worker subprocess performs indexing in isolation",
+      "given": ["SPECD_GRAPH_INDEX_NO_WORKER is not set"],
+      "when": ["specd graph index is run"],
       "then": [
-        "the command passes an effective graph config to the indexer that includes synthetic spec-root exclusions"
+        "the parent process spawns a child worker with SPECD_GRAPH_INDEX_WORKER=true",
+        "AND the parent forwards SIGINT and SIGTERM to the worker",
+        "AND the parent releases the indexing lock when the worker exits"
+      ]
+    },
+    {
+      "requirement": "Indexing behaviour",
+      "name": "Host context from openSpecdHost",
+      "when": ["specd graph index executes in the worker"],
+      "then": [
+        "it obtains host context via openSpecdHost from @specd/sdk",
+        "AND platform symbols come from @specd/sdk"
       ]
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "cli:graph-index",
-        "file": "cli:src/commands/graph/build-project-graph-config.ts"
-      },
-      {
-        "specId": "cli:graph-index",
-        "file": "cli:test/commands/graph-index.spec.ts"
-      },
-      {
-        "specId": "cli:graph-index",
-        "file": "cli:test/commands/build-project-graph-config.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "cli:graph-index",
@@ -185,8 +193,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:50b65fcebb0a1f8d19a87112127b7bedfce7750985222559eaff46775550c48c",
-    "verify.md": "sha256:88ab7e8095e9fa6802cf5735bf6318e4a7f0d9dc66fe830c8ca3c479b3b86e37"
+    "spec.md": "sha256:605892207f4a32adc1ee61ec13a64c426663a42a91eab667b463091cbfcc6945",
+    "verify.md": "sha256:91fb81d390469b08c04a58a29a079f07c571aec2bb3ed98ba1ad718c41197273"
   },
   "generatedBy": "core"
 }

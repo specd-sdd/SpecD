@@ -6,7 +6,8 @@
     "plugin-manager:agent-plugin-type",
     "skills:skill-bundle",
     "skills:skill-templates-source",
-    "skills:resolve-bundle"
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "context": [
     "This spec defines the Copilot plugin contract for concrete install/uninstall behavior, project install location, and exact metadata value support so agent skills are rendered through `@specd/skills` and remain usable directly in Copilot workflows."
@@ -27,7 +28,7 @@
     {
       "requirement": "Skill installation and frontmatter injection",
       "rules": [
-        "The plugin MUST install skills from `@specd/skills` and pass Copilot-compatible capability identifiers plus frontmatter source values into markdown skill rendering during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve structured frontmatter source values for each skill\n3. declare only the Copilot-supported capability identifiers for each skill\n4. resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. pass `variables.sharedFolder` only when overriding the default shared path contract\n6. write files marked as shared to the rendered `sharedFolder` location under the project root\n7. write files not marked as shared to the installed skill directory\n8. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files\n9. return an `InstallResult` with installed and skipped entries\n\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available."
+        "The plugin MUST install skills from `@specd/skills` and pass Copilot-compatible capability identifiers (`['frontmatter', 'agents']`) plus frontmatter source values into markdown skill rendering during install.\n\nInstallation flow MUST:\n\n1. load requested skills (or all skills when no filter is provided)\n2. resolve structured frontmatter source values for each skill\n3. declare only the Copilot-supported capability identifiers for each skill\n4. resolve bundles through `ResolveBundle` so built-in render defaults are supplied by `@specd/skills`\n5. pass `variables.sharedFolder` only when overriding the default shared path contract\n6. write files marked as shared to the rendered `sharedFolder` location under the project root\n7. write files not marked as shared to categorized directories relative to `projectRoot`:\n   - Skills to `.github/skills/<skill-name>/`\n   - Agents to `.github/agents/<agent-name>.agent.md`\n8. Sub-agent Mapping: When installing an agent, the plugin MUST:\n   - Use the `.agent.md` suffix.\n   - Emit `tools` as a YAML list of strings.\n   - Prepend the rendered system prompt with the generated YAML frontmatter.\n9. rely on the rendered markdown returned by `@specd/skills` for non-shared markdown files\n10. return an `InstallResult` with installed and skipped entries\n\nThe plugin MUST NOT prepend YAML frontmatter for standard skills after bundle resolution.\nThe plugin MUST NOT call `SkillRepository.getBundle(...)` directly from the install flow when `ResolveBundle` is available.\nThe plugin MUST NOT use a `buildCapabilities` helper; capability arrays MUST be passed as literals or constants."
       ]
     },
     {
@@ -45,7 +46,7 @@
     {
       "requirement": "Uninstall behavior",
       "rules": [
-        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.github/skills/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.skills` is omitted, uninstall MUST remove all specd-managed skill directories and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.github/skills/` that are not part of the specd-managed skill set."
+        "`uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.github/skills/` and agent profiles from `.github/agents/` relative to `config.projectRoot`.\n\nWhen `options.skills` is provided, uninstall MUST remove only the selected specd-managed skill directories. The shared resource directory at the resolved `sharedFolder` location MUST remain in place because other installed skills may still reference it.\n\nWhen `options.agents` is provided, uninstall MUST remove only the selected specd-managed agent files from `.github/agents/`.\n\nWhen no filters are provided, uninstall MUST remove all specd-managed skill directories, all specd-managed agent files under `.github/agents/`, and the resolved sharedFolder location.\n\nUninstall MUST NOT remove unrelated directories or files under `.github/skills/` or `.github/agents/` that are not part of the specd-managed set."
       ]
     }
   ],
@@ -157,6 +158,17 @@
       "then": ["that location does not contain a SKILL.md file"]
     },
     {
+      "requirement": "Install location",
+      "name": "Installs agent profiles to .github/agents/",
+      "given": ["a request to install an agent"],
+      "when": ["install(config, options) runs"],
+      "then": [
+        "it copies the agent to .github/agents/ (since agents capability is supported)",
+        "AND the file uses the .agent.md extension",
+        "AND the YAML frontmatter contains tools as a list"
+      ]
+    },
+    {
       "requirement": "Uninstall behavior",
       "name": "Uninstall removes selected skill directories and keeps shared resources",
       "given": ["multiple skills are installed and share the resolved sharedFolder location"],
@@ -175,6 +187,22 @@
         "AND the resolved sharedFolder location is removed",
         "AND unrelated user skill directories remain"
       ]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall removes selected agent files",
+      "given": ["multiple agents are installed"],
+      "when": ["uninstall(config, { agents: ['specd-project-context-optimizer'] }) is executed"],
+      "then": ["only .github/agents/specd-project-context-optimizer.agent.md is removed"]
+    },
+    {
+      "requirement": "Uninstall behavior",
+      "name": "Uninstall without filter removes all specd-managed agents",
+      "given": [
+        "specd-managed agents and unrelated user agents are installed under .github/agents/"
+      ],
+      "when": ["uninstall(config) is executed without filters"],
+      "then": ["all specd-managed agent files are removed", "AND unrelated user agent files remain"]
     }
   ],
   "implementation": {
@@ -189,12 +217,17 @@
         "specId": "plugin-agent-copilot:plugin-agent",
         "file": "plugin-agent-copilot:src/application/use-cases/install-skills.ts",
         "symbol": "InstallSkills"
+      },
+      {
+        "specId": "plugin-agent-copilot:plugin-agent",
+        "file": "plugin-agent-copilot:src/domain/frontmatter/index.ts",
+        "symbol": "agentFrontmatter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:d8f3d81094228ad010846b85d60f708e134df1e336bb36cb515a0cb73d4e51fe",
-    "verify.md": "sha256:49de47ae265208e66a791c5286ddc5b678a7a83cb2c792427a4bea1470dd0598"
+    "spec.md": "sha256:56d807d66636b19c0759faed98e66ea8900a789a67e2bbedf5bad95a75f61c6e",
+    "verify.md": "sha256:f528f03187a96034ae31136af39455c2349d7015c3bf11f07c0568e1e9b0463f"
   },
   "generatedBy": "core"
 }

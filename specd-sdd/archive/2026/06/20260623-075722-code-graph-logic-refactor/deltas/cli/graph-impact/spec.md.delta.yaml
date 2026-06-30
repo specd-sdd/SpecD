@@ -1,0 +1,63 @@
+- op: modified
+  description: Delegate file impact aggregation to code-graph
+  selector:
+    type: section
+    matches: 'Requirement: File impact analysis'
+  content: |
+    Single-file and multi-file impact analyses resolve selectors and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `@specd/code-graph` provider.
+
+- op: modified
+  description: Document advanced symbol selector resolution
+  selector:
+    type: section
+    matches: 'Requirement: Symbol impact analysis'
+  content: |
+    When `--symbol` is provided:
+
+    1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+    2. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)
+    3. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0
+    4. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result
+    5. If multiple symbols match, analyzes each one and outputs all results
+
+- op: modified
+  description: Spec not found fails via SpecNotFoundError
+  selector:
+    type: section
+    matches: 'Requirement: Spec impact analysis'
+  content: |
+    When `--spec` is provided:
+
+    1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
+    2. Creates a `CodeGraphProvider` from the resolved graph context
+    3. Opens the provider
+    4. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id
+    5. Calls `analyzeSpecImpact(specId, direction)`
+    6. Outputs the resulting `ImpactResult`
+    7. Closes the provider and exits
+
+    The CLI SHALL let `SpecNotFoundError` propagate to the global error handler so the command fails with exit code 1 and a machine-readable `SPEC_NOT_FOUND` error code.
+
+    Spec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:
+
+    - `DEPENDS_ON` between specs
+    - `COVERS_FILE` between specs and files
+    - `COVERS_SYMBOL` between specs and symbols
+
+- op: modified
+  description: Delegate lock check to provider
+  selector:
+    type: section
+    matches: 'Requirement: Concurrent indexing guard'
+  content: |
+    Before attempting to open the provider, the command SHALL query the lock status from the provider. If indexing is currently in progress, it SHALL fail fast with a short user-facing retry-later message.
+
+- op: modified
+  description: Constraints after delegation refactor
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates entirely to `@specd/code-graph`
+    - `process.exit(0)` is called explicitly after closing the provider
+    - Output path formatting and console text/JSON formatting are managed by the CLI

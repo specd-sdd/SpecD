@@ -5,6 +5,9 @@ import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { SaveChangeArtifact } from '../../../src/application/use-cases/save-change-artifact.js'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
+import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
+import { LifecycleEngine } from '../../../src/domain/services/lifecycle-engine.js'
+import { Logger } from '../../../src/application/logger.js'
 import { SaveRequiresForceError } from '../../../src/application/errors/save-requires-force-error.js'
 import { ChangeArtifactFileNotFoundError } from '../../../src/application/errors/change-artifact-file-not-found-error.js'
 import { makeChangeRepository, makeSchemaProvider, testActor } from './helpers.js'
@@ -116,7 +119,16 @@ describe('GetStatus ifModifiedSince', () => {
   it('short-circuits when client revision is current', async () => {
     const change = makeChangeWithProposal()
     const repo = makeChangeRepository([change])
-    const sut = new GetStatus(repo, makeSchemaProvider(), { spec: false, signoff: false })
+    const refresh = {
+      execute: vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
+    } as unknown as RefreshImplementationTracking
+    const sut = new GetStatus(
+      repo,
+      makeSchemaProvider(),
+      { spec: false, signoff: false },
+      refresh,
+      new LifecycleEngine(Logger.debug.bind(Logger)),
+    )
 
     const result = await sut.execute({
       name: 'studio-save',

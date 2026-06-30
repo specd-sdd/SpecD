@@ -1,0 +1,22 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Implementation tracking state'
+  content: |
+    A `Change` SHALL persist implementation-tracking state separately from artifact state.
+
+    This state MUST distinguish:
+
+    - `trackedImplementationFiles` — tracked raw project-relative files under review for the change
+    - `implementationLinks` — confirmed `spec + file` implementation links, optionally refined by one or more symbols
+
+    Each tracked implementation file MUST carry an explicit review state of `open`, `resolved`, `ignored`, or `removed`.
+
+    `removed` means the file remains part of the change's tracked review history, but refresh has confirmed that the file is no longer present on disk. A `removed` file is not implicitly untracked and is not manually reopened through `resolve`; it returns to `open` only when refresh confirms the file exists again.
+
+    `implementationLinks` MUST support both:
+
+    - file-level links (`spec -> file`)
+    - symbol-level refinements (`spec -> file -> symbols`)
+
+    A confirmed link's raw file path remains project-relative while the change is active. Canonical `workspace:path` normalization happens later during archive-time materialization.

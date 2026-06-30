@@ -1,7 +1,13 @@
 {
   "title": "API Reference",
   "description": "Public consumers of `specd` need a technical reference that explains the exported API surface without reading source code directly. This spec defines how API reference content is generated and exposed inside the public site so that technical documentation lives alongside the rest of the public web experience.",
-  "dependsOn": ["public-web:public-site", "default:_global/docs"],
+  "dependsOn": [
+    "public-web:public-site",
+    "default:_global/docs",
+    "sdk:composition",
+    "core:composition",
+    "code-graph:composition"
+  ],
   "context": [
     "Public consumers of `specd` need a technical reference that explains the exported API surface without reading source code directly. This spec defines how API reference content is generated and exposed inside the public site so that technical documentation lives alongside the rest of the public web experience."
   ],
@@ -21,7 +27,7 @@
     {
       "requirement": "Initial API coverage",
       "rules": [
-        "The initial API reference scope MUST cover the public surfaces selected for the first public website release. That initial scope MUST include the APIs exposed by `@specd/core`, and it MAY exclude packages whose public surface is not yet intended for public consumption."
+        "The initial API reference scope MUST cover the curated public `\".\"` exports of `@specd/sdk`, `@specd/core`, and `@specd/code-graph`.\n\nGeneration MUST run one TypeDoc (or equivalent) pass per package public entry point:\n\n- `@specd/sdk` — `packages/sdk/src/index.ts` (host integrator surface)\n- `@specd/core` — `packages/core/src/public.ts` (curated core public barrel)\n- `@specd/code-graph` — `packages/code-graph/src/public.ts` (curated graph public barrel)\n\nGenerated output MUST be partitioned under package-scoped directories (for example `.generated/api/sdk`, `.generated/api/core`, `.generated/api/code-graph`) so routes and navigation do not collide.\n\nThe API sidebar and landing copy MUST list packages in this order: `@specd/sdk`, then `@specd/core`, then `@specd/code-graph`. The landing page MUST state that host integrations import from `@specd/sdk` while the additional package sections document their public barrels for package-level discovery.\n\nThe reference MUST NOT include `@specd/core/ports`, `@specd/core/extensions`, `@specd/core/internal`, or `@specd/code-graph/internal` unless explicitly added in a later scope expansion."
       ]
     },
     {
@@ -33,7 +39,7 @@
   ],
   "constraints": [
     "API reference content must be generated, not maintained as a separate handwritten duplicate of the exported API",
-    "Initial coverage must include @specd/core",
+    "Initial coverage must use the curated public \".\" entry points for @specd/sdk, @specd/core, and @specd/code-graph",
     "API reference must be served inside the public site"
   ],
   "scenarios": [
@@ -57,9 +63,29 @@
     },
     {
       "requirement": "Initial API coverage",
-      "name": "First release includes the core API surface",
-      "when": ["the initial public API reference scope is assembled"],
-      "then": ["it includes the public surfaces of @specd/core"]
+      "name": "TypeDoc entry points cover sdk, core, and code-graph public barrels",
+      "when": ["apps/public-web/src/lib/public-docs-config.ts apiPackageEntryPoints is inspected"],
+      "then": [
+        "it lists packages/sdk/src/index.ts, packages/core/src/public.ts, and packages/code-graph/src/public.ts in that order",
+        "AND it does not reference packages/core/src/index.ts or other internal barrels"
+      ]
+    },
+    {
+      "requirement": "Initial API coverage",
+      "name": "Generated API output is partitioned by package",
+      "when": ["API docs are generated for the public site"],
+      "then": [
+        "markdown output is written under package-scoped directories such as .generated/api/sdk, .generated/api/core, and .generated/api/code-graph",
+        "AND the generated landing page links to each package section"
+      ]
+    },
+    {
+      "requirement": "Initial API coverage",
+      "name": "API sidebar lists packages in integrator-first order",
+      "when": ["apps/public-web/api-sidebars.ts is inspected"],
+      "then": [
+        "top-level API categories appear as @specd/sdk, @specd/core, and @specd/code-graph in that order"
+      ]
     },
     {
       "requirement": "Public-site integration",
@@ -71,9 +97,18 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "public-web:api-reference",
+        "file": "public-web:src/lib/public-docs-config.ts",
+        "symbol": "initialApiEntryPoints"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:feb6cfaee3f68259d81f0a564c9956e55ba2fa734dc820e435bbe36248462223",
-    "verify.md": "sha256:b24db3bfb15160aa755471cfc5bb70424879546b4e04d84cb2d82db2e2296b0b"
+    "spec.md": "sha256:5191e0c2586d34ca155442f15efaaf9bef806e10551b24cfb664f43096af46ee",
+    "verify.md": "sha256:c7c833d7d14e217eee958580bbf331e5ea488dcc2e2db5fef84b12f08aeba120"
   },
   "generatedBy": "core"
 }

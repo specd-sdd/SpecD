@@ -19,6 +19,7 @@ Each change is persisted as a manifest.json file inside its change directory. It
   "invalidationPolicy": "downstream",
   "trackedImplementationFiles": [
     { "file": "packages/core/src/domain/entities/change.ts", "state": "open" },
+    { "file": "packages/core/src/domain/entities/removed-file.ts", "state": "removed" },
   ],
   "implementationLinks": [
     {
@@ -57,7 +58,7 @@ Field definitions:
 - `workspaces` — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from specIds via parseSpecId()
 - `specIds` — current snapshot of spec IDs; mutable
 - `invalidationPolicy` — the change's persisted invalidation policy (`none`, `surgical`, `downstream`, `global`)
-- `trackedImplementationFiles` — optional array of tracked implementation file entries; each entry requires `file` and `state`, where `file` is a raw project-relative path and `state` is one of `open`, `resolved`, or `ignored`
+- `trackedImplementationFiles` — optional array of tracked implementation file entries; each entry requires `file` and `state`, where `file` is a raw project-relative path and `state` is one of `open`, `resolved`, `ignored`, or `removed`
 - `implementationLinks` — optional array of confirmed implementation links; each entry requires `specId`, `file`, and `fileLinkExplicit`, and may include `symbols`
 - `fileLinkExplicit: false` is valid only when `symbols` is present and non-empty, because that shape means the file-level presence exists only as the container for symbol-level links
 - `specDependsOn` (optional) — a record keyed by spec ID, each value being an array of spec ID strings representing that spec's current in-change declared dependencies. For existing persisted specs, the entry MUST be seeded when the spec first enters the change scope from spec-lock.json, then legacy metadata.json.dependsOn, then an empty set when neither exists. These entries are archive-time inputs to sidecar and metadata generation, not the long-term archived record.
@@ -117,7 +118,11 @@ Any normalization that changes the representation class of a tracked artifact fi
 
 `schema.name` is the value of the `schema` field from `specd.yaml` at creation time. `schema.version` is the `version` integer from the schema's `schema.yaml`. Both are written once at change creation and never updated.
 
-When a change is loaded and the active schema's name or version differs from what is recorded in the manifest, specd must emit a warning. The change remains usable — the warning is advisory, not a hard error. Archiving a change with a schema version mismatch must still be possible; the warning surfaces the mismatch so the user can decide whether to proceed.
+When a change is loaded and the active schema's version differs from what is recorded in the manifest, specd MUST emit a warning. The change remains usable — the version mismatch warning is advisory, not a hard error. Archiving a change with a schema version mismatch MUST still be possible; the warning surfaces the mismatch so the user can decide whether to proceed.
+
+When a change is loaded and the active schema's name differs from what is recorded in the manifest, the repository MUST reject the load with `SchemaMismatchError`. A schema-name mismatch indicates that the change was created against a different schema family rather than a later compatible revision of the same schema.
+
+The manifest's schema fields remain persisted facts only; enforcement behavior is defined by the change and repository contracts that consume them.
 
 ### Requirement: Atomic writes
 

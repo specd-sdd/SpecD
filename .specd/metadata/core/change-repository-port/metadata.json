@@ -60,18 +60,6 @@
       ]
     },
     {
-      "requirement": "Shared drift reconciliation hook",
-      "rules": [
-        "`FsChangeRepository` MUST expose a single drift-reconciliation algorithm used by both `get()` (before return) and **`SaveChangeArtifact`** (after a successful artifact write).\n\nThe hook MUST:\n\n- Compare on-disk content to `validatedHash` for tracked artifact files\n- Support excluding one or more file keys (the just-saved file during human save)\n- Apply the same invalidation semantics as auto-invalidation on drift (`artifact-drift`, `designing`, file states)\n\n`SaveChangeArtifact` MUST invoke this hook after writing file bytes and before final `save(change)` so agent edits to sibling artifacts are detected in the same pass as load-time drift."
-      ]
-    },
-    {
-      "requirement": "Idempotent drift reconciliation persistence",
-      "rules": [
-        "Drift reconciliation invoked during `get()` (and any shared hook used by load paths) MUST NOT rewrite the change manifest when `Change.invalidate('artifact-drift', ...)` is a deduped no-op per `core:change`.\n\nThe repository MUST detect whether new history was appended (for example by comparing history length or an explicit signal from the domain invalidation) **before** calling `_writeManifestAtomic` or equivalent direct manifest persistence.\n\nWhen invalidation is deduped:\n\n- The manifest file on disk MUST remain unchanged\n- `reconcileArtifactDrift()` (or the internal helper) MUST return `false`\n\nWhen invalidation appends new history:\n\n- The updated manifest MUST be persisted atomically before the loaded change is returned\n- The helper MUST return `true`\n\nRepeated read-only loads with unchanged drift scope MUST therefore be safe for polling clients: history event count and manifest revision MUST remain stable across consecutive polls."
-      ]
-    },
-    {
       "requirement": "list returns active changes in creation order",
       "rules": [
         "`list()` MUST return all active (non-drafted, non-discarded) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state (derived statuses) but MUST NOT include artifact content. Content is loaded on demand via `artifact()`."
@@ -108,12 +96,6 @@
       ]
     },
     {
-      "requirement": "artifactReadOnly loads bytes without returning Change",
-      "rules": [
-        "`artifactReadOnly(readOnlyOrigin, name, filename)` MUST load tracked artifact file content for a {@link ReadOnlyChangeView} storage location (`draft`, `discarded`; `archived` when wired). It MUST use the same confinement and `originalHash` semantics as `artifact(change, filename)` but MUST NOT return a mutable `Change` aggregate to callers.\n\n`readOnlyOrigin` MUST be a {@link ReadOnlyChangeOrigin} value. Implementations MUST resolve the change directory from `drafts/` or `discarded/` only for the matching origin."
-      ]
-    },
-    {
       "requirement": "saveArtifact with optimistic concurrency",
       "rules": [
         "`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory. If `change.isDrafted === true`, `saveArtifact` MUST throw `DraftedChangeReadOnlyError` before any filesystem write.\n\nIf `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally. After a successful write, the corresponding `ChangeArtifact` status in the change manifest MUST be reset to `in-progress`; the caller is responsible for calling `save(change)` to persist this state change."
@@ -141,6 +123,12 @@
       "requirement": "draftChangePath returns the drafted directory path",
       "rules": [
         "`draftChangePath(view)` MUST accept a `DraftedChangeView` (or the internal drafted `Change` during `mutateDraft`) and return the absolute filesystem path under `drafts/` for template variables and CLI display.\n\n`changePath(change)` MUST continue to resolve paths under `changes/` for active changes only."
+      ]
+    },
+    {
+      "requirement": "internalPaths returns absolute storage paths",
+      "rules": [
+        "`internalPaths()` MUST return an array of absolute filesystem paths to internal specd management directories owned by the repository, or `undefined` when the concept does not apply.\n\nReturning `undefined` signals that internal-path exclusion is not applicable (e.g. remote backends that do not manage local filesystem directories). Implementations MUST NOT return an empty array to signal inapplicability; an empty array means \"no paths to exclude\".\n\nFor `FsChangeRepository`, this MUST include:\n\n- the absolute path to `changes/`\n- the absolute path to `drafts/`\n- the absolute path to `discarded/`\n\nThese paths are used by implementation discovery to avoid tracking specd's own metadata."
       ]
     },
     {
@@ -395,68 +383,6 @@
       "then": ["no invalidation occurs"]
     },
     {
-      "requirement": "Shared drift reconciliation hook",
-      "name": "Save excludes just-written file key",
-      "given": ["SaveChangeArtifact wrote proposal.md"],
-      "when": ["drift reconciliation runs after save"],
-      "then": [
-        "proposal.md is excluded from hash comparison",
-        "AND sibling artifacts are still checked"
-      ]
-    },
-    {
-      "requirement": "Shared drift reconciliation hook",
-      "name": "Drift on sibling invalidates artifact state",
-      "given": ["another artifact file changed on disk without validatedHash update"],
-      "when": ["reconciliation runs after save"],
-      "then": [
-        "drifted file is marked invalidated",
-        "AND same semantics as load-time auto-invalidation apply"
-      ]
-    },
-    {
-      "requirement": "Shared drift reconciliation hook",
-      "name": "Get path uses same hook before return",
-      "given": ["on-disk content differs from stored validatedHash"],
-      "when": ["repository get() loads the change"],
-      "then": [
-        "shared hook runs before returning entity",
-        "AND invalidation matches post-save reconciliation rules"
-      ]
-    },
-    {
-      "requirement": "Idempotent drift reconciliation persistence",
-      "name": "First drift load persists invalidation",
-      "given": [
-        "a persisted change beyond designing with a validated artifact file that has drifted on disk"
-      ],
-      "when": ["FsChangeRepository.get() loads the change"],
-      "then": [
-        "an invalidated event with cause: 'artifact-drift' is recorded",
-        "AND the manifest is persisted before return"
-      ]
-    },
-    {
-      "requirement": "Idempotent drift reconciliation persistence",
-      "name": "Repeated get with unchanged drift scope does not rewrite manifest",
-      "given": [
-        "a change already in designing with a persisted artifact-drift invalidation for the current drift scope",
-        "AND on-disk artifact content still matches the drifted state detected on the prior load"
-      ],
-      "when": ["FsChangeRepository.get() is called twice in succession"],
-      "then": [
-        "the second load does not append another invalidated event",
-        "AND the manifest file mtime and history length remain unchanged after the second load"
-      ]
-    },
-    {
-      "requirement": "Idempotent drift reconciliation persistence",
-      "name": "reconcileArtifactDrift returns false on deduped no-op",
-      "given": ["drift reconciliation detects drift but domain invalidation dedupes"],
-      "when": ["reconcileArtifactDrift() completes"],
-      "then": ["it returns false", "AND no manifest write occurs"]
-    },
-    {
       "requirement": "list returns active changes in creation order",
       "name": "Mixed active and drafted changes",
       "given": [
@@ -540,30 +466,6 @@
       "name": "Artifact does not exist",
       "when": ["artifact(change, \"nonexistent.md\") is called"],
       "then": ["null is returned"]
-    },
-    {
-      "requirement": "artifactReadOnly loads bytes without returning Change",
-      "name": "Draft origin reads from drafts directory",
-      "given": ["change parked exists only under drafts/"],
-      "when": ["artifactReadOnly('draft', 'parked', 'proposal.md') runs"],
-      "then": [
-        "returns SpecArtifact with content and originalHash",
-        "AND caller does not receive a Change instance"
-      ]
-    },
-    {
-      "requirement": "artifactReadOnly loads bytes without returning Change",
-      "name": "Discarded origin reads from discarded directory",
-      "given": ["change gone exists only under discarded/"],
-      "when": ["artifactReadOnly('discarded', 'gone', 'proposal.md') runs"],
-      "then": ["returns SpecArtifact with content and originalHash"]
-    },
-    {
-      "requirement": "artifactReadOnly loads bytes without returning Change",
-      "name": "Missing change returns null",
-      "given": ["no drafted change named missing"],
-      "when": ["artifactReadOnly('draft', 'missing', 'proposal.md') runs"],
-      "then": ["returns null"]
     },
     {
       "requirement": "artifact only loads tracked change artifact files",
@@ -750,6 +652,20 @@
       "then": ["callers use draftChangePath(view) rather than changePath with an active Change"]
     },
     {
+      "requirement": "internalPaths returns absolute storage paths",
+      "name": "FsChangeRepository returns storage paths",
+      "given": ["FsChangeRepository is configured with changes/, drafts/, and discarded/"],
+      "when": ["internalPaths() is called"],
+      "then": ["it returns an array containing the absolute paths to those three directories"]
+    },
+    {
+      "requirement": "internalPaths returns absolute storage paths",
+      "name": "Non-filesystem implementation returns undefined",
+      "given": ["a ChangeRepository implementation that does not manage local directories"],
+      "when": ["internalPaths() is called"],
+      "then": ["it returns undefined"]
+    },
+    {
       "requirement": "scaffold creates artifact directories",
       "name": "Scaffold creates spec directories",
       "given": ["a change with specIds including core:edit-change"],
@@ -767,14 +683,29 @@
     "symbols": [
       {
         "specId": "core:change-repository-port",
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "ChangeRepository"
+      },
+      {
+        "specId": "core:change-repository-port",
         "file": "core:src/infrastructure/fs/change-repository.ts",
         "symbol": "FsChangeRepository"
+      },
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "saveArtifact"
+      },
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "artifactExists"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:77a12e62dacf8b4f86dc3d1fbef825e5e8ba175b9d45008366fc529c8f92deea",
-    "verify.md": "sha256:547905ae40fb686ee56e94a93e468ef0c0bde60b933cb6fe46307cea1b0c9ef4"
+    "spec.md": "sha256:cbea628a335bb4e17986b1c5fe1e4043187a2219ae4472beb8ca3a04bf4b2aa7",
+    "verify.md": "sha256:d047a4f0064d4c8a1fd0c6f7f61c6c4134a80171a406d89e4d1182362997af8f"
   },
   "generatedBy": "core"
 }

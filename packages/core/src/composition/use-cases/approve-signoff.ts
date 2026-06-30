@@ -37,6 +37,8 @@ export interface FsApproveSignoffOptions {
   readonly projectRoot: string
   readonly schemaRef: string
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
+  /** Approval gate configuration from project config. */
+  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
 }
 
 /**
@@ -102,6 +104,7 @@ export function createApproveSignoff(
         projectRoot: config.projectRoot,
         schemaRef: config.schemaRef,
         schemaRepositories: schemaRepos,
+        approvals: config.approvals,
       },
     )
   }
@@ -115,5 +118,5 @@ export function createApproveSignoff(
   const resolveSchema = new ResolveSchema(schemas, options!.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   const hasher = new NodeContentHasher()
-  return new ApproveSignoff(changeRepo, actor, schemaProvider, hasher)
+  return new ApproveSignoff(changeRepo, actor, schemaProvider, hasher, options!.approvals)
 }

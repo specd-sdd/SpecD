@@ -14,7 +14,7 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 }))
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
-import { ChangeNotFoundError } from '@specd/core'
+import { ChangeNotFoundError } from '@specd/sdk'
 import { registerDraftsShow } from '../../src/commands/drafts/show.js'
 
 function setup() {

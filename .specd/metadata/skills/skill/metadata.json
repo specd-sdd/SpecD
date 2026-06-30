@@ -9,7 +9,7 @@
     {
       "requirement": "Skill interface",
       "rules": [
-        "`Skill` MUST be an interface with:\n\n- `name: string` — unique identifier for the skill\n- `description: string` — human-readable description of what the skill does\n- `templates: SkillTemplate[]` — template files associated with this skill"
+        "`Skill` MUST be an interface with:\n\n- `name: string` — unique identifier for the skill\n- `description: string` — human-readable description of what the skill does\n- `kind: 'skill' | 'agent'` — categorizes the template as a standard skill or a specialized agent\n- `templates: SkillTemplate[]` — template files associated with this skill"
       ]
     },
     {
@@ -46,7 +46,10 @@
       "requirement": "Skill interface",
       "name": "Skill creation",
       "when": ["a Skill object is created"],
-      "then": ["it has name, description, and templates properties"]
+      "then": [
+        "it has name, description, kind, and templates properties",
+        "AND kind is either 'skill' or 'agent'"
+      ]
     },
     {
       "requirement": "SkillTemplate interface",
@@ -94,29 +97,21 @@
     "symbols": [
       {
         "specId": "skills:skill",
-        "file": "skills:src/domain/errors/specd-skills-error.ts",
-        "symbol": "SpecdSkillsError"
-      },
-      {
-        "specId": "skills:skill",
-        "file": "skills:src/domain/errors/skill-not-found-error.ts",
-        "symbol": "SkillNotFoundError"
-      },
-      {
-        "specId": "skills:skill",
         "file": "skills:src/domain/skill.ts",
         "symbol": "Skill"
       },
       {
         "specId": "skills:skill",
-        "file": "skills:src/domain/skill.ts",
-        "symbol": "SkillTemplate"
+        "file": "skills:src/domain/skill-template-metadata.ts",
+        "symbol": "SkillTemplateMetadata"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:65ebaeaa9e5f39c4bc88c9907e6492a061a7cfdbdd7b4e1f8d3bfd91d003ceff",
-    "verify.md": "sha256:2e6de88bf615f58642dbdd395d373bdbcf16673d07599f0d6b2ab5dc3a5b3b2a"
+    "spec.md": "sha256:0f582de9b928912a78aa2e5e5ea4048dab178ef40e051e95ee087c8f2dee5611",
+    "verify.md": "sha256:ada1cbca83da5c249addd9b5d75b856bcf3412c064c41e7787a7006c08fd6388"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Defines pure domain interfaces for Skill and SkillTemplate with lazy template loading and no domain I/O.",
+  "optimizedContext": "# skills:skill\n## Rules\n- `Skill` interface: `name: string`, `description: string`, `kind: \"skill\" | \"agent\"`, `templates: SkillTemplate[]`.\n- `SkillTemplate` interface: `filename: string`, `getContent(): Promise<string>`.\n- Domain no I/O: no fs/network/process in domain; I/O only infrastructure.\n- Template content lazy: load only via `getContent()`, never stored eagerly on `Skill`.\n- Skill domain errors typed: extend package base like `SpecdSkillsError`; base follows Specd Error Contract and extends `SpecdError` from `@specd/core`.\n## Constraints\n- Domain types pure TypeScript interfaces.\n- No deps on `node:fs` or any I/O library."
 }

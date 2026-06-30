@@ -1,0 +1,42 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    The command MUST support:
+
+    ```bash
+    specd specs context <specPath> [options]
+    ```
+
+    - `<specPath>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)
+    - `--mode <mode>` — optional; `list|summary|full|hybrid` (default: `full`)
+    - `--rules` — when present, includes only the rules sections in the output
+    - `--constraints` — when present, includes only the constraints sections in the output
+    - `--scenarios` — when present, includes only the scenarios sections in the output
+    - `--follow-deps` — when present, follows `dependsOn` links transitively and includes each dependency's context in the output
+    - `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
+    - `--optimized` — optional; force prefer optimized context
+    - `--no-optimized` — optional; suppress preference for optimized context
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included (description + rules + constraints + scenarios). When one or more section flags are passed, only those sections are included. Section flags have no effect in list or summary modes.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    The command reads the active project config and renders the requested spec according to the configured `contextMode`. It reads the spec's `.specd-metadata.yaml` and renders the requested sections only when the selected mode is full-shaped. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations where available and emits a `warning:` to stderr.
+
+    When `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same display mode and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order.
+
+    By default, if `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedDescription` and `optimizedContext` from fresh metadata.
+
+    The effective `llmOptimizedContext` value is overridden to `false` if `--no-optimized` is passed, or if section flags are provided that exclude either rules or constraints (e.g. only `--rules` or only `--constraints` is passed).
+
+    When optimization is effectively enabled (including when both rules and constraints are requested or defaulted), it prefers `optimizedDescription` and `optimizedContext` from fresh metadata.
+
+    The command MUST emit a `stale-optimization` warning to stderr when the effective `llmOptimizedContext` is `true` but optimized fields are missing or stale.
+
+    The warning MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".

@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "core:change"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/approve.ts"
+    }
+  ]
+}

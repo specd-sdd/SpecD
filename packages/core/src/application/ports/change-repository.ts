@@ -70,13 +70,12 @@ export abstract class ChangeRepository extends Repository {
   abstract getDiscarded(name: string): Promise<DiscardedChangeView | null>
 
   /**
-   * Loads tracked artifact bytes for a {@link ReadOnlyChangeView} storage (same semantics as
-   * {@link artifact} for active changes) without returning a mutable {@link Change} aggregate.
+   * Loads artifact content for a drafted, discarded, or archived change view.
    *
-   * @param readOnlyOrigin - Storage backing the view (`draft`, `discarded`; `archived` when wired)
-   * @param name - Change name within that storage
-   * @param filename - Tracked artifact filename within the change directory
-   * @returns Artifact content and hash, or `null` when the change or file is missing
+   * @param readOnlyOrigin - Which read-only storage bucket to read from
+   * @param name - The change name
+   * @param filename - Artifact filename within the change directory
+   * @returns Artifact content and hash metadata, or `null` when missing
    */
   abstract artifactReadOnly(
     readOnlyOrigin: ReadOnlyChangeOrigin,
@@ -255,12 +254,26 @@ export abstract class ChangeRepository extends Repository {
   abstract unscaffold(change: Change, specIds: readonly string[]): Promise<void>
 
   /**
-   * Compares tracked artifact files against disk and invalidates on drift.
+   * Returns the absolute filesystem paths to specd-managed internal directories
+   * (e.g. `changes/`, `drafts/`, `discarded/`).
    *
-   * @param change - Change loaded from the manifest
-   * @param options - Reconciliation options
-   * @param options.excludeFileKeys - File keys to skip (e.g. the file just saved)
-   * @returns `true` when drift triggered an invalidation event
+   * Used by implementation discovery to exclude internal specd directories
+   * from detection results. Returns absolute paths in stable order.
+   *
+   * Implementations that do not manage local filesystem directories
+   * (e.g. remote backends) MUST return `undefined` instead of an empty array
+   * to signal that internal-path exclusion does not apply.
+   *
+   * @returns Absolute filesystem paths to internal storage roots, or `undefined`
+   */
+  abstract internalPaths(): readonly string[] | undefined
+
+  /**
+   * Reconciles artifact drift for the given change after external edits.
+   *
+   * @param change - The change whose artifacts to reconcile
+   * @param options - Optional exclusion list for files being saved concurrently
+   * @returns Whether any artifact was invalidated by drift reconciliation
    */
   abstract reconcileArtifactDrift(
     change: Change,

@@ -1,0 +1,37 @@
+- op: removed
+  description: Remove CLI-owned refresh prelude; TransitionChange owns refresh policy
+  selector:
+    type: section
+    matches: 'Requirement: Implementation tracking refresh before transition'
+
+- op: added
+  description: Transition command delegates refresh to TransitionChange
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Next-transition resolution'
+  content: |
+    ### Requirement: Delegates refresh policy to TransitionChange
+
+    The command MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector` directly.
+
+    Pre-transition status reads MUST call `GetStatus` with `refreshImplementationTracking: false` because `TransitionChange` performs the refresh.
+
+    `TransitionChange` MUST be invoked with default `refreshImplementationTrackingBefore` behaviour unless a future CLI flag explicitly opts out.
+
+    When rendering a repair guide after a failed transition, the command MUST call `GetStatus` with `refreshImplementationTracking: false` and MUST NOT trigger a second refresh solely for diagnostics.
+
+- op: modified
+  description: Remove direct refresh use-case dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`core:change`](../../core/change/spec.md) — change lifecycle state model
+    - [`core:transition-change`](../../core/transition-change/spec.md) — transition execution and default refresh orchestration
+    - [`core:hook-execution-model`](../../core/hook-execution-model/spec.md) — hook ordering and failure semantics
+    - [`core:get-status`](../../core/get-status/spec.md) — pre-transition and repair-guide status reads

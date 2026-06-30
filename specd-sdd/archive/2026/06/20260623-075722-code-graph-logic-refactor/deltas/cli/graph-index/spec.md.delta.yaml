@@ -1,0 +1,38 @@
+- op: modified
+  description: Delegate indexing to code-graph and document worker subprocess isolation
+  selector:
+    type: section
+    matches: 'Requirement: Indexing behaviour'
+  content: |
+    The command obtains the workspace targets and spec sources from the project configuration.
+    It delegates bootstrap configuration creation, effective project graph config merging, lock acquisition, and index execution entirely to the `@specd/code-graph` provider.
+    The command SHALL pass an `onProgress` callback to the provider's `index()` method. When running in `text` mode, this callback prints the current progress percentage and indexing phase to stdout.
+
+    Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs the actual indexing work, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
+
+    When `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests.
+
+- op: modified
+  description: Document lock acquisition failure exit code
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    If the provider cannot be opened or indexing fails due to an infrastructure error (I/O, database), the command exits with code 3.
+
+    If the shared graph indexing lock cannot be acquired because another indexing run is in progress, the command exits with code 3 after printing a user-facing retry-later message.
+
+    Per-file indexing errors (parse failures, unsupported syntax) do not cause a non-zero exit — they are reported in the `errors` array of `IndexResult` and the command exits with code 0.
+
+- op: modified
+  description: Constraints after delegation refactor
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The CLI does not contain indexing logic, lock management, or configuration building — it delegates entirely to `@specd/code-graph`
+    - `process.exit(0)` is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive
+    - `--force` delegates destructive backend recreation to the graph-store contract
+    - The `withProvider` helper manages lifecycle and registers `SIGINT`/`SIGTERM` signal handlers
+    - Workspace targets and spec sources are derived from `SpecdConfig` and `Kernel`
+    - Worker subprocess isolation keeps native graph-store threads out of the parent CLI process; tests bypass spawning via `SPECD_GRAPH_INDEX_NO_WORKER`

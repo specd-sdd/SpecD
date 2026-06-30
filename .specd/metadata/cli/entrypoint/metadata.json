@@ -55,6 +55,18 @@
       ]
     },
     {
+      "requirement": "Host package SDK dependency boundary",
+      "rules": [
+        "Delivery host packages `@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct workspace dependency on specd platform packages (`@specd/core`, `@specd/code-graph`, `@specd/sdk`). Plugin, schema, and third-party dependencies are unaffected.\n\n`@specd/mcp` declares `@specd/sdk` as its specd platform dependency even when the package contains no MCP tools yet."
+      ]
+    },
+    {
+      "requirement": "Banner version labels",
+      "rules": [
+        "When the root help banner renders version labels, it MUST show installed versions for `@specd/cli`, `@specd/sdk`, the `@specd/core` version obtained through `@specd/sdk` re-exports (`CORE_VERSION`), and the `@specd/code-graph` version obtained through `@specd/sdk` re-exports (`codeGraphVersion`)."
+      ]
+    },
+    {
       "requirement": "Excess arguments rejected",
       "rules": [
         "Every leaf command rejects unexpected positional arguments. If a user passes more positional arguments than the command declares, the command exits with code 1 and prints a usage error to stderr. This prevents silent typos and misremembered syntax from being ignored."
@@ -279,6 +291,20 @@
       ]
     },
     {
+      "requirement": "Host package SDK dependency boundary",
+      "name": "MCP depends on SDK only",
+      "when": ["packages/mcp/package.json dependencies are inspected"],
+      "then": ["@specd/sdk is the specd platform dependency", "AND @specd/core is absent"]
+    },
+    {
+      "requirement": "Banner version labels",
+      "name": "Root banner shows CLI SDK core and code-graph versions",
+      "when": ["specd --help is run with a configured project"],
+      "then": [
+        "stdout includes cli  v, sdk   v, core  v, and graph v version labels from installed packages"
+      ]
+    },
+    {
       "requirement": "Output format flag",
       "name": "Text format produces human-readable output",
       "when": ["a command is run with --format text (or without --format)"],
@@ -338,37 +364,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:entrypoint",
-        "file": "cli:src/errors/specd-cli-error.ts",
-        "symbol": "SpecdCliError"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/errors/cli-validation-error.ts",
-        "symbol": "CliValidationError"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/formatter.ts",
-        "symbol": "parseFormat"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/formatter.ts",
-        "symbol": "output"
-      },
-      {
-        "specId": "cli:entrypoint",
-        "file": "cli:src/helpers/parse-comma-values.ts",
-        "symbol": "parseCommaSeparatedValues"
+        "file": "cli:package.json"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:56092c81a6091bea888288b17291782a25e3cb2de8cf298f37afc2971a14708e",
-    "verify.md": "sha256:5c24ca92c87c7d1cd158461b38c1f8b04785e766bbf3b8ca418045f834f9c008"
+    "spec.md": "sha256:e5293050d50b803eaf2e0202e5b3e9fe7e7cec37fa03eb508acb3190d57bc638",
+    "verify.md": "sha256:f90b6ed89df73a690148b0ece6f836854c2090a170837b8bae186bccd79a56e2"
   },
   "generatedBy": "core"
 }

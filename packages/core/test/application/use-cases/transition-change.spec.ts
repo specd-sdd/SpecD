@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { TransitionChange } from '../../../src/application/use-cases/transition-change.js'
 import { type TransitionProgressEvent } from '../../../src/application/use-cases/transition-change.js'
+import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
@@ -15,6 +16,7 @@ import {
   makeSchema,
   makeArtifactType,
   makeRunStepHooks,
+  makeWorkflowStep,
   testActor,
 } from './helpers.js'
 
@@ -29,19 +31,35 @@ function makeChangeInState(name: string, events: ChangeEvent[]): Change {
 
 const actor = testActor
 
+function makeRefreshImplementationTracking(
+  execute: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
+): RefreshImplementationTracking {
+  return { execute } as unknown as RefreshImplementationTracking
+}
+
 /** Creates a TransitionChange with all required deps (schema + hooks are no-ops by default). */
 function makeUseCase(
   repo: ReturnType<typeof makeChangeRepository>,
   overrides?: {
     schema?: ReturnType<typeof makeSchema> | null
     runStepHooks?: ReturnType<typeof makeRunStepHooks>
+    refresh?: RefreshImplementationTracking
+    refreshExecute?: ReturnType<typeof vi.fn>
+    approvals?: { spec: boolean; signoff: boolean }
   },
 ): TransitionChange {
+  const refresh =
+    overrides?.refresh ??
+    makeRefreshImplementationTracking(
+      overrides?.refreshExecute ?? vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
+    )
   return new TransitionChange(
     repo,
     makeActorResolver(),
     makeSchemaProvider(overrides?.schema !== undefined ? overrides.schema : makeSchema()),
     overrides?.runStepHooks ?? makeRunStepHooks(),
+    refresh,
+    overrides?.approvals ?? { spec: false, signoff: false },
   )
 }
 
@@ -66,8 +84,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'parked',
           to: 'designing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(ChangeNotFoundError)
     })
@@ -81,10 +97,37 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'missing',
           to: 'designing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(ChangeNotFoundError)
+    })
+  })
+
+  describe('implementation tracking refresh', () => {
+    it('refreshes active changes by default', async () => {
+      const change = makeChangeInState('my-change', [])
+      const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
+      const uc = makeUseCase(makeChangeRepository([change]), { refreshExecute })
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+      })
+
+      expect(refreshExecute).toHaveBeenCalledWith({ name: 'my-change' })
+    })
+
+    it('skips refresh when explicitly disabled', async () => {
+      const change = makeChangeInState('my-change', [])
+      const refreshExecute = vi.fn().mockResolvedValue({ trackedFiles: [], links: [] })
+      const uc = makeUseCase(makeChangeRepository([change]), { refreshExecute })
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+        refreshImplementationTrackingBefore: false,
+      })
+
+      expect(refreshExecute).not.toHaveBeenCalled()
     })
   })
 
@@ -96,8 +139,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -111,8 +152,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       const saved = repo.store.get('my-change')
@@ -128,8 +167,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(mutateSpy).toHaveBeenCalledOnce()
@@ -143,8 +180,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -158,8 +193,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -175,13 +208,13 @@ describe('TransitionChange', () => {
 
     it('routes ready → implementing when approvalsSpec is false', async () => {
       const change = makeReadyChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: false, signoff: false },
+      })
 
       const result = await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('implementing')
@@ -189,13 +222,13 @@ describe('TransitionChange', () => {
 
     it('routes ready → pending-spec-approval when approvalsSpec is true', async () => {
       const change = makeReadyChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: true, signoff: false },
+      })
 
       const result = await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: true,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('pending-spec-approval')
@@ -215,13 +248,13 @@ describe('TransitionChange', () => {
 
     it('routes done → archivable when approvalsSignoff is false', async () => {
       const change = makeDoneChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: false, signoff: false },
+      })
 
       const result = await uc.execute({
         name: 'my-change',
         to: 'archivable',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('archivable')
@@ -229,13 +262,13 @@ describe('TransitionChange', () => {
 
     it('routes done → pending-signoff when approvalsSignoff is true', async () => {
       const change = makeDoneChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: false, signoff: true },
+      })
 
       const result = await uc.execute({
         name: 'my-change',
         to: 'archivable',
-        approvalsSpec: false,
-        approvalsSignoff: true,
       })
 
       expect(result.change.state).toBe('pending-signoff')
@@ -276,8 +309,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'spec-approved',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toMatchObject({
         reason: { type: 'approval-required', gate: 'spec' },
@@ -292,8 +323,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'signed-off',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toMatchObject({
         reason: { type: 'approval-required', gate: 'signoff' },
@@ -307,8 +336,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -356,8 +383,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       const saved = repo.store.get('my-change')
@@ -382,8 +407,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(spec.getFile('spec')?.validatedHash).toBe('sha256:abc')
@@ -449,8 +472,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'verifying',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -470,8 +491,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('verifying')
@@ -487,8 +506,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('verifying')
@@ -523,8 +540,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('verifying')
@@ -573,8 +588,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'archivable',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -611,8 +624,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('verifying')
@@ -654,8 +665,6 @@ describe('TransitionChange', () => {
         await uc.execute({
           name: 'my-change',
           to: 'verifying',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         })
         expect.unreachable('should have thrown')
       } catch (err) {
@@ -686,10 +695,7 @@ describe('TransitionChange', () => {
 
       const events: TransitionProgressEvent[] = []
       await expect(
-        uc.execute(
-          { name: 'my-change', to: 'verifying', approvalsSpec: false, approvalsSignoff: false },
-          (evt) => events.push(evt),
-        ),
+        uc.execute({ name: 'my-change', to: 'verifying' }, (evt) => events.push(evt)),
       ).rejects.toThrow(InvalidStateTransitionError)
 
       const failedEvent = events.find((e) => e.type === 'task-completion-failed')
@@ -729,8 +735,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -753,8 +757,6 @@ describe('TransitionChange', () => {
         await uc.execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         })
         expect.unreachable('should have thrown')
       } catch (err) {
@@ -795,8 +797,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('implementing')
@@ -832,8 +832,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('implementing')
@@ -848,8 +846,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('implementing')
@@ -883,8 +879,6 @@ describe('TransitionChange', () => {
         {
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         },
         (evt) => events.push(evt),
       )
@@ -924,8 +918,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -952,8 +944,6 @@ describe('TransitionChange', () => {
           {
             name: 'my-change',
             to: 'implementing',
-            approvalsSpec: false,
-            approvalsSignoff: false,
           },
           (evt) => events.push(evt),
         )
@@ -1001,8 +991,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       // ready has no workflow step → no source.post hooks, only target.pre
@@ -1045,8 +1033,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(HookFailedError)
     })
@@ -1088,8 +1074,6 @@ describe('TransitionChange', () => {
         .execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         })
         .catch(() => {})
 
@@ -1134,8 +1118,6 @@ describe('TransitionChange', () => {
         .execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         })
         .catch(() => {})
 
@@ -1151,8 +1133,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
         skipHookPhases: new Set(['all']),
       })
 
@@ -1197,8 +1177,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(calls).toEqual([
@@ -1221,8 +1199,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       // ready has no workflow step, so no source.post hooks
@@ -1258,8 +1234,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       // drafting has no workflow step → no source.post hooks
@@ -1304,8 +1278,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(order).toEqual(['implementing.post', 'verifying.pre'])
@@ -1361,8 +1333,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'verifying',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow(HookFailedError)
     })
@@ -1404,8 +1374,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
         skipHookPhases: new Set(['target.pre']),
       })
 
@@ -1449,8 +1417,6 @@ describe('TransitionChange', () => {
       await uc.execute({
         name: 'my-change',
         to: 'verifying',
-        approvalsSpec: false,
-        approvalsSignoff: false,
         skipHookPhases: new Set(['source.post']),
       })
 
@@ -1466,8 +1432,6 @@ describe('TransitionChange', () => {
         {
           name: 'my-change',
           to: 'designing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         },
         (evt) => events.push(evt),
       )
@@ -1497,8 +1461,6 @@ describe('TransitionChange', () => {
         {
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         },
         (evt) => events.push(evt),
       )
@@ -1556,8 +1518,6 @@ describe('TransitionChange', () => {
         {
           name: 'my-change',
           to: 'verifying',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         },
         (evt) => events.push(evt),
       )
@@ -1619,8 +1579,6 @@ describe('TransitionChange', () => {
         {
           name: 'my-change',
           to: 'verifying',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         },
         (evt) => events.push(evt),
       )
@@ -1651,8 +1609,6 @@ describe('TransitionChange', () => {
         uc.execute({
           name: 'my-change',
           to: 'implementing',
-          approvalsSpec: false,
-          approvalsSignoff: false,
         }),
       ).rejects.toThrow()
     })
@@ -1670,8 +1626,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'implementing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('implementing')
@@ -1743,8 +1697,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -1757,8 +1709,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -1773,8 +1723,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -1786,26 +1734,23 @@ describe('TransitionChange', () => {
       expect(change.activeSpecApproval).toBeUndefined()
       expect(change.activeSignoff).toBeUndefined()
 
-      const uc = makeUseCase(makeChangeRepository([change]))
+      const invalidateSpy = vi.spyOn(change, 'invalidate')
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
 
-      const result = await uc.execute({
+      await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
-      expect(result.change.state).toBe('designing')
-      expect(result.change.history.at(-2)).toMatchObject({
-        type: 'invalidated',
-        cause: 'artifact-review-required',
-        message:
-          'Invalidated because the change returned to designing and all artifacts require review.',
-      })
-      expect(result.change.history.at(-1)).toMatchObject({
-        type: 'transitioned',
-        to: 'designing',
-      })
+      expect(invalidateSpy).toHaveBeenCalledTimes(1)
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        'artifact-review-required',
+        expect.anything(),
+        'Invalidated because the change returned to designing and all artifacts require review.',
+        expect.any(Array),
+        expect.anything(),
+      )
     })
 
     it('does not trigger invalidation for drafting to designing', async () => {
@@ -1818,8 +1763,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -1838,8 +1781,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -1870,8 +1811,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -1896,8 +1835,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')
@@ -1927,8 +1864,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'archivable',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('archivable')
@@ -1969,8 +1904,6 @@ describe('TransitionChange', () => {
       const result = await uc.execute({
         name: 'my-change',
         to: 'designing',
-        approvalsSpec: false,
-        approvalsSignoff: false,
       })
 
       expect(result.change.state).toBe('designing')

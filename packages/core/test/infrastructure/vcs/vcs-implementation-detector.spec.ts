@@ -109,3 +109,71 @@ describe('NullVcsAdapter', () => {
     await expect(adapter.modifiedFiles('HEAD')).resolves.toEqual([])
   })
 })
+
+describe('VcsImplementationDetector exclusion filtering', () => {
+  function makeAdapter(files: string[]): VcsAdapter {
+    return {
+      async rootDir() {
+        return '/repo'
+      },
+      async branch() {
+        return 'main'
+      },
+      async isClean() {
+        return true
+      },
+      async ref() {
+        return 'HEAD'
+      },
+      async refAt() {
+        return 'base-abc'
+      },
+      async modifiedFiles() {
+        return files
+      },
+      async show() {
+        return null
+      },
+    }
+  }
+
+  it('excludes files under specified excludePaths prefixes', async () => {
+    const detector = new VcsImplementationDetector(
+      '/repo',
+      makeAdapter([
+        'packages/core/src/change.ts',
+        'specd-sdd/changes/20260603-foo/deltas/core/change/spec.md.delta.yaml',
+        'specd-sdd/archive/old-change/manifest.json',
+        'src/feature.ts',
+      ]),
+    )
+
+    const result = await detector.detectModifiedFiles(makeChange(), {
+      excludePaths: ['specd-sdd/changes', 'specd-sdd/archive'],
+    })
+
+    expect(result).toEqual(['packages/core/src/change.ts', 'src/feature.ts'])
+  })
+
+  it('does not exclude when excludePaths is omitted', async () => {
+    const allFiles = ['packages/core/src/change.ts', 'specd-sdd/changes/foo/manifest.json']
+    const detector = new VcsImplementationDetector('/repo', makeAdapter(allFiles))
+
+    const result = await detector.detectModifiedFiles(makeChange())
+
+    expect(result).toEqual(allFiles)
+  })
+
+  it('exact prefix match is excluded', async () => {
+    const detector = new VcsImplementationDetector(
+      '/repo',
+      makeAdapter(['specd-sdd/changes', 'packages/core/src/change.ts']),
+    )
+
+    const result = await detector.detectModifiedFiles(makeChange(), {
+      excludePaths: ['specd-sdd/changes'],
+    })
+
+    expect(result).toEqual(['packages/core/src/change.ts'])
+  })
+})

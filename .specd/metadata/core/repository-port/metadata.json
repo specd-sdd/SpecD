@@ -1,27 +1,27 @@
 {
   "title": "Repository Base",
-  "description": "All repository ports share three construction-time invariants — workspace, ownership, and locality — that determine how use cases interact with stored data. Without a shared base, each port would duplicate these fields, their accessors, and their semantics. `Repository` is the abstract base class that encapsulates these invariants once, so that subclasses only need to declare their storage-specific operations.",
+  "description": "All repository ports share construction-time invariants that determine how use cases interact with stored data: workspace, ownership, locality, and the config-root path used to derive repository-owned runtime files. Without a shared base, each port would duplicate these fields, their accessors, and their semantics. `Repository` is the abstract base class that encapsulates these invariants once, so that subclasses only need to declare their storage-specific operations.",
   "dependsOn": ["default:_global/architecture"],
   "context": [
-    "All repository ports share three construction-time invariants — workspace, ownership, and locality — that determine how use cases interact with stored data. Without a shared base, each port would duplicate these fields, their accessors, and their semantics. `Repository` is the abstract base class that encapsulates these invariants once, so that subclasses only need to declare their storage-specific operations."
+    "All repository ports share construction-time invariants that determine how use cases interact with stored data: workspace, ownership, locality, and the config-root path used to derive repository-owned runtime files. Without a shared base, each port would duplicate these fields, their accessors, and their semantics. `Repository` is the abstract base class that encapsulates these invariants once, so that subclasses only need to declare their storage-specific operations."
   ],
   "rules": [
     {
       "requirement": "RepositoryConfig shape",
       "rules": [
-        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository. External repositories may not be accessible to agents restricted to the git root."
+        "`Repository` is constructed from a `RepositoryConfig` object:\n\n```typescript\ninterface RepositoryConfig {\n  readonly workspace: string\n  readonly ownership: 'owned' | 'shared' | 'readOnly'\n  readonly isExternal: boolean\n  readonly configPath: string\n}\n```\n\n- `workspace` — the workspace name this repository is bound to (e.g. `\"default\"`, `\"billing\"`)\n- `ownership` — the ownership level declared in `specd.yaml`:\n  - `owned` — full control, no restrictions\n  - `shared` — writes allowed but recorded in the change manifest as `touchedSharedSpecs`\n  - `readOnly` — no writes allowed; data may only be read\n- `isExternal` — whether this repository points to data outside the current git repository. External repositories may not be accessible to agents restricted to the git root.\n- `configPath` — absolute path to the config directory. Repository implementations use it to derive runtime-owned paths such as change locks, graph persistence, and other repository-local support files."
       ]
     },
     {
       "requirement": "Abstract class, not interface",
       "rules": [
-        "`Repository` MUST be an `abstract class`. It sets the three invariant fields in its constructor from `RepositoryConfig` and exposes them as methods. This follows the architecture spec requirement that ports with shared construction are abstract classes — the TypeScript compiler enforces both the construction contract and the method contract."
+        "`Repository` MUST be an `abstract class`. It sets the four invariant fields in its constructor from `RepositoryConfig` and exposes them as methods. This follows the architecture spec requirement that ports with shared construction are abstract classes — the TypeScript compiler enforces both the construction contract and the method contract."
       ]
     },
     {
       "requirement": "Immutable accessors",
       "rules": [
-        "`Repository` MUST expose three methods that return the values set at construction time:\n\n- `workspace(): string` — the workspace name\n- `ownership(): 'owned' | 'shared' | 'readOnly'` — the ownership level\n- `isExternal(): boolean` — whether the repository is external\n\nThese values MUST NOT change during the lifetime of the instance. The backing fields are private — subclasses access them only through the methods."
+        "`Repository` MUST expose four methods that return the values set at construction time:\n\n- `workspace(): string` — the workspace name\n- `ownership(): 'owned' | 'shared' | 'readOnly'` — the ownership level\n- `isExternal(): boolean` — whether the repository is external\n- `configPath(): string` — the absolute config directory path\n\nThese values MUST NOT change during the lifetime of the instance. The backing fields are private — subclasses access them only through the methods."
       ]
     },
     {
@@ -62,24 +62,25 @@
       "requirement": "Immutable accessors",
       "name": "Accessors return construction-time values",
       "given": [
-        "a Repository subclass constructed with { workspace: \"billing\", ownership: \"shared\", isExternal: true }"
+        "a Repository subclass constructed with { workspace: \"billing\", ownership: \"shared\", isExternal: true, configPath: \"/project/.specd/config\" }"
       ],
       "then": [
         "workspace() returns \"billing\"",
         "AND ownership() returns \"shared\"",
-        "AND isExternal() returns true"
+        "AND isExternal() returns true",
+        "AND configPath() returns \"/project/.specd/config\""
       ]
     },
     {
       "requirement": "Subclass contract",
       "name": "Subclass inherits accessors without redeclaring them",
       "given": [
-        "a ChangeRepository subclass that does not override workspace(), ownership(), or isExternal()"
+        "a ChangeRepository subclass that does not override workspace(), ownership(), isExternal(), or configPath()"
       ],
       "when": [
-        "the subclass is constructed with { workspace: \"default\", ownership: \"owned\", isExternal: false }"
+        "the subclass is constructed with { workspace: \"default\", ownership: \"owned\", isExternal: false, configPath: \"/project/.specd/config\" }"
       ],
-      "then": ["all three accessors return the values from RepositoryConfig"]
+      "then": ["all four accessors return the values from RepositoryConfig"]
     },
     {
       "requirement": "ReadOnlyWorkspaceError",
@@ -104,11 +105,21 @@
       ],
       "when": ["the repository is instantiated"],
       "then": ["construction succeeds without error"]
+    },
+    {
+      "requirement": "RepositoryConfig shape",
+      "name": "RepositoryConfig requires configPath for runtime-owned storage",
+      "given": ["a repository implementation derives change locks or graph persistence paths"],
+      "when": ["it is constructed from RepositoryConfig"],
+      "then": [
+        "configPath is available as the absolute config-directory root for those derived paths"
+      ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:d10763da75620b581e613d90a203eddfb907247f9b951c09a9ad756124243b3a",
-    "verify.md": "sha256:98cff78d753fccf29d500c282ad2a14974ca0504f298446f4e91ea7adb7a25ee"
+    "spec.md": "sha256:76981c40fed1bab528e359b0dd67d8f786d934fffb14b335bce2de9fc996b74f",
+    "verify.md": "sha256:b70e53c5dfe2ce58e719db753d1355080fd2ff17ebc9dff461d90127224bc865"
   },
   "generatedBy": "core"
 }

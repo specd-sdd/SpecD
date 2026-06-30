@@ -8,18 +8,20 @@ Agents need a way to retrieve the baseline project context -- instructions and s
 
 ### Requirement: Command signature
 
-```
-specd project context
-  [--rules] [--constraints] [--scenarios]
-  [--follow-deps [--depth <n>]]
-  [--format text|json|toon]
+The command MUST support:
+
+```bash
+specd project context [options]
 ```
 
+- `--mode <mode>` — optional; `list|summary|full|hybrid`
 - `--rules` — when present, includes only the rules sections of spec content in the output
 - `--constraints` — when present, includes only the constraints sections of spec content in the output
 - `--scenarios` — when present, includes only the scenarios sections of spec content in the output
 - `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively to discover additional specs beyond those matched by include/exclude patterns. By default (without this flag) `dependsOn` traversal is not performed.
 - `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`
+- `--optimized` — optional; force prefer optimized context
+- `--no-optimized` — optional; suppress preference for optimized context
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 When none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included. When one or more are passed, only those sections appear in each spec's content block.
@@ -36,13 +38,27 @@ For structured formats, the warning SHALL be included in the response.
 
 The command compiles the project-level context: the `context:` entries and the specs matched by the **project-level** `contextIncludeSpecs`/`contextExcludeSpecs` patterns only. Workspace-level patterns are not applied — those are conditional on a specific change having that workspace active.
 
-Concretely:
+The CLI MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. Yaml-derived context configuration is baked into the kernel-wired `GetProjectContext` instance at composition time.
 
-1. Project `context:` entries from `specd.yaml` are rendered (instruction text verbatim, file entries read from disk)
-2. Project-level `contextIncludeSpecs` patterns are applied across all workspaces (defaults to `['default:*']` when not declared)
-3. Project-level `contextExcludeSpecs` patterns are applied to remove specs from the set
-4. Optional `dependsOn` traversal is applied only when `--follow-deps` is present
-5. The collected specs are rendered according to the configured `contextMode`
+The CLI MUST pass only runtime overrides to `GetProjectContext.execute`:
+
+- `contextMode` from `--mode` or the CLI's effective-mode derivation (section flags may force `full` when yaml default is not `full`/`hybrid`)
+- `llmOptimizedContext` only when `--optimized` or `--no-optimized` resolves a value that differs from the yaml default
+- `followDeps`, `depth`, and `sections` from the corresponding CLI flags
+
+Concretely, the use case:
+
+1. Renders project `context:` entries from the baked default configuration (instruction text verbatim, file entries read from disk)
+2. Applies project-level `contextIncludeSpecs` patterns across all workspaces (defaults to `['default:*']` when not declared in yaml)
+3. Applies project-level `contextExcludeSpecs` patterns to remove specs from the set
+4. Applies optional `dependsOn` traversal only when `--follow-deps` is present
+5. Renders the collected specs according to the effective `contextMode`
+
+When `llmOptimizedContext` is enabled in the baked default, `GetProjectContext` prefers optimized project-level content when fresh.
+
+Optimization bypass for partial section requests is enforced by `GetProjectContext` from the forwarded `sections` input. The CLI MUST NOT recompute `llmOptimizedContext` based on section flags except via explicit `--optimized` / `--no-optimized`.
+
+The command MUST suppress `stale-optimization` warnings when optimization is effectively bypassed (for example via `--no-optimized` or partial section requests handled in the use case).
 
 ### Requirement: Output
 

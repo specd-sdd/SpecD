@@ -9,13 +9,13 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd spec context <workspace:capability-path>\n  [--rules] [--constraints] [--scenarios]\n  [--follow-deps [--depth <n>]]\n  [--format text|json|toon]\n```\n\n- `<workspace:capability-path>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)\n- `--rules` — when present, includes only the rules sections in the output\n- `--constraints` — when present, includes only the constraints sections in the output\n- `--scenarios` — when present, includes only the scenarios sections in the output\n- `--follow-deps` — when present, follows `dependsOn` links from `.specd-metadata.yaml` transitively and includes each dependency's context in the output\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only, 2 = deps of deps, etc.); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included (description + rules + constraints + scenarios). When one or more section flags are passed, only those sections are included."
+        "The command MUST support:\n\n```bash\nspecd specs context <specPath> [options]\n```\n\n- `<specPath>` — required positional; the fully-qualified spec ID (e.g. `default:auth/login`)\n- `--mode <mode>` — optional; `list|summary|full|hybrid` (default: `full`)\n- `--rules` — when present, includes only the rules sections in the output\n- `--constraints` — when present, includes only the constraints sections in the output\n- `--scenarios` — when present, includes only the scenarios sections in the output\n- `--follow-deps` — when present, follows `dependsOn` links transitively and includes each dependency's context in the output\n- `--depth <n>` — optional; only valid with `--follow-deps`; limits dependency traversal to N levels (1 = direct deps only); defaults to unlimited when `--follow-deps` is passed without `--depth`\n- `--optimized` — optional; force prefer optimized context\n- `--no-optimized` — optional; suppress preference for optimized context\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen none of `--rules`, `--constraints`, or `--scenarios` are passed, all available sections are included (description + rules + constraints + scenarios). When one or more section flags are passed, only those sections are included. Section flags have no effect in list or summary modes."
       ]
     },
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command reads the active project config and renders the requested spec according to the configured `contextMode`. It reads the spec's `.specd-metadata.yaml` and renders the requested sections only when the selected mode is full-shaped. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations where available and emits a `warning:` to stderr.\n\nWhen `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same display mode and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order."
+        "The command reads the active project config and renders the requested spec according to the configured `contextMode`. It reads the spec's `.specd-metadata.yaml` and renders the requested sections only when the selected mode is full-shaped. If the metadata is absent or stale (content hashes do not match current artifact files), the command falls back to the schema's `metadataExtraction` declarations where available and emits a `warning:` to stderr.\n\nWhen `--follow-deps` is passed, the command recursively follows the `dependsOn` entries in each spec's `.specd-metadata.yaml`, applying the same display mode and stale-fallback logic to each dependency. Cycles are detected and silently broken. The root spec is always listed first; dependencies follow in traversal order.\n\nBy default, if `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedDescription` and `optimizedContext` from fresh metadata.\n\nThe effective `llmOptimizedContext` value is overridden to `false` if `--no-optimized` is passed, or if section flags are provided that exclude either rules or constraints (e.g. only `--rules` or only `--constraints` is passed).\n\nWhen optimization is effectively enabled (including when both rules and constraints are requested or defaulted), it prefers `optimizedDescription` and `optimizedContext` from fresh metadata.\n\nThe command MUST emit a `stale-optimization` warning to stderr when the effective `llmOptimizedContext` is `true` but optimized fields are missing or stale.\n\nThe warning MUST include remediation instructions: \"Launch specd-spec-context-optimizer agent to refresh\"."
       ]
     },
     {
@@ -93,6 +93,40 @@
       "then": ["output contains root and dependency entries in full mode"]
     },
     {
+      "requirement": "Behaviour",
+      "name": "Prefers optimized content when enabled",
+      "given": [
+        "llmOptimizedContext is enabled in config",
+        "AND a spec has fresh optimized metadata"
+      ],
+      "when": ["specd specs context <path> is run"],
+      "then": ["it displays the optimized content instead of raw sections"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "--no-optimized forces raw sections",
+      "given": ["llmOptimizedContext is enabled in config"],
+      "when": ["specd specs context <path> --no-optimized is run"],
+      "then": ["it displays the raw sections", "AND it emits no optimization warnings"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags do not override optimization when both rules and constraints are requested",
+      "given": [
+        "llmOptimizedContext is enabled in config",
+        "AND a spec has fresh optimized metadata"
+      ],
+      "when": ["specd specs context <path> --rules --constraints is run"],
+      "then": ["it displays the optimized content"]
+    },
+    {
+      "requirement": "Behaviour",
+      "name": "Section flags override optimization when only rules are requested",
+      "given": ["llmOptimizedContext is enabled in config"],
+      "when": ["specd specs context <path> --rules is run"],
+      "then": ["it displays the raw rules", "AND it emits no optimization warnings"]
+    },
+    {
       "requirement": "Output",
       "name": "Text output includes explicit mode label",
       "when": ["specd spec context <spec-id> is run in text mode"],
@@ -141,9 +175,18 @@
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:spec-context",
+        "file": "cli:src/commands/spec/context.ts",
+        "symbol": "registerSpecContext"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:c0952f4459f415d6e93910ab17ded1a50d019797d01ba2ac1d8f104adece2d82",
-    "verify.md": "sha256:8b4889e5d8d18c406465b07e51a0494198a4955ec2e7736cc372d76f78229918"
+    "spec.md": "sha256:96d776d3aa01bcfaa0f5011853f7478f95e71507b5ec2d3ce5f2b2b289e828d0",
+    "verify.md": "sha256:ef0329da25ec6627bcdbc3a9460bf711905a77f4ddc5c022c62e6c971e4b9e73"
   },
   "generatedBy": "core"
 }

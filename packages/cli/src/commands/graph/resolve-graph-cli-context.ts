@@ -1,7 +1,8 @@
-import { createVcsAdapter, type Kernel, type SpecdConfig } from '@specd/core'
+import { createVcsAdapter, type Kernel, type SpecdConfig } from '@specd/sdk'
+import { CliValidationError } from '../../errors/index.js'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { resolveConfigPath } from '../../load-config.js'
-import { createBootstrapGraphConfig } from './bootstrap-graph-config.js'
+import { createBootstrapGraphConfig } from '@specd/sdk'
 
 /**
  * Resolved execution context for graph commands.
@@ -29,14 +30,14 @@ export interface GraphCliContext {
  * @param options.configPath - Explicit path to `specd.yaml`.
  * @param options.repoPath - Explicit repository path for bootstrap mode.
  * @returns The resolved graph command context.
- * @throws {Error} If bootstrap mode is requested or required outside a repository.
+ * @throws {CliValidationError} If bootstrap mode is requested or required outside a repository.
  */
 export async function resolveGraphCliContext(options?: {
   configPath?: string | undefined
   repoPath?: string | undefined
 }): Promise<GraphCliContext> {
   if (options?.configPath !== undefined && options.repoPath !== undefined) {
-    throw new Error('--config and --path are mutually exclusive')
+    throw new CliValidationError('--config and --path are mutually exclusive')
   }
 
   if (options?.repoPath !== undefined) {
@@ -76,7 +77,7 @@ export async function resolveGraphCliContext(options?: {
  *
  * @param startPath - Path inside the repository.
  * @returns Bootstrap graph context.
- * @throws {Error} If no repository root can be resolved.
+ * @throws {CliValidationError} If no repository root can be resolved.
  */
 async function createBootstrapContext(startPath: string): Promise<GraphCliContext> {
   const vcsRoot = await resolveRepoRoot(startPath)
@@ -96,18 +97,19 @@ async function createBootstrapContext(startPath: string): Promise<GraphCliContex
  *
  * @param startPath - Path inside the target repository.
  * @returns Absolute repository root path.
- * @throws {Error} If the path is not inside a repository.
+ * @throws {CliValidationError} If the path is not inside a repository.
  */
 async function resolveRepoRoot(startPath: string): Promise<string> {
   try {
     const vcs = await createVcsAdapter(startPath)
     const root = await vcs.rootDir()
     if (root === null) {
-      throw new Error('No repository root found')
+      throw new CliValidationError('No repository root found')
     }
     return root
-  } catch {
-    throw new Error(
+  } catch (err) {
+    if (err instanceof CliValidationError) throw err
+    throw new CliValidationError(
       'Graph bootstrap mode requires a path inside a VCS repository or a discovered specd.yaml',
     )
   }

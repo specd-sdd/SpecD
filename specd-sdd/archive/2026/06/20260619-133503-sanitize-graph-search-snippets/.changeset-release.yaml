@@ -1,0 +1,3 @@
+releases:
+  cli:graph-search: patch
+  skills:skill-templates-source: patch

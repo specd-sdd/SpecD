@@ -1,3 +1,5 @@
+import type { SkillTemplateMetadata } from './skill-template-metadata.js'
+
 /**
  * Lazily-loaded template file associated with a skill.
  */
@@ -30,7 +32,17 @@ export interface Skill {
   readonly description: string
 
   /**
+   * Whether this is a standard skill or a specialized agent.
+   */
+  readonly kind: 'skill' | 'agent'
+
+  /**
    * Templates that belong to this skill.
    */
   readonly templates: readonly SkillTemplate[]
+
+  /**
+   * Structural metadata defining capabilities and requirements.
+   */
+  readonly metadata: SkillTemplateMetadata
 }

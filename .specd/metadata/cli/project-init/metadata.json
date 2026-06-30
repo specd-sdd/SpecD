@@ -1,9 +1,14 @@
 {
   "title": "Project Init",
-  "description": "Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills -- doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to the `InitProject` use case in `@specd/core`.",
-  "dependsOn": ["cli:entrypoint", "cli:skills-install", "core:config"],
+  "description": "Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills — doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to `createConfigWriter().initProject(...)` in `@specd/core`.",
+  "dependsOn": [
+    "cli:entrypoint",
+    "cli:plugins-install",
+    "core:composition",
+    "core:config-writer-port"
+  ],
   "context": [
-    "Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills -- doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to the `InitProject` use case in `@specd/core`."
+    "Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills — doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to `createConfigWriter().initProject(...)` in `@specd/core`."
   ],
   "rules": [
     {
@@ -21,13 +26,13 @@
     {
       "requirement": "Known plugin options",
       "rules": [
-        "The interactive plugin-selection wizard MUST expose this known agent plugin option set:\n\n- `@specd/plugin-agent-claude`\n- `@specd/plugin-agent-copilot`\n- `@specd/plugin-agent-codex`\n- `@specd/plugin-agent-opencode`"
+        "The interactive plugin-selection wizard MUST expose this known agent plugin option set:\n\n- `@specd/plugin-agent-claude`\n- `@specd/plugin-agent-copilot`\n- `@specd/plugin-agent-codex`\n- `@specd/plugin-agent-opencode`\n- `@specd/plugin-agent-standard`"
       ]
     },
     {
       "requirement": "Non-interactive mode",
       "rules": [
-        "When not in interactive mode, the command uses the flag values (or defaults) directly, calls `InitProject`, optionally installs skills for agents specified via `--agent`, and prints output according to `--format`.\n\n- `text`: prints `initialized specd in <absolute-project-root-path>` followed by any skills installed.\n- `json` or `toon`: outputs `{\"result\":\"ok\",\"configPath\":\"...\",\"schema\":\"...\",\"workspaces\":[...],\"skillsInstalled\":{}}` where `skillsInstalled` maps agent ids to arrays of installed skill names."
+        "When not in interactive mode, the command uses the flag values (or defaults) directly, calls `createConfigWriter().initProject(...)`, optionally installs plugins specified via `--plugin`, and prints output according to `--format`.\n\n- `text`: prints `initialized specd in <absolute-project-root-path>` followed by per-plugin install status lines when any `--plugin` flags were given.\n- `json` or `toon`: outputs `{\"result\":\"ok\",\"configPath\":\"...\",\"schema\":\"...\",\"workspaces\":[...],\"plugins\":[...]}` where `plugins` is an array of install result entries (`name`, `status`, `detail`)."
       ]
     },
     {
@@ -37,9 +42,9 @@
       ]
     },
     {
-      "requirement": "Delegation to InitProject",
+      "requirement": "Delegation to ConfigWriter",
       "rules": [
-        "The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `InitProject`. All file creation — `specd.yaml`, storage directories, `.gitignore` entry — is handled by `InitProject` via `ConfigWriter`. The CLI never touches `specd.yaml` directly."
+        "The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, `.gitignore` entry — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml` directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`."
       ]
     },
     {
@@ -104,6 +109,13 @@
       "then": ["@specd/plugin-agent-opencode is listed as a selectable plugin option"]
     },
     {
+      "requirement": "Known plugin options",
+      "name": "Wizard includes standard agent plugin",
+      "given": ["interactive mode is active"],
+      "when": ["the plugin selection options are rendered"],
+      "then": ["@specd/plugin-agent-standard is listed as a selectable plugin option"]
+    },
+    {
       "requirement": "Non-interactive mode",
       "name": "Default values produce a valid minimal config",
       "when": ["specd project init --workspace default --workspace-path specs/ is run"],
@@ -114,10 +126,11 @@
     },
     {
       "requirement": "Non-interactive mode",
-      "name": "JSON output contains all fields including skillsInstalled",
-      "when": ["specd project init --format json --agent claude is run"],
+      "name": "JSON output contains plugins install results",
+      "when": ["specd project init --format json --plugin @specd/plugin-agent-claude is run"],
       "then": [
-        "stdout is valid JSON with result, configPath, schema, workspaces, and skillsInstalled fields"
+        "stdout is valid JSON with result, configPath, schema, workspaces, and plugins fields",
+        "AND plugins is an array of per-plugin install entries"
       ]
     },
     {
@@ -135,7 +148,7 @@
       "then": ["specd.yaml is written in the current working directory"]
     },
     {
-      "requirement": "Delegation to InitProject",
+      "requirement": "Delegation to ConfigWriter",
       "name": "Standard directories are created",
       "given": ["a project root with no pre-existing change directories"],
       "when": ["specd project init --workspace default completes successfully"],
@@ -144,11 +157,20 @@
       ]
     },
     {
-      "requirement": "Delegation to InitProject",
+      "requirement": "Delegation to ConfigWriter",
       "name": ".gitignore entry is added",
       "given": ["no .gitignore exists in the project root"],
       "when": ["specd project init --workspace default completes successfully"],
       "then": ["a .gitignore is created containing specd.local.yaml"]
+    },
+    {
+      "requirement": "Delegation to ConfigWriter",
+      "name": "Init uses createConfigWriter not InitProject use case",
+      "when": ["specd project init runs the init step"],
+      "then": [
+        "it calls createConfigWriter().initProject(...)",
+        "AND it does not call createInitProject, InitProject.execute, or kernel.project.init"
+      ]
     },
     {
       "requirement": "Skills installation after init",
@@ -181,9 +203,24 @@
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:project-init",
+        "file": "cli:test/commands/project-init.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:project-init",
+        "file": "cli:src/commands/project/init.ts",
+        "symbol": "registerProjectInit"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:d0112875cfcb4dd3d55f950613f8c40912eb91bcc5d5f5cfc9043e3b0d6d20a0",
-    "verify.md": "sha256:8d5454febaf20f8b42aea2e5166b63569c423e770ad62f38132bc700ae276dcf"
+    "spec.md": "sha256:d3b2fa439b9d3ca4faa239dcaa2bce6a8209f86b70dffb7e74b8ad920767ec4b",
+    "verify.md": "sha256:fad0372688d8e26406f2f63428caaca3327fe8fd4ec6896e30216bd99fa1964c"
   },
   "generatedBy": "core"
 }

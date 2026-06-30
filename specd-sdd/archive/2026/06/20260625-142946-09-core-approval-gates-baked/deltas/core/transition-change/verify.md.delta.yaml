@@ -1,0 +1,111 @@
+- op: modified
+  description: Refresh scenarios without per-execute approval flags
+  selector:
+    type: section
+    matches: 'Requirement: Optional pre-transition implementation tracking refresh'
+  content: |
+    #### Scenario: TransitionChange does not invoke detector directly
+
+    - **GIVEN** a change has entered `implementing` at least once
+    - **WHEN** `TransitionChange.execute()` runs
+    - **THEN** it does not invoke `ImplementationDetector` directly
+    - **AND** it does not duplicate refresh merge logic
+
+    #### Scenario: Active change refreshes by default
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **GIVEN** `TransitionChange` is constructed with project approval configuration
+    - **WHEN** `TransitionChange.execute({ name, to })` is called without `refreshImplementationTrackingBefore`
+    - **THEN** it invokes `RefreshImplementationTracking.execute({ name })` before lifecycle evaluation
+
+    #### Scenario: Explicit opt-out skips refresh
+
+    - **GIVEN** an active change exists in `changes/` storage
+    - **GIVEN** `TransitionChange` is constructed with project approval configuration
+    - **WHEN** `TransitionChange.execute({ name, to, refreshImplementationTrackingBefore: false })` is called
+    - **THEN** it does not invoke `RefreshImplementationTracking`
+
+- op: modified
+  description: Spec routing uses constructor-baked approvals
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing for spec approval'
+  content: |
+    #### Scenario: Ready to implementing is rerouted when spec approval is active
+
+    - **GIVEN** a change in `ready` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.spec: true`
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** the `LifecycleEngine` identifies `pending-spec-approval` as the effective target
+    - **AND** the change transitions to `pending-spec-approval`
+
+    #### Scenario: Ready to implementing is direct when spec approval is inactive
+
+    - **GIVEN** a change in `ready` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.spec: false`
+    - **WHEN** `execute` is called with `to: 'implementing'`
+    - **THEN** the `LifecycleEngine` identifies `implementing` as the effective target
+    - **AND** the change transitions to `implementing`
+
+- op: modified
+  description: Signoff routing uses constructor-baked approvals
+  selector:
+    type: section
+    matches: 'Requirement: Approval-gate routing for signoff'
+  content: |
+    #### Scenario: Done to archivable is rerouted when signoff is active
+
+    - **GIVEN** a change in `done` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.signoff: true`
+    - **WHEN** `execute` is called with `to: 'archivable'`
+    - **THEN** the `LifecycleEngine` identifies `pending-signoff` as the effective target
+    - **AND** the change transitions to `pending-signoff`
+
+    #### Scenario: Done to archivable is direct when signoff is inactive
+
+    - **GIVEN** a change in `done` state
+    - **GIVEN** `TransitionChange` is constructed with `approvals.signoff: false`
+    - **WHEN** `execute` is called with `to: 'archivable'`
+    - **THEN** the `LifecycleEngine` identifies `archivable` as the effective target
+    - **AND** the change transitions to `archivable`
+
+- op: modified
+  description: Input contract excludes approval flags
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    #### Scenario: Input accepts transition controls without approval flags
+
+    - **WHEN** `TransitionChange.execute` is called
+    - **THEN** its input accepts `name`, `to`, and optional `skipHookPhases` and `refreshImplementationTrackingBefore`
+    - **AND** its input does not accept `approvalsSpec` or `approvalsSignoff`
+
+    #### Scenario: Approval gates are fixed at construction
+
+    - **GIVEN** `TransitionChange` is constructed with `approvals: { spec: true, signoff: false }`
+    - **WHEN** `execute` is called with `to: 'implementing'` from `ready`
+    - **THEN** routing uses the constructor-provided `approvals.spec` value
+
+- op: added
+  description: Constructor baking verify scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input contract'
+  content: |
+    ### Requirement: Approval gates baked at construction
+
+    #### Scenario: Factory passes config.approvals
+
+    - **WHEN** `createTransitionChange(config)` constructs the use case
+    - **THEN** the instance receives `config.approvals` as its baked gate configuration
+
+    #### Scenario: Execute does not accept gate overrides
+
+    - **GIVEN** `TransitionChange` is constructed with `approvals.spec: false`
+    - **WHEN** a caller attempts to pass approval gate fields on `TransitionChangeInput`
+    - **THEN** TypeScript rejects the call at compile time

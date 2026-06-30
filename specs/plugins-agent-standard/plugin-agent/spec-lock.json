@@ -4,9 +4,12 @@
     "version": 1
   },
   "dependsOn": [
-    "plugin-agent-opencode:plugin-agent",
-    "default:_global/commits",
-    "skills:resolve-bundle"
+    "core:config",
+    "plugin-manager:agent-plugin-type",
+    "skills:skill-bundle",
+    "skills:skill-repository",
+    "skills:resolve-bundle",
+    "skills:agents"
   ],
   "implementation": [
     {
@@ -15,6 +18,10 @@
     },
     {
       "file": "plugin-agent-standard:test/install-skills.spec.ts"
+    },
+    {
+      "file": "plugin-agent-standard:src/domain/frontmatter/index.ts",
+      "symbols": ["agentFrontmatter"]
     }
   ]
 }

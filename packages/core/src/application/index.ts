@@ -5,8 +5,6 @@ export { Logger } from './logger.js'
 export { TemplateExpander, type TemplateVariables } from './template-expander.js'
 export {
   type SpecdConfig,
-  type SpecdApiConfig,
-  type SpecdApiAuthConfig,
   type SpecdGraphConfig,
   type SpecdWorkspaceConfig,
   type SpecdWorkspaceGraphConfig,

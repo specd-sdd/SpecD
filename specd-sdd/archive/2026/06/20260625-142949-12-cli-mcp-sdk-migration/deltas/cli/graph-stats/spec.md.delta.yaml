@@ -1,0 +1,36 @@
+- op: modified
+  description: Statistics retrieval via SDK host context
+  selector:
+    type: section
+    matches: 'Requirement: Statistics retrieval'
+  content: |
+    The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through `withOpenGraphProvider(ctx, fn)`, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()` inside the callback. It outputs the returned result fields, closes the provider via the SDK lifecycle wrapper, and exits.
+
+    The command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.
+
+    Graph context and provider lifecycle MUST go through `cli:graph-cli-context` and `@specd/sdk` symbols.
+
+- op: modified
+  description: Constraints reflect SDK delegation
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Health orchestration runs inside `withOpenGraphProvider` from `@specd/sdk`; the CLI does not manage provider lifecycle inline
+    - `process.exit(0)` is called explicitly after the SDK wrapper closes the provider
+    - Zero-value relation counts are omitted from text output for readability
+    - Bootstrap mode (`--path`) resolves host context through `openSpecdHost` with the appropriate config path input
+
+- op: modified
+  description: Update spec dependencies for SDK host
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md)
+    - [`core:config`](../../core/config/spec.md)
+    - [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md)
+    - [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration (invoked via SDK host session)
+    - [`sdk:with-open-graph-provider`](../../sdk/with-open-graph-provider/spec.md) — provider lifecycle wrapper
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

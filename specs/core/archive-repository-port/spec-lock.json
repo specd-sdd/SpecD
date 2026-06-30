@@ -16,11 +16,11 @@
   "implementation": [
     {
       "file": "core:src/application/ports/archive-repository.ts",
-      "symbols": ["ArchiveListOptions", "ArchiveListResult", "ArchiveRepository"]
+      "symbols": ["ArchiveRepository"]
     },
     {
       "file": "core:src/infrastructure/fs/archive-repository.ts",
-      "symbols": ["FsArchiveRepository", "_updateMetaCount", "_readMetaCount", "_writeMetaCount"]
+      "symbols": ["FsArchiveRepository"]
     }
   ]
 }

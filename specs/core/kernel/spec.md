@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Consumers of `@specd/core` need a single, stable entry point that exposes every use case without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles all use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Delivery mechanisms (CLI, MCP, plugins) consume use cases exclusively through the kernel interface, which defines the contract between `@specd/core` and its consumers.
+Consumers of `@specd/core` need a single, stable entry point that exposes domain use cases without requiring knowledge of internal wiring or adapter construction. The kernel serves this role: it assembles lifecycle, spec, and project-query use cases from a resolved `SpecdConfig` and exposes them as a typed object grouped by domain area. Config mutation (`initProject`, `addPlugin`, `removePlugin`) is outside the kernel — delivery mechanisms use `createConfigWriter()` instead.
 
 ## Requirements
 
@@ -10,9 +10,11 @@ Consumers of `@specd/core` need a single, stable entry point that exposes every 
 
 The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
 
-- `changes` — use cases that operate on change lifecycle (create, transition, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
-- `specs` — use cases that operate on specs and approval gates (approve spec, approve signoff, list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context)
-- `project` — use cases that operate on the project configuration (init, record skill install, get skills manifest, get project context)
+- `changes` — use cases that operate on change lifecycle (create, transition, approve spec, approve signoff, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
+- `specs` — use cases that operate on specs (list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context, resolve schema)
+- `project` — use cases that query project configuration (list workspaces, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot including `plugins`, get metadata, update metadata)
+
+Plugin declaration listing is not a kernel use case — declarations are config data on the `getConfig` snapshot. Config file mutation is not a kernel use case — delivery uses `createConfigWriter()`.
 
 Use cases must not appear at the top level of the kernel object — they must be nested under their domain-area group.
 
@@ -117,6 +119,8 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `changes.create`                 | `CreateChange`           | [core:create-change](../create-change/spec.md)                       | Creates a new change                                    |
 | `changes.status`                 | `GetStatus`              | [core:get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
 | `changes.transition`             | `TransitionChange`       | [core:transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
+| `changes.approveSpec`            | `ApproveSpec`            | [core:approve-spec](../approve-spec/spec.md)                         | Records spec gate approval and transitions state        |
+| `changes.approveSignoff`         | `ApproveSignoff`         | [core:approve-signoff](../approve-signoff/spec.md)                   | Records signoff gate approval and transitions state     |
 | `changes.draft`                  | `DraftChange`            | [core:draft-change](../draft-change/spec.md)                         | Shelves a change to drafts                              |
 | `changes.restore`                | `RestoreChange`          | [core:restore-change](../restore-change/spec.md)                     | Recovers a drafted change                               |
 | `changes.discard`                | `DiscardChange`          | [core:discard-change](../discard-change/spec.md)                     | Permanently abandons a change                           |
@@ -141,8 +145,6 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | Kernel path                | Use case class                        | Spec                                                                 | Description                                                 |
 | -------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                                    | Spec repositories keyed by workspace name                   |
-| `specs.approveSpec`        | `ApproveSpec`                         | [core:approve-spec](../approve-spec/spec.md)                         | Records a spec approval and transitions state               |
-| `specs.approveSignoff`     | `ApproveSignoff`                      | [core:approve-signoff](../approve-signoff/spec.md)                   | Records a sign-off and transitions state                    |
 | `specs.list`               | `ListSpecs`                           | [core:list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
 | `specs.search`             | `SearchSpecs`                         | [core:search-specs](../search-specs/spec.md)                         | Searches spec content across all workspaces                 |
 | `specs.get`                | `GetSpec`                             | [core:get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
@@ -156,19 +158,70 @@ The following table is the exhaustive mapping between kernel paths and use case 
 
 #### kernel.project
 
-| Kernel path                  | Use case class       | Spec                                                         | Description                                     |
-| ---------------------------- | -------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| `project.init`               | `InitProject`        | [core:init-project](../init-project/spec.md)                 | Initialises a new specd project                 |
-| `project.recordSkillInstall` | `RecordSkillInstall` | [core:record-skill-install](../record-skill-install/spec.md) | Records that skills were installed for an agent |
-| `project.getSkillsManifest`  | `GetSkillsManifest`  | [core:get-skills-manifest](../get-skills-manifest/spec.md)   | Reads the installed skills manifest             |
-| `project.getProjectContext`  | `GetProjectContext`  | [core:get-project-context](../get-project-context/spec.md)   | Compiles the project-level context block        |
+| Kernel path                 | Use case class          | Spec                                                               | Description                                                   |
+| --------------------------- | ----------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `project.listWorkspaces`    | `ListWorkspaces`        | [core:list-workspaces](../list-workspaces/spec.md)                 | Lists configured workspace IDs                                |
+| `project.getProjectContext` | `GetProjectContext`     | [core:get-project-context](../get-project-context/spec.md)         | Compiles the project-level context block                      |
+| `project.getConfig`         | `GetConfig`             | [core:get-config](../get-config/spec.md)                           | Returns the readonly construction-time `SpecdConfig` snapshot |
+| `project.getMetadata`       | `GetProjectMetadata`    | [core:project-metadata](../project-metadata/spec.md)               | Reads cached project metadata                                 |
+| `project.updateMetadata`    | `UpdateProjectMetadata` | [core:update-project-metadata](../update-project-metadata/spec.md) | Writes cached project metadata                                |
 
-Adding, removing, or renaming an entry in this table is a contract change and must be reflected in both the `Kernel` interface and `createKernel`.
+### Requirement: Plugin declarations are not a kernel use case
+
+Declared plugins are part of the readonly `SpecdConfig` snapshot exposed by `kernel.project.getConfig`. Hosts and delivery mechanisms that need plugin declarations MUST read them from `getConfig().plugins` or from an already-loaded `SpecdConfig` — not via a dedicated kernel use case and not via a redundant disk read through `ConfigWriter`.
+
+`kernel.project` MUST NOT expose `listPlugins` or any equivalent listing use case for plugin declarations. The `ListPlugins` application use case is not part of the public kernel surface.
+
+### Requirement: Config mutation is not a kernel use case
+
+Operations that create or mutate `specd.yaml` (`initProject`, `addPlugin`, `removePlugin`) MUST NOT appear on `kernel.project` or anywhere on the `Kernel` interface. Delivery mechanisms and hosts that need to write config MUST call `createConfigWriter()` from the composition layer and invoke the corresponding port methods.
+
+`InitProject`, `AddPlugin`, and `RemovePlugin` application use case classes are not part of the public `@specd/core` surface after this change.
+
+### Requirement: Skills manifest use cases are not a kernel use case
+
+The pre-plugin-era skills manifest flow (`RecordSkillInstall`, `GetSkillsManifest`) is obsolete. Plugin declarations are tracked via `specd.yaml` `plugins.*` and `createConfigWriter().addPlugin()`.
+
+`kernel.project` MUST NOT expose `recordSkillInstall`, `getSkillsManifest`, or any equivalent skills-manifest use case. Those application use case classes are not part of the public kernel surface and MUST NOT appear in the kernel entry mapping table.
+
+`@specd/core` MUST NOT export `RecordSkillInstall`, `GetSkillsManifest`, `createRecordSkillInstall`, or `createGetSkillsManifest`.
+
+### Requirement: Kernel use case execute inputs must not re-pass construction-time config
+
+Every use case exposed on the `Kernel` interface receives construction-time dependencies (including `SpecdConfig`, approval gate settings, and `KernelOptions`) via its constructor when `createKernel` wires the kernel. Callers MUST NOT supply those same values again in the use case `execute()` input.
+
+A field in `*Input` violates this rule when its value is derivable solely from `SpecdConfig`, `KernelOptions`, or other data fixed at `createKernel` time and identical for every call until the kernel is recreated.
+
+Delivery mechanisms that need readonly config MUST call `kernel.project.getConfig.execute()` (or use the `SpecdConfig` they already passed to `createKernel`) — not pass `config` or config-derived subtrees into other use case inputs.
+
+Known violations owned by other active changes MUST be recorded in the change design audit matrix until resolved; this requirement applies once those changes archive.
+
+### Requirement: Allowed runtime override inputs
+
+Optional `execute()` fields that select per-call behaviour (not config re-reads) are permitted when documented below. Fields not listed remain subject to the construction-time rule.
+
+| Use case            | Allowed override fields                                                                                      | Rationale                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `CompileContext`    | `contextMode`, `llmOptimizedContext`, `includeChangeSpecs`, `followDeps`, `depth`, `sections`, `fingerprint` | Per-step context compilation controls chosen by the caller at invocation time |
+| `GetProjectContext` | `contextMode`, `llmOptimizedContext`, `followDeps`, `depth`, `sections`                                      | Per-call project context shaping                                              |
+| `GetSpecContext`    | `followDeps`, `depth`, `contextMode`, `sections`, `llmOptimizedContext`                                      | Per-call spec context shaping                                                 |
+| `TransitionChange`  | `skipHookPhases`, `refreshImplementationTrackingBefore`                                                      | Caller-controlled transition options for the specific invocation              |
+| `ArchiveChange`     | `skipHookPhases`, `allowOverlap`, `allowOutOfScope`                                                          | Caller-controlled archive options for the specific invocation                 |
+| `RunStepHooks`      | `only`                                                                                                       | Caller scopes hook execution to one hook id                                   |
+| `GetStatus`         | `refreshImplementationTracking`                                                                              | Caller chooses whether to refresh tracking on this status read                |
+| `CreateChange`      | `includeOverlapCheck`                                                                                        | Caller opts into overlap detection for this create                            |
+| `ValidateArtifacts` | `specPath`, `artifactId`                                                                                     | Caller scopes validation to one spec or artifact                              |
+
+Use cases whose `execute()` accepts no input (`GetConfig`, `ListWorkspaces`, `ListSpecs`, `ListChanges`, etc.) are conformant by definition.
+
+### Requirement: Kernel is a plain object, not a class
+
+`createKernel` returns a plain object literal conforming to the `Kernel` interface. The kernel has no internal state, no lifecycle methods, and no event system. It is a one-shot wiring of use cases — once created, it is immutable.
 
 ## Examples
 
 ```typescript
-import { createKernel, createConfigLoader } from '@specd/core'
+import { createKernel, createConfigLoader, createConfigWriter } from '@specd/core'
 
 const config = await createConfigLoader({ projectRoot: process.cwd() }).load()
 const kernel = createKernel(config)
@@ -182,36 +235,23 @@ const change = await kernel.changes.create.execute({
 // Check its status
 const status = await kernel.changes.status.execute({ name: 'add-oauth-login' })
 
-// Transition through the lifecycle
-await kernel.changes.transition.execute({ name: 'add-oauth-login', to: 'specifying' })
-
-// List all active changes
-const active = await kernel.changes.list.execute()
-
 // List all specs across workspaces
 const specs = await kernel.specs.list.execute()
 
-// Get structured context for a spec with transitive dependencies
-const ctx = await kernel.specs.getContext.execute({
-  specId: 'core:change',
-  depth: 2,
-})
-
-// Initialise a new project
-await kernel.project.init.execute({
+// Initialise a new project (config mutation — not via kernel)
+const writer = createConfigWriter()
+await writer.initProject({
   projectRoot: '/path/to/project',
   schemaRef: '@specd/schema-std',
+  workspaceId: 'default',
+  specsPath: 'specs/',
 })
 ```
 
-### Requirement: Kernel is a plain object, not a class
-
-`createKernel` returns a plain object literal conforming to the `Kernel` interface. The kernel has no internal state, no lifecycle methods, and no event system. It is a one-shot wiring of use cases — once created, it is immutable.
-
 ## Constraints
 
-- The `Kernel` interface is the only way delivery mechanisms should access use cases — direct use case construction is reserved for tests and the composition layer's own factories
-- Adding a use case to `application/use-cases/` without adding it to the `Kernel` interface is a spec violation
+- The `Kernel` interface is the mandatory entry point for domain use cases exposed on the kernel — config mutation uses `createConfigWriter()` instead
+- Adding a domain use case to `application/use-cases/` without adding it to the `Kernel` interface is a spec violation unless it is a config I/O operation covered by `ConfigWriter`
 - Removing a use case from the `Kernel` interface is a breaking change and must follow the breaking change commit convention
 - The kernel must not contain business logic — it is purely a wiring and grouping mechanism
 - `createKernelInternals` is not exported from `@specd/core` — it is internal to the composition layer
@@ -251,9 +291,11 @@ await kernel.project.init.execute({
 - [`core:validate-specs`](../validate-specs/spec.md)
 - [`core:generate-metadata`](../generate-metadata/spec.md)
 - [`core:get-spec-context`](../get-spec-context/spec.md)
-- [`core:init-project`](../init-project/spec.md)
-- [`core:record-skill-install`](../record-skill-install/spec.md)
-- [`core:get-skills-manifest`](../get-skills-manifest/spec.md)
+- [`core:config-writer-port`](../config-writer-port/spec.md)
+- [`core:list-workspaces`](../list-workspaces/spec.md)
 - [`core:get-project-context`](../get-project-context/spec.md)
+- [`core:get-config`](../get-config/spec.md)
+- [`core:project-metadata`](../project-metadata/spec.md)
+- [`core:update-project-metadata`](../update-project-metadata/spec.md)
 - [`core:resolve-schema`](../resolve-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)

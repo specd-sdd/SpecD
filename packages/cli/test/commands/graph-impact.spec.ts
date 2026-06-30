@@ -6,6 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
+  ExitSentinel,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -20,13 +21,17 @@ vi.mock('../../src/commands/graph/with-provider.js', () => ({
   withProvider: vi.fn(),
 }))
 
-vi.mock('../../src/commands/graph/graph-index-lock.js', () => ({
-  assertGraphIndexUnlocked: vi.fn(),
-}))
+vi.mock('@specd/sdk', async () => {
+  const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
+  return {
+    ...actual,
+    assertGraphIndexUnlocked: vi.fn(),
+  }
+})
 
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
-import { assertGraphIndexUnlocked } from '../../src/commands/graph/graph-index-lock.js'
+import { assertGraphIndexUnlocked, type ImpactResult } from '@specd/sdk'
 import { registerGraphImpact } from '../../src/commands/graph/impact.js'
 
 function setup() {
@@ -43,6 +48,50 @@ function setup() {
   const mockProvider = {
     analyzeImpact: vi.fn(),
     analyzeFileImpact: vi.fn(),
+    analyzeFilesImpact: vi
+      .fn()
+      .mockImplementation(async (filePaths: string[], direction, maxDepth) => {
+        const results = await Promise.all(
+          filePaths.map(
+            (fp) =>
+              mockProvider.analyzeFileImpact(fp, direction, maxDepth) as Promise<ImpactResult>,
+          ),
+        )
+        const affectedFileSet = new Set<string>()
+        const rawAffectedSymbols = []
+        let directDependents = 0
+        let indirectDependents = 0
+        let transitiveDependents = 0
+        let overallRisk = 'LOW'
+        const riskOrder = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+
+        for (const r of results) {
+          for (const f of r.affectedFiles) {
+            affectedFileSet.add(f)
+          }
+          if (r.affectedSymbols) {
+            rawAffectedSymbols.push(...r.affectedSymbols)
+          }
+          directDependents += r.directDependents
+          indirectDependents += r.indirectDependents
+          transitiveDependents += r.transitiveDependents
+          const ri = riskOrder.indexOf(r.riskLevel)
+          const oi = riskOrder.indexOf(overallRisk)
+          if (ri > oi) overallRisk = r.riskLevel
+        }
+
+        return {
+          target: filePaths.join(', '),
+          directDependents,
+          indirectDependents,
+          transitiveDependents,
+          riskLevel: overallRisk,
+          affectedFiles: [...affectedFileSet],
+          affectedSymbols: rawAffectedSymbols,
+          affectedProcesses: [],
+          symbols: results,
+        }
+      }),
     analyzeSpecImpact: vi.fn(),
     detectChanges: vi.fn(),
     findSymbols: vi.fn(),
@@ -74,8 +123,20 @@ function setup() {
     ]),
     resolveSymbolSelector: vi.fn().mockResolvedValue([]),
   }
-  vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
-    await fn(mockProvider as never)
+  vi.mocked(withProvider).mockImplementation(async (_config, format, fn) => {
+    try {
+      await fn(mockProvider as never)
+    } catch (err) {
+      if (err instanceof ExitSentinel) {
+        throw err
+      }
+      const { handleError } = await import('../../src/handle-error.js')
+      const { SpecdError } = await import('@specd/sdk')
+      if (err instanceof SpecdError) {
+        handleError(err, format)
+      }
+      throw err
+    }
   })
 
   const getStdout = captureStdout()
@@ -528,6 +589,28 @@ describe('graph impact', () => {
 
       expect(getStderr()).toContain('--config and --path are mutually exclusive')
     })
+
+    it('reports normalized config-relative path for missing file selectors', async () => {
+      const { mockProvider, getStderr } = setup()
+      mockProvider.resolveFileSelector.mockResolvedValue([])
+
+      const program = makeImpactProgram()
+      try {
+        await program.parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--file',
+          '/project/packages/core/src/missing.ts',
+        ])
+      } catch {
+        /* ExitSentinel from process.exit(1) */
+      }
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(getStderr()).toContain('no indexed file matches "packages/core/src/missing.ts"')
+    })
   })
 
   describe('--spec output', () => {
@@ -569,24 +652,47 @@ describe('graph impact', () => {
       expect(out).toContain('core:get-status')
     })
 
-    it('returns structured not_found output for unknown specs', async () => {
+    it('fails with SPEC_NOT_FOUND for unknown specs', async () => {
+      const { mockProvider, getStderr } = setup()
+      mockProvider.getSpec.mockResolvedValue(undefined)
+
+      const program = makeImpactProgram()
+      try {
+        await program.parseAsync(['node', 'specd', 'graph', 'impact', '--spec', 'core:missing'])
+      } catch {
+        /* ExitSentinel from process.exit(1) */
+      }
+
+      expect(process.exit).toHaveBeenCalledWith(1)
+      expect(getStderr()).toContain('No spec found matching "core:missing".')
+      expect(getStderr()).toContain('error:')
+    })
+
+    it('returns structured SPEC_NOT_FOUND output for unknown specs in json mode', async () => {
       const { mockProvider, getStdout } = setup()
       mockProvider.getSpec.mockResolvedValue(undefined)
 
-      await makeImpactProgram().parseAsync([
-        'node',
-        'specd',
-        'graph',
-        'impact',
-        '--spec',
-        'core:missing',
-        '--format',
-        'json',
-      ])
+      const program = makeImpactProgram()
+      try {
+        await program.parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--spec',
+          'core:missing',
+          '--format',
+          'json',
+        ])
+      } catch {
+        /* ExitSentinel from process.exit(1) */
+      }
 
-      expect(JSON.parse(getStdout())).toEqual({
-        error: 'not_found',
-        spec: 'core:missing',
+      expect(JSON.parse(getStdout())).toMatchObject({
+        result: 'error',
+        code: 'SPEC_NOT_FOUND',
+        message: 'No spec found matching "core:missing".',
+        exitCode: 1,
       })
     })
 
@@ -1024,5 +1130,20 @@ describe('graph impact', () => {
         'packages/core/src/auth.ts:function:validate',
       )
     })
+  })
+
+  it('exits with code 3 when lock check fails', async () => {
+    setup()
+    vi.mocked(assertGraphIndexUnlocked).mockImplementationOnce(() => {
+      throw new Error('graph is locked')
+    })
+    mockProcessExit()
+
+    const program = makeImpactProgram()
+    await expect(
+      program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts']),
+    ).rejects.toThrow(ExitSentinel)
+
+    expect(process.exit).toHaveBeenCalledWith(3)
   })
 })

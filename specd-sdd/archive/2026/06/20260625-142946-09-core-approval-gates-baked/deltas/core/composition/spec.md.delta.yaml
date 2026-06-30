@@ -1,0 +1,20 @@
+- op: modified
+  description: Kernel example shows approve under changes namespace
+  selector:
+    type: section
+    matches: 'Requirement: Kernel builds all use cases from SpecdConfig'
+  content: |
+    `createKernel(config: SpecdConfig)` calls every use-case factory with the given config and returns an object containing all pre-wired use cases. The kernel object groups use cases by domain area:
+
+    ```typescript
+    const kernel = createKernel(config)
+    kernel.changes.archive // ArchiveChange
+    kernel.changes.create // CreateChange
+    kernel.changes.approveSpec // ApproveSpec — change lifecycle gate
+    kernel.changes.approveSignoff // ApproveSignoff — change lifecycle gate
+    // …
+    ```
+
+    Approval gate use cases belong to the change lifecycle group (`kernel.changes`), not `kernel.specs`, because they mutate `Change` state via `ChangeRepository`.
+
+    The kernel is a convenience — it is not the mandatory entry point. Callers that need a single use case call its factory directly.

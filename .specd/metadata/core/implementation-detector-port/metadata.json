@@ -9,7 +9,7 @@
     {
       "requirement": "Detector interface",
       "rules": [
-        "The implementation detector SHALL expose an operation that returns modified implementation-file candidates for a change.\n\n- `detectModifiedFiles(change)` MUST return project-relative file paths representing files changed for the supplied change context\n\nThe detector itself owns baseline-resolution policy for that change context. Callers provide the change; they do not compute or pass a raw VCS baseline reference themselves.\n\nThe returned paths are candidate inputs for tracked implementation review. The detector does not itself classify files as linked, resolved, or ignored."
+        "The implementation detector SHALL expose an operation that returns modified implementation-file candidates for a change.\n\n```typescript\ninterface ImplementationDetectorOptions {\n  readonly excludePaths?: readonly string[]\n}\n```\n\n- `detectModifiedFiles(change, options?)` MUST return project-relative file paths representing files changed for the supplied change context\n- when `options.excludePaths` is provided, the detector MUST exclude any returned path that falls under one of those project-relative portable directory prefixes\n\nThe detector itself owns baseline-resolution policy for that change context. Callers provide the change; they do not compute or pass a raw VCS baseline reference themselves.\n\nThe returned paths are candidate inputs for tracked implementation review. The detector does not itself classify files as linked, resolved, or ignored."
       ]
     },
     {
@@ -28,17 +28,25 @@
   "constraints": [
     "Returned paths MUST be forward-slash-normalized.",
     "Returned paths MUST be relative to the project root.",
-    "The detector MUST NOT assign workspace identities to returned paths."
+    "The detector MUST NOT assign workspace identities to returned paths.",
+    "excludePaths entries MUST be interpreted as forward-slash-normalized project-relative paths."
   ],
   "scenarios": [
     {
       "requirement": "Detector interface",
       "name": "Detector returns normalized project-relative candidates",
-      "when": ["detectModifiedFiles(change) is called"],
+      "when": ["detectModifiedFiles(change, options?) is called"],
       "then": [
         "every returned path is relative to the project root",
         "AND path separators are normalized to forward slashes"
       ]
+    },
+    {
+      "requirement": "Detector interface",
+      "name": "Detector excludes configured internal paths",
+      "given": ["options.excludePaths contains project-relative internal directory prefixes"],
+      "when": ["detectModifiedFiles(change, options?) returns candidate files"],
+      "then": ["no returned path falls under the excluded prefixes"]
     },
     {
       "requirement": "Detector interface",
@@ -59,6 +67,7 @@
       "when": ["modified files are requested"],
       "then": [
         "RefreshImplementationTracking calls the detector port",
+        "AND the call includes any internal-path exclusions needed for the active project",
         "AND the Change entity itself does not perform detection"
       ]
     },
@@ -80,10 +89,28 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:implementation-detector-port",
+        "file": "core:src/application/ports/implementation-detector.ts",
+        "symbol": "ImplementationDetectorOptions"
+      },
+      {
+        "specId": "core:implementation-detector-port",
+        "file": "core:src/application/ports/implementation-detector.ts",
+        "symbol": "ImplementationDetector"
+      },
+      {
+        "specId": "core:implementation-detector-port",
+        "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
+        "symbol": "VcsImplementationDetector"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:4f27a8213f279855aad024788ada4724b900032bfc8c37cd97bea1c5dc0250bd",
-    "verify.md": "sha256:94dc13b2e08529adf0e15e353bf0a827449271f64e07f41c4ce4c2b958cc45ae"
+    "spec.md": "sha256:3ebb454526456dc3e625228430e40326684816283a2640668b781f281c8325d7",
+    "verify.md": "sha256:49f85123f2d2dc67c3e587a54baa841728d272e7b88fcd42a64eb37a77320526"
   },
   "generatedBy": "core"
 }

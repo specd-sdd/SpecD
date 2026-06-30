@@ -85,6 +85,24 @@
 - **THEN** `FileNode.configRelativePath` is `../../packages/core/src/index.ts`
 - **AND** it has forward slashes and no leading `./`
 
+### Requirement: Binary file filtering
+
+#### Scenario: Known binary extensions are skipped before decoding
+
+- **GIVEN** a workspace contains `image.png`, `document.pdf`, and `archive.zip`
+- **WHEN** file discovery runs
+- **THEN** those files are excluded before any text decoding heuristics are applied
+- **AND** they do not appear in the discovered source-file set
+
+### Requirement: Bounded analysis memory
+
+#### Scenario: Retained analysis state excludes parser runtime objects
+
+- **GIVEN** Pass 1 has completed for a large project
+- **WHEN** retained run-scoped analysis state is inspected
+- **THEN** it contains compact facts and shared lookup indexes needed for Pass 2
+- **AND** it does not retain AST nodes, parser trees, or equivalent heavyweight parser-runtime objects
+
 ### Requirement: Discovery fingerprint uses effective config
 
 #### Scenario: Synthetic spec-root exclusions affect fingerprint
@@ -95,62 +113,64 @@
 
 ### Requirement: Two-pass extraction with in-memory index
 
-#### Scenario: Symbols from all workspaces available before relation resolution
+#### Scenario: Symbols from all workspaces are available before relation resolution
 
-- **GIVEN** two workspaces contain symbols that import/call each other
+- **GIVEN** two workspaces contain symbols that import or call each other
 - **WHEN** Pass 2 runs
-- **THEN** cross-workspace relations can be resolved from the in-memory `SymbolIndex`
-- **AND** no store query is needed during extraction
+- **THEN** cross-workspace relations are resolved from the previously registered in-memory analysis data
+- **AND** no graph-store query is needed during extraction or relation building
 
-#### Scenario: Combined namespace and symbol extraction uses one adapter fast path
+#### Scenario: Each file is analyzed once before later relation work
 
-- **GIVEN** a language adapter implements `extractSymbolsWithNamespace()`
-- **WHEN** Pass 1 processes a file from that language
-- **THEN** the indexer may obtain symbols and namespace information from that single adapter call
-- **AND** it does not need a separate namespace-only extraction step for that file
+- **GIVEN** a built-in adapter returns imports, symbols, binding facts, and call facts from `analyzeFile()`
+- **WHEN** the same file reaches Pass 2
+- **THEN** the indexer reuses the stored `FileAnalysis`
+- **AND** it does not call back into the adapter to re-parse the same file content
 
-#### Scenario: PHP unresolved qualified name falls back to path resolution
+#### Scenario: Unresolved qualified names may still become file imports
 
-- **GIVEN** a PHP file importing `App\Services\Mailer`
-- **AND** `App\Services\Mailer` is NOT present in the in-memory symbol index
-- **AND** the PHP adapter's `resolveQualifiedNameToPath` resolves it to `{codeRoot}/src/Services/Mailer.php`
+- **GIVEN** a PHP file imports `App\Services\Mailer`
+- **AND** no registered symbol has that qualified name
+- **AND** the adapter can deterministically map the qualified name to a source file path
+- **WHEN** Pass 2 resolves imports from the stored analysis
+- **THEN** a file-to-file `IMPORTS` relation is emitted to that resolved file target
+
+#### Scenario: Unresolvable imports are dropped without aborting the run
+
+- **GIVEN** an analyzed file contains an import that cannot be resolved through shared session lookups or deterministic adapter rules
 - **WHEN** Pass 2 runs
-- **THEN** a file-to-file `IMPORTS` relation is emitted from the importing file to `src/Services/Mailer.php`
+- **THEN** no relation is emitted for that import
+- **AND** indexing continues without throwing
 
-#### Scenario: PHP import unresolvable via both mechanisms produces no relation
+#### Scenario: Shared scoped resolution runs after import resolution
 
-- **GIVEN** a PHP file containing `use Vendor\\External\\Class`
-- **AND** the qualified name is not in the symbol index
-- **AND** `resolveQualifiedNameToPath` returns `undefined` for that name
+- **GIVEN** a file analysis contains imported type names and deterministic binding facts that reference those names
 - **WHEN** Pass 2 runs
-- **THEN** no `IMPORTS` relation is created for that import and no error is thrown
+- **THEN** import resolution completes before shared scoped binding resolution consumes those candidates
+- **AND** derived `USES_TYPE`, `CONSTRUCTS`, or `CALLS` relations are emitted from the stored facts
 
-#### Scenario: DEPENDS_ON relations from dynamic loaders accumulated in Pass 2
+### Requirement: Shared indexing session
 
-- **GIVEN** a PHP file from which `extractRelations` returns `DEPENDS_ON` relations for dynamic loader calls
-- **WHEN** Pass 2 runs
-- **THEN** those `DEPENDS_ON` relations are accumulated and passed to bulk load
+#### Scenario: Adapters and pass logic share the same run-scoped session
 
-#### Scenario: Hierarchy relations are accumulated in Pass 2
+- **GIVEN** Pass 1 has registered files, symbols, and per-file analyses in the `IndexSession`
+- **WHEN** Pass 2 resolves imports and builds relations
+- **THEN** it reads those registrations from the same session instance
+- **AND** it does not rebuild equivalent per-file lookup structures from scratch
 
-- **GIVEN** an adapter returns `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations for a file
-- **WHEN** Pass 2 runs
-- **THEN** those hierarchy relations are accumulated with the other extracted relations
-- **AND** they are included in the single bulk load
+#### Scenario: Run-scoped adapter cache state stays behind the common session API
 
-#### Scenario: Binding facts are resolved after import maps
+- **GIVEN** a built-in adapter stores compact run-scoped cache state for later deterministic resolution
+- **WHEN** the state is consumed in Pass 2
+- **THEN** access goes through the `IndexSession` API
+- **AND** the adapter does not mutate raw internal lookup maps owned by the session
 
-- **GIVEN** a file has imported type names and adapter binding facts that reference those names
-- **WHEN** Pass 2 runs
-- **THEN** import declarations are resolved before scoped binding lookup uses those imported type candidates
-- **AND** no store query is performed during binding resolution
+#### Scenario: Shared session also serves later spec and document lookups
 
-#### Scenario: USES_TYPE and CONSTRUCTS relations are accumulated in Pass 2
-
-- **GIVEN** scoped binding resolution returns `USES_TYPE` and `CONSTRUCTS` relations for a file
-- **WHEN** Pass 2 runs
-- **THEN** those relations are accumulated with imports, calls, and hierarchy relations
-- **AND** they are included in the single bulk load
+- **GIVEN** the indexing run has already registered documents, specs, and covered symbols
+- **WHEN** a later indexing phase needs a spec-to-symbol or symbol-to-spec lookup
+- **THEN** it reads that relationship from the same run-scoped session
+- **AND** it does not rebuild a parallel cross-entity cache outside the session
 
 ### Requirement: Scoped binding environment resolution
 
@@ -215,13 +235,25 @@
 
 ### Requirement: Progress reporting
 
-#### Scenario: Progress callback receives granular updates
+#### Scenario: Progress callback receives pass labels aligned to the new pipeline
 
 - **GIVEN** an `onProgress` callback is provided in `IndexOptions`
 - **WHEN** indexing runs
-- **THEN** the callback is called with increasing percent values from 0 to 100
-- **AND** phase strings describe the current activity (e.g. `"Parsing symbols"`, `"Resolving imports"`, `"Bulk loading"`)
-- **AND** detail strings are included for per-file phases (e.g. `"150/460"`)
+- **THEN** the callback reports progress across discovery, pass 1 file analysis, pass 2 relation building, and bulk loading
+- **AND** per-file phases include detail strings such as `"150/460 files"`
+
+#### Scenario: Progress callback fires before blocking processing
+
+- **WHEN** a phase like discovery or pass 1 finishes
+- **THEN** the progress callback is fired immediately with the next phase label
+- **AND** this happens before synchronous heavy work begins, such as session index finalization or relation aggregation
+
+### Requirement: Phase execution timing logging
+
+#### Scenario: Debug logs record phase duration
+
+- **WHEN** indexing completes
+- **THEN** debug logs contain execution times for discovery, pass 1, pass 2, and bulk loading
 
 ### Requirement: Cross-workspace package resolution
 

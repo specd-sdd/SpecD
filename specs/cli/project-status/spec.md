@@ -20,20 +20,24 @@ The command output MUST include rich workspace information obtained via the `Lis
 
 ### Requirement: includes spec counts
 
-The command output MUST include spec counts obtained efficiently through the `SpecRepository.count()` method for each orchestrated workspace:
+The command output MUST include spec counts obtained via `kernel.project.getProjectSummary.execute()`:
 
-- Total spec count across all workspaces
-- Spec count per workspace
+- Total spec count across all workspaces (sum of `specsByWorkspace` values)
+- Spec count per workspace (`specsByWorkspace` map)
 
 The command SHALL NOT load full spec metadata or artifacts to perform this count.
+The command MUST NOT call `SpecRepository.count()` directly or orchestrate `ListWorkspaces` for counting.
 
 ### Requirement: includes change counts
 
-The command output MUST include:
+The command output MUST obtain change counts via `kernel.project.getProjectSummary.execute()`:
 
-- Number of active changes
-- Number of drafts
-- Number of discarded changes
+- Number of active changes (`activeCount`)
+- Number of drafts (`draftCount`)
+- Number of discarded changes (`discardedCount`)
+- Number of archived changes (`archivedCount`)
+
+The command MUST NOT call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting.
 
 ### Requirement: includes approval gates
 
@@ -44,20 +48,26 @@ The command output MUST include:
 
 ### Requirement: includes graph freshness (always)
 
-The command output MUST always include:
+The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with `{ includeGraph: true }`:
 
 - Whether the code graph is stale (boolean)
 - Last indexed timestamp (or null if never indexed)
+
+The command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.
+
+Graph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.
 
 This is included by default, not behind a flag.
 
 ### Requirement: supports --graph flag
 
-When `--graph` flag is provided, the command MUST include extended graph statistics:
+When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }` and include extended graph statistics from the snapshot:
 
-- Number of indexed files
-- Number of indexed symbols
-- Hotspots (if available)
+- Number of indexed files (`graphHealth.fileCount`)
+- Number of indexed symbols (`graphHealth.symbolCount`)
+- Hotspots (from snapshot `hotspots` when available)
+
+Presenter formatting (text/json/toon) remains in the CLI command handler.
 
 ### Requirement: includes config flags (always)
 
@@ -71,11 +81,34 @@ This is included by default, not behind a flag.
 
 ### Requirement: supports --context flag
 
-When `--context` flag is provided, the output MUST include project context references:
+When `--context` flag is provided, the output MUST include project context references.
+
+In `text` mode:
+
+- The command MUST display the **full** project context (not truncated).
+- If `llmOptimizedContext` is enabled in config, the command MUST prefer `optimizedContext` from `project-metadata.json` if it is fresh.
+- If `llmOptimizedContext` is enabled but optimized context is missing or stale, the command MUST fall back to raw context entries and emit a `stale-optimization` warning.
+- The warning MUST include remediation instructions: "Launch specd-project-context-optimizer agent to generate it".
+
+In `json`/`toon` mode, the output MUST include:
 
 - Instruction entries (the directive text without reading files)
 - File entries (which files should be read without content)
 - Spec entries (which specs should be read without content)
+- `optimizedContext` (optional string, included if fresh and enabled)
+
+When assembling context references for `--context`, the command MUST NOT construct a `CompileContextConfig` object inline from `SpecdConfig`. It MUST invoke the kernel-wired `GetProjectContext` use case, which carries yaml-derived defaults from composition time.
+
+The command MUST call `GetProjectContext.execute` with runtime overrides only:
+
+- `execute({})` for the primary context assembly (baked yaml defaults)
+- `execute({ llmOptimizedContext: false })` when it needs the raw spec catalogue alongside fresh optimized project context (for example to populate spec reference lists without optimized spec bodies)
+
+Section-filtered optimization bypass behaviour is enforced by `GetProjectContext` / `CompileContext` from forwarded `sections` when applicable; this command does not recompute `llmOptimizedContext` from section flags.
+
+### Requirement: Optimization warning signal
+
+The command MUST emit a `stale-optimization` warning to stderr when `llmOptimizedContext` is enabled but optimized project context is missing or stale.
 
 ### Requirement: defaults to text output
 
@@ -86,6 +119,10 @@ Without `--format` flag, output MUST be plain text formatted for readability.
 When `--format json` is provided, output MUST be valid JSON.
 When `--format toon` is provided, output MUST be TOON-formatted.
 
+### Requirement: SDK host bootstrap
+
+The command MUST obtain host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`). Project summary, approval flags, and graph snapshot orchestration MUST use the returned `SdkHostContext`.
+
 ## Constraints
 
 - The command MUST NOT auto-index the graph — callers decide whether to index
@@ -95,6 +132,8 @@ When `--format toon` is provided, output MUST be TOON-formatted.
 
 ## Spec Dependencies
 
-- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure and repositories
-- [`core:list-drafts`](../../core/list-drafts/spec.md) — existing draft counting behavior remains part of project status
-- [`core:list-changes`](../../core/list-changes/spec.md) — existing active-change counting behavior remains part of project status
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — source for orchestrated project structure in workspace output
+- [`core:get-project-summary`](../../core/get-project-summary/spec.md) — consolidated change and spec counts
+- [`core:get-project-context`](../../core/get-project-context/spec.md) — baked context defaults and runtime override merge for `--context` assembly
+- [`sdk:build-project-status-snapshot`](../../sdk/build-project-status-snapshot/spec.md) — graph freshness and extended graph stats orchestration
+- [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

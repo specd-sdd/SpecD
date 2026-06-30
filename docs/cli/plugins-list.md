@@ -16,7 +16,7 @@ Options:
 
 ## Behavior
 
-- Reads declared plugins from `specd.yaml` via `ConfigWriter.listPlugins()`.
+- Reads declared plugins from the loaded `SpecdConfig.plugins` snapshot (via `loadConfig`).
 - Attempts runtime load through plugin manager for each declaration.
 - Emits status:
   - `installed` when plugin loads.

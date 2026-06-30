@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills -- doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to the `InitProject` use case in `@specd/core`.
+Getting a specd project off the ground requires creating a config file, storage directories, and optionally installing agent skills — doing this manually is tedious and error-prone. The `specd project init` command bootstraps a new specd project, presenting a guided wizard in interactive mode or proceeding silently with flags in non-interactive mode. All file creation is delegated to `createConfigWriter().initProject(...)` in `@specd/core`.
 
 ## Requirements
 
@@ -47,21 +47,22 @@ The interactive plugin-selection wizard MUST expose this known agent plugin opti
 - `@specd/plugin-agent-copilot`
 - `@specd/plugin-agent-codex`
 - `@specd/plugin-agent-opencode`
+- `@specd/plugin-agent-standard`
 
 ### Requirement: Non-interactive mode
 
-When not in interactive mode, the command uses the flag values (or defaults) directly, calls `InitProject`, optionally installs skills for agents specified via `--agent`, and prints output according to `--format`.
+When not in interactive mode, the command uses the flag values (or defaults) directly, calls `createConfigWriter().initProject(...)`, optionally installs plugins specified via `--plugin`, and prints output according to `--format`.
 
-- `text`: prints `initialized specd in <absolute-project-root-path>` followed by any skills installed.
-- `json` or `toon`: outputs `{"result":"ok","configPath":"...","schema":"...","workspaces":[...],"skillsInstalled":{}}` where `skillsInstalled` maps agent ids to arrays of installed skill names.
+- `text`: prints `initialized specd in <absolute-project-root-path>` followed by per-plugin install status lines when any `--plugin` flags were given.
+- `json` or `toon`: outputs `{"result":"ok","configPath":"...","schema":"...","workspaces":[...],"plugins":[...]}` where `plugins` is an array of install result entries (`name`, `status`, `detail`).
 
 ### Requirement: Config file placement
 
 The target directory is the **git root** when inside a git repository, or the **current working directory** otherwise. This resolution happens in the CLI before entering the wizard or calling `InitProject`.
 
-### Requirement: Delegation to InitProject
+### Requirement: Delegation to ConfigWriter
 
-The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `InitProject`. All file creation — `specd.yaml`, storage directories, `.gitignore` entry — is handled by `InitProject` via `ConfigWriter`. The CLI never touches `specd.yaml` directly.
+The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, `.gitignore` entry — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml` directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`.
 
 ### Requirement: Skills installation after init
 
@@ -103,5 +104,6 @@ specd init --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — exit codes, output conventions
-- [`cli:skills-install`](../skills-install/spec.md) — skill installation logic called after init
-- [`core:config`](../../core/config/spec.md) — InitProject use case, ConfigWriter port
+- [`cli:plugins-install`](../plugins-install/spec.md) — plugin installation after init
+- [`core:composition`](../../core/composition/spec.md) — `createConfigWriter()` factory
+- [`core:config-writer-port`](../../core/config-writer-port/spec.md) — `initProject` operation

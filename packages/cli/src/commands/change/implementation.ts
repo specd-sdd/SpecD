@@ -1,10 +1,5 @@
-import { stat } from 'node:fs/promises'
-import path from 'node:path'
 import { type Command } from 'commander'
-import {
-  ImplementationFileNotFoundError,
-  type UpdateImplementationTrackingResult,
-} from '@specd/core'
+import { type UpdateImplementationTrackingResult } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
@@ -93,7 +88,7 @@ export function registerChangeImplementation(parent: Command): void {
   command
     .command('ignore <name>')
     .description(
-      'Mark one or more tracked implementation files as ignored. Validates file existence on disk.',
+      'Mark one or more tracked implementation files as ignored. Allows already-tracked missing files.',
     )
     .requiredOption(
       '--file <paths...>',
@@ -124,6 +119,26 @@ export function registerChangeImplementation(parent: Command): void {
     .action(async (name: string, opts: { file: string[]; format: string; config?: string }) => {
       await mutateImplementationTracking(name, {
         action: 'resolve',
+        files: opts.file,
+        format: opts.format,
+        ...(opts.config !== undefined ? { config: opts.config } : {}),
+      })
+    })
+
+  command
+    .command('unresolve <name>')
+    .description(
+      'Reopen one or more tracked implementation files. Validates file existence on disk. Cannot reopen removed files.',
+    )
+    .requiredOption(
+      '--file <paths...>',
+      'raw project-relative file paths (comma-separated list supported)',
+    )
+    .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--config <path>', 'path to specd.yaml')
+    .action(async (name: string, opts: { file: string[]; format: string; config?: string }) => {
+      await mutateImplementationTracking(name, {
+        action: 'unresolve',
         files: opts.file,
         format: opts.format,
         ...(opts.config !== undefined ? { config: opts.config } : {}),
@@ -160,7 +175,7 @@ async function renderImplementationState(
         '',
         'tracked files:',
       ]
-      for (const state of ['open', 'resolved', 'ignored'] as const) {
+      for (const state of ['open', 'resolved', 'ignored', 'removed'] as const) {
         const files = enriched.trackedFiles.filter((entry) => entry.state === state)
         lines.push(
           `  ${state}: ${files.length > 0 ? files.map((entry) => entry.file).join(', ') : '(none)'}`,
@@ -206,6 +221,10 @@ async function renderImplementationState(
 /**
  * Applies one or more implementation-tracking mutations and renders the result.
  *
+ * File-existence validation is delegated to the core use case. The CLI does
+ * not perform its own `stat(...)` preflight — all validation errors surface
+ * from `UpdateImplementationTracking`.
+ *
  * @param name - Change name
  * @param input - Mutation input and CLI options
  * @param input.action - Mutation kind
@@ -219,7 +238,7 @@ async function renderImplementationState(
 async function mutateImplementationTracking(
   name: string,
   input: {
-    action: 'add' | 'remove' | 'ignore' | 'resolve'
+    action: 'add' | 'remove' | 'ignore' | 'resolve' | 'unresolve'
     files: string[]
     specId?: string
     symbols?: readonly string[]
@@ -228,23 +247,9 @@ async function mutateImplementationTracking(
   },
 ): Promise<void> {
   try {
-    const { config, kernel } = await resolveCliContext({ configPath: input.config })
+    const { kernel } = await resolveCliContext({ configPath: input.config })
 
-    // Support comma-separated lists in any of the file arguments
     const expandedFiles = input.files.flatMap((f) => f.split(',').map((p) => p.trim()))
-
-    // Validate file existence for actions that specify a file (add, resolve, ignore)
-    // Remove action might target a file that was already deleted but had links.
-    if (input.action !== 'remove') {
-      for (const file of expandedFiles) {
-        const filePath = path.join(config.projectRoot, file)
-        try {
-          await stat(filePath)
-        } catch {
-          throw new ImplementationFileNotFoundError(file)
-        }
-      }
-    }
 
     let lastResult: UpdateImplementationTrackingResult | undefined
     for (const file of expandedFiles) {
@@ -269,7 +274,6 @@ async function mutateImplementationTracking(
         result: 'ok',
         name,
         action: input.action,
-        // Return the last implementation tracking state
         implementationTracking: lastResult?.implementationTracking,
       },
       fmt,

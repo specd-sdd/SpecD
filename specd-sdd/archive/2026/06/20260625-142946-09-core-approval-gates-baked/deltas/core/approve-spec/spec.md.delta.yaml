@@ -1,0 +1,73 @@
+- op: modified
+  description: Remove approvalsSpec from ApproveSpecInput
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    The `ApproveSpecInput` interface MUST include:
+
+    - `name` (string) — the change slug identifying the target change.
+    - `reason` (string) — free-text rationale recorded in the approval event.
+
+    All fields are required and readonly. Approval gate state MUST NOT appear on the input.
+
+- op: added
+  description: Bake spec gate at construction
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Input contract'
+  content: |
+    ### Requirement: Approval gate baked at construction
+
+    `ApproveSpec` SHALL accept approval gate configuration at construction time:
+
+    ```typescript
+    type ApprovalGates = { readonly spec: boolean; readonly signoff: boolean }
+    ```
+
+    The constructor MUST receive `approvals: ApprovalGates`. `createApproveSpec(config)` and kernel wiring MUST pass `config.approvals`.
+
+    `ApproveSpec.execute` MUST evaluate the spec gate using `approvals.spec` from construction. Callers MUST NOT supply gate flags per invocation.
+
+- op: modified
+  description: Gate guard uses constructor config
+  selector:
+    type: section
+    matches: 'Requirement: Gate guard'
+  content: |
+    The gate guard sequence is:
+
+    1. If `approvals.spec` is `false` (baked at construction), throw `ApprovalGateDisabledError` with gate `'spec'`. No repository access occurs.
+    2. Load the change by name from the `ChangeRepository`. If no change exists, throw `ChangeNotFoundError`.
+    3. Resolve the current actor identity via `ActorResolver`.
+    4. Obtain the active schema from `SchemaProvider`. If the schema cannot be resolved, `get()` throws `SchemaNotFoundError` or `SchemaValidationError` — the use case does not catch these.
+    5. Compare `schema.name()` with `change.schemaName`. If they differ, throw `SchemaMismatchError`.
+
+- op: modified
+  description: Caller no longer passes gate decision
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The gate check MUST be the first validation step — no I/O occurs if the gate is disabled.
+    - Artifact hashes are computed from on-disk content at approval time, not from cached or in-memory state.
+    - The use case does not validate artifact content beyond hashing it — content validation is a separate concern.
+    - The use case does not determine whether the gate should be enabled at execute time; gate state is fixed at construction from project configuration.
+
+- op: modified
+  description: Kernel entry is changes.approveSpec
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md) — Change entity lifecycle and state machine
+
+    - [`core:schema-format`](../schema-format/spec.md) — schema structure and pre-hash cleanup rules
+
+    - [`core:composition`](../composition/spec.md) — how the use case is wired and injected
+
+    - [`core:kernel`](../kernel/spec.md) — kernel entry under `changes.approveSpec`

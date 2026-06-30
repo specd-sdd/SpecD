@@ -1,0 +1,27 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Reads template files'
+  rename: 'Scenario: Reads template files from skills and agents subfolders'
+  content: |
+    - **WHEN** `getBundle` is called for a skill or an agent
+    - **THEN** it reads from `packages/skills/templates/skills/` or `packages/skills/templates/agents/` respectively
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: TemplateReader loads .md files lazily'
+  rename: 'Scenario: TemplateReader loads .md.tpl files from categorized subfolders'
+  content: |
+    - **WHEN** templates are loaded
+    - **THEN** the `TemplateReader` correctly resolves paths under `skills/` or `agents/`
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Shared template entries are marked in resolved bundle files'
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Shared file scanning'

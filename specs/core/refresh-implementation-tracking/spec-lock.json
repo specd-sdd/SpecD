@@ -3,20 +3,16 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:implementation-detector-port", "core:storage"],
+  "dependsOn": [
+    "core:change",
+    "core:implementation-detector-port",
+    "core:storage",
+    "core:archive-repository-port"
+  ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
-      "symbols": ["RefreshImplementationTracking", "RefreshImplementationTracking.execute"]
-    },
-    {
-      "file": "core:src/composition/kernel.ts"
-    },
-    {
-      "file": "core:test/application/use-cases/refresh-implementation-tracking.spec.ts"
-    },
-    {
-      "file": "core:src/application/use-cases/index.ts"
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
     }
   ]
 }

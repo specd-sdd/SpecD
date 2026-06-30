@@ -1,0 +1,39 @@
+- op: modified
+  description: Graph freshness via buildProjectStatusSnapshot
+  selector:
+    type: section
+    matches: 'Scenario: Graph freshness included by default'
+  content: |
+    - **GIVEN** a project with an indexed code graph
+    - **WHEN** `specd project status` runs without --graph flag
+    - **THEN** graph staleness and last indexed timestamp are included
+    - **AND** the command obtains them via `buildProjectStatusSnapshot` with `{ includeGraph: true }`
+    - **AND** graph data comes exclusively from `@specd/sdk`
+
+- op: modified
+  description: Extended stats via SDK snapshot with hotspots
+  selector:
+    type: section
+    matches: 'Scenario: Extended graph stats with --graph flag'
+  content: |
+    - **GIVEN** a project with indexed code
+    - **WHEN** `specd project status --graph` runs
+    - **THEN** indexed files count, symbols count, and hotspots are included
+    - **AND** the command calls `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }`
+
+- op: added
+  description: SDK host bootstrap verification
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: supports json and toon formats'
+  content: |
+    ### Requirement: SDK host bootstrap
+
+    #### Scenario: Host context from openSpecdHost
+
+    - **WHEN** `specd project status` is executed
+    - **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`)

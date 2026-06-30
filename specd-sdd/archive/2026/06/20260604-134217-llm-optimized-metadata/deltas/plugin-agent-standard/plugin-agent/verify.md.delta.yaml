@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Install location'
+    after:
+      type: section
+      matches: 'Scenario: Shared directory is not discovered as a skill'
+  content: |
+    #### Scenario: Fallback to shared location for agents
+
+    - **GIVEN** a request to install an agent
+    - **WHEN** `install(config, options)` runs
+    - **THEN** it copies the agent to the same directory as `shared.md` (since `agents` capability is not supported)

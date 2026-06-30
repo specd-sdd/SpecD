@@ -30,12 +30,11 @@ JSON/TOON output schema:
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath, kernel } = await resolveCliContext({
+        const { config, configFilePath } = await resolveCliContext({
           configPath: opts.config,
         })
         const configPath = configFilePath ?? `${config.projectRoot}/specd.yaml`
         const result = await updatePluginsWithKernel({
-          kernel,
           config,
           configPath,
         })

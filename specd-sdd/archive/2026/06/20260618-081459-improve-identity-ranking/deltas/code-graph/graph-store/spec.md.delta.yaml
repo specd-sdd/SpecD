@@ -1,0 +1,77 @@
+- op: modified
+  description: Broaden abstract ranking semantics from exact identity matches to stronger token-aware primary-identity preference without narrowing generic text retrieval.
+  selector:
+    type: section
+    matches: '^Requirement: Search with exact-match prioritization$'
+  rename: 'Requirement: Search with primary-identity prioritization'
+  content: |
+    `GraphStore` SHALL provide:
+
+    - **`searchSymbols(options: SearchOptions)`** — search symbols using normalized search text and symbol comments, returning results ranked by relevance in descending order
+    - **`searchSpecs(options: SearchOptions)`** — search spec title, description, and content, returning results ranked by relevance in descending order
+    - **`searchDocuments(options: SearchOptions)`** — search document paths and textual content, returning results ranked by relevance in descending order
+    - **`rebuildFtsIndexes(): Promise<void>`** — a store-maintenance hook used by implementations whose search indexes require explicit rebuilding after bulk data changes
+
+    Search results MUST return match-aware **snippets** and the corresponding 1-based **line range** (`startLine` to `endLine`) from the source content.
+
+    Primary identity fields are:
+
+    - **specs** — canonical `specId`
+    - **symbols** — declared symbol `name` and canonical symbol `id`
+    - **documents** — canonical `path`, and any persisted alternate path identity such as `configRelativePath` when the backend exposes it to search
+
+    Search ranking MUST prioritize primary-identity matches ahead of generic content-only matches, but MUST NOT narrow candidate retrieval to identity fields only. Generic text matching across the backend's searchable fields remains part of discovery.
+
+    Implementations MAY supplement their backend-native full-text candidate set with additional identity-derived candidates when the backend tokenizer would otherwise miss a strong identity hit required by this contract. Identity-aware logic may therefore affect both candidate coverage and final ordering, as long as generic text retrieval remains available.
+
+    Implementations MUST expand query tokens with a shared specd/code-aware lexical policy before applying identity-aware ranking. That expansion is lexical only — it does not classify user intent as “symbol”, “spec”, or “document”.
+
+    Required expansion behavior:
+
+    - preserve each normalized original token
+    - split on whitespace
+    - split useful specd/code separators such as `:`, `/`, `_`, `.`, and `-`
+    - split CamelCase and PascalCase boundaries
+
+    Examples:
+
+    - `core:change` expands to tokens including `core:change`, `core`, and `change`
+    - `ArchiveChange` expands to tokens including `archivechange`, `archive`, and `change`
+
+    Required observable ordering:
+
+    - **Exact canonical identity match** — prioritized first in its category.
+    - **Exact primary-name or alternate identity match** — prioritized ahead of body-only/comment-only/content-only matches.
+    - **Primary-identity prefix, suffix, or substring token match** — prioritized ahead of results whose relevance comes only from generic description, comment, or body-content frequency.
+    - **Structured identity component or path-component match** — prioritized ahead of arbitrary substring-only matches on the same identity field.
+
+    When a backend compares expanded query tokens against selected identity fields, token-strength MUST follow this order:
+
+    1. exact token match: `x`
+    2. prefix token match: `x%`
+    3. suffix token match: `%x`
+    4. substring token match: `%x%`
+
+    For structured identities such as spec ids and paths, a real component match (for example `core` in `core:change`) MUST rank above an arbitrary substring match (for example `core` in `score`).
+
+    When multiple expanded query tokens match the same candidate's selected identity fields, that higher token coverage MUST improve ranking ahead of candidates matching fewer identity tokens.
+
+    This means, for example:
+
+    - a spec whose `specId` contains the queried capability path MUST outrank unrelated specs that match only because the same word appears many times in their content
+    - a symbol whose declared name matches the query intent MUST outrank symbols that match only through attached comments
+    - a document whose path identity matches the query intent MUST outrank documents that match only through body text
+
+    `SearchOptions` is a value object with:
+
+    - **`query`** — the search query string (required)
+    - **`limit`** — maximum results to return (default `20`)
+    - **`kind`** — filter symbols by `SymbolKind` (symbols only)
+    - **`filePattern`** — filter symbols by file path glob (supports `*` wildcards, case-insensitive; symbols only)
+    - **`workspace`** — filter results to a single workspace
+    - **`excludePaths`** — array of glob patterns to exclude by file path (supports `*` wildcards, case-insensitive)
+    - **`excludeWorkspaces`** — array of workspace names to exclude
+
+    All filters (kind, filePattern, workspace, excludePaths, excludeWorkspaces) are applied before the result limit. Score calculation and index-maintenance strategy are implementation concerns.
+
+    Generic text matching (BM25 or equivalent) SHALL still participate in retrieval and SHALL rank the remaining hits after primary-identity preference is applied.

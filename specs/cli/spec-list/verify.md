@@ -51,6 +51,12 @@
 - **WHEN** `specd spec list --summary` is run
 - **THEN** the row for `default:auth/login` shows `Handles login` as its summary
 
+#### Scenario: Summary from metadata optimizedDescription
+
+- **GIVEN** `default:auth/login` has `.specd-metadata.yaml` with `optimizedDescription: "Terse login summary"`
+- **WHEN** `specd spec list --summary` is run
+- **THEN** the row for `default:auth/login` shows `Terse login summary` as its summary
+
 #### Scenario: Summary fallback — paragraph after H1
 
 - **GIVEN** `default:auth/login` has no metadata `description` but `spec.md` begins with `# Auth Login\n\nHandles the login flow.\n\n## Overview`

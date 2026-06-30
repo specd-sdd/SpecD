@@ -10,8 +10,8 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/file-node.ts",
-      "symbols": ["FileNode", "createFileNode"]
+      "file": "code-graph:src/domain/services/scoped-binding-environment.ts",
+      "symbols": ["lookupBindingFacts"]
     }
   ]
 }

@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:graph-store", "code-graph:indexer", "code-graph:get-graph-health"],
+  "implementation": []
+}
