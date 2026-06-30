@@ -5,12 +5,12 @@ import fastifySwagger from '@fastify/swagger'
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify'
 import {
   createConfigLoader,
-  createKernel,
   createLogFormatter,
+  createSdkContext,
   Logger,
   LogRingBuffer,
   type SpecdConfig,
-} from '@specd/core'
+} from '@specd/sdk'
 import { type AuthAdapterRegistry } from '../application/auth/auth-adapter-registry.js'
 import { defaultAuthAdapterRegistry } from './default-auth-registry.js'
 import { registerAuthMiddleware } from '../delivery/http/middleware/auth.js'
@@ -74,7 +74,7 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
   }
 
   const logRing = new LogRingBuffer(500)
-  const kernel = await createKernel(config, {
+  const sdkHost = await createSdkContext(config, {
     logRing,
     logFormatter: createLogFormatter({ colorize: false }),
   })
@@ -84,7 +84,7 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
   const verifier = registry.resolve(auth.type, auth.config, { actorResolver: kernelActor })
 
   const state: ApiServerState = {
-    kernel,
+    ...sdkHost,
     config,
     kernelActor,
     authType: auth.type,

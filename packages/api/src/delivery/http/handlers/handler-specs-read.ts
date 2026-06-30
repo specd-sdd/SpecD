@@ -1,4 +1,4 @@
-import { type Change, SpecNotFoundError, SpecPath } from '@specd/core'
+import { type Change, SpecNotFoundError, SpecPath } from '@specd/sdk'
 import { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { type ApiContext } from '../../../composition/create-api-context.js'
 import { apiHandler } from '../handler-utils.js'

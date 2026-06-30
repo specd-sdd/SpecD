@@ -1,4 +1,4 @@
-import { type ActorIdentity, type ActorResolver } from '@specd/core'
+import { type ActorIdentity, type ActorResolver } from '@specd/sdk'
 import { type ApiActor } from '../../domain/auth/api-actor.js'
 
 /**

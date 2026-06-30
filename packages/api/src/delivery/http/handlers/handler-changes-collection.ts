@@ -76,16 +76,9 @@ export function registerChangesCollectionRoutes(app: FastifyInstance): void {
       if (typeof body.name !== 'string' || body.name.length === 0) {
         throw new Error('name is required')
       }
-      const activeSchema = await ctx.kernel.specs.getActiveSchema.execute()
-      if (activeSchema.raw) {
-        throw new Error('Cannot create change with raw schema reference')
-      }
-      const schema = activeSchema.schema
       const { change } = await ctx.kernel.changes.create.execute({
         name: body.name,
         specIds: body.specIds ?? [],
-        schemaName: schema.name(),
-        schemaVersion: schema.version(),
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.invalidationPolicy !== undefined
           ? {

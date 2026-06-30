@@ -8,7 +8,7 @@ import {
   type GetImplementationReviewResult,
   type GetStatusResult,
   type ReadOnlyChangeView,
-} from '@specd/core'
+} from '@specd/sdk'
 import { type ChangeDetailDto, type ChangeHistoryEventDto } from '../dto/change-detail.js'
 import { type ChangeStatusDto } from '../dto/change-status.js'
 import { type ChangeSummaryDto } from '../dto/change-summary.js'

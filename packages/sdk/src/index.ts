@@ -50,6 +50,13 @@ export {
   type RiskLevel,
   type FileImpactResult,
   type ImpactResult,
+  type GraphStatistics,
+  type SymbolNode,
+  type SpecNode,
+  type DocumentNode,
+  type IndexError,
+  type WorkspaceIndexBreakdown,
+  type HotspotEntry,
   CODE_GRAPH_VERSION,
 } from '@specd/code-graph'
 

@@ -3,7 +3,7 @@ import {
   type DraftedChangeView,
   type Kernel,
   type ValidateChangeBatchResult,
-} from '@specd/core'
+} from '@specd/sdk'
 import { type FastifyInstance } from 'fastify'
 import { type ApiContext } from '../../../composition/create-api-context.js'
 import { apiHandler } from '../handler-utils.js'
@@ -135,11 +135,11 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
       const body = (req.body ?? {}) as { to?: string; skipHookPhases?: string[] }
       const result = await ctx.kernel.changes.transition.execute({
         name,
-        to: body.to as import('@specd/core').ChangeState,
+        to: body.to as import('@specd/sdk').ChangeState,
         ...(body.skipHookPhases !== undefined
           ? {
               skipHookPhases: new Set(
-                body.skipHookPhases as import('@specd/core').HookPhaseSelector[],
+                body.skipHookPhases as import('@specd/sdk').HookPhaseSelector[],
               ),
             }
           : {}),
@@ -312,7 +312,7 @@ export function registerChangesMutateRoutes(app: FastifyInstance): void {
         ...(body.invalidationPolicy !== undefined
           ? {
               invalidationPolicy:
-                body.invalidationPolicy as import('@specd/core').InvalidationPolicy,
+                body.invalidationPolicy as import('@specd/sdk').InvalidationPolicy,
             }
           : {}),
       })

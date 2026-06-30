@@ -4,6 +4,9 @@ export { createConfigLoader, type FsConfigLoaderOptions } from '@specd/core'
 export { createConfigWriter, type FsConfigWriterOptions } from '@specd/core'
 export { createVcsAdapter } from '@specd/core'
 export { createVcsActorResolver } from '@specd/core'
+export { createLogFormatter } from '@specd/core'
+export { LogRingBuffer } from '@specd/core'
+export type { ActorResolver } from '@specd/core'
 export { createSchemaRegistry, type FsSchemaRegistryOptions } from '@specd/core'
 export {
   createSchemaRepository,
@@ -128,6 +131,13 @@ export {
   type ApproveSpecInput,
   type ApproveSignoff,
   type ApproveSignoffInput,
+  type GetChangeArtifactInput,
+  type GetChangeArtifactResult,
+  type SaveChangeArtifactInput,
+  type SaveChangeArtifactResult,
+  type ValidateChangeBatchInput,
+  type ValidateChangeBatchResult,
+  type ValidateChangeBatchStepResult,
   type ArchiveHookPhaseSelector,
   type ArchiveChange,
   type ArchiveChangeInput,

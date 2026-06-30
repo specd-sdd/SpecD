@@ -1,4 +1,4 @@
-import { ChangeNotFoundError, type Kernel } from '@specd/core'
+import { ChangeNotFoundError, type GetStatusResult, type Kernel } from '@specd/sdk'
 import {
   formatCompiledContextMarkdown,
   resolveCompileContextStep,
@@ -27,39 +27,27 @@ import {
   strictObjectSchema,
 } from '../route-schema.js'
 
-async function readArtifactTaskMaps(ctx: { kernel: Kernel }) {
-  const schemaResult = await ctx.kernel.specs.getActiveSchema.execute()
-  if (schemaResult.raw) {
-    return {
-      hasTasksByType: new Map<string, boolean>(),
-      taskSummaryByType: new Map<string, { totalTasks: number; completedTasks: number }>(),
-    }
-  }
-  const hasTasksByType = new Map<string, boolean>(
-    schemaResult.schema
-      .artifacts()
-      .map((artifactType) => [artifactType.id, artifactType.hasTasks] as [string, boolean]),
-  )
-  return {
-    hasTasksByType,
-    taskSummaryByType: new Map<string, { totalTasks: number; completedTasks: number }>(),
-  }
-}
-
-async function readArtifactTaskMapsForChange(ctx: { kernel: Kernel }, name: string) {
-  const [maps, status] = await Promise.all([
-    readArtifactTaskMaps(ctx),
-    ctx.kernel.changes.status.execute({ name }),
-  ])
+function artifactTaskMapsFromStatus(status: GetStatusResult): {
+  hasTasksByType: Map<string, boolean>
+  taskSummaryByType: Map<string, { totalTasks: number; completedTasks: number }>
+} {
+  const hasTasksByType = new Map<string, boolean>()
   const taskSummaryByType = new Map<string, { totalTasks: number; completedTasks: number }>()
   for (const artifact of status.artifactStatuses) {
-    if (!artifact.hasTasks || artifact.taskCompletion === undefined) continue
-    taskSummaryByType.set(artifact.type, {
-      totalTasks: artifact.taskCompletion.total,
-      completedTasks: artifact.taskCompletion.complete,
-    })
+    hasTasksByType.set(artifact.type, artifact.hasTasks)
+    if (artifact.hasTasks && artifact.taskCompletion !== undefined) {
+      taskSummaryByType.set(artifact.type, {
+        totalTasks: artifact.taskCompletion.total,
+        completedTasks: artifact.taskCompletion.complete,
+      })
+    }
   }
-  return { ...maps, taskSummaryByType }
+  return { hasTasksByType, taskSummaryByType }
+}
+
+async function artifactTaskMapsForChange(ctx: { kernel: Kernel }, name: string) {
+  const status = await ctx.kernel.changes.status.execute({ name })
+  return artifactTaskMapsFromStatus(status)
 }
 
 const STATUS_QUERY = strictObjectSchema({
@@ -197,12 +185,12 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
         ifModifiedSince?: string
         refreshImplementation?: string
       }
-      if (query.refreshImplementation === 'true') {
-        await ctx.kernel.changes.refreshImplementationTracking.execute({ name })
-      }
       const result = await ctx.kernel.changes.status.execute({
         name,
         ...(query.ifModifiedSince !== undefined ? { ifModifiedSince: query.ifModifiedSince } : {}),
+        ...(query.refreshImplementation === 'false'
+          ? { refreshImplementationTracking: false }
+          : {}),
       })
       return toChangeStatusDto(result)
     }),
@@ -222,7 +210,7 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       if (view === null) {
         throw new ChangeNotFoundError(name)
       }
-      const taskMaps = await readArtifactTaskMapsForChange(ctx, name)
+      const taskMaps = await artifactTaskMapsForChange(ctx, name)
       return toArtifactListDtoFromView(view, taskMaps)
     }),
   )
@@ -241,7 +229,7 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       if (view === null) {
         throw new ChangeNotFoundError(name)
       }
-      const taskMaps = await readArtifactTaskMapsForChange(ctx, name)
+      const taskMaps = await artifactTaskMapsForChange(ctx, name)
       return toArtifactListDtoFromView(view, taskMaps)
     }),
   )
@@ -260,7 +248,7 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       if (change === null) {
         throw new ChangeNotFoundError(name)
       }
-      const taskMaps = await readArtifactTaskMapsForChange(ctx, name)
+      const taskMaps = await artifactTaskMapsForChange(ctx, name)
       return toArtifactListDtoFromView(change, taskMaps)
     }),
   )
@@ -476,7 +464,7 @@ export function registerChangesReadRoutes(app: FastifyInstance): void {
       const query = req.query as { step?: string; phase?: string }
       const result = await ctx.kernel.changes.getHookInstructions.execute({
         name,
-        step: query.step as import('@specd/core').ChangeState,
+        step: query.step as import('@specd/sdk').ChangeState,
         phase: (query.phase as 'pre' | 'post') ?? 'pre',
       })
       return toHookInstructionsDto(result)

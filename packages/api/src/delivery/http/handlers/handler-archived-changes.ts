@@ -1,4 +1,4 @@
-import { safeRegex, type ArchivedChange, type Kernel } from '@specd/core'
+import { safeRegex, type ArchivedChange, type Kernel } from '@specd/sdk'
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import { apiRouteSchema, PARAMS_CHANGE_NAME, PARAMS_CHANGE_NAME_FILENAME } from '../route-schema.js'

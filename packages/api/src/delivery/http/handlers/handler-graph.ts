@@ -1,5 +1,14 @@
-import { type SymbolKind, buildProjectGraphConfig } from '@specd/code-graph'
-import { createVcsAdapter, ChangeNotFoundError, SpecNotFoundError, SpecPath } from '@specd/core'
+import {
+  type SymbolKind,
+  acquireGraphIndexLock,
+  assertGraphIndexUnlocked,
+  codeGraphVersion,
+  createGetGraphHealth,
+  ChangeNotFoundError,
+  runIndexProjectGraph,
+  SpecNotFoundError,
+  SpecPath,
+} from '@specd/sdk'
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import {
@@ -33,20 +42,20 @@ export function registerGraphRoutes(app: FastifyInstance): void {
     '/graph/status',
     { ...apiRouteSchema({ response: { 200: 'GraphStatusDto' } }) },
     apiHandler(async (ctx) => {
+      assertGraphIndexUnlocked(ctx.config)
+      const getGraphHealth = createGetGraphHealth()
+      const workspaces = await ctx.kernel.project.listWorkspaces.execute()
       const provider = ctx.createGraphProvider()
       await provider.open()
       try {
-        const stats = await provider.getStatistics()
-        let stale = false
-        const currentRef = await Promise.resolve(createVcsAdapter(ctx.config.projectRoot))
-          .then((vcs) => vcs.ref())
-          .catch(() => null)
-        if (stats.lastIndexedRef !== null && currentRef !== null) {
-          stale = stats.lastIndexedRef !== currentRef
-        } else if (stats.lastIndexedAt !== undefined && stats.lastIndexedAt !== null) {
-          stale = Date.now() - new Date(stats.lastIndexedAt).getTime() > 24 * 60 * 60 * 1000
-        }
-        return toGraphStatusDto(stats, stale)
+        const health = await getGraphHealth.execute({
+          config: ctx.config,
+          provider,
+          codeGraphVersion,
+          workspaces: [...workspaces],
+          assertUnlocked: false,
+        })
+        return toGraphStatusDto(health, health.stale)
       } finally {
         await provider.close()
       }
@@ -63,28 +72,13 @@ export function registerGraphRoutes(app: FastifyInstance): void {
     },
     apiHandler(async (ctx, req) => {
       const body = (req.body ?? {}) as { force?: boolean }
-      const provider = ctx.createGraphProvider()
-      if (body.force === true) {
-        await provider.recreate()
-      }
-      await provider.open()
-      try {
-        const workspaces = await ctx.kernel.project.listWorkspaces.execute()
-        const graphConfig = buildProjectGraphConfig(ctx.config)
-        const vcs = await Promise.resolve(createVcsAdapter(ctx.config.projectRoot)).catch(
-          () => null,
-        )
-        const vcsRef = (await vcs?.ref()) ?? undefined
-        const result = await provider.index({
-          projectRoot: ctx.config.projectRoot,
-          workspaces,
-          graphConfig,
-          ...(vcsRef !== undefined ? { vcsRef } : {}),
-        })
-        return toGraphIndexResultDto(result)
-      } finally {
-        await provider.close()
-      }
+      const result = await runIndexProjectGraph(ctx, {
+        ...(body.force === true ? { force: true } : {}),
+        beforeOpen: async () => {
+          await Promise.resolve(acquireGraphIndexLock(ctx.config))
+        },
+      })
+      return toGraphIndexResultDto(result)
     }),
   )
 

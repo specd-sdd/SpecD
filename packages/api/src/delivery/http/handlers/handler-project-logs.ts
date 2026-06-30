@@ -1,4 +1,4 @@
-import { Logger } from '@specd/core'
+import { Logger } from '@specd/sdk'
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
 import type { LogReadDto } from '../dto/log-read.js'

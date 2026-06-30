@@ -1,4 +1,4 @@
-import { type SpecListEntry } from '@specd/core'
+import { type SpecListEntry } from '@specd/sdk'
 import { type SpecDetailDto } from '../dto/spec-detail.js'
 import { type SpecSummaryDto } from '../dto/spec-summary.js'
 import { type WorkspaceSpecTreeDto } from '../dto/workspace-spec-tree.js'

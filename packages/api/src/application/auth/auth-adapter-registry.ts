@@ -1,4 +1,4 @@
-import { type ActorResolver } from '@specd/core'
+import { type ActorResolver } from '@specd/sdk'
 import { type ApiTokenVerifier } from '../ports/api-token-verifier.js'
 
 /** Bootstrap context passed to auth adapter factories. */
@@ -43,4 +43,3 @@ export class AuthAdapterRegistry {
     return factory(config, ctx)
   }
 }
-

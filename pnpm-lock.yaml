@@ -159,9 +159,9 @@ importers:
       '@specd/code-graph-electron':
         specifier: workspace:*
         version: link:../../packages/code-graph-electron
-      '@specd/core':
+      '@specd/sdk':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../packages/sdk
       '@specd/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -254,12 +254,9 @@ importers:
       '@fastify/swagger':
         specifier: ^9.7.0
         version: 9.7.0
-      '@specd/code-graph':
+      '@specd/sdk':
         specifier: workspace:*
-        version: link:../code-graph
-      '@specd/core':
-        specifier: workspace:*
-        version: link:../core
+        version: link:../sdk
       fastify:
         specifier: ^5.3.3
         version: 5.9.0

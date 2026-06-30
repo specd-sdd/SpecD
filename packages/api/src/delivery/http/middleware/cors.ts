@@ -1,6 +1,6 @@
 import cors from '@fastify/cors'
 import { type FastifyInstance } from 'fastify'
-import { type SpecdConfig } from '@specd/core'
+import { type SpecdConfig } from '@specd/sdk'
 
 /**
  * Merges configured and runtime CORS origins (deduplicated).

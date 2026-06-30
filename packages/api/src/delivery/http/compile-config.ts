@@ -1,4 +1,4 @@
-import { type CompileContextConfig, type SpecdConfig } from '@specd/core'
+import { type CompileContextConfig, type SpecdConfig } from '@specd/sdk'
 
 /**
  * Builds compile-context config from resolved {@link SpecdConfig}.

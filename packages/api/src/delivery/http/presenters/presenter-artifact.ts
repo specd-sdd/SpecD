@@ -1,4 +1,4 @@
-import { type GetChangeArtifactResult, type SaveChangeArtifactResult } from '@specd/core'
+import { type GetChangeArtifactResult, type SaveChangeArtifactResult } from '@specd/sdk'
 import { type ArtifactContentDto } from '../dto/artifact-content.js'
 
 /**

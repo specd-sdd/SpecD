@@ -1,8 +1,4 @@
-import type {
-  CompileContextResult,
-  ContextSpecEntry,
-  ProjectContextEntry,
-} from '@specd/core'
+import type { CompileContextResult, ContextSpecEntry, ProjectContextEntry } from '@specd/sdk'
 
 /**
  * Renders {@link CompileContextResult} as agent-facing markdown (CLI `changes context` parity).
@@ -83,13 +79,7 @@ function formatSpecCatalogue(specs: readonly ContextSpecEntry[]): string {
  * Maps change lifecycle `state` to a workflow step name for {@link CompileContext}.
  */
 export function resolveCompileContextStep(state: string): string {
-  const workflowSteps = new Set([
-    'designing',
-    'ready',
-    'implementing',
-    'verifying',
-    'archiving',
-  ])
+  const workflowSteps = new Set(['designing', 'ready', 'implementing', 'verifying', 'archiving'])
   if (workflowSteps.has(state)) {
     return state
   }

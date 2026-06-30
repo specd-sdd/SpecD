@@ -1,7 +1,7 @@
-import { createVcsAdapter } from '@specd/core'
+import { buildProjectStatusSnapshot } from '@specd/sdk'
 import { type FastifyInstance } from 'fastify'
 import { apiHandler } from '../handler-utils.js'
-import { toProjectDto, toProjectStatusDto } from '../presenters/presenter-project.js'
+import { toProjectDto, toProjectStatusDtoFromSnapshot } from '../presenters/presenter-project.js'
 import {
   apiRouteSchema,
   BOOLEAN_QUERY_SCHEMA,
@@ -24,58 +24,8 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     '/project/status',
     { ...apiRouteSchema({ response: { 200: 'ProjectStatusDto' } }) },
     apiHandler(async (ctx) => {
-      const [active, drafts, discarded, archived, specs] = await Promise.all([
-        ctx.kernel.changes.list.execute(),
-        ctx.kernel.changes.listDrafts.execute(),
-        ctx.kernel.changes.listDiscarded.execute(),
-        ctx.kernel.changes.listArchived.execute(),
-        ctx.kernel.specs.list.execute({ includeSummary: false }),
-      ])
-
-      const specsByWorkspace: Record<string, number> = {}
-      for (const s of specs) {
-        specsByWorkspace[s.workspace] = (specsByWorkspace[s.workspace] ?? 0) + 1
-      }
-
-      let graphStats = null
-      let graphStale: boolean | null = null
-      const fingerprintMismatch: boolean | null = null
-      try {
-        const provider = ctx.createGraphProvider()
-        await provider.open()
-        try {
-          graphStats = await provider.getStatistics()
-          let currentRef: string | null = null
-          try {
-            const vcs = await createVcsAdapter(ctx.config.projectRoot)
-            currentRef = await vcs.ref()
-          } catch {
-            // no vcs
-          }
-          if (graphStats.lastIndexedRef !== null && currentRef !== null) {
-            graphStale = graphStats.lastIndexedRef !== currentRef
-          } else if (graphStats.lastIndexedAt !== undefined && graphStats.lastIndexedAt !== null) {
-            graphStale =
-              Date.now() - new Date(graphStats.lastIndexedAt).getTime() > 24 * 60 * 60 * 1000
-          }
-        } finally {
-          await provider.close()
-        }
-      } catch {
-        graphStats = null
-      }
-
-      return toProjectStatusDto({
-        activeCount: active.length,
-        draftCount: drafts.length,
-        discardedCount: discarded.length,
-        archivedCount: archived.meta.total,
-        specsByWorkspace,
-        graphStats,
-        graphStale,
-        fingerprintMismatch,
-        config: ctx.config,
-      })
+      const snapshot = await buildProjectStatusSnapshot(ctx, { includeGraph: true })
+      return toProjectStatusDtoFromSnapshot(snapshot)
     }),
   )
 

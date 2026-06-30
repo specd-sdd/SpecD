@@ -1,13 +1,5 @@
 import path from 'node:path'
-import { createRequire } from 'node:module'
 import { dialog } from 'electron'
-
-const require = createRequire(import.meta.url)
-let codeGraphVersion = '0.0.0'
-try {
-  const pkg = require('@specd/code-graph/package.json') as { version?: string }
-  codeGraphVersion = pkg.version ?? '0.0.0'
-} catch {}
 import {
   readRecents,
   addRecentConnection,
@@ -22,16 +14,20 @@ import {
   type SymbolKind,
   createCodeGraphProvider,
   type IndexResult,
-  buildProjectGraphConfig,
 } from '@specd/code-graph-electron'
 import {
+  acquireGraphIndexLock,
+  assertGraphIndexUnlocked,
+  buildProjectStatusSnapshot,
+  codeGraphVersion,
   createConfigLoader,
-  createKernel,
+  createGetGraphHealth,
   createLogFormatter,
+  createSdkContext,
   createVcsActorResolver,
-  createVcsAdapter,
   Logger,
   LogRingBuffer,
+  runIndexProjectGraph,
   SpecPath,
   type ArchivedChange,
   type Change,
@@ -47,11 +43,12 @@ import {
   type ProjectWorkspace,
   type ReadOnlyChangeView,
   type SaveChangeArtifactResult,
+  type SdkHostContext,
   type SpecdConfig,
   type SpecListEntry,
   type SpecSearchEntry,
   type ValidateChangeBatchResult,
-} from '@specd/core'
+} from '@specd/sdk'
 import {
   createIpcFailure,
   createIpcSuccess,
@@ -193,9 +190,22 @@ type TaskSummaryByType = ReadonlyMap<
   { readonly totalTasks: number; readonly completedTasks: number }
 >
 
-let kernelPromise: Promise<Kernel> | undefined
-let loadedConfig: SpecdConfig | undefined
+let hostPromise: Promise<DesktopHostContext> | undefined
 let logRing: LogRingBuffer | undefined
+
+interface DesktopHostContext {
+  readonly kernel: Kernel
+  readonly config: SpecdConfig
+  readonly createGraphProvider: () => ReturnType<typeof createCodeGraphProvider>
+}
+
+function toSdkHostContext(host: DesktopHostContext): SdkHostContext {
+  return {
+    kernel: host.kernel,
+    createGraphProvider:
+      host.createGraphProvider as unknown as SdkHostContext['createGraphProvider'],
+  }
+}
 
 /**
  * Formats a date as an ISO string.
@@ -231,14 +241,36 @@ function resolveUpdatedAt(input: {
  * @returns Loaded config.
  */
 async function getConfig(): Promise<SpecdConfig> {
-  await getKernel()
-  if (loadedConfig === undefined) {
-    throw new Error('Desktop config failed to load')
-  }
-  return loadedConfig
+  return (await getHost()).config
 }
 
 export let activeProjectRoot: string | undefined = undefined
+
+/**
+ * Lazily boots the project SDK host for local IPC.
+ *
+ * @returns Active desktop host context.
+ */
+async function getHost(): Promise<DesktopHostContext> {
+  if (hostPromise === undefined) {
+    hostPromise = (async () => {
+      const loader = createConfigLoader({ startDir: activeProjectRoot ?? process.cwd() })
+      const config = await loader.load()
+      logRing = new LogRingBuffer(1000)
+      const { kernel } = await createSdkContext(config, {
+        logRing,
+        logFormatter: createLogFormatter({ colorize: false }),
+      })
+      Logger.info('Desktop kernel booted', { projectRoot: config.projectRoot })
+      return {
+        kernel,
+        config,
+        createGraphProvider: () => createCodeGraphProvider(config),
+      }
+    })()
+  }
+  return await hostPromise
+}
 
 /**
  * Lazily boots the project kernel for local IPC.
@@ -246,20 +278,7 @@ export let activeProjectRoot: string | undefined = undefined
  * @returns Active project kernel.
  */
 async function getKernel(): Promise<Kernel> {
-  if (kernelPromise === undefined) {
-    kernelPromise = (async () => {
-      const loader = createConfigLoader({ startDir: activeProjectRoot ?? process.cwd() })
-      loadedConfig = await loader.load()
-      logRing = new LogRingBuffer(1000)
-      const kernel = await createKernel(loadedConfig, {
-        logRing,
-        logFormatter: createLogFormatter({ colorize: false }),
-      })
-      Logger.info('Desktop kernel booted', { projectRoot: loadedConfig.projectRoot })
-      return kernel
-    })()
-  }
-  return kernelPromise
+  return (await getHost()).kernel
 }
 
 /**
@@ -635,37 +654,25 @@ function toWorkspaceSummaryDtos(
   })
 }
 
-/**
- * Maps project aggregates to the status DTO consumed by the UI.
- *
- * @param input - Aggregate project status values.
- * @returns Project status DTO.
- */
-function toProjectStatusDto(input: {
-  activeCount: number
-  draftCount: number
-  discardedCount: number
-  archivedCount: number
-  graphStats: GraphStatistics | null
-  graphStale: boolean | null
-  config: SpecdConfig
-}): ProjectStatusDto {
+function toProjectStatusDtoFromSnapshot(
+  snapshot: Awaited<ReturnType<typeof buildProjectStatusSnapshot>>,
+  config: SpecdConfig,
+): ProjectStatusDto {
+  const graphHealth = snapshot.graphHealth
   return {
-    activeChanges: input.activeCount,
-    drafts: input.draftCount,
-    discarded: input.discardedCount,
-    archived: input.archivedCount,
+    activeChanges: snapshot.summary.activeCount,
+    drafts: snapshot.summary.draftCount,
+    discarded: snapshot.summary.discardedCount,
+    archived: snapshot.summary.archivedCount,
     graph: {
-      indexed: input.graphStats !== null,
-      ...(input.graphStale !== null ? { stale: input.graphStale } : {}),
-      ...(input.graphStats?.symbolCount !== undefined
-        ? { symbolCount: input.graphStats.symbolCount }
+      indexed: graphHealth !== null,
+      ...(graphHealth?.stale !== undefined && graphHealth.stale !== null
+        ? { stale: graphHealth.stale }
         : {}),
-      ...(input.graphStats?.specCount !== undefined
-        ? { specCount: input.graphStats.specCount }
-        : {}),
+      ...(graphHealth?.symbolCount !== undefined ? { symbolCount: graphHealth.symbolCount } : {}),
+      ...(graphHealth?.specCount !== undefined ? { specCount: graphHealth.specCount } : {}),
     },
-    auth: { type: input.config.api?.auth.type ?? 'disabled' },
+    auth: { type: config.api?.auth.type ?? 'disabled' },
   }
 }
 
@@ -1047,41 +1054,27 @@ function toSpecSummaryDtos(
   }))
 }
 
-/**
- * Builds task-aware artifact metadata for one change.
- *
- * @param kernel - Active project kernel.
- * @param name - Change name.
- * @returns Task maps keyed by artifact type.
- */
-async function readArtifactTaskMapsForChange(
-  kernel: Kernel,
-  name: string,
-): Promise<{
+function artifactTaskMapsFromStatus(status: GetStatusResult): {
   hasTasksByType: Map<string, boolean>
   taskSummaryByType: Map<string, { totalTasks: number; completedTasks: number }>
-}> {
-  const [schemaResult, status] = await Promise.all([
-    kernel.specs.getActiveSchema.execute(),
-    kernel.changes.status.execute({ name }),
-  ])
+} {
   const hasTasksByType = new Map<string, boolean>()
-  if (!schemaResult.raw) {
-    for (const artifactType of schemaResult.schema.artifacts()) {
-      hasTasksByType.set(artifactType.id, artifactType.hasTasks)
-    }
-  }
   const taskSummaryByType = new Map<string, { totalTasks: number; completedTasks: number }>()
   for (const artifact of status.artifactStatuses) {
-    if (!artifact.hasTasks || artifact.taskCompletion === undefined) {
-      continue
+    hasTasksByType.set(artifact.type, artifact.hasTasks)
+    if (artifact.hasTasks && artifact.taskCompletion !== undefined) {
+      taskSummaryByType.set(artifact.type, {
+        totalTasks: artifact.taskCompletion.total,
+        completedTasks: artifact.taskCompletion.complete,
+      })
     }
-    taskSummaryByType.set(artifact.type, {
-      totalTasks: artifact.taskCompletion.total,
-      completedTasks: artifact.taskCompletion.complete,
-    })
   }
   return { hasTasksByType, taskSummaryByType }
+}
+
+async function artifactTaskMapsForChange(kernel: Kernel, name: string) {
+  const status = await kernel.changes.status.execute({ name })
+  return artifactTaskMapsFromStatus(status)
 }
 
 /**
@@ -1196,36 +1189,11 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     case 'getProject':
       return createIpcSuccess(envelope.id, toProjectDto(config))
     case 'getProjectStatus': {
-      const [active, drafts, discarded, archived, graphStats] = await Promise.all([
-        kernel.changes.list.execute(),
-        kernel.changes.listDrafts.execute(),
-        kernel.changes.listDiscarded.execute(),
-        kernel.changes.listArchived.execute(),
-        withGraphProvider<GraphStatistics>((provider) => provider.getStatistics()).catch(
-          (): GraphStatistics | null => null,
-        ),
-      ])
-      let graphStale: boolean | null = null
-      if (graphStats !== null && graphStats.lastIndexedRef !== null) {
-        const currentRef = await Promise.resolve(createVcsAdapter(config.projectRoot))
-          .then((vcs) => vcs.ref())
-          .catch(() => null)
-        if (currentRef !== null) {
-          graphStale = graphStats.lastIndexedRef !== currentRef
-        }
-      }
-      return createIpcSuccess(
-        envelope.id,
-        toProjectStatusDto({
-          activeCount: active.length,
-          draftCount: drafts.length,
-          discardedCount: discarded.length,
-          archivedCount: archived.meta.total,
-          graphStats,
-          graphStale,
-          config,
-        }),
-      )
+      const host = await getHost()
+      const snapshot = await buildProjectStatusSnapshot(toSdkHostContext(host), {
+        includeGraph: true,
+      })
+      return createIpcSuccess(envelope.id, toProjectStatusDtoFromSnapshot(snapshot, host.config))
     }
     case 'listChanges': {
       const changes = await kernel.changes.list.execute()
@@ -1275,19 +1243,10 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
           invalidationPolicy?: 'none' | 'surgical' | 'downstream' | 'global'
         },
       ]
-      const schemaResult = await kernel.specs.getActiveSchema.execute()
-      if (schemaResult.raw) {
-        throw new Error('Active schema did not resolve to a compiled schema')
-      }
       const result = await kernel.changes.create.execute({
         name: input.name,
         ...(input.description !== undefined ? { description: input.description } : {}),
         specIds: input.specIds ?? [],
-        schemaName: input.schemaName ?? schemaResult.schema.name(),
-        schemaVersion:
-          input.schemaVersion !== undefined
-            ? Number(input.schemaVersion)
-            : schemaResult.schema.version(),
         ...(input.invalidationPolicy !== undefined
           ? { invalidationPolicy: input.invalidationPolicy }
           : {}),
@@ -1307,13 +1266,13 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         string,
         { ifModifiedSince?: string; refreshImplementation?: boolean }?,
       ]
-      if (options?.refreshImplementation === true) {
-        await kernel.changes.refreshImplementationTracking.execute({ name })
-      }
       const status = await kernel.changes.status.execute({
         name,
         ...(options?.ifModifiedSince !== undefined
           ? { ifModifiedSince: options.ifModifiedSince }
+          : {}),
+        ...(options?.refreshImplementation === false
+          ? { refreshImplementationTracking: false }
           : {}),
       })
       return createIpcSuccess(envelope.id, toChangeStatusDto(status))
@@ -1324,7 +1283,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       if (change === null) {
         throw new Error(`Change not found: ${name}`)
       }
-      const taskMaps = await readArtifactTaskMapsForChange(kernel, name)
+      const taskMaps = await artifactTaskMapsForChange(kernel, name)
       return createIpcSuccess(envelope.id, toArtifactListDtoFromView(change, taskMaps))
     }
     case 'getChangeArtifact': {
@@ -1356,7 +1315,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       if (draft === null) {
         throw new Error(`Draft not found: ${name}`)
       }
-      const taskMaps = await readArtifactTaskMapsForChange(kernel, name)
+      const taskMaps = await artifactTaskMapsForChange(kernel, name)
       return createIpcSuccess(envelope.id, toArtifactListDtoFromView(draft, taskMaps))
     }
     case 'getDraftArtifact': {
@@ -1392,7 +1351,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       if (discarded === null) {
         throw new Error(`Discarded change not found: ${name}`)
       }
-      const taskMaps = await readArtifactTaskMapsForChange(kernel, name)
+      const taskMaps = await artifactTaskMapsForChange(kernel, name)
       return createIpcSuccess(envelope.id, toArtifactListDtoFromView(discarded, taskMaps))
     }
     case 'getDiscardedArtifact': {
@@ -1741,43 +1700,32 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       return createIpcSuccess(envelope.id, result)
     }
     case 'getGraphStatus': {
+      const host = await getHost()
+      assertGraphIndexUnlocked(host.config)
+      const getGraphHealth = createGetGraphHealth()
+      const workspaces = await kernel.project.listWorkspaces.execute()
       const result = await withGraphProvider(async (provider) => {
-        const stats = await provider.getStatistics()
-        const config = await getConfig()
-        let stale = false
-        const currentRef = await Promise.resolve(createVcsAdapter(config.projectRoot))
-          .then((vcs) => vcs.ref())
-          .catch(() => null)
-        if (stats.lastIndexedRef !== null && currentRef !== null) {
-          stale = stats.lastIndexedRef !== currentRef
-        } else if (stats.lastIndexedAt !== undefined && stats.lastIndexedAt !== null) {
-          stale = Date.now() - new Date(stats.lastIndexedAt).getTime() > 24 * 60 * 60 * 1000
-        }
-        return toGraphStatusDto(stats, stale)
+        const health = await getGraphHealth.execute({
+          config: host.config,
+          provider,
+          codeGraphVersion,
+          workspaces: [...workspaces],
+          assertUnlocked: false,
+        })
+        return toGraphStatusDto(health, health.stale)
       })
       return createIpcSuccess(envelope.id, result)
     }
     case 'indexGraph': {
       const [input = {}] = params as [GraphIndexInput?]
-      const result = await withGraphProvider(async (provider) => {
-        const config = await getConfig()
-        const workspaces = await kernel.project.listWorkspaces.execute()
-        const graphConfig = buildProjectGraphConfig(config)
-        const vcs = await Promise.resolve(createVcsAdapter(config.projectRoot)).catch(() => null)
-        const vcsRef = (await vcs?.ref()) ?? undefined
-        if (input?.force === true) {
-          await provider.recreate()
-        }
-        const indexResult = await provider.index({
-          projectRoot: config.projectRoot,
-          workspaces,
-          graphConfig,
-          codeGraphVersion,
-          ...(vcsRef !== undefined ? { vcsRef } : {}),
-        })
-        return toGraphIndexResultDto(indexResult)
+      const host = await getHost()
+      const indexResult = await runIndexProjectGraph(toSdkHostContext(host), {
+        ...(input?.force === true ? { force: true } : {}),
+        beforeOpen: async () => {
+          await Promise.resolve(acquireGraphIndexLock(host.config))
+        },
       })
-      return createIpcSuccess(envelope.id, result)
+      return createIpcSuccess(envelope.id, toGraphIndexResultDto(indexResult))
     }
     case 'getHotspots': {
       const [query = {}] = params as [{ readonly minRisk?: string; readonly limit?: number }?]
@@ -2192,6 +2140,5 @@ export async function dispatchIpc(envelope: IpcRequestEnvelope): Promise<IpcResp
  * Resets kernel state after a project switch or teardown.
  */
 export function resetDesktopKernel(): void {
-  kernelPromise = undefined
-  loadedConfig = undefined
+  hostPromise = undefined
 }

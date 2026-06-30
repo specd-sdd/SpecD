@@ -1,26 +1,22 @@
-import { createCodeGraphProvider, type CodeGraphProvider } from '@specd/code-graph'
 import {
-  type Kernel,
-  type SpecdConfig,
   type ActorResolver,
+  type SdkHostContext,
+  type SpecdConfig,
   createVcsActorResolver,
-} from '@specd/core'
+} from '@specd/sdk'
 import { type ApiActor } from '../domain/auth/api-actor.js'
 import { ApiActorResolver } from '../infrastructure/auth/api-actor-resolver.js'
 
 /** Per-request API context shared by handlers. */
-export interface ApiContext {
-  readonly kernel: Kernel
+export interface ApiContext extends SdkHostContext {
   readonly config: SpecdConfig
   readonly actor: ActorResolver
   readonly authType: string
   readonly apiActor: ApiActor | null
-  createGraphProvider(): CodeGraphProvider
 }
 
 /** Process-scoped dependencies for building request context. */
-export interface ApiServerState {
-  readonly kernel: Kernel
+export interface ApiServerState extends SdkHostContext {
   readonly config: SpecdConfig
   readonly kernelActor: ActorResolver
   readonly authType: string
@@ -36,13 +32,11 @@ export function createApiContext(state: ApiServerState, apiActor: ApiActor | nul
   const actor = new ApiActorResolver(state.kernelActor, apiActor)
   return {
     kernel: state.kernel,
+    createGraphProvider: state.createGraphProvider,
     config: state.config,
     actor,
     authType: state.authType,
     apiActor,
-    createGraphProvider() {
-      return createCodeGraphProvider(state.config)
-    },
   }
 }
 

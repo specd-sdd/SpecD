@@ -23,7 +23,7 @@
   "dependencies": {
     "@specd/code-graph-electron": "workspace:*",
     "@specd/client": "workspace:*",
-    "@specd/core": "workspace:*",
+    "@specd/sdk": "workspace:*",
     "@specd/ui": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

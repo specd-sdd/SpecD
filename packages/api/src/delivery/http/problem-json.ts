@@ -1,4 +1,4 @@
-import { SpecdError } from '@specd/core'
+import { SpecdError } from '@specd/sdk'
 
 /** RFC 7807 problem details for specd API errors. */
 export interface ProblemJsonBody {

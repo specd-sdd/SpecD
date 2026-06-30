@@ -8,8 +8,8 @@ import {
   type IndexError,
   type WorkspaceIndexBreakdown,
   type HotspotEntry,
-} from '@specd/code-graph'
-import type { SpecdConfig } from '@specd/core'
+} from '@specd/sdk'
+import type { SpecdConfig } from '@specd/sdk'
 import { type GraphStatusDto } from '../dto/graph-status.js'
 import { type GraphFileRefDto } from '../dto/graph-file-ref.js'
 import { type GraphSymbolRefDto } from '../dto/graph-symbol-ref.js'
