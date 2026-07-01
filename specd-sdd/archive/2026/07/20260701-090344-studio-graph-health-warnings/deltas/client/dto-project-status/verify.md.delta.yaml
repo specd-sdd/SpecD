@@ -1,0 +1,16 @@
+- op: added
+  description: Verify client project graph summary parity
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: client DTO matches API wire shape'
+  content: |
+    ### Requirement: client project status graph includes warnings
+
+    #### Scenario: Project status graph warnings deserialize on client
+
+    - **WHEN** API returns `graph.warnings` on project status
+    - **THEN** client `ProjectStatusDto.graph.warnings` preserves entries

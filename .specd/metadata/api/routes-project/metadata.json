@@ -15,7 +15,13 @@
     {
       "requirement": "project status aggregates lists and graph freshness",
       "rules": [
-        "`GET /project/status` MUST compose active/draft/discarded/archive counts and graph freshness/stale flags equivalent to CLI `project status`."
+        "`GET /project/status` MUST compose active/draft/discarded/archive counts and a `graph` summary equivalent to CLI `project status --graph`, including `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]` per [`api:dto-project-status`](../dto-project-status/spec.md)."
+      ]
+    },
+    {
+      "requirement": "project status exposes graph warnings",
+      "rules": [
+        "`GET /v1/project/status` MUST return `graph.warnings` as an array (possibly empty) when graph health is available, with stale and fingerprint diagnostics present when computed."
       ]
     },
     {
@@ -77,6 +83,15 @@
       "then": ["HTTP 404 is returned", "AND body is application/problem+json"]
     },
     {
+      "requirement": "project status exposes graph warnings",
+      "name": "GET project status returns graph warnings",
+      "when": ["GET /v1/project/status is called with graph health available"],
+      "then": [
+        "response graph.warnings is an array (possibly empty)",
+        "AND stale and fingerprint diagnostics are present when computed"
+      ]
+    },
+    {
       "requirement": "GET project echoes auth type for clients",
       "name": "GET /project exposes auth type",
       "when": ["GET /v1/project on running server"],
@@ -115,8 +130,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:bac176681a6d98ba19b3006bd069bbeb3ffc771c4bdadf300f7d4dac04d6744e",
-    "verify.md": "sha256:1c2cb8c4d7917cfc4ded466e1f3db269524989aaeac96f4cc7a1be8e1b3676c9"
+    "spec.md": "sha256:5f38021185c6d8c78192f377b3407f3370e6d3ceae8f2c145bb3ce096a8179c1",
+    "verify.md": "sha256:2aefbb5b56f0987c4954d43e1dfecf69b25c6a755d407e2a3b3788f4f4ea9146"
   },
   "generatedBy": "core"
 }

@@ -25,7 +25,7 @@ import { useSpecdDataPort } from '../context/specd-data-context.js'
 import type { ChangeView } from '../tabs/ChangeTabs.js'
 import { useChangeArtifact } from '../hooks/use-change-artifact.js'
 import { useChangesRead } from '../hooks/use-changes-read.js'
-import { useGraphStatus } from '../hooks/use-graph-status.js'
+import { useProjectPollSession } from '../hooks/project-poll-session.js'
 import { useClosedSpecsValidation } from '../hooks/use-closed-specs-validation.js'
 import { useDocumentPlatform } from '../hooks/use-document-platform.js'
 import { useWorkspaceSpecsCollection } from '../hooks/use-workspace-specs-collection.js'
@@ -287,7 +287,7 @@ export function ShellLayout({
     pollStatus: !workflowStatusUnavailable,
   })
   const archivedRead = useArchivedChange(isArchivedChange ? changeName : undefined)
-  const graphStatus = useGraphStatus(refreshKey)
+  const pollSession = useProjectPollSession()
 
   const changeArtifactFile =
     selectedArtifact?.kind === 'change' ? selectedArtifact.filename : undefined
@@ -770,7 +770,7 @@ export function ShellLayout({
     activeSection: railActiveSection,
     projectLabel: project?.name,
     activeChangeCount: changes.active.length,
-    graphStale: graphStatus.data?.stale === true,
+    graphStale: pollSession.projectStatus?.graph?.stale === true,
     onSelectSection: handleSelectSidebarSection,
     embeddedSidebarToggle: !isDarwinChrome,
     panels: {

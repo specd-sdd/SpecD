@@ -42,6 +42,14 @@
 - **THEN** error before response sent
 - **AND** no incomplete JSON
 
+### Requirement: project graph summary exposes health diagnostics
+
+#### Scenario: Project status graph slice mirrors graph status diagnostics
+
+- **WHEN** `GET /v1/project/status` includes graph health
+- **THEN** `graph.warnings` uses the same shape as `GraphStatusDto.warnings`
+- **AND** `graph.fingerprintMismatch` is exposed when computed
+
 ### Requirement: presenters map domain results without embedding rules
 
 #### Scenario: Presenter does not add business rules to DTO

@@ -88,7 +88,7 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
       drafts: 0,
       discarded: 0,
       archived: 0,
-      graph: { indexed: false, stale: true },
+      graph: { indexed: false, stale: true, warnings: [] },
       auth: { type: 'disabled' },
     })
   }
@@ -565,6 +565,9 @@ export class MemorySpecdDataAdapter implements SpecdDataPort {
       specCount: 0,
       graphFingerprint: null,
       stale: true,
+      currentRef: null,
+      fingerprintMismatch: null,
+      warnings: [],
     })
   }
 

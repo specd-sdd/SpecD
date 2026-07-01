@@ -6,6 +6,10 @@
   "dependsOn": ["client:specd-data-port", "client:port-project"],
   "implementation": [
     {
+      "file": "ui:src/hooks/project-poll-session.ts",
+      "symbols": ["publishProjectPollSession", "useProjectPollSession"]
+    },
+    {
       "file": "ui:src/hooks/use-project-poll.ts",
       "symbols": ["useProjectPoll"]
     }

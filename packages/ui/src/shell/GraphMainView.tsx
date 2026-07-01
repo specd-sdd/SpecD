@@ -2,10 +2,11 @@ import * as React from 'react'
 import { Network, RefreshCw, AlertTriangle, FileText, Code, FolderTree } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.js'
 import { Button } from '../components/ui/button.js'
-import { type GraphSymbolRefDto } from '@specd/client'
+import { type GraphSymbolRefDto, type ProjectGraphSummaryDto } from '@specd/client'
 import { Badge } from '../components/ui/badge.js'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
 import { useAsyncResource } from '../hooks/use-async-resource.js'
+import { useProjectPollSession } from '../hooks/project-poll-session.js'
 import { useStudioPanelActions } from '../hooks/use-studio-panel.js'
 
 type HotspotEntry = {
@@ -15,6 +16,19 @@ type HotspotEntry = {
   readonly symbol: GraphSymbolRefDto
 }
 
+function graphIndexLabel(graph: ProjectGraphSummaryDto | undefined): { headline: string; subtitle: string } {
+  if (graph?.lastIndexedAt == null && graph?.stale == null) {
+    return { headline: 'Off', subtitle: 'No index exists' }
+  }
+  if (graph?.stale) {
+    return { headline: 'Stale', subtitle: 'Graph needs reindexing' }
+  }
+  if (graph?.lastIndexedAt != null) {
+    return { headline: 'Ready', subtitle: 'Up to date' }
+  }
+  return { headline: 'Off', subtitle: 'No index exists' }
+}
+
 export function GraphMainView({
   refreshKey,
 }: {
@@ -22,13 +36,23 @@ export function GraphMainView({
 }): React.ReactElement {
   const port = useSpecdDataPort()
   const { appendOutput } = useStudioPanelActions()
+  const pollSession = useProjectPollSession()
   const [indexing, setIndexing] = React.useState(false)
 
-  // Fetch status
-  const loadStatus = React.useCallback(() => port.getGraphStatus(), [port])
-  const status = useAsyncResource('graph-status-main', loadStatus, { refreshKey })
+  const graph = pollSession.projectStatus?.graph
+  const indexLabel = graphIndexLabel(graph)
+  const diagnosticLines =
+    graph?.warnings && graph.warnings.length > 0
+      ? graph.warnings.map((warning) => warning.message)
+      : [
+          ...(graph?.stale ? ['Graph is stale — run graph index to refresh'] : []),
+          ...(graph?.fingerprintMismatch
+            ? [
+                'Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index',
+              ]
+            : []),
+        ]
 
-  // Fetch hotspots
   const loadHotspots = React.useCallback(async () => {
     try {
       return (await port.getHotspots()) as readonly HotspotEntry[]
@@ -52,7 +76,7 @@ export function GraphMainView({
         level: 'info',
         action: 'index-graph',
       })
-      status.refetch()
+      pollSession.refetch()
       hotspots.refetch()
     } catch (err) {
       void appendOutput({
@@ -65,7 +89,10 @@ export function GraphMainView({
     }
   }
 
-  const s = status.data
+  const refSubtitle =
+    graph?.lastIndexedRef != null && graph?.currentRef != null
+      ? `Indexed ref ${graph.lastIndexedRef} · current ${graph.currentRef}`
+      : null
 
   return (
     <div className="@container min-h-0 flex-1 overflow-auto p-4 text-xs">
@@ -85,7 +112,7 @@ export function GraphMainView({
         <Button
           variant="secondary"
           size="sm"
-          disabled={indexing || status.isLoading}
+          disabled={indexing || pollSession.isLoading}
           onClick={() => void handleIndexGraph()}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${indexing ? 'animate-spin' : ''}`} />
@@ -94,7 +121,6 @@ export function GraphMainView({
       </div>
 
       <div className="grid w-full grid-cols-1 gap-3 @[640px]:grid-cols-2 @[960px]:grid-cols-4">
-        {/* Stats Cards */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -104,17 +130,27 @@ export function GraphMainView({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {s?.stale ? (
+              {indexLabel.headline === 'Stale' ? (
                 <span className="text-amber-500">Stale</span>
-              ) : s?.lastIndexedAt !== null ? (
+              ) : indexLabel.headline === 'Ready' ? (
                 <span className="text-emerald-500">Ready</span>
               ) : (
                 <span className="text-amber-500">Off</span>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              {s?.stale ? 'Graph needs reindexing' : s?.lastIndexedAt !== null ? 'Up to date' : 'No index exists'}
-            </p>
+            <p className="text-[10px] text-muted-foreground mt-1">{indexLabel.subtitle}</p>
+            {refSubtitle !== null ? (
+              <p className="text-[10px] text-muted-foreground mt-1 font-mono">{refSubtitle}</p>
+            ) : null}
+            {diagnosticLines.length > 0 ? (
+              <div className="mt-2 space-y-1">
+                {diagnosticLines.map((line, idx) => (
+                  <p key={idx} className="text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -126,7 +162,7 @@ export function GraphMainView({
             <FileText className="h-4 w-4 text-studio-info" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">{s?.specCount ?? 0}</div>
+            <div className="text-2xl font-bold font-mono">{graph?.specCount ?? 0}</div>
             <p className="text-[10px] text-muted-foreground mt-1">Indexed specs</p>
           </CardContent>
         </Card>
@@ -140,10 +176,10 @@ export function GraphMainView({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">
-              {(s?.fileCount ?? 0) + (s?.documentCount ?? 0)}
+              {(graph?.fileCount ?? 0) + (graph?.documentCount ?? 0)}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              {s?.fileCount ?? 0} code files, {s?.documentCount ?? 0} documents
+              {graph?.fileCount ?? 0} code files, {graph?.documentCount ?? 0} documents
             </p>
           </CardContent>
         </Card>
@@ -156,12 +192,11 @@ export function GraphMainView({
             <Code className="h-4 w-4 text-studio-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">{s?.symbolCount ?? 0}</div>
+            <div className="text-2xl font-bold font-mono">{graph?.symbolCount ?? 0}</div>
             <p className="text-[10px] text-muted-foreground mt-1">Indexed symbols</p>
           </CardContent>
         </Card>
 
-        {/* Hotspots Section */}
         <Card className="col-span-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

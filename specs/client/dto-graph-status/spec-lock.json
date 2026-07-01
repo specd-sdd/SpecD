@@ -6,6 +6,10 @@
   "dependsOn": ["default:_global/architecture", "api:dto-graph-status"],
   "implementation": [
     {
+      "file": "client:src/graph-health-warnings.ts",
+      "symbols": ["deriveGraphHealthWarnings", "GraphHealthWarningDto"]
+    },
+    {
       "file": "client:src/dto/graph-status.ts",
       "symbols": ["GraphStatusDto"]
     }

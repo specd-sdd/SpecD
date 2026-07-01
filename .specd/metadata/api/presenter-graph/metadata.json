@@ -17,6 +17,12 @@
       "rules": [
         "The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in core use cases invoked via the SDK kernel surface."
       ]
+    },
+    {
+      "requirement": "graph status presenter derives warnings from health result",
+      "rules": [
+        "`toGraphStatusDto` MUST accept `GetGraphHealthResult` (or equivalent fields) and populate [`api:dto-graph-status`](../dto-graph-status/spec.md) diagnostic properties.\n\nThe presenter MUST derive `warnings[]` deterministically:\n\n- When `stale === true` and both `lastIndexedRef` and `currentRef` are non-null, append `{ type: 'graph-stale', message: ... }` using CLI-equivalent copy (short ref prefixes allowed).\n- When `fingerprintMismatch === true`, append `{ type: 'graph-fingerprint-mismatch', message: ... }` using CLI-equivalent copy.\n\nThe presenter MUST NOT recompute staleness or fingerprint mismatch — it formats values already computed by `GetGraphHealth`."
+      ]
     }
   ],
   "constraints": [
@@ -66,6 +72,20 @@
       "name": "Repeated mapping is deterministic",
       "when": ["presenter called twice on same input"],
       "then": ["outputs are identical", "AND no time-dependent fields unless documented"]
+    },
+    {
+      "requirement": "graph status presenter derives warnings from health result",
+      "name": "Presenter does not recompute staleness",
+      "given": ["a GetGraphHealthResult fixture with stale: true"],
+      "when": ["toGraphStatusDto runs"],
+      "then": ["output stale matches input", "AND warnings are derived only from input fields"]
+    },
+    {
+      "requirement": "graph status presenter derives warnings from health result",
+      "name": "CLI-equivalent stale message",
+      "given": ["known lastIndexedRef and currentRef"],
+      "when": ["stale warning is emitted"],
+      "then": ["message mentions indexed vs current ref prefixes"]
     }
   ],
   "implementation": {
@@ -74,27 +94,12 @@
         "specId": "api:presenter-graph",
         "file": "api:src/delivery/http/presenters/presenter-graph.ts",
         "symbol": "toGraphStatusDto"
-      },
-      {
-        "specId": "api:presenter-graph",
-        "file": "api:src/delivery/http/presenters/presenter-graph.ts",
-        "symbol": "toGraphSearchResultDto"
-      },
-      {
-        "specId": "api:presenter-graph",
-        "file": "api:src/delivery/http/presenters/presenter-graph.ts",
-        "symbol": "toGraphImpactDto"
-      },
-      {
-        "specId": "api:presenter-graph",
-        "file": "api:src/delivery/http/presenters/presenter-graph.ts",
-        "symbol": "toChangeGraphViewDto"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:09984f4781a3169779a4c1eff62c85dbf68cf9cec385ca13188d705f0bb5da34",
-    "verify.md": "sha256:75846f0798cfe617448a882088c7c5611a1573b3a394b99ee3a25998a05f12b1"
+    "spec.md": "sha256:0e882fd1646a8e4c836a6dadd2767e0df9ee601991a631f5911dfcf7e84af5da",
+    "verify.md": "sha256:8e402660daabeb9684c0d9509c33703f3a94dfa143b70cd76e7f2c3f3001f3c4"
   },
   "generatedBy": "core"
 }

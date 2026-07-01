@@ -1,0 +1,21 @@
+- op: modified
+  description: Client ProjectGraphSummaryDto mirrors API diagnostics
+  selector:
+    type: section
+    matches: 'Requirement: client DTO matches API wire shape'
+  content: |
+    The TypeScript `ProjectStatusDto` / embedded `graph` summary in `@specd/client` MUST mirror [`api:dto-project-status`](../../api/dto-project-status/spec.md), including graph count and diagnostic fields (`fileCount`, `documentCount`, `symbolCount`, `specCount`, `lastIndexedAt`, `lastIndexedRef`, `stale`, `currentRef`, `fingerprintMismatch`, `warnings[]`).
+
+- op: added
+  description: Client project graph warnings requirement
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: client DTO matches API wire shape'
+  content: |
+    ### Requirement: client project status graph includes warnings
+
+    `ProjectStatusDto.graph.warnings` in `@specd/client` MUST preserve `{ type: string; message: string }[]` entries from the API wire shape.

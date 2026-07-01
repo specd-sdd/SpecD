@@ -110,7 +110,7 @@
     {
       "requirement": "UI stack uses Tailwind Radix shadcn and named libraries",
       "rules": [
-        "`@specd/ui` MUST build Studio chrome on this **v1 stack** (no alternate component library):\n\n| Concern            | Library                                                          | Usage                                                                                                  |\n| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |\n| Utility CSS        | **Tailwind CSS**                                                 | Layout, spacing, colors mapped to Studio tokens                                                        |\n| Primitives         | **Radix UI** / **Base UI**                                       | Accessible primitives via shadcn components (Dialog, Popover, Combobox, Tabs, etc.)                    |\n| Component kit      | **shadcn/ui**                                                    | Copied into `packages/ui/src/components/ui/`; re-themed to IDE density (not default marketing spacing) |\n| Variants           | **class-variance-authority** (`cva`)                             | Variant props on shared components                                                                     |\n| Class merging      | **tailwind-merge** (+ `clsx` or equivalent)                      | `cn()` helper in `lib/utils.ts`                                                                        |\n| Split layout       | **react-resizable-panels**                                       | Sidebar / editor / inspector / bottom splits                                                           |\n| Selection & Lists  | **cmdk** / **Base UI**                                           | Command palettes and advanced Combobox implementations                                                 |\n| Trees              | **`react-arborist`** or shadcn/Radix-backed tree wrappers        | Changes and workspace sidebars                                                                         |\n| Code editor        | **@monaco-editor/react** + **monaco-editor**                     | `ui:artifact-editor` and read-only inspectors                                                          |\n| Icons              | **lucide-react**                                                 | Navigation and toolbars                                                                                |\n\nshadcn components MUST be customized (Tailwind theme + `cva`) to match this spec’s palette, radius, and density. Local names such as `StudioDialog` or sidebar/tree wrappers MUST be thin shadcn/Radix-backed adapters, not reimplemented primitives. Default shadcn “card dashboard” layouts MUST NOT be used for the shell.\n\nHosts (`studio-web`, `studio-desktop`) MUST configure Tailwind to scan `@specd/ui` sources (or consume a prebuilt UI stylesheet) so utilities compile correctly."
+        "`@specd/ui` MUST build Studio chrome on this **v1 stack** (no alternate component library):\n\n| Concern           | Library                                                   | Usage                                                                                                  |\n| ----------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |\n| Utility CSS       | **Tailwind CSS**                                          | Layout, spacing, colors mapped to Studio tokens                                                        |\n| Primitives        | **Radix UI** / **Base UI**                                | Accessible primitives via shadcn components (Dialog, Popover, Combobox, Tabs, etc.)                    |\n| Component kit     | **shadcn/ui**                                             | Copied into `packages/ui/src/components/ui/`; re-themed to IDE density (not default marketing spacing) |\n| Variants          | **class-variance-authority** (`cva`)                      | Variant props on shared components                                                                     |\n| Class merging     | **tailwind-merge** (+ `clsx` or equivalent)               | `cn()` helper in `lib/utils.ts`                                                                        |\n| Split layout      | **react-resizable-panels**                                | Sidebar / editor / inspector / bottom splits                                                           |\n| Selection & Lists | **cmdk** / **Base UI**                                    | Command palettes and advanced Combobox implementations                                                 |\n| Trees             | **`react-arborist`** or shadcn/Radix-backed tree wrappers | Changes and workspace sidebars                                                                         |\n| Code editor       | **@monaco-editor/react** + **monaco-editor**              | `ui:artifact-editor` and read-only inspectors                                                          |\n| Icons             | **lucide-react**                                          | Navigation and toolbars                                                                                |\n\nshadcn components MUST be customized (Tailwind theme + `cva`) to match this spec’s palette, radius, and density. Local names such as `StudioDialog` or sidebar/tree wrappers MUST be thin shadcn/Radix-backed adapters, not reimplemented primitives. Default shadcn “card dashboard” layouts MUST NOT be used for the shell.\n\nHosts (`studio-web`, `studio-desktop`) MUST configure Tailwind to scan `@specd/ui` sources (or consume a prebuilt UI stylesheet) so utilities compile correctly."
       ]
     },
     {
@@ -122,7 +122,7 @@
     {
       "requirement": "top bar exposes docs, notifications, and theme controls",
       "rules": [
-        "The `StudioTopBar` component MUST expose three control buttons on the right side:\n\n1. **Docs** (`BookOpenText`): Redirects/opens the native browser to `https://getspecd.dev/docs/guide/getting-started`.\n2. **Notifications** (`Bell`): Shows a popover with project health checks: change overlaps/conflicts, stale graph warnings, and spec validation failures. Displays a red badge when any issues are active.\n3. **Appearance** (`SunMedium` / `Moon`): Toggles between light and dark visual themes. Persists selection in user storage."
+        "The `StudioTopBar` component MUST expose three control buttons on the right side:\n\n1. **Docs** (`BookOpenText`): Redirects/opens the native browser to `https://getspecd.dev/docs/guide/getting-started`.\n2. **Notifications** (`Bell`): Shows a popover with project health checks: change overlaps/conflicts, graph health warnings from `projectStatus.graph.warnings[]` (including stale graph and fingerprint mismatch), and spec validation failures. When `warnings[]` is absent, the UI MUST fall back to `graph.stale` and `graph.fingerprintMismatch` booleans. Displays a red badge when any issue is active.\n3. **Appearance** (`SunMedium` / `Moon`): Toggles between light and dark visual themes. Persists selection in user storage.\n\nGraph warning cards MUST use distinct titles for `graph-stale` vs `graph-fingerprint-mismatch` (or equivalent boolean fallback) and render the server-provided `message` text."
       ]
     }
   ],
@@ -605,10 +605,12 @@
     {
       "requirement": "top bar exposes docs, notifications, and theme controls",
       "name": "Notifications popover displays health checks and conflicts",
-      "given": ["stale graph index is true or change overlaps are detected"],
+      "given": [
+        "stale graph index is true, fingerprint mismatch is true, or change overlaps are detected"
+      ],
       "when": ["user clicks on Notifications button"],
       "then": [
-        "popover renders showing active warnings",
+        "popover renders distinct cards for each active graph warning type when present in graph.warnings or boolean fallbacks",
         "AND indicator badge is visible on notifications button"
       ]
     },
@@ -643,28 +645,18 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "ui:design-system",
-        "file": "ui:src/styles/globals.css"
-      },
-      {
-        "specId": "ui:design-system",
-        "file": "ui:src/SpecdApp.tsx"
-      },
-      {
-        "specId": "ui:design-system",
-        "file": "ui:tailwind.config.ts"
-      },
-      {
-        "specId": "ui:design-system",
-        "file": "ui:test/use-async-resource.spec.ts"
+        "file": "ui:src/shell/StudioTopBar.tsx",
+        "symbol": "StudioTopBar"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ae44f9ec573102968250b9b2d7361d61440b823f5470d52765f498f4de455bda",
-    "verify.md": "sha256:4e3e36710bc63b6bd724738f906e4a60fddfd0654148eaa8c221c83a6332cf2d"
+    "spec.md": "sha256:a9ed0290f72af8438ec5020c9ad5335c3c2c22453d399d2406c722e2944b95a3",
+    "verify.md": "sha256:e11e9753e3dd54978606c096b20bfdd7df0f2e5519c0a1e7baf7b962a535c576"
   },
-  "generatedBy": "core"
+  "generatedBy": "core",
+  "dependsOn": []
 }

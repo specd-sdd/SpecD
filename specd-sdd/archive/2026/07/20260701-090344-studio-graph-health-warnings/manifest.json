@@ -1,0 +1,1610 @@
+{
+  "name": "studio-graph-health-warnings",
+  "createdAt": "2026-07-01T09:03:44.537Z",
+  "updatedAt": "2026-07-01T15:12:07.542Z",
+  "description": "Graph health warnings via project poll session store, Bell, and Graph panel (CLI parity)",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "api:dto-graph-status",
+    "api:dto-project-status",
+    "client:dto-graph-status",
+    "client:dto-project-status",
+    "api:presenter-graph",
+    "api:presenter-project",
+    "api:routes-graph",
+    "api:routes-project",
+    "ui:design-system",
+    "ui:graph-main-view",
+    "ui:hooks-project",
+    "ui:hooks-graph",
+    "ui:sidebar-graph-entry"
+  ],
+  "specDependsOn": {
+    "api:dto-graph-status": ["default:_global/architecture", "default:_global/conventions"],
+    "api:dto-project-status": ["default:_global/architecture", "default:_global/conventions"],
+    "client:dto-graph-status": ["default:_global/architecture", "api:dto-graph-status"],
+    "client:dto-project-status": ["default:_global/architecture", "api:dto-project-status"],
+    "api:presenter-graph": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "api:dto-graph"
+    ],
+    "api:presenter-project": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "api:dto-project"
+    ],
+    "api:routes-graph": ["default:_global/architecture", "default:_global/conventions"],
+    "api:routes-project": ["default:_global/architecture", "default:_global/conventions"],
+    "ui:design-system": [],
+    "ui:graph-main-view": ["client:specd-data-port", "ui:design-system"],
+    "ui:hooks-project": ["client:specd-data-port", "client:port-project"],
+    "ui:hooks-graph": ["client:specd-data-port", "client:port-graph"],
+    "ui:sidebar-graph-entry": ["client:specd-data-port"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/dto/graph-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/dto/project-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/openapi-schemas.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/presenters/presenter-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/presenters/presenter-project.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/adapter-memory-specd-data.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/dto/graph-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/dto/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/dto/project-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/hooks/use-project-poll.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/GraphMainView.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/ShellLayout.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/shell/StudioTopBar.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/test/presenter-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/graph-health-warnings.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/test/graph-health-warnings.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/src/hooks/project-poll-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/hooks/project-poll-session.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/ui/test/shell/graph-main-view-health.spec.tsx",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-project.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "client:dto-graph-status",
+      "file": "packages/client/src/graph-health-warnings.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["deriveGraphHealthWarnings", "GraphHealthWarningDto"]
+    },
+    {
+      "specId": "api:presenter-graph",
+      "file": "packages/api/src/delivery/http/presenters/presenter-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toGraphStatusDto"]
+    },
+    {
+      "specId": "api:presenter-project",
+      "file": "packages/api/src/delivery/http/presenters/presenter-project.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toProjectStatusDtoFromSnapshot", "toProjectGraphSummaryDto"]
+    },
+    {
+      "specId": "ui:hooks-project",
+      "file": "packages/ui/src/hooks/project-poll-session.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["publishProjectPollSession", "useProjectPollSession"]
+    },
+    {
+      "specId": "ui:hooks-project",
+      "file": "packages/ui/src/hooks/use-project-poll.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["useProjectPoll"]
+    },
+    {
+      "specId": "ui:design-system",
+      "file": "packages/ui/src/shell/StudioTopBar.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["StudioTopBar"]
+    },
+    {
+      "specId": "ui:graph-main-view",
+      "file": "packages/ui/src/shell/GraphMainView.tsx",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphMainView"]
+    },
+    {
+      "specId": "ui:sidebar-graph-entry",
+      "file": "packages/ui/src/shell/ShellLayout.tsx",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "client:dto-graph-status",
+      "file": "packages/client/src/dto/graph-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStatusDto"]
+    },
+    {
+      "specId": "client:dto-project-status",
+      "file": "packages/client/src/dto/project-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ProjectGraphSummaryDto", "ProjectStatusDto"]
+    },
+    {
+      "specId": "api:dto-graph-status",
+      "file": "packages/api/src/delivery/http/dto/graph-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStatusDto"]
+    },
+    {
+      "specId": "api:dto-project-status",
+      "file": "packages/api/src/delivery/http/dto/project-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ProjectStatusDto"]
+    },
+    {
+      "specId": "api:routes-graph",
+      "file": "packages/api/src/delivery/http/handlers/handler-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphRoutes"]
+    },
+    {
+      "specId": "api:routes-project",
+      "file": "packages/api/src/delivery/http/handlers/handler-project.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectRoutes"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:55ebbed67de01ec45cdfd02cff97cd6333750c4e606391587ebfe03b0aa3f1e5"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "api:dto-graph-status",
+          "filename": "deltas/api/dto-graph-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3774f187ebadf70d7468c661aa7d7c3995383a6761ec12c21c1c4341d1952be1"
+        },
+        {
+          "key": "api:dto-project-status",
+          "filename": "deltas/api/dto-project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2048541985721cb7e1a544a4e9b442387c50141b49d282fe699affd2f4e40e6f"
+        },
+        {
+          "key": "client:dto-graph-status",
+          "filename": "deltas/client/dto-graph-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a2c42ed97626397202dcc6a97ebc9178effedc47a6397c9ca079a6bf4a6bd352"
+        },
+        {
+          "key": "client:dto-project-status",
+          "filename": "deltas/client/dto-project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e499839b10ec0c7bae7ce44293f5554c473a90667b3ef0fc35a5680a9d097f32"
+        },
+        {
+          "key": "api:presenter-graph",
+          "filename": "deltas/api/presenter-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4b592e2ddad481ca1f07e04541003844e0d0c21be20734fbe1f0bd7e8e695312"
+        },
+        {
+          "key": "api:presenter-project",
+          "filename": "deltas/api/presenter-project/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d9ce07b82a4b3fdce4a869e12729368871d8d35c8963d82edfedf9dc24a6f459"
+        },
+        {
+          "key": "api:routes-graph",
+          "filename": "deltas/api/routes-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bd42a812115581c10040f5856709aaf1ae9e2916a997ff3850fbe302369e7aaf"
+        },
+        {
+          "key": "api:routes-project",
+          "filename": "deltas/api/routes-project/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:82a812e8ae556b663471b9da4c2b993e9d49f5433a18f72e7631d0d01d087dff"
+        },
+        {
+          "key": "ui:design-system",
+          "filename": "deltas/ui/design-system/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:309e31b11a42eca9be7ebf273e2c94e3a225325f70bea3e833c4ae5a5009a4d6"
+        },
+        {
+          "key": "ui:graph-main-view",
+          "filename": "deltas/ui/graph-main-view/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1f60195d76b887139932c088760a5783fe2da605fd537f4715aecdfce93c26af"
+        },
+        {
+          "key": "ui:hooks-project",
+          "filename": "deltas/ui/hooks-project/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ce6e2d9039305dffb07fc5e7a61aabb6dccb4f0198531a156c9cc97be9051a0c"
+        },
+        {
+          "key": "ui:hooks-graph",
+          "filename": "deltas/ui/hooks-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0f3673952a7984d15eb95510ca50ef5d077409fc0c3acda6d7e31ec8d3d761e5"
+        },
+        {
+          "key": "ui:sidebar-graph-entry",
+          "filename": "deltas/ui/sidebar-graph-entry/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:43df600011b619c9c3c848e6f8d304e4a26723bfba0cde07a8a1d328b161e7e6"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "api:dto-graph-status",
+          "filename": "deltas/api/dto-graph-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:66c248c3764472e5e563bd3a9bb66e8e72d4d357f8f8677b257a30af428268fb"
+        },
+        {
+          "key": "api:dto-project-status",
+          "filename": "deltas/api/dto-project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bfd87403e6a4e1504220b010e8cde2501e13efb9fbdaf7ef3b6b6cde8857dbd5"
+        },
+        {
+          "key": "client:dto-graph-status",
+          "filename": "deltas/client/dto-graph-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:85505c7f7e66cc633bbd403d8eafd29c20050c03f892900890cc2c991a637f75"
+        },
+        {
+          "key": "client:dto-project-status",
+          "filename": "deltas/client/dto-project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02fd090eaa06dc2ae933ccaf84f1fe5554a871806c2934cf0c4d29fb4db155bb"
+        },
+        {
+          "key": "api:presenter-graph",
+          "filename": "deltas/api/presenter-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:edbca56b3ad26ed3a6cd147aee775a6bf8729f2edce9b76c66fd47a52b32892a"
+        },
+        {
+          "key": "api:presenter-project",
+          "filename": "deltas/api/presenter-project/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a445da12d2dd67e1bd9b254cb733cc79cfe38394de1e35b97ec9bb9d5634c08c"
+        },
+        {
+          "key": "api:routes-graph",
+          "filename": "deltas/api/routes-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a055f7acad66830ccfefbfc8e19668ea3994ad30103a8dff6446fc137de47cda"
+        },
+        {
+          "key": "api:routes-project",
+          "filename": "deltas/api/routes-project/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7b0310d3137d30e89b18c7a03afa9e76a565fc598a97563b98549e7c06c923bc"
+        },
+        {
+          "key": "ui:design-system",
+          "filename": "deltas/ui/design-system/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3834c5314a8b699584d6471c42ddd56667ad2c34bfac06e48bf5216eb4ed073c"
+        },
+        {
+          "key": "ui:graph-main-view",
+          "filename": "deltas/ui/graph-main-view/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3babd6969280e6a19a1da63741665a14703c7dde66db444f4e06a5b9763cb923"
+        },
+        {
+          "key": "ui:hooks-project",
+          "filename": "deltas/ui/hooks-project/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:50fa9ab079e3890338c0ecfe79f83c7e7c16626ee2059791749cc8ee2b05beaf"
+        },
+        {
+          "key": "ui:hooks-graph",
+          "filename": "deltas/ui/hooks-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:859c330a2338480156d154390674523f12e77b11c1e9ebcaef8b890438971661"
+        },
+        {
+          "key": "ui:sidebar-graph-entry",
+          "filename": "deltas/ui/sidebar-graph-entry/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:35eddac7b67bcb122e49cb0567556a7390637d171826503ca2f853722af44630"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:d9ec5a323a664f5840b06d7bd277b9597d3093dbe3ebfa4fb87411876e32b56f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:59a2923214af7571a6f4da1a79971826b51d98f6398aa859561a559ef4c3233b"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-01T09:03:44.537Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "api:dto-graph-status",
+        "api:dto-project-status",
+        "client:dto-graph-status",
+        "client:dto-project-status",
+        "api:presenter-graph",
+        "api:presenter-project",
+        "api:routes-graph",
+        "api:routes-project",
+        "ui:design-system"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-01T09:03:44.562Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "api:dto-graph-status"
+        },
+        {
+          "type": "specs",
+          "key": "api:dto-project-status"
+        },
+        {
+          "type": "specs",
+          "key": "client:dto-graph-status"
+        },
+        {
+          "type": "specs",
+          "key": "client:dto-project-status"
+        },
+        {
+          "type": "specs",
+          "key": "api:presenter-graph"
+        },
+        {
+          "type": "specs",
+          "key": "api:presenter-project"
+        },
+        {
+          "type": "specs",
+          "key": "api:routes-graph"
+        },
+        {
+          "type": "specs",
+          "key": "api:routes-project"
+        },
+        {
+          "type": "specs",
+          "key": "ui:design-system"
+        },
+        {
+          "type": "verify",
+          "key": "api:dto-graph-status"
+        },
+        {
+          "type": "verify",
+          "key": "api:dto-project-status"
+        },
+        {
+          "type": "verify",
+          "key": "client:dto-graph-status"
+        },
+        {
+          "type": "verify",
+          "key": "client:dto-project-status"
+        },
+        {
+          "type": "verify",
+          "key": "api:presenter-graph"
+        },
+        {
+          "type": "verify",
+          "key": "api:presenter-project"
+        },
+        {
+          "type": "verify",
+          "key": "api:routes-graph"
+        },
+        {
+          "type": "verify",
+          "key": "api:routes-project"
+        },
+        {
+          "type": "verify",
+          "key": "ui:design-system"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T09:09:57.907Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T10:31:46.551Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [api:dto-project-status, api:routes-project, client:dto-graph-status, client:dto-project-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "api:dto-project-status",
+            "api:routes-project",
+            "client:dto-graph-status",
+            "client:dto-project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T10:32:23.690Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T10:40:32.912Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T10:40:32.912Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T10:40:34.178Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-01T10:40:34.186Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "ui:graph-main-view"
+        },
+        {
+          "type": "verify",
+          "key": "ui:graph-main-view"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-01T10:41:21.211Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Expose graph health warnings in API/IPC DTOs, Bell notifications, and Graph panel (CLI parity)"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T10:41:43.953Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T10:53:21.829Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system",
+            "ui:graph-main-view"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system",
+            "ui:graph-main-view"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T10:53:21.829Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T10:53:23.465Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system",
+            "ui:graph-main-view"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:dto-graph-status",
+            "api:dto-project-status",
+            "client:dto-graph-status",
+            "client:dto-project-status",
+            "api:presenter-graph",
+            "api:presenter-project",
+            "api:routes-graph",
+            "api:routes-project",
+            "ui:design-system",
+            "ui:graph-main-view"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-01T10:53:23.515Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Graph health warnings via project poll session store, Bell, and Graph panel (CLI parity)"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-01T10:53:23.517Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "ui:hooks-project"
+        },
+        {
+          "type": "specs",
+          "key": "ui:hooks-graph"
+        },
+        {
+          "type": "specs",
+          "key": "ui:sidebar-graph-entry"
+        },
+        {
+          "type": "verify",
+          "key": "ui:hooks-project"
+        },
+        {
+          "type": "verify",
+          "key": "ui:hooks-graph"
+        },
+        {
+          "type": "verify",
+          "key": "ui:sidebar-graph-entry"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T10:55:43.217Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T10:58:35.069Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T11:23:13.766Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T11:23:13.766Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T11:30:02.336Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T12:02:33.379Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:28:20.091Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T14:28:46.417Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:28:46.417Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:43:02.978Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:43:04.838Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:43:06.731Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:43:14.053Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:43:23.460Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T14:45:27.634Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:45:27.634Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:46:24.668Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:46:28.116Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:46:33.929Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:46:41.328Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T14:46:43.577Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:46:43.577Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "done",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:47:53.311Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:48:03.967Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:48:11.492Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:48:21.405Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:48:29.125Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T14:48:51.145Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:48:51.145Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:49:29.084Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:49:32.550Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:49:36.179Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:49:40.079Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:49:44.172Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T14:50:24.280Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:50:24.280Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:54:19.615Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:54:33.715Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T14:54:34.187Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:54:34.187Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:56:27.179Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:56:30.741Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:56:44.388Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-01T14:56:56.048Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T14:56:56.048Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T15:05:28.977Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T15:05:33.833Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T15:05:39.189Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T15:05:43.931Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T15:05:49.094Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-01T15:07:18.565Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'api:presenter-graph': extracted dependencies [default:_global/architecture, default:_global/conventions, api:dto-graph] do not match persisted dependencies [default:_global/architecture, default:_global/conventions, api:dto-graph, api:dto-graph-status, code-graph:get-graph-health]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-01T15:10:00.952Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'api:presenter-project': extracted dependencies [default:_global/architecture, default:_global/conventions, api:dto-project] do not match persisted dependencies [default:_global/architecture, default:_global/conventions, api:dto-project, api:dto-project-status, sdk:build-project-status-snapshot]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-01T15:12:07.542Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-01T15:12:07.784Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

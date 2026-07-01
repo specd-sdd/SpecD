@@ -8,7 +8,7 @@ export {
   type RecentConnection,
 } from './welcome/WelcomeScreen.js'
 export { SpecdDataProvider, useSpecdDataPort } from './context/specd-data-context.js'
-export { useProjectPoll } from './hooks/use-project-poll.js'
+export { useProjectPoll, useProjectPollSession } from './hooks/use-project-poll.js'
 export { useChangesCollection } from './hooks/use-changes-collection.js'
 export { useChangesRead } from './hooks/use-changes-read.js'
 export { useGraphStatus } from './hooks/use-graph-status.js'

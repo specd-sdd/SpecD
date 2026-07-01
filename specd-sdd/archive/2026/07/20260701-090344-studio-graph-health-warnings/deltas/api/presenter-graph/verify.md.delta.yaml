@@ -1,0 +1,24 @@
+- op: added
+  description: Verify presenter warning derivation
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: presenter does not encode business rules'
+  content: |
+    ### Requirement: graph status presenter derives warnings from health result
+
+    #### Scenario: Presenter does not recompute staleness
+
+    - **GIVEN** a `GetGraphHealthResult` fixture with `stale: true`
+    - **WHEN** `toGraphStatusDto` runs
+    - **THEN** output `stale` matches input
+    - **AND** warnings are derived only from input fields
+
+    #### Scenario: CLI-equivalent stale message
+
+    - **GIVEN** known `lastIndexedRef` and `currentRef`
+    - **WHEN** stale warning is emitted
+    - **THEN** message mentions indexed vs current ref prefixes

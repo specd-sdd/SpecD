@@ -10,7 +10,6 @@ import {
 import { getSetting, setSetting, removeSetting } from './settings-store.js'
 
 import {
-  type GraphStatistics,
   type SymbolKind,
   createCodeGraphProvider,
   type IndexResult,
@@ -36,6 +35,7 @@ import {
   type CompileContextResult,
   type GetArtifactInstructionResult,
   type GetChangeArtifactResult,
+  type GetGraphHealthResult,
   type GetHookInstructionsResult,
   type GetImplementationReviewResult,
   type GetStatusResult,
@@ -86,6 +86,7 @@ import {
   type ValidateBatchResultDto,
   type WorkspaceSpecTreeDto,
   type WorkspaceSummaryDto,
+  deriveGraphHealthWarnings,
 } from '@specd/client'
 import type {
   OutlineChangeArtifactInput,
@@ -672,45 +673,75 @@ function toWorkspaceSummaryDtos(
   })
 }
 
+function toProjectGraphSummaryDto(
+  graphHealth: GetGraphHealthResult | null,
+): NonNullable<ProjectStatusDto['graph']> {
+  if (graphHealth === null) {
+    return {
+      indexed: false,
+      warnings: [],
+    }
+  }
+  const warnings = deriveGraphHealthWarnings({
+    stale: graphHealth.stale,
+    fingerprintMismatch: graphHealth.fingerprintMismatch,
+    lastIndexedRef: graphHealth.lastIndexedRef,
+    currentRef: graphHealth.currentRef,
+  })
+  return {
+    indexed: true,
+    lastIndexedAt: graphHealth.lastIndexedAt ?? null,
+    lastIndexedRef: graphHealth.lastIndexedRef ?? null,
+    stale: graphHealth.stale,
+    currentRef: graphHealth.currentRef,
+    fingerprintMismatch: graphHealth.fingerprintMismatch,
+    fileCount: graphHealth.fileCount,
+    documentCount: graphHealth.documentCount,
+    symbolCount: graphHealth.symbolCount,
+    specCount: graphHealth.specCount,
+    warnings,
+  }
+}
+
 function toProjectStatusDtoFromSnapshot(
   snapshot: Awaited<ReturnType<typeof buildProjectStatusSnapshot>>,
   config: SpecdConfig,
 ): ProjectStatusDto {
-  const graphHealth = snapshot.graphHealth
   return {
     activeChanges: snapshot.summary.activeCount,
     drafts: snapshot.summary.draftCount,
     discarded: snapshot.summary.discardedCount,
     archived: snapshot.summary.archivedCount,
-    graph: {
-      indexed: graphHealth !== null,
-      ...(graphHealth?.stale !== undefined && graphHealth.stale !== null
-        ? { stale: graphHealth.stale }
-        : {}),
-      ...(graphHealth?.symbolCount !== undefined ? { symbolCount: graphHealth.symbolCount } : {}),
-      ...(graphHealth?.specCount !== undefined ? { specCount: graphHealth.specCount } : {}),
-    },
+    graph: toProjectGraphSummaryDto(snapshot.graphHealth),
     auth: { type: config.api?.auth.type ?? 'disabled' },
   }
 }
 
 /**
- * Maps graph statistics to the graph status DTO.
+ * Maps graph health to the graph status DTO.
  *
- * @param stats - Graph statistics.
- * @param stale - Staleness flag.
+ * @param health - Enriched graph health.
  * @returns Graph status DTO.
  */
-function toGraphStatusDto(stats: GraphStatistics, stale: boolean | null): GraphStatusDto {
+function toGraphStatusDto(health: GetGraphHealthResult): GraphStatusDto {
+  const warnings = deriveGraphHealthWarnings({
+    stale: health.stale,
+    fingerprintMismatch: health.fingerprintMismatch,
+    lastIndexedRef: health.lastIndexedRef,
+    currentRef: health.currentRef,
+  })
   return {
-    lastIndexedAt: stats.lastIndexedAt ?? null,
-    lastIndexedRef: stats.lastIndexedRef ?? null,
-    fileCount: stats.fileCount,
-    documentCount: stats.documentCount,
-    symbolCount: stats.symbolCount,
-    specCount: stats.specCount,
-    graphFingerprint: stats.graphFingerprint ?? null,
-    stale,
+    lastIndexedAt: health.lastIndexedAt ?? null,
+    lastIndexedRef: health.lastIndexedRef ?? null,
+    fileCount: health.fileCount,
+    documentCount: health.documentCount,
+    symbolCount: health.symbolCount,
+    specCount: health.specCount,
+    graphFingerprint: health.graphFingerprint ?? null,
+    stale: health.stale,
+    currentRef: health.currentRef,
+    fingerprintMismatch: health.fingerprintMismatch,
+    warnings,
   }
 }
 
@@ -1730,7 +1761,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
           workspaces: [...workspaces],
           assertUnlocked: false,
         })
-        return toGraphStatusDto(health, health.stale)
+        return toGraphStatusDto(health)
       })
       return createIpcSuccess(envelope.id, result)
     }

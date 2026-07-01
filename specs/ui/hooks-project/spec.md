@@ -18,6 +18,14 @@ While the shell global poll runs, these hooks MUST refresh project and project s
 
 Parallel mounts MUST share one in-flight request per cache key to avoid stampedes.
 
+### Requirement: project poll publishes a session snapshot store
+
+`useProjectPoll` MUST remain the single writer for global project polling. On each successful fetch it MUST publish `{ project, projectStatus, refreshKey, isLoading, error }` to a module-level session store consumed via `useSyncExternalStore` (same pattern as studio output in `ui:bottom-panel-output`).
+
+`useProjectPollSession()` MUST expose the latest snapshot to any Studio consumer without prop drilling. Parallel subscribers MUST read the same in-memory snapshot for a given poll tick.
+
+Chrome surfaces (top bar, sidebar graph rail, status bar, graph main view index card) MUST read graph health from `projectStatus.graph` on this session store and MUST NOT issue separate `getGraphStatus` calls for stale/warning display.
+
 ## Spec Dependencies
 
 - [`client:specd-data-port`](../../client/specd-data-port/spec.md) — data access

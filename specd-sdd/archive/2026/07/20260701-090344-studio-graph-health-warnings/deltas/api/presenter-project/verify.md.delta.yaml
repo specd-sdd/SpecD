@@ -1,0 +1,17 @@
+- op: added
+  description: Verify project presenter graph slice
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: presenter does not encode business rules'
+  content: |
+    ### Requirement: project status presenter maps graph health diagnostics
+
+    #### Scenario: Project presenter reuses graph warning derivation
+
+    - **GIVEN** `buildProjectStatusSnapshot` with `graphHealth` fixture
+    - **WHEN** project status DTO is built
+    - **THEN** `graph.warnings` matches `toGraphStatusDto` output for the same health result

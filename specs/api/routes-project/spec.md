@@ -12,7 +12,11 @@ The API MUST provide `GET /project`, `/project/status`, `/project/context`, `/pr
 
 ### Requirement: project status aggregates lists and graph freshness
 
-`GET /project/status` MUST compose active/draft/discarded/archive counts and graph freshness/stale flags equivalent to CLI `project status`.
+`GET /project/status` MUST compose active/draft/discarded/archive counts and a `graph` summary equivalent to CLI `project status --graph`, including `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]` per [`api:dto-project-status`](../dto-project-status/spec.md).
+
+### Requirement: project status exposes graph warnings
+
+`GET /v1/project/status` MUST return `graph.warnings` as an array (possibly empty) when graph health is available, with stale and fingerprint diagnostics present when computed.
 
 ### Requirement: GET project echoes auth type for clients
 

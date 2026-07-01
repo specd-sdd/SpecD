@@ -8,7 +8,11 @@ Client-side type for **Dto Project Status**, kept in parity with the matching `a
 
 ### Requirement: client DTO matches API wire shape
 
-Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names.
+The TypeScript `ProjectStatusDto` / embedded `graph` summary in `@specd/client` MUST mirror [`api:dto-project-status`](../../api/dto-project-status/spec.md), including graph count and diagnostic fields (`fileCount`, `documentCount`, `symbolCount`, `specCount`, `lastIndexedAt`, `lastIndexedRef`, `stale`, `currentRef`, `fingerprintMismatch`, `warnings[]`).
+
+### Requirement: client project status graph includes warnings
+
+`ProjectStatusDto.graph.warnings` in `@specd/client` MUST preserve `{ type: string; message: string }[]` entries from the API wire shape.
 
 ### Requirement: types are shared or generated from API schemas
 

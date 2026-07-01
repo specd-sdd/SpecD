@@ -1,0 +1,15 @@
+- op: added
+  description: Project status presenter maps graphHealth diagnostics
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: presenter does not encode business rules'
+  content: |
+    ### Requirement: project status presenter maps graph health diagnostics
+
+    When mapping `buildProjectStatusSnapshot.graphHealth`, the project presenter MUST populate the `graph` slice on [`api:dto-project-status`](../dto-project-status/spec.md) with the same diagnostic fields and `warnings[]` derivation rules as `toGraphStatusDto` in [`api:presenter-graph`](../presenter-graph/spec.md).
+
+    Count fields (`symbolCount`, `specCount`, `indexed`) MUST continue to reflect graph statistics when graph health is included.

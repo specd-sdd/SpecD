@@ -1,0 +1,27 @@
+- op: modified
+  description: Extend project graph summary with health diagnostics
+  selector:
+    type: section
+    matches: 'Requirement: DTO includes mandatory Studio fields'
+  content: |
+    The type MUST include at least:
+
+    - active/draft/discarded/archive counts
+    - `graph` summary with freshness/stale and the same fields as [`api:dto-graph-status`](../dto-graph-status/spec.md) needed for Studio chrome and Graph main view: counts (`fileCount`, `documentCount`, `symbolCount`, `specCount`), `lastIndexedAt`, `lastIndexedRef`, `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]`
+    - `auth: { type }`
+
+    When graph health is unavailable, `graph` MAY be omitted; when present, diagnostic fields MUST follow the same omission rules as `GraphStatusDto`.
+
+- op: added
+  description: Dedicated requirement for project graph health diagnostics
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: DTO includes mandatory Studio fields'
+  content: |
+    ### Requirement: project graph summary exposes health diagnostics
+
+    The embedded `graph` summary on `ProjectStatusDto` MUST expose count, freshness, and diagnostic fields with the same shapes and omission rules as [`api:dto-graph-status`](../dto-graph-status/spec.md), including `warnings[]`, `fingerprintMismatch`, `currentRef`, and `stale`.

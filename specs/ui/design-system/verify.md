@@ -411,9 +411,9 @@
 
 #### Scenario: Notifications popover displays health checks and conflicts
 
-- **GIVEN** stale graph index is true or change overlaps are detected
+- **GIVEN** stale graph index is true, fingerprint mismatch is true, or change overlaps are detected
 - **WHEN** user clicks on Notifications button
-- **THEN** popover renders showing active warnings
+- **THEN** popover renders distinct cards for each active graph warning type when present in `graph.warnings` or boolean fallbacks
 - **AND** indicator badge is visible on notifications button
 
 #### Scenario: Appearance button toggles theme between light and dark

@@ -1,0 +1,21 @@
+- op: modified
+  description: Client GraphStatusDto mirrors API diagnostics
+  selector:
+    type: section
+    matches: 'Requirement: client DTO matches API wire shape'
+  content: |
+    The TypeScript `GraphStatusDto` in `@specd/client` MUST mirror [`api:dto-graph-status`](../../api/dto-graph-status/spec.md), including `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]` with `{ type: string; message: string }` entries.
+
+- op: added
+  description: Client graph status warnings requirement
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: client DTO matches API wire shape'
+  content: |
+    ### Requirement: client graph status includes warnings
+
+    `GraphStatusDto` in `@specd/client` MUST include `warnings: { type: string; message: string }[]` with the same semantics as the API wire shape.

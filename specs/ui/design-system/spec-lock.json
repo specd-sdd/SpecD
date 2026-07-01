@@ -6,16 +6,8 @@
   "dependsOn": [],
   "implementation": [
     {
-      "file": "ui:src/styles/globals.css"
-    },
-    {
-      "file": "ui:src/SpecdApp.tsx"
-    },
-    {
-      "file": "ui:tailwind.config.ts"
-    },
-    {
-      "file": "ui:test/use-async-resource.spec.ts"
+      "file": "ui:src/shell/StudioTopBar.tsx",
+      "symbols": ["StudioTopBar"]
     }
   ]
 }

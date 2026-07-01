@@ -1,0 +1,16 @@
+- op: added
+  description: Verify client GraphStatusDto parity
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: client DTO matches API wire shape'
+  content: |
+    ### Requirement: client graph status includes warnings
+
+    #### Scenario: Remote adapter deserializes warnings array
+
+    - **WHEN** API returns `warnings` on graph status
+    - **THEN** `GraphStatusDto` in client preserves `type` and `message` entries

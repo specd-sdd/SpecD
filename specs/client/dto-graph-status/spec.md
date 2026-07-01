@@ -8,7 +8,11 @@ Client-side type for **Dto Graph Status**, kept in parity with the matching `api
 
 ### Requirement: client DTO matches API wire shape
 
-Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names.
+The TypeScript `GraphStatusDto` in `@specd/client` MUST mirror [`api:dto-graph-status`](../../api/dto-graph-status/spec.md), including `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]` with `{ type: string; message: string }` entries.
+
+### Requirement: client graph status includes warnings
+
+`GraphStatusDto` in `@specd/client` MUST include `warnings: { type: string; message: string }[]` with the same semantics as the API wire shape.
 
 ### Requirement: types are shared or generated from API schemas
 

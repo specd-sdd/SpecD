@@ -8,7 +8,7 @@ Authoritative HTTP contract (methods, paths, query, bodies, status codes) for **
 
 ### Requirement: GET graph status exposes freshness and stale flag
 
-`GET /v1/graph/status` MUST return fingerprint, stale/freshness flags, and counts sufficient for sidebar warnings.
+`GET /v1/graph/status` MUST return fingerprint, stale/freshness flags, counts, `currentRef`, `fingerprintMismatch`, and `warnings[]` sufficient for sidebar and notification warnings per [`api:dto-graph-status`](../dto-graph-status/spec.md).
 
 ### Requirement: POST graph index rebuilds the code graph index
 

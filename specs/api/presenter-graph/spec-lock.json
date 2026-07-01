@@ -7,12 +7,7 @@
   "implementation": [
     {
       "file": "api:src/delivery/http/presenters/presenter-graph.ts",
-      "symbols": [
-        "toGraphStatusDto",
-        "toGraphSearchResultDto",
-        "toGraphImpactDto",
-        "toChangeGraphViewDto"
-      ]
+      "symbols": ["toGraphStatusDto"]
     }
   ]
 }

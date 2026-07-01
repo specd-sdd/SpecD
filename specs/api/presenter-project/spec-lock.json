@@ -7,7 +7,7 @@
   "implementation": [
     {
       "file": "api:src/delivery/http/presenters/presenter-project.ts",
-      "symbols": ["toProjectDto", "toProjectStatusDto"]
+      "symbols": ["toProjectStatusDtoFromSnapshot", "toProjectGraphSummaryDto"]
     }
   ]
 }

@@ -1,0 +1,23 @@
+- op: modified
+  description: Graph status route verify scenarios
+  selector:
+    type: section
+    matches: 'Requirement: GET graph status exposes freshness and stale flag'
+  content: |
+    #### Scenario: Versioned API path
+
+    - **WHEN** client calls the documented route with `/v1` prefix
+    - **THEN** route handler is reached
+    - **AND** unprefixed legacy path is not registered
+
+    #### Scenario: Graph status exposes freshness and warnings
+
+    - **WHEN** `GET /v1/graph/status` is called
+    - **THEN** response includes fingerprint, stale flags, `fingerprintMismatch`, and `warnings[]`
+    - **AND** sidebar and notifications can warn from response payload
+
+    #### Scenario: Undocumented path returns 404
+
+    - **WHEN** client requests a URL outside this routes contract
+    - **THEN** HTTP 404 is returned
+    - **AND** body is `application/problem+json`

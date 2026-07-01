@@ -62,3 +62,17 @@
 - **GIVEN** request still needed by sibling mount
 - **WHEN** one component unmounts
 - **THEN** in-flight completes for remaining mount
+
+### Requirement: project poll publishes a session snapshot store
+
+#### Scenario: Subscribers receive the same projectStatus snapshot
+
+- **GIVEN** `useProjectPoll` fetched `projectStatus` with `graph.warnings`
+- **WHEN** two components call `useProjectPollSession()`
+- **THEN** both read identical `projectStatus.graph` without separate `getGraphStatus` calls
+
+#### Scenario: Poll tick updates session store
+
+- **GIVEN** global poll increments `refreshKey`
+- **WHEN** `getProjectStatus` resolves
+- **THEN** session store snapshot updates and subscribers re-render

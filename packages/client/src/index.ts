@@ -40,6 +40,7 @@ export {
 } from './errors/specd-client-error.js'
 
 export * from './dto/index.js'
+export { deriveGraphHealthWarnings, type GraphHealthWarningDto } from './graph-health-warnings.js'
 export * from './inputs.js'
 
 export type {

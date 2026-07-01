@@ -1,6 +1,48 @@
-import { type BuildProjectStatusSnapshotResult, type SpecdConfig } from '@specd/sdk'
+import {
+  type BuildProjectStatusSnapshotResult,
+  type GetGraphHealthResult,
+  type SpecdConfig,
+} from '@specd/sdk'
+import { deriveGraphHealthWarnings } from '@specd/client'
 import { type ProjectDto } from '../dto/project.js'
 import { type ProjectStatusDto } from '../dto/project-status.js'
+
+function toProjectGraphSummaryDto(
+  graphHealth: GetGraphHealthResult | null,
+): ProjectStatusDto['graph'] {
+  if (graphHealth === null) {
+    return {
+      lastIndexedAt: null,
+      lastIndexedRef: null,
+      stale: null,
+      currentRef: null,
+      fingerprintMismatch: null,
+      fileCount: null,
+      documentCount: null,
+      symbolCount: null,
+      specCount: null,
+      warnings: [],
+    }
+  }
+  const warnings = deriveGraphHealthWarnings({
+    stale: graphHealth.stale,
+    fingerprintMismatch: graphHealth.fingerprintMismatch,
+    lastIndexedRef: graphHealth.lastIndexedRef,
+    currentRef: graphHealth.currentRef,
+  })
+  return {
+    lastIndexedAt: graphHealth.lastIndexedAt ?? null,
+    lastIndexedRef: graphHealth.lastIndexedRef ?? null,
+    stale: graphHealth.stale,
+    currentRef: graphHealth.currentRef,
+    fingerprintMismatch: graphHealth.fingerprintMismatch,
+    fileCount: graphHealth.fileCount,
+    documentCount: graphHealth.documentCount,
+    symbolCount: graphHealth.symbolCount,
+    specCount: graphHealth.specCount,
+    warnings,
+  }
+}
 
 /**
  * Maps project config to DTO.
@@ -30,20 +72,13 @@ export function toProjectDto(config: SpecdConfig): ProjectDto {
 export function toProjectStatusDtoFromSnapshot(
   snapshot: BuildProjectStatusSnapshotResult,
 ): ProjectStatusDto {
-  const graphHealth = snapshot.graphHealth
   return {
     activeChanges: snapshot.summary.activeCount,
     drafts: snapshot.summary.draftCount,
     discarded: snapshot.summary.discardedCount,
     archived: snapshot.summary.archivedCount,
     specsByWorkspace: { ...snapshot.summary.specsByWorkspace },
-    graph: {
-      lastIndexedAt: graphHealth?.lastIndexedAt ?? null,
-      stale: graphHealth?.stale ?? null,
-      fingerprintMismatch: graphHealth?.fingerprintMismatch ?? null,
-      fileCount: graphHealth?.fileCount ?? null,
-      symbolCount: graphHealth?.symbolCount ?? null,
-    },
+    graph: toProjectGraphSummaryDto(snapshot.graphHealth),
     approvals: {
       specEnabled: snapshot.approvals.specEnabled,
       signoffEnabled: snapshot.approvals.signoffEnabled,

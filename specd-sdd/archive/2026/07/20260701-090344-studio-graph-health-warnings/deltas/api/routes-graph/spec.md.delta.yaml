@@ -1,0 +1,7 @@
+- op: modified
+  description: Graph status route returns diagnostic warnings
+  selector:
+    type: section
+    matches: 'Requirement: GET graph status exposes freshness and stale flag'
+  content: |
+    `GET /v1/graph/status` MUST return fingerprint, stale/freshness flags, counts, `currentRef`, `fingerprintMismatch`, and `warnings[]` sufficient for sidebar and notification warnings per [`api:dto-graph-status`](../dto-graph-status/spec.md).

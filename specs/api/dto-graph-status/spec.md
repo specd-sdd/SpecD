@@ -18,6 +18,22 @@ The **Dto Graph Status** wire shape MUST use camelCase property names stable acr
 
 Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`.
 
+### Requirement: graph status exposes health diagnostics
+
+`GraphStatusDto` MUST include graph statistics fields already returned today plus:
+
+- `stale: boolean | null` — VCS staleness per `code-graph:staleness-detection`
+- `currentRef: string | null` — current VCS ref when resolvable; omitted when unknown
+- `fingerprintMismatch: boolean | null` — derivation fingerprint mismatch when computable; omitted when unknown
+- `warnings: { type: string; message: string }[]` — zero or more human-readable diagnostics derived from graph health (MUST be present; MAY be empty)
+
+Warning `type` values MUST use stable lowercase kebab-case identifiers. v1 types:
+
+- `graph-stale` — indexed VCS ref differs from current ref
+- `graph-fingerprint-mismatch` — code-graph version or workspace graph config changed since last index
+
+Warning `message` strings MUST align with CLI stderr copy from `warnGraphStale` where applicable.
+
 ## Constraints
 
 - `@specd/api` delivery and composition code MUST import host bootstrap and kernel types from `@specd/sdk`, not `@specd/core` or `@specd/code-graph` directly.

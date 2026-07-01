@@ -42,6 +42,14 @@
 - **THEN** HTTP 404 is returned
 - **AND** body is `application/problem+json`
 
+### Requirement: project status exposes graph warnings
+
+#### Scenario: GET project status returns graph warnings
+
+- **WHEN** `GET /v1/project/status` is called with graph health available
+- **THEN** response `graph.warnings` is an array (possibly empty)
+- **AND** stale and fingerprint diagnostics are present when computed
+
 ### Requirement: GET project echoes auth type for clients
 
 #### Scenario: GET /project exposes auth type

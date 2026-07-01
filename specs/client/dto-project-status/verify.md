@@ -23,6 +23,13 @@
 - **THEN** build or contract test fails
 - **AND** prevents silent UI breakage
 
+### Requirement: client project status graph includes warnings
+
+#### Scenario: Project status graph warnings deserialize on client
+
+- **WHEN** API returns `graph.warnings` on project status
+- **THEN** client `ProjectStatusDto.graph.warnings` preserves entries
+
 ### Requirement: types are shared or generated from API schemas
 
 #### Scenario: Types imported from shared package

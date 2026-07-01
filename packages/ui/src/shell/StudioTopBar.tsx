@@ -1,4 +1,4 @@
-import type { ProjectDto, ProjectStatusDto, ChangeSummaryDto } from '@specd/client'
+import type { GraphHealthWarningDto, ProjectDto, ProjectStatusDto, ChangeSummaryDto } from '@specd/client'
 import { AlertTriangle, Bell, BookOpenText, CheckCircle2, Moon, Plus, Search, SunMedium } from 'lucide-react'
 import * as React from 'react'
 import { Button } from '../components/ui/button.js'
@@ -11,6 +11,7 @@ import {
 } from '../components/ui/tooltip.js'
 import { useChangesOverlaps } from '../hooks/use-changes-overlaps.js'
 import { useClosedSpecsValidation } from '../hooks/use-closed-specs-validation.js'
+import { useProjectPollSession } from '../hooks/project-poll-session.js'
 import { cn } from '../lib/utils.js'
 
 export type StudioTopBarProps = {
@@ -26,6 +27,13 @@ export type StudioTopBarProps = {
   loadingActive?: boolean
 }
 
+function graphWarningTitle(type: string): string {
+  if (type === 'graph-fingerprint-mismatch') {
+    return 'Graph Fingerprint Mismatch'
+  }
+  return 'Stale Code Graph'
+}
+
 /**
  * Global Studio chrome: search entry, new change, command palette.
  */
@@ -34,13 +42,16 @@ export function StudioTopBar({
   onNewChange,
   className,
   project,
-  projectStatus,
+  projectStatus: projectStatusProp,
   activeChanges,
   refreshKey = 0,
   theme = 'dark',
   onToggleTheme,
   loadingActive = false,
 }: StudioTopBarProps): React.ReactElement {
+  const pollSession = useProjectPollSession()
+  const projectStatus = pollSession.projectStatus ?? projectStatusProp
+
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -69,9 +80,28 @@ export function StudioTopBar({
 
   const overlaps = overlapsRes.data
   const failedClosedSpecs = validationRes.data
+  const graph = projectStatus?.graph
+  const graphWarnings = graph?.warnings ?? []
+  const graphWarningCards: readonly GraphHealthWarningDto[] =
+    graphWarnings.length > 0
+      ? graphWarnings
+      : [
+          ...(graph?.stale
+            ? [{ type: 'graph-stale', message: 'Graph is stale — run graph index to refresh' }]
+            : []),
+          ...(graph?.fingerprintMismatch
+            ? [
+                {
+                  type: 'graph-fingerprint-mismatch',
+                  message:
+                    'Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index',
+                },
+              ]
+            : []),
+        ]
 
   const hasNotifications = !!(
-    projectStatus?.graph?.stale ||
+    graphWarningCards.length > 0 ||
     overlaps?.hasOverlap ||
     (failedClosedSpecs && failedClosedSpecs.length > 0)
   )
@@ -152,20 +182,21 @@ export function StudioTopBar({
                   </span>
                 )}
               </div>
-              
+
               <div className="p-2 space-y-2 text-xs">
-                {/* 1. Stale Graph */}
-                {projectStatus?.graph?.stale && (
-                  <div className="flex gap-2 rounded border border-studio-warning/30 bg-studio-warning/5 p-2 text-[11px] leading-relaxed">
+                {graphWarningCards.map((warning, idx) => (
+                  <div
+                    key={`${warning.type}-${idx}`}
+                    className="flex gap-2 rounded border border-studio-warning/30 bg-studio-warning/5 p-2 text-[11px] leading-relaxed"
+                  >
                     <AlertTriangle className="h-3.5 w-3.5 text-studio-warning shrink-0 mt-0.5" />
                     <div>
-                      <div className="font-semibold text-foreground">Stale Code Graph</div>
-                      <div className="text-muted-foreground mt-0.5">Codebase graph index is outdated. Run <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10px]">specd graph index</code> to refresh.</div>
+                      <div className="font-semibold text-foreground">{graphWarningTitle(warning.type)}</div>
+                      <div className="text-muted-foreground mt-0.5">{warning.message}</div>
                     </div>
                   </div>
-                )}
+                ))}
 
-                {/* 2. Overlaps */}
                 {overlaps?.hasOverlap && overlaps.entries.map((entry, idx) => (
                   <div key={idx} className="flex gap-2 rounded border border-studio-warning/30 bg-studio-warning/5 p-2 text-[11px] leading-relaxed">
                     <AlertTriangle className="h-3.5 w-3.5 text-studio-warning shrink-0 mt-0.5" />
@@ -186,7 +217,6 @@ export function StudioTopBar({
                   </div>
                 ))}
 
-                {/* 3. Validation failures in closed specs */}
                 {failedClosedSpecs && failedClosedSpecs.length > 0 && failedClosedSpecs.map((entry, idx) => (
                   <div key={idx} className="flex gap-2 rounded border border-studio-error/30 bg-studio-error/5 p-2 text-[11px] leading-relaxed">
                     <AlertTriangle className="h-3.5 w-3.5 text-studio-error shrink-0 mt-0.5" />
@@ -204,7 +234,6 @@ export function StudioTopBar({
                   </div>
                 ))}
 
-                {/* 4. Healthy state */}
                 {!hasNotifications && (
                   <div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
                     <CheckCircle2 className="h-8 w-8 text-studio-success mb-2 opacity-80" />

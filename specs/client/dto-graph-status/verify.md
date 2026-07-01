@@ -23,6 +23,13 @@
 - **THEN** build or contract test fails
 - **AND** prevents silent UI breakage
 
+### Requirement: client graph status includes warnings
+
+#### Scenario: Remote adapter deserializes warnings array
+
+- **WHEN** API returns `warnings` on graph status
+- **THEN** `GraphStatusDto` in client preserves `type` and `message` entries
+
 ### Requirement: types are shared or generated from API schemas
 
 #### Scenario: Types imported from shared package

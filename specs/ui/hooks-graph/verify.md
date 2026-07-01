@@ -32,21 +32,21 @@
 
 #### Scenario: Stale flag shows warning badge
 
-- **GIVEN** status returns `stale: true`
+- **GIVEN** project poll session `projectStatus.graph.stale: true`
 - **WHEN** graph entry renders
 - **THEN** warning affordance visible
 - **AND** copy suggests rebuild
 
 #### Scenario: Fresh index hides warning
 
-- **GIVEN** status returns `stale: false`
+- **GIVEN** project poll session `projectStatus.graph.stale: false`
 - **WHEN** graph entry renders
 - **THEN** no stale banner
-- **AND** last indexed time shown
+- **AND** last indexed time shown when available
 
 #### Scenario: Rebuild clears warning after success
 
 - **GIVEN** index was stale
-- **WHEN** user completes index rebuild
-- **THEN** status refetch shows fresh
+- **WHEN** user completes index rebuild and project poll refetches
+- **THEN** session store shows fresh graph slice
 - **AND** warning removed

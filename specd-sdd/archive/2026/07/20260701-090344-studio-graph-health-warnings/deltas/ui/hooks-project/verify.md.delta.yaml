@@ -1,0 +1,23 @@
+- op: added
+  description: Verify project poll session store
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: hooks dedupe concurrent fetches'
+  content: |
+    ### Requirement: project poll publishes a session snapshot store
+
+    #### Scenario: Subscribers receive the same projectStatus snapshot
+
+    - **GIVEN** `useProjectPoll` fetched `projectStatus` with `graph.warnings`
+    - **WHEN** two components call `useProjectPollSession()`
+    - **THEN** both read identical `projectStatus.graph` without separate `getGraphStatus` calls
+
+    #### Scenario: Poll tick updates session store
+
+    - **GIVEN** global poll increments `refreshKey`
+    - **WHEN** `getProjectStatus` resolves
+    - **THEN** session store snapshot updates and subscribers re-render

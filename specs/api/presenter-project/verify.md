@@ -45,3 +45,11 @@
 - **WHEN** presenter called twice on same input
 - **THEN** outputs are identical
 - **AND** no time-dependent fields unless documented
+
+### Requirement: project status presenter maps graph health diagnostics
+
+#### Scenario: Project presenter reuses graph warning derivation
+
+- **GIVEN** `buildProjectStatusSnapshot` with `graphHealth` fixture
+- **WHEN** project status DTO is built
+- **THEN** `graph.warnings` matches `toGraphStatusDto` output for the same health result

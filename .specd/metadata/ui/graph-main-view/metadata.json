@@ -9,7 +9,13 @@
     {
       "requirement": "view renders graph overview and index controls",
       "rules": [
-        "When `GraphMainView` is active in the central workspace, it MUST display a high-level summary of the codebase's graph state.\nThe view MUST show the current index status (`getGraphStatus`), distinguishing between \"Ready\", \"Stale\", and \"Off\".\nIt MUST provide a manual \"Reindex\" button that triggers `indexGraph({ force: false })` and displays the progress/result in the global Output panel.\nIt MUST display aggregate counts for Specifications, Files & Docs (code files and documents), and Code Symbols sourced from the graph status."
+        "When `GraphMainView` is active in the central workspace, it MUST display a high-level summary of the codebase's graph state.\nThe view MUST show the current index status from `projectStatus.graph` on the project poll session store, distinguishing between \"Ready\", \"Stale\", and \"Off\".\nWhen the graph slice includes `warnings[]`, `fingerprintMismatch`, or `currentRef`, the Index Status card MUST surface those diagnostics (not only the coarse Ready/Stale/Off label).\nIt MUST provide a manual \"Reindex\" button that triggers `indexGraph({ force: false })` and displays the progress/result in the global Output panel.\nIt MUST display aggregate counts for Specifications, Files & Docs (code files and documents), and Code Symbols sourced from `projectStatus.graph` (same fields as [`client:dto-project-status`](../../client/dto-project-status/spec.md) graph summary)."
+      ]
+    },
+    {
+      "requirement": "view surfaces graph health diagnostics in index status",
+      "rules": [
+        "The Index Status card in `GraphMainView` MUST render graph health diagnostics from `useProjectPollSession().projectStatus.graph`:\n\n- When `warnings[]` is non-empty, MUST show each warning's `message` under the status label (distinct styling per `type` when multiple).\n- When `warnings[]` is empty but `stale` or `fingerprintMismatch` is true, MUST show human-readable fallback copy equivalent to Bell notifications.\n- When `currentRef` and `lastIndexedRef` are present, MAY show ref context in the card subtitle.\n\nDiagnostics MUST use the same `type` / `message` semantics as [`client:dto-project-status`](../../client/dto-project-status/spec.md); the view MUST NOT recompute staleness or fingerprint mismatch locally and MUST NOT call `getGraphStatus` for the Index Status card."
       ]
     },
     {
@@ -38,20 +44,40 @@
       "given": ["GraphMainView is active"],
       "when": ["the view loads"],
       "then": [
-        "it calls getGraphStatus",
+        "it reads projectStatus.graph from the project poll session store",
         "AND it renders the \"Ready\", \"Stale\", or \"Off\" status",
-        "AND it renders counts for Specs, Files & Docs, and Symbols"
+        "AND it renders counts for Specs, Files & Docs, and Symbols from the graph slice"
       ]
     },
     {
-      "requirement": "view renders graph overview and index controls",
-      "name": "Reindex triggers API and output log",
-      "given": ["GraphMainView is active"],
-      "when": ["the user clicks \"Force Reindex\""],
+      "requirement": "view surfaces graph health diagnostics in index status",
+      "name": "Stale graph shows warning messages in Index Status card",
+      "given": [
+        "project poll session returns graph.stale: true and graph.warnings with { type: 'graph-stale', message: '...' }"
+      ],
+      "when": ["GraphMainView renders"],
+      "then": ["Index Status shows Stale label", "AND the warning message is visible in the card"]
+    },
+    {
+      "requirement": "view surfaces graph health diagnostics in index status",
+      "name": "Fingerprint mismatch shows dedicated diagnostic",
+      "given": [
+        "project poll session returns graph.fingerprintMismatch: true with a graph-fingerprint-mismatch warning"
+      ],
+      "when": ["GraphMainView renders"],
       "then": [
-        "it calls indexGraph({ force: false })",
-        "AND it pushes an info message to the Output panel"
+        "Index Status card shows the fingerprint warning message",
+        "AND copy is distinct from stale-only messaging"
       ]
+    },
+    {
+      "requirement": "view surfaces graph health diagnostics in index status",
+      "name": "Healthy graph shows Ready without warning lines",
+      "given": [
+        "project poll session returns graph.stale: false, graph.fingerprintMismatch: false, and graph.warnings: []"
+      ],
+      "when": ["GraphMainView renders"],
+      "then": ["Index Status shows Ready", "AND no diagnostic warning lines are shown"]
     },
     {
       "requirement": "view surfaces high-impact graph hotspots",
@@ -80,10 +106,18 @@
       "then": ["a loading indicator is displayed in the Hotspots section"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "ui:graph-main-view",
+        "file": "ui:src/shell/GraphMainView.tsx",
+        "symbol": "GraphMainView"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:5ddcf5b809ff6d372fba54fd4a507e0829a5ba2fbfb0c10a8152de78e67b9808",
-    "verify.md": "sha256:518e3f6b25352597ecbfe5db616d3f93972ead39dd0c54dec6766c08e3a2c3a2"
+    "spec.md": "sha256:f787564eba9b3b68799f625f1c7c4c410e37e858dc21ecd1966d2db7b0455f58",
+    "verify.md": "sha256:18333e42c8c2f5721ce28bdc19180c6623ac91f2a860abc2b320acee4faca0c6"
   },
   "generatedBy": "core"
 }

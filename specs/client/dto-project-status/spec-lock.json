@@ -7,7 +7,7 @@
   "implementation": [
     {
       "file": "client:src/dto/project-status.ts",
-      "symbols": ["ProjectStatusDto"]
+      "symbols": ["ProjectGraphSummaryDto", "ProjectStatusDto"]
     }
   ]
 }

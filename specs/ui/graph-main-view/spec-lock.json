@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["client:specd-data-port", "ui:design-system"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "ui:src/shell/GraphMainView.tsx",
+      "symbols": ["GraphMainView"]
+    }
+  ]
 }

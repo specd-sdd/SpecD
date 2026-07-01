@@ -1,0 +1,11 @@
+- op: modified
+  description: Stale rail scenario reads project poll session
+  selector:
+    type: section
+    matches: 'Scenario: Stale graph shows indicator on collapsed rail icon'
+  content: |
+    #### Scenario: Stale graph shows indicator on collapsed rail icon
+
+    - **GIVEN** sidebar collapsed and project poll session reports `graph.stale: true`
+    - **WHEN** activity rail renders
+    - **THEN** Graph icon shows stale indicator

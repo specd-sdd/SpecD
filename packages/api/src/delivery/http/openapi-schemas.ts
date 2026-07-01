@@ -105,10 +105,24 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
         type: 'object',
         properties: {
           lastIndexedAt: { type: 'string', nullable: true },
+          lastIndexedRef: { type: 'string', nullable: true },
           stale: { type: 'boolean', nullable: true },
+          currentRef: { type: 'string', nullable: true },
           fingerprintMismatch: { type: 'boolean', nullable: true },
           fileCount: { type: 'integer', nullable: true },
+          documentCount: { type: 'integer', nullable: true },
           symbolCount: { type: 'integer', nullable: true },
+          specCount: { type: 'integer', nullable: true },
+          warnings: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string' },
+                message: { type: 'string' },
+              },
+            },
+          },
         },
       },
       approvals: {
@@ -619,6 +633,18 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
       specCount: { type: 'integer' },
       graphFingerprint: { type: 'string', nullable: true },
       stale: { type: 'boolean', nullable: true },
+      currentRef: { type: 'string', nullable: true },
+      fingerprintMismatch: { type: 'boolean', nullable: true },
+      warnings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            type: { type: 'string' },
+            message: { type: 'string' },
+          },
+        },
+      },
     },
   },
   GraphFileRefDto: {

@@ -164,8 +164,10 @@ Radix/shadcn `Dialog` and `AlertDialog` primitives MUST be the underlying implem
 The `StudioTopBar` component MUST expose three control buttons on the right side:
 
 1. **Docs** (`BookOpenText`): Redirects/opens the native browser to `https://getspecd.dev/docs/guide/getting-started`.
-2. **Notifications** (`Bell`): Shows a popover with project health checks: change overlaps/conflicts, stale graph warnings, and spec validation failures. Displays a red badge when any issues are active.
+2. **Notifications** (`Bell`): Shows a popover with project health checks: change overlaps/conflicts, graph health warnings from `projectStatus.graph.warnings[]` (including stale graph and fingerprint mismatch), and spec validation failures. When `warnings[]` is absent, the UI MUST fall back to `graph.stale` and `graph.fingerprintMismatch` booleans. Displays a red badge when any issue is active.
 3. **Appearance** (`SunMedium` / `Moon`): Toggles between light and dark visual themes. Persists selection in user storage.
+
+Graph warning cards MUST use distinct titles for `graph-stale` vs `graph-fingerprint-mismatch` (or equivalent boolean fallback) and render the server-provided `message` text.
 
 ## Constraints
 

@@ -1,3 +1,5 @@
+import type { GraphHealthWarningDto } from '@specd/client'
+
 /**
  *
  */
@@ -10,4 +12,7 @@ export interface GraphStatusDto {
   readonly specCount: number
   readonly graphFingerprint: string | null
   readonly stale: boolean | null
+  readonly currentRef: string | null
+  readonly fingerprintMismatch: boolean | null
+  readonly warnings: readonly GraphHealthWarningDto[]
 }

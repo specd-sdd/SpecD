@@ -17,6 +17,12 @@
       "rules": [
         "The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in core use cases invoked via the SDK kernel surface."
       ]
+    },
+    {
+      "requirement": "project status presenter maps graph health diagnostics",
+      "rules": [
+        "When mapping `buildProjectStatusSnapshot.graphHealth`, the project presenter MUST populate the `graph` slice on [`api:dto-project-status`](../dto-project-status/spec.md) with the same diagnostic fields and `warnings[]` derivation rules as `toGraphStatusDto` in [`api:presenter-graph`](../presenter-graph/spec.md).\n\nCount fields (`symbolCount`, `specCount`, `indexed`) MUST continue to reflect graph statistics when graph health is included."
+      ]
     }
   ],
   "constraints": [
@@ -66,6 +72,13 @@
       "name": "Repeated mapping is deterministic",
       "when": ["presenter called twice on same input"],
       "then": ["outputs are identical", "AND no time-dependent fields unless documented"]
+    },
+    {
+      "requirement": "project status presenter maps graph health diagnostics",
+      "name": "Project presenter reuses graph warning derivation",
+      "given": ["buildProjectStatusSnapshot with graphHealth fixture"],
+      "when": ["project status DTO is built"],
+      "then": ["graph.warnings matches toGraphStatusDto output for the same health result"]
     }
   ],
   "implementation": {
@@ -73,18 +86,18 @@
       {
         "specId": "api:presenter-project",
         "file": "api:src/delivery/http/presenters/presenter-project.ts",
-        "symbol": "toProjectDto"
+        "symbol": "toProjectStatusDtoFromSnapshot"
       },
       {
         "specId": "api:presenter-project",
         "file": "api:src/delivery/http/presenters/presenter-project.ts",
-        "symbol": "toProjectStatusDto"
+        "symbol": "toProjectGraphSummaryDto"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:fa6dc6d688c363ff948542e5b9ffb546fdad825ab89ef655fd8cec69ac45bbaa",
-    "verify.md": "sha256:10794a3f6afb66038154918967dbd9d5f7204a6dd56c296543e782475c970f60"
+    "spec.md": "sha256:f721caf4272236599c2a1925255013320f72b8a31fa058eecf6fd5db3d9e5931",
+    "verify.md": "sha256:ac7820f65823503116317c0cb92202d90cbe3e2e72c73a2ea119868f44f2118b"
   },
   "generatedBy": "core"
 }

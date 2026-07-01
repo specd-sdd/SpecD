@@ -1,3 +1,5 @@
+import type { GraphHealthWarningDto } from '../graph-health-warnings.js'
+
 /** `GET /v1/graph/status` wire shape. */
 export interface GraphStatusDto {
   readonly lastIndexedAt: string | null
@@ -8,4 +10,7 @@ export interface GraphStatusDto {
   readonly specCount: number
   readonly graphFingerprint: string | null
   readonly stale: boolean | null
+  readonly currentRef?: string | null
+  readonly fingerprintMismatch?: boolean | null
+  readonly warnings: readonly GraphHealthWarningDto[]
 }

@@ -1,0 +1,37 @@
+- op: modified
+  description: Notifications verify for graph warning types
+  selector:
+    type: section
+    matches: 'Requirement: top bar exposes docs, notifications, and theme controls'
+  content: |
+    #### Scenario: Docs button links to getting-started guide
+
+    - **WHEN** user clicks on Docs button
+    - **THEN** app redirects or opens default browser to `https://getspecd.dev/docs/guide/getting-started`
+
+    #### Scenario: Notifications popover displays health checks and conflicts
+
+    - **GIVEN** stale graph index is true, fingerprint mismatch is true, or change overlaps are detected
+    - **WHEN** user clicks on Notifications button
+    - **THEN** popover renders distinct cards for each active graph warning type when present in `graph.warnings` or boolean fallbacks
+    - **AND** indicator badge is visible on notifications button
+
+    #### Scenario: Appearance button toggles theme between light and dark
+
+    - **WHEN** user clicks on Appearance button
+    - **THEN** visual theme toggles between light and dark modes
+    - **AND** preference is persisted in user storage
+
+    #### Scenario: Stored theme preference is applied synchronously at startup
+
+    - **GIVEN** a stored theme preference (e.g. `light`) in user storage
+    - **WHEN** the host application bootstraps (web or desktop)
+    - **THEN** the stored theme class (e.g. `light`) is applied to `document.documentElement` immediately
+    - **AND** UI elements like the loading screen and project dialog render in the correct theme without a flash
+
+    #### Scenario: Background validation checks are deferred at startup
+
+    - **GIVEN** the top bar is rendered during project loading or initial startup
+    - **WHEN** the component mounts
+    - **THEN** overlaps and closed-spec validations are not invoked immediately
+    - **AND** the checks remain disabled until the loading phase completes and a 3-second delay has elapsed

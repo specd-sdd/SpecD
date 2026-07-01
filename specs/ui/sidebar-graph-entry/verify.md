@@ -27,7 +27,7 @@
 
 #### Scenario: Stale graph shows indicator on collapsed rail icon
 
-- **GIVEN** sidebar collapsed and graph status reports stale
+- **GIVEN** sidebar collapsed and project poll session reports `graph.stale: true`
 - **WHEN** activity rail renders
 - **THEN** Graph icon shows stale indicator
 

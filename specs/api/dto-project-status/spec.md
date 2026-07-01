@@ -15,8 +15,14 @@ The **Dto Project Status** wire shape MUST use camelCase property names stable a
 The type MUST include at least:
 
 - active/draft/discarded/archive counts
-- graph freshness/stale
+- `graph` summary with freshness/stale and the same fields as [`api:dto-graph-status`](../dto-graph-status/spec.md) needed for Studio chrome and Graph main view: counts (`fileCount`, `documentCount`, `symbolCount`, `specCount`), `lastIndexedAt`, `lastIndexedRef`, `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]`
 - `auth: { type }`
+
+When graph health is unavailable, `graph` MAY be omitted; when present, diagnostic fields MUST follow the same omission rules as `GraphStatusDto`.
+
+### Requirement: project graph summary exposes health diagnostics
+
+The embedded `graph` summary on `ProjectStatusDto` MUST expose count, freshness, and diagnostic fields with the same shapes and omission rules as [`api:dto-graph-status`](../dto-graph-status/spec.md), including `warnings[]`, `fingerprintMismatch`, `currentRef`, and `stale`.
 
 ### Requirement: presenters map domain results without embedding rules
 

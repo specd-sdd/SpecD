@@ -9,7 +9,13 @@
     {
       "requirement": "client DTO matches API wire shape",
       "rules": [
-        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names."
+        "The TypeScript `ProjectStatusDto` / embedded `graph` summary in `@specd/client` MUST mirror [`api:dto-project-status`](../../api/dto-project-status/spec.md), including graph count and diagnostic fields (`fileCount`, `documentCount`, `symbolCount`, `specCount`, `lastIndexedAt`, `lastIndexedRef`, `stale`, `currentRef`, `fingerprintMismatch`, `warnings[]`)."
+      ]
+    },
+    {
+      "requirement": "client project status graph includes warnings",
+      "rules": [
+        "`ProjectStatusDto.graph.warnings` in `@specd/client` MUST preserve `{ type: string; message: string }[]` entries from the API wire shape."
       ]
     },
     {
@@ -48,6 +54,12 @@
       "then": ["build or contract test fails", "AND prevents silent UI breakage"]
     },
     {
+      "requirement": "client project status graph includes warnings",
+      "name": "Project status graph warnings deserialize on client",
+      "when": ["API returns graph.warnings on project status"],
+      "then": ["client ProjectStatusDto.graph.warnings preserves entries"]
+    },
+    {
       "requirement": "types are shared or generated from API schemas",
       "name": "Types imported from shared package",
       "when": ["client and api packages build"],
@@ -72,13 +84,18 @@
       {
         "specId": "client:dto-project-status",
         "file": "client:src/dto/project-status.ts",
+        "symbol": "ProjectGraphSummaryDto"
+      },
+      {
+        "specId": "client:dto-project-status",
+        "file": "client:src/dto/project-status.ts",
         "symbol": "ProjectStatusDto"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e7a890b542357b3321a0c8b26db2706a86bc0aa3a44936fb0634e46dbb782b63",
-    "verify.md": "sha256:e35f5f9e16da2a37a9083b87e54aeed18353d82712fdbcd7c690526f37c96e90"
+    "spec.md": "sha256:8948efb55bb3015173c7dfc5d68bd9a301327f55384ecb844e4d192722e1458f",
+    "verify.md": "sha256:ad9c9c0e906d80129968e3e962ee889b988a50b67160cebc797d9cf5daff16c7"
   },
   "generatedBy": "core"
 }

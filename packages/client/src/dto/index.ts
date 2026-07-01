@@ -28,6 +28,7 @@ export type {
   WorkspaceGraphIndexBreakdownDto,
 } from './graph-index-result.js'
 export type { GraphSearchResultDto } from './graph-search.js'
+export type { GraphHealthWarningDto, deriveGraphHealthWarnings } from '../graph-health-warnings.js'
 export type { GraphStatusDto } from './graph-status.js'
 export type { PreviewResultDto, PreviewResultFileDto } from './preview-result.js'
 export type { ProjectDto, WorkspaceSummaryDto } from './project.js'

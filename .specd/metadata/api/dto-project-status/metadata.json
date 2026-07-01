@@ -15,7 +15,13 @@
     {
       "requirement": "DTO includes mandatory Studio fields",
       "rules": [
-        "The type MUST include at least:\n\n- active/draft/discarded/archive counts\n- graph freshness/stale\n- `auth: { type }`"
+        "The type MUST include at least:\n\n- active/draft/discarded/archive counts\n- `graph` summary with freshness/stale and the same fields as [`api:dto-graph-status`](../dto-graph-status/spec.md) needed for Studio chrome and Graph main view: counts (`fileCount`, `documentCount`, `symbolCount`, `specCount`), `lastIndexedAt`, `lastIndexedRef`, `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]`\n- `auth: { type }`\n\nWhen graph health is unavailable, `graph` MAY be omitted; when present, diagnostic fields MUST follow the same omission rules as `GraphStatusDto`."
+      ]
+    },
+    {
+      "requirement": "project graph summary exposes health diagnostics",
+      "rules": [
+        "The embedded `graph` summary on `ProjectStatusDto` MUST expose count, freshness, and diagnostic fields with the same shapes and omission rules as [`api:dto-graph-status`](../dto-graph-status/spec.md), including `warnings[]`, `fingerprintMismatch`, `currentRef`, and `stale`."
       ]
     },
     {
@@ -72,6 +78,15 @@
       "then": ["error before response sent", "AND no incomplete JSON"]
     },
     {
+      "requirement": "project graph summary exposes health diagnostics",
+      "name": "Project status graph slice mirrors graph status diagnostics",
+      "when": ["GET /v1/project/status includes graph health"],
+      "then": [
+        "graph.warnings uses the same shape as GraphStatusDto.warnings",
+        "AND graph.fingerprintMismatch is exposed when computed"
+      ]
+    },
+    {
       "requirement": "presenters map domain results without embedding rules",
       "name": "Presenter does not add business rules to DTO",
       "given": ["kernel returns a status result with blockers"],
@@ -105,8 +120,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:968956ad4c917d1d145d67ec58d1efcb02b62b4de2eb4473c23460f8a53fb54f",
-    "verify.md": "sha256:e09b0918e91d4b045eaa495a74938f45c563314558739e62564e4ff0d3fc085c"
+    "spec.md": "sha256:8d0d165c926e8637329f90794bc0ae85eb9bcde6e21b6761d246696f3e2a0adc",
+    "verify.md": "sha256:c118167e52a2f8b26c9051bffef0763c7e2c333111bf5b2748a18d3c7664fdc3"
   },
   "generatedBy": "core"
 }

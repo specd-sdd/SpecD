@@ -23,6 +23,12 @@
       "rules": [
         "Optional properties MUST be omitted from JSON when absent unless the OpenAPI schema explicitly allows `null`."
       ]
+    },
+    {
+      "requirement": "graph status exposes health diagnostics",
+      "rules": [
+        "`GraphStatusDto` MUST include graph statistics fields already returned today plus:\n\n- `stale: boolean | null` — VCS staleness per `code-graph:staleness-detection`\n- `currentRef: string | null` — current VCS ref when resolvable; omitted when unknown\n- `fingerprintMismatch: boolean | null` — derivation fingerprint mismatch when computable; omitted when unknown\n- `warnings: { type: string; message: string }[]` — zero or more human-readable diagnostics derived from graph health (MUST be present; MAY be empty)\n\nWarning `type` values MUST use stable lowercase kebab-case identifiers. v1 types:\n\n- `graph-stale` — indexed VCS ref differs from current ref\n- `graph-fingerprint-mismatch` — code-graph version or workspace graph config changed since last index\n\nWarning `message` strings MUST align with CLI stderr copy from `warnGraphStale` where applicable."
+      ]
     }
   ],
   "constraints": [
@@ -93,6 +99,30 @@
       "name": "Client parser accepts omitted keys",
       "when": ["client reads JSON without optional field"],
       "then": ["typed object treats field as undefined", "AND UI guards optional access"]
+    },
+    {
+      "requirement": "graph status exposes health diagnostics",
+      "name": "Stale graph includes graph-stale warning",
+      "given": ["GetGraphHealthResult with stale: true and known refs"],
+      "when": ["presenter serializes GraphStatusDto"],
+      "then": ["JSON includes warnings with an entry { type: 'graph-stale', message: ... }"]
+    },
+    {
+      "requirement": "graph status exposes health diagnostics",
+      "name": "Fingerprint mismatch includes dedicated warning",
+      "given": ["fingerprintMismatch: true"],
+      "when": ["presenter serializes GraphStatusDto"],
+      "then": ["JSON includes warnings with { type: 'graph-fingerprint-mismatch', message: ... }"]
+    },
+    {
+      "requirement": "graph status exposes health diagnostics",
+      "name": "Healthy graph returns empty warnings array",
+      "given": ["stale: false and fingerprintMismatch: false"],
+      "when": ["presenter serializes"],
+      "then": [
+        "warnings is []",
+        "AND diagnostic booleans are present or omitted per optional-field rules"
+      ]
     }
   ],
   "implementation": {
@@ -105,8 +135,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a605157eed1f1437acff32e121bca3ed0f3014a931e582045eb103fd5e2a70fd",
-    "verify.md": "sha256:b59451ea62314fd115b96dd1aabc0a662a9622aec4c0f724af1c313b32659153"
+    "spec.md": "sha256:66e8171abf5ff5d81df10cffb6ee3ddad9c14f6f413c387576a094a73db5d71d",
+    "verify.md": "sha256:1e366176484698845eee4c27c18495f36e244b20ea8e06bc1a26c4bd2c7337d9"
   },
   "generatedBy": "core"
 }

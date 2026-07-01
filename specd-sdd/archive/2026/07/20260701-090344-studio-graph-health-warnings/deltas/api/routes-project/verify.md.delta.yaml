@@ -1,0 +1,17 @@
+- op: added
+  description: Project status route graph warnings scenario
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: project status aggregates lists and graph freshness'
+  content: |
+    ### Requirement: project status exposes graph warnings
+
+    #### Scenario: GET project status returns graph warnings
+
+    - **WHEN** `GET /v1/project/status` is called with graph health available
+    - **THEN** response `graph.warnings` is an array (possibly empty)
+    - **AND** stale and fingerprint diagnostics are present when computed

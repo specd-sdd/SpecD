@@ -13,13 +13,13 @@ The sidebar MUST render lists from global poll hooks (`hooks-changes-collection`
 ### Requirement: graph activity rail icon reflects stale index state
 
 When the sidebar is collapsed to the activity rail, the Graph icon MUST show a stale
-indicator (amber dot or equivalent badge) when `getGraphStatus` reports a stale index.
+indicator (amber dot or equivalent badge) when `projectStatus.graph.stale` from the project poll session store is true.
 
 Clicking the Graph activity-rail icon MUST switch the central workspace to **Graph
 Main View**. It MUST NOT open a Graph sidebar body panel.
 
 Stale state MUST use a corner badge on the rail icon (not inline text overlapping the
-icon).
+icon). Fingerprint mismatch MUST NOT add a separate rail indicator in v1.
 
 ### Requirement: view uses SpecdDataPort hooks only
 

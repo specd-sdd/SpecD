@@ -1,0 +1,9 @@
+- op: modified
+  description: Chrome stale affordances read project poll session
+  selector:
+    type: section
+    matches: 'Requirement: stale graph index shows warning affordances'
+  content: |
+    When `projectStatus.graph` from the project poll session store reports a stale index, hooks and shell chrome MUST expose a boolean consumed by `ui:sidebar-graph-entry` and graph tabs.
+
+    `getGraphStatus` remains for graph workspace operations (search, impact, hotspots, index mutate flows) but MUST NOT be used solely to drive sidebar rail stale badges or other chrome that already receives `projectStatus` on the global poll.

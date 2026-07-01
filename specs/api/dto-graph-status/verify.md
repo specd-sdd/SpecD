@@ -63,3 +63,24 @@
 - **WHEN** client reads JSON without optional field
 - **THEN** typed object treats field as undefined
 - **AND** UI guards optional access
+
+### Requirement: graph status exposes health diagnostics
+
+#### Scenario: Stale graph includes graph-stale warning
+
+- **GIVEN** `GetGraphHealthResult` with `stale: true` and known refs
+- **WHEN** presenter serializes `GraphStatusDto`
+- **THEN** JSON includes `warnings` with an entry `{ type: 'graph-stale', message: ... }`
+
+#### Scenario: Fingerprint mismatch includes dedicated warning
+
+- **GIVEN** `fingerprintMismatch: true`
+- **WHEN** presenter serializes `GraphStatusDto`
+- **THEN** JSON includes `warnings` with `{ type: 'graph-fingerprint-mismatch', message: ... }`
+
+#### Scenario: Healthy graph returns empty warnings array
+
+- **GIVEN** `stale: false` and `fingerprintMismatch: false`
+- **WHEN** presenter serializes
+- **THEN** `warnings` is `[]`
+- **AND** diagnostic booleans are present or omitted per optional-field rules

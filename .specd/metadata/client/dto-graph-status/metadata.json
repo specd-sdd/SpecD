@@ -9,7 +9,13 @@
     {
       "requirement": "client DTO matches API wire shape",
       "rules": [
-        "Field names, optional/required semantics, and nesting MUST match the paired `api:dto-*` spec. The client MUST NOT invent alternate property names."
+        "The TypeScript `GraphStatusDto` in `@specd/client` MUST mirror [`api:dto-graph-status`](../../api/dto-graph-status/spec.md), including `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]` with `{ type: string; message: string }` entries."
+      ]
+    },
+    {
+      "requirement": "client graph status includes warnings",
+      "rules": [
+        "`GraphStatusDto` in `@specd/client` MUST include `warnings: { type: string; message: string }[]` with the same semantics as the API wire shape."
       ]
     },
     {
@@ -48,6 +54,12 @@
       "then": ["build or contract test fails", "AND prevents silent UI breakage"]
     },
     {
+      "requirement": "client graph status includes warnings",
+      "name": "Remote adapter deserializes warnings array",
+      "when": ["API returns warnings on graph status"],
+      "then": ["GraphStatusDto in client preserves type and message entries"]
+    },
+    {
       "requirement": "types are shared or generated from API schemas",
       "name": "Types imported from shared package",
       "when": ["client and api packages build"],
@@ -71,14 +83,24 @@
     "symbols": [
       {
         "specId": "client:dto-graph-status",
+        "file": "client:src/graph-health-warnings.ts",
+        "symbol": "deriveGraphHealthWarnings"
+      },
+      {
+        "specId": "client:dto-graph-status",
+        "file": "client:src/graph-health-warnings.ts",
+        "symbol": "GraphHealthWarningDto"
+      },
+      {
+        "specId": "client:dto-graph-status",
         "file": "client:src/dto/graph-status.ts",
         "symbol": "GraphStatusDto"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:bbdf11ac8f76481afa82332963bd9ca018a235542aa6e6c2535641baf0f6a3e2",
-    "verify.md": "sha256:a6b2dd052c25375e60afab32bd77b9f85d482cc88068ac426618286a13b8c3f4"
+    "spec.md": "sha256:a90eba7e45675c4dac70270c711db644111ad4e8af3cccd906c2a0b38b620a55",
+    "verify.md": "sha256:6935c5e465156bfaf8c84a01783db7edff408a7b84191aa0a35802561f32bccf"
   },
   "generatedBy": "core"
 }

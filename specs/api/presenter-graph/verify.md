@@ -45,3 +45,18 @@
 - **WHEN** presenter called twice on same input
 - **THEN** outputs are identical
 - **AND** no time-dependent fields unless documented
+
+### Requirement: graph status presenter derives warnings from health result
+
+#### Scenario: Presenter does not recompute staleness
+
+- **GIVEN** a `GetGraphHealthResult` fixture with `stale: true`
+- **WHEN** `toGraphStatusDto` runs
+- **THEN** output `stale` matches input
+- **AND** warnings are derived only from input fields
+
+#### Scenario: CLI-equivalent stale message
+
+- **GIVEN** known `lastIndexedRef` and `currentRef`
+- **WHEN** stale warning is emitted
+- **THEN** message mentions indexed vs current ref prefixes

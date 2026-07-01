@@ -1,0 +1,26 @@
+- op: modified
+  description: Stale affordances use project poll session
+  selector:
+    type: section
+    matches: 'Requirement: stale graph index shows warning affordances'
+  content: |
+    #### Scenario: Stale flag shows warning badge
+
+    - **GIVEN** project poll session `projectStatus.graph.stale: true`
+    - **WHEN** graph entry renders
+    - **THEN** warning affordance visible
+    - **AND** copy suggests rebuild
+
+    #### Scenario: Fresh index hides warning
+
+    - **GIVEN** project poll session `projectStatus.graph.stale: false`
+    - **WHEN** graph entry renders
+    - **THEN** no stale banner
+    - **AND** last indexed time shown when available
+
+    #### Scenario: Rebuild clears warning after success
+
+    - **GIVEN** index was stale
+    - **WHEN** user completes index rebuild and project poll refetches
+    - **THEN** session store shows fresh graph slice
+    - **AND** warning removed

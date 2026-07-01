@@ -14,6 +14,17 @@ Given the same kernel or graph result, the presenter MUST produce the same DTO J
 
 The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in core use cases invoked via the SDK kernel surface.
 
+### Requirement: graph status presenter derives warnings from health result
+
+`toGraphStatusDto` MUST accept `GetGraphHealthResult` (or equivalent fields) and populate [`api:dto-graph-status`](../dto-graph-status/spec.md) diagnostic properties.
+
+The presenter MUST derive `warnings[]` deterministically:
+
+- When `stale === true` and both `lastIndexedRef` and `currentRef` are non-null, append `{ type: 'graph-stale', message: ... }` using CLI-equivalent copy (short ref prefixes allowed).
+- When `fingerprintMismatch === true`, append `{ type: 'graph-fingerprint-mismatch', message: ... }` using CLI-equivalent copy.
+
+The presenter MUST NOT recompute staleness or fingerprint mismatch — it formats values already computed by `GetGraphHealth`.
+
 ## Constraints
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.

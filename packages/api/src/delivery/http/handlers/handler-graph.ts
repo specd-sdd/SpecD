@@ -55,7 +55,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           workspaces: [...workspaces],
           assertUnlocked: false,
         })
-        return toGraphStatusDto(health, health.stale)
+        return toGraphStatusDto(health)
       } finally {
         await provider.close()
       }

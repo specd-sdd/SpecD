@@ -1,6 +1,6 @@
 import path from 'node:path'
 import {
-  type GraphStatistics,
+  type GetGraphHealthResult,
   type SymbolNode,
   type SpecNode,
   type DocumentNode,
@@ -10,6 +10,7 @@ import {
   type HotspotEntry,
 } from '@specd/sdk'
 import type { SpecdConfig } from '@specd/sdk'
+import { deriveGraphHealthWarnings } from '@specd/client'
 import { type GraphStatusDto } from '../dto/graph-status.js'
 import { type GraphFileRefDto } from '../dto/graph-file-ref.js'
 import { type GraphSymbolRefDto } from '../dto/graph-symbol-ref.js'
@@ -18,20 +19,28 @@ import { type GraphImpactDto } from '../dto/graph-impact.js'
 import { type ChangeGraphViewDto } from '../dto/change-graph-view.js'
 
 /**
- * Maps graph statistics to status DTO.
- * @param stats
- * @param stale
+ * Maps graph health to status DTO.
+ * @param health - Enriched graph health from `GetGraphHealth`
  */
-export function toGraphStatusDto(stats: GraphStatistics, stale: boolean | null): GraphStatusDto {
+export function toGraphStatusDto(health: GetGraphHealthResult): GraphStatusDto {
+  const warnings = deriveGraphHealthWarnings({
+    stale: health.stale,
+    fingerprintMismatch: health.fingerprintMismatch,
+    lastIndexedRef: health.lastIndexedRef,
+    currentRef: health.currentRef,
+  })
   return {
-    lastIndexedAt: stats.lastIndexedAt ?? null,
-    lastIndexedRef: stats.lastIndexedRef ?? null,
-    fileCount: stats.fileCount,
-    documentCount: stats.documentCount,
-    symbolCount: stats.symbolCount,
-    specCount: stats.specCount,
-    graphFingerprint: stats.graphFingerprint ?? null,
-    stale,
+    lastIndexedAt: health.lastIndexedAt ?? null,
+    lastIndexedRef: health.lastIndexedRef ?? null,
+    fileCount: health.fileCount,
+    documentCount: health.documentCount,
+    symbolCount: health.symbolCount,
+    specCount: health.specCount,
+    graphFingerprint: health.graphFingerprint ?? null,
+    stale: health.stale,
+    currentRef: health.currentRef,
+    fingerprintMismatch: health.fingerprintMismatch,
+    warnings,
   }
 }
 

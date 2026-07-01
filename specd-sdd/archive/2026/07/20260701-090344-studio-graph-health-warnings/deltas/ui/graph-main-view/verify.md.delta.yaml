@@ -1,0 +1,48 @@
+- op: modified
+  description: Graph status scenario uses project poll session
+  selector:
+    type: section
+    matches: 'Requirement: view renders graph overview and index controls'
+  content: |
+    ### Requirement: view renders graph overview and index controls
+
+    #### Scenario: Graph status is rendered
+
+    - **GIVEN** `GraphMainView` is active
+    - **WHEN** the view loads
+    - **THEN** it reads `projectStatus.graph` from the project poll session store
+    - **AND** it renders the "Ready", "Stale", or "Off" status
+    - **AND** it renders counts for Specs, Files & Docs, and Symbols from the graph slice
+
+- op: added
+  description: Verify graph panel health diagnostics from session store
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: view renders graph overview and index controls'
+  content: |
+    ### Requirement: view surfaces graph health diagnostics in index status
+
+    #### Scenario: Stale graph shows warning messages in Index Status card
+
+    - **GIVEN** project poll session returns `graph.stale: true` and `graph.warnings` with `{ type: 'graph-stale', message: '...' }`
+    - **WHEN** `GraphMainView` renders
+    - **THEN** Index Status shows Stale label
+    - **AND** the warning `message` is visible in the card
+
+    #### Scenario: Fingerprint mismatch shows dedicated diagnostic
+
+    - **GIVEN** project poll session returns `graph.fingerprintMismatch: true` with a `graph-fingerprint-mismatch` warning
+    - **WHEN** `GraphMainView` renders
+    - **THEN** Index Status card shows the fingerprint warning message
+    - **AND** copy is distinct from stale-only messaging
+
+    #### Scenario: Healthy graph shows Ready without warning lines
+
+    - **GIVEN** project poll session returns `graph.stale: false`, `graph.fingerprintMismatch: false`, and `graph.warnings: []`
+    - **WHEN** `GraphMainView` renders
+    - **THEN** Index Status shows Ready
+    - **AND** no diagnostic warning lines are shown

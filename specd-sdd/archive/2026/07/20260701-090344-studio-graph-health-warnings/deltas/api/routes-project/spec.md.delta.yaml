@@ -1,0 +1,21 @@
+- op: modified
+  description: Project status route returns graph diagnostics
+  selector:
+    type: section
+    matches: 'Requirement: project status aggregates lists and graph freshness'
+  content: |
+    `GET /project/status` MUST compose active/draft/discarded/archive counts and a `graph` summary equivalent to CLI `project status --graph`, including `stale`, `currentRef`, `fingerprintMismatch`, and `warnings[]` per [`api:dto-project-status`](../dto-project-status/spec.md).
+
+- op: added
+  description: Project status route graph warnings requirement
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: project status aggregates lists and graph freshness'
+  content: |
+    ### Requirement: project status exposes graph warnings
+
+    `GET /v1/project/status` MUST return `graph.warnings` as an array (possibly empty) when graph health is available, with stale and fingerprint diagnostics present when computed.

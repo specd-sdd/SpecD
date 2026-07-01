@@ -14,6 +14,12 @@ Given the same kernel or graph result, the presenter MUST produce the same DTO J
 
 The presenter MUST NOT decide lifecycle transitions, validation outcomes, or approval state — those belong in core use cases invoked via the SDK kernel surface.
 
+### Requirement: project status presenter maps graph health diagnostics
+
+When mapping `buildProjectStatusSnapshot.graphHealth`, the project presenter MUST populate the `graph` slice on [`api:dto-project-status`](../dto-project-status/spec.md) with the same diagnostic fields and `warnings[]` derivation rules as `toGraphStatusDto` in [`api:presenter-graph`](../presenter-graph/spec.md).
+
+Count fields (`symbolCount`, `specCount`, `indexed`) MUST continue to reflect graph statistics when graph health is included.
+
 ## Constraints
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.

@@ -15,7 +15,7 @@
     {
       "requirement": "graph activity rail icon reflects stale index state",
       "rules": [
-        "When the sidebar is collapsed to the activity rail, the Graph icon MUST show a stale\nindicator (amber dot or equivalent badge) when `getGraphStatus` reports a stale index.\n\nClicking the Graph activity-rail icon MUST switch the central workspace to **Graph\nMain View**. It MUST NOT open a Graph sidebar body panel.\n\nStale state MUST use a corner badge on the rail icon (not inline text overlapping the\nicon)."
+        "When the sidebar is collapsed to the activity rail, the Graph icon MUST show a stale\nindicator (amber dot or equivalent badge) when `projectStatus.graph.stale` from the project poll session store is true.\n\nClicking the Graph activity-rail icon MUST switch the central workspace to **Graph\nMain View**. It MUST NOT open a Graph sidebar body panel.\n\nStale state MUST use a corner badge on the rail icon (not inline text overlapping the\nicon). Fingerprint mismatch MUST NOT add a separate rail indicator in v1."
       ]
     },
     {
@@ -54,7 +54,7 @@
     {
       "requirement": "graph activity rail icon reflects stale index state",
       "name": "Stale graph shows indicator on collapsed rail icon",
-      "given": ["sidebar collapsed and graph status reports stale"],
+      "given": ["sidebar collapsed and project poll session reports graph.stale: true"],
       "when": ["activity rail renders"],
       "then": ["Graph icon shows stale indicator"]
     },
@@ -111,17 +111,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "ui:sidebar-graph-entry",
-        "file": "ui:src/shell/studio-sidebar/StudioSidebarRail.tsx",
-        "symbol": "StudioSidebarRail"
+        "file": "ui:src/shell/ShellLayout.tsx"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:56f1e41f0982021b10f6638bf9429fd676164fd7c6376294bea7d7d99fecf00a",
-    "verify.md": "sha256:ee99c94ed183b00f9f655c6787a5c113fb9cfc126961ccb7f4456cd6bda1936d"
+    "spec.md": "sha256:9927cd66fc2da5da9a5f94023cfbecd381e63f3b71695c714c910180e22a3752",
+    "verify.md": "sha256:e2505e0c836767311d708e41523226fbdd60c5130b34d2a4240a760f2b466213"
   },
   "generatedBy": "core"
 }

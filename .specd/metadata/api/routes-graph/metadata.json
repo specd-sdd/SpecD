@@ -9,7 +9,7 @@
     {
       "requirement": "GET graph status exposes freshness and stale flag",
       "rules": [
-        "`GET /v1/graph/status` MUST return fingerprint, stale/freshness flags, and counts sufficient for sidebar warnings."
+        "`GET /v1/graph/status` MUST return fingerprint, stale/freshness flags, counts, `currentRef`, `fingerprintMismatch`, and `warnings[]` sufficient for sidebar and notification warnings per [`api:dto-graph-status`](../dto-graph-status/spec.md)."
       ]
     },
     {
@@ -60,11 +60,11 @@
     },
     {
       "requirement": "GET graph status exposes freshness and stale flag",
-      "name": "Graph status exposes freshness",
+      "name": "Graph status exposes freshness and warnings",
       "when": ["GET /v1/graph/status is called"],
       "then": [
-        "response includes fingerprint and stale flags",
-        "AND sidebar can warn when graph is stale"
+        "response includes fingerprint, stale flags, fingerprintMismatch, and warnings[]",
+        "AND sidebar and notifications can warn from response payload"
       ]
     },
     {
@@ -221,8 +221,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5d2002d9497af4ffc763ca87b2914f76d6109873552e3e411a69837f42f05f5a",
-    "verify.md": "sha256:b971d3e13baa1ceaffc9a174ba85981f80a412394d2564cef9e9ca293ef0c1d3"
+    "spec.md": "sha256:102d73b1bdf7bb5087cffa3239fc97603a8699c3fa9f0b6f63f9f0e79ac213a4",
+    "verify.md": "sha256:71ec5a87d70659637970ab36bee0ea299066c7e9211cdab6c1c8e4ce5de08e56"
   },
   "generatedBy": "core"
 }

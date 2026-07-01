@@ -10,11 +10,11 @@
 - **THEN** route handler is reached
 - **AND** unprefixed legacy path is not registered
 
-#### Scenario: Graph status exposes freshness
+#### Scenario: Graph status exposes freshness and warnings
 
 - **WHEN** `GET /v1/graph/status` is called
-- **THEN** response includes fingerprint and stale flags
-- **AND** sidebar can warn when graph is stale
+- **THEN** response includes fingerprint, stale flags, `fingerprintMismatch`, and `warnings[]`
+- **AND** sidebar and notifications can warn from response payload
 
 #### Scenario: Undocumented path returns 404
 

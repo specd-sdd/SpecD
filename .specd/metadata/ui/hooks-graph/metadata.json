@@ -15,7 +15,7 @@
     {
       "requirement": "stale graph index shows warning affordances",
       "rules": [
-        "When `getGraphStatus` reports a stale index, hooks MUST expose a boolean consumed by `ui:sidebar-graph-entry` and graph tabs."
+        "When `projectStatus.graph` from the project poll session store reports a stale index, hooks and shell chrome MUST expose a boolean consumed by `ui:sidebar-graph-entry` and graph tabs.\n\n`getGraphStatus` remains for graph workspace operations (search, impact, hotspots, index mutate flows) but MUST NOT be used solely to drive sidebar rail stale badges or other chrome that already receives `projectStatus` on the global poll."
       ]
     }
   ],
@@ -50,37 +50,29 @@
     {
       "requirement": "stale graph index shows warning affordances",
       "name": "Stale flag shows warning badge",
-      "given": ["status returns stale: true"],
+      "given": ["project poll session projectStatus.graph.stale: true"],
       "when": ["graph entry renders"],
       "then": ["warning affordance visible", "AND copy suggests rebuild"]
     },
     {
       "requirement": "stale graph index shows warning affordances",
       "name": "Fresh index hides warning",
-      "given": ["status returns stale: false"],
+      "given": ["project poll session projectStatus.graph.stale: false"],
       "when": ["graph entry renders"],
-      "then": ["no stale banner", "AND last indexed time shown"]
+      "then": ["no stale banner", "AND last indexed time shown when available"]
     },
     {
       "requirement": "stale graph index shows warning affordances",
       "name": "Rebuild clears warning after success",
       "given": ["index was stale"],
-      "when": ["user completes index rebuild"],
-      "then": ["status refetch shows fresh", "AND warning removed"]
+      "when": ["user completes index rebuild and project poll refetches"],
+      "then": ["session store shows fresh graph slice", "AND warning removed"]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "ui:hooks-graph",
-        "file": "ui:src/hooks/use-graph-status.ts",
-        "symbol": "useGraphStatus"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:41d5e8d22dd3c462cce78a8ff146fa92fac8e8d24daec2e62ab1a716f0346649",
-    "verify.md": "sha256:67efb659ac78ca80714b7a182aeeb12f8301f98fb35266b75878c32174827f39"
+    "spec.md": "sha256:f4f7e7375d3333ed3dd37a21a31d11b060abaa627803e355143d5a65d81ad612",
+    "verify.md": "sha256:1440ee53145379987df60cf3b99062c747fef26d0a72cd4a452f968847052665"
   },
   "generatedBy": "core"
 }

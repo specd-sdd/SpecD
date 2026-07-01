@@ -1,6 +1,7 @@
 import type { ProjectDto, ProjectStatusDto } from '@specd/client'
 import * as React from 'react'
 import { useSpecdDataPort } from '../context/specd-data-context.js'
+import { publishProjectPollSession } from './project-poll-session.js'
 import { useAsyncResource } from './use-async-resource.js'
 
 const POLL_MS = 2500
@@ -49,5 +50,32 @@ export function useProjectPoll(options: { poll?: boolean } = {}): {
   const project = useAsyncResource('project', loadProject, { refreshKey })
   const status = useAsyncResource('project-status', loadStatus, { refreshKey })
 
+  const refetch = React.useCallback(() => {
+    project.refetch()
+    status.refetch()
+  }, [project, status])
+
+  React.useEffect(() => {
+    publishProjectPollSession({
+      project: project.data,
+      projectStatus: status.data,
+      refreshKey,
+      isLoading: project.isLoading || status.isLoading,
+      error: project.error ?? status.error,
+      refetch,
+    })
+  }, [
+    project.data,
+    project.error,
+    project.isLoading,
+    status.data,
+    status.error,
+    status.isLoading,
+    refreshKey,
+    refetch,
+  ])
+
   return { project, status, refreshKey }
 }
+
+export { useProjectPollSession } from './project-poll-session.js'

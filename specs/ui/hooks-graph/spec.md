@@ -12,7 +12,9 @@ Consumers MUST receive graph status, search, impact, spec coverage, and linkage 
 
 ### Requirement: stale graph index shows warning affordances
 
-When `getGraphStatus` reports a stale index, hooks MUST expose a boolean consumed by `ui:sidebar-graph-entry` and graph tabs.
+When `projectStatus.graph` from the project poll session store reports a stale index, hooks and shell chrome MUST expose a boolean consumed by `ui:sidebar-graph-entry` and graph tabs.
+
+`getGraphStatus` remains for graph workspace operations (search, impact, hotspots, index mutate flows) but MUST NOT be used solely to drive sidebar rail stale badges or other chrome that already receives `projectStatus` on the global poll.
 
 ## Spec Dependencies
 
