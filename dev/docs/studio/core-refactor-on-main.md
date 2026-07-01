@@ -2,7 +2,7 @@
 
 Trabajo completado en rama **`main`** (`87401d64`): use cases host en `core` y `code-graph`, paquete `@specd/sdk`, CLI/MCP adelgazados, public barrels.
 
-**Adaptación de la rama feature** (api, IPC, presenters): [merge-main-analysis-2026-06-25.md](./merge-main-analysis-2026-06-25.md) — Track B **completado** (`0cc90abb`, merge en `main` `fed3b7e4`). Pendiente: alinear specs (`align-studio-specs-post-merge`).
+**Adaptación de la rama feature** (api, IPC, presenters): [merge-main-analysis-2026-06-25.md](./merge-main-analysis-2026-06-25.md) — Track B **completado** (`0cc90abb`, merge en `main` `fed3b7e4`). Specs Studio archivados en `20260630-171934-align-studio-specs-post-merge` (`9bbfb3e2`).
 
 **Paquetes tocados:** `packages/core`, `packages/code-graph`, `packages/sdk` (nuevo), `packages/cli`, `packages/mcp`.
 

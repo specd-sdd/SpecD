@@ -293,4 +293,53 @@ test.describe('SpecD Studio UI', () => {
     await dialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(dialog).not.toBeVisible()
   })
+
+  test('workflow status stays available across status poll ticks', async ({ page }) => {
+    await openFirstActiveChange(page)
+    await expectWorkflowStatusAvailable(page)
+
+    await page.waitForTimeout(3_500)
+    await expectWorkflowStatusAvailable(page)
+  })
+
+  test('archive sidebar opens a read-only archived change', async ({ page }) => {
+    await openStudioShell(page)
+
+    const archivedRows = page.locator('[data-testid^="studio-archived-change-"]')
+    try {
+      await archivedRows.first().waitFor({ state: 'visible', timeout: 15_000 })
+    } catch {
+      test.skip(true, 'No archived changes in project')
+    }
+
+    const testId = await archivedRows.first().getAttribute('data-testid')
+    const archivedName = testId?.replace(/^studio-archived-change-/, '')
+    test.skip(!archivedName, 'Archived change name not found')
+
+    await archivedRows.first().click()
+    await expect(page.getByRole('heading', { level: 1, name: archivedName! })).toBeVisible({
+      timeout: 12_000,
+    })
+    await expect(page.getByText('Read-only archived snapshot')).toBeVisible({ timeout: 12_000 })
+  })
+
+  test('command palette graph search can render result snippets', async ({ page }) => {
+    await openStudioShell(page)
+
+    await page.getByTestId('studio-open-command-palette').click()
+    const input = page.getByTestId('studio-command-palette-input')
+    await expect(input).toBeVisible()
+
+    await input.fill('architecture')
+    await expect(page.getByTestId('studio-command-palette-specs')).toBeVisible({ timeout: 12_000 })
+
+    const snippetBlocks = page.getByTestId('studio-command-palette-list').locator('pre')
+    await expect(async () => {
+      const count = await snippetBlocks.count()
+      if (count === 0) {
+        throw new Error('Waiting for graph search snippets')
+      }
+    }).toPass({ timeout: 12_000 })
+    await expect(snippetBlocks.first()).not.toBeEmpty()
+  })
 })

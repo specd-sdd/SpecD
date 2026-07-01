@@ -650,7 +650,7 @@ core ◄── code-graph ◄── sdk ◄── cli | api | mcp | studio-deskt
 ui → client → api/ipc   (sin sdk)
 ```
 
-**Migración:** sustituir `"@specd/core"` / `"@specd/code-graph"` por `"@specd/sdk"` en `package.json` de hosts; reemplazar imports; ESLint `no-restricted-imports` opcional en esos paquetes para evitar regresiones.
+**Migración:** sustituir `"@specd/core"` / `"@specd/code-graph"` por `"@specd/sdk"` en `package.json` de hosts; reemplazar imports; ESLint `no-restricted-imports` en `api`, `studio-desktop` (main/preload) y `mcp` (✅).
 
 Cada adaptador se queda con **lo suyo**:
 
@@ -1036,8 +1036,8 @@ Ninguno de estos existe en `main`; el merge **no debe eliminarlos**.
 ### Fase 4 — UI — ✅ (con notas)
 
 - [x] `pnpm --filter @specd/ui test`
-- [x] E2E: `apps/specd-studio-web/tests/e2e/studio.ui.spec.ts` — 5 pass / 3 skip (sin changes activos)
-- [ ] Probar manualmente: status poll, archive sidebar, graph search con snippets (opcional)
+- [x] E2E: `apps/specd-studio-web/tests/e2e/studio.ui.spec.ts` — status poll, archive sidebar, graph search snippets (+ skips sin changes activos)
+- [x] Probar manualmente: opcional; cubierto por Playwright Fase 4
 
 ### Fase 5 — Regresión CLI (paridad con Studio) — ✅
 
@@ -1048,12 +1048,12 @@ Ninguno de estos existe en `main`; el merge **no debe eliminarlos**.
 
 - [x] Registrar workspaces Studio en `specd.yaml` (`api`, `studio-desktop`, `studio-web`, `client`, `code-graph-electron`)
 - [x] Change `align-studio-specs-post-merge`: 113 spec deltas → `@specd/sdk` / IPC / runtime fixes
-- [x] Implementation links (134) desde `spec-lock` + overrides — 112/113 specs (sin `bottom-panel-terminal`, sin xterm en disco)
+- [x] Implementation links (134) desde `spec-lock` + overrides — 112/112 specs Studio desktop (spec `bottom-panel-terminal` eliminado; terminal vía otro enfoque)
 - [x] Desktop smoke: `pnpm build && pnpm start` OK (`ELECTRON_RUN_AS_NODE=` + CJS main)
 - [x] `change transition align-studio-specs-post-merge ready` → implement/verify → archive
 - [x] Archive: `specd-sdd/archive/2026/06/20260630-171934-align-studio-specs-post-merge`
 
-**Pendiente opcional (no bloquea):** QA manual Fase 4; spec `bottom-panel-terminal` sin impl xterm; warnings staleness en `GraphStatusDto`.
+**Pendiente opcional (no bloquea):** warnings staleness en `GraphStatusDto` (ver notificaciones UI); push/merge `9bbfb3e2` → `main`.
 
 ---
 

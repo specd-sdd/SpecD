@@ -67,6 +67,7 @@ export function ChangesSidebar({
           onSelect={onSelectArchived ?? onSelect}
           showState={false}
           fixedCircleColor="text-muted-foreground/30"
+          rowTestIdPrefix="studio-archived-change"
         />
       ) : null}
       {discarded !== undefined && discarded.length > 0 ? (

@@ -172,6 +172,43 @@ export default tseslint.config(
     },
   },
 
+  // Delivery hosts — import @specd/sdk only (Track B guardrail)
+  {
+    files: [
+      'packages/api/src/**/*.ts',
+      'apps/specd-studio-desktop/src/main/**/*.ts',
+      'apps/specd-studio-desktop/src/preload/**/*.ts',
+      'packages/mcp/src/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@specd/core',
+              message: 'Delivery hosts must import from @specd/sdk, not @specd/core.',
+            },
+            {
+              name: '@specd/code-graph',
+              message: 'Delivery hosts must import from @specd/sdk, not @specd/code-graph.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['@specd/core/*', '@specd/core/**'],
+              message: 'Delivery hosts must import from @specd/sdk, not @specd/core.',
+            },
+            {
+              group: ['@specd/code-graph/*', '@specd/code-graph/**'],
+              message: 'Delivery hosts must import from @specd/sdk, not @specd/code-graph.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // SpecD Studio UI hosts — relax JSDoc until components are documented to core standard
   {
     files: [
@@ -202,7 +239,7 @@ export default tseslint.config(
 
   // Playwright e2e (studio-web)
   {
-    files: ['apps/specd-studio-web/e2e/**/*.ts'],
+    files: ['apps/specd-studio-web/tests/e2e/**/*.ts'],
     rules: {
       'jsdoc/require-jsdoc': 'off',
       'jsdoc/require-description': 'off',

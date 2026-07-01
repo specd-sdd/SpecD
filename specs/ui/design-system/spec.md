@@ -132,19 +132,18 @@ Lifecycle and validation states MUST use the semantic palette: success green, wa
 
 `@specd/ui` MUST build Studio chrome on this **v1 stack** (no alternate component library):
 
-| Concern            | Library                                                          | Usage                                                                                                  |
-| ------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Utility CSS        | **Tailwind CSS**                                                 | Layout, spacing, colors mapped to Studio tokens                                                        |
-| Primitives         | **Radix UI** / **Base UI**                                       | Accessible primitives via shadcn components (Dialog, Popover, Combobox, Tabs, etc.)                    |
-| Component kit      | **shadcn/ui**                                                    | Copied into `packages/ui/src/components/ui/`; re-themed to IDE density (not default marketing spacing) |
-| Variants           | **class-variance-authority** (`cva`)                             | Variant props on shared components                                                                     |
-| Class merging      | **tailwind-merge** (+ `clsx` or equivalent)                      | `cn()` helper in `lib/utils.ts`                                                                        |
-| Split layout       | **react-resizable-panels**                                       | Sidebar / editor / inspector / bottom splits                                                           |
-| Selection & Lists  | **cmdk** / **Base UI**                                           | Command palettes and advanced Combobox implementations                                                 |
-| Trees              | **`react-arborist`** or shadcn/Radix-backed tree wrappers        | Changes and workspace sidebars                                                                         |
-| Code editor        | **@monaco-editor/react** + **monaco-editor**                     | `ui:artifact-editor` and read-only inspectors                                                          |
-| Icons              | **lucide-react**                                                 | Navigation and toolbars                                                                                |
-| Terminal (desktop) | **xterm** (+ fit addon as needed) + **node-pty** in main process | `studio-desktop:bottom-panel-terminal` only                                                            |
+| Concern           | Library                                                   | Usage                                                                                                  |
+| ----------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Utility CSS       | **Tailwind CSS**                                          | Layout, spacing, colors mapped to Studio tokens                                                        |
+| Primitives        | **Radix UI** / **Base UI**                                | Accessible primitives via shadcn components (Dialog, Popover, Combobox, Tabs, etc.)                    |
+| Component kit     | **shadcn/ui**                                             | Copied into `packages/ui/src/components/ui/`; re-themed to IDE density (not default marketing spacing) |
+| Variants          | **class-variance-authority** (`cva`)                      | Variant props on shared components                                                                     |
+| Class merging     | **tailwind-merge** (+ `clsx` or equivalent)               | `cn()` helper in `lib/utils.ts`                                                                        |
+| Split layout      | **react-resizable-panels**                                | Sidebar / editor / inspector / bottom splits                                                           |
+| Selection & Lists | **cmdk** / **Base UI**                                    | Command palettes and advanced Combobox implementations                                                 |
+| Trees             | **`react-arborist`** or shadcn/Radix-backed tree wrappers | Changes and workspace sidebars                                                                         |
+| Code editor       | **@monaco-editor/react** + **monaco-editor**              | `ui:artifact-editor` and read-only inspectors                                                          |
+| Icons             | **lucide-react**                                          | Navigation and toolbars                                                                                |
 
 shadcn components MUST be customized (Tailwind theme + `cva`) to match this spec’s palette, radius, and density. Local names such as `StudioDialog` or sidebar/tree wrappers MUST be thin shadcn/Radix-backed adapters, not reimplemented primitives. Default shadcn “card dashboard” layouts MUST NOT be used for the shell.
 
