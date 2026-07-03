@@ -52,7 +52,7 @@
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
       "rules": [
-        "When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec, using persisted metadata when it is fresh and the schema's `metadataExtraction` declarations as a fallback when metadata is absent or stale.\n\nThat fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.\n\nIf fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent."
+        "When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec.\n\nTraversal resolves dependencies in this order:\n\n1. canonical `metadata.json.dependsOn` when persisted metadata is available\n2. the schema's `metadataExtraction.dependsOn` declarations as a fallback when metadata is absent\n\nIf metadata exists but is stale, the use case MAY still traverse using the persisted canonical `dependsOn` projection, but it MUST emit a `stale-metadata` warning. The use case MUST NOT treat stale metadata as though it were missing.\n\nThat fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.\n\nIf fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent.\n\nThe use case MUST NOT read `spec-lock.json` as a generic spec artifact to discover dependencies; persisted sidecars are consumed through the canonical metadata projection."
       ]
     },
     {
@@ -228,9 +228,33 @@
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
       "name": "DependsOn traversal respects depth limit",
-      "given": ["spec A depends on B, B depends on C"],
+      "given": ["spec A depends on B and B depends on C"],
       "when": ["execute is called with followDeps: true and depth: 1"],
       "then": ["specs contains A and B but not C"]
+    },
+    {
+      "requirement": "Supports dependsOn traversal when followDeps is true",
+      "name": "Canonical metadata dependency projection works without extraction",
+      "given": [
+        "an included persisted spec has fresh metadata.json.dependsOn",
+        "AND the active schema omits metadataExtraction.dependsOn"
+      ],
+      "when": ["execute is called with followDeps: true"],
+      "then": ["traversal still discovers those dependencies from metadata"]
+    },
+    {
+      "requirement": "Supports dependsOn traversal when followDeps is true",
+      "name": "Stale metadata remains distinct from missing metadata",
+      "given": [
+        "an included persisted spec has metadata.json.dependsOn",
+        "AND that metadata is marked stale"
+      ],
+      "when": ["execute is called with followDeps: true"],
+      "then": [
+        "traversal still sees the persisted dependency projection",
+        "AND the result includes a stale-metadata warning",
+        "AND the use case does not treat that spec as metadata-missing"
+      ]
     },
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
@@ -248,8 +272,8 @@
       "requirement": "Supports dependsOn traversal when followDeps is true",
       "name": "DependsOn traversal does not silently drop found dependency values",
       "given": [
-        "live fallback extraction finds dependency values for a spec",
-        "AND transform execution cannot normalize those found values"
+        "extraction finds dependency values for a stale or metadata-less spec",
+        "AND transform execution cannot normalize those values"
       ],
       "when": ["execute is called with followDeps: true"],
       "then": ["traversal fails explicitly instead of treating the spec as having no dependencies"]
@@ -355,33 +379,17 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:get-project-context",
-        "file": "core:test/application/use-cases/get-project-context.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:get-project-context",
         "file": "core:src/application/use-cases/get-project-context.ts",
         "symbol": "GetProjectContext"
-      },
-      {
-        "specId": "core:get-project-context",
-        "file": "core:src/application/use-cases/get-project-context.ts",
-        "symbol": "GetProjectContextInput"
-      },
-      {
-        "specId": "core:get-project-context",
-        "file": "core:src/composition/use-cases/get-project-context.ts",
-        "symbol": "createGetProjectContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:30e3433270c6a1c799b28275537282e606b38df57b11f146f687cd20c8c3aa05",
-    "verify.md": "sha256:b57b051832b12b55098fad0f71e6379225b95c7735f3189627194294b4484cef"
+    "spec.md": "sha256:6506937bfc229af558ed5d05c70d397596eb6ae0aeeb831d1c27ab710ee9719e",
+    "verify.md": "sha256:999f271670d5c5497dfbaf317a6f65d4b5e75451a37f6723259bb4bfd91c7592"
   },
   "generatedBy": "core"
 }

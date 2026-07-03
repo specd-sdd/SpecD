@@ -1,0 +1,16 @@
+- op: modified
+  description: 'Seed dependency snapshots from semantic persisted state instead of raw sidecar assumptions'
+  selector:
+    type: section
+    matches: '^Requirement: Initial specDependsOn seeding$'
+  content: |
+    When `CreateChange.execute` is called with spec IDs that already exist in a configured spec repository, the newly constructed `Change` MUST seed `change.specDependsOn` for each such spec before persistence.
+
+    Seeding rules:
+
+    - If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.
+    - Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.
+    - Otherwise, the seeded value is an empty array.
+    - Specs that do not yet exist in the repository do not require a seeded dependency entry at creation time.
+
+    This ensures a change created against existing specs starts from the current persisted dependency snapshot without depending on raw sidecar filenames or generic artifact reads.

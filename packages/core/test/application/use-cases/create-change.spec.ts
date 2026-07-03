@@ -173,6 +173,57 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
+    it('still falls back to stale metadata for dependencies when sidecar is absent', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])],
+        artifacts: {
+          'auth/login/spec.md': '# Login flow',
+          'auth/login/metadata.json': JSON.stringify({
+            dependsOn: ['default:shared/auth'],
+            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+          }),
+        },
+      })
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map([['default', specRepo]])))
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
+    })
+
+    it('prefers persisted dependencies over metadata fallback when both exist', async () => {
+      const repo = makeChangeRepository()
+      const specRepo = makeSpecRepository({
+        specs: [new Spec('default', SpecPath.parse('auth/login'), [])],
+        artifacts: {
+          'auth/login/spec-lock.json': JSON.stringify({
+            dependsOn: ['default:shared/persisted'],
+          }),
+          'auth/login/metadata.json': JSON.stringify({
+            dependsOn: ['default:shared/metadata'],
+          }),
+        },
+      })
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map([['default', specRepo]])))
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['default:auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+      })
+
+      expect(result.change.specDependsOn.get('default:auth/login')).toEqual([
+        'default:shared/persisted',
+      ])
+    })
+
     it('does not seed dependsOn for non-existent specs (newly created)', async () => {
       const repo = makeChangeRepository()
       const uc = makeCreateChange(

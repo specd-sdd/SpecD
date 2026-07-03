@@ -301,6 +301,7 @@ describe('GenerateSpecMetadata', () => {
 
     const result = await useCase.execute({ specId: 'core:change' })
 
+    expect(result.metadata.dependsOn).toEqual([])
     expect(result.metadata.implementation).toEqual({
       files: [{ specId: 'core:change', file: 'core:src/domain/entities/change.ts' }],
       symbols: [
@@ -311,6 +312,126 @@ describe('GenerateSpecMetadata', () => {
         },
       ],
     })
+  })
+
+  it('projects persisted dependsOn when extraction omits dependencies', async () => {
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('specs', {
+          scope: 'spec',
+          output: 'spec.md',
+          format: 'markdown',
+        }),
+      ],
+      metadataExtraction: {},
+    })
+
+    const spec = new Spec('core', SpecPath.parse('change'), ['spec.md'])
+    const repo = makeSpecRepository({
+      workspace: 'core',
+      specs: [spec],
+      artifacts: {
+        'change/spec.md': '# Change\n',
+        'change/spec-lock.json': JSON.stringify({
+          schema: { name: 'specd', version: 1 },
+          dependsOn: ['core:spec-lock', 'core:spec-metadata'],
+          implementation: [],
+        }),
+      },
+    })
+
+    const markdownParser = makeParser({
+      parse: () => ({ root: { type: 'document', children: [] } }),
+    })
+
+    const useCase = new GenerateSpecMetadata(
+      makeListWorkspaces(new Map([['core', repo]])),
+      makeSchemaProvider(schema),
+      makeParsers(markdownParser),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+    )
+
+    const result = await useCase.execute({ specId: 'core:change' })
+
+    expect(result.hasExtraction).toBe(true)
+    expect(result.metadata.dependsOn).toEqual(['core:spec-lock', 'core:spec-metadata'])
+  })
+
+  it('fails when extracted dependsOn mismatches persisted dependencies', async () => {
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('specs', {
+          scope: 'spec',
+          output: 'spec.md',
+          format: 'markdown',
+        }),
+      ],
+      metadataExtraction: {
+        dependsOn: {
+          artifact: 'specs',
+          extractor: {
+            selector: { type: 'section', matches: '^Spec Dependencies$' },
+            extract: 'content',
+            capture:
+              '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+            transform: { name: 'resolveSpecPath', args: ['$2'] },
+          },
+        },
+      },
+    })
+
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+    const repo = makeSpecRepository({
+      specs: [spec, shared],
+      artifacts: {
+        'auth/login/spec.md':
+          '# Auth Login\n\n## Spec Dependencies\n\n- [`default:auth/shared`](../shared/spec.md)\n',
+        'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'specd', version: 1 },
+          dependsOn: ['default:auth/other'],
+          implementation: [],
+        }),
+      },
+    })
+
+    const markdownParser = makeParser({
+      parse: () => ({
+        root: {
+          type: 'document',
+          children: [
+            {
+              type: 'section',
+              label: 'Spec Dependencies',
+              children: [
+                {
+                  type: 'paragraph',
+                  value: '- [`default:auth/shared`](../shared/spec.md)',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      renderSubtree: (node) =>
+        (node.value as string | undefined) ??
+        (node.children ?? [])
+          .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+          .join('\n'),
+    })
+
+    const useCase = new GenerateSpecMetadata(
+      makeListWorkspaces(new Map([['default', repo]])),
+      makeSchemaProvider(schema),
+      makeParsers(markdownParser),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+    )
+
+    await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toThrow(
+      "Generated metadata for 'default:auth/login' found extracted dependencies [default:auth/shared] that do not match persisted dependencies [default:auth/other].",
+    )
   })
 
   it('accepts canonical spec ids without backticks or links', async () => {

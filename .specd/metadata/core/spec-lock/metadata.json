@@ -21,7 +21,7 @@
     {
       "requirement": "Persistent dependencies",
       "rules": [
-        "`spec-lock.json` MUST store the final persisted `dependsOn` list for the archived spec as canonical spec IDs.\n\nThis sidecar list is the durable archived dependency record. Archive-time metadata generation and later metadata regeneration flows SHALL treat it as the authoritative fallback when dependency extraction omits `dependsOn`."
+        "`spec-lock.json` MUST store the final persisted `dependsOn` list for the archived spec as canonical spec IDs.\n\nThis sidecar list is the durable archived dependency record. Archive-time metadata generation and later metadata regeneration flows SHALL treat it as the authoritative persisted dependency state when projecting canonical `metadata.json.dependsOn`, including schemas that do not declare dependency extraction in their spec artifacts."
       ]
     },
     {
@@ -128,41 +128,62 @@
         "spec-lock.json content remains unchanged",
         "AND metadata only projects from the sidecar"
       ]
+    },
+    {
+      "requirement": "Sidecar is not a schema artifact",
+      "name": "Sidecar is omitted from generic artifact metadata",
+      "given": ["an archived spec persisted with spec.md, verify.md, and spec-lock.json"],
+      "when": ["the repository returns the spec's normal artifact metadata"],
+      "then": [
+        "Spec.filenames includes only schema-declared artifacts",
+        "AND spec-lock.json is not exposed as a normal artifact filename"
+      ]
+    },
+    {
+      "requirement": "Sidecar is not a schema artifact",
+      "name": "Generic artifact reads reject the sidecar",
+      "given": ["an archived spec persisted with spec-lock.json"],
+      "when": [
+        "application logic attempts to load spec-lock.json through the generic artifact API"
+      ],
+      "then": [
+        "the repository rejects the request",
+        "AND callers must use persisted-state semantic operations instead"
+      ]
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:spec-lock",
-        "file": "core:test/infrastructure/fs/spec-repository.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:spec-lock",
-        "file": "core:src/domain/services/parse-spec-lock.ts",
-        "symbol": "SpecLockData"
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "FsSpecRepository"
       },
       {
         "specId": "core:spec-lock",
-        "file": "core:src/domain/services/parse-spec-lock.ts",
-        "symbol": "SpecLockImplementationEntry"
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "filterFiles"
       },
       {
         "specId": "core:spec-lock",
-        "file": "core:src/domain/services/parse-spec-lock.ts",
-        "symbol": "specLockSchema"
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "allowedSpecArtifactFilenames"
       },
       {
         "specId": "core:spec-lock",
-        "file": "core:src/domain/services/parse-spec-lock.ts",
-        "symbol": "parseSpecLock"
+        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+        "symbol": "GenerateSpecMetadata"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+        "symbol": "projectImplementationMetadata"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c2a54420a7953005df60fa0b8b9fdf4c38569667a0b18802cf5e8addff8b3afd",
-    "verify.md": "sha256:f0fe315e5269429d386a20c0efebbd8fc83f6bb41a46cf38978f44ada4ad82fe"
+    "spec.md": "sha256:53cb1c9dc46a3864fab85de9120632932d6f61462e6199c33b7558476a450a51",
+    "verify.md": "sha256:0eb33dc8f9b31cee792b95a3b44b98fced90e514b902527e0770165a2cf01040"
   },
   "generatedBy": "core"
 }

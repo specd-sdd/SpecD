@@ -1,0 +1,28 @@
+- op: added
+  description: 'Declare spec-lock as a semantic sidecar instead of a schema artifact'
+  position:
+    after:
+      type: section
+      matches: '^Requirement: Sidecar location and naming$'
+  content: |
+    ### Requirement: Sidecar is not a schema artifact
+
+    `spec-lock.json` is a persisted semantic sidecar, not a schema-declared spec artifact.
+
+    As a consequence:
+
+    - it MUST NOT appear in `Spec.filenames`
+    - it MUST NOT be accepted by the generic `SpecRepository.artifact()` / `save()` API
+    - it is read and written only through the repository's persisted-state semantic operations
+
+    This keeps the schema artifact surface stable across single-file and multi-file spec schemas while still allowing persisted dependency and implementation state to exist next to canonical spec artifacts.
+
+- op: modified
+  description: 'Clarify sidecar role for canonical dependency projection'
+  selector:
+    type: section
+    matches: '^Requirement: Persistent dependencies$'
+  content: |
+    `spec-lock.json` MUST store the final persisted `dependsOn` list for the archived spec as canonical spec IDs.
+
+    This sidecar list is the durable archived dependency record. Archive-time metadata generation and later metadata regeneration flows SHALL treat it as the authoritative persisted dependency state when projecting canonical `metadata.json.dependsOn`, including schemas that do not declare dependency extraction in their spec artifacts.

@@ -141,3 +141,38 @@
 - **GIVEN** an artifact type whose inferred format has no registered parser
 - **WHEN** validation runs
 - **THEN** no failure or warning is recorded for that artifact
+
+### Requirement: Canonical metadata consistency validation
+
+#### Scenario: Stale metadata hash becomes a validation failure
+
+- **GIVEN** a spec has `metadata.json`
+- **AND** its recorded `contentHashes` do not match the current required artifacts
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** the spec entry includes a `ValidationFailure` instructing the caller to regenerate metadata
+
+#### Scenario: Repository stale classification becomes a validation failure
+
+- **GIVEN** `SpecRepository.metadata()` returns persisted metadata with `freshness: 'stale'`
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** the spec entry includes a `ValidationFailure` for stale canonical metadata
+
+#### Scenario: Metadata dependsOn projection drift becomes a validation failure
+
+- **GIVEN** `metadata.json.dependsOn` differs from `SpecRepository.readPersistedDependsOn(spec)`
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** the spec entry includes a `ValidationFailure` describing the canonical dependency projection mismatch
+
+#### Scenario: Extracted dependsOn mismatch becomes a validation failure
+
+- **GIVEN** the schema declares `metadataExtraction.dependsOn`
+- **AND** extraction yields a dependency set different from the persisted dependency state
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** the spec entry includes a `ValidationFailure`
+
+#### Scenario: Persisted dependency projection remains valid without extraction
+
+- **GIVEN** the schema omits `metadataExtraction.dependsOn`
+- **AND** `metadata.json.dependsOn` matches the persisted dependency state
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** no dependency-projection failure is recorded for that check

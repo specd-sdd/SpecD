@@ -1,0 +1,32 @@
+- op: modified
+  description: 'Verify create-change seeds from semantic persisted dependency state'
+  selector:
+    type: section
+    matches: '^Requirement: Initial specDependsOn seeding$'
+  content: |
+    #### Scenario: Persisted dependency state seeds dependencies at creation time
+
+    - **GIVEN** `CreateChange.execute` is called with a spec that already exists in a repository
+    - **AND** that repository returns persisted dependencies from `readPersistedDependsOn(spec)`
+    - **WHEN** the change is constructed
+    - **THEN** the change seeds `specDependsOn` for that spec from that semantic persisted state
+
+    #### Scenario: Legacy metadata seeds when persisted semantic state is absent
+
+    - **GIVEN** `CreateChange.execute` is called with a persisted spec whose repository returns no semantic persisted dependency state
+    - **AND** `metadata.json.dependsOn` exists for that spec
+    - **WHEN** the change is constructed
+    - **THEN** the change seeds `specDependsOn` from `metadata.json.dependsOn`
+
+    #### Scenario: Stale metadata still seeds as legacy fallback
+
+    - **GIVEN** `CreateChange.execute` is called with a persisted spec whose repository returns no semantic persisted dependency state
+    - **AND** `metadata.json.dependsOn` exists for that spec but the metadata is marked stale
+    - **WHEN** the change is constructed
+    - **THEN** the change still seeds `specDependsOn` from the persisted metadata dependency list
+
+    #### Scenario: New spec starts without seeded dependency entry
+
+    - **GIVEN** `CreateChange.execute` is called with a spec ID that does not yet exist in the repository
+    - **WHEN** the change is constructed
+    - **THEN** no seeded dependency entry is required for that spec at creation time

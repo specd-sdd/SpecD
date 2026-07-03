@@ -120,9 +120,25 @@
 
 #### Scenario: DependsOn traversal respects depth limit
 
-- **GIVEN** spec A depends on B, B depends on C
+- **GIVEN** spec A depends on B and B depends on C
 - **WHEN** `execute` is called with `followDeps: true` and `depth: 1`
 - **THEN** `specs` contains A and B but not C
+
+#### Scenario: Canonical metadata dependency projection works without extraction
+
+- **GIVEN** an included persisted spec has fresh `metadata.json.dependsOn`
+- **AND** the active schema omits `metadataExtraction.dependsOn`
+- **WHEN** `execute` is called with `followDeps: true`
+- **THEN** traversal still discovers those dependencies from metadata
+
+#### Scenario: Stale metadata remains distinct from missing metadata
+
+- **GIVEN** an included persisted spec has `metadata.json.dependsOn`
+- **AND** that metadata is marked stale
+- **WHEN** `execute` is called with `followDeps: true`
+- **THEN** traversal still sees the persisted dependency projection
+- **AND** the result includes a `stale-metadata` warning
+- **AND** the use case does not treat that spec as metadata-missing
 
 #### Scenario: DependsOn traversal falls back to transform-backed extraction
 
@@ -133,8 +149,8 @@
 
 #### Scenario: DependsOn traversal does not silently drop found dependency values
 
-- **GIVEN** live fallback extraction finds dependency values for a spec
-- **AND** transform execution cannot normalize those found values
+- **GIVEN** extraction finds dependency values for a stale or metadata-less spec
+- **AND** transform execution cannot normalize those values
 - **WHEN** `execute` is called with `followDeps: true`
 - **THEN** traversal fails explicitly instead of treating the spec as having no dependencies
 

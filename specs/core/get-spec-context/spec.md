@@ -48,9 +48,10 @@ Section filters MUST have no effect in `list` or `summary` modes. Those modes co
 
 When `input.followDeps` is `true`, the use case SHALL traverse dependencies transitively. For each unvisited spec identity:
 
-1. Parse the ID via `parseSpecId`.
-2. Resolve the target `SpecRepository` using the `ListWorkspaces` orchestrator.
-3. Load the spec and its dependencies.
+1. Resolve the canonical dependency list from `metadata.json.dependsOn` when persisted metadata is available.
+2. If metadata is missing, MAY fall back to the schema's `metadataExtraction.dependsOn` declarations when the schema provides them.
+3. If metadata exists but is stale, the use case MAY continue using its persisted `dependsOn` projection for traversal, but it MUST emit a `stale-metadata` warning for that spec.
+4. If neither canonical metadata nor extraction yields dependencies, treat the spec as having no outgoing dependencies.
 
 Traversal SHALL use DFS with cycle detection.
 
@@ -65,9 +66,11 @@ During dependency traversal, the use case SHALL emit warnings (not throw) for:
 - Missing metadata on the current spec during traversal — `type: 'missing-metadata'`.
 - Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.
 - Dependency spec not found in its workspace — `type: 'missing-spec'`.
-- Stale metadata on any resolved entry — `type: 'stale-metadata'`.
+- Stale metadata on any resolved entry whose persisted dependency projection is still being used — `type: 'stale-metadata'`.
 
 Warnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal.
+
+The use case MUST NOT read `spec-lock.json` through generic artifact access in order to continue traversal. Persisted sidecars influence traversal only through repository semantic state that has already been projected into metadata.
 
 ### Requirement: Result shape
 

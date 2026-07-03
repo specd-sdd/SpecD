@@ -1,0 +1,51 @@
+- op: modified
+  description: 'Verify generate-metadata projects canonical persisted dependsOn'
+  selector:
+    type: section
+    matches: '^Requirement: dependsOn resolution$'
+  content: |
+    #### Scenario: Relative spec path resolved during extraction
+
+    - **GIVEN** the current spec origin is workspace `core` and capability path `core/change`
+    - **AND** extraction yields the relative link `../storage/spec.md`
+    - **AND** the schema declares `transform: resolveSpecPath`
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** the transformed `dependsOn` value is `core:storage`
+    - **AND** no separate post-extraction repair step runs afterward
+
+    #### Scenario: Cross-workspace relative spec path resolves through repository-backed normalization
+
+    - **GIVEN** the current spec origin is workspace `core` and capability path `core/actor-resolver-port`
+    - **AND** extraction yields the relative link `../../_global/architecture/spec.md`
+    - **AND** the registered `resolveSpecPath` runtime uses repository-backed resolution across configured workspaces
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** the transformed `dependsOn` value is `default:_global/architecture`
+    - **AND** it is not normalized to `core:_global/architecture`
+
+    #### Scenario: Persisted dependency state overrides omitted extracted dependsOn
+
+    - **GIVEN** extraction does not yield `dependsOn`
+    - **AND** `SpecRepository.readPersistedDependsOn(spec)` returns `['core:storage']`
+    - **WHEN** `GenerateSpecMetadata` assembles metadata
+    - **THEN** the returned `metadata.dependsOn` is `['core:storage']`
+
+    #### Scenario: Mismatched extracted and persisted dependencies fail generation
+
+    - **GIVEN** extraction yields `dependsOn: ['core:config']`
+    - **AND** `SpecRepository.readPersistedDependsOn(spec)` returns `['core:storage']`
+    - **WHEN** `GenerateSpecMetadata` executes
+    - **THEN** metadata generation fails explicitly instead of silently choosing one set
+
+    #### Scenario: Unresolvable dependency value fails extraction instead of being omitted
+
+    - **GIVEN** extraction yields a `dependsOn` value like `https://example.com`
+    - **AND** the registered transform cannot normalize that value
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** extraction fails explicitly instead of silently omitting that dependency
+
+    #### Scenario: Canonical spec ID may pass through resolveSpecPath when enabled by args
+
+    - **GIVEN** extraction yields the canonical spec ID `core:storage`
+    - **AND** the schema declares `transform: { name: "resolveSpecPath", args: ["true"] }`
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** the final `dependsOn` value remains `core:storage`

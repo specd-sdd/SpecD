@@ -104,6 +104,13 @@ export async function traverseDependsOn(
 
   if (metadata !== null) {
     dependsOn = metadata.dependsOn
+    if (metadata.freshness === 'stale') {
+      warnings.push({
+        type: 'stale-metadata',
+        path: key,
+        message: `Metadata for '${key}' is stale`,
+      })
+    }
   } else {
     warnings.push({
       type: 'missing-metadata',

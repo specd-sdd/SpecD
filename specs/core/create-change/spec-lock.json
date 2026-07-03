@@ -11,23 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/create-change.ts",
-      "symbols": ["CreateChange", "CreateChangeInput", "CreateChangeResult"]
-    },
-    {
-      "file": "core:src/application/errors/invalid-create-change-input-error.ts",
-      "symbols": ["InvalidCreateChangeInputError"]
-    },
-    {
-      "file": "core:src/composition/use-cases/create-change.ts",
-      "symbols": ["createCreateChange"]
-    },
-    {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["createKernel"]
-    },
-    {
-      "file": "core:src/application/errors/index.ts"
+      "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
+      "symbols": ["loadPersistedSpecDependsOn"]
     }
   ]
 }

@@ -60,7 +60,7 @@
     {
       "requirement": "Context spec collection",
       "rules": [
-        "`CompileContext` must collect the set of specs to include in the context by applying the five-step resolution defined in [`specs/core/config/spec.md` — Requirement: Context spec selection](../config/spec.md) on top of an optional change-scoped seed set.\n\nBefore steps 1-5 begin, `CompileContext` seeds the collected set with:\n\n- every spec in `change.specIds`, only when `includeChangeSpecs: true`\n- every spec that appears as a value in `change.specDependsOn`\n\nSpecs seeded from `change.specIds` because `includeChangeSpecs: true` are mandatory context members for that call and MUST remain in the collected set even when later project-level or workspace-level exclude rules would otherwise match them. When `includeChangeSpecs` is `false` or absent, `change.specIds` are not mandatory seeds, but they may still be included if selected by project-level include patterns, workspace-level include patterns, `change.specDependsOn`, or `dependsOn` traversal.\n\nAfter seeding, `CompileContext` applies the five-step resolution:\n\n1. **Project-level include patterns** — always applied, regardless of which workspaces are active.\n2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set, except mandatory `change.specIds` seed entries from this call.\n3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).\n4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set, except mandatory `change.specIds` seed entries from this call.\n5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's metadata `dependsOn` entries via `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.\n\nWhen a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.\n\nThe final collected set is deduplicated across all seed and traversal sources. A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included earlier also appear once, at their earlier position."
+        "`CompileContext` must collect the set of specs to include in the context by applying the five-step resolution defined in [`specs/core/config/spec.md` — Requirement: Context spec selection](../config/spec.md) on top of an optional change-scoped seed set.\n\nBefore steps 1-5 begin, `CompileContext` seeds the collected set with:\n\n- every spec in `change.specIds`, only when `includeChangeSpecs: true`\n- every spec that appears as a value in `change.specDependsOn`\n\nSpecs seeded from `change.specIds` because `includeChangeSpecs: true` are mandatory context members for that call and MUST remain in the collected set even when later project-level or workspace-level exclude rules would otherwise match them. When `includeChangeSpecs` is `false` or absent, `change.specIds` are not mandatory seeds, but they may still be included if selected by project-level include patterns, workspace-level include patterns, `change.specDependsOn`, or `dependsOn` traversal.\n\nAfter seeding, `CompileContext` applies the five-step resolution:\n\n1. **Project-level include patterns** — start with specs matched by any project-level include pattern.\n2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set, except mandatory `change.specIds` seed entries from this call.\n3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).\n4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set, except mandatory `change.specIds` seed entries from this call.\n5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's canonical dependency projection from `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.\n\nWhen a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal then continues with any dependency information available from the change manifest's `specDependsOn` or from schema extraction fallback when the schema actually declares `metadataExtraction.dependsOn`.\n\nWhen a spec in the traversal has stale metadata, `CompileContext` keeps the persisted canonical metadata result visible to the caller, emits a `stale-metadata` warning, and applies the dependency-resolution rules below without collapsing stale metadata into the same case as missing metadata.\n\nThe final collected set is deduplicated across all seed and traversal sources. A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included earlier also appear once, at their earlier position."
       ]
     },
     {
@@ -72,7 +72,7 @@
     {
       "requirement": "dependsOn resolution order",
       "rules": [
-        "For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:\n\n1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)\n2. Metadata `dependsOn` field — the persisted metadata loaded via `SpecRepository.metadata()`\n3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent or stale, using the shared extractor-transform registry and caller-owned origin context bag\n\nThe first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies."
+        "For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:\n\n1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)\n2. Metadata `dependsOn` field — the canonical normalized dependency projection loaded via `SpecRepository.metadata()`, whether fresh or stale\n3. Schema `metadataExtraction.dependsOn` engine — extracts `dependsOn` from spec content only when metadata is absent and the schema declares dependency extraction, using the shared extractor-transform registry and caller-owned origin context bag\n\nThe first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies."
       ]
     },
     {
@@ -352,6 +352,30 @@
     },
     {
       "requirement": "dependsOn resolution order",
+      "name": "Canonical metadata dependency projection works without extraction",
+      "given": [
+        "a traversed persisted spec has fresh metadata.json.dependsOn",
+        "AND the active schema omits metadataExtraction.dependsOn"
+      ],
+      "when": ["CompileContext.execute is called with followDeps: true"],
+      "then": ["traversal still uses that metadata dependency list"]
+    },
+    {
+      "requirement": "dependsOn resolution order",
+      "name": "Stale metadata dependency projection remains second-tier input",
+      "given": [
+        "change.specDependsOn has no entry for a traversed spec",
+        "AND that spec has persisted metadata.json.dependsOn",
+        "AND the metadata is marked stale"
+      ],
+      "when": ["CompileContext.execute is called with followDeps: true"],
+      "then": [
+        "traversal still uses the persisted metadata dependency list before any extraction fallback",
+        "AND result.warnings includes stale-metadata"
+      ]
+    },
+    {
+      "requirement": "dependsOn resolution order",
       "name": "Fallback to transform-backed extraction when metadata absent in dependsOn traversal",
       "given": [
         "the schema declares metadataExtraction.dependsOn",
@@ -374,7 +398,7 @@
       ],
       "when": ["CompileContext.execute is called with followDeps: true"],
       "then": [
-        "the fallback extraction fails explicitly instead of treating the spec as having no dependencies"
+        "the traversal fails explicitly instead of treating the spec as having no dependencies"
       ]
     },
     {
@@ -700,56 +724,17 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:compile-context",
-        "file": "core:test/composition/build-compile-context-config.spec.ts"
-      },
-      {
-        "specId": "core:compile-context",
-        "file": "core:test/application/use-cases/_shared/merge-compile-context-config.spec.ts"
-      },
-      {
-        "specId": "core:compile-context",
-        "file": "core:test/application/use-cases/compile-context.spec.ts"
-      }
-    ],
     "symbols": [
-      {
-        "specId": "core:compile-context",
-        "file": "core:src/composition/build-compile-context-config.ts",
-        "symbol": "buildCompileContextConfig"
-      },
-      {
-        "specId": "core:compile-context",
-        "file": "core:src/application/use-cases/_shared/merge-compile-context-config.ts",
-        "symbol": "mergeCompileContextRuntimeOverrides"
-      },
       {
         "specId": "core:compile-context",
         "file": "core:src/application/use-cases/compile-context.ts",
         "symbol": "CompileContext"
-      },
-      {
-        "specId": "core:compile-context",
-        "file": "core:src/application/use-cases/compile-context.ts",
-        "symbol": "CompileContextInput"
-      },
-      {
-        "specId": "core:compile-context",
-        "file": "core:src/composition/use-cases/compile-context.ts",
-        "symbol": "createCompileContext"
-      },
-      {
-        "specId": "core:compile-context",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a3e3d72726ed4e073dd1c685ddc9fcc73a500862277d7b4b1179955a70ec3afe",
-    "verify.md": "sha256:ddbe12d99e8422c577af68b04326cb0d6c2b532ce02ef2c16b2e16b6f6cfc18e"
+    "spec.md": "sha256:5a5f056d3e6a1714798670a08aa67d6f0a70e5d4076aa8112a8ebaa21bfe10f9",
+    "verify.md": "sha256:be14f9ca6d3271030d45f110e1bdea17fc768a0e7c9ff8c0592b47d00ac5216c"
   },
   "generatedBy": "core"
 }

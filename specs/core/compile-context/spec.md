@@ -95,13 +95,15 @@ Specs seeded from `change.specIds` because `includeChangeSpecs: true` are mandat
 
 After seeding, `CompileContext` applies the five-step resolution:
 
-1. **Project-level include patterns** — always applied, regardless of which workspaces are active.
+1. **Project-level include patterns** — start with specs matched by any project-level include pattern.
 2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set, except mandatory `change.specIds` seed entries from this call.
 3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set, except mandatory `change.specIds` seed entries from this call.
-5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's metadata `dependsOn` entries via `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
+5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's canonical dependency projection from `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
 
-When a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal continues with any `dependsOn` information available from the change manifest's `specDependsOn` or from content extraction via the schema's `metadataExtraction` declarations.
+When a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal then continues with any dependency information available from the change manifest's `specDependsOn` or from schema extraction fallback when the schema actually declares `metadataExtraction.dependsOn`.
+
+When a spec in the traversal has stale metadata, `CompileContext` keeps the persisted canonical metadata result visible to the caller, emits a `stale-metadata` warning, and applies the dependency-resolution rules below without collapsing stale metadata into the same case as missing metadata.
 
 The final collected set is deduplicated across all seed and traversal sources. A spec matched by multiple include patterns appears exactly once, at the position of the first matching include pattern. Specs added via `dependsOn` traversal that were already included earlier also appear once, at their earlier position.
 
@@ -139,8 +141,8 @@ Display-mode classification MUST happen after the full collection pipeline (step
 For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:
 
 1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)
-2. Metadata `dependsOn` field — the persisted metadata loaded via `SpecRepository.metadata()`
-3. Schema `metadataExtraction` engine — extracts `dependsOn` from spec content when metadata is absent or stale, using the shared extractor-transform registry and caller-owned origin context bag
+2. Metadata `dependsOn` field — the canonical normalized dependency projection loaded via `SpecRepository.metadata()`, whether fresh or stale
+3. Schema `metadataExtraction.dependsOn` engine — extracts `dependsOn` from spec content only when metadata is absent and the schema declares dependency extraction, using the shared extractor-transform registry and caller-owned origin context bag
 
 The first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies.
 

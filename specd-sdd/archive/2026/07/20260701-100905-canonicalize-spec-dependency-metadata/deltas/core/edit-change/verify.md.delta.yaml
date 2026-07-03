@@ -1,0 +1,32 @@
+- op: modified
+  description: 'Verify edit-change seeds from semantic persisted dependency state'
+  selector:
+    type: section
+    matches: '^Requirement: Seed specDependsOn for added specs$'
+  content: |
+    #### Scenario: Persisted dependency state seeds new spec entry
+
+    - **GIVEN** a persisted spec being added to the change has semantic dependency state available through `readPersistedDependsOn(spec)`
+    - **WHEN** `EditChange.execute` adds that spec to the change
+    - **THEN** the seeded `change.specDependsOn` entry comes from that semantic persisted state
+
+    #### Scenario: Legacy metadata seeds when persisted semantic state is absent
+
+    - **GIVEN** a persisted spec being added has no semantic persisted dependency state
+    - **AND** `metadata.json.dependsOn` exists for that spec
+    - **WHEN** `EditChange.execute` adds that spec
+    - **THEN** the seeded `change.specDependsOn` entry comes from `metadata.json.dependsOn`
+
+    #### Scenario: Stale metadata still seeds as legacy fallback
+
+    - **GIVEN** a persisted spec being added has no semantic persisted dependency state
+    - **AND** `metadata.json.dependsOn` exists for that spec but the metadata is marked stale
+    - **WHEN** `EditChange.execute` adds that spec
+    - **THEN** the seeded `change.specDependsOn` entry still comes from the persisted metadata dependency list
+
+    #### Scenario: Existing in-change dependency snapshot is not overwritten
+
+    - **GIVEN** a spec is already present in the change
+    - **AND** `change.specDependsOn` already contains an entry for it
+    - **WHEN** later scope edits run
+    - **THEN** `EditChange` does not overwrite that existing dependency snapshot automatically

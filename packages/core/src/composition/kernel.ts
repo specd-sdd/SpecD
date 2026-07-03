@@ -224,6 +224,17 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     config.schemaRef,
   )
   const detectOverlap = new DetectOverlap(i.changes)
+  const validateArtifacts = new ValidateArtifacts(
+    i.changes,
+    listWorkspaces,
+    schemaProvider,
+    i.parsers,
+    i.actor,
+    i.hasher,
+    i.registry.extractorTransforms,
+    workspaceRoutes,
+    lifecycle,
+  )
 
   return {
     registry,
@@ -270,17 +281,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
         workspaceRoutes,
         config.projectRoot,
       ),
-      validate: new ValidateArtifacts(
-        i.changes,
-        listWorkspaces,
-        schemaProvider,
-        i.parsers,
-        i.actor,
-        i.hasher,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-        lifecycle,
-      ),
+      validate: validateArtifacts,
       compile: new CompileContext(
         i.changes,
         listWorkspaces,
@@ -349,10 +350,24 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       getActiveSchema,
       resolve: resolveSchema,
       validateSchema: new ValidateSchema(i.schemas, config.schemaRef, buildSchema, resolveSchema),
-      validate: new ValidateSpecs(i.specs, schemaProvider, i.parsers),
+      validate: new ValidateSpecs(
+        i.specs,
+        schemaProvider,
+        i.parsers,
+        i.hasher,
+        i.registry.extractorTransforms,
+        workspaceRoutes,
+      ),
       generateMetadata,
       updateMetadata: updateSpecMetadata,
-      getContext: new GetSpecContext(listWorkspaces, i.hasher),
+      getContext: new GetSpecContext(
+        listWorkspaces,
+        i.hasher,
+        schemaProvider,
+        i.parsers,
+        i.registry.extractorTransforms,
+        workspaceRoutes,
+      ),
     },
     project: {
       listWorkspaces,

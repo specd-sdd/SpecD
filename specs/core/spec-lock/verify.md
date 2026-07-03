@@ -66,3 +66,19 @@
 - **WHEN** metadata is regenerated later
 - **THEN** `spec-lock.json` content remains unchanged
 - **AND** metadata only projects from the sidecar
+
+### Requirement: Sidecar is not a schema artifact
+
+#### Scenario: Sidecar is omitted from generic artifact metadata
+
+- **GIVEN** an archived spec persisted with `spec.md`, `verify.md`, and `spec-lock.json`
+- **WHEN** the repository returns the spec's normal artifact metadata
+- **THEN** `Spec.filenames` includes only schema-declared artifacts
+- **AND** `spec-lock.json` is not exposed as a normal artifact filename
+
+#### Scenario: Generic artifact reads reject the sidecar
+
+- **GIVEN** an archived spec persisted with `spec-lock.json`
+- **WHEN** application logic attempts to load `spec-lock.json` through the generic artifact API
+- **THEN** the repository rejects the request
+- **AND** callers must use persisted-state semantic operations instead

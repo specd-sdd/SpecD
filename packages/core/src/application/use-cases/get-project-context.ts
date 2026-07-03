@@ -1,6 +1,5 @@
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { checkProjectMetadataFreshness } from './_shared/project-metadata-freshness.js'
-import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type FileReader } from '../ports/file-reader.js'
@@ -259,12 +258,6 @@ export class GetProjectContext {
 
       const spec = new Spec(workspace, specPathObj, [])
       const metadata = await specRepo.metadata(spec)
-      let isFresh = false
-
-      if (metadata !== null) {
-        isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
-      }
-
       const specId = `${workspace}:${capPath}`
       const title = metadata?.title ?? ''
       const description = metadata?.description ?? ''
@@ -293,7 +286,7 @@ export class GetProjectContext {
 
       let content: string
 
-      if (isFresh && metadata !== null) {
+      if (metadata !== null && metadata.freshness === 'fresh') {
         content = this._renderFromMetadata(metadata, sectionsFilter, config.llmOptimizedContext)
       } else {
         if (metadata !== null) {
@@ -457,30 +450,6 @@ export class GetProjectContext {
     }
 
     return metaParts.join('\n\n')
-  }
-
-  /**
-   * Checks whether metadata content hashes match the current artifacts.
-   *
-   * @param specRepo - Repository to read spec artifacts from
-   * @param spec - The spec whose metadata to verify
-   * @param metadata - Parsed metadata containing content hashes
-   * @returns `true` if all recorded hashes match current artifact content
-   */
-  private async _isMetadataFresh(
-    specRepo: SpecRepository,
-    spec: Spec,
-    metadata: SpecMetadata,
-  ): Promise<boolean> {
-    const result = await checkMetadataFreshness(
-      metadata.contentHashes,
-      async (filename) => {
-        const artifact = await specRepo.artifact(spec, filename)
-        return artifact?.content ?? null
-      },
-      (c) => this._hasher.hash(c),
-    )
-    return result.allFresh
   }
 }
 

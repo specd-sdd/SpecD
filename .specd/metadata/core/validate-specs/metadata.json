@@ -231,11 +231,68 @@
       "given": ["an artifact type whose inferred format has no registered parser"],
       "when": ["validation runs"],
       "then": ["no failure or warning is recorded for that artifact"]
+    },
+    {
+      "requirement": "Canonical metadata consistency validation",
+      "name": "Stale metadata hash becomes a validation failure",
+      "given": [
+        "a spec has metadata.json",
+        "AND its recorded contentHashes do not match the current required artifacts"
+      ],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": [
+        "the spec entry includes a ValidationFailure instructing the caller to regenerate metadata"
+      ]
+    },
+    {
+      "requirement": "Canonical metadata consistency validation",
+      "name": "Repository stale classification becomes a validation failure",
+      "given": ["SpecRepository.metadata() returns persisted metadata with freshness: 'stale'"],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": ["the spec entry includes a ValidationFailure for stale canonical metadata"]
+    },
+    {
+      "requirement": "Canonical metadata consistency validation",
+      "name": "Metadata dependsOn projection drift becomes a validation failure",
+      "given": ["metadata.json.dependsOn differs from SpecRepository.readPersistedDependsOn(spec)"],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": [
+        "the spec entry includes a ValidationFailure describing the canonical dependency projection mismatch"
+      ]
+    },
+    {
+      "requirement": "Canonical metadata consistency validation",
+      "name": "Extracted dependsOn mismatch becomes a validation failure",
+      "given": [
+        "the schema declares metadataExtraction.dependsOn",
+        "AND extraction yields a dependency set different from the persisted dependency state"
+      ],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": ["the spec entry includes a ValidationFailure"]
+    },
+    {
+      "requirement": "Canonical metadata consistency validation",
+      "name": "Persisted dependency projection remains valid without extraction",
+      "given": [
+        "the schema omits metadataExtraction.dependsOn",
+        "AND metadata.json.dependsOn matches the persisted dependency state"
+      ],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": ["no dependency-projection failure is recorded for that check"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/application/use-cases/validate-specs.ts",
+        "symbol": "ValidateSpecs"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:6c0c665d69d9940b43e529f596909a2f4b596e4b102e6cd15d5ec59ecad66297",
-    "verify.md": "sha256:1b7e7baba1b390edf6f059d5a8ca47b5cacbbadf7ff757d0d1dbb20991b6cd3b"
+    "spec.md": "sha256:fdef9ec739e7c532b8b05f6e0113ef0659025f24952a4d19b6793650fb3c70d2",
+    "verify.md": "sha256:3029658c2d5e434372b4be8493ca31385fa59eb8ffa8cdf6bdc52a8fb3caba2d"
   },
   "generatedBy": "core"
 }

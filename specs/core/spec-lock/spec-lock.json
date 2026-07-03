@@ -6,11 +6,12 @@
   "dependsOn": ["core:spec-id-format", "core:storage"],
   "implementation": [
     {
-      "file": "core:src/domain/services/parse-spec-lock.ts",
-      "symbols": ["SpecLockData", "SpecLockImplementationEntry", "specLockSchema", "parseSpecLock"]
+      "file": "core:src/infrastructure/fs/spec-repository.ts",
+      "symbols": ["FsSpecRepository", "filterFiles", "allowedSpecArtifactFilenames"]
     },
     {
-      "file": "core:test/infrastructure/fs/spec-repository.spec.ts"
+      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+      "symbols": ["GenerateSpecMetadata", "projectImplementationMetadata"]
     }
   ]
 }

@@ -329,10 +329,25 @@
 - **WHEN** a `requiredSpecArtifacts` file exists but has no corresponding entry in `contentHashes`
 - **THEN** specd emits a staleness warning
 
+#### Scenario: Projected dependsOn drift is treated as stale
+
+- **GIVEN** `metadata.json.dependsOn` differs from the repository's persisted dependency state for the same spec
+- **WHEN** metadata freshness is evaluated
+- **THEN** the metadata is treated as stale
+- **AND** the result instructs the caller to regenerate metadata
+
+#### Scenario: Existing stale metadata is returned as stale, not missing
+
+- **GIVEN** a persisted `metadata.json` file exists for the spec
+- **AND** its freshness evaluation fails
+- **WHEN** `SpecRepository.metadata()` is called
+- **THEN** the caller receives the parsed persisted metadata with `freshness: 'stale'`
+- **AND** the result is not `null`
+
 #### Scenario: Stale metadata does not block operations
 
 - **WHEN** metadata is stale
-- **THEN** specd emits a warning but does not block any command — the stale `dependsOn` is still used for context traversal
+- **THEN** specd emits a warning but does not block any command
 
 ### Requirement: Use by CompileContext
 
@@ -345,6 +360,22 @@
 
 - **WHEN** change has `specIds: ['default:auth/login']` and `auth/login` metadata lists `auth/jwt` in `dependsOn`, and `auth/jwt` metadata lists `crypto/keys`
 - **THEN** `CompileContext` includes all three: `auth/login`, `auth/jwt`, and `crypto/keys`
+
+#### Scenario: Canonical metadata dependency projection works without extraction
+
+- **GIVEN** a persisted spec has `metadata.json.dependsOn: ['core:storage']`
+- **AND** its schema omits `metadataExtraction.dependsOn`
+- **WHEN** a context consumer traverses dependencies
+- **THEN** `core:storage` is still discovered from metadata
+- **AND** no direct sidecar artifact read is required
+
+#### Scenario: Consumers distinguish missing metadata from stale metadata
+
+- **GIVEN** one spec has no persisted metadata file
+- **AND** another spec has persisted metadata marked `stale`
+- **WHEN** a context consumer reads both through `SpecRepository.metadata()`
+- **THEN** the missing case is handled as `null`
+- **AND** the stale case remains readable with a `stale-metadata` warning
 
 #### Scenario: Missing spec in dependsOn skipped with warning
 

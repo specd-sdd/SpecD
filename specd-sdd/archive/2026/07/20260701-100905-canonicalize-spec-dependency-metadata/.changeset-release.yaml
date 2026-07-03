@@ -1,0 +1,12 @@
+releases:
+  core:spec-metadata: patch
+  core:spec-lock: patch
+  core:get-spec-context: patch
+  core:get-project-context: patch
+  core:compile-context: patch
+  core:validate-specs: patch
+  core:create-change: patch
+  core:edit-change: patch
+  core:spec-repository-port: patch
+  core:generate-metadata: patch
+  core:save-spec-metadata: patch

@@ -14,14 +14,7 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-project-context.ts",
-      "symbols": ["GetProjectContext", "GetProjectContextInput"]
-    },
-    {
-      "file": "core:src/composition/use-cases/get-project-context.ts",
-      "symbols": ["createGetProjectContext"]
-    },
-    {
-      "file": "core:test/application/use-cases/get-project-context.spec.ts"
+      "symbols": ["GetProjectContext"]
     }
   ]
 }

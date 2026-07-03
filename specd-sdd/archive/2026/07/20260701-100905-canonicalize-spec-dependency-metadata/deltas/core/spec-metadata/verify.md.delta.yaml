@@ -1,0 +1,87 @@
+- op: modified
+  description: 'Verify metadata staleness catches dependency projection drift'
+  selector:
+    type: section
+    matches: '^Requirement: Staleness detection$'
+  content: |
+    #### Scenario: Content unchanged — no warning
+
+    - **WHEN** the current hash of the spec's requiredSpecArtifacts matches `contentHashes` in metadata
+    - **THEN** no staleness warning is emitted
+
+    #### Scenario: Content changed — warning emitted
+
+    - **WHEN** a spec's `spec.md` has been modified and its hash no longer matches `contentHashes`
+    - **THEN** specd emits a warning that the spec metadata may be stale and the agent should regenerate it
+
+    #### Scenario: Missing contentHashes — treated as stale
+
+    - **WHEN** metadata exists but has no `contentHashes` field
+    - **THEN** specd emits the same staleness warning
+
+    #### Scenario: requiredSpecArtifact missing from contentHashes — treated as stale
+
+    - **WHEN** a `requiredSpecArtifacts` file exists but has no corresponding entry in `contentHashes`
+    - **THEN** specd emits a staleness warning
+
+    #### Scenario: Projected dependsOn drift is treated as stale
+
+    - **GIVEN** `metadata.json.dependsOn` differs from the repository's persisted dependency state for the same spec
+    - **WHEN** metadata freshness is evaluated
+    - **THEN** the metadata is treated as stale
+    - **AND** the result instructs the caller to regenerate metadata
+
+    #### Scenario: Existing stale metadata is returned as stale, not missing
+
+    - **GIVEN** a persisted `metadata.json` file exists for the spec
+    - **AND** its freshness evaluation fails
+    - **WHEN** `SpecRepository.metadata()` is called
+    - **THEN** the caller receives the parsed persisted metadata with `freshness: 'stale'`
+    - **AND** the result is not `null`
+
+    #### Scenario: Stale metadata does not block operations
+
+    - **WHEN** metadata is stale
+    - **THEN** specd emits a warning but does not block any command
+
+- op: modified
+  description: 'Verify context consumers rely on metadata projection even without extraction'
+  selector:
+    type: section
+    matches: '^Requirement: Use by CompileContext$'
+  content: |
+    #### Scenario: dependsOn adds context beyond excludes
+
+    - **WHEN** `specd.yaml` has `contextExcludeSpecs: ['core/storage']` and a spec's metadata lists `core/storage` in `dependsOn`
+    - **THEN** `CompileContext` includes `core/storage` — `dependsOn` overrides project-level excludes
+
+    #### Scenario: Transitive traversal
+
+    - **WHEN** change has `specIds: ['default:auth/login']` and `auth/login` metadata lists `auth/jwt` in `dependsOn`, and `auth/jwt` metadata lists `crypto/keys`
+    - **THEN** `CompileContext` includes all three: `auth/login`, `auth/jwt`, and `crypto/keys`
+
+    #### Scenario: Canonical metadata dependency projection works without extraction
+
+    - **GIVEN** a persisted spec has `metadata.json.dependsOn: ['core:storage']`
+    - **AND** its schema omits `metadataExtraction.dependsOn`
+    - **WHEN** a context consumer traverses dependencies
+    - **THEN** `core:storage` is still discovered from metadata
+    - **AND** no direct sidecar artifact read is required
+
+    #### Scenario: Consumers distinguish missing metadata from stale metadata
+
+    - **GIVEN** one spec has no persisted metadata file
+    - **AND** another spec has persisted metadata marked `stale`
+    - **WHEN** a context consumer reads both through `SpecRepository.metadata()`
+    - **THEN** the missing case is handled as `null`
+    - **AND** the stale case remains readable with a `stale-metadata` warning
+
+    #### Scenario: Missing spec in dependsOn skipped with warning
+
+    - **WHEN** `dependsOn` references a spec ID that does not exist on disk
+    - **THEN** specd emits a warning and skips that entry — context compilation continues
+
+    #### Scenario: Cycle in dependsOn broken with warning
+
+    - **WHEN** spec A lists spec B in `dependsOn` and spec B lists spec A in `dependsOn`
+    - **THEN** specd detects the cycle, breaks it, emits a warning, and includes both specs only once

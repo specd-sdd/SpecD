@@ -15,7 +15,7 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-spec-context.ts",
-      "symbols": ["GetSpecContextInput", "SpecContextEntry", "_buildEntry", "_traverseDeps"]
+      "symbols": ["GetSpecContext"]
     }
   ]
 }

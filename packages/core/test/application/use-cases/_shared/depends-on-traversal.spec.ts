@@ -252,6 +252,69 @@ describe('traverseDependsOn', () => {
     expect(warnings).toHaveLength(0)
   })
 
+  it('prefers metadata dependsOn over fallback extraction when metadata exists', async () => {
+    const repo = makeSpecRepository({
+      specs: [
+        new Spec('default', SpecPath.parse('auth/login'), ['spec.md', '.specd-metadata.yaml']),
+        new Spec('default', SpecPath.parse('auth/shared'), ['.specd-metadata.yaml']),
+        new Spec('default', SpecPath.parse('auth/jwt'), ['.specd-metadata.yaml']),
+      ],
+      artifacts: {
+        'auth/login/spec.md':
+          '# Auth Login\n\n## Spec Dependencies\n\n- [`default:auth/jwt`](../jwt/spec.md)\n',
+        'auth/login/.specd-metadata.yaml': metadataJson(['default:auth/shared']),
+        'auth/shared/.specd-metadata.yaml': JSON.stringify({ title: 'Shared' }),
+        'auth/jwt/.specd-metadata.yaml': JSON.stringify({ title: 'JWT' }),
+      },
+    })
+    const workspaces = await makeWorkspaceMap(new Map([['default', repo]]))
+    const included = new Map<string, ResolvedSpec>()
+    const added = new Map<string, ResolvedSpec>()
+    const seen = new Set<string>()
+    const warnings: ContextWarning[] = []
+    const fallback: DependsOnFallback = {
+      extraction: {
+        dependsOn: {
+          artifact: 'specs',
+          extractor: {
+            selector: { type: 'section', matches: '^Spec Dependencies$' },
+            extract: 'content',
+          },
+        },
+      },
+      schemaArtifacts: [
+        makeArtifactType('specs', { scope: 'spec', output: 'spec.md', format: 'markdown' }),
+      ],
+      parsers: new Map([
+        [
+          'markdown',
+          makeParser({
+            parse: () => ({ root: { type: 'document', children: [] } }),
+          }),
+        ],
+      ]),
+      workspaceRoutes: [],
+    }
+
+    await traverseDependsOn(
+      'default',
+      'auth/login',
+      included,
+      added,
+      seen,
+      new Set(),
+      workspaces,
+      warnings,
+      undefined,
+      0,
+      fallback,
+    )
+
+    expect(added.has('default:auth/shared')).toBe(true)
+    expect(added.has('default:auth/jwt')).toBe(false)
+    expect(warnings).toHaveLength(0)
+  })
+
   it('extracts dependsOn from spec content when metadata is absent and fallback is provided', async () => {
     // spec.md contains a "Spec Dependencies" section with links
     const specContent = '# Auth Login\n\n## Spec Dependencies\n\n- auth/shared\n- auth/jwt\n'

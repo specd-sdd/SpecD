@@ -58,9 +58,11 @@ export class InvalidateSpecMetadata {
       return null
     }
 
-    // Remove contentHashes and originalHash, re-serialize the rest
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { contentHashes: _discarded, originalHash: _hash, ...withoutHashes } = existing
+    // Remove repository-managed freshness fields before re-serializing.
+    const { contentHashes, originalHash, freshness, ...withoutHashes } = existing
+    void contentHashes
+    void originalHash
+    void freshness
     const content = JSON.stringify(withoutHashes, null, 2) + '\n'
 
     await repo.saveMetadata(spec, content, { force: true })

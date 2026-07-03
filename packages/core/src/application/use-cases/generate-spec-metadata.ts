@@ -7,6 +7,7 @@ import { type ContentHasher } from '../ports/content-hasher.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
@@ -149,9 +150,15 @@ export class GenerateSpecMetadata {
     })
 
     // Assemble final metadata
+    const dependsOn = resolveCanonicalDependsOn(
+      input.specId,
+      extracted.metadata.dependsOn,
+      await specRepo.readPersistedDependsOn(spec),
+    )
     const implementation = await specRepo.readPersistedImplementation(spec)
     const metadata: SpecMetadata = {
       ...extracted.metadata,
+      ...(dependsOn !== undefined ? { dependsOn } : {}),
       ...(implementation !== null
         ? { implementation: projectImplementationMetadata(input.specId, implementation) }
         : {}),
@@ -161,6 +168,40 @@ export class GenerateSpecMetadata {
 
     return { metadata, hasExtraction: true }
   }
+}
+
+/**
+ * Resolves the canonical `dependsOn` set for generated metadata.
+ *
+ * Persisted dependency state wins when present because it is the durable
+ * semantic source. Schema extraction is still executed so drift can be
+ * surfaced immediately when both sources disagree.
+ *
+ * @param specId - Spec whose metadata is being generated
+ * @param extractedDependsOn - Dependencies extracted from schema artifacts
+ * @param persistedDependsOn - Dependencies persisted in `spec-lock.json`
+ * @returns Canonical dependency set to emit into metadata, when any exists
+ * @throws {Error} If extracted and persisted dependency sets disagree
+ */
+function resolveCanonicalDependsOn(
+  specId: string,
+  extractedDependsOn: readonly string[] | undefined,
+  persistedDependsOn: readonly string[] | null,
+): string[] | undefined {
+  if (persistedDependsOn === null) {
+    return extractedDependsOn !== undefined ? [...extractedDependsOn] : undefined
+  }
+
+  if (
+    extractedDependsOn !== undefined &&
+    !DependsOnOverwriteError.areSame(extractedDependsOn, persistedDependsOn)
+  ) {
+    throw new Error(
+      `Generated metadata for '${specId}' found extracted dependencies [${extractedDependsOn.join(', ')}] that do not match persisted dependencies [${persistedDependsOn.join(', ')}].`,
+    )
+  }
+
+  return [...persistedDependsOn]
 }
 
 /**

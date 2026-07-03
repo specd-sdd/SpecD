@@ -91,11 +91,26 @@
 - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
 - **THEN** `entries` contains A, B, and C in that order
 
+#### Scenario: Canonical metadata dependsOn works without extraction
+
+- **GIVEN** the root spec has fresh `metadata.json.dependsOn: ['default:B']`
+- **AND** the active schema omits `metadataExtraction.dependsOn`
+- **WHEN** `execute({ ..., followDeps: true })` is called
+- **THEN** dependency traversal still includes spec B
+
+#### Scenario: Stale metadata remains usable for dependency traversal with warning
+
+- **GIVEN** the root spec has persisted `metadata.json.dependsOn: ['default:B']`
+- **AND** that metadata is marked stale
+- **WHEN** `execute({ ..., followDeps: true })` is called
+- **THEN** dependency traversal still includes spec B
+- **AND** the result includes a `stale-metadata` warning
+
 #### Scenario: Circular dependency does not cause infinite loop
 
-- **GIVEN** spec A depends on spec B, and spec B depends on spec A
+- **GIVEN** spec A depends on spec B and spec B depends on spec A
 - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
-- **THEN** `entries` contains A and B (each visited once)
+- **THEN** `entries` includes each spec at most once
 
 #### Scenario: Dependencies not followed when followDeps is false
 

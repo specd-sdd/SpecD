@@ -83,18 +83,25 @@
 
 ### Requirement: Seed specDependsOn for added specs
 
-#### Scenario: Existing sidecar seeds new spec entry
+#### Scenario: Persisted dependency state seeds new spec entry
 
-- **GIVEN** a persisted spec being added to the change already has `spec-lock.json`
+- **GIVEN** a persisted spec being added to the change has semantic dependency state available through `readPersistedDependsOn(spec)`
 - **WHEN** `EditChange.execute` adds that spec to the change
-- **THEN** the seeded `change.specDependsOn` entry comes from `spec-lock.json.dependsOn`
+- **THEN** the seeded `change.specDependsOn` entry comes from that semantic persisted state
 
-#### Scenario: Legacy metadata seeds when sidecar is absent
+#### Scenario: Legacy metadata seeds when persisted semantic state is absent
 
-- **GIVEN** a persisted spec being added has no `spec-lock.json`
+- **GIVEN** a persisted spec being added has no semantic persisted dependency state
 - **AND** `metadata.json.dependsOn` exists for that spec
 - **WHEN** `EditChange.execute` adds that spec
 - **THEN** the seeded `change.specDependsOn` entry comes from `metadata.json.dependsOn`
+
+#### Scenario: Stale metadata still seeds as legacy fallback
+
+- **GIVEN** a persisted spec being added has no semantic persisted dependency state
+- **AND** `metadata.json.dependsOn` exists for that spec but the metadata is marked stale
+- **WHEN** `EditChange.execute` adds that spec
+- **THEN** the seeded `change.specDependsOn` entry still comes from the persisted metadata dependency list
 
 #### Scenario: Existing in-change dependency snapshot is not overwritten
 

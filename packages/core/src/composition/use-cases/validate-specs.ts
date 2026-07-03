@@ -4,11 +4,15 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { createSpecRepository } from '../spec-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { type SchemaRepository } from '../../application/ports/schema-repository.js'
 import { createSchemaRepository } from '../schema-repository.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
+import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
+import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 
 /** Filesystem adapter options for `createValidateSpecs(options)`. */
 export interface FsValidateSpecsOptions {
@@ -17,24 +21,26 @@ export interface FsValidateSpecsOptions {
   readonly configDir: string
   readonly schemaRef: string
   readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
+  /** Workspace routing metadata for cross-workspace spec reference resolution. */
+  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
 }
 
 /**
  * Constructs a `ValidateSpecs` use case with full project config.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel options for schema resolution
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional kernel options for schema resolution
+ * @param options.extraNodeModulesPaths - Additional node_modules paths for schema resolution
  * @returns The pre-wired use case instance
  */
 export function createValidateSpecs(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: { extraNodeModulesPaths?: readonly string[] },
 ): ValidateSpecs
 /**
  * Constructs a `ValidateSpecs` use case with explicit adapter options.
  *
- * @param options - Spec repositories and node_modules paths
+ * @param options - Spec repositories and schema resolution paths
  * @returns The pre-wired use case instance
  */
 export function createValidateSpecs(options: FsValidateSpecsOptions): ValidateSpecs
@@ -42,13 +48,13 @@ export function createValidateSpecs(options: FsValidateSpecsOptions): ValidateSp
  * Constructs a `ValidateSpecs` instance wired with filesystem adapters.
  *
  * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
- * @param kernelOpts - Optional kernel options; only used with `SpecdConfig`
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional kernel options; only used with the `SpecdConfig` form
+ * @param options.extraNodeModulesPaths - Additional node_modules paths for schema resolution
  * @returns The pre-wired use case instance
  */
 export function createValidateSpecs(
   configOrOptions: SpecdConfig | FsValidateSpecsOptions,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: { extraNodeModulesPaths?: readonly string[] },
 ): ValidateSpecs {
   if (isSpecdConfig(configOrOptions)) {
     const config = configOrOptions
@@ -92,20 +98,30 @@ export function createValidateSpecs(
       specRepositories: specRepos,
       nodeModulesPaths: [
         path.join(config.projectRoot, 'node_modules'),
-        ...(kernelOpts?.extraNodeModulesPaths ?? []),
+        ...(options?.extraNodeModulesPaths ?? []),
       ],
       configDir: config.projectRoot,
       schemaRef: config.schemaRef,
       schemaRepositories: schemaRepos,
+      workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
     })
   }
+
+  const opts = configOrOptions
   const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: configOrOptions.nodeModulesPaths,
-    configDir: configOrOptions.configDir,
-    schemaRepositories: configOrOptions.schemaRepositories,
+    nodeModulesPaths: opts.nodeModulesPaths,
+    configDir: opts.configDir,
+    schemaRepositories: opts.schemaRepositories,
   })
-  const resolveSchema = new ResolveSchema(schemas, configOrOptions.schemaRef, [], undefined)
+  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
   const schemaProvider = new LazySchemaProvider(resolveSchema)
   const parsers = createArtifactParserRegistry()
-  return new ValidateSpecs(configOrOptions.specRepositories, schemaProvider, parsers)
+  return new ValidateSpecs(
+    opts.specRepositories,
+    schemaProvider,
+    parsers,
+    new NodeContentHasher(),
+    createBuiltinExtractorTransforms(),
+    opts.workspaceRoutes ?? [],
+  )
 }

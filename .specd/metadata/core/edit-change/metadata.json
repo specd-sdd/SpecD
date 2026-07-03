@@ -57,7 +57,7 @@
     {
       "requirement": "Seed specDependsOn for added specs",
       "rules": [
-        "When `EditChange.execute` effectively adds a spec ID that was not already present in the change, it MUST seed `change.specDependsOn` for that spec before returning the updated change.\n\nSeeding rules:\n\n- Seeding applies only to spec IDs newly entering the change scope.\n- If a canonical `spec-lock.json` exists for the spec, its `dependsOn` value MUST be used.\n- Otherwise, if legacy `metadata.json.dependsOn` exists for the spec, that value MUST be used.\n- Otherwise, the seeded value is an empty array.\n- If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.\n\nThis seeding establishes the baseline dependency snapshot for the change so later artifact validation and archive do not start from an empty dependency set for existing specs."
+        "When `EditChange.execute` effectively adds a spec ID that was not already present in the change, it MUST seed `change.specDependsOn` for that spec before returning the updated change.\n\nSeeding rules:\n\n- Seeding applies only to spec IDs newly entering the change scope.\n- If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.\n- Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.\n- Otherwise, the seeded value is an empty array.\n- If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.\n\nThis seeding establishes the baseline dependency snapshot for the change so later artifact validation and archive do not start from an empty dependency set for existing specs."
       ]
     },
     {
@@ -176,20 +176,34 @@
     },
     {
       "requirement": "Seed specDependsOn for added specs",
-      "name": "Existing sidecar seeds new spec entry",
-      "given": ["a persisted spec being added to the change already has spec-lock.json"],
+      "name": "Persisted dependency state seeds new spec entry",
+      "given": [
+        "a persisted spec being added to the change has semantic dependency state available through readPersistedDependsOn(spec)"
+      ],
       "when": ["EditChange.execute adds that spec to the change"],
-      "then": ["the seeded change.specDependsOn entry comes from spec-lock.json.dependsOn"]
+      "then": ["the seeded change.specDependsOn entry comes from that semantic persisted state"]
     },
     {
       "requirement": "Seed specDependsOn for added specs",
-      "name": "Legacy metadata seeds when sidecar is absent",
+      "name": "Legacy metadata seeds when persisted semantic state is absent",
       "given": [
-        "a persisted spec being added has no spec-lock.json",
+        "a persisted spec being added has no semantic persisted dependency state",
         "AND metadata.json.dependsOn exists for that spec"
       ],
       "when": ["EditChange.execute adds that spec"],
       "then": ["the seeded change.specDependsOn entry comes from metadata.json.dependsOn"]
+    },
+    {
+      "requirement": "Seed specDependsOn for added specs",
+      "name": "Stale metadata still seeds as legacy fallback",
+      "given": [
+        "a persisted spec being added has no semantic persisted dependency state",
+        "AND metadata.json.dependsOn exists for that spec but the metadata is marked stale"
+      ],
+      "when": ["EditChange.execute adds that spec"],
+      "then": [
+        "the seeded change.specDependsOn entry still comes from the persisted metadata dependency list"
+      ]
     },
     {
       "requirement": "Seed specDependsOn for added specs",
@@ -332,9 +346,18 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:edit-change",
+        "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
+        "symbol": "loadPersistedSpecDependsOn"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:b1d60a6c003564800895efafd8a82d09994ba15b137fd9f3766c27a03d35812f",
-    "verify.md": "sha256:d16d12c29fa4fcf08d09c4deb6b844b04cbe39ab0270b026441c401292206743"
+    "spec.md": "sha256:39b2115b520ce4f31de579e68d19ead242a49bb07b0b8946f9a8199229825471",
+    "verify.md": "sha256:10ae926d41931597135dd1a6ac058b357f752022c998f1ce31ad5a3389958bc7"
   },
   "generatedBy": "core"
 }

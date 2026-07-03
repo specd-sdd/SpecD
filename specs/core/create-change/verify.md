@@ -58,19 +58,26 @@
 
 ### Requirement: Initial specDependsOn seeding
 
-#### Scenario: Existing sidecar seeds dependencies at creation time
+#### Scenario: Persisted dependency state seeds dependencies at creation time
 
 - **GIVEN** `CreateChange.execute` is called with a spec that already exists in a repository
-- **AND** that spec already has `spec-lock.json`
+- **AND** that repository returns persisted dependencies from `readPersistedDependsOn(spec)`
 - **WHEN** the change is constructed
-- **THEN** the change seeds `specDependsOn` for that spec from `spec-lock.json.dependsOn`
+- **THEN** the change seeds `specDependsOn` for that spec from that semantic persisted state
 
-#### Scenario: Legacy metadata seeds when sidecar is absent
+#### Scenario: Legacy metadata seeds when persisted semantic state is absent
 
-- **GIVEN** `CreateChange.execute` is called with a persisted spec that has no sidecar
+- **GIVEN** `CreateChange.execute` is called with a persisted spec whose repository returns no semantic persisted dependency state
 - **AND** `metadata.json.dependsOn` exists for that spec
 - **WHEN** the change is constructed
 - **THEN** the change seeds `specDependsOn` from `metadata.json.dependsOn`
+
+#### Scenario: Stale metadata still seeds as legacy fallback
+
+- **GIVEN** `CreateChange.execute` is called with a persisted spec whose repository returns no semantic persisted dependency state
+- **AND** `metadata.json.dependsOn` exists for that spec but the metadata is marked stale
+- **WHEN** the change is constructed
+- **THEN** the change still seeds `specDependsOn` from the persisted metadata dependency list
 
 #### Scenario: New spec starts without seeded dependency entry
 

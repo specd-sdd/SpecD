@@ -154,3 +154,27 @@
 - **GIVEN** a `ReadonlyMap<string, SpecRepository>` of spec repositories
 - **WHEN** `SaveSpecMetadata` is constructed
 - **THEN** it accepts the spec repositories map as its only dependency
+
+#### Scenario: Existing stale metadata hash is still captured for conflict detection
+
+- **GIVEN** a spec with existing persisted metadata on disk
+- **AND** `SpecRepository.metadata()` marks that metadata `stale`
+- **WHEN** `execute()` is called without `force`
+- **THEN** the existing metadata's `originalHash` is still captured via `SpecRepository.metadata()`
+- **AND** that hash is passed to `SpecRepository.saveMetadata()` for optimistic concurrency
+
+#### Scenario: Existing stale dependsOn would still be changed
+
+- **GIVEN** existing persisted metadata has `dependsOn: ['core:storage', 'core:config']`
+- **AND** that metadata file is marked stale
+- **AND** incoming content has `dependsOn: ['core:storage']`
+- **WHEN** `execute()` is called without `force`
+- **THEN** `DependsOnOverwriteError` is thrown
+
+#### Scenario: Force still bypasses stale overwrite protection
+
+- **GIVEN** existing persisted metadata has `dependsOn: ['core:storage']`
+- **AND** that metadata file is marked stale
+- **AND** incoming content has `dependsOn: ['core:other']`
+- **WHEN** `execute()` is called with `force: true`
+- **THEN** the write succeeds

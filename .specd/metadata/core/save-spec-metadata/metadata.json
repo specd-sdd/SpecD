@@ -39,13 +39,13 @@
     {
       "requirement": "Conflict detection via originalHash",
       "rules": [
-        "When `force` is not set, the use case MUST load the existing metadata (if any) via `SpecRepository.metadata()` and capture its `originalHash`. This hash is passed to `SpecRepository.saveMetadata()` so that the repository layer can detect concurrent modifications. When `force` is set, this step is skipped entirely — no existing metadata is loaded."
+        "When `force` is not set, the use case MUST load the existing metadata (if any) via `SpecRepository.metadata()` and capture its `originalHash`. This hash is passed to `SpecRepository.saveMetadata()` so that the repository layer can detect concurrent modifications. When `force` is set, this step is skipped entirely — no existing metadata is loaded.\n\nIf `SpecRepository.metadata()` returns persisted metadata with `freshness: 'stale'`, `SaveSpecMetadata` MUST still use its `originalHash` for optimistic concurrency. Staleness does not make the persisted file unreadable for this use case because the purpose of the read is to protect the existing serialized snapshot on disk, not to reconstruct canonical metadata."
       ]
     },
     {
       "requirement": "dependsOn overwrite protection",
       "rules": [
-        "When `force` is not set and existing metadata exists on disk, the use case MUST check whether the incoming content would change the `dependsOn` array:\n\n1. Parse the existing metadata content (loaded via `SpecRepository.metadata()` in the conflict detection step) and validate it against `specMetadataSchema` (the lenient schema)\n2. Extract the `dependsOn` arrays from both existing and incoming metadata\n3. Compare the two arrays using `DependsOnOverwriteError.areSame()`, which performs order-independent comparison\n4. If the existing metadata has a non-empty `dependsOn` and the incoming `dependsOn` differs, throw `DependsOnOverwriteError`\n5. If the existing metadata has no `dependsOn` (absent or empty), any incoming `dependsOn` is allowed\n\nWhen `force` is set, this check MUST be skipped entirely."
+        "When `force` is not set and existing metadata exists on disk, the use case MUST check whether the incoming content would change the `dependsOn` array:\n\n1. Parse the existing metadata content (loaded via `SpecRepository.metadata()` in the conflict detection step) and validate it against `specMetadataSchema` (the lenient schema)\n2. Extract the `dependsOn` arrays from both existing and incoming metadata\n3. Compare the two arrays using `DependsOnOverwriteError.areSame()`, which performs order-independent comparison\n4. If the existing metadata has a non-empty `dependsOn` and the incoming `dependsOn` differs, throw `DependsOnOverwriteError`\n5. If the existing metadata has no `dependsOn` (absent or empty), any incoming `dependsOn` is allowed\n\nIf the existing metadata file is stale, `SaveSpecMetadata` still performs this comparison against the persisted `dependsOn` value currently on disk. The overwrite check protects against silently discarding that persisted snapshot; it does not attempt deterministic metadata regeneration.\n\nWhen `force` is set, this check MUST be skipped entirely."
       ]
     },
     {
@@ -257,6 +257,41 @@
       "given": ["a ReadonlyMap<string, SpecRepository> of spec repositories"],
       "when": ["SaveSpecMetadata is constructed"],
       "then": ["it accepts the spec repositories map as its only dependency"]
+    },
+    {
+      "requirement": "Constructor dependencies",
+      "name": "Existing stale metadata hash is still captured for conflict detection",
+      "given": [
+        "a spec with existing persisted metadata on disk",
+        "AND SpecRepository.metadata() marks that metadata stale"
+      ],
+      "when": ["execute() is called without force"],
+      "then": [
+        "the existing metadata's originalHash is still captured via SpecRepository.metadata()",
+        "AND that hash is passed to SpecRepository.saveMetadata() for optimistic concurrency"
+      ]
+    },
+    {
+      "requirement": "Constructor dependencies",
+      "name": "Existing stale dependsOn would still be changed",
+      "given": [
+        "existing persisted metadata has dependsOn: ['core:storage', 'core:config']",
+        "AND that metadata file is marked stale",
+        "AND incoming content has dependsOn: ['core:storage']"
+      ],
+      "when": ["execute() is called without force"],
+      "then": ["DependsOnOverwriteError is thrown"]
+    },
+    {
+      "requirement": "Constructor dependencies",
+      "name": "Force still bypasses stale overwrite protection",
+      "given": [
+        "existing persisted metadata has dependsOn: ['core:storage']",
+        "AND that metadata file is marked stale",
+        "AND incoming content has dependsOn: ['core:other']"
+      ],
+      "when": ["execute() is called with force: true"],
+      "then": ["the write succeeds"]
     }
   ],
   "implementation": {
@@ -269,8 +304,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:831f6860271f56c56e9b7375f0c2827633e8a27cbd9f774c54a69fc7f4799028",
-    "verify.md": "sha256:131145b21a64e6c214c60333afcb69979390a291fc7f98b1b7380a8490e05d22"
+    "spec.md": "sha256:a7912d2d65b4ed45c96bfa7c5ab7bf421d51150f59b89c826219e0de09e405a3",
+    "verify.md": "sha256:cf0151020e95e9fe52b0abb6acc38d1f0904902a0dcf673969c4c8c580c26c8d"
   },
   "generatedBy": "core"
 }
