@@ -1,8 +1,7 @@
-import * as path from 'node:path'
 import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
+import { createSharedSpecRepositories } from '../shared-repository-wiring.js'
 
 /** Filesystem adapter options for `createListWorkspaces(options)`. */
 export interface FsListWorkspacesOptions {
@@ -44,25 +43,7 @@ export function createListWorkspaces(
   options?: FsListWorkspacesOptions,
 ): ListWorkspaces {
   if (options === undefined) {
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
+    const specRepos = createSharedSpecRepositories({ config })
     return new ListWorkspaces(config, specRepos)
   }
   return new ListWorkspaces(config, options.specRepositories)

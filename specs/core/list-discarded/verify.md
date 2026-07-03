@@ -63,3 +63,12 @@
 - **GIVEN** the repository contains only active and drafted changes
 - **WHEN** `execute()` is called
 - **THEN** the result is an empty array
+
+### Requirement: Config-based factory preserves complete change repository bootstrap
+
+#### Scenario: Config-wired discarded listing preserves artifact-type repository semantics
+
+- **GIVEN** `createListDiscarded(config)` initializes a `ChangeRepository` from `SpecdConfig`
+- **WHEN** `ListDiscarded.execute()` reads discarded changes through that repository
+- **THEN** discarded artifact states are derived with complete artifact-type and spec-existence bootstrap semantics
+- **AND** the config-based factory does not expose a weaker change repository variant

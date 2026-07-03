@@ -69,6 +69,12 @@
       ]
     },
     {
+      "requirement": "Config-based factory preserves complete repository bootstrap",
+      "rules": [
+        "When `createGetStatus(config)` wires `GetStatus` from `SpecdConfig`, the resulting read path MUST preserve complete change-repository bootstrap semantics, including schema-driven artifact-type behavior needed for status derivation.\n\nThe config-based factory MUST NOT assemble a weaker repository variant that can report different artifact states for the same persisted change than the canonical status read path."
+      ]
+    },
+    {
       "requirement": "Reports effective status for every artifact",
       "rules": [
         "The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.\n\n`GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state."
@@ -487,6 +493,18 @@
       ]
     },
     {
+      "requirement": "Config-based factory preserves complete repository bootstrap",
+      "name": "Config-wired status path preserves schema-driven artifact-state derivation",
+      "given": ["createGetStatus(config) wires GetStatus from SpecdConfig"],
+      "when": [
+        "GetStatus.execute() loads a persisted change whose artifact-state derivation depends on schema-driven artifact-type behavior"
+      ],
+      "then": [
+        "the returned artifact statuses reflect complete schema-driven artifact-state derivation for that change",
+        "AND the config-based factory does not report status through a weaker or partial repository bootstrap path"
+      ]
+    },
+    {
       "requirement": "Identifies blockers",
       "name": "Blockers are surfaced from lifecycle interpretation",
       "given": ["lifecycle interpretation finds artifact drift or missing required artifacts"],
@@ -497,16 +515,21 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatus"
+        "file": "core:test/composition/shared-repository-wiring.spec.ts"
       },
       {
         "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatusInput"
+        "file": "core:test/application/use-cases/get-status.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:get-status",
+        "file": "core:src/composition/shared-repository-wiring.ts",
+        "symbol": "createSharedChangeRepository"
       },
       {
         "specId": "core:get-status",
@@ -516,8 +539,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:6f2522e0669d14a0be1f71b1a1bdc3c389d31f85f42bf5a7cbee0a7b549639db",
-    "verify.md": "sha256:8cf6ebd0d4a20cef69b67daefbd76bf703487c4eea5b3764b9670809146966de"
+    "spec.md": "sha256:190628ec9d1e6b2819984d15277d647e43f52588b8aa6cfe16966908e65dd16d",
+    "verify.md": "sha256:098e5e7e19bc0e6c32ef550cfcad1a4d2a8ade4e9f8d397e706957cfbd0a1bd4"
   },
   "generatedBy": "core"
 }

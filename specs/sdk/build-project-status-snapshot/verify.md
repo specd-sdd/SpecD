@@ -49,3 +49,12 @@
 - **WHEN** snapshot completes
 - **THEN** the result is a plain object with `summary`, `graphHealth`, `approvals`, and `llmOptimizedContext` fields
 - **AND** no formatted text output is produced
+
+### Requirement: No direct repository bootstrap in snapshot orchestration
+
+#### Scenario: Snapshot orchestration relies only on SDK host context project queries
+
+- **WHEN** `buildProjectStatusSnapshot` assembles summary and workspace information
+- **THEN** it obtains them exclusively through `SdkHostContext` project queries
+- **AND** it does not construct `ChangeRepository` or `SpecRepository` instances directly
+- **AND** it does not recreate a parallel or partial repository bootstrap path outside the canonical composition-backed read flow

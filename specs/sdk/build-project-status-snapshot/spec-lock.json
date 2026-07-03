@@ -7,11 +7,7 @@
   "implementation": [
     {
       "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
-      "symbols": [
-        "BuildProjectStatusSnapshotOptions",
-        "BuildProjectStatusSnapshotResult",
-        "buildProjectStatusSnapshot"
-      ]
+      "symbols": ["buildProjectStatusSnapshot"]
     }
   ]
 }

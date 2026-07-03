@@ -29,6 +29,12 @@
       "rules": [
         "When the repository contains no drafted changes, `execute()` MUST return an empty array. It MUST NOT throw."
       ]
+    },
+    {
+      "requirement": "Config-based factory preserves complete change repository bootstrap",
+      "rules": [
+        "When `createListDrafts(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.\n\nThe config-based factory MUST NOT construct a weaker repository variant that can derive different draft artifact states for the same persisted change than the canonical listing read path."
+      ]
     }
   ],
   "scenarios": [
@@ -102,22 +108,30 @@
       "given": ["the repository contains only active and discarded changes"],
       "when": ["execute() is called"],
       "then": ["the result is an empty array"]
+    },
+    {
+      "requirement": "Config-based factory preserves complete change repository bootstrap",
+      "name": "Config-wired draft listing preserves artifact-type repository semantics",
+      "given": ["createListDrafts(config) initializes a ChangeRepository from SpecdConfig"],
+      "when": ["ListDrafts.execute() reads drafted changes through that repository"],
+      "then": [
+        "draft artifact states are derived with complete artifact-type and spec-existence bootstrap semantics",
+        "AND the config-based factory does not expose a weaker change repository variant"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:list-drafts",
-        "file": "core:src/application/use-cases/list-drafts.ts",
-        "symbol": "ListDrafts"
+        "file": "core:src/composition/use-cases/list-drafts.ts",
+        "symbol": "createListDrafts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:7b5627d8b6d5af2089948cef5e09029a54834030e9de58f7e92105c4db14bd24",
-    "verify.md": "sha256:8a12ffbf30962286b1e1eb1ef7af277d23c767a78ae57b8a7b6201cb88523578"
+    "spec.md": "sha256:48eec2fb5eb5273a0c38897aeca50db049d43c3aa9ec8653f8c369c233ae188e",
+    "verify.md": "sha256:17caef6f22ee36231586b0c6bf2d07f7a25c2dc952ed0b9e7cc11783db9cd5ed"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Users who draft changes need visibility into what is parked so they can decide what to resume.",
-  "optimizedContext": "# ListDrafts\n\n## Rules\n- Returns all drafted changes: ListDrafts.execute() MUST return all changes that are in the drafted lifecycle state.\n- Returns DraftedChangeView without content: ListDrafts.execute() MUST return DraftedChangeView[].\n- Constructor accepts a ChangeRepository: ListDrafts MUST accept a ChangeRepository as its sole constructor argument.\n- Returns an empty array when no drafted changes exist: When the repository contains no drafted changes, execute() MUST return an empty array.\n- Dependencies: core:change, core:kernel\n\n## Constraints\n- None explicit.\n"
+  "generatedBy": "core"
 }

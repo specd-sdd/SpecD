@@ -187,4 +187,20 @@ describe('GetProjectSummary', () => {
     expect(order.indexOf('changes-start')).toBeLessThan(order.indexOf('changes-end'))
     expect(order.indexOf('drafts-start')).toBeLessThan(order.indexOf('drafts-end'))
   })
+
+  it('returns correct counts when active changes have drifted artifacts', async () => {
+    const deps = makeListUseCases({
+      active: [makeChange('alpha')],
+      workspaces: [{ name: 'default', count: 1 }],
+    })
+    const uc = new GetProjectSummary(
+      deps.listChanges,
+      deps.listDrafts,
+      deps.listDiscarded,
+      deps.listArchived,
+      deps.listWorkspaces,
+    )
+    const summary = await uc.execute()
+    expect(summary.activeCount).toBe(1)
+  })
 })

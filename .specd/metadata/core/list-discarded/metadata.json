@@ -34,6 +34,12 @@
       "rules": [
         "When the repository contains no discarded changes, `execute()` MUST return an empty array. It MUST NOT throw."
       ]
+    },
+    {
+      "requirement": "Config-based factory preserves complete change repository bootstrap",
+      "rules": [
+        "When `createListDiscarded(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.\n\nThe config-based factory MUST NOT construct a weaker repository variant that can derive different discarded artifact states for the same persisted change than the canonical listing read path."
+      ]
     }
   ],
   "scenarios": [
@@ -107,20 +113,30 @@
       "given": ["the repository contains only active and drafted changes"],
       "when": ["execute() is called"],
       "then": ["the result is an empty array"]
+    },
+    {
+      "requirement": "Config-based factory preserves complete change repository bootstrap",
+      "name": "Config-wired discarded listing preserves artifact-type repository semantics",
+      "given": ["createListDiscarded(config) initializes a ChangeRepository from SpecdConfig"],
+      "when": ["ListDiscarded.execute() reads discarded changes through that repository"],
+      "then": [
+        "discarded artifact states are derived with complete artifact-type and spec-existence bootstrap semantics",
+        "AND the config-based factory does not expose a weaker change repository variant"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:list-discarded",
-        "file": "core:src/application/use-cases/list-discarded.ts",
-        "symbol": "ListDiscarded"
+        "file": "core:src/composition/use-cases/list-discarded.ts",
+        "symbol": "createListDiscarded"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e4d4ce1005f733043466194839134a3d853e8ccb18acb10c894dd0ff3a330525",
-    "verify.md": "sha256:a41016b2cbecd5c5c42f0558707d9c0e0e53353941d1ace79ca46738d77e8d4d"
+    "spec.md": "sha256:625d8fbb29b435628c9114e4abb8d7673a995f2b04eddd93d2dbc7f3f7c1920b",
+    "verify.md": "sha256:c0fc4e42a1237256874278dc2b9dfb36d32a84cbc266e9080b1ab0558fe77605"
   },
   "generatedBy": "core"
 }

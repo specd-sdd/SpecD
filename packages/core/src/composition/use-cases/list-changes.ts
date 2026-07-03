@@ -1,7 +1,7 @@
 import { ListChanges } from '../../application/use-cases/list-changes.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
+import { createSharedChangeRepository } from '../shared-repository-wiring.js'
 
 /** Domain context for `createListChanges(context, options)`. */
 export interface ListChangesContext {
@@ -49,20 +49,8 @@ export function createListChanges(
 ): ListChanges {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    return createListChanges(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-      },
-    )
+    const changeRepo = createSharedChangeRepository({ config })
+    return new ListChanges(changeRepo)
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
   return new ListChanges(changeRepo)

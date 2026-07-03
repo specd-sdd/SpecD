@@ -116,6 +116,12 @@ It MUST load the change via `ChangeRepository.get(name)` and, when that returns 
 
 `GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly.
 
+### Requirement: Config-based factory preserves complete repository bootstrap
+
+When `createGetStatus(config)` wires `GetStatus` from `SpecdConfig`, the resulting read path MUST preserve complete change-repository bootstrap semantics, including schema-driven artifact-type behavior needed for status derivation.
+
+The config-based factory MUST NOT assemble a weaker repository variant that can report different artifact states for the same persisted change than the canonical status read path.
+
 ### Requirement: Reports effective status for every artifact
 
 The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.

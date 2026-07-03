@@ -14,12 +14,18 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus", "GetStatusInput"]
+      "file": "core:src/composition/shared-repository-wiring.ts",
+      "symbols": ["createSharedChangeRepository"]
     },
     {
       "file": "core:src/composition/use-cases/get-status.ts",
       "symbols": ["createGetStatus"]
+    },
+    {
+      "file": "core:test/composition/shared-repository-wiring.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/get-status.spec.ts"
     }
   ]
 }

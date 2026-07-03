@@ -6,8 +6,8 @@
   "dependsOn": ["core:change", "core:kernel"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/list-drafts.ts",
-      "symbols": ["ListDrafts"]
+      "file": "core:src/composition/use-cases/list-drafts.ts",
+      "symbols": ["createListDrafts"]
     }
   ]
 }

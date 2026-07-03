@@ -1,0 +1,15 @@
+- op: added
+  description: 'Require config-based active-change listing to use complete canonical change repository bootstrap'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Returns an empty array when no active changes exist$'
+  content: |
+    ### Requirement: Config-based factory preserves complete change repository bootstrap
+
+    When `createListChanges(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.
+
+    The config-based factory MUST NOT construct a weaker repository variant that can derive different artifact states for the same persisted change than the canonical status/listing read path.

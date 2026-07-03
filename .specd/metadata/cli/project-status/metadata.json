@@ -87,6 +87,12 @@
       "rules": [
         "The command MUST obtain host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`). Project summary, approval flags, and graph snapshot orchestration MUST use the returned `SdkHostContext`."
       ]
+    },
+    {
+      "requirement": "No direct repository bootstrap in command handler",
+      "rules": [
+        "The `project status` command handler MUST obtain repository-backed project information only through the SDK host context and its project queries.\n\nThe handler MUST NOT construct `ChangeRepository` or `SpecRepository` instances directly, and it MUST NOT assemble an alternate read path whose repository bootstrap semantics differ from the canonical composition-backed status flow."
+      ]
     }
   ],
   "constraints": [
@@ -253,6 +259,16 @@
       "then": [
         "it obtains host context via openSpecdHost from @specd/sdk (directly or through resolveCliContext)"
       ]
+    },
+    {
+      "requirement": "No direct repository bootstrap in command handler",
+      "name": "Command handler routes repository-backed reads through SDK host context only",
+      "when": ["project status assembles repository-backed project information"],
+      "then": [
+        "it obtains that information only through the SDK host context and its project queries",
+        "AND it does not construct ChangeRepository or SpecRepository instances directly",
+        "AND it does not assemble an alternate repository bootstrap path with semantics different from the canonical composition-backed status flow"
+      ]
     }
   ],
   "implementation": {
@@ -265,8 +281,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:24de611cdd4adeea683dcbf678934d8bb3bc2702e8cf0f3755299c6193ee2954",
-    "verify.md": "sha256:129e4a10a498bce796003315453c869a8328589a29471821965cbea6f89c0678"
+    "spec.md": "sha256:5ab8011c1af6f23983827db4057ec0b4a89fbfe917b4d268a36bb95e1cf6111b",
+    "verify.md": "sha256:d9cb63db4520a7c3046534be36c0d36a24e093eb8ef2f755a69304b5a3eac70d"
   },
   "generatedBy": "core"
 }

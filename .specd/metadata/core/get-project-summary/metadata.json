@@ -50,6 +50,12 @@
       ]
     },
     {
+      "requirement": "Config-based summary wiring preserves complete repository bootstrap semantics",
+      "rules": [
+        "When `createGetProjectSummary(config)` wires `ListChanges`, `ListDrafts`, `ListDiscarded`, and `ListWorkspaces`, the resulting read path MUST preserve complete repository bootstrap semantics for those downstream use cases.\n\nIn particular, summary reads MUST inherit schema-driven artifact-type behavior from change repositories and canonical metadata-path behavior from spec repositories through the downstream factories they compose. `GetProjectSummary` MUST NOT introduce an alternate or partial repository bootstrap path that can yield divergent status or count results for the same persisted project state."
+      ]
+    },
+    {
       "requirement": "Kernel exposes use case",
       "rules": [
         "`createKernel()` MUST wire `GetProjectSummary` on `kernel.project.getProjectSummary`."
@@ -141,6 +147,18 @@
       "then": ["it returns a GetProjectSummary instance with all dependencies wired from config"]
     },
     {
+      "requirement": "Config-based summary wiring preserves complete repository bootstrap semantics",
+      "name": "Summary path inherits complete bootstrap semantics from downstream factories",
+      "given": [
+        "createGetProjectSummary(config) wires ListChanges, ListDrafts, ListDiscarded, and ListWorkspaces from SpecdConfig"
+      ],
+      "when": ["GetProjectSummary.execute() is called through that config-based path"],
+      "then": [
+        "change and workspace counts are derived through downstream repositories with complete artifact-type and metadata bootstrap semantics",
+        "AND the summary path does not introduce an alternate or partial repository bootstrap that can produce divergent status or count results"
+      ]
+    },
+    {
       "requirement": "Kernel exposes use case",
       "name": "Kernel project namespace includes getProjectSummary",
       "given": ["createKernel(config) is called"],
@@ -153,50 +171,19 @@
       {
         "specId": "core:get-project-summary",
         "file": "core:test/application/use-cases/get-project-summary.spec.ts"
-      },
-      {
-        "specId": "core:get-project-summary",
-        "file": "core:test/composition/get-project-summary.spec.ts"
-      },
-      {
-        "specId": "core:get-project-summary",
-        "file": "core:src/application/index.ts"
-      },
-      {
-        "specId": "core:get-project-summary",
-        "file": "core:src/composition/use-cases/index.ts"
-      },
-      {
-        "specId": "core:get-project-summary",
-        "file": "core:test/composition/kernel-get-config.spec.ts"
       }
     ],
     "symbols": [
       {
         "specId": "core:get-project-summary",
-        "file": "core:src/application/use-cases/get-project-summary.ts",
-        "symbol": "GetProjectSummary"
-      },
-      {
-        "specId": "core:get-project-summary",
-        "file": "core:src/application/use-cases/get-project-summary.ts",
-        "symbol": "GetProjectSummaryResult"
-      },
-      {
-        "specId": "core:get-project-summary",
         "file": "core:src/composition/use-cases/get-project-summary.ts",
         "symbol": "createGetProjectSummary"
-      },
-      {
-        "specId": "core:get-project-summary",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:bcef4984bc20801dc585500440aef3759bc09b5a30f906dd525268ec98fca0f3",
-    "verify.md": "sha256:7b6ccca7f31e676a015af57bfbe59b526edcb97cc027bf5a1e31443e94d530d9"
+    "spec.md": "sha256:1694f517ac4e50a87db31bbef6c3a2bd1ba35b4edc5267350d007c2754be2e1d",
+    "verify.md": "sha256:28571422b3687c33a4735dc974c68b98fa7a6f662b61af1dbb773f0a7ef1c297"
   },
   "generatedBy": "core"
 }

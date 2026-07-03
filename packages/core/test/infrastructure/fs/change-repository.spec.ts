@@ -590,6 +590,70 @@ describe('FsChangeRepository', () => {
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
     })
+
+    it('given tasks artifact type with preHashCleanup, when get is called on a change where task checklist progress was updated, then the artifact status remains complete', async () => {
+      const tasksType = new ArtifactType({
+        id: 'tasks',
+        scope: 'change',
+        output: 'tasks.md',
+        hasTasks: true,
+        requires: [],
+        validations: [],
+        deltaValidations: [],
+        preHashCleanup: [
+          {
+            id: 'normalize-checkboxes',
+            pattern: '^([ \\t]*-\\s+)\\[x\\]',
+            replacement: '$1[ ]',
+          },
+        ],
+      })
+
+      const repoWithResolver = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        resolveArtifactTypes: async () => [tasksType],
+      })
+
+      const initialContent = '- [ ] Task 1\n'
+      const { applyPreHashCleanup } =
+        await import('../../../src/domain/services/pre-hash-cleanup.js')
+      const cleaned = applyPreHashCleanup(initialContent, tasksType.preHashCleanup)
+      const validatedHash = sha256(cleaned)
+
+      const change = makeChange('c1')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'tasks',
+          optional: false,
+          requires: [],
+          files: new Map([
+            [
+              'tasks',
+              new ArtifactFile({
+                key: 'tasks',
+                filename: 'tasks.md',
+                status: 'complete',
+                validatedHash,
+              }),
+            ],
+          ]),
+        }),
+      )
+
+      await repoWithResolver.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'tasks.md'), '- [x] Task 1\n', 'utf8')
+
+      const loaded = await repoWithResolver.get('c1')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('complete')
+    })
   })
 
   describe('artifact()', () => {

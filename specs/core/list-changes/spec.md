@@ -22,6 +22,12 @@ The returned `Change[]` MUST contain artifact state (status, validated hashes) b
 
 When the repository contains no active changes (all are drafted, discarded, or none exist), `execute()` MUST return an empty array. It MUST NOT throw.
 
+### Requirement: Config-based factory preserves complete change repository bootstrap
+
+When `createListChanges(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.
+
+The config-based factory MUST NOT construct a weaker repository variant that can derive different artifact states for the same persisted change than the canonical status/listing read path.
+
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)

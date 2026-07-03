@@ -1,0 +1,15 @@
+- op: added
+  description: 'Require config-based workspace listing to use canonical spec repository initialization'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Handle all configured workspaces$'
+  content: |
+    ### Requirement: Config-based factory preserves canonical spec repository bootstrap
+
+    When `createListWorkspaces(config)` initializes `SpecRepository` instances from `SpecdConfig`, each repository MUST be bootstrapped with canonical metadata-path semantics for that workspace.
+
+    The config-based factory MUST NOT derive a weaker or divergent metadata lookup strategy than the canonical repository bootstrap used by the composition layer. Status and context consumers that receive `ProjectWorkspace.specRepo` from `ListWorkspaces` MUST observe a complete and stable spec repository view.

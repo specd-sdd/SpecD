@@ -1,0 +1,15 @@
+- op: added
+  description: 'Require SDK snapshot orchestration to rely on SDK host context project queries instead of direct repository bootstrap'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: No presenter formatting$'
+  content: |
+    ### Requirement: No direct repository bootstrap in snapshot orchestration
+
+    `buildProjectStatusSnapshot` MUST obtain project summary and workspace information exclusively through project queries exposed by `SdkHostContext`.
+
+    The orchestration MUST NOT construct `ChangeRepository` or `SpecRepository` instances directly, and it MUST NOT recreate a parallel or partial repository bootstrap path outside the canonical composition-backed read flow.

@@ -146,3 +146,12 @@
 
 - **WHEN** `specd project status` is executed
 - **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`)
+
+### Requirement: No direct repository bootstrap in command handler
+
+#### Scenario: Command handler routes repository-backed reads through SDK host context only
+
+- **WHEN** `project status` assembles repository-backed project information
+- **THEN** it obtains that information only through the SDK host context and its project queries
+- **AND** it does not construct `ChangeRepository` or `SpecRepository` instances directly
+- **AND** it does not assemble an alternate repository bootstrap path with semantics different from the canonical composition-backed status flow

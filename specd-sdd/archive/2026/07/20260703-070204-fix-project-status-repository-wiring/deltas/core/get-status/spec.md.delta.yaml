@@ -1,0 +1,15 @@
+- op: added
+  description: 'Require config-based GetStatus wiring to preserve complete repository bootstrap semantics'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Constructor dependencies$'
+  content: |
+    ### Requirement: Config-based factory preserves complete repository bootstrap
+
+    When `createGetStatus(config)` wires `GetStatus` from `SpecdConfig`, the resulting read path MUST preserve complete change-repository bootstrap semantics, including schema-driven artifact-type behavior needed for status derivation.
+
+    The config-based factory MUST NOT assemble a weaker repository variant that can report different artifact states for the same persisted change than the canonical status read path.

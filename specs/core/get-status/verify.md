@@ -311,6 +311,15 @@
 - **WHEN** the use case is constructed
 - **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, `LifecycleEngine`, and `RefreshImplementationTracking`
 
+### Requirement: Config-based factory preserves complete repository bootstrap
+
+#### Scenario: Config-wired status path preserves schema-driven artifact-state derivation
+
+- **GIVEN** `createGetStatus(config)` wires `GetStatus` from `SpecdConfig`
+- **WHEN** `GetStatus.execute()` loads a persisted change whose artifact-state derivation depends on schema-driven artifact-type behavior
+- **THEN** the returned artifact statuses reflect complete schema-driven artifact-state derivation for that change
+- **AND** the config-based factory does not report status through a weaker or partial repository bootstrap path
+
 ### Requirement: Identifies blockers
 
 #### Scenario: Blockers are surfaced from lifecycle interpretation

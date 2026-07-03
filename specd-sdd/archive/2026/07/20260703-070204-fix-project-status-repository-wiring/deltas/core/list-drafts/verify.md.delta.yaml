@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add verification for complete canonical change repository bootstrap in draft listing'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Returns an empty array when no drafted changes exist$'
+  content: |
+    ### Requirement: Config-based factory preserves complete change repository bootstrap
+
+    #### Scenario: Config-wired draft listing preserves artifact-type repository semantics
+
+    - **GIVEN** `createListDrafts(config)` initializes a `ChangeRepository` from `SpecdConfig`
+    - **WHEN** `ListDrafts.execute()` reads drafted changes through that repository
+    - **THEN** draft artifact states are derived with complete artifact-type and spec-existence bootstrap semantics
+    - **AND** the config-based factory does not expose a weaker change repository variant

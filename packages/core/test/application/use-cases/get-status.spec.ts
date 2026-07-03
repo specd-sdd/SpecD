@@ -4,6 +4,7 @@ import { RefreshImplementationTracking } from '../../../src/application/use-case
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
+import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { VALID_TRANSITIONS } from '../../../src/domain/value-objects/change-state.js'
 import { type Schema } from '../../../src/domain/value-objects/schema.js'
 import { LifecycleEngine } from '../../../src/domain/services/lifecycle-engine.js'
@@ -263,6 +264,184 @@ describe('GetStatus', () => {
       // When schema fails, GetStatus returns an empty array now because of the try/catch block
       // Wait, let's check GetStatus implementation again.
       expect(result.artifactStatuses).toEqual([])
+    })
+  })
+
+  describe('task checklist preservation', () => {
+    it('does not reset or invalidate completed tasks when retrieving status', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+
+      const tasksArtifact = new ChangeArtifact({ type: 'tasks' })
+      tasksArtifact.setFile(
+        new ArtifactFile({ key: 'tasks', filename: 'tasks.md', status: 'complete' }),
+      )
+      change.setArtifact(tasksArtifact)
+
+      const changesRepo = makeChangeRepository([change])
+      vi.spyOn(changesRepo, 'artifact').mockResolvedValue(
+        new SpecArtifact(
+          'tasks.md',
+          '# Tasks\n- [x] 1.1 Completed Task\n- [ ] 1.2 Incomplete Task',
+        ),
+      )
+
+      const schema = makeSchema([
+        makeArtifactType('proposal'),
+        makeArtifactType('tasks', {
+          hasTasks: true,
+          taskCompletionCheck: {
+            incompletePattern: '^\\s*-\\s*\\[ \\]\\s+',
+            completePattern: '^\\s*-\\s*\\[x\\]\\s+',
+          },
+        }),
+      ])
+
+      const uc = makeGetStatus(changesRepo, { schema })
+      const result = await uc.execute({ name: 'my-change' })
+
+      const tasksStatus = result.artifactStatuses.find((a) => a.type === 'tasks')
+      expect(tasksStatus?.taskCompletion).toEqual({
+        complete: 1,
+        incomplete: 1,
+        total: 2,
+      })
+    })
+  })
+
+  describe('missing application-level test requirements', () => {
+    it('cascades effectiveStatus to required dependencies', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+
+      const proposal = new ChangeArtifact({ type: 'proposal' })
+      proposal.setFile(
+        new ArtifactFile({ key: 'proposal', filename: 'proposal.md', status: 'in-progress' }),
+      )
+      change.setArtifact(proposal)
+
+      const specs = new ChangeArtifact({ type: 'specs' })
+      specs.setFile(
+        new ArtifactFile({
+          key: 'auth/login',
+          filename: 'specs/auth/login/spec.md',
+          status: 'complete',
+          validatedHash: 'hash',
+        }),
+      )
+      change.setArtifact(specs)
+
+      const schema = makeSchema([
+        makeArtifactType('proposal'),
+        makeArtifactType('specs', { scope: 'spec', requires: ['proposal'] }),
+      ])
+
+      const uc = makeGetStatus(makeChangeRepository([change]), { schema })
+      const result = await uc.execute({ name: 'my-change' })
+
+      const proposalStatus = result.artifactStatuses.find((a) => a.type === 'proposal')
+      const specsStatus = result.artifactStatuses.find((a) => a.type === 'specs')
+
+      expect(proposalStatus?.state).toBe('in-progress')
+      expect(proposalStatus?.effectiveStatus).toBe('in-progress')
+
+      expect(specsStatus?.state).toBe('complete')
+      expect(specsStatus?.effectiveStatus).toBe('in-progress')
+    })
+
+    it('aggregates displayStatus using precedence (complete-with-drift)', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+
+      const specs = new ChangeArtifact({ type: 'specs' })
+
+      const file1 = new ArtifactFile({
+        key: 'auth/login',
+        filename: 'specs/auth/login/spec.md',
+        status: 'complete',
+        validatedHash: 'hash',
+      })
+      const file2 = new ArtifactFile({
+        key: 'auth/logout',
+        filename: 'specs/auth/logout/spec.md',
+        status: 'complete',
+        hasDrift: true,
+        validatedHash: 'hash2',
+      })
+
+      specs.setFile(file1)
+      specs.setFile(file2)
+      change.setArtifact(specs)
+
+      const schema = makeSchema([makeArtifactType('specs', { scope: 'spec' })])
+
+      const uc = makeGetStatus(makeChangeRepository([change]), { schema })
+      const result = await uc.execute({ name: 'my-change' })
+
+      const specsStatus = result.artifactStatuses.find((a) => a.type === 'specs')
+      expect(specsStatus?.displayStatus).toBe('complete-with-drift')
+    })
+
+    it('asserts that machine blocker codes ARTIFACT_DRIFT and REVIEW_REQUIRED are correctly projected', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+
+      const proposal = new ChangeArtifact({ type: 'proposal' })
+      proposal.setFile(
+        new ArtifactFile({
+          key: 'proposal',
+          filename: 'proposal.md',
+          status: 'drifted-pending-review',
+          hasDrift: true,
+          validatedHash: 'hash',
+        }),
+      )
+      change.setArtifact(proposal)
+
+      const uc = makeGetStatus(makeChangeRepository([change]))
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.blockers.some((b) => b.code === 'ARTIFACT_DRIFT')).toBe(true)
+
+      const change2 = makeChange('my-change-2')
+      change2.transition('designing', testActor)
+
+      const proposal2 = new ChangeArtifact({ type: 'proposal' })
+      proposal2.setFile(
+        new ArtifactFile({
+          key: 'proposal',
+          filename: 'proposal.md',
+          status: 'pending-review',
+          validatedHash: 'hash',
+        }),
+      )
+      change2.setArtifact(proposal2)
+
+      const uc2 = makeGetStatus(makeChangeRepository([change2]))
+      const result2 = await uc2.execute({ name: 'my-change-2' })
+
+      expect(result2.blockers.some((b) => b.code === 'REVIEW_REQUIRED')).toBe(true)
+    })
+
+    it('projects read-only views with empty transitions for drafted changes', async () => {
+      const change = makeChange('my-change')
+      change.transition('designing', testActor)
+      change.draft(testActor)
+
+      const repo = makeChangeRepository()
+      repo.store.set(change.name, change)
+
+      const uc = makeGetStatus(repo)
+      const result = await uc.execute({ name: 'my-change' })
+
+      expect(result.change).toBeUndefined()
+      expect(result.draftView).toBeDefined()
+      expect(result.draftView?.name).toBe('my-change')
+
+      expect(result.lifecycle.validTransitions).toEqual([])
+      expect(result.lifecycle.availableTransitions).toEqual([])
+      expect(result.lifecycle.blockers).toEqual([])
+      expect(result.lifecycle.nextArtifact).toBeNull()
     })
   })
 })

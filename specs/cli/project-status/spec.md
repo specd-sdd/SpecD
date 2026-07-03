@@ -123,6 +123,12 @@ When `--format toon` is provided, output MUST be TOON-formatted.
 
 The command MUST obtain host context via `openSpecdHost` from `@specd/sdk` (directly or through `resolveCliContext`). Project summary, approval flags, and graph snapshot orchestration MUST use the returned `SdkHostContext`.
 
+### Requirement: No direct repository bootstrap in command handler
+
+The `project status` command handler MUST obtain repository-backed project information only through the SDK host context and its project queries.
+
+The handler MUST NOT construct `ChangeRepository` or `SpecRepository` instances directly, and it MUST NOT assemble an alternate read path whose repository bootstrap semantics differ from the canonical composition-backed status flow.
+
 ## Constraints
 
 - The command MUST NOT auto-index the graph — callers decide whether to index

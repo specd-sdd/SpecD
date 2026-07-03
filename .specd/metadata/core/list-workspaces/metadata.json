@@ -23,6 +23,12 @@
       "rules": [
         "The use case MUST include every workspace declared in the `specd.yaml` (or its local overrides). If a workspace is configured but its repository cannot be initialized, the use case SHALL still include the workspace in the list but MAY mark the repository as unavailable or throw a project-level initialization error, depending on the failure severity."
       ]
+    },
+    {
+      "requirement": "Config-based factory preserves canonical spec repository bootstrap",
+      "rules": [
+        "When `createListWorkspaces(config)` initializes `SpecRepository` instances from `SpecdConfig`, each repository MUST be bootstrapped with canonical metadata-path semantics for that workspace.\n\nThe config-based factory MUST NOT derive a weaker or divergent metadata lookup strategy than the canonical repository bootstrap used by the composition layer. Status and context consumers that receive `ProjectWorkspace.specRepo` from `ListWorkspaces` MUST observe a complete and stable spec repository view."
+      ]
     }
   ],
   "constraints": [
@@ -66,37 +72,43 @@
       "given": ["specd.yaml declares five workspaces"],
       "when": ["ListWorkspaces.execute() is called"],
       "then": ["exactly five ProjectWorkspace entities are returned"]
+    },
+    {
+      "requirement": "Config-based factory preserves canonical spec repository bootstrap",
+      "name": "Config-wired workspace repositories use canonical metadata-path semantics",
+      "given": [
+        "createListWorkspaces(config) initializes workspace spec repositories from SpecdConfig"
+      ],
+      "when": ["ListWorkspaces.execute() returns ProjectWorkspace.specRepo"],
+      "then": [
+        "each returned repository uses canonical metadata-path semantics for that workspace",
+        "AND the config-based factory does not expose a weaker spec repository view than the canonical composition bootstrap"
+      ]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "core:list-workspaces",
-        "file": "core:src/composition/kernel.ts"
-      },
-      {
-        "specId": "core:list-workspaces",
-        "file": "core:src/application/index.ts"
+        "file": "core:test/composition/shared-repository-wiring.spec.ts"
       }
     ],
     "symbols": [
       {
         "specId": "core:list-workspaces",
-        "file": "core:src/application/use-cases/list-workspaces.ts",
-        "symbol": "ProjectWorkspace"
+        "file": "core:src/composition/shared-repository-wiring.ts",
+        "symbol": "createSharedSpecRepositories"
       },
       {
         "specId": "core:list-workspaces",
-        "file": "core:src/application/use-cases/list-workspaces.ts",
-        "symbol": "ListWorkspaces"
+        "file": "core:src/composition/use-cases/list-workspaces.ts",
+        "symbol": "createListWorkspaces"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:693742077c5c7ca4b493b8d82937703af0d8b51f462c6ddc86d2509837b600d0",
-    "verify.md": "sha256:37de401fb74c8735b759e8c3c8ec935b77ff6a00c72287a01fd3ee76142c12ef"
+    "spec.md": "sha256:7c92ae52449579c21a78db2b41c91f1ec670da6397033f343212a7b131ed8a8a",
+    "verify.md": "sha256:0734f7720b825bc80d3edd56236420f46bb338ee2c5ea380f7ca27852d0c27c3"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "The project configuration defines workspaces as isolated units of specs, code, and ownership, but consumers need a unified way to discover and…",
-  "optimizedContext": "# List Workspaces\n\n## Rules\n- Orchestrate workspaces with repositories: ListWorkspaces.execute() SHALL iterate through all workspaces defined in the project configuration and pair each one with its corresponding SpecRepository instance.\n- ProjectWorkspace entity properties: Each ProjectWorkspace entity MUST include the following immutable properties derived from the project configuration and kernel internals: - name — the unique workspace identifier…\n- Handle all configured workspaces: The use case MUST include every workspace declared in the specd.yaml (or its local overrides).\n- Dependencies: core:config, core:workspace, core:spec-repository-port\n\n## Constraints\n- The use case MUST NOT modify the configuration or the repository states.\n- The ProjectWorkspace entity SHALL be considered a read-only view of the project structure for high-level orchestration.\n- The use case SHALL NOT pre-load any spec content or metadata; it only provides access to the repository ports.\n"
+  "generatedBy": "core"
 }
