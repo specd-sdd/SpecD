@@ -1,0 +1,753 @@
+{
+  "name": "fix-change-repository-write-on-read",
+  "createdAt": "2026-07-02T07:50:37.295Z",
+  "description": "This change decouples manifest write operations from change repository read paths, preventing side effects during ordinary reads (e.g. status commands). When drift or sync updates are detected during a read by an initialized repository, the invalidation is safely written under a process-level change lock. Uninitialized repositories bypass drift checking and status derivation entirely, preventing disk writes and state corruption.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:storage", "core:change-repository-port"],
+  "specDependsOn": {
+    "core:storage": [
+      "default:_global/architecture",
+      "core:change",
+      "core:change-manifest",
+      "default:_global/logging"
+    ],
+    "core:change-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:read-only-change-view",
+      "core:drafted-change-view",
+      "core:discarded-change-view",
+      "core:drafted-change-read-only-error",
+      "core:storage",
+      "core:change-manifest",
+      "default:_global/logging"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config-writer-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/resolve-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/create-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/discard-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/draft-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-active-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-status/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/restore-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-registry-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/transition-change/metadata.json",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "FsChangeRepository",
+        "_getInternal",
+        "_manifestToChange",
+        "get",
+        "mutate",
+        "list"
+      ]
+    },
+    {
+      "specId": "core:storage",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["_manifestToChange", "_ensureArtifactTypes"]
+    },
+    {
+      "specId": "core:core/change-repository",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["_manifestToChange", "_getInternal", "get", "mutate", "list"]
+    },
+    {
+      "specId": "core:core/change-repository",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:4c441f8617c4d99525809d993a31f0505bb9015ea20366494aabeed16ab33c22"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:storage",
+          "filename": "deltas/core/storage/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3c66cfa1a8c708d0db018d7c8214d48cf2708e0ccf72cee768c71d3a4c6ad88d"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:66c4cb1259152c6bcd36200a0c056c6c4591c87377000ad36c93b2ebb2bdd347"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:storage",
+          "filename": "deltas/core/storage/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8266b8a5a8f722884002d2b202d0660a26404d4902e65a35d94c405096e7f879"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:851f812ee1084e76a0351dbe7c07ed85cad5ac45e2914476e932f00db085a769"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:6331100327ec299758d184a3fc706feb8588a596488c7e290fadfe6752eb41bd"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:bedfcfe635511c129123b959ec6445e8fdb4acd836d88c7e7b514f4318f3acac"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-02T07:50:37.295Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:storage", "core:change-repository-port"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-02T07:50:37.309Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:storage"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:storage"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T07:54:48.116Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T08:10:16.249Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T08:11:38.165Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T08:22:39.555Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T08:36:50.816Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T08:36:50.816Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T08:37:25.548Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T08:39:06.536Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T08:39:06.536Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T08:39:31.535Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T08:41:56.278Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T08:41:56.278Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T08:42:05.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T11:20:48.754Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T11:20:48.754Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T11:20:58.215Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T11:25:20.070Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:change-repository-port]; verify [core:change-repository-port]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change-repository-port"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T11:25:20.070Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T11:25:38.509Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-02T11:25:59.182Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:storage", "core:change-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T11:25:59.182Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-02T11:26:18.623Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T09:06:11.762Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T13:50:15.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T14:12:33.258Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T14:12:50.088Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-03T14:24:11.401Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "This change decouples manifest write operations from change repository read paths, preventing side effects during ordinary reads (e.g. status commands). When drift or sync updates are detected during a read by an initialized repository, the invalidation is safely written under a process-level change lock. Uninitialized repositories bypass drift checking and status derivation entirely, preventing disk writes and state corruption."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-03T14:24:47.248Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation sidecar updates would touch specs outside the change \"fix-change-repository-write-on-read\" scope (core:core/change-repository). Re-run with --allow-out-of-scope if intentional.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T14:26:21.094Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-03T14:26:21.145Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

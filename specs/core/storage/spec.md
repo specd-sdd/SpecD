@@ -25,6 +25,8 @@ Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derive
 
 "Cleaned hash" means: read the file content, apply the artifact type's `preHashCleanup` rules in order (the same rules `ValidateArtifacts` applies before computing `validatedHash`), then compute SHA-256 of the result. `FsChangeRepository` must have access to the schema's artifact types at load time so that it can retrieve the `preHashCleanup` array for each artifact type. If no `preHashCleanup` rules are defined for an artifact type, the raw content is hashed directly.
 
+To prevent false-drift detection and unnecessary write operations on uninitialized repositories, status derivation (including comparing current hashes to `validatedHash`) and drift invalidations must only be performed when the repository is fully initialized with resolved artifact types (i.e. `artifactTypes.length > 0`). If the repository is not initialized with artifact types, drift detection is bypassed.
+
 ### Requirement: Artifact dependency cascade
 
 `Change.effectiveStatus(type)` must cascade through the artifact dependency graph. An artifact whose own hash matches its `validatedHash` must still be reported as `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`. A `skipped` optional artifact satisfies the dependency — it does not block downstream artifacts.

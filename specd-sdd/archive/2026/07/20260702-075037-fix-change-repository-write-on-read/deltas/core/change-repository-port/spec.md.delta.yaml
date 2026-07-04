@@ -1,0 +1,87 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: get returns a Change or null'
+  content: |
+    `get(name)` MUST resolve the change name **only** under active storage (`changes/`). It MUST NOT search `drafts/` or `discarded/`.
+
+    When a change with the given name exists only as drafted, `get(name)` MUST return `null`.
+
+    When a change exists in active storage, `get(name)` MUST return the `Change` with artifact and file states loaded from the persisted manifest. If an artifact or file entry omits `state`, the repository defaults that missing value to `missing` while loading.
+
+    `validatedHash` is still loaded with the artifact data, but hash comparison is not the sole source of truth for steady-state status. The repository MAY detect drift and persist updated file and artifact states before returning (see Requirement: Auto-invalidation on get when artifact files drift).
+
+    `get()` is a snapshot read for **active** changes. It MAY auto-invalidate and persist drifted artifacts under the repository's change lock (`_withChangeLock`) before returning, but it MUST NOT be the repository's serialized mutation primitive. Callers that need a coordinated read-modify-write section for an existing active change MUST use `mutate(name, fn)` instead of relying on a later `save()` against a stale snapshot.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Auto-invalidation on get when artifact files drift'
+  content: |
+    The `FsChangeRepository` implementation of `get()` MUST detect artifact file drift and auto-invalidate the change when appropriate, provided that the repository is fully initialized with resolved artifact types. After loading a change, the repository compares the current cleaned file hash against each file's stored `validatedHash` for files that were previously validated. If the repository is not initialized with artifact types, drift detection is bypassed.
+
+    To support clean delegation and avoid deadlocks, the core loading, status mapping, and lock-based drift invalidation/sync checks MUST be encapsulated in a single internal read path (e.g., a private helper like `_getInternal`) shared by `get()` and `mutate()`.
+
+    A file is drifted when:
+
+    - `validatedHash` is a SHA-256 value recorded by prior validation, and
+    - the current cleaned content hash no longer matches that `validatedHash`
+
+    When drift is detected, the repository MUST:
+
+    1. Acquire the repository's change lock (`_withChangeLock`) for the change name.
+    2. Inside the lock, reload the manifest from disk to ensure consistency.
+    3. If drift is still present on the reloaded state, scan the full affected artifact set first, collecting every drifted file key grouped by artifact type. It MUST NOT stop at the first mismatch.
+    4. Mark each drifted file as `drifted-pending-review`.
+    5. Recompute every affected artifact's aggregate `state`.
+    6. Invalidate the change back to `designing` using the domain invalidation mechanism, preserving `drifted-pending-review` on the drifted files and downgrading the remaining files to `pending-review`.
+    7. Persist the updated manifest inside the lock boundary before returning.
+
+    This invalidation is lifecycle-independent: if a validated file drifts, the change is invalidated back to `designing` regardless of whether the current lifecycle state is `designing`, `ready`, `implementing`, `verifying`, `done`, or `archivable`.
+
+    The invalidation history entry MUST record:
+
+    - `cause: "artifact-drift"`
+    - a clear `message`
+    - `affectedArtifacts`, including each affected artifact type and the full list of drifted file keys captured in step 3
+
+    The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) is used as the actor for these automated invalidations.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: mutate serializes persisted change updates'
+  content: |
+    `mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing **active** persisted change.
+
+    Resolution MUST use the same rules as `get(name)` — only `changes/`. If the name exists only under `drafts/`, `mutate()` MUST throw `ChangeNotFoundError`.
+
+    For a given active change name, the repository MUST:
+
+    1. Acquire exclusive mutation access scoped to that persisted change
+    2. Reload the freshest persisted `Change` state from active storage after the exclusive access is acquired, ensuring that this load operation does not trigger nested write locks or deadlocks. In filesystem-backed implementations, this reload operation MUST be performed using the internal read helper (e.g. `_getInternal(..., { skipWrite: true })`) to bypass nested locks and auto-invalidation writes, deferring all writes to the final save step.
+    3. Invoke `fn(change)` with that fresh `Change` where `change.isDrafted === false`
+    4. Persist the updated change manifest if `fn` resolves successfully
+    5. Release the exclusive access before returning or throwing
+
+    If no active change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.
+
+    If `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.
+
+    The serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.
+
+    Exclusive access is per change name, not global. Mutations targeting different change names MAY proceed concurrently.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Changes are stored globally, not per-workspace — the inherited workspace context is unused
+    - `get()` in `FsChangeRepository` may auto-invalidate and persist the change under the mutation lock before returning, if artifact drift is detected and the change is beyond `designing` or has active approvals
+    - All list methods return `Change` objects with derived artifact state but without artifact content
+    - `save()` writes the manifest only; `saveArtifact()` writes file content only — these are separate operations
+    - `ArtifactConflictError` is the sole error type for concurrent modification detection
+    - The `force` option on `saveArtifact()` bypasses conflict detection entirely
+    - `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
+    - Manifest writes MUST be atomic to prevent corruption from partial reads

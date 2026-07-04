@@ -187,5 +187,7 @@
     "spec.md": "sha256:3a4a0de823eb11f1e9ea3c88e7bf39fa2d98d15bade46ff2926e6e609cbd5901",
     "verify.md": "sha256:f85153f46da1e42281046e0e99ad268f1874d42f7f8882005fba9cdb2716004c"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "`DiscardChange` permanently abandons active or drafted change by appending `discarded` history and moving storage into `discarded/`.",
+  "optimizedContext": "# DiscardChange\n\n## Rules\n- `DiscardChangeInput` requires `name` and `reason`; accepts optional `supersededBy` and `force`.\n- Locate change from active storage via `get(name)` or, if absent, drafted storage via `getDraft(name)`; otherwise throw `ChangeNotFoundError`.\n- Resolve actor via `ActorResolver` and record it in `discarded` event.\n- Respect historical implementation guard: if change ever reached `implementing`, fail unless `force === true`.\n- Append discard history via `change.discard(reason, actor, supersededBy, force)`.\n- Persist through `ChangeRepository.mutate` for active changes or `mutateDraft` for drafted changes; repository writes manifest and relocates directory into `discarded/`.\n\n## Constraints\n- No lifecycle transition; discard is orthogonal to lifecycle state.\n- `reason` is mandatory.\n- Discarded changes are terminal; repository relocation belongs to storage adapter.\n"
 }

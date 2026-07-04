@@ -26,7 +26,7 @@
     {
       "requirement": "Artifact status derivation",
       "rules": [
-        "Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derived at load time — it must not be stored directly in the manifest. The manifest stores only `validatedHash` per artifact. `FsChangeRepository` must compute status using this precedence:\n\n1. `validatedHash === \"__skipped__\"` → `skipped` (only valid for `optional: true` artifacts)\n2. File absent (and no sentinel) → `missing`\n3. File present and cleaned hash matches `validatedHash` → `complete`\n4. File present but hash differs or `validatedHash` is `null` → `in-progress`\n\n\"Cleaned hash\" means: read the file content, apply the artifact type's `preHashCleanup` rules in order (the same rules `ValidateArtifacts` applies before computing `validatedHash`), then compute SHA-256 of the result. `FsChangeRepository` must have access to the schema's artifact types at load time so that it can retrieve the `preHashCleanup` array for each artifact type. If no `preHashCleanup` rules are defined for an artifact type, the raw content is hashed directly."
+        "Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derived at load time — it must not be stored directly in the manifest. The manifest stores only `validatedHash` per artifact. `FsChangeRepository` must compute status using this precedence:\n\n1. `validatedHash === \"__skipped__\"` → `skipped` (only valid for `optional: true` artifacts)\n2. File absent (and no sentinel) → `missing`\n3. File present and cleaned hash matches `validatedHash` → `complete`\n4. File present but hash differs or `validatedHash` is `null` → `in-progress`\n\n\"Cleaned hash\" means: read the file content, apply the artifact type's `preHashCleanup` rules in order (the same rules `ValidateArtifacts` applies before computing `validatedHash`), then compute SHA-256 of the result. `FsChangeRepository` must have access to the schema's artifact types at load time so that it can retrieve the `preHashCleanup` array for each artifact type. If no `preHashCleanup` rules are defined for an artifact type, the raw content is hashed directly.\n\nTo prevent false-drift detection and unnecessary write operations on uninitialized repositories, status derivation (including comparing current hashes to `validatedHash`) and drift invalidations must only be performed when the repository is fully initialized with resolved artifact types (i.e. `artifactTypes.length > 0`). If the repository is not initialized with artifact types, drift detection is bypassed."
       ]
     },
     {
@@ -134,36 +134,24 @@
     },
     {
       "requirement": "Artifact status derivation",
-      "name": "Artifact edited after validation",
-      "when": ["an artifact file is modified after ValidateArtifacts ran and stored its hash"],
-      "then": ["FsChangeRepository recomputes the hash on next load and returns in-progress"]
-    },
-    {
-      "requirement": "Artifact status derivation",
-      "name": "Artifact file missing",
-      "when": ["an artifact file does not exist on disk and validatedHash is null"],
-      "then": ["its status is missing"]
-    },
-    {
-      "requirement": "Artifact status derivation",
-      "name": "Artifact skipped — sentinel in manifest",
+      "name": "Valid hash matches file content",
       "given": [
-        "an optional: true artifact with validatedHash: \"__skipped__\" in the manifest and no file on disk"
+        "an artifact was validated with content some content (hash stored as validatedHash)"
       ],
-      "when": ["FsChangeRepository loads the change"],
-      "then": ["its status is skipped"]
+      "when": ["the file is loaded"],
+      "then": ["its status becomes complete"]
     },
     {
       "requirement": "Artifact status derivation",
-      "name": "validatedHash cleared on rollback — skipped becomes missing",
-      "given": ["an artifact with validatedHash: \"__skipped__\" in the manifest"],
-      "when": ["an invalidated event is appended and all validatedHash values are cleared"],
-      "then": ["its status becomes missing — the sentinel is gone and there is no file"]
+      "name": "Hash mismatch triggers in-progress status",
+      "given": ["an artifact was validated with content some content"],
+      "when": ["the file is edited to different content"],
+      "then": ["its status becomes in-progress"]
     },
     {
       "requirement": "Artifact status derivation",
-      "name": "validatedHash cleared on rollback — complete becomes in-progress",
-      "given": ["an artifact with validatedHash: \"sha256:abc\" and its file still present"],
+      "name": "Missing validatedHash defaults to in-progress",
+      "given": ["a file present on disk"],
       "when": ["all validatedHash values are cleared"],
       "then": ["its status becomes in-progress — file present but no valid hash"]
     },
@@ -202,6 +190,16 @@
       ],
       "when": ["the file content is unchanged"],
       "then": ["sha256(rawContent) === validatedHash", "AND the derived status is complete"]
+    },
+    {
+      "requirement": "Artifact status derivation",
+      "name": "Status derivation bypassed when repository is uninitialized",
+      "given": ["a repository initialized without artifact types (artifactTypes.length === 0)"],
+      "when": ["a change is loaded"],
+      "then": [
+        "drift detection and status derivation are bypassed",
+        "AND files do not report drift or trigger auto-invalidations"
+      ]
     },
     {
       "requirement": "Artifact dependency cascade",
@@ -399,11 +397,23 @@
       ]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:b8ea05b48223ef8336b9cea4569927f1025fb922838b49fb3d834ca068fb4eee",
-    "verify.md": "sha256:5bcc1fcf64ec36ca5dbaa222645fe644c0a57b3d158e74020c3797c6658678e3"
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:storage",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "_manifestToChange"
+      },
+      {
+        "specId": "core:storage",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "_ensureArtifactTypes"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Storage ports isolate persistence; defines status derivation, archive index, confinement, staged archive writes.",
-  "optimizedContext": "# Storage\n\n## Rules\n- Change directory naming: Active change directories must use format `YYYYMMDD-HHmmss-<name>`, where timestamp is moment change was created. prefix must be filesystem convention only — it must not appear in domain model, change manifest, or any CLI argument. `FsChangeRepository` must resolve change by name using glob pattern `*-<name>`.\n- Change directory listing order: `ChangeRepository.list()` must return changes in creation order (oldest first). With `fs` adapter, this is achieved by sorting directory entries by name, is chronological given timestamp prefix.\n- Artifact status derivation: Artifact status (`missing`, `in-progress`, `complete`, `skipped`) must be derived at load time — it must not be stored directly in manifest. manifest stores only `validatedHash` per artifact. `FsChangeRepository` must compute status using this precedence: `validatedHash === \"__skipped__\"` → `skipped` (only valid for `optional: true` artifacts) File absent (and no sentinel) → `missing` File present and cleaned hash matches `validatedHash` → `complete` File present but hash differs or `validatedHash` is `null` → `in-progress` \"Cleaned hash\" means: read file content, apply artifact type's `preHashCleanup` rules in order (same rules `ValidateArtifacts` applies before computing `validatedHash`), then compute SHA-256 of result. `FsChangeRepository` must have access to schema's artifact types at load time so it can retrieve `preHashCleanup` array for each artifact type. If no `preHashCleanup` rules are defined for artifact type, raw content is hashed directly.\n- Artifact dependency cascade: `Change.effectiveStatus(type)` must cascade through artifact dependency graph. artifact whose own hash matches its `validatedHash` must still be reported as `in-progress` if any artifact in its `requires` chain is neither `complete` nor `skipped`. `skipped` optional artifact satisfies dependency — it does not block downstream artifacts.\n- ValidateArtifacts is the sole path to complete: `Artifact.markComplete(hash)` must only be called by `ValidateArtifacts` use case. `Artifact.markSkipped()` must only be called by skip use case (sets `validatedHash` to `\"__skipped__\"`). No other code path may set these values.\n- Archive pattern configuration: `fs` archive adapter must support configurable `pattern` field in `specd.yaml` under `storage.archive.pattern`. pattern controls directory structure within archive root. Supported variables: `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`. default pattern must be `{{change.archivedName}}`.\n- Scope excluded from archive pattern: `{{change.scope}}` must not be supported archive pattern variable. Scope paths use `/` as segment separator, produces ambiguous slugs when normalized for use in directory names.\n- Archive index: `FsArchiveRepository` must maintain `index.jsonl` at archive root. Each line must be JSON object with `name` and `path` fields. file must be kept in chronological order (oldest first, newest last) so git diffs only show lines added at bottom or lines removed — never reorderings. `archive(change)` must append one line at end (O(1)). `get(name)` must scan file from end without loading it fully into memory; if not found, it must fall back to recursive glob `**/*-<name>` and append recovered entry. `reindex()` must be declared on `ArchiveRepository` port. `fs` adapter implements it by globbing all `manifest.json` files under archive root, sorting entries by `archivedAt`, and writing clean `index.jsonl` in chronological order. Other adapters implement it according to their storage mechanism. `specd storage reindex` calls port method — it has no knowledge of underlying implementation.\n- Archive runtime ignore hygiene: Fs-backed archive storage MUST maintain archive-local `.gitignore` for runtime archive artifacts. `FsArchiveRepository` MUST ensure archive root ignores both `.specd-index.jsonl` and `.staging`. This guarantee MUST be exercised by runtime archive behavior rather than relying on project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, or index recovery. `FsArchiveRepository` MAY centralize this behavior in shared internal archive-directory preparation helper, but runtime guarantee MUST cover archive creation, index rebuild, and runtime index recovery or append paths.\n- Named storage factories: Kernel composition SHALL support named storage factories for repository-backed capabilities. storage factory SHALL be selected by adapter name and SHALL be responsible for creating repository implementation needed for storage mode. When storage selection requires workspace-specific VCS or null-VCS handling, responsibility SHALL remain within selected storage factory rather than leaking into unrelated composition paths.\n- Archive pattern date variables are zero-padded: `{{month}}` and `{{day}}` must be zero-padded to two digits. `{{year}}` is four digits. This ensures lexicographic sort produces chronological order.\n- Change manifest format: format of `manifest.json` — its fields, event shapes, and schema version behavior — is defined in `core:change-manifest`. `FsChangeRepository` reads and writes manifest according to format and must write it atomically (temp file + rename) to prevent partial reads.\n- Repository path confinement: Fs-backed repositories MUST treat path confinement as storage invariant. Change, spec, archive, and metadata operations MUST reject any derived path would escape their configured storage root or address arbitrary untracked file outside permitted artifact set for operation.\n- Staged archive persistence: Fs-backed archive persistence MUST prefer staged commit semantics over ad hoc rollback. When archive requires multiple durable updates, storage behavior MUST prepare complete result first and only then expose committed archive result, so failures before commit do not leave partially visible permanent archive state.\n- Storage debug logging: Fs-backed repositories SHOULD emit debug-level logs for tracked artifact resolution, path-confinement rejections, staged archive commit progress, and archive failure diagnostics. These logs MUST follow project's global logging conventions.\n- Change locks directory placement: `FsChangeRepository` implementation derives its change lock directory path internally from `configPath` field: `{configPath}/tmp/change-locks`. This directory is distinct from changes storage root and allows per-change lock files to be co-located with other config-scoped temporary artifacts. `configPath` field is part of `ChangeRepositoryConfig` port contract, provided at construction time. repository derives locks directory internally as `path.join(configPath, 'tmp', 'change-locks')`.\n\n## Constraints\n- Manifest files must be written atomically (write to temp file, then rename) to prevent partial reads\n- Archive index entries must use forward slashes as path separators regardless of host OS\n- timestamp in change directory name must be derived from change.createdAt, not from system clock at write time\n"
+  "contentHashes": {
+    "spec.md": "sha256:6752d7727ef9afcbdbf9d14610497b8d3b4983c3854653b9e70144774607b71e",
+    "verify.md": "sha256:f4a99863b564dedd25f31570eb304a0871b8b7a79309a8fa3a31a728cd4e90b8"
+  },
+  "generatedBy": "core"
 }

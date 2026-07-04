@@ -17,12 +17,15 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/ports/change-repository.ts",
-      "symbols": ["ChangeRepository"]
-    },
-    {
       "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository", "saveArtifact", "artifactExists"]
+      "symbols": [
+        "FsChangeRepository",
+        "_getInternal",
+        "_manifestToChange",
+        "get",
+        "mutate",
+        "list"
+      ]
     }
   ]
 }

@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "symbols": ["_manifestToChange", "_getInternal", "get", "mutate", "list"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
+    }
+  ]
+}
