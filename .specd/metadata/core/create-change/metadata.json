@@ -5,7 +5,8 @@
     "core:change",
     "default:_global/architecture",
     "core:get-active-schema",
-    "core:spec-overlap"
+    "core:spec-overlap",
+    "core:composition-resolver"
   ],
   "context": [
     "Every spec workflow begins with a named change, so the system needs a single entry point that guarantees uniqueness and records provenance from the start. The `CreateChange` use case creates a new change entity, enforces name uniqueness, resolves the current actor, and records a single `created` event as the initial history entry."
@@ -75,6 +76,12 @@
       "requirement": "Dependencies",
       "rules": [
         "`CreateChange` depends on the following ports and use cases injected via constructor:\n\n- `ChangeRepository` — for existence checks, persistence, and scaffolding\n- `ListWorkspaces` — orchestrated workspace map for spec existence checks and persisted dependency seeding\n- `ActorResolver` — for resolving the current actor identity\n- `GetActiveSchema` — for resolving the project's active schema when `schemaName` / `schemaVersion` are not provided on input\n- `DetectOverlap` — for optional post-create overlap detection when `includeOverlapCheck` is `true`"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveCreateChangeDeps",
+      "rules": [
+        "The config-based `createCreateChange(config, options?)` form MUST derive `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)` and then delegate to canonical `createCreateChange(deps)`.\n\n`resolveCreateChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `listWorkspaces: ListWorkspaces`\n- `actor: ActorResolver`\n- `getActiveSchema: GetActiveSchema`\n- `detectOverlap: DetectOverlap`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -324,22 +331,30 @@
       "name": "Uses DetectOverlap for optional overlap check",
       "when": ["CreateChange is instantiated"],
       "then": ["it requires a DetectOverlap use case in its constructor"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveCreateChangeDeps",
+      "name": "createCreateChange config form derives CreateChangeDeps through resolveCreateChangeDeps",
+      "when": ["createCreateChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives CreateChangeDeps through resolveCreateChangeDeps(resolver)",
+        "AND resolveCreateChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createCreateChange(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:create-change",
-        "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
-        "symbol": "loadPersistedSpecDependsOn"
+        "file": "core:src/composition/use-cases/create-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c41dbcfaf1d4e798301615fd831eb63d7d2f4239b152553d514756e7ee5773e8",
-    "verify.md": "sha256:cc12c9aef4804dd27c34c16edae8cb761415e293fd4bfd521136b60e6f89cd2d"
+    "spec.md": "sha256:b541a78c736528e7150ff05fcabeec43f202755f085c87520fb23026c7510d58",
+    "verify.md": "sha256:1a322f8c983feb54906e6a6a3f9b66cae036b9e4b0bdf15205dd13d6c1a45dbb"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`CreateChange` creates unique drafted change, resolves schema and actor, seeds `specDependsOn`, scaffolds artifacts, optionally returns overlap report.",
-  "optimizedContext": "# CreateChange\n\n## Rules\n- `CreateChangeInput` requires `name` and `specIds`; accepts optional `description`, `schemaName`, `schemaVersion`, `invalidationPolicy`, `includeOverlapCheck`.\n- If both schema override fields absent, call `GetActiveSchema.execute()` and derive effective schema from returned `Schema`; if only one override field present, reject before persistence.\n- Persist initial invalidation policy as one of `none`, `surgical`, `downstream`, `global`.\n- Enforce unique name via `ChangeRepository`; resolve actor via `ActorResolver`.\n- Append exactly one `created` event with `at`, `by`, `specIds`, effective `schemaName`, effective `schemaVersion`.\n- Seed `change.specDependsOn` per existing spec from `readPersistedDependsOn(spec)`, else canonical `metadata.json.dependsOn`, else `[]`; non-existing specs need no seeded entry.\n- Persist via `ChangeRepository.save`, scaffold via `ChangeRepository.scaffold(change, specExists)`, return `{ change, changePath, overlapReport? }`.\n- If `includeOverlapCheck === true` and `specIds` non-empty, run `DetectOverlap.execute({ name: input.name })` after scaffold; include report when successful, omit when detector fails.\n\n## Constraints\n- No lifecycle transition; new change starts `drafting`.\n- No artifact file reads or writes beyond scaffold directory creation.\n- `created.at` and `Change.createdAt` use same `Date` instance.\n"
+  "generatedBy": "core"
 }

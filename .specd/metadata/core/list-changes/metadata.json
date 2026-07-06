@@ -1,7 +1,7 @@
 {
   "title": "ListChanges",
   "description": "Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically. The `ListChanges` use case retrieves all active changes — those that have not been drafted or discarded — from the default workspace, sorted by creation order.",
-  "dependsOn": ["core:change", "core:kernel"],
+  "dependsOn": ["core:change", "core:kernel", "core:composition-resolver"],
   "context": [
     "Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically. The `ListChanges` use case retrieves all active changes — those that have not been drafted or discarded — from the default workspace, sorted by creation order."
   ],
@@ -34,6 +34,12 @@
       "requirement": "Config-based factory preserves complete change repository bootstrap",
       "rules": [
         "When `createListChanges(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.\n\nThe config-based factory MUST NOT construct a weaker repository variant that can derive different artifact states for the same persisted change than the canonical status/listing read path."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListChangesDeps",
+      "rules": [
+        "The config-based `createListChanges(config, options?)` form MUST derive `ListChangesDeps` through `resolveListChangesDeps(resolver)` and then delegate to canonical `createListChanges(deps)`.\n\n`resolveListChangesDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -94,20 +100,30 @@
         "artifact states are derived with complete artifact-type and spec-existence bootstrap semantics",
         "AND the config-based factory does not expose a weaker change repository variant"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListChangesDeps",
+      "name": "createListChanges config form derives ListChangesDeps through resolveListChangesDeps",
+      "when": ["createListChanges(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ListChangesDeps through resolveListChangesDeps(resolver)",
+        "AND resolveListChangesDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createListChanges(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:list-changes",
-        "file": "core:src/composition/use-cases/list-changes.ts",
-        "symbol": "createListChanges"
+        "file": "core:src/composition/use-cases/list-changes.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f2b3bfebf561632711f5e523ec2f08b62a7ea74298d1fac78c6a4af25930c0ea",
-    "verify.md": "sha256:0c1da317c9a0b9e63a92abd69d9f2e0b804b518e80f2ca7167e713e507d84c5a"
+    "spec.md": "sha256:4069c7a2c64ac5554cfc122ffbc6ecbdb9fc7fc1b8ec3624b43987e79ebf92b0",
+    "verify.md": "sha256:b03d83935bbde89225e3b9366c1224c6a5534a538b679db2ec97a7c3fa7c496a"
   },
   "generatedBy": "core"
 }

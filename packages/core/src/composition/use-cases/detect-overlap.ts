@@ -1,69 +1,94 @@
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { DetectOverlap } from '../../application/use-cases/detect-overlap.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createDetectOverlap(context, options)`. */
-export interface DetectOverlapContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createDetectOverlap(context, options)`. */
-export interface FsDetectOverlapOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
+/**
+ * Explicit dependencies for {@link createDetectOverlap}.
+ */
+export interface DetectOverlapDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
 }
 
 /**
- * Constructs a `DetectOverlap` use case with full project config.
+ * Resolves {@link DetectOverlapDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `DetectOverlap`
+ */
+export function resolveDetectOverlapDeps(resolver: CompositionResolver): DetectOverlapDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+  }
+}
+
+/**
+ * Constructs `DetectOverlap` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createDetectOverlap(deps: DetectOverlapDeps): DetectOverlap
+/**
+ * Constructs `DetectOverlap` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createDetectOverlap(config: SpecdConfig): DetectOverlap
-/**
- * Constructs a `DetectOverlap` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for change resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createDetectOverlap(
-  context: DetectOverlapContext,
-  options: FsDetectOverlapOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): DetectOverlap
 /**
- * Constructs a `DetectOverlap` instance wired with filesystem adapters.
+ * Constructs `DetectOverlap` from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createDetectOverlap(
-  configOrContext: SpecdConfig | DetectOverlapContext,
-  options?: FsDetectOverlapOptions,
+  depsOrConfig: DetectOverlapDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): DetectOverlap {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    return createDetectOverlap(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createDetectOverlap',
+    depsOrConfig,
+    options,
+    isDetectOverlapDeps,
+  )
+  return createDetectOverlapFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `DetectOverlap` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createDetectOverlapFromNormalized(
+  input: FactoryInput<DetectOverlapDeps, CompositionResolutionOptions>,
+): DetectOverlap {
+  if (input.kind === 'deps') {
+    return new DetectOverlap(input.deps.changes)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  return new DetectOverlap(changeRepo)
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createDetectOverlap(resolveDetectOverlapDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `DetectOverlapDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isDetectOverlapDeps(value: DetectOverlapDeps | SpecdConfig): value is DetectOverlapDeps {
+  return 'changes' in value
 }

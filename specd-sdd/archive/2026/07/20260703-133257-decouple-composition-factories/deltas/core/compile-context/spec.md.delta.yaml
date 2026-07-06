@@ -1,0 +1,65 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveCompileContextDeps
+
+    The config-based `createCompileContext(config, options?)` form MUST derive `CompileContextDeps` through `resolveCompileContextDeps(resolver)` and then delegate to canonical `createCompileContext(deps)`.
+
+    `resolveCompileContextDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `schemaProvider: SchemaProvider`
+    - `files: FileReader`
+    - `parsers: ArtifactParserRegistry`
+    - `hasher: ContentHasher`
+    - `previewSpec: PreviewSpec`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+    - `lifecycle: LifecycleEngine`
+    - `defaultConfig: CompileContextConfig`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Clarify that top-level step availability follows the full lifecycle-engine availability verdict'
+  selector:
+    type: section
+    matches: 'Requirement: Step availability'
+  content: |
+    `CompileContext` must evaluate whether the requested step is available for the current change using `LifecycleEngine`.
+
+    A step is considered available when the engine determines that the step is both:
+
+    - **ready** — all required artifacts are effectively `complete` or `skipped`
+    - **permitted** — the lifecycle protocol allows entry into that step under the current transition and approval state
+
+    A skipped optional artifact satisfies the requirement in the same way a completed artifact does.
+
+    If the step is not available, `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
+
+    For backward compatibility, the top-level `stepAvailable` and `blockingArtifacts` fields remain part of the result. `stepAvailable` MUST mirror the lifecycle-engine `available` verdict for the requested step rather than `isReady` alone. The richer per-step blocker diagnostics are exposed through `availableSteps`.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:config`](../config/spec.md)
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:delta-format`](../delta-format/spec.md)
+    - [`core:selector-model`](../selector-model/spec.md)
+    - [`core:spec-id-format`](../spec-id-format/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md)
+    - [`core:get-hook-instructions`](../get-hook-instructions/spec.md)
+    - [`core:preview-spec`](../preview-spec/spec.md)
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+    - [`core:core/project-metadata`](../core/project-metadata/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

@@ -1,5 +1,5 @@
 import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
-import { type VcsProvider } from './kernel-registries.js'
+import { type VcsProvider } from './vcs-provider.js'
 import { GitVcsAdapter } from '../infrastructure/git/vcs-adapter.js'
 import { HgVcsAdapter } from '../infrastructure/hg/vcs-adapter.js'
 import { SvnVcsAdapter } from '../infrastructure/svn/vcs-adapter.js'

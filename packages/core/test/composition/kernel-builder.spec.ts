@@ -120,7 +120,6 @@ describe('createKernelBuilder', () => {
   it('builds kernels with createKernel-equivalent registry contents', async () => {
     const config = await makeConfig()
     const remoteSpecFactory = { create: vi.fn() }
-    const remoteGraphStoreFactory = { create: vi.fn() }
     const vcsProvider = { name: 'custom-vcs', detect: vi.fn(async () => null) }
     const actorProvider = {
       name: 'custom-actor',
@@ -135,8 +134,6 @@ describe('createKernelBuilder', () => {
 
     const direct = await createKernel(config, {
       specStorageFactories: { remote: remoteSpecFactory },
-      graphStoreFactories: { remote: remoteGraphStoreFactory },
-      graphStoreId: 'sqlite',
       parsers: { toml: TOML_PARSER },
       extractorTransforms: { trim: trimTransform },
       vcsProviders: [vcsProvider],
@@ -146,8 +143,6 @@ describe('createKernelBuilder', () => {
 
     const built = await createKernelBuilder(config)
       .registerSpecStorage('remote', remoteSpecFactory)
-      .registerGraphStore('remote', remoteGraphStoreFactory)
-      .useGraphStore('sqlite')
       .registerParser('toml', TOML_PARSER)
       .registerExtractorTransform('trim', trimTransform)
       .registerVcsProvider(vcsProvider)
@@ -158,7 +153,6 @@ describe('createKernelBuilder', () => {
     expect([...built.registry.storages.specs.keys()]).toEqual([
       ...direct.registry.storages.specs.keys(),
     ])
-    expect([...built.registry.graphStores.keys()]).toEqual([...direct.registry.graphStores.keys()])
     expect([...built.registry.parsers.keys()]).toEqual([...direct.registry.parsers.keys()])
     expect([...built.registry.extractorTransforms.keys()]).toEqual([
       ...direct.registry.extractorTransforms.keys(),
@@ -191,12 +185,6 @@ describe('createKernelBuilder', () => {
         .registerExtractorTransform('trim', (value) => value)
         .registerExtractorTransform('trim', (value) => value),
     ).toThrow(RegistryConflictError)
-    expect(() =>
-      createKernelBuilder(config).registerGraphStore('sqlite', { create: vi.fn() }),
-    ).toThrow(RegistryConflictError)
-    expect(() => createKernelBuilder(config).useGraphStore('missing')).toThrow(
-      "graph store 'missing' is not registered",
-    )
   })
 
   it('accepts base registration state and extends it', async () => {
@@ -211,5 +199,13 @@ describe('createKernelBuilder', () => {
     expect(kernel.registry.vcsProviders.map((p) => p.name)).toEqual(
       expect.arrayContaining(['base-vcs', 'extra-vcs', 'git', 'hg', 'svn']),
     )
+  })
+
+  it('does not expose graph-store builder methods on the fluent contract', async () => {
+    const config = await makeConfig()
+    const builder = createKernelBuilder(config) as unknown as Record<string, unknown>
+
+    expect(builder.registerGraphStore).toBeUndefined()
+    expect(builder.useGraphStore).toBeUndefined()
   })
 })

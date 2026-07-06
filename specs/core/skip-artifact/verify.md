@@ -57,3 +57,15 @@
 - **THEN** `ChangeRepository.mutate(input.name, fn)` is called with the target change name
 - **AND** the callback records the skip and marks the artifact skipped on the fresh persisted `Change`
 - **AND** the returned value is the `Change` entity
+
+### Requirement: Config-based factory delegates through resolveSkipArtifactDeps
+
+#### Scenario: createSkipArtifact config form derives SkipArtifactDeps through resolveSkipArtifactDeps
+
+- **WHEN** `createSkipArtifact(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `SkipArtifactDeps` through `resolveSkipArtifactDeps(resolver)`
+- **AND** `resolveSkipArtifactDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- **AND** the factory delegates to canonical `createSkipArtifact(deps)`

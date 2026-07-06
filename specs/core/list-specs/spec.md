@@ -56,6 +56,18 @@ Optional fields (`summary`, `metadataStatus`) MUST only be present when explicit
 
 When workspace filtering is active, the result array contains entries only from the filtered workspaces. Callers that need all configured workspace names (including those with no matching specs) MUST consult the config directly.
 
+### Requirement: Config-based factory delegates through resolveListSpecsDeps
+
+The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.
+
+`resolveListSpecsDeps(resolver)` MUST resolve:
+
+- `listWorkspaces: ListWorkspaces`
+- `hasher: ContentHasher`
+- `yaml: YamlSerializer`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT modify the repositories.
@@ -64,8 +76,9 @@ When workspace filtering is active, the result array contains entries only from 
 
 ## Spec Dependencies
 
-- [`core:spec-metadata`](../spec-metadata/spec.md) — title and summary metadata model used in list output
-- [`core:content-extraction`](../content-extraction/spec.md) — summary extraction semantics
-- [`core:storage`](../storage/spec.md) — repository traversal and persistence layout assumptions
-- [`core:workspace`](../workspace/spec.md) — workspace identity carried in list results
-- [`core:list-workspaces`](../list-workspaces/spec.md) — orchestrated workspace source used for enumeration
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:content-extraction`](../content-extraction/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:list-workspaces`](../list-workspaces/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

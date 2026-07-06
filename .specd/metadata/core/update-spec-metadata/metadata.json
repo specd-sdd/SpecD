@@ -1,7 +1,7 @@
 {
   "title": "core:update-spec-metadata",
   "description": "Agents and external tools that generate LLM-optimized metadata need a safe way to save these fields without managing the entire machine-readable summary or risking overwriting deterministic fields. The `UpdateSpecMetadata` use case performs a fresh deterministic extraction of spec metadata and merges it with agent-provided optimized fields before persisting, ensuring the metadata file is always up-to-date and consistent.",
-  "dependsOn": ["core:spec-metadata", "core:save-spec-metadata"],
+  "dependsOn": ["core:spec-metadata", "core:save-spec-metadata", "core:composition-resolver"],
   "context": [
     "Agents and external tools that generate LLM-optimized metadata need a safe way to save these fields without managing the entire machine-readable summary or risking overwriting deterministic fields. The `UpdateSpecMetadata` use case performs a fresh deterministic extraction of spec metadata and merges it with agent-provided optimized fields before persisting, ensuring the metadata file is always up-to-date and consistent."
   ],
@@ -22,6 +22,12 @@
       "requirement": "Persistence",
       "rules": [
         "The resulting merged metadata SHALL be validated against `strictSpecMetadataSchema` and persisted via `SaveSpecMetadata`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateSpecMetadataDeps",
+      "rules": [
+        "The config-based `createUpdateSpecMetadata(config, options?)` form MUST derive `UpdateSpecMetadataDeps` through `resolveUpdateSpecMetadataDeps(resolver)` and then delegate to canonical `createUpdateSpecMetadata(deps)`.\n\n`resolveUpdateSpecMetadataDeps(resolver)` MUST resolve:\n\n- `generateMetadata: GenerateSpecMetadata`\n- `saveMetadata: SaveSpecMetadata`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -51,30 +57,30 @@
       "name": "Merged metadata is saved",
       "when": ["UpdateSpecMetadata completes the merge"],
       "then": ["it calls SaveSpecMetadata with the complete merged object"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateSpecMetadataDeps",
+      "name": "createUpdateSpecMetadata config form derives UpdateSpecMetadataDeps through resolveUpdateSpecMetadataDeps",
+      "when": ["createUpdateSpecMetadata(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives UpdateSpecMetadataDeps through resolveUpdateSpecMetadataDeps(resolver)",
+        "AND resolveUpdateSpecMetadataDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createUpdateSpecMetadata(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:update-spec-metadata",
-        "file": "core:src/application/use-cases/update-spec-metadata.ts",
-        "symbol": "UpdateSpecMetadataInput"
-      },
-      {
-        "specId": "core:update-spec-metadata",
-        "file": "core:src/application/use-cases/update-spec-metadata.ts",
-        "symbol": "UpdateSpecMetadataResult"
-      },
-      {
-        "specId": "core:update-spec-metadata",
-        "file": "core:src/application/use-cases/update-spec-metadata.ts",
-        "symbol": "UpdateSpecMetadata"
+        "file": "core:src/composition/use-cases/update-spec-metadata.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ec2eaf2f2cbe0fa235268741e5edf6f85c60216f6150ae0e04aa171d59063431",
-    "verify.md": "sha256:bc2fb60095be13125d26d2d760992d7e1c665ce3c37960708386bfd8f14ccaac"
+    "spec.md": "sha256:35dd8436d17a8584baa2215f2636b694eb26207f7046ef8e4ea8cc221684654e",
+    "verify.md": "sha256:b49a292a31de3f22f0eb6c9177349584fc425553fc914c993fd3fb82b5ee6a89"
   },
   "generatedBy": "core"
 }

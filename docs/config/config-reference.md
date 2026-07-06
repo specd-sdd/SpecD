@@ -280,7 +280,7 @@ storage:
 
 All relative paths resolve from the `specd.yaml` directory. Storage paths must remain within the repo root.
 
-The built-in `fs` adapter resolves `path` values to absolute paths during config loading. Non-`fs` adapter blocks are preserved opaquely in `SpecdConfig` and validated later during kernel construction, because external storage factories are only known once additive kernel registries are available.
+The built-in `fs` adapter resolves `path` values to absolute paths during config loading. Non-`fs` adapter blocks are preserved opaquely in `SpecdConfig` and validated later during kernel construction, because external storage factories are only known once additive composition registries are available.
 
 ### Named adapter bindings
 

@@ -1,0 +1,36 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
+
+    The config-based `createTransitionChange(config, options?)` form MUST derive `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)` and then delegate to canonical `createTransitionChange(deps)`.
+
+    `resolveTransitionChangeDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `actor: ActorResolver`
+    - `schemaProvider: SchemaProvider`
+    - `runStepHooks: RunStepHooks`
+    - `refreshImplementationTracking: RefreshImplementationTracking`
+    - `approvals: ApprovalGates`
+    - `lifecycle: LifecycleEngine`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md)
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md)
+    - [`core:workflow-model`](../workflow-model/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

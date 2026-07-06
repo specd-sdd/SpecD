@@ -71,6 +71,20 @@ The constructor MUST receive `approvals: ApprovalGates`. `createApproveSpec(conf
 
 `ApproveSpec.execute` MUST evaluate the spec gate using `approvals.spec` from construction. Callers MUST NOT supply gate flags per invocation.
 
+### Requirement: Config-based factory delegates through resolveApproveSpecDeps
+
+The config-based `createApproveSpec(config, options?)` form MUST derive `ApproveSpecDeps` through `resolveApproveSpecDeps(resolver)` and then delegate to canonical `createApproveSpec(deps)`.
+
+`resolveApproveSpecDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+- `hasher: ContentHasher`
+- `approvals: ApprovalGates`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The gate check MUST be the first validation step — no I/O occurs if the gate is disabled.
@@ -80,7 +94,8 @@ The constructor MUST receive `approvals: ApprovalGates`. `createApproveSpec(conf
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — Change entity lifecycle and state machine
-- [`core:schema-format`](../schema-format/spec.md) — schema structure and pre-hash cleanup rules
-- [`core:composition`](../composition/spec.md) — how the use case is wired and injected
-- [`core:kernel`](../kernel/spec.md) — kernel entry under `changes.approveSpec`
+- [`core:change`](../change/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:composition`](../composition/spec.md)
+- [`core:kernel`](../kernel/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

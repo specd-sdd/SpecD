@@ -1,157 +1,61 @@
-export {
-  createListChanges,
-  type ListChangesContext,
-  type FsListChangesOptions,
-} from './list-changes.js'
-export {
-  createListDrafts,
-  type ListDraftsContext,
-  type FsListDraftsOptions,
-} from './list-drafts.js'
-export {
-  createListDiscarded,
-  type ListDiscardedContext,
-  type FsListDiscardedOptions,
-} from './list-discarded.js'
-export {
-  createListArchived,
-  type ListArchivedContext,
-  type FsListArchivedOptions,
-} from './list-archived.js'
-export {
-  createGetArchivedChange,
-  type GetArchivedChangeContext,
-  type FsGetArchivedChangeOptions,
-} from './get-archived-change.js'
-export {
-  createEditChange,
-  type EditChangeContext,
-  type FsEditChangeOptions,
-} from './edit-change.js'
-export {
-  createSkipArtifact,
-  type SkipArtifactContext,
-  type FsSkipArtifactOptions,
-} from './skip-artifact.js'
-export { createListSpecs, type FsListSpecsOptions } from './list-specs.js'
-export { createListWorkspaces, type FsListWorkspacesOptions } from './list-workspaces.js'
+export { createListChanges, type ListChangesDeps } from './list-changes.js'
+export { createListDrafts, type ListDraftsDeps } from './list-drafts.js'
+export { createListDiscarded, type ListDiscardedDeps } from './list-discarded.js'
+export { createListArchived, type ListArchivedDeps } from './list-archived.js'
+export { createGetArchivedChange, type GetArchivedChangeDeps } from './get-archived-change.js'
+export { createEditChange, type EditChangeDeps } from './edit-change.js'
+export { createSkipArtifact, type SkipArtifactDeps } from './skip-artifact.js'
+export { createListSpecs, type ListSpecsDeps } from './list-specs.js'
+export { createListWorkspaces, type ListWorkspacesDeps } from './list-workspaces.js'
 export { createGetProjectSummary } from './get-project-summary.js'
-export { createSearchSpecs, type FsSearchSpecsOptions } from './search-specs.js'
-export { createGetSpec, type FsGetSpecOptions } from './get-spec.js'
-export { createSaveSpecMetadata, type FsSaveSpecMetadataOptions } from './save-spec-metadata.js'
+export { createSearchSpecs, type SearchSpecsDeps } from './search-specs.js'
+export { createGetSpec, type GetSpecDeps } from './get-spec.js'
+export { createSaveSpecMetadata, type SaveSpecMetadataDeps } from './save-spec-metadata.js'
 export {
   createInvalidateSpecMetadata,
-  type FsInvalidateSpecMetadataOptions,
+  type InvalidateSpecMetadataDeps,
 } from './invalidate-spec-metadata.js'
-export { createGetActiveSchema, type FsGetActiveSchemaOptions } from './get-active-schema.js'
-export { createGetProjectContext, type FsGetProjectContextOptions } from './get-project-context.js'
-export { createGetConfig, type GetConfigOptions } from './get-config.js'
-export {
-  createCreateChange,
-  type CreateChangeContext,
-  type FsCreateChangeOptions,
-} from './create-change.js'
-export { createGetStatus, type GetStatusContext, type FsGetStatusOptions } from './get-status.js'
-export {
-  createTransitionChange,
-  type TransitionChangeContext,
-  type FsTransitionChangeOptions,
-} from './transition-change.js'
-export {
-  createDraftChange,
-  type DraftChangeContext,
-  type FsDraftChangeOptions,
-} from './draft-change.js'
-export {
-  createRestoreChange,
-  type RestoreChangeContext,
-  type FsRestoreChangeOptions,
-} from './restore-change.js'
-export {
-  createDiscardChange,
-  type DiscardChangeContext,
-  type FsDiscardChangeOptions,
-} from './discard-change.js'
-export {
-  createApproveSpec,
-  type ApproveSpecContext,
-  type FsApproveSpecOptions,
-} from './approve-spec.js'
-export {
-  createApproveSignoff,
-  type ApproveSignoffContext,
-  type FsApproveSignoffOptions,
-} from './approve-signoff.js'
-export {
-  createArchiveChange,
-  type ArchiveChangeContext,
-  type FsArchiveChangeOptions,
-} from './archive-change.js'
-export {
-  createValidateArtifacts,
-  type ValidateArtifactsContext,
-  type FsValidateArtifactsOptions,
-} from './validate-artifacts.js'
-export {
-  createCompileContext,
-  type CompileContextWorkspace,
-  type FsCompileContextOptions,
-} from './compile-context.js'
-export { createValidateSpecs, type FsValidateSpecsOptions } from './validate-specs.js'
-export { createGetSpecContext, type FsGetSpecContextOptions } from './get-spec-context.js'
-export {
-  createDetectOverlap,
-  type DetectOverlapContext,
-  type FsDetectOverlapOptions,
-} from './detect-overlap.js'
-export {
-  createPreviewSpec,
-  type PreviewSpecWorkspace,
-  type FsPreviewSpecOptions,
-} from './preview-spec.js'
-export { createResolveSchema, type FsResolveSchemaOptions } from './resolve-schema.js'
-export {
-  createUpdateSpecDeps,
-  type UpdateSpecDepsContext,
-  type FsUpdateSpecDepsOptions,
-} from './update-spec-deps.js'
-export {
-  createInvalidateChange,
-  type InvalidateChangeContext,
-  type FsInvalidateChangeOptions,
-} from './invalidate-change.js'
-export {
-  createRunStepHooks,
-  type RunStepHooksContext,
-  type FsRunStepHooksOptions,
-} from './run-step-hooks.js'
-export {
-  createGetHookInstructions,
-  type GetHookInstructionsContext,
-  type FsGetHookInstructionsOptions,
-} from './get-hook-instructions.js'
+export { createGetActiveSchema, type GetActiveSchemaDeps } from './get-active-schema.js'
+export { createGetProjectContext, type GetProjectContextDeps } from './get-project-context.js'
+export { createGetConfig, type GetConfigDeps } from './get-config.js'
+export { createCreateChange, type CreateChangeDeps } from './create-change.js'
+export { createGetStatus, type GetStatusDeps } from './get-status.js'
+export { createTransitionChange, type TransitionChangeDeps } from './transition-change.js'
+export { createDraftChange, type DraftChangeDeps } from './draft-change.js'
+export { createRestoreChange, type RestoreChangeDeps } from './restore-change.js'
+export { createDiscardChange, type DiscardChangeDeps } from './discard-change.js'
+export { createApproveSpec, type ApproveSpecDeps } from './approve-spec.js'
+export { createApproveSignoff, type ApproveSignoffDeps } from './approve-signoff.js'
+export { createArchiveChange, type ArchiveChangeDeps } from './archive-change.js'
+export { createValidateArtifacts, type ValidateArtifactsDeps } from './validate-artifacts.js'
+export { createCompileContext, type CompileContextDeps } from './compile-context.js'
+export { createValidateSpecs, type ValidateSpecsDeps } from './validate-specs.js'
+export { createGetSpecContext, type GetSpecContextDeps } from './get-spec-context.js'
+export { createDetectOverlap, type DetectOverlapDeps } from './detect-overlap.js'
+export { createPreviewSpec, type PreviewSpecDeps } from './preview-spec.js'
+export { createResolveSchema, type ResolveSchemaDeps } from './resolve-schema.js'
+export { createUpdateSpecDeps, type UpdateSpecDepsDeps } from './update-spec-deps.js'
+export { createInvalidateChange, type InvalidateChangeDeps } from './invalidate-change.js'
+export { createRunStepHooks, type RunStepHooksDeps } from './run-step-hooks.js'
+export { createGetHookInstructions, type GetHookInstructionsDeps } from './get-hook-instructions.js'
 export {
   createGetArtifactInstruction,
-  type GetArtifactInstructionContext,
-  type FsGetArtifactInstructionOptions,
+  type GetArtifactInstructionDeps,
 } from './get-artifact-instruction.js'
 export {
   createUpdateImplementationTracking,
-  type UpdateImplementationTrackingContext,
-  type FsUpdateImplementationTrackingOptions,
+  type UpdateImplementationTrackingDeps,
 } from './update-implementation-tracking.js'
 export {
   createRefreshImplementationTracking,
-  type RefreshImplementationTrackingContext,
-  type FsRefreshImplementationTrackingOptions,
+  type RefreshImplementationTrackingDeps,
 } from './refresh-implementation-tracking.js'
 export {
   createGetImplementationReview,
-  type GetImplementationReviewContext,
-  type FsGetImplementationReviewOptions,
+  type GetImplementationReviewDeps,
 } from './get-implementation-review.js'
-export { createGetSpecOutline, type FsGetSpecOutlineOptions } from './get-spec-outline.js'
-export { createValidateSchema, type FsValidateSchemaOptions } from './validate-schema.js'
+export { createGetSpecOutline, type GetSpecOutlineDeps } from './get-spec-outline.js'
+export { createValidateSchema, type ValidateSchemaDeps } from './validate-schema.js'
 export { createGenerateSpecMetadata } from './generate-spec-metadata.js'
 export { createUpdateSpecMetadata } from './update-spec-metadata.js'
 export { createGetProjectMetadata } from './get-project-metadata.js'

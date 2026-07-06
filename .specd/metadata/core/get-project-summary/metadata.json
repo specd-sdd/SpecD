@@ -7,7 +7,8 @@
     "core:list-drafts",
     "core:list-discarded",
     "core:list-archived",
-    "core:kernel"
+    "core:kernel",
+    "core:composition-resolver"
   ],
   "context": [
     "Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals."
@@ -59,6 +60,12 @@
       "requirement": "Kernel exposes use case",
       "rules": [
         "`createKernel()` MUST wire `GetProjectSummary` on `kernel.project.getProjectSummary`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetProjectSummaryDeps",
+      "rules": [
+        "The config-based `createGetProjectSummary(config, options?)` form MUST derive `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)` and then delegate to canonical `createGetProjectSummary(deps)`.\n\n`resolveGetProjectSummaryDeps(resolver)` MUST resolve:\n\n- `listChanges: ListChanges`\n- `listDrafts: ListDrafts`\n- `listDiscarded: ListDiscarded`\n- `listArchived: ListArchived`\n- `listWorkspaces: ListWorkspaces`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -164,26 +171,30 @@
       "given": ["createKernel(config) is called"],
       "when": ["the returned kernel is inspected"],
       "then": ["kernel.project.getProjectSummary is a GetProjectSummary instance"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetProjectSummaryDeps",
+      "name": "createGetProjectSummary config form derives GetProjectSummaryDeps through resolveGetProjectSummaryDeps",
+      "when": ["createGetProjectSummary(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetProjectSummaryDeps through resolveGetProjectSummaryDeps(resolver)",
+        "AND resolveGetProjectSummaryDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetProjectSummary(deps)"
+      ]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "core:get-project-summary",
-        "file": "core:test/application/use-cases/get-project-summary.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:get-project-summary",
-        "file": "core:src/composition/use-cases/get-project-summary.ts",
-        "symbol": "createGetProjectSummary"
+        "file": "core:src/composition/use-cases/get-project-summary.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1694f517ac4e50a87db31bbef6c3a2bd1ba35b4edc5267350d007c2754be2e1d",
-    "verify.md": "sha256:28571422b3687c33a4735dc974c68b98fa7a6f662b61af1dbb773f0a7ef1c297"
+    "spec.md": "sha256:32a98f91fcf943e97d468cf5f34dc861d4fe1aef2e264937621050ab1ca6677c",
+    "verify.md": "sha256:8411743e18837c91c1ae67c46648804e40751f968e718b7f5b0fc35d2e429044"
   },
   "generatedBy": "core"
 }

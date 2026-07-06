@@ -7,12 +7,12 @@
     "core:change",
     "default:_global/architecture",
     "core:get-active-schema",
-    "core:spec-overlap"
+    "core:spec-overlap",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
-      "symbols": ["loadPersistedSpecDependsOn"]
+      "file": "core:src/composition/use-cases/create-change.ts"
     }
   ]
 }

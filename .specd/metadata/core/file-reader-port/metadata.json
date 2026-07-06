@@ -111,5 +111,7 @@
     "spec.md": "sha256:e0dd5cf84090601e3d35006bab3345018195a02ddc3ebb8b98d816cfba840370",
     "verify.md": "sha256:fda427f6d0c8b410497d371fb0fac8b9df297de59a7df429e89e63d011933c2b"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Application logic such CompileContext must read arbitrary files but cannot import node: fs directly violating hexagonal boundary.",
+  "optimizedContext": "# FileReader Port\n\n## Rules\n- Interface shape: port MUST declared TypeScript interface named FileReader single method read. SHALL NOT abstract class, because there no invariant constructor arguments shared across all implementations.\n- Read method signature: read method MUST accept single parameter: 1. absolutePath: string — absolute filesystem path read MUST return Promise<string | null>. content MUST read UTF-8 text.\n- Missing file handling: When file absolutePath does not exist, read method MUST return null. SHALL NOT throw error missing files.\n- Non-ENOENT errors propagate: filesystem errors other than \"file not found\" (e. g. permission denied), read method MUST propagate error throwing. Only ENOENT errors converted null.\n- Path traversal protection (implementation concern): Implementations MAY accept optional basePath constraint construction time. When basePath configured, implementation MUST verify resolved path does not escape base directory. If does, implementation MUST throw PathTraversalError.\n- Path resolution: Implementations MUST resolve provided path (e. g. via path. resolve) before performing any read traversal check, ensuring relative components like. . normalised."
 }

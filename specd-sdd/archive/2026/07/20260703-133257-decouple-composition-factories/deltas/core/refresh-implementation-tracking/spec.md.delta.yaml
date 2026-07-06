@@ -1,0 +1,31 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveRefreshImplementationTrackingDeps
+
+    The config-based `createRefreshImplementationTracking(config, options?)` form MUST derive `RefreshImplementationTrackingDeps` through `resolveRefreshImplementationTrackingDeps(resolver)` and then delegate to canonical `createRefreshImplementationTracking(deps)`.
+
+    `resolveRefreshImplementationTrackingDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `archives: ArchiveRepository`
+    - `implementationDetector: ImplementationDetector`
+    - `files: FileReader`
+    - `projectRoot: string`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:implementation-detector-port`](../implementation-detector-port/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:archive-repository-port`](../archive-repository-port/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

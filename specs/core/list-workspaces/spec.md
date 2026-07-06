@@ -30,6 +30,17 @@ When `createListWorkspaces(config)` initializes `SpecRepository` instances from 
 
 The config-based factory MUST NOT derive a weaker or divergent metadata lookup strategy than the canonical repository bootstrap used by the composition layer. Status and context consumers that receive `ProjectWorkspace.specRepo` from `ListWorkspaces` MUST observe a complete and stable spec repository view.
 
+### Requirement: Config-based factory delegates through resolveListWorkspacesDeps
+
+The config-based `createListWorkspaces(config, options?)` form MUST derive `ListWorkspacesDeps` through `resolveListWorkspacesDeps(resolver)` and then delegate to canonical `createListWorkspaces(deps)`.
+
+`resolveListWorkspacesDeps(resolver)` MUST resolve:
+
+- `config: SpecdConfig`
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT modify the configuration or the repository states.
@@ -38,6 +49,7 @@ The config-based factory MUST NOT derive a weaker or divergent metadata lookup s
 
 ## Spec Dependencies
 
-- [`core:config`](../config/spec.md) — defines the workspace configuration schema
-- [`core:workspace`](../workspace/spec.md) — defines workspace identity and ownership semantics
-- [`core:spec-repository-port`](../spec-repository-port/spec.md) — defines the interface for spec storage and counting
+- [`core:config`](../config/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:spec-repository-port`](../spec-repository-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

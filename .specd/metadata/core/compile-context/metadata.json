@@ -15,7 +15,8 @@
     "core:preview-spec",
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
-    "core:core/project-metadata"
+    "core:core/project-metadata",
+    "core:composition-resolver"
   ],
   "context": [
     "AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, evaluates step availability, and combines project context entries, spec content, and available steps into a single structured output. Artifact instructions and step hooks are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively."
@@ -90,7 +91,7 @@
     {
       "requirement": "Step availability",
       "rules": [
-        "`CompileContext` must evaluate whether the requested step is available for the current change using `LifecycleEngine`.\n\nA step is considered available when the engine determines that the step is both:\n\n- **ready** — all required artifacts are effectively `complete` or `skipped`\n- **permitted** — the lifecycle protocol allows entry into that step under the current transition and approval state\n\nA skipped optional artifact satisfies the requirement in the same way a completed artifact does.\n\nIf the step is not available, `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.\n\nFor backward compatibility, the top-level `stepAvailable` and `blockingArtifacts` fields remain part of the result. The richer per-step blocker diagnostics are exposed through `availableSteps`."
+        "`CompileContext` must evaluate whether the requested step is available for the current change using `LifecycleEngine`.\n\nA step is considered available when the engine determines that the step is both:\n\n- **ready** — all required artifacts are effectively `complete` or `skipped`\n- **permitted** — the lifecycle protocol allows entry into that step under the current transition and approval state\n\nA skipped optional artifact satisfies the requirement in the same way a completed artifact does.\n\nIf the step is not available, `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.\n\nFor backward compatibility, the top-level `stepAvailable` and `blockingArtifacts` fields remain part of the result. `stepAvailable` MUST mirror the lifecycle-engine `available` verdict for the requested step rather than `isReady` alone. The richer per-step blocker diagnostics are exposed through `availableSteps`."
       ]
     },
     {
@@ -133,6 +134,12 @@
       "requirement": "Optimization warning signal",
       "rules": [
         "When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimization` warning for each spec that is missing fresh optimized context.\n\nThe warning message MUST include remediation instructions: \"Launch specd-spec-context-optimizer agent to refresh\"."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveCompileContextDeps",
+      "rules": [
+        "The config-based `createCompileContext(config, options?)` form MUST derive `CompileContextDeps` through `resolveCompileContextDeps(resolver)` and then delegate to canonical `createCompileContext(deps)`.\n\n`resolveCompileContextDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `listWorkspaces: ListWorkspaces`\n- `schemaProvider: SchemaProvider`\n- `files: FileReader`\n- `parsers: ArtifactParserRegistry`\n- `hasher: ContentHasher`\n- `previewSpec: PreviewSpec`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `lifecycle: LifecycleEngine`\n- `defaultConfig: CompileContextConfig`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -315,6 +322,19 @@
         "it calls LifecycleEngine.evaluate",
         "AND result.stepAvailable matches the engine's verdict",
         "AND result.blockingArtifacts is populated from the engine's blockers"
+      ]
+    },
+    {
+      "requirement": "Step availability",
+      "name": "Step unavailable when artifacts are ready but transition is not permitted",
+      "given": [
+        "the lifecycle engine reports isReady: true",
+        "AND the lifecycle engine reports isPermitted: false"
+      ],
+      "when": ["CompileContext.execute is called for that step"],
+      "then": [
+        "result.stepAvailable is false",
+        "AND availableSteps preserves the distinct isReady and isPermitted values"
       ]
     },
     {
@@ -721,9 +741,30 @@
         "it emits a stale-optimization warning",
         "AND the message mentions specd-spec-context-optimizer"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveCompileContextDeps",
+      "name": "createCompileContext config form derives CompileContextDeps through resolveCompileContextDeps",
+      "when": ["createCompileContext(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives CompileContextDeps through resolveCompileContextDeps(resolver)",
+        "AND resolveCompileContextDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createCompileContext(deps)"
+      ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:compile-context",
+        "file": "core:src/composition/use-cases/compile-context.ts"
+      },
+      {
+        "specId": "core:compile-context",
+        "file": "core:test/application/use-cases/compile-context.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:compile-context",
@@ -733,8 +774,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5a5f056d3e6a1714798670a08aa67d6f0a70e5d4076aa8112a8ebaa21bfe10f9",
-    "verify.md": "sha256:be14f9ca6d3271030d45f110e1bdea17fc768a0e7c9ff8c0592b47d00ac5216c"
+    "spec.md": "sha256:d17a46f86fcd207641ec7ea2c44a8f5486ecb82b5d353b0ca343440634dc85e5",
+    "verify.md": "sha256:997fb40bceee755abaf4fec07a544d956cf5ac2adf6898b45b910b56ae8793b8"
   },
   "generatedBy": "core"
 }

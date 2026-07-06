@@ -1,0 +1,32 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveGetHookInstructionsDeps
+
+    The config-based `createGetHookInstructions(config, options?)` form MUST derive `GetHookInstructionsDeps` through `resolveGetHookInstructionsDeps(resolver)` and then delegate to canonical `createGetHookInstructions(deps)`.
+
+    `resolveGetHookInstructionsDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `archive: ArchiveRepository`
+    - `schemaProvider: SchemaProvider`
+    - `templates: TemplateExpander`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:config`](../config/spec.md)
+    - [`core:change`](../change/spec.md)
+    - [`core:template-variables`](../template-variables/spec.md)
+    - [`core:archive-repository-port`](../archive-repository-port/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

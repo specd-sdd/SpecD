@@ -592,6 +592,50 @@ describe('GetProjectContext', () => {
       expect(result.warnings).toHaveLength(0)
     })
 
+    it('ignores fresh optimized cache when llmOptimizedContext is disabled', async () => {
+      const schema = makeSchema([])
+      const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
+      const hasher = makeContentHasher()
+      const fileReader = makeFileReader({
+        [metadataPath]: JSON.stringify({
+          version: 1,
+          optimized: { context: 'Optimized project summary' },
+          freshness: {
+            algorithm: 'sha256',
+            inputs: {
+              config: { path: 'specd.yaml', hash: hasher.hash('config content') },
+              contextFiles: [],
+              specMetadata: [],
+            },
+            combinedHash: 'combined',
+          },
+          generated: { at: new Date().toISOString() },
+        }),
+        [configYamlPath]: 'config content',
+      })
+
+      const uc = makeGetProjectContext(
+        specRepos,
+        makeSchemaProvider(schema),
+        fileReader,
+        makeParsers(),
+        hasher,
+      )
+
+      const result = await uc.execute({
+        config: {
+          projectRoot: '/project',
+          configPath,
+          llmOptimizedContext: false,
+          context: [{ instruction: 'Fallback context' }],
+        },
+      })
+
+      expect(result.contextEntries).toEqual(['**Source: instruction**\n\nFallback context'])
+      expect(result.specs).toHaveLength(0)
+      expect(result.warnings).toHaveLength(0)
+    })
+
     it('falls back and warns when config hash mismatches', async () => {
       const schema = makeSchema([])
       const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))

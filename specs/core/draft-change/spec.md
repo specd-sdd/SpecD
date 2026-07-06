@@ -56,6 +56,17 @@ Inside the mutation callback, the repository supplies the fresh persisted active
 - `ChangeRepository` — for loading and persistence
 - `ActorResolver` — for resolving the current actor identity
 
+### Requirement: Config-based factory delegates through resolveDraftChangeDeps
+
+The config-based `createDraftChange(config, options?)` form MUST derive `DraftChangeDeps` through `resolveDraftChangeDeps(resolver)` and then delegate to canonical `createDraftChange(deps)`.
+
+`resolveDraftChangeDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT perform any state transitions — drafting is orthogonal to lifecycle state
@@ -65,5 +76,6 @@ Inside the mutation callback, the repository supplies the fresh persisted active
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
-- [`core:drafted-change-view`](../drafted-change-view/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:drafted-change-view`](../drafted-change-view/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

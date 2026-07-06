@@ -3,15 +3,19 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "code-graph:symbol-model"],
+  "dependsOn": [
+    "core:change",
+    "code-graph:symbol-model",
+    "core:update-implementation-tracking",
+    "core:get-implementation-review",
+    "core:refresh-implementation-tracking"
+  ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/implementation.ts",
-      "symbols": ["renderImplementationState"]
+      "file": "cli:src/commands/change/implementation.ts"
     },
     {
-      "file": "cli:src/commands/change/_implementation-tracking.ts",
-      "symbols": ["enrichImplementationTracking"]
+      "file": "cli:src/commands/change/_implementation-tracking.ts"
     }
   ]
 }

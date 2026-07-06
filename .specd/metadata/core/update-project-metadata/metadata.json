@@ -1,7 +1,7 @@
 {
   "title": "core:update-project-metadata",
   "description": "To maintain an optimized project context, we need a way for agents to save their optimizations while the system ensures the cache remains valid. The `UpdateProjectMetadata` use case accepts an optimized payload, computes the current hashes for all project context inputs, and persists the full `project-metadata.json` structure.",
-  "dependsOn": ["core:project-metadata"],
+  "dependsOn": ["core:project-metadata", "core:composition-resolver"],
   "context": [
     "To maintain an optimized project context, we need a way for agents to save their optimizations while the system ensures the cache remains valid. The `UpdateProjectMetadata` use case accepts an optimized payload, computes the current hashes for all project context inputs, and persists the full `project-metadata.json` structure."
   ],
@@ -20,6 +20,12 @@
       "requirement": "Payload separation",
       "rules": [
         "The use case SHALL only accept the `optimizedContext` string (wrapped in an input object) from the caller. It SHALL NOT allow the caller to provide its own freshness hashes or versioning information. This data is mapped to the internal `optimized.context` field in the persisted file."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateProjectMetadataDeps",
+      "rules": [
+        "The config-based `createUpdateProjectMetadata(config, options?)` form MUST derive `UpdateProjectMetadataDeps` through `resolveUpdateProjectMetadataDeps(resolver)` and then delegate to canonical `createUpdateProjectMetadata(deps)`.\n\n`resolveUpdateProjectMetadataDeps(resolver)` MUST resolve:\n\n- `config: SpecdConfig`\n- `listWorkspaces: ListWorkspaces`\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n- `files: FileReader`\n- `fileWriter: FileWriter`\n- `hasher: ContentHasher`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -47,30 +53,30 @@
       "then": [
         "the use case ignores those fields and computes them itself, only using the provided optimizedContext"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateProjectMetadataDeps",
+      "name": "createUpdateProjectMetadata config form derives UpdateProjectMetadataDeps through resolveUpdateProjectMetadataDeps",
+      "when": ["createUpdateProjectMetadata(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives UpdateProjectMetadataDeps through resolveUpdateProjectMetadataDeps(resolver)",
+        "AND resolveUpdateProjectMetadataDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createUpdateProjectMetadata(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:update-project-metadata",
-        "file": "core:src/application/use-cases/update-project-metadata.ts",
-        "symbol": "UpdateProjectMetadataInput"
-      },
-      {
-        "specId": "core:update-project-metadata",
-        "file": "core:src/application/use-cases/update-project-metadata.ts",
-        "symbol": "UpdateProjectMetadataResult"
-      },
-      {
-        "specId": "core:update-project-metadata",
-        "file": "core:src/application/use-cases/update-project-metadata.ts",
-        "symbol": "UpdateProjectMetadata"
+        "file": "core:src/composition/use-cases/update-project-metadata.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b1da2cb64e339734a9a31c9a2a40e74250fc78c1e4a618407ebf6671d37c5121",
-    "verify.md": "sha256:5a049a3863b62c6971075a34ca8efd340633ceef6894703c77d18d546d563185"
+    "spec.md": "sha256:20c52979a98589548a2fddaf2e68df440c32cbb947ef6ec97933f141b21079ce",
+    "verify.md": "sha256:04d05fed5e80ce86fcac9058461ec356abef7ca056dea2afc2eafac18961e645"
   },
   "generatedBy": "core"
 }

@@ -1,201 +1,170 @@
-import * as path from 'node:path'
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type FileReader } from '../../application/ports/file-reader.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import {
   CompileContext,
   type CompileContextConfig,
 } from '../../application/use-cases/compile-context.js'
-import { PreviewSpec } from '../../application/use-cases/preview-spec.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { Logger } from '../../application/logger.js'
-import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
-import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
-import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
-import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
-import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
-import { buildCompileContextConfig } from '../build-compile-context-config.js'
+import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type PreviewSpec } from '../../application/use-cases/preview-spec.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
+import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createPreviewSpec } from './preview-spec.js'
 
 /**
- * Domain context for the primary (default) workspace used by `CompileContext`.
+ * Explicit dependencies for {@link createCompileContext}.
  */
-export interface CompileContextWorkspace {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/**
- * Filesystem adapter paths and pre-built port instances for
- * `createCompileContext(context, options)`.
- */
-export interface FsCompileContextOptions {
-  /** Absolute path to the `changes/` directory. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
-  readonly discardedPath: string
-  /**
-   * The project orchestrator.
-   */
+export interface CompileContextDeps {
+  readonly changes: ChangeRepository
   readonly listWorkspaces: ListWorkspaces
-  /** Absolute path to the `node_modules` directory for schema resolution. */
-  readonly nodeModulesPaths: readonly string[]
-  /** Project root directory for resolving relative schema paths. */
-  readonly configDir: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Workspace routing metadata for cross-workspace spec reference resolution. */
-  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
-  /** Yaml-derived context defaults for {@link CompileContext}. */
+  readonly schemaProvider: SchemaProvider
+  readonly fileReader: FileReader
+  readonly parsers: ArtifactParserRegistry
+  readonly contentHasher: ContentHasher
+  readonly previewSpec: PreviewSpec
+  readonly extractorTransforms: ExtractorTransformRegistry
+  readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
+  readonly lifecycle: LifecycleEngine
   readonly defaultConfig: CompileContextConfig
 }
 
 /**
- * Constructs a `CompileContext` use case wired to all configured workspaces.
+ * Resolves `CompileContext` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `CompileContext`
+ */
+export function resolveCompileContextDeps(resolver: CompositionResolver): CompileContextDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    listWorkspaces: resolver.getListWorkspaces(),
+    schemaProvider: resolver.getSchemaProvider(),
+    fileReader: resolver.getFileReader(),
+    parsers: resolver.getArtifactParserRegistry(),
+    contentHasher: resolver.getContentHasher(),
+    previewSpec: createPreviewSpec({
+      changes: resolver.getChangeRepository(),
+      specs: resolver.getSpecRepositories(),
+      schemaProvider: resolver.getSchemaProvider(),
+      parsers: resolver.getArtifactParserRegistry(),
+    }),
+    extractorTransforms: resolver.getExtractorTransforms(),
+    workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
+    lifecycle: resolver.getLifecycleEngine(),
+    defaultConfig: resolver.getCompileContextConfig(),
+  }
+}
+
+/**
+ * Constructs `CompileContext` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createCompileContext(deps: CompileContextDeps): CompileContext
+/**
+ * Constructs `CompileContext` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel-level overrides
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createCompileContext(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): CompileContext
 /**
- * Constructs a `CompileContext` use case with explicit context and options.
+ * Constructs `CompileContext` from explicit deps or config bootstrap.
  *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths and pre-built spec repositories
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createCompileContext(
-  context: CompileContextWorkspace,
-  options: FsCompileContextOptions,
-): CompileContext
-/**
- * Constructs a `CompileContext` instance wired with filesystem adapters.
- *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
- * @returns The pre-wired use case instance
- */
-export function createCompileContext(
-  configOrContext: SpecdConfig | CompileContextWorkspace,
-  options?: FsCompileContextOptions | { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: CompileContextDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): CompileContext {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const defaultWs = getDefaultWorkspace(config)
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((ws) => ws.schemasPath !== null)
-        .map((ws) => [
-          ws.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws.name,
-              ownership: ws.ownership,
-              isExternal: ws.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: ws.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
-    const defaultConfig = buildCompileContextConfig(config)
-    return createCompileContext(
-      {
-        workspace: defaultWs.name,
-        ownership: defaultWs.ownership,
-        isExternal: defaultWs.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        listWorkspaces: new ListWorkspaces(config, specRepos),
-        nodeModulesPaths: [
-          path.join(config.projectRoot, 'node_modules'),
-          ...(kernelOpts?.extraNodeModulesPaths ?? []),
-        ],
-        configDir: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: schemaRepos,
-        workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
-        defaultConfig,
-      },
+  const normalized = normalizeCompositionFactoryArgs(
+    'createCompileContext',
+    depsOrConfig,
+    options,
+    isCompileContextDeps,
+  )
+  return createCompileContextFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `CompileContext` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createCompileContextFromNormalized(
+  input: FactoryInput<CompileContextDeps, CompositionResolutionOptions>,
+): CompileContext {
+  if (input.kind === 'deps') {
+    const {
+      changes,
+      listWorkspaces,
+      schemaProvider,
+      fileReader,
+      parsers,
+      contentHasher,
+      previewSpec,
+      extractorTransforms,
+      workspaceRoutes,
+      lifecycle,
+      defaultConfig,
+    } = input.deps
+    return new CompileContext(
+      changes,
+      listWorkspaces,
+      schemaProvider,
+      fileReader,
+      parsers,
+      contentHasher,
+      previewSpec,
+      extractorTransforms,
+      workspaceRoutes,
+      lifecycle,
+      defaultConfig,
     )
   }
-  const opts = options as FsCompileContextOptions
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    discardedPath: opts.discardedPath,
-  })
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.configDir,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const files = new FsFileReader()
-  const parsers = createArtifactParserRegistry()
-  const hasher = new NodeContentHasher()
-  const previewSpec = new PreviewSpec(
-    changeRepo,
-    opts.listWorkspaces.repos,
-    schemaProvider,
-    parsers,
-  )
-  return new CompileContext(
-    changeRepo,
-    opts.listWorkspaces,
-    schemaProvider,
-    files,
-    parsers,
-    hasher,
-    previewSpec,
-    createBuiltinExtractorTransforms(),
-    opts.workspaceRoutes ?? [],
-    new LifecycleEngine(Logger.debug.bind(Logger)),
-    opts.defaultConfig,
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createCompileContext(resolveCompileContextDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `CompileContextDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isCompileContextDeps(
+  value: CompileContextDeps | SpecdConfig,
+): value is CompileContextDeps {
+  return (
+    'changes' in value &&
+    'listWorkspaces' in value &&
+    'schemaProvider' in value &&
+    'fileReader' in value &&
+    'parsers' in value &&
+    'contentHasher' in value &&
+    'previewSpec' in value &&
+    'extractorTransforms' in value &&
+    'workspaceRoutes' in value &&
+    'lifecycle' in value &&
+    'defaultConfig' in value
   )
 }

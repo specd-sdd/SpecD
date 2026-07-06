@@ -8,9 +8,11 @@ Consumers that need to register kernel extensions conditionally or incrementally
 
 ### Requirement: Builder accumulates additive kernel registrations
 
-A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, graph-store factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.
+A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.
 
 The builder SHALL be a pre-construction composition surface only. It MUST NOT mutate an already-built kernel.
+
+The builder MUST NOT own code-graph-specific backend composition. Graph-store registration and backend selection remain outside the core builder contract.
 
 ### Requirement: Builder supports fluent registration methods
 
@@ -20,8 +22,6 @@ The builder SHALL expose fluent registration methods for each additive registry 
 - schema storage registration
 - change storage registration
 - archive storage registration
-- graph-store registration via `registerGraphStore(id, factory)`
-- graph-store selection via `useGraphStore(id)`
 - parser registration
 - external hook runner registration
 - VCS provider registration
@@ -29,17 +29,14 @@ The builder SHALL expose fluent registration methods for each additive registry 
 
 Each registration method SHALL return the builder itself so callers can chain registrations conditionally and ergonomically.
 
-`useGraphStore(id)` selects the single active graph-store backend for the kernel being built. It does not register a backend by itself.
-
 ### Requirement: Builder builds kernels with createKernel-equivalent semantics
 
-Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations and selected `graphStoreId`.
+Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations.
 
 This equivalence includes:
 
 - built-in capabilities remain available
 - external registrations extend rather than replace built-ins
-- the selected graph-store backend id is passed through exactly as if it had been supplied in `KernelOptions`
 - shared adapters are constructed once
 - the resulting kernel is immutable after construction
 
@@ -47,11 +44,23 @@ This equivalence includes:
 
 The builder SHALL reject conflicting registrations instead of silently overwriting them. Attempting to register a capability name that collides with an existing built-in or already-registered external entry for the same registry category MUST fail with an error.
 
-The builder SHALL also reject `useGraphStore(id)` when `id` is not present in the merged built-in plus externally-registered graph-store registry available at build time.
-
 ### Requirement: Builder accepts base registration state
 
 The builder SHALL support initialization from a resolved project configuration plus optional base registration state, so callers can start from a partially-prepared additive registry set before applying additional fluent registrations.
+
+### Requirement: Builder reuses the shared composition-resolver path
+
+The kernel builder SHALL remain a full-kernel construction surface only.
+
+It MUST accumulate additive composition options and registrations for the same resolver-backed assembly path used by `createKernel(config, options?)`.
+
+The builder MUST NOT define a second per-use-case public composition model.
+
+### Requirement: Builder shares composition-owned registry primitives
+
+The builder SHALL reuse the same composition-owned registry input, registry view, and built-in capability-merging primitives consumed by `CompositionResolver` and `createKernel(...)`.
+
+It MUST NOT introduce a builder-specific registry ownership model beneath its fluent API.
 
 ## Constraints
 
@@ -64,4 +73,5 @@ The builder SHALL support initialization from a resolved project configuration p
 
 - [`core:kernel`](../kernel/spec.md) — kernel shape, additive registries, merged registry exposure
 - [`core:composition`](../composition/spec.md) — composition-layer exports and construction responsibilities
+- [`core:composition-resolver`](../composition-resolver/spec.md) — shared config-to-deps resolver path reused by builder and kernel
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — composition-layer boundaries

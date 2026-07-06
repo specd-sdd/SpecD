@@ -173,3 +173,19 @@
 - **AND** the spec has `optimizedContext` populated
 - **WHEN** `GetSpecContext` is executed
 - **THEN** the entry uses the optimized content
+
+### Requirement: Config-based factory delegates through resolveGetSpecContextDeps
+
+#### Scenario: createGetSpecContext config form derives GetSpecContextDeps through resolveGetSpecContextDeps
+
+- **WHEN** `createGetSpecContext(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetSpecContextDeps` through `resolveGetSpecContextDeps(resolver)`
+- **AND** `resolveGetSpecContextDeps(resolver)` resolves:
+- `listWorkspaces: ListWorkspaces`
+- `hasher: ContentHasher`
+- `schemaProvider?: SchemaProvider`
+- `parsers?: ArtifactParserRegistry`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- **AND** the factory delegates to canonical `createGetSpecContext(deps)`

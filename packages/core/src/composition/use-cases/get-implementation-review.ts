@@ -1,69 +1,97 @@
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { GetImplementationReview } from '../../application/use-cases/get-implementation-review.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-
-/** Domain context for `createGetImplementationReview(context, options)`. */
-export interface GetImplementationReviewContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createGetImplementationReview(context, options)`. */
-export interface FsGetImplementationReviewOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
-}
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Constructs a `GetImplementationReview` use case with full project config.
- *
- * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
+ * Explicit dependencies for {@link createGetImplementationReview}.
  */
-export function createGetImplementationReview(config: SpecdConfig): GetImplementationReview
+export interface GetImplementationReviewDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+}
+
 /**
- * Constructs a `GetImplementationReview` use case with explicit context and options.
+ * Resolves {@link GetImplementationReviewDeps} from the shared composition resolver.
  *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for change resolution
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetImplementationReview`
+ */
+export function resolveGetImplementationReviewDeps(
+  resolver: CompositionResolver,
+): GetImplementationReviewDeps {
+  return { changes: resolver.getChangeRepository() }
+}
+
+/**
+ * Constructs a `GetImplementationReview` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
  * @returns The pre-wired use case instance
  */
 export function createGetImplementationReview(
-  context: GetImplementationReviewContext,
-  options: FsGetImplementationReviewOptions,
+  deps: GetImplementationReviewDeps,
 ): GetImplementationReview
 /**
- * Constructs a `GetImplementationReview` instance wired with filesystem adapters.
+ * Constructs a `GetImplementationReview` use case from project configuration.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param config - The fully-resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetImplementationReview(
-  configOrContext: SpecdConfig | GetImplementationReviewContext,
-  options?: FsGetImplementationReviewOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): GetImplementationReview
+/**
+ * Constructs a `GetImplementationReview` instance from explicit deps or config bootstrap.
+ *
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
+ * @returns The pre-wired use case instance
+ */
+export function createGetImplementationReview(
+  depsOrConfig: GetImplementationReviewDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetImplementationReview {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    return createGetImplementationReview(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetImplementationReview',
+    depsOrConfig,
+    options,
+    isGetImplementationReviewDeps,
+  )
+  return createGetImplementationReviewFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetImplementationReview` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetImplementationReviewFromNormalized(
+  input: FactoryInput<GetImplementationReviewDeps, CompositionResolutionOptions>,
+): GetImplementationReview {
+  if (input.kind === 'deps') {
+    return new GetImplementationReview(input.deps.changes)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  return new GetImplementationReview(changeRepo)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetImplementationReview(resolveGetImplementationReviewDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetImplementationReviewDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetImplementationReviewDeps(
+  value: GetImplementationReviewDeps | SpecdConfig,
+): value is GetImplementationReviewDeps {
+  return 'changes' in value
 }

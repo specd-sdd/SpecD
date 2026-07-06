@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:list-changes", "core:kernel", "core:composition-resolver"],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/detect-overlap.ts"
+    }
+  ]
+}

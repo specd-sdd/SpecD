@@ -1,0 +1,25 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveGetProjectMetadataDeps
+
+    The config-based `createGetProjectMetadata(config, options?)` form MUST derive `GetProjectMetadataDeps` through `resolveGetProjectMetadataDeps(resolver)` and then delegate to canonical `createGetProjectMetadata(deps)`.
+
+    `resolveGetProjectMetadataDeps(resolver)` MUST resolve:
+
+    - `config: SpecdConfig`
+    - `files: FileReader`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:config`](../config/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

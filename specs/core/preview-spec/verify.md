@@ -126,3 +126,17 @@
 - **GIVEN** a change with `schemaName: "schema-std"` and a schema whose `name()` is `"other-schema"`
 - **WHEN** `PreviewSpec.execute` is called
 - **THEN** the use case throws `SchemaMismatchError`
+
+### Requirement: Config-based factory delegates through resolvePreviewSpecDeps
+
+#### Scenario: createPreviewSpec config form derives PreviewSpecDeps through resolvePreviewSpecDeps
+
+- **WHEN** `createPreviewSpec(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `PreviewSpecDeps` through `resolvePreviewSpecDeps(resolver)`
+- **AND** `resolvePreviewSpecDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- **AND** the factory delegates to canonical `createPreviewSpec(deps)`

@@ -1,0 +1,34 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveGetStatusDeps
+
+    The config-based `createGetStatus(config, options?)` form MUST derive `GetStatusDeps` through `resolveGetStatusDeps(resolver)` and then delegate to canonical `createGetStatus(deps)`.
+
+    `resolveGetStatusDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `schemaProvider: SchemaProvider`
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }`
+    - `refreshImplementationTracking: RefreshImplementationTracking`
+    - `lifecycle: LifecycleEngine`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:kernel`](../kernel/spec.md)
+    - [`core:transition-change`](../transition-change/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:config`](../config/spec.md)
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

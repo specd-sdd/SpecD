@@ -199,6 +199,22 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 `TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly.
 
+### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
+
+The config-based `createTransitionChange(config, options?)` form MUST derive `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)` and then delegate to canonical `createTransitionChange(deps)`.
+
+`resolveTransitionChangeDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+- `runStepHooks: RunStepHooks`
+- `refreshImplementationTracking: RefreshImplementationTracking`
+- `approvals: ApprovalGates`
+- `lifecycle: LifecycleEngine`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates
@@ -214,10 +230,11 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — lifecycle state machine and artifact review downgrade semantics
-- [`core:run-step-hooks`](../run-step-hooks/spec.md) — hook execution entry point
-- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook ordering and failure semantics
-- [`core:workflow-model`](../workflow-model/spec.md) — workflow `requires` and verification routing
-- [`default:_global/architecture`](../../../_global/architecture/spec.md) — application ownership and port boundaries
-- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative lifecycle routing and dependency interpretation used before hook execution and persistence
-- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — primitive invoked by default before active-change transitions
+- [`core:change`](../change/spec.md)
+- [`core:run-step-hooks`](../run-step-hooks/spec.md)
+- [`core:hook-execution-model`](../hook-execution-model/spec.md)
+- [`core:workflow-model`](../workflow-model/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

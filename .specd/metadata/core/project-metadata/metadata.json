@@ -1,7 +1,7 @@
 {
   "title": "core:project-metadata",
   "description": "Project-level context can be large and benefit from LLM optimization. To avoid repeated manual assembly and allow for efficient agent consumption, we need a dedicated storage and schema for project-level metadata. The `project-metadata.json` file stores optimized context alongside freshness hashes to ensure the cached content remains valid as the project configuration or included specs change.",
-  "dependsOn": ["core:config"],
+  "dependsOn": ["core:config", "core:composition-resolver"],
   "context": [
     "Project-level context can be large and benefit from LLM optimization. To avoid repeated manual assembly and allow for efficient agent consumption, we need a dedicated storage and schema for project-level metadata. The `project-metadata.json` file stores optimized context alongside freshness hashes to ensure the cached content remains valid as the project configuration or included specs change."
   ],
@@ -22,6 +22,12 @@
       "requirement": "Input tracking",
       "rules": [
         "The `freshness` block SHALL track:\n\n- The hash of the `specd.yaml` configuration file\n- The hashes of any `contextFiles` referenced in the configuration\n- The metadata hashes of all specs included in the project context"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetProjectMetadataDeps",
+      "rules": [
+        "The config-based `createGetProjectMetadata(config, options?)` form MUST derive `GetProjectMetadataDeps` through `resolveGetProjectMetadataDeps(resolver)` and then delegate to canonical `createGetProjectMetadata(deps)`.\n\n`resolveGetProjectMetadataDeps(resolver)` MUST resolve:\n\n- `config: SpecdConfig`\n- `files: FileReader`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -45,45 +51,30 @@
       "then": [
         "they include specd.yaml, all context files, and metadata hashes of all resolved project context specs"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetProjectMetadataDeps",
+      "name": "createGetProjectMetadata config form derives GetProjectMetadataDeps through resolveGetProjectMetadataDeps",
+      "when": ["createGetProjectMetadata(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetProjectMetadataDeps through resolveGetProjectMetadataDeps(resolver)",
+        "AND resolveGetProjectMetadataDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetProjectMetadata(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:project-metadata",
-        "file": "core:src/domain/services/project-metadata.ts",
-        "symbol": "projectMetadataSchema"
-      },
-      {
-        "specId": "core:project-metadata",
-        "file": "core:src/domain/services/project-metadata.ts",
-        "symbol": "ProjectMetadata"
-      },
-      {
-        "specId": "core:project-metadata",
-        "file": "core:src/domain/services/project-metadata.ts",
-        "symbol": "updateProjectMetadataSchema"
-      },
-      {
-        "specId": "core:project-metadata",
-        "file": "core:src/domain/services/project-metadata.ts",
-        "symbol": "UpdateProjectMetadataPayload"
-      },
-      {
-        "specId": "core:project-metadata",
-        "file": "core:src/application/use-cases/get-project-metadata.ts",
-        "symbol": "GetProjectMetadata"
-      },
-      {
-        "specId": "core:project-metadata",
-        "file": "core:src/application/use-cases/get-project-metadata.ts",
-        "symbol": "GetProjectMetadataResult"
+        "file": "core:src/composition/use-cases/get-project-metadata.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:67e7632cef4cda22ba31750f1f6f4223b7af5780f59a2bfd8d734f5341493ff4",
-    "verify.md": "sha256:25b7c1235a9c8b88a713b0f76e478ae67b72103ad1c4e7af45e6fe7360dda674"
+    "spec.md": "sha256:64f887d1ca3245253820c32e76a45707ee9dedc329e1c7909923a9f1a1d4d877",
+    "verify.md": "sha256:16789898523a9f7d17bf2ded857de9b213b6e253cb9915b69e5141148bb4ab46"
   },
   "generatedBy": "core"
 }

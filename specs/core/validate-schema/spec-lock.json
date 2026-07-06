@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:resolve-schema",
+    "core:build-schema",
+    "core:schema-registry-port",
+    "core:parse-schema-yaml",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/validate-schema.ts"
+    }
+  ]
+}

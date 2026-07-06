@@ -210,3 +210,18 @@
 
 - **WHEN** `CreateChange` is instantiated
 - **THEN** it requires a `DetectOverlap` use case in its constructor
+
+### Requirement: Config-based factory delegates through resolveCreateChangeDeps
+
+#### Scenario: createCreateChange config form derives CreateChangeDeps through resolveCreateChangeDeps
+
+- **WHEN** `createCreateChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)`
+- **AND** `resolveCreateChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `actor: ActorResolver`
+- `getActiveSchema: GetActiveSchema`
+- `detectOverlap: DetectOverlap`
+- **AND** the factory delegates to canonical `createCreateChange(deps)`

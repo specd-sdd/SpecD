@@ -8,7 +8,8 @@
     "core:workflow-model",
     "default:_global/architecture",
     "core:lifecycle-engine",
-    "core:refresh-implementation-tracking"
+    "core:refresh-implementation-tracking",
+    "core:composition-resolver"
   ],
   "context": [
     "Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, delegating schema-aware lifecycle interpretation (approval-gate routing, workflow requires evaluation, recursive blocking, and task gating) to `LifecycleEngine` while still owning hook execution, redesign invalidation, and persistence of the final transitioned state."
@@ -138,6 +139,12 @@
       "requirement": "Dependencies",
       "rules": [
         "`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`.\n\n`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveTransitionChangeDeps",
+      "rules": [
+        "The config-based `createTransitionChange(config, options?)` form MUST derive `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)` and then delegate to canonical `createTransitionChange(deps)`.\n\n`resolveTransitionChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n- `schemaProvider: SchemaProvider`\n- `runStepHooks: RunStepHooks`\n- `refreshImplementationTracking: RefreshImplementationTracking`\n- `approvals: ApprovalGates`\n- `lifecycle: LifecycleEngine`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -653,27 +660,30 @@
       "then": [
         "it receives ChangeRepository, ActorResolver, SchemaProvider, LifecycleEngine, RunStepHooks, and RefreshImplementationTracking"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveTransitionChangeDeps",
+      "name": "createTransitionChange config form derives TransitionChangeDeps through resolveTransitionChangeDeps",
+      "when": ["createTransitionChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives TransitionChangeDeps through resolveTransitionChangeDeps(resolver)",
+        "AND resolveTransitionChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createTransitionChange(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:transition-change",
-        "file": "core:src/application/use-cases/transition-change.ts",
-        "symbol": "ApprovalGates"
-      },
-      {
-        "specId": "core:transition-change",
-        "file": "core:src/application/use-cases/transition-change.ts",
-        "symbol": "TransitionChange"
+        "file": "core:src/composition/use-cases/transition-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:08a66b32ad56d8cc4416fbb797e5d9edd1526b2aeffffda02dc1a5c39a7f34db",
-    "verify.md": "sha256:2999edc42e4d8aba3c50adef28d8cd56edf9894ff87e0df1f9876bfbb09488de"
+    "spec.md": "sha256:ee9cfc196185241a38a7fa109246420db878054fed9a6f6e02e5c533c9824673",
+    "verify.md": "sha256:507ac222c819449d23f33ce41647309557e1dbba363a23d298b851f6d357fdd9"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`TransitionChange` routes lifecycle moves through `LifecycleEngine`, enforces requires and gates, runs hooks, and persists final state.",
-  "optimizedContext": "# TransitionChange\n\n## Rules\n- `TransitionChangeInput` requires `name` and target `to`; accepts `skipHookPhases`, `refreshImplementationTrackingBefore`; optional progress callback emits requires, task, hook, and transition events.\n- Approval gates come from constructor `approvals`; wiring must pass `config.approvals`, not execute-time flags.\n- Load active change via `ChangeRepository`; if missing throw `ChangeNotFoundError`; optionally refresh implementation tracking before evaluation.\n- Use `LifecycleEngine` plus active schema to route `ready -> pending-spec-approval` and `done -> pending-signoff` when gates enabled; pending approval states reject normal progression with `InvalidStateTransitionError` reason `approval-required` or `gate-not-required`.\n- After effective target resolved, enforce workflow `requires` via lifecycle interpretation and enforce `requiresTaskCompletion`; missing task capability or incomplete tasks fail with structured `InvalidStateTransitionError` reasons.\n- `verifying -> implementing` is implementation-only retry path: allowed only when current design remains valid; clear validation only for implementing-required artifacts that must be reopened.\n- `designing` is valid from every state except `drafting`; re-entry from later states performs redesign invalidation, but `designing -> designing` must not downgrade approvals or artifacts.\n- Allow `archiving -> archivable` as rollback path after failed archive recovery; skip archive-step hooks and `archivable` requires in that rollback.\n- Run source `post` hooks, then target `pre` hooks, unless skipped; both phases fail fast through `RunStepHooks`.\n- Persist through `ChangeRepository.mutate(name, fn)` on fresh persisted change; perform `change.transition(effectiveTarget, actor)` inside mutation; return updated `change`.\n\n## Constraints\n- Never bypass entity transition validation.\n- Requires and task checks are schema-driven; caller does not supply artifact truth.\n- When schema resolution fails or target workflow step missing, requires and hooks degrade gracefully.\n- Hook failure aborts transition; no state change occurs.\n- Structured transition failure reasons include `incomplete-artifact`, `incomplete-tasks`, `missing-task-capability`, `invalid-transition`, `approval-required`, `gate-not-required`.\n"
+  "generatedBy": "core"
 }

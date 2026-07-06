@@ -103,3 +103,15 @@
 
 - **WHEN** `DiscardChange` is instantiated
 - **THEN** it requires an `ActorResolver` port in its constructor
+
+### Requirement: Config-based factory delegates through resolveDiscardChangeDeps
+
+#### Scenario: createDiscardChange config form derives DiscardChangeDeps through resolveDiscardChangeDeps
+
+- **WHEN** `createDiscardChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `DiscardChangeDeps` through `resolveDiscardChangeDeps(resolver)`
+- **AND** `resolveDiscardChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- **AND** the factory delegates to canonical `createDiscardChange(deps)`

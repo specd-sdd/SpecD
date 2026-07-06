@@ -1,36 +1,35 @@
-import * as path from 'node:path'
+/* eslint-disable jsdoc/require-jsdoc */
+import { type ArchiveBatchSnapshotPort } from '../../application/ports/archive-batch-snapshot.js'
+import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SpecRepository } from '../../application/ports/spec-repository.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
-import { createArchiveRepository } from '../archive-repository.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { TemplateExpander } from '../../application/template-expander.js'
-import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
-import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
-import { GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
-import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
-import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
-import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
+import {
+  ListWorkspaces,
+  type ProjectWorkspace,
+} from '../../application/use-cases/list-workspaces.js'
+import { type RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
+import { type SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import {
   FsArchiveBatchSnapshot,
   type ArchiveBatchSnapshotWorkspaceLayout,
 } from '../../infrastructure/fs/archive-batch-snapshot.js'
-import { type ArchiveBatchSnapshotPort } from '../../application/ports/archive-batch-snapshot.js'
 import { FsSpecRepository } from '../../infrastructure/fs/spec-repository.js'
 import {
-  ListWorkspaces,
-  type ProjectWorkspace,
-} from '../../application/use-cases/list-workspaces.js'
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createGenerateSpecMetadata } from './generate-spec-metadata.js'
+import { createSaveSpecMetadata } from './save-spec-metadata.js'
 
 /**
  * Builds workspace spec layout map for {@link FsArchiveBatchSnapshot}.
@@ -104,192 +103,128 @@ export function resolveArchiveBatchSnapshotPort(
   }
 }
 
-/**
- * Domain context for the primary (default) workspace used by `ArchiveChange`.
- */
-export interface ArchiveChangeContext {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/**
- * Filesystem adapter paths and pre-built port instances for
- * `createArchiveChange(context, options)`.
- */
-export interface FsArchiveChangeOptions {
-  /** Absolute path to the `changes/` directory. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
-  readonly discardedPath: string
-  /** Absolute path to the archive root directory. */
-  readonly archivePath: string
-  /** Optional archive directory pattern (e.g. `'{{year}}/{{change.archivedName}}'`). */
-  readonly archivePattern?: string
-  /** The project orchestrator. */
+export interface ArchiveChangeDeps {
+  readonly changes: ChangeRepository
   readonly listWorkspaces: ListWorkspaces
-  /** Absolute path to the `node_modules` directory for schema resolution. */
-  readonly nodeModulesPaths: readonly string[]
-  /** Project root directory for resolving relative schema paths. */
-  readonly configDir: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Absolute path to the project root. */
+  readonly archive: ArchiveRepository
+  readonly runStepHooks: RunStepHooks
+  readonly actor: ActorResolver
+  readonly parsers: ArtifactParserRegistry
+  readonly schemaProvider: SchemaProvider
+  readonly generateMetadata: GenerateSpecMetadata
+  readonly saveMetadata: SaveSpecMetadata
+  readonly extractorTransforms: ExtractorTransformRegistry
+  readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
   readonly projectRoot: string
-  /** Workspace routing metadata for cross-workspace spec reference resolution. */
-  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
-  /** Workspace spec directory layouts for batch snapshot restore. */
-  readonly workspaceSpecLayouts?: ReadonlyMap<string, ArchiveBatchSnapshotWorkspaceLayout>
+  readonly batchSnapshot: ArchiveBatchSnapshotPort
 }
 
-/**
- * Constructs an `ArchiveChange` use case wired to all configured workspaces.
- *
- * @param configOrContext - Full project config or workspace-specific context
- * @param options - Filesystem adapter paths and pre-built port instances
- * @returns Fully-wired `ArchiveChange` use case
- */
+export function resolveArchiveChangeDeps(resolver: CompositionResolver): ArchiveChangeDeps {
+  const listWorkspaces = resolver.getListWorkspaces()
+  const specRepositories = resolver.getSpecRepositories()
+  const workspaceLayouts = buildWorkspaceSpecLayouts(
+    resolver.config.workspaces.map((workspace) => ({
+      name: workspace.name,
+      prefix: workspace.prefix ?? null,
+      codeRoot: workspace.codeRoot,
+      isExternal: workspace.isExternal,
+      ownership: workspace.ownership,
+      specRepo: specRepositories.get(workspace.name) as SpecRepository,
+    })),
+  )
+
+  return {
+    changes: resolver.getChangeRepository(),
+    listWorkspaces,
+    archive: resolver.getArchiveRepository(),
+    runStepHooks: resolver.getRunStepHooks(),
+    actor: resolver.getActorResolver(),
+    parsers: resolver.getArtifactParserRegistry(),
+    schemaProvider: resolver.getSchemaProvider(),
+    generateMetadata: createGenerateSpecMetadata(resolver.config, resolver.options),
+    saveMetadata: createSaveSpecMetadata({
+      specRepositories,
+    }),
+    extractorTransforms: resolver.getExtractorTransforms(),
+    workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
+    projectRoot: resolver.config.projectRoot,
+    batchSnapshot: resolveArchiveBatchSnapshotPort(listWorkspaces, workspaceLayouts),
+  }
+}
+
+export function createArchiveChange(deps: ArchiveChangeDeps): ArchiveChange
 export function createArchiveChange(
-  configOrContext: SpecdConfig | ArchiveChangeContext,
-  options?: FsArchiveChangeOptions | { extraNodeModulesPaths?: readonly string[] },
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): ArchiveChange
+export function createArchiveChange(
+  depsOrConfig: ArchiveChangeDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ArchiveChange {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const defaultWs = getDefaultWorkspace(config)
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((ws) => ws.schemasPath !== null)
-        .map((ws) => [
-          ws.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws.name,
-              ownership: ws.ownership,
-              isExternal: ws.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: ws.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
-    const listWorkspaces = new ListWorkspaces(config, specRepos)
-    return createArchiveChange(
-      {
-        workspace: defaultWs.name,
-        ownership: defaultWs.ownership,
-        isExternal: defaultWs.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        archivePath: config.storage.archivePath,
-        ...(config.storage.archivePattern !== undefined
-          ? { archivePattern: config.storage.archivePattern }
-          : {}),
-        listWorkspaces,
-        nodeModulesPaths: [
-          path.join(config.projectRoot, 'node_modules'),
-          ...(kernelOpts?.extraNodeModulesPaths ?? []),
-        ],
-        configDir: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: schemaRepos,
-        projectRoot: config.projectRoot,
-        workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
-        workspaceSpecLayouts: buildWorkspaceSpecLayouts(
-          Array.from(config.workspaces).map((w) => ({
-            name: w.name,
-            prefix: w.prefix ?? null,
-            codeRoot: w.codeRoot,
-            isExternal: w.isExternal,
-            ownership: w.ownership,
-            specRepo: specRepos.get(w.name)!,
-          })),
-        ),
-      },
+  const normalized = normalizeCompositionFactoryArgs(
+    'createArchiveChange',
+    depsOrConfig,
+    options,
+    isArchiveChangeDeps,
+  )
+  return createArchiveChangeFromNormalized(normalized)
+}
+
+function createArchiveChangeFromNormalized(
+  input: FactoryInput<ArchiveChangeDeps, CompositionResolutionOptions>,
+): ArchiveChange {
+  if (input.kind === 'deps') {
+    const {
+      changes,
+      listWorkspaces,
+      archive,
+      runStepHooks,
+      actor,
+      parsers,
+      schemaProvider,
+      generateMetadata,
+      saveMetadata,
+      extractorTransforms,
+      workspaceRoutes,
+      projectRoot,
+      batchSnapshot,
+    } = input.deps
+
+    return new ArchiveChange(
+      changes,
+      listWorkspaces,
+      archive,
+      runStepHooks,
+      actor,
+      parsers,
+      schemaProvider,
+      generateMetadata,
+      saveMetadata,
+      extractorTransforms,
+      workspaceRoutes,
+      projectRoot,
+      batchSnapshot,
     )
   }
 
-  const opts = options as FsArchiveChangeOptions
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    discardedPath: opts.discardedPath,
-  })
-  const archiveRepo = createArchiveRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    archivePath: opts.archivePath,
-    ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
-  })
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.configDir,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const parsers = createArtifactParserRegistry()
-  const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
-  const hooks = new NodeHookRunner(expander)
-  const actor = createVcsActorResolver()
-  const hasher = new NodeContentHasher()
-  const generateMetadata = new GenerateSpecMetadata(
-    opts.listWorkspaces,
-    schemaProvider,
-    parsers,
-    hasher,
-    createBuiltinExtractorTransforms(),
-    opts.workspaceRoutes ?? [],
-  )
-  const saveMetadata = new SaveSpecMetadata(opts.listWorkspaces.repos)
-  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)
-  const batchSnapshot = resolveArchiveBatchSnapshotPort(
-    opts.listWorkspaces,
-    opts.workspaceSpecLayouts,
-  )
-  return new ArchiveChange(
-    changeRepo,
-    opts.listWorkspaces,
-    archiveRepo,
-    runStepHooks,
-    actor,
-    parsers,
-    schemaProvider,
-    generateMetadata,
-    saveMetadata,
-    createBuiltinExtractorTransforms(),
-    opts.workspaceRoutes ?? [],
-    opts.projectRoot,
-    batchSnapshot,
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createArchiveChange(resolveArchiveChangeDeps(resolver))
+}
+
+function isArchiveChangeDeps(value: ArchiveChangeDeps | SpecdConfig): value is ArchiveChangeDeps {
+  return (
+    'changes' in value &&
+    'listWorkspaces' in value &&
+    'archive' in value &&
+    'runStepHooks' in value &&
+    'actor' in value &&
+    'parsers' in value &&
+    'schemaProvider' in value &&
+    'generateMetadata' in value &&
+    'saveMetadata' in value &&
+    'extractorTransforms' in value &&
+    'workspaceRoutes' in value &&
+    'projectRoot' in value &&
+    'batchSnapshot' in value
   )
 }

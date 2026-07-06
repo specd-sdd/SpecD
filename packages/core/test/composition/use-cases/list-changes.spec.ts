@@ -3,7 +3,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ListChanges } from '../../../src/application/use-cases/list-changes.js'
-import { createListChanges } from '../../../src/composition/use-cases/list-changes.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
+import {
+  createListChanges,
+  type ListChangesDeps,
+} from '../../../src/composition/use-cases/list-changes.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
@@ -66,5 +70,21 @@ describe('createListChanges', () => {
     const useCase = createListChanges(config)
 
     expect(useCase).toBeInstanceOf(ListChanges)
+  })
+
+  it('accepts explicit deps without config bootstrap', () => {
+    const changes = { list: async () => [] } as never
+    const deps: ListChangesDeps = { changes }
+
+    expect(createListChanges(deps)).toBeInstanceOf(ListChanges)
+  })
+
+  it('rejects deps plus composition options', () => {
+    const changes = { list: async () => [] } as never
+    const deps: ListChangesDeps = { changes }
+
+    expect(() =>
+      createListChanges(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
+    ).toThrow(InvalidCompositionFactoryArgumentsError)
   })
 })

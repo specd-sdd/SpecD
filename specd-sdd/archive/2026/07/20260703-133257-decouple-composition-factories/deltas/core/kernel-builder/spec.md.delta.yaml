@@ -1,0 +1,89 @@
+- op: modified
+  description: 'Limit builder registrations to core-owned additive composition concerns'
+  selector:
+    type: section
+    matches: 'Requirement: Builder accumulates additive kernel registrations'
+  content: |
+    A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.
+
+    The builder SHALL be a pre-construction composition surface only. It MUST NOT mutate an already-built kernel.
+
+    The builder MUST NOT own code-graph-specific backend composition. Graph-store registration and backend selection remain outside the core builder contract.
+- op: modified
+  description: 'Remove graph-store-specific fluent methods from the core builder surface'
+  selector:
+    type: section
+    matches: 'Requirement: Builder supports fluent registration methods'
+  content: |
+    The builder SHALL expose fluent registration methods for each additive registry category that this change introduces. At minimum, it SHALL support:
+
+    - spec storage registration
+    - schema storage registration
+    - change storage registration
+    - archive storage registration
+    - parser registration
+    - external hook runner registration
+    - VCS provider registration
+    - actor provider registration
+
+    Each registration method SHALL return the builder itself so callers can chain registrations conditionally and ergonomically.
+- op: modified
+  description: 'Remove graph-store backend selection from builder equivalence'
+  selector:
+    type: section
+    matches: 'Requirement: Builder builds kernels with createKernel-equivalent semantics'
+  content: |
+    Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations.
+
+    This equivalence includes:
+
+    - built-in capabilities remain available
+    - external registrations extend rather than replace built-ins
+    - shared adapters are constructed once
+    - the resulting kernel is immutable after construction
+- op: modified
+  description: 'Remove unknown graph-store validation from the core builder contract'
+  selector:
+    type: section
+    matches: 'Requirement: Builder rejects conflicting registrations'
+  content: |
+    The builder SHALL reject conflicting registrations instead of silently overwriting them. Attempting to register a capability name that collides with an existing built-in or already-registered external entry for the same registry category MUST fail with an error.
+- op: added
+  description: 'Clarify builder as full-kernel surface over the shared composition-resolver path'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Builder reuses the shared composition-resolver path
+
+    The kernel builder SHALL remain a full-kernel construction surface only.
+
+    It MUST accumulate additive composition options and registrations for the same resolver-backed assembly path used by `createKernel(config, options?)`.
+
+    The builder MUST NOT define a second per-use-case public composition model.
+- op: added
+  description: 'Clarify builder reuses composition-owned registry primitives'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Builder reuses the shared composition-resolver path'
+  content: |
+    ### Requirement: Builder shares composition-owned registry primitives
+
+    The builder SHALL reuse the same composition-owned registry input, registry view, and built-in capability-merging primitives consumed by `CompositionResolver` and `createKernel(...)`.
+
+    It MUST NOT introduce a builder-specific registry ownership model beneath its fluent API.
+- op: modified
+  description: 'Add composition-resolver dependency'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:kernel`](../kernel/spec.md) — kernel shape, additive registries, merged registry exposure
+    - [`core:composition`](../composition/spec.md) — composition-layer exports and construction responsibilities
+    - [`core:composition-resolver`](../composition-resolver/spec.md) — shared config-to-deps resolver path reused by builder and kernel
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — composition-layer boundaries

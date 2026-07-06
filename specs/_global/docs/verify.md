@@ -114,3 +114,10 @@
 
 - **WHEN** a non-exported helper function has no JSDoc
 - **THEN** the linter must not report an error
+
+### Requirement: Public composition-surface documentation stays aligned
+
+#### Scenario: Composition API change updates docs
+
+- **WHEN** the public composition contracts of `@specd/core` are refactored
+- **THEN** the corresponding documentation in `docs/` is updated to reflect the new factory and kernel composition model

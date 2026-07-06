@@ -178,3 +178,14 @@
 - **AND** incoming content has `dependsOn: ['core:other']`
 - **WHEN** `execute()` is called with `force: true`
 - **THEN** the write succeeds
+
+### Requirement: Config-based factory delegates through resolveSaveSpecMetadataDeps
+
+#### Scenario: createSaveSpecMetadata config form derives SaveSpecMetadataDeps through resolveSaveSpecMetadataDeps
+
+- **WHEN** `createSaveSpecMetadata(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `SaveSpecMetadataDeps` through `resolveSaveSpecMetadataDeps(resolver)`
+- **AND** `resolveSaveSpecMetadataDeps(resolver)` resolves:
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+- **AND** the factory delegates to canonical `createSaveSpecMetadata(deps)`

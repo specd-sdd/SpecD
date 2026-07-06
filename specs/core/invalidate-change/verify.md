@@ -106,3 +106,16 @@
 - **GIVEN** a downstream invalidation whose expanded affected set spans `specs`, `verify`, and `design`
 - **WHEN** `InvalidateChange.execute` succeeds
 - **THEN** human-facing reporting orders artifact types in `schema.artifactDag().topologicalOrder()` among affected types
+
+### Requirement: Config-based factory delegates through resolveInvalidateChangeDeps
+
+#### Scenario: createInvalidateChange config form derives InvalidateChangeDeps through resolveInvalidateChangeDeps
+
+- **WHEN** `createInvalidateChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `InvalidateChangeDeps` through `resolveInvalidateChangeDeps(resolver)`
+- **AND** `resolveInvalidateChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+- **AND** the factory delegates to canonical `createInvalidateChange(deps)`

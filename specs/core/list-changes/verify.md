@@ -53,3 +53,14 @@
 - **WHEN** `ListChanges.execute()` reads active changes through that repository
 - **THEN** artifact states are derived with complete artifact-type and spec-existence bootstrap semantics
 - **AND** the config-based factory does not expose a weaker change repository variant
+
+### Requirement: Config-based factory delegates through resolveListChangesDeps
+
+#### Scenario: createListChanges config form derives ListChangesDeps through resolveListChangesDeps
+
+- **WHEN** `createListChanges(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ListChangesDeps` through `resolveListChangesDeps(resolver)`
+- **AND** `resolveListChangesDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- **AND** the factory delegates to canonical `createListChanges(deps)`

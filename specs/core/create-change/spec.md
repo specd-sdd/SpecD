@@ -113,6 +113,20 @@ The return type is `{ change: Change; changePath: string; overlapReport?: Overla
 - `GetActiveSchema` — for resolving the project's active schema when `schemaName` / `schemaVersion` are not provided on input
 - `DetectOverlap` — for optional post-create overlap detection when `includeOverlapCheck` is `true`
 
+### Requirement: Config-based factory delegates through resolveCreateChangeDeps
+
+The config-based `createCreateChange(config, options?)` form MUST derive `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)` and then delegate to canonical `createCreateChange(deps)`.
+
+`resolveCreateChangeDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `actor: ActorResolver`
+- `getActiveSchema: GetActiveSchema`
+- `detectOverlap: DetectOverlap`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT perform any state transitions — the change starts in `drafting` state (the default when no `transitioned` event exists)
@@ -122,6 +136,7 @@ The return type is `{ change: Change; changePath: string; overlapReport?: Overla
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
-- [`core:get-active-schema`](../get-active-schema/spec.md) — project-mode active schema resolution
-- [`core:spec-overlap`](../spec-overlap/spec.md) — overlap report structure and detection semantics
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:get-active-schema`](../get-active-schema/spec.md)
+- [`core:spec-overlap`](../spec-overlap/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

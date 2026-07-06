@@ -28,7 +28,18 @@ When `createListChanges(config)` initializes a `ChangeRepository` from `SpecdCon
 
 The config-based factory MUST NOT construct a weaker repository variant that can derive different artifact states for the same persisted change than the canonical status/listing read path.
 
+### Requirement: Config-based factory delegates through resolveListChangesDeps
+
+The config-based `createListChanges(config, options?)` form MUST derive `ListChangesDeps` through `resolveListChangesDeps(resolver)` and then delegate to canonical `createListChanges(deps)`.
+
+`resolveListChangesDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
 - [`core:kernel`](../kernel/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

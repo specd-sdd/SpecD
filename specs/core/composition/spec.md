@@ -14,12 +14,45 @@ Config I/O is an exception: `createConfigLoader()` and `createConfigWriter()` re
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
-Every use-case factory supports two call signatures:
+Every kernel-mounted public use-case factory supports two public call shapes:
 
-- `createArchiveChange(config: SpecdConfig)` — extracts all required values from a fully resolved config object
-- `createArchiveChange(context: ArchiveChangeContext, options: FsArchiveChangeOptions)` — accepts domain context and adapter options explicitly
+- `createArchiveChange(deps: ArchiveChangeDeps)` — canonical dependency-based construction
+- `createArchiveChange(config: SpecdConfig, options?)` — convenience bootstrap form that resolves dependencies from config and delegates to the canonical deps form
 
-Both signatures are public exports. The explicit form is used in tests and in scenarios where only a subset of the config is available. The `SpecdConfig` form is used by the kernel and by delivery mechanisms that have already loaded config.
+The canonical form accepts already-resolved ports, services, and collaborator use cases only. It MUST NOT expose filesystem paths, adapter ids, or fs-specific bootstrap fragments.
+
+The config-based form MUST use the shared composition-resolver path plus per-use-case dependency assembly helpers. It MUST NOT maintain a separate fs-shaped wiring branch per factory.
+
+Composition options are valid only for the config-based form. When callers use the canonical deps form, composition options MUST be rejected by the shared argument-normalization path.
+
+### Requirement: Shared composition resolver normalizes config-based factory bootstrap
+
+The composition layer SHALL define a shared `CompositionResolver` contract for config-based public factory assembly.
+
+The resolver MUST:
+
+- be scoped to one composition session, not process-global
+- resolve shared ports and services lazily
+- cache resolved shared dependencies within the resolver instance
+- avoid eagerly instantiating the full kernel dependency graph for a single standalone factory call
+
+The resolver itself MUST NOT know per-use-case dependency objects. Per-use-case assembly helpers (for example `resolveCreateChangeDeps(resolver)`) derive those deps near their corresponding factories.
+
+Public `createX(config, options?)` wrappers MUST internally perform: create resolver, assemble `XDeps` through the per-use-case helper, and delegate to canonical `createX(deps)`.
+
+### Requirement: Shared factory-argument validation error
+
+Public composition factories SHALL share one argument-normalization path for their supported call shapes.
+
+When callers provide an invalid argument combination, the normalization path MUST throw `InvalidCompositionFactoryArgumentsError`.
+
+That error MUST identify at least the target factory or use-case name so diagnostics clearly indicate which `createX(...)` entry was invoked incorrectly.
+
+### Requirement: Reusable registry primitives are composition-owned
+
+The reusable registry input, registry view, and built-in capability-merging primitives consumed by public factory bootstrap SHALL belong to composition infrastructure.
+
+The kernel MAY reuse those primitives, but it SHALL remain a facade over them rather than their semantic owner or naming source of truth.
 
 ### Requirement: Internal ports are never exported
 
@@ -144,9 +177,11 @@ Integrators MUST be able to obtain default filesystem storage (for example `crea
 
 ### Requirement: Extension registration surface
 
-`"./extensions"` MUST export `SpecStorageFactory`, `ChangeStorageFactory`, `ArchiveStorageFactory`, `SchemaStorageFactory`, `KernelRegistryInput`, `KernelRegistryView`, `KernelBuilder`, `createKernelBuilder`, `ActorProvider`, `VcsProvider`, `ExternalHookRunner`, and `RegistryConflictError`. Builtin `FS_*` storage factory markers MUST remain internal.
+`"./extensions"` MUST export `SpecStorageFactory`, `ChangeStorageFactory`, `ArchiveStorageFactory`, `SchemaStorageFactory`, `CompositionRegistryInput`, `CompositionRegistryView`, `KernelBuilder`, `createKernelBuilder`, `ActorProvider`, `VcsProvider`, `ExternalHookRunner`, and `RegistryConflictError`. Builtin `FS_*` storage factory markers MUST remain internal.
 
 Plugin authors implement port contracts from `./ports`, expose a `*StorageFactory` from `./extensions`, and register it before calling repository factories with the matching adapter id or before `createKernel` / `createKernelBuilder`.
+
+`@specd/core/extensions` MUST stay limited to composition concerns owned by `@specd/core`. Graph-store registration and backend selection belong to `@specd/code-graph`, not to the core extension surface.
 
 ## Constraints
 
@@ -163,6 +198,8 @@ Plugin authors implement port contracts from `./ports`, expose a `*StorageFactor
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
 - [`core:resolve-schema`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
 - [`core:config-writer-port`](../config-writer-port/spec.md) — `createConfigWriter` factory surface
+- [`core:kernel-builder`](../kernel-builder/spec.md) — aligned full-kernel builder semantics
+- [`core:composition-resolver`](../composition-resolver/spec.md) — shared config-to-deps resolver contract for public factories
 
 ## ADRs
 

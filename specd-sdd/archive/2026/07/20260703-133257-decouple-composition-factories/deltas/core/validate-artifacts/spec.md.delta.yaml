@@ -1,0 +1,41 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveValidateArtifactsDeps
+
+    The config-based `createValidateArtifacts(config, options?)` form MUST derive `ValidateArtifactsDeps` through `resolveValidateArtifactsDeps(resolver)` and then delegate to canonical `createValidateArtifacts(deps)`.
+
+    `resolveValidateArtifactsDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `schemaProvider: SchemaProvider`
+    - `parsers: ArtifactParserRegistry`
+    - `actor: ActorResolver`
+    - `hasher: ContentHasher`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+    - `lifecycle: LifecycleEngine`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:change-layout`](../change-layout/spec.md)
+    - [`core:change-manifest`](../change-manifest/spec.md)
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+    - [`core:delta-format`](../delta-format/spec.md)
+    - [`core:selector-model`](../selector-model/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:spec-id-format`](../spec-id-format/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

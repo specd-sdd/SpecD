@@ -3,11 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "default:_global/architecture"],
+  "dependsOn": ["core:change", "default:_global/architecture", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/discard-change.ts",
-      "symbols": ["DiscardChange"]
+      "file": "core:src/composition/use-cases/discard-change.ts"
     }
   ]
 }

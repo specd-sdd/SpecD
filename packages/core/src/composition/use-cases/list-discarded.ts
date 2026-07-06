@@ -1,57 +1,91 @@
 import { ListDiscarded } from '../../application/use-cases/list-discarded.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSharedChangeRepository } from '../shared-repository-wiring.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createListDiscarded(context, options)`. */
-export interface ListDiscardedContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createListDiscarded(context, options)`. */
-export interface FsListDiscardedOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
+/**
+ * Explicit dependencies for {@link createListDiscarded}.
+ */
+export interface ListDiscardedDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
 }
 
 /**
- * Constructs a `ListDiscarded` use case with full project config.
+ * Resolves {@link ListDiscardedDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ListDiscarded`
+ */
+export function resolveListDiscardedDeps(resolver: CompositionResolver): ListDiscardedDeps {
+  return { changes: resolver.getChangeRepository() }
+}
+
+/**
+ * Constructs a `ListDiscarded` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createListDiscarded(deps: ListDiscardedDeps): ListDiscarded
+/**
+ * Constructs a `ListDiscarded` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createListDiscarded(config: SpecdConfig): ListDiscarded
-/**
- * Constructs a `ListDiscarded` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for discarded change resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createListDiscarded(
-  context: ListDiscardedContext,
-  options: FsListDiscardedOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ListDiscarded
 /**
- * Constructs a `ListDiscarded` instance wired with filesystem adapters.
+ * Constructs a `ListDiscarded` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createListDiscarded(
-  configOrContext: SpecdConfig | ListDiscardedContext,
-  options?: FsListDiscardedOptions,
+  depsOrConfig: ListDiscardedDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ListDiscarded {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const changeRepo = createSharedChangeRepository({ config })
-    return new ListDiscarded(changeRepo)
+  const normalized = normalizeCompositionFactoryArgs(
+    'createListDiscarded',
+    depsOrConfig,
+    options,
+    isListDiscardedDeps,
+  )
+  return createListDiscardedFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ListDiscarded` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createListDiscardedFromNormalized(
+  input: FactoryInput<ListDiscardedDeps, CompositionResolutionOptions>,
+): ListDiscarded {
+  if (input.kind === 'deps') {
+    return new ListDiscarded(input.deps.changes)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  return new ListDiscarded(changeRepo)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createListDiscarded(resolveListDiscardedDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ListDiscardedDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isListDiscardedDeps(value: ListDiscardedDeps | SpecdConfig): value is ListDiscardedDeps {
+  return 'changes' in value
 }

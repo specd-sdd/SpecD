@@ -111,3 +111,14 @@
 - **WHEN** `UpdateSpecDeps` is called to remove `'core:non-existent'`
 - **THEN** a typed error is thrown
 - **AND** the message indicates which dependency was not found
+
+### Requirement: Config-based factory delegates through resolveUpdateSpecDepsDeps
+
+#### Scenario: createUpdateSpecDeps config form derives UpdateSpecDepsDeps through resolveUpdateSpecDepsDeps
+
+- **WHEN** `createUpdateSpecDeps(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `UpdateSpecDepsDeps` through `resolveUpdateSpecDepsDeps(resolver)`
+- **AND** `resolveUpdateSpecDepsDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- **AND** the factory delegates to canonical `createUpdateSpecDeps(deps)`

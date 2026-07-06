@@ -22,15 +22,46 @@
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
-#### Scenario: Factory called with SpecdConfig
+#### Scenario: Canonical deps form constructs one use case from resolved dependencies
 
-- **WHEN** `createArchiveChange(config)` is called with a valid `SpecdConfig`
-- **THEN** it returns a pre-wired `ArchiveChange` with all ports constructed from the config values
+- **WHEN** a caller invokes a kernel-mounted public `createX(deps)` factory
+- **THEN** the factory accepts already-resolved dependencies only
+- **AND** it does not require filesystem paths or adapter ids
 
-#### Scenario: Factory called with explicit context and options
+#### Scenario: Config-based form delegates through resolver-backed assembly
 
-- **WHEN** `createArchiveChange(context, options)` is called with an explicit context and options object
-- **THEN** it returns a pre-wired `ArchiveChange` using those values directly
+- **WHEN** a caller invokes `createX(config, options?)`
+- **THEN** the factory creates a composition resolver scoped to that composition session
+- **AND** it resolves `XDeps` through the shared resolver path before delegating to canonical deps construction
+
+#### Scenario: Invalid deps-plus-options input throws shared error
+
+- **WHEN** a caller supplies a deps-form invocation plus composition options
+- **THEN** the factory path throws `InvalidCompositionFactoryArgumentsError`
+- **AND** the error identifies the target `createX(...)` factory
+
+### Requirement: Shared composition resolver normalizes config-based factory bootstrap
+
+#### Scenario: Config-based public factory delegates through resolver path
+
+- **WHEN** `createX(config, options?)` is invoked
+- **THEN** the factory creates a resolver, derives `XDeps`, and delegates to canonical `createX(deps)`
+
+### Requirement: Reusable registry primitives are composition-owned
+
+#### Scenario: Kernel does not remain the owner of generic registry semantics
+
+- **WHEN** public factory bootstrap, kernel assembly, and builder assembly reuse the same merged capability model
+- **THEN** that model is defined as composition infrastructure
+- **AND** the kernel remains a facade over it rather than a second source of truth
+
+### Requirement: Shared factory-argument validation error
+
+#### Scenario: Invalid deps-plus-options combination throws shared error
+
+- **WHEN** a public factory receives deps together with composition options
+- **THEN** it throws `InvalidCompositionFactoryArgumentsError`
+- **AND** the error identifies the target factory or use-case name
 
 ### Requirement: Internal ports are never exported
 
@@ -39,10 +70,11 @@
 - **WHEN** the public export surface of `@specd/core` is inspected
 - **THEN** `NodeHookRunner`, `GitVcsAdapter`, and `FsFileReader` are not present
 
-#### Scenario: Repository factories not in public exports
+#### Scenario: Repository factories on public root return port types only
 
 - **WHEN** the public export surface of `@specd/core` is inspected
-- **THEN** `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` are not present
+- **THEN** `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` are present
+- **AND** they return port contracts rather than concrete adapter classes
 
 ### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
 
@@ -213,7 +245,12 @@
 #### Scenario: ChangeStorageFactory exported from extensions subpath
 
 - **WHEN** importing from `@specd/core/extensions`
-- **THEN** `ChangeStorageFactory` and `createKernelBuilder` are available
+- **THEN** `ChangeStorageFactory`, `CompositionRegistryInput`, `CompositionRegistryView`, and `createKernelBuilder` are available
+
+#### Scenario: Core extensions surface does not export graph-store registration types
+
+- **WHEN** importing from `@specd/core/extensions`
+- **THEN** graph-store-specific extension hooks are not part of the core extensions surface
 
 #### Scenario: Builtin FS storage factory markers stay internal
 

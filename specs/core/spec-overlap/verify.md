@@ -101,3 +101,14 @@
 - **WHEN** `new DetectOverlap(changeRepository)` is called
 - **THEN** the instance is created successfully
 - **AND** `execute()` delegates to `changeRepository.list()`
+
+### Requirement: Config-based factory delegates through resolveDetectOverlapDeps
+
+#### Scenario: createDetectOverlap config form derives DetectOverlapDeps through resolveDetectOverlapDeps
+
+- **WHEN** `createDetectOverlap(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `DetectOverlapDeps` through `resolveDetectOverlapDeps(resolver)`
+- **AND** `resolveDetectOverlapDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- **AND** the factory delegates to canonical `createDetectOverlap(deps)`

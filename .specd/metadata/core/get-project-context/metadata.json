@@ -7,7 +7,8 @@
     "core:spec-metadata",
     "core:schema-format",
     "default:_global/architecture",
-    "core:core/project-metadata"
+    "core:core/project-metadata",
+    "core:composition-resolver"
   ],
   "context": [
     "Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`."
@@ -76,7 +77,13 @@
     {
       "requirement": "Project context optimization and invalidation",
       "rules": [
-        "When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.\n\nThe system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:\n\n- `specd.yaml`\n- Referenced `contextFiles`\n- Metadata of included specs\n\nIf all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.\n\nThe warning message MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\"."
+        "When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.\n\nWhen `llmOptimizedContext` is disabled, the use case MUST NOT return the cached optimized project context as the primary response, even if the cache is fresh. In that case it MUST continue with the standard compilation flow.\n\nThe system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:\n\n- `specd.yaml`\n- Referenced `contextFiles`\n- Metadata of included specs\n\nIf all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context only when optimization is enabled. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.\n\nThe warning message MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\"."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetProjectContextDeps",
+      "rules": [
+        "The config-based `createGetProjectContext(config, options?)` form MUST derive `GetProjectContextDeps` through `resolveGetProjectContextDeps(resolver)` and then delegate to canonical `createGetProjectContext(deps)`.\n\n`resolveGetProjectContextDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `schemaProvider: SchemaProvider`\n- `files: FileReader`\n- `parsers: ArtifactParserRegistry`\n- `hasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `defaultConfig: CompileContextConfig`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -365,6 +372,19 @@
     },
     {
       "requirement": "Project context optimization and invalidation",
+      "name": "Fresh optimized cache is ignored when llmOptimizedContext is disabled",
+      "given": [
+        "llmOptimizedContext: false",
+        "AND project-metadata.json exists and all hashes match"
+      ],
+      "when": ["project context is retrieved"],
+      "then": [
+        "the use case does not return optimized.context as the primary response",
+        "AND it continues with the standard compilation flow"
+      ]
+    },
+    {
+      "requirement": "Project context optimization and invalidation",
       "name": "Falls back and warns when project context is stale",
       "given": [
         "llmOptimizedContext is enabled",
@@ -376,9 +396,30 @@
         "AND it emits a warning",
         "AND the warning message mentions specd-project-context-optimizer"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetProjectContextDeps",
+      "name": "createGetProjectContext config form derives GetProjectContextDeps through resolveGetProjectContextDeps",
+      "when": ["createGetProjectContext(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetProjectContextDeps through resolveGetProjectContextDeps(resolver)",
+        "AND resolveGetProjectContextDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetProjectContext(deps)"
+      ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:get-project-context",
+        "file": "core:src/composition/use-cases/get-project-context.ts"
+      },
+      {
+        "specId": "core:get-project-context",
+        "file": "core:test/application/use-cases/get-project-context.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:get-project-context",
@@ -388,8 +429,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:6506937bfc229af558ed5d05c70d397596eb6ae0aeeb831d1c27ab710ee9719e",
-    "verify.md": "sha256:999f271670d5c5497dfbaf317a6f65d4b5e75451a37f6723259bb4bfd91c7592"
+    "spec.md": "sha256:70245ef4b0eeab5959cf09aae2ce42e0549131e7d89350ecc5077a2b0ee0aede",
+    "verify.md": "sha256:f7c03a82190fb57fb26e3fb8b3ae26eabfd2b4ae72df380bf19204c920833388"
   },
   "generatedBy": "core"
 }

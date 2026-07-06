@@ -2,12 +2,13 @@
   "title": "GetArtifactInstruction",
   "description": "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its composition rules and delta guidance — but this is instruction content, not context. `CompileContext` handles context (specs, metadata, available steps); `GetArtifactInstruction` handles the artifact-specific instructions: the schema instruction, composition rules (`rules.pre`/`rules.post`), and delta instructions with existing artifact outlines. The skill retrieves these at the right moment — after loading context but before doing the work.",
   "dependsOn": [
-    "core:schema-format",
     "core:delta-format",
     "core:change",
     "core:schema-merge",
     "core:template-variables",
-    "core:lifecycle-engine"
+    "core:lifecycle-engine",
+    "core:schema-format",
+    "core:composition-resolver"
   ],
   "context": [
     "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its composition rules and delta guidance — but this is instruction content, not context. `CompileContext` handles context (specs, metadata, available steps); `GetArtifactInstruction` handles the artifact-specific instructions: the schema instruction, composition rules (`rules.pre`/`rules.post`), and delta instructions with existing artifact outlines. The skill retrieves these at the right moment — after loading context but before doing the work."
@@ -53,6 +54,12 @@
       "requirement": "Result shape",
       "rules": [
         "`GetArtifactInstruction.execute` MUST return a structured result containing:\n\n- `artifactId` (string) — the artifact ID\n- `rulesPre` (string\\[]) — `rules.pre` texts in declaration order; empty array if none\n- `instruction` (string | null) — the artifact's instruction text; `null` if not declared\n- `template` (string | null) — the resolved template file content with variables expanded; `null` when the artifact has no template declared\n- `delta` (object | null) — delta-specific instruction components; `null` when `delta: false`:\n  - `formatInstructions` (string) — format-specific delta writing guidance\n  - `domainInstructions` (string | null) — the artifact's `deltaInstruction` text; `null` if not declared\n  - `availableOutlines` (string\\[]) — spec IDs from `change.specIds` whose artifact file exists and can be outlined\n- `rulesPost` (string\\[]) — `rules.post` texts in declaration order; empty array if none\n\nThe caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `template` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost`, and fetches outline details on demand with `specd specs outline <specPath> --artifact <artifactId>`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetArtifactInstructionDeps",
+      "rules": [
+        "The config-based `createGetArtifactInstruction(config, options?)` form MUST derive `GetArtifactInstructionDeps` through `resolveGetArtifactInstructionDeps(resolver)` and then delegate to canonical `createGetArtifactInstruction(deps)`.\n\n`resolveGetArtifactInstructionDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `templates: TemplateExpander`\n- `lifecycle: LifecycleEngine`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -184,22 +191,30 @@
       "given": ["every artifact is effectively complete or skipped"],
       "when": ["GetArtifactInstruction.execute is called without artifactId"],
       "then": ["ArtifactNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetArtifactInstructionDeps",
+      "name": "createGetArtifactInstruction config form derives GetArtifactInstructionDeps through resolveGetArtifactInstructionDeps",
+      "when": ["createGetArtifactInstruction(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetArtifactInstructionDeps through resolveGetArtifactInstructionDeps(resolver)",
+        "AND resolveGetArtifactInstructionDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetArtifactInstruction(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:get-artifact-instruction",
-        "file": "core:src/application/use-cases/get-artifact-instruction.ts",
-        "symbol": "GetArtifactInstruction"
+        "file": "core:src/composition/use-cases/get-artifact-instruction.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:440689a93012fa89b495eb722c24a5067aad381db40c8a1808b452b29caccc1d",
-    "verify.md": "sha256:c57b9ce4b041d9a3c7f2404668e54f11ab54271f985478acce0906b8afda8d32"
+    "spec.md": "sha256:15068b507daf402a6591753840e1f5c75503392384e8f37571f1789a4260a947",
+    "verify.md": "sha256:fc63185fab482993f2c6ea2d963ce9455162fd4cbb775b086447034ac5b6e257"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "When an agent is creating or modifying a specific artifact during the designing step, it needs the artifact's instruction along with its…",
-  "optimizedContext": "# GetArtifactInstruction\n\n## Rules\n- Ports and constructor: GetArtifactInstruction receives at construction time: ChangeRepository, a map of SpecRepository instances, SchemaProvider, ArtifactParserRegistry, TemplateExpander, and…\n- Input: GetArtifactInstruction.execute receives: - name (string, required) — the change name - artifactId (string, optional) — the artifact ID from the schema (e.g.\n- Change lookup: GetArtifactInstruction loads the change by name via ChangeRepository.\n- Schema name guard: After resolving the schema, GetArtifactInstruction MUST compare schema.name() with change.schemaName.\n- Artifact resolution: GetArtifactInstruction MUST find the artifact entry in the schema whose id matches the input artifactId.\n- Instruction resolution: GetArtifactInstruction MUST resolve each instruction component independently: - rulesPre — if the artifact declares rules.pre, collect all entries' text in declaration order.\n- Result shape: GetArtifactInstruction.execute MUST return a structured result containing: - artifactId (string) — the artifact ID - rulesPre (string\\[]) — rules.pre texts in declaration order;…\n- Dependencies: core:delta-format, core:change, core:schema-merge, core:template-variables, core:lifecycle-engine, core:schema-format\n\n## Constraints\n- This use case is read-only — it does not modify the change or execute any commands\n- rules.pre and rules.post are schema composition mechanisms — they augment the instruction without replacing it\n- The use case does not evaluate step availability or artifact status\n- Delta outline availability is derived from SpecRepository for each spec in change.specIds; missing files are silently skipped\n- Full outline trees are intentionally excluded from this result; consumers must call GetSpecOutline/specd specs outline on demand\n- ArtifactParserRegistry must contain an adapter for the artifact's format; if no adapter is registered, the use case throws ParserNotRegisteredError\n"
+  "generatedBy": "core"
 }

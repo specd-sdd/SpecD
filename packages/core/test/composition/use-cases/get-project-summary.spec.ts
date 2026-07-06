@@ -3,7 +3,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GetProjectSummary } from '../../../src/application/use-cases/get-project-summary.js'
-import { createGetProjectSummary } from '../../../src/composition/use-cases/get-project-summary.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
+import {
+  createGetProjectSummary,
+  type GetProjectSummaryDeps,
+} from '../../../src/composition/use-cases/get-project-summary.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
@@ -89,5 +93,41 @@ describe('createGetProjectSummary', () => {
     expect(useCase).toBeDefined()
     const summary = await useCase.execute()
     expect(summary.workspaceCount).toBe(1)
+  })
+
+  it('accepts explicit deps without config bootstrap', () => {
+    const listChanges = { execute: async () => [] } as never
+    const listDrafts = { execute: async () => [] } as never
+    const listDiscarded = { execute: async () => [] } as never
+    const listArchived = { execute: async () => ({ meta: { total: 0 } }) } as never
+    const listWorkspaces = { execute: async () => [] } as never
+    const deps: GetProjectSummaryDeps = {
+      listChanges,
+      listDrafts,
+      listDiscarded,
+      listArchived,
+      listWorkspaces,
+    }
+
+    expect(createGetProjectSummary(deps)).toBeInstanceOf(GetProjectSummary)
+  })
+
+  it('rejects deps plus composition options', () => {
+    const listChanges = { execute: async () => [] } as never
+    const listDrafts = { execute: async () => [] } as never
+    const listDiscarded = { execute: async () => [] } as never
+    const listArchived = { execute: async () => ({ meta: { total: 0 } }) } as never
+    const listWorkspaces = { execute: async () => [] } as never
+    const deps: GetProjectSummaryDeps = {
+      listChanges,
+      listDrafts,
+      listDiscarded,
+      listArchived,
+      listWorkspaces,
+    }
+
+    expect(() =>
+      createGetProjectSummary(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
+    ).toThrow(InvalidCompositionFactoryArgumentsError)
   })
 })

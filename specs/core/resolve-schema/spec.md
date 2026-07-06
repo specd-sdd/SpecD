@@ -55,6 +55,19 @@ This may require extending `SchemaRegistry.resolve()` to return a richer result 
 
 `ResolveSchema` is idempotent — multiple executions with the same construction config produce equivalent `Schema` objects. The resolution pipeline has no side effects that alter subsequent calls.
 
+### Requirement: Config-based factory delegates through resolveResolveSchemaDeps
+
+The config-based `createResolveSchema(config, options?)` form MUST derive `ResolveSchemaDeps` through `resolveResolveSchemaDeps(resolver)` and then delegate to canonical `createResolveSchema(deps)`.
+
+`resolveResolveSchemaDeps(resolver)` MUST resolve:
+
+- `schemas: SchemaRegistry`
+- `schemaRef: string`
+- `schemaPlugins: readonly string[]`
+- `schemaOverrides: SchemaOperations | undefined`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - `ResolveSchema` is an application use case — it lives in `application/use-cases/`
@@ -66,9 +79,10 @@ This may require extending `SchemaRegistry.resolve()` to return a richer result 
 
 ## Spec Dependencies
 
-- [`core:schema-format`](../schema-format/spec.md) — `kind`, `extends`, schema structure
-- [`core:schema-merge`](../schema-merge/spec.md) — `mergeSchemaLayers`, `SchemaLayer`
-- [`core:build-schema`](../build-schema/spec.md) — `buildSchema`, `SchemaYamlData`
-- [`core:schema-registry-port`](../schema-registry-port/spec.md) — `SchemaRegistry` port
-- [`core:config`](../config/spec.md) — `schemaPlugins`, `schemaOverrides` fields
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — use case design
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:schema-merge`](../schema-merge/spec.md)
+- [`core:build-schema`](../build-schema/spec.md)
+- [`core:schema-registry-port`](../schema-registry-port/spec.md)
+- [`core:config`](../config/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

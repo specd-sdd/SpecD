@@ -1,0 +1,73 @@
+- op: modified
+  description: 'Remove graph-store-specific KernelOptions scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: createKernel accepts optional KernelOptions'
+  content: |
+    #### Scenario: Extra node_modules paths appended to schema search
+
+    - **GIVEN** a `KernelOptions` with `extraNodeModulesPaths: ['/usr/lib/node_modules']`
+    - **WHEN** `createKernel(config, options)` is called
+    - **THEN** the schema registry searches the project's own `node_modules` first, then `/usr/lib/node_modules`
+
+    #### Scenario: No options provided
+
+    - **WHEN** `createKernel(config)` is called without options
+    - **THEN** the schema registry searches only the project's own `node_modules`
+- op: modified
+  description: 'Remove graph-store capability category from additive-registry verification'
+  selector:
+    type: section
+    matches: 'Scenario: External registrations extend built-ins'
+  content: |
+    #### Scenario: External registrations extend built-ins
+
+    - **GIVEN** built-in storages, parsers, VCS providers, actor providers, and external hook runners are available
+    - **WHEN** `createKernel(config, options)` is called with additional registrations in one or more categories
+    - **THEN** the built kernel uses a merged capability set that includes both the built-ins and the newly registered entries
+    - **AND** omitting a category from `KernelOptions` leaves that built-in category unchanged
+- op: modified
+  description: 'Remove graph-store capability category from merged-registry verification'
+  selector:
+    type: section
+    matches: 'Scenario: Exposed registries reflect the merged construction set'
+  content: |
+    #### Scenario: Exposed registries reflect the merged construction set
+
+    - **GIVEN** external registrations were provided during kernel construction
+    - **WHEN** the built kernel's registry view is inspected
+    - **THEN** it exposes the final merged set of storage factories, parsers, providers, and external hook runners actually used for construction
+    - **AND** the view includes built-ins as well as accepted external registrations
+- op: modified
+  description: 'Remove graph-store-specific invalid-registry scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Kernel rejects invalid registry references'
+  content: |
+    #### Scenario: Conflicting registration names fail before kernel construction
+
+    - **GIVEN** an external registration uses a name already claimed by a built-in or previously-registered external entry in the same registry category
+    - **WHEN** `createKernel(config, options)` processes the registrations
+    - **THEN** kernel construction fails with a clear conflict error
+    - **AND** the conflicting registration does not overwrite the existing entry
+
+    #### Scenario: Unknown registry reference in config or workflow fails clearly
+
+    - **GIVEN** configuration or workflow data names an adapter, parser, provider, or external hook type that is absent from the merged registry set
+    - **WHEN** the kernel resolves that reference
+    - **THEN** specd fails with a clear unknown-reference error
+    - **AND** the reference is not ignored or deferred silently
+- op: added
+  description: 'Verify kernel remains a facade over composition-owned registry primitives'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Kernel is a facade over composition-owned registry primitives
+
+    #### Scenario: Kernel does not own merged-registry semantics
+
+    - **WHEN** `createKernel(...)` assembles use cases and exposes merged capabilities
+    - **THEN** it reuses composition-owned registry primitives also consumed by the resolver and builder
+    - **AND** it does not maintain a separate registry-merging source of truth

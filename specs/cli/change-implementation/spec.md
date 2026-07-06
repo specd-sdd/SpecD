@@ -118,3 +118,6 @@ The CLI MUST NOT require users to enter canonical `workspace:path` identities du
 
 - [`core:change`](../../core/change/spec.md) — tracked implementation file state and confirmed link behavior
 - [`code-graph:symbol-model`](../../code-graph/symbol-model/spec.md) — file-level and symbol-level graph relations
+- [`core:update-implementation-tracking`](../../core/update-implementation-tracking/spec.md) — core mutation primitive for tracked files and confirmed links
+- [`core:get-implementation-review`](../../core/get-implementation-review/spec.md) — core read model for implementation review
+- [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — autodetection-driven refresh path reused by implementation review flows

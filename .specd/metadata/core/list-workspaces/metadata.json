@@ -1,7 +1,12 @@
 {
   "title": "List Workspaces",
   "description": "The project configuration defines workspaces as isolated units of specs, code, and ownership, but consumers need a unified way to discover and interact with these workspaces alongside their initialized storage adapters. The `ListWorkspaces` use case orchestrates the project configuration with the available repository instances, providing a rich, single source of truth for project traversal. It is the foundational query for discovery UIs, CLI status reporting, and graph indexing.",
-  "dependsOn": ["core:config", "core:workspace", "core:spec-repository-port"],
+  "dependsOn": [
+    "core:config",
+    "core:workspace",
+    "core:spec-repository-port",
+    "core:composition-resolver"
+  ],
   "context": [
     "The project configuration defines workspaces as isolated units of specs, code, and ownership, but consumers need a unified way to discover and interact with these workspaces alongside their initialized storage adapters. The `ListWorkspaces` use case orchestrates the project configuration with the available repository instances, providing a rich, single source of truth for project traversal. It is the foundational query for discovery UIs, CLI status reporting, and graph indexing."
   ],
@@ -28,6 +33,12 @@
       "requirement": "Config-based factory preserves canonical spec repository bootstrap",
       "rules": [
         "When `createListWorkspaces(config)` initializes `SpecRepository` instances from `SpecdConfig`, each repository MUST be bootstrapped with canonical metadata-path semantics for that workspace.\n\nThe config-based factory MUST NOT derive a weaker or divergent metadata lookup strategy than the canonical repository bootstrap used by the composition layer. Status and context consumers that receive `ProjectWorkspace.specRepo` from `ListWorkspaces` MUST observe a complete and stable spec repository view."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListWorkspacesDeps",
+      "rules": [
+        "The config-based `createListWorkspaces(config, options?)` form MUST derive `ListWorkspacesDeps` through `resolveListWorkspacesDeps(resolver)` and then delegate to canonical `createListWorkspaces(deps)`.\n\n`resolveListWorkspacesDeps(resolver)` MUST resolve:\n\n- `config: SpecdConfig`\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -84,31 +95,30 @@
         "each returned repository uses canonical metadata-path semantics for that workspace",
         "AND the config-based factory does not expose a weaker spec repository view than the canonical composition bootstrap"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListWorkspacesDeps",
+      "name": "createListWorkspaces config form derives ListWorkspacesDeps through resolveListWorkspacesDeps",
+      "when": ["createListWorkspaces(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ListWorkspacesDeps through resolveListWorkspacesDeps(resolver)",
+        "AND resolveListWorkspacesDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createListWorkspaces(deps)"
+      ]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "core:list-workspaces",
-        "file": "core:test/composition/shared-repository-wiring.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:list-workspaces",
-        "file": "core:src/composition/shared-repository-wiring.ts",
-        "symbol": "createSharedSpecRepositories"
-      },
-      {
-        "specId": "core:list-workspaces",
-        "file": "core:src/composition/use-cases/list-workspaces.ts",
-        "symbol": "createListWorkspaces"
+        "file": "core:src/composition/use-cases/list-workspaces.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:7c92ae52449579c21a78db2b41c91f1ec670da6397033f343212a7b131ed8a8a",
-    "verify.md": "sha256:0734f7720b825bc80d3edd56236420f46bb338ee2c5ea380f7ca27852d0c27c3"
+    "spec.md": "sha256:ca6a70c6ee0f050a401ace3d822500c1f4e6d511034a9af89e5362fc7b09dfbc",
+    "verify.md": "sha256:3ca4f6036edfa4937087d64fc95802fe2ca882e9ed199a8ce602f2937b47d43d"
   },
   "generatedBy": "core"
 }

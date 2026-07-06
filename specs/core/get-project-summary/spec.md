@@ -60,6 +60,20 @@ In particular, summary reads MUST inherit schema-driven artifact-type behavior f
 
 `createKernel()` MUST wire `GetProjectSummary` on `kernel.project.getProjectSummary`.
 
+### Requirement: Config-based factory delegates through resolveGetProjectSummaryDeps
+
+The config-based `createGetProjectSummary(config, options?)` form MUST derive `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)` and then delegate to canonical `createGetProjectSummary(deps)`.
+
+`resolveGetProjectSummaryDeps(resolver)` MUST resolve:
+
+- `listChanges: ListChanges`
+- `listDrafts: ListDrafts`
+- `listDiscarded: ListDiscarded`
+- `listArchived: ListArchived`
+- `listWorkspaces: ListWorkspaces`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT invoke code-graph providers or context compilation.
@@ -68,9 +82,10 @@ In particular, summary reads MUST inherit schema-driven artifact-type behavior f
 
 ## Spec Dependencies
 
-- [`core:list-workspaces`](../list-workspaces/spec.md) — workspace orchestration and `SpecRepository.count()` access
-- [`core:list-changes`](../list-changes/spec.md) — active change enumeration
-- [`core:list-drafts`](../list-drafts/spec.md) — draft enumeration
-- [`core:list-discarded`](../list-discarded/spec.md) — discarded change enumeration
-- [`core:list-archived`](../list-archived/spec.md) — archived change enumeration
-- [`core:kernel`](../kernel/spec.md) — kernel wiring contract for `project` query use cases
+- [`core:list-workspaces`](../list-workspaces/spec.md)
+- [`core:list-changes`](../list-changes/spec.md)
+- [`core:list-drafts`](../list-drafts/spec.md)
+- [`core:list-discarded`](../list-discarded/spec.md)
+- [`core:list-archived`](../list-archived/spec.md)
+- [`core:kernel`](../kernel/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

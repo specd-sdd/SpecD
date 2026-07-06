@@ -199,3 +199,18 @@
 - **WHEN** `RunStepHooks.execute` is called with `step: "archiving"`, `phase: "pre"`
 - **THEN** `pnpm test` is executed via `HookRunner`
 - **AND** the result includes the hook outcome
+
+### Requirement: Config-based factory delegates through resolveRunStepHooksDeps
+
+#### Scenario: createRunStepHooks config form derives RunStepHooksDeps through resolveRunStepHooksDeps
+
+- **WHEN** `createRunStepHooks(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `RunStepHooksDeps` through `resolveRunStepHooksDeps(resolver)`
+- **AND** `resolveRunStepHooksDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `archive: ArchiveRepository`
+- `hooks: HookRunner`
+- `externalHookRunners: ReadonlyMap<string, ExternalHookRunner>`
+- `schemaProvider: SchemaProvider`
+- **AND** the factory delegates to canonical `createRunStepHooks(deps)`

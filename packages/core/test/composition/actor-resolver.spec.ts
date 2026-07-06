@@ -7,7 +7,7 @@ import { NullAutoDetectActorProvider } from '../../src/composition/null-actor-pr
 import { GitActorResolver } from '../../src/infrastructure/git/actor-resolver.js'
 import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 import { type ActorResolver } from '../../src/application/ports/actor-resolver.js'
-import { type AutoDetectActorProvider } from '../../src/composition/kernel-registries.js'
+import { type AutoDetectActorProvider } from '../../src/composition/composition-registries.js'
 
 describe('createVcsActorResolver', () => {
   describe('VCS detection priority', () => {

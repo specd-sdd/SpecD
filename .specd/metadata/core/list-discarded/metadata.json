@@ -5,7 +5,8 @@
     "core:change",
     "core:kernel",
     "core:discarded-change-view",
-    "core:change-repository-port"
+    "core:change-repository-port",
+    "core:composition-resolver"
   ],
   "context": [
     "Discarded changes remain in storage for audit purposes, and teams need to review them — for example, to confirm a superseded change was properly replaced. The `ListDiscarded` use case retrieves all discarded changes from the default workspace, providing visibility into abandoned work that has not been permanently deleted."
@@ -39,6 +40,12 @@
       "requirement": "Config-based factory preserves complete change repository bootstrap",
       "rules": [
         "When `createListDiscarded(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.\n\nThe config-based factory MUST NOT construct a weaker repository variant that can derive different discarded artifact states for the same persisted change than the canonical listing read path."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListDiscardedDeps",
+      "rules": [
+        "The config-based `createListDiscarded(config, options?)` form MUST derive `ListDiscardedDeps` through `resolveListDiscardedDeps(resolver)` and then delegate to canonical `createListDiscarded(deps)`.\n\n`resolveListDiscardedDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -123,20 +130,30 @@
         "discarded artifact states are derived with complete artifact-type and spec-existence bootstrap semantics",
         "AND the config-based factory does not expose a weaker change repository variant"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListDiscardedDeps",
+      "name": "createListDiscarded config form derives ListDiscardedDeps through resolveListDiscardedDeps",
+      "when": ["createListDiscarded(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ListDiscardedDeps through resolveListDiscardedDeps(resolver)",
+        "AND resolveListDiscardedDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createListDiscarded(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:list-discarded",
-        "file": "core:src/composition/use-cases/list-discarded.ts",
-        "symbol": "createListDiscarded"
+        "file": "core:src/composition/use-cases/list-discarded.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:625d8fbb29b435628c9114e4abb8d7673a995f2b04eddd93d2dbc7f3f7c1920b",
-    "verify.md": "sha256:c0fc4e42a1237256874278dc2b9dfb36d32a84cbc266e9080b1ab0558fe77605"
+    "spec.md": "sha256:ee21239f19f95a0b47edb8306e5025095cb84f7ffe07a3d044d2cba8370d447d",
+    "verify.md": "sha256:1383d7d64aa32084f01d2dd8d61d9fb64298eb1b5381b3809e54d1558cfb51ce"
   },
   "generatedBy": "core"
 }

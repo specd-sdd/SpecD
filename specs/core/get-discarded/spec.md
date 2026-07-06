@@ -29,6 +29,16 @@ The use case MUST NOT fall back to `ChangeRepository.get(name)` or `getDraft(nam
 
 `GetDiscarded` depends on `ChangeRepository` injected via constructor.
 
+### Requirement: Config-based factory delegates through resolveGetDiscardedDeps
+
+The config-based `createGetDiscarded(config, options?)` form MUST derive `GetDiscardedDeps` through `resolveGetDiscardedDeps(resolver)` and then delegate to canonical `createGetDiscarded(deps)`.
+
+`resolveGetDiscardedDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - Listing all discarded changes remains `ListDiscarded`.
@@ -36,6 +46,7 @@ The use case MUST NOT fall back to `ChangeRepository.get(name)` or `getDraft(nam
 
 ## Spec Dependencies
 
-- [`core:discarded-change-view`](discarded-change-view/spec.md) — return type
-- [`core:change`](../../../../specs/core/change/spec.md) — discard semantics and `discarded` event
-- [`core:change-repository-port`](../../../../specs/core/change-repository-port/spec.md) — `getDiscarded`
+- [`core:discarded-change-view`](../discarded-change-view/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:change-repository-port`](../change-repository-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

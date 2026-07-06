@@ -6,7 +6,8 @@
     "core:content-extraction",
     "core:schema-format",
     "core:spec-id-format",
-    "core:spec-repository-port"
+    "core:spec-repository-port",
+    "core:composition-resolver"
   ],
   "context": [
     "Metadata must be producible deterministically from spec content so that every project gets a consistent baseline without requiring LLM involvement. The `GenerateSpecMetadata` use case achieves this by resolving a spec ID, loading its artifacts, parsing them into ASTs, running the schema's `metadataExtraction` engine, computing content hashes, and returning the assembled `.specd-metadata.yaml` content."
@@ -58,6 +59,12 @@
       "requirement": "Assembled result",
       "rules": [
         "The final metadata object merges:\n\n- all fields from `extractMetadata()` output\n- canonical `dependsOn` determined by the dependency-resolution rules above\n- implementation projection from persisted repository semantics\n- `contentHashes` from the hashing step\n- `generatedBy: 'core'`\n\nThe result is returned with `hasExtraction: true`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGenerateSpecMetadataDeps",
+      "rules": [
+        "The config-based `createGenerateSpecMetadata(config, options?)` form MUST derive `GenerateSpecMetadataDeps` through `resolveGenerateSpecMetadataDeps(resolver)` and then delegate to canonical `createGenerateSpecMetadata(deps)`.\n\n`resolveGenerateSpecMetadataDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `hasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -262,25 +269,30 @@
       "then": [
         "the returned metadata contains fields from extractMetadata() plus contentHashes and generatedBy: 'core'"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGenerateSpecMetadataDeps",
+      "name": "createGenerateSpecMetadata config form derives GenerateSpecMetadataDeps through resolveGenerateSpecMetadataDeps",
+      "when": ["createGenerateSpecMetadata(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GenerateSpecMetadataDeps through resolveGenerateSpecMetadataDeps(resolver)",
+        "AND resolveGenerateSpecMetadataDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGenerateSpecMetadata(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:generate-metadata",
-        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-        "symbol": "GenerateSpecMetadata"
-      },
-      {
-        "specId": "core:generate-metadata",
-        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-        "symbol": "projectImplementationMetadata"
+        "file": "core:src/composition/use-cases/generate-spec-metadata.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:756c43b6d0ea81d2dbad3dc45236b0aef7b805db081ee7a5b09dd0e1d9f1f613",
-    "verify.md": "sha256:7beb1ffc917b0523be23ed7730663dddc43049b1482cba24309db9a079f6f9bb"
+    "spec.md": "sha256:072a3c5265f368eaea5561d9e39d438fb28a66b77869f1cd50bf7cd60769793b",
+    "verify.md": "sha256:61134eac917761cb40c75ca243c5265f985753d9c2e56b0f7c976ca8a27fa94f"
   },
   "generatedBy": "core"
 }

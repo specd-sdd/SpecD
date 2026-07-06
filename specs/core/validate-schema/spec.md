@@ -75,6 +75,18 @@ When validating a file or ref that declares `extends` and the extends chain reso
 
 When the extends reference cannot be resolved (e.g. the parent is an npm package not installed), the use case SHALL return a failure result with the resolution error — extends resolution is not optional in file or ref mode.
 
+### Requirement: Config-based factory delegates through resolveValidateSchemaDeps
+
+The config-based `createValidateSchema(config, options?)` form MUST derive `ValidateSchemaDeps` through `resolveValidateSchemaDeps(resolver)` and then delegate to canonical `createValidateSchema(deps)`.
+
+`resolveValidateSchemaDeps(resolver)` MUST resolve:
+
+- `schemas: SchemaRegistry`
+- `schemaRef: string`
+- `buildSchemaFn: ( ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>, )`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - `ValidateSchema` is an application use case — it lives in `application/use-cases/`
@@ -86,7 +98,8 @@ When the extends reference cannot be resolved (e.g. the parent is an npm package
 
 ## Spec Dependencies
 
-- [`core:resolve-schema`](../resolve-schema/spec.md) — delegated to for project resolved mode
-- [`core:build-schema`](../build-schema/spec.md) — semantic validation service
-- [`core:schema-registry-port`](../schema-registry-port/spec.md) — resolution port for all I/O
-- [`core:parse-schema-yaml`](../parse-schema-yaml/spec.md) — structural validation (internal to registry)
+- [`core:resolve-schema`](../resolve-schema/spec.md)
+- [`core:build-schema`](../build-schema/spec.md)
+- [`core:schema-registry-port`](../schema-registry-port/spec.md)
+- [`core:parse-schema-yaml`](../parse-schema-yaml/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

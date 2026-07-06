@@ -1,57 +1,91 @@
 import { ListDrafts } from '../../application/use-cases/list-drafts.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSharedChangeRepository } from '../shared-repository-wiring.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createListDrafts(context, options)`. */
-export interface ListDraftsContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createListDrafts(context, options)`. */
-export interface FsListDraftsOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
+/**
+ * Explicit dependencies for {@link createListDrafts}.
+ */
+export interface ListDraftsDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
 }
 
 /**
- * Constructs a `ListDrafts` use case with full project config.
+ * Resolves {@link ListDraftsDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ListDrafts`
+ */
+export function resolveListDraftsDeps(resolver: CompositionResolver): ListDraftsDeps {
+  return { changes: resolver.getChangeRepository() }
+}
+
+/**
+ * Constructs a `ListDrafts` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createListDrafts(deps: ListDraftsDeps): ListDrafts
+/**
+ * Constructs a `ListDrafts` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createListDrafts(config: SpecdConfig): ListDrafts
-/**
- * Constructs a `ListDrafts` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for draft resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createListDrafts(
-  context: ListDraftsContext,
-  options: FsListDraftsOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ListDrafts
 /**
- * Constructs a `ListDrafts` instance wired with filesystem adapters.
+ * Constructs a `ListDrafts` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createListDrafts(
-  configOrContext: SpecdConfig | ListDraftsContext,
-  options?: FsListDraftsOptions,
+  depsOrConfig: ListDraftsDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ListDrafts {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const changeRepo = createSharedChangeRepository({ config })
-    return new ListDrafts(changeRepo)
+  const normalized = normalizeCompositionFactoryArgs(
+    'createListDrafts',
+    depsOrConfig,
+    options,
+    isListDraftsDeps,
+  )
+  return createListDraftsFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ListDrafts` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createListDraftsFromNormalized(
+  input: FactoryInput<ListDraftsDeps, CompositionResolutionOptions>,
+): ListDrafts {
+  if (input.kind === 'deps') {
+    return new ListDrafts(input.deps.changes)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  return new ListDrafts(changeRepo)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createListDrafts(resolveListDraftsDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ListDraftsDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isListDraftsDeps(value: ListDraftsDeps | SpecdConfig): value is ListDraftsDeps {
+  return 'changes' in value
 }

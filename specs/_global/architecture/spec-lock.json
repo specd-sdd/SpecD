@@ -4,5 +4,12 @@
     "version": 1
   },
   "dependsOn": [],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "default:packages/core/src/composition/composition-resolver.ts"
+    },
+    {
+      "file": "default:packages/core/src/composition/kernel.ts"
+    }
+  ]
 }

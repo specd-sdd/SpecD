@@ -27,7 +27,7 @@ This approach has two problems. First, it leaks infrastructure detail: delivery 
 - Port-level factories only — caller constructs ports and wires them into use cases manually
 - Use-case-level factories — composition constructs and wires ports internally, exposes pre-wired use cases
 - Use-case-level factories + kernel + config loader port — adds a single-entry-point kernel that builds all use cases from a typed config object, with config loading separated behind a port
-- Use-case factories accepting `SpecdConfig` directly — factories can be called with a fully resolved config object in addition to the explicit `(context, options)` form
+- Use-case factories accepting `SpecdConfig` directly — factories can be called with a fully resolved config object in addition to the explicit deps form
 
 ## Decision Outcome
 
@@ -35,9 +35,9 @@ Chosen option: "Use-case-level factories + kernel + config loader port", because
 
 The composition layer is structured in three levels:
 
-**Level 1 — Use-case factories** (`composition/use-cases/`): each factory (e.g. `createArchiveChange`) accepts either a fully resolved `SpecdConfig` or an explicit `(context, options)` pair. Both call signatures are public. The explicit form covers composition without the full kernel; in current code it is primarily used for explicit filesystem-backed wiring rather than arbitrary mock injection. Repository-level factories (`createSpecRepository`, etc.) are also internal to this level.
+**Level 1 — Use-case factories** (`composition/use-cases/`): each factory (e.g. `createArchiveChange`) accepts either a fully resolved `SpecdConfig` or an explicit dependency object (`createX(deps)`). Config-based calls bootstrap through a shared `CompositionResolver`; dependency-based calls are the canonical low-level entrypoint for standalone composition and tests. Repository-level factories (`createSpecRepository`, etc.) remain internal to this level.
 
-**Level 2 — Kernel** (`composition/kernel.ts`): `createKernel(config: SpecdConfig)` is a convenience that calls every use-case factory with the same `SpecdConfig` and returns an object with all pre-wired use cases. Delivery mechanisms that need the full set call `createKernel`; those that need a single use case call its factory directly.
+**Level 2 — Kernel** (`composition/kernel.ts`): `createKernel(config: SpecdConfig)` is a convenience that creates one composition session, reuses the same shared resolver state, and assembles all public use-case factories into a grouped kernel. Delivery mechanisms that need the full set call `createKernel`; those that need a single use case call its factory directly.
 
 **Level 3 — Config loader** (`application/ports/config-loader.ts` + `infrastructure/`): `ConfigLoader` is a port that resolves a `SpecdConfig` from one or more sources. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) can add new sources without touching the kernel or any delivery layer. The CLI calls `loadConfig()` and passes the result to `createKernel` or to individual use-case factories.
 
@@ -57,7 +57,7 @@ The composition layer is structured in three levels:
 The composition surface has evolved since this ADR was accepted:
 
 - `createKernel(...)` is now asynchronous.
-- `@specd/core` now also exposes `createKernelBuilder(...)` and additive kernel registries for storage factories, parsers, VCS providers, actor providers, and external hook runners.
+- `@specd/core/extensions` now exposes `createKernelBuilder(...)` and additive composition registries for storage factories, parsers, VCS providers, actor providers, and external hook runners.
 - Some concrete composition-layer adapters are now exported publicly, so the "never exported" language in this ADR should be read as the original design intent, not the exact current export surface.
 
 ### Original confirmation criteria

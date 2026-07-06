@@ -1,0 +1,30 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveListSpecsDeps
+
+    The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.
+
+    `resolveListSpecsDeps(resolver)` MUST resolve:
+
+    - `listWorkspaces: ListWorkspaces`
+    - `hasher: ContentHasher`
+    - `yaml: YamlSerializer`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:content-extraction`](../content-extraction/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:list-workspaces`](../list-workspaces/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

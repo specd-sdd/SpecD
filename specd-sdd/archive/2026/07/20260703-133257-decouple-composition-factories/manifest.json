@@ -1,0 +1,5328 @@
+{
+  "name": "decouple-composition-factories",
+  "createdAt": "2026-07-03T13:32:57.899Z",
+  "description": "Normalize @specd/core composition factories around canonical createX(deps) and convenience createX(config, options?) entry points backed by a shared CompositionResolver. Make the kernel and kernel builder pure orchestration over that same resolver path, remove core-owned graph-store extensibility, and align compile-context, get-project-context, and project-status graph behavior with the merged specs.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:composition",
+    "core:kernel",
+    "default:_global/architecture",
+    "core:kernel-builder",
+    "core:create-change",
+    "core:get-status",
+    "core:transition-change",
+    "core:draft-change",
+    "core:restore-change",
+    "core:discard-change",
+    "core:archive-change",
+    "core:composition-resolver",
+    "core:validate-artifacts",
+    "core:compile-context",
+    "core:list-changes",
+    "core:list-drafts",
+    "core:list-discarded",
+    "core:edit-change",
+    "core:skip-artifact",
+    "core:update-spec-deps",
+    "core:list-archived",
+    "core:get-archived-change",
+    "core:run-step-hooks",
+    "core:get-hook-instructions",
+    "core:get-artifact-instruction",
+    "core:approve-spec",
+    "core:approve-signoff",
+    "core:list-specs",
+    "core:get-spec",
+    "core:save-spec-metadata",
+    "core:invalidate-spec-metadata",
+    "core:get-active-schema",
+    "core:validate-specs",
+    "core:generate-metadata",
+    "core:get-spec-context",
+    "core:list-workspaces",
+    "core:get-project-context",
+    "core:get-config",
+    "core:project-metadata",
+    "core:update-project-metadata",
+    "core:resolve-schema",
+    "core:spec-overlap",
+    "core:get-draft",
+    "core:get-discarded",
+    "core:invalidate-change",
+    "core:search-specs",
+    "core:preview-spec",
+    "core:validate-schema",
+    "core:get-spec-outline",
+    "core:update-implementation-tracking",
+    "core:refresh-implementation-tracking",
+    "core:get-implementation-review",
+    "core:update-spec-metadata",
+    "core:get-project-summary",
+    "default:_global/docs",
+    "cli:change-implementation",
+    "sdk:build-project-status-snapshot"
+  ],
+  "specDependsOn": {
+    "core:composition": [
+      "default:_global/architecture",
+      "core:resolve-schema",
+      "core:config-writer-port",
+      "core:kernel-builder",
+      "core:composition-resolver"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:save-spec-metadata",
+      "core:invalidate-spec-metadata",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap"
+    ],
+    "default:_global/architecture": [],
+    "core:kernel-builder": [
+      "core:kernel",
+      "core:composition",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:create-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:get-active-schema",
+      "core:spec-overlap",
+      "core:composition-resolver"
+    ],
+    "core:get-status": [
+      "core:change",
+      "core:kernel",
+      "core:transition-change",
+      "core:schema-format",
+      "core:config",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver"
+    ],
+    "core:transition-change": [
+      "core:change",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:workflow-model",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver"
+    ],
+    "core:draft-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:drafted-change-view",
+      "core:composition-resolver"
+    ],
+    "core:restore-change": [
+      "core:change",
+      "core:draft-change",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:discard-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging",
+      "core:spec-lock",
+      "default:_global/error-handling-conventions",
+      "core:composition-resolver"
+    ],
+    "core:composition-resolver": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:kernel",
+      "core:kernel-builder"
+    ],
+    "core:validate-artifacts": [
+      "core:change",
+      "core:change-layout",
+      "core:change-manifest",
+      "core:lifecycle-engine",
+      "core:delta-format",
+      "core:selector-model",
+      "core:storage",
+      "default:_global/architecture",
+      "core:spec-id-format",
+      "core:schema-format",
+      "core:composition-resolver"
+    ],
+    "core:compile-context": [
+      "core:change",
+      "core:config",
+      "core:spec-metadata",
+      "core:schema-format",
+      "core:delta-format",
+      "core:selector-model",
+      "core:spec-id-format",
+      "core:workspace",
+      "core:get-artifact-instruction",
+      "core:get-hook-instructions",
+      "core:preview-spec",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:core/project-metadata",
+      "core:composition-resolver"
+    ],
+    "core:list-changes": ["core:change", "core:kernel", "core:composition-resolver"],
+    "core:list-drafts": ["core:change", "core:kernel", "core:composition-resolver"],
+    "core:list-discarded": [
+      "core:change",
+      "core:kernel",
+      "core:discarded-change-view",
+      "core:change-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:edit-change": ["core:change", "core:composition", "core:composition-resolver"],
+    "core:skip-artifact": ["core:change", "core:composition", "core:composition-resolver"],
+    "core:update-spec-deps": [
+      "core:change",
+      "core:spec-id-format",
+      "core:compile-context",
+      "core:composition",
+      "default:_global/error-handling-conventions",
+      "core:composition-resolver"
+    ],
+    "core:list-archived": [
+      "core:archive-change",
+      "core:storage",
+      "core:kernel",
+      "default:_global/architecture",
+      "core:archived-change-index-entry",
+      "core:composition-resolver"
+    ],
+    "core:get-archived-change": [
+      "core:archive-change",
+      "core:storage",
+      "core:change",
+      "core:kernel",
+      "default:_global/architecture",
+      "core:archived-change-index-entry",
+      "core:read-only-change-view",
+      "core:composition-resolver"
+    ],
+    "core:run-step-hooks": [
+      "core:hook-execution-model",
+      "core:hook-runner-port",
+      "core:external-hook-runner-port",
+      "core:schema-format",
+      "core:config",
+      "core:change",
+      "core:template-variables",
+      "core:archive-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:get-hook-instructions": [
+      "core:hook-execution-model",
+      "core:schema-format",
+      "core:config",
+      "core:change",
+      "core:template-variables",
+      "core:archive-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:get-artifact-instruction": [
+      "core:delta-format",
+      "core:change",
+      "core:schema-merge",
+      "core:template-variables",
+      "core:lifecycle-engine",
+      "core:schema-format",
+      "core:composition-resolver"
+    ],
+    "core:approve-spec": [
+      "core:change",
+      "core:schema-format",
+      "core:composition",
+      "core:kernel",
+      "core:composition-resolver"
+    ],
+    "core:approve-signoff": [
+      "core:change",
+      "core:schema-format",
+      "core:composition",
+      "core:kernel",
+      "core:composition-resolver"
+    ],
+    "core:list-specs": [
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:storage",
+      "core:workspace",
+      "core:list-workspaces",
+      "core:composition-resolver"
+    ],
+    "core:get-spec": [
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:composition-resolver"
+    ],
+    "core:save-spec-metadata": [
+      "core:spec-metadata",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:invalidate-spec-metadata": [
+      "core:spec-metadata",
+      "core:storage",
+      "core:composition-resolver"
+    ],
+    "core:get-active-schema": [
+      "core:resolve-schema",
+      "core:config",
+      "core:schema-format",
+      "core:schema-registry-port",
+      "core:build-schema",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:validate-specs": [
+      "core:validate-artifacts",
+      "core:schema-format",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:composition-resolver"
+    ],
+    "core:generate-metadata": [
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:schema-format",
+      "core:spec-id-format",
+      "core:spec-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:get-spec-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:list-workspaces",
+      "core:composition-resolver"
+    ],
+    "core:list-workspaces": [
+      "core:config",
+      "core:workspace",
+      "core:spec-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:get-project-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:core/project-metadata",
+      "core:composition-resolver"
+    ],
+    "core:get-config": ["core:config", "default:_global/architecture", "core:composition-resolver"],
+    "core:project-metadata": ["core:config", "core:composition-resolver"],
+    "core:update-project-metadata": ["core:project-metadata", "core:composition-resolver"],
+    "core:resolve-schema": [
+      "core:schema-format",
+      "core:schema-merge",
+      "core:build-schema",
+      "core:schema-registry-port",
+      "core:config",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:spec-overlap": [
+      "core:change",
+      "core:list-changes",
+      "core:kernel",
+      "core:composition-resolver"
+    ],
+    "core:get-draft": [
+      "core:drafted-change-view",
+      "core:change-repository-port",
+      "core:change",
+      "core:composition-resolver"
+    ],
+    "core:get-discarded": [
+      "core:discarded-change-view",
+      "core:change",
+      "core:change-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:invalidate-change": [
+      "core:change",
+      "core:lifecycle-engine",
+      "core:config",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:search-specs": [
+      "core:spec-repository-port",
+      "core:list-specs",
+      "core:workspace",
+      "core:list-workspaces",
+      "core:composition-resolver"
+    ],
+    "core:preview-spec": [
+      "core:delta-format",
+      "core:artifact-parser-port",
+      "core:change-layout",
+      "core:file-reader-port",
+      "core:composition-resolver"
+    ],
+    "core:validate-schema": [
+      "core:resolve-schema",
+      "core:build-schema",
+      "core:schema-registry-port",
+      "core:parse-schema-yaml",
+      "core:composition-resolver"
+    ],
+    "core:get-spec-outline": [
+      "core:get-spec",
+      "core:artifact-parser-port",
+      "core:get-active-schema",
+      "core:composition-resolver"
+    ],
+    "core:update-implementation-tracking": [
+      "core:change",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver"
+    ],
+    "core:refresh-implementation-tracking": [
+      "core:change",
+      "core:implementation-detector-port",
+      "core:storage",
+      "core:archive-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:get-implementation-review": [
+      "core:change",
+      "core:update-implementation-tracking",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver"
+    ],
+    "core:update-spec-metadata": [
+      "core:spec-metadata",
+      "core:save-spec-metadata",
+      "core:composition-resolver"
+    ],
+    "core:get-project-summary": [
+      "core:list-workspaces",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:list-archived",
+      "core:kernel",
+      "core:composition-resolver"
+    ],
+    "default:_global/docs": ["default:_global/conventions"],
+    "cli:change-implementation": [
+      "core:change",
+      "code-graph:symbol-model",
+      "core:update-implementation-tracking",
+      "core:get-implementation-review",
+      "core:refresh-implementation-tracking"
+    ],
+    "sdk:build-project-status-snapshot": [
+      "sdk:host-context",
+      "core:get-project-summary",
+      "code-graph:get-graph-health"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".changeset/20260703-fix-change-repository-write-on-read-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260703-fix-change-repository-write-on-read.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config-writer-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/create-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/discard-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/draft-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-active-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-status/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/resolve-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/restore-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-registry-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/storage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/transition-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-repository-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-repository-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/core/change-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/storage/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/storage/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/storage/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/tmp/generate-composition-spec-artifacts.mjs",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/normalize-factory-args.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/invalid-composition-factory-arguments-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/discard-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/draft-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-active-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-archived-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-artifact-instruction.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-discarded.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-draft.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-hook-instructions.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-implementation-review.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-spec-outline.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/invalidate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-archived.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-changes.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-discarded.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-drafts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-workspaces.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/refresh-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/resolve-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/restore-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/run-step-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/save-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/search-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0015-use-case-level-composition.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0018-graduated-composition-levels.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/examples/implementing-a-port.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/services.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/approve-signoff.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/approve-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/create-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/detect-overlap.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/generate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-spec-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/invalidate-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/preview-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/skip-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-project-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-spec-deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-artifacts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-summary.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-status.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-changes.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-discarded.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-drafts.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/composition-resolver.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-implementation-review.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/update-implementation-tracking.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/approve-signoff.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/approve-spec.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/archive-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/compile-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/create-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-config.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-metadata.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/preview-spec.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/resolve-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/transition-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-graph-health/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/staleness-detection/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/approve-signoff/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/approve-spec/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/artifact-ast/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/artifact-parser-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/build-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-manifest/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/compile-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/content-extraction/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/edit-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/external-hook-runner-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/file-reader-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/generate-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-archived-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-summary/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/hook-execution-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/hook-runner-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/implementation-detector-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/invalidate-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel-builder/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-archived/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-changes/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-discarded/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-drafts/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-workspaces/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/parse-schema-yaml/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/refresh-implementation-tracking/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/run-step-hooks/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/save-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-merge/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/skip-artifact/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-lock/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-overlap/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/template-variables/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-spec-deps/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-artifacts/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/host-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-project-status-snapshot.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-internals.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/extensions.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/config/config-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/composition-registries.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/registry-conflict-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/actor-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/graph-store-factory.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/src/composition/null-actor-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/actor-resolver.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-internals.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-builder.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/core/get-draft/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-discarded/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/invalidate-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/search-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-outline/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-implementation/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/build-project-status-snapshot/metadata.json",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:composition-resolver",
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "fileLinkExplicit": true,
+      "symbols": [
+        "CompositionResolutionOptions",
+        "CompositionResolver",
+        "createCompositionResolver"
+      ]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/normalize-factory-args.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["FactoryInput", "normalizeCompositionFactoryArgs"]
+    },
+    {
+      "specId": "core:composition-resolver",
+      "file": "packages/core/src/domain/errors/invalid-composition-factory-arguments-error.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["InvalidCompositionFactoryArgumentsError"]
+    },
+    {
+      "specId": "default:_global/architecture",
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/architecture",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/adr/0015-use-case-level-composition.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/adr/0018-graduated-composition-levels.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/core/examples/implementing-a-port.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/core/overview.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/core/ports.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/core/services.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:kernel-builder",
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition-resolver",
+      "file": "packages/core/src/domain/errors/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/composition/use-cases/create-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:transition-change",
+      "file": "packages/core/src/composition/use-cases/transition-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:draft-change",
+      "file": "packages/core/src/composition/use-cases/draft-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:restore-change",
+      "file": "packages/core/src/composition/use-cases/restore-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:discard-change",
+      "file": "packages/core/src/composition/use-cases/discard-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:validate-artifacts",
+      "file": "packages/core/src/composition/use-cases/validate-artifacts.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/composition/use-cases/compile-context.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:list-changes",
+      "file": "packages/core/src/composition/use-cases/list-changes.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:list-drafts",
+      "file": "packages/core/src/composition/use-cases/list-drafts.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:list-discarded",
+      "file": "packages/core/src/composition/use-cases/list-discarded.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:edit-change",
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:skip-artifact",
+      "file": "packages/core/src/composition/use-cases/skip-artifact.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:update-spec-deps",
+      "file": "packages/core/src/composition/use-cases/update-spec-deps.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:list-archived",
+      "file": "packages/core/src/composition/use-cases/list-archived.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-archived-change",
+      "file": "packages/core/src/composition/use-cases/get-archived-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:run-step-hooks",
+      "file": "packages/core/src/composition/use-cases/run-step-hooks.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-hook-instructions",
+      "file": "packages/core/src/composition/use-cases/get-hook-instructions.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-artifact-instruction",
+      "file": "packages/core/src/composition/use-cases/get-artifact-instruction.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:approve-spec",
+      "file": "packages/core/src/composition/use-cases/approve-spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:approve-signoff",
+      "file": "packages/core/src/composition/use-cases/approve-signoff.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:list-specs",
+      "file": "packages/core/src/composition/use-cases/list-specs.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-spec",
+      "file": "packages/core/src/composition/use-cases/get-spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:save-spec-metadata",
+      "file": "packages/core/src/composition/use-cases/save-spec-metadata.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:invalidate-spec-metadata",
+      "file": "packages/core/src/composition/use-cases/invalidate-spec-metadata.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-active-schema",
+      "file": "packages/core/src/composition/use-cases/get-active-schema.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:validate-specs",
+      "file": "packages/core/src/composition/use-cases/validate-specs.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:generate-metadata",
+      "file": "packages/core/src/composition/use-cases/generate-spec-metadata.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-spec-context",
+      "file": "packages/core/src/composition/use-cases/get-spec-context.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:list-workspaces",
+      "file": "packages/core/src/composition/use-cases/list-workspaces.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/composition/use-cases/get-project-context.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-config",
+      "file": "packages/core/src/composition/use-cases/get-config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:project-metadata",
+      "file": "packages/core/src/composition/use-cases/get-project-metadata.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:update-project-metadata",
+      "file": "packages/core/src/composition/use-cases/update-project-metadata.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-schema",
+      "file": "packages/core/src/composition/use-cases/resolve-schema.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:spec-overlap",
+      "file": "packages/core/src/composition/use-cases/detect-overlap.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-draft",
+      "file": "packages/core/src/composition/use-cases/get-draft.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-discarded",
+      "file": "packages/core/src/composition/use-cases/get-discarded.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:invalidate-change",
+      "file": "packages/core/src/composition/use-cases/invalidate-change.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:search-specs",
+      "file": "packages/core/src/composition/use-cases/search-specs.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/src/composition/use-cases/preview-spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:validate-schema",
+      "file": "packages/core/src/composition/use-cases/validate-schema.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-spec-outline",
+      "file": "packages/core/src/composition/use-cases/get-spec-outline.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:update-implementation-tracking",
+      "file": "packages/core/src/composition/use-cases/update-implementation-tracking.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:refresh-implementation-tracking",
+      "file": "packages/core/src/composition/use-cases/refresh-implementation-tracking.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-implementation-review",
+      "file": "packages/core/src/composition/use-cases/get-implementation-review.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:update-spec-metadata",
+      "file": "packages/core/src/composition/use-cases/update-spec-metadata.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-implementation",
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-implementation",
+      "file": "packages/cli/src/commands/change/_implementation-tracking.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetProjectContext"]
+    },
+    {
+      "specId": "sdk:build-project-status-snapshot",
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildProjectStatusSnapshot"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CompileContext"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:build-project-status-snapshot",
+      "file": "packages/sdk/test/orchestration/build-project-status-snapshot.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition-resolver",
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "CompositionRegistryInput",
+        "CompositionRegistryView",
+        "createBuiltinCompositionRegistry",
+        "createCompositionRegistryView"
+      ]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel-internals.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["KernelInternals", "createKernelInternals"]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CompositionRegistryView", "createCompositionRegistryView"]
+    },
+    {
+      "specId": "core:kernel-builder",
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "CompositionRegistryView",
+        "createBuiltinCompositionRegistry",
+        "createCompositionRegistryView"
+      ]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/extensions.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/config/config-reference.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition-resolver",
+      "file": "packages/core/test/composition/composition-registries.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:254eb8eb403c0d4dac6dc94fe1b0cf8645afa25f3c24a0cbedd5547adbecdab8"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:681cc40aab01c6e71d15f42a4a677d8a2ebe8c2428b3d8a5a8d5e3cc9a600828"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0b8568df3d7ea7fad7f6c52c7ee8929ea9e239cfa1776a01f9108b067323d73a"
+        },
+        {
+          "key": "default:_global/architecture",
+          "filename": "deltas/default/_global/architecture/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:20c6057318b82b492d992e795dd461e028f64dda7676bc00d055ccf848d799f5"
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:324982851716c93ab93d1a478ecd0ba5d817d5ced6bdd21cb2efc47b0e986db8"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:85a5952ebe90bc3d4a23f2e3512d672d41c41a915e32f4ab16c654f31bff0e04"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:773256a16cc735366d7c008d7ae024b26dd851c8fed904cea413b68b6a353782"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:adb072896584faebf5bc5cc2c440bf0bc4e10f0745b27a46b8f8d523e6d7b693"
+        },
+        {
+          "key": "core:draft-change",
+          "filename": "deltas/core/draft-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1199872948637cf8d7e6e1dd2048a7ba63798807262c5e1b361818ba3bdfd9f1"
+        },
+        {
+          "key": "core:restore-change",
+          "filename": "deltas/core/restore-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c2c76df4a040a33eb7abc6143dcf0c97be95a103efc87d8bfdc281cf5fbd26fe"
+        },
+        {
+          "key": "core:discard-change",
+          "filename": "deltas/core/discard-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e21fc742e42a841371363b1e7ef492011b03e95c57d45b5a621af6090a273093"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:03b3c7e8b5321f355b1b4078037d744ed83e00907b747aa1172f57862924dbe9"
+        },
+        {
+          "key": "core:composition-resolver",
+          "filename": "specs/core/composition-resolver/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:1eb2e3e97775981e497d73a10851590350fb7d1d08aa3f3b9334c826652771e0"
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ddbf4159c168c02c297864689b7536f20b5e8ba1adea5c09a0e43e99ed61c91a"
+        },
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:073295500ca875e55223f2d6fe1f29c07f36350b745809b50cb4b6f8b3126a6f"
+        },
+        {
+          "key": "core:list-changes",
+          "filename": "deltas/core/list-changes/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e33718db7c87dd4f0380d713849a7c282ab19caf6753ca910033420c69c25e05"
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d3ded482070ab395a734c27c7c7583c0004762bb5213b625721fe34870d48cdb"
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:95d4a327ea9ca0d096bc482348bb014e8907c1e070c571c16b3ae0bc36c6532f"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a6ca6e01e0cefbd64b0c4549188f7c86e71052f2252223e1069a650e969c03dd"
+        },
+        {
+          "key": "core:skip-artifact",
+          "filename": "deltas/core/skip-artifact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cf54361df88d3d46f47088a3b1f1bb71c78c56ead72420f51d966869ec3c4c6e"
+        },
+        {
+          "key": "core:update-spec-deps",
+          "filename": "deltas/core/update-spec-deps/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e3a434fc11aacb26fae0e469ab30657f205d73e0708833af1b53cd6abf42f92d"
+        },
+        {
+          "key": "core:list-archived",
+          "filename": "deltas/core/list-archived/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9bfc712f33dc3888978ffbba28536892d79cc710ebdf5cff37458b750d2dd644"
+        },
+        {
+          "key": "core:get-archived-change",
+          "filename": "deltas/core/get-archived-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:19919e5d919e6960e98af565e39e793d03e3b56193acb592e1b64d97dfadc50b"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:be818c9f9517901d2f46036427ffbc1f2b8603d14aa3f0018610f9b24446bd35"
+        },
+        {
+          "key": "core:get-hook-instructions",
+          "filename": "deltas/core/get-hook-instructions/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b06996d91adb20581ec60047c73e78ac33150586398e7d2377869982c203ab23"
+        },
+        {
+          "key": "core:get-artifact-instruction",
+          "filename": "deltas/core/get-artifact-instruction/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5562f0ce102527be83c2bc8d87d312b1774e17523a1c9a3195557274c9d236b8"
+        },
+        {
+          "key": "core:approve-spec",
+          "filename": "deltas/core/approve-spec/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1e69e3cfa00145614b9e07b6162c5a70c66c27bf4a11e20d487da1bc3053be4b"
+        },
+        {
+          "key": "core:approve-signoff",
+          "filename": "deltas/core/approve-signoff/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ec78bdbd77db5e95b2a82b68661ccae8a5c22200a9e2a36c3b3f542d4b991cfa"
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d4759c868a92cd5d3b5815d981fc6f551a3c0b68d4d166fe32714ac216a912fb"
+        },
+        {
+          "key": "core:get-spec",
+          "filename": "deltas/core/get-spec/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:158a268aaa00edfbd8dad5e071929210f3a2e7ecadc27ac2d9f964f52dbc9fc6"
+        },
+        {
+          "key": "core:save-spec-metadata",
+          "filename": "deltas/core/save-spec-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3de9175c841530c27de8b04d72dc0b62bbb332b8d6a6c0bd0721841d2c6a4200"
+        },
+        {
+          "key": "core:invalidate-spec-metadata",
+          "filename": "deltas/core/invalidate-spec-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cbb5276053d6ddd1bc219cb59f1d39b782fb66ed71752dd75ba933b315e098d4"
+        },
+        {
+          "key": "core:get-active-schema",
+          "filename": "deltas/core/get-active-schema/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60d1b22fa7f4aff19e31ccb12873b1bd1a7aed2499a371335e45ddd2b4f24c2b"
+        },
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7e84a4efcf3df1ab0ee52ff086ff0308feb0f3272cfd8ea74d81dad6e6c98c7c"
+        },
+        {
+          "key": "core:generate-metadata",
+          "filename": "deltas/core/generate-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:79e451b12f57325becd83400361fd65a15bfb4b4742aa729bcaf0957a8866aa9"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:836c14f362309200dc0b1fee2207718cd8b34afe30f8053719d22049ad9e4350"
+        },
+        {
+          "key": "core:list-workspaces",
+          "filename": "deltas/core/list-workspaces/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d6540d74967a337f18afcdf19d5b5434c8b02afde2f058359fa91ef77412f7ea"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:04aafc72b6f86f949853cfba4246eb34d55e3a4473850653d49f1ffc31f01214"
+        },
+        {
+          "key": "core:get-config",
+          "filename": "deltas/core/get-config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:77a97c87a05145f86e1fb824e1b7c94e513a1bd116fa2df3074d207c303cd425"
+        },
+        {
+          "key": "core:project-metadata",
+          "filename": "deltas/core/project-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e5b9e1543f76e27f3465499535488fe7cc8c56507f721b09256ead0e040a1e01"
+        },
+        {
+          "key": "core:update-project-metadata",
+          "filename": "deltas/core/update-project-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f3146ca13dd62a8ce152a66ea10c6fd3cbac24a9156a7e68e515530d512c4801"
+        },
+        {
+          "key": "core:resolve-schema",
+          "filename": "deltas/core/resolve-schema/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:811c0020ae24c667315d7179c7bf1c0f5fdad7fabe6bc3c8941430a74f6257f3"
+        },
+        {
+          "key": "core:spec-overlap",
+          "filename": "deltas/core/spec-overlap/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b7c172b1654dde161d62f60b43a725653fce1f2b95fdee8603c9b79fe113caab"
+        },
+        {
+          "key": "core:get-draft",
+          "filename": "deltas/core/get-draft/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:863fcaccfc5eedc5dbb64e4bc4b1ef3f0b05339ff3e959995a7ad2498f643947"
+        },
+        {
+          "key": "core:get-discarded",
+          "filename": "deltas/core/get-discarded/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9824659f3fd418c4aee0e450568805ab092256043ee2e82529adfc44d7882524"
+        },
+        {
+          "key": "core:invalidate-change",
+          "filename": "deltas/core/invalidate-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ca1837e810e0dac3a1693504afc2cb29f94070b8f06036106b9111684a9622df"
+        },
+        {
+          "key": "core:search-specs",
+          "filename": "deltas/core/search-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:67da143274755477c89ab4e58410a20979d57094b1a198fe4c2f0c1c30f5ae12"
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2688badfdcb633516c7f415659561595bb42739730e4968185f07f9e9d7660c4"
+        },
+        {
+          "key": "core:validate-schema",
+          "filename": "deltas/core/validate-schema/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a6a50922c7db2dc9777b68d9323cbc156604d1d8177c15c68d515a2f343b9daf"
+        },
+        {
+          "key": "core:get-spec-outline",
+          "filename": "deltas/core/get-spec-outline/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c7269c388b0cb3695d241c7473323bb4a95366e1891261cd6bfe673d64a25dbe"
+        },
+        {
+          "key": "core:update-implementation-tracking",
+          "filename": "specs/core/update-implementation-tracking/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:6610dbd3f529ef58089a9d273c887068ae90b070b91a22a930604ec20c8b5d64"
+        },
+        {
+          "key": "core:refresh-implementation-tracking",
+          "filename": "deltas/core/refresh-implementation-tracking/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:33b2ba9e98a197fb32592e350e3cec335e6d5f8bcb40e90b8af18eeb3145f348"
+        },
+        {
+          "key": "core:get-implementation-review",
+          "filename": "specs/core/get-implementation-review/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:1e9cdf9590b7c90c679cf074e743e9e403289dd5c75264b0084e414d2731eb21"
+        },
+        {
+          "key": "core:update-spec-metadata",
+          "filename": "deltas/core/update-spec-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:629b1dbcd15549402f5442b0ff29baa058cb8048469919b86f1db34939f90e1c"
+        },
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3f11628d2d099cb1f0a85b741ed8a2fec490f26af867ba4f9da4db9e6e92ed41"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9c1f6e3b96f8914e42928fcd654658466999e1e4f70d1fc1ed476356baa158cf"
+        },
+        {
+          "key": "cli:change-implementation",
+          "filename": "deltas/cli/change-implementation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:564cc321b1bede8b0f5512e4edefd949cc0f7ef2f1d35b1a8833b06dfefa4a69"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:69c7080bf1ccb18e80bfb62371b0f589b1e466850589aa53a408de75e89196f3"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7b5f42a732b9d2cdcb55773f586687bd99ee3aa9eda34939d8def2529382f4bc"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1f4d3b81169b1f122f0ef2b2582a51d3b1ae442afa16472af236d1b59c1ba196"
+        },
+        {
+          "key": "default:_global/architecture",
+          "filename": "deltas/default/_global/architecture/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1077f774cd2e2a52ec5d884f829dac1a4e807fb867506ce98e3232b790fcd841"
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bf1754704a2f6504a0211e27e6e6d1a9fd459d0a69c34faa209d1cc04d68a71c"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:41fa6f9647b1f66e16e071b97a04f24f586046d1e19fae09552885e89711a80e"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:84da55af3a4de46df23fae068755a0174a02bb2a062799ae602ebe70148e71f9"
+        },
+        {
+          "key": "core:transition-change",
+          "filename": "deltas/core/transition-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3edaa22166fab1f4767dfa718078e3a210e85954d8a4e47153a4b23892ef13cd"
+        },
+        {
+          "key": "core:draft-change",
+          "filename": "deltas/core/draft-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6b5e25ea14550f6e8f27dfd03198f0a86b437e7878dde0265ed647c29c4c125e"
+        },
+        {
+          "key": "core:restore-change",
+          "filename": "deltas/core/restore-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0efca4b8d7309bc7b06b5bdb4691657733f7b5d924d1995e139a290c12e2b609"
+        },
+        {
+          "key": "core:discard-change",
+          "filename": "deltas/core/discard-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:68a795c38cf08a721eb11a78adca50e6407e9f655df3383ad21bd207e7a56398"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bf68e1432bb7440f2f4002b1f03996e84ed5a9ef6faa4ea92bc1d8d3d524997b"
+        },
+        {
+          "key": "core:composition-resolver",
+          "filename": "specs/core/composition-resolver/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:637964925dcac04e482d40a1e349f87f785fa1b6a819361b03c46431bf54b803"
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:71873c859e7ac529f64ab833efb703697015f65bf4b954feb6e87e38f2c7b238"
+        },
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:da012403051a1b9f2a2c58d5538caff9ce3b27ee3b909ed3da9c22f3cc84e148"
+        },
+        {
+          "key": "core:list-changes",
+          "filename": "deltas/core/list-changes/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:938e246e95b6acba70131f3755367b0c025de8b2490d85635a92de0e040ac722"
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4812db693f4deaef419b1cd0df054f083a6fa926f431a75a7460c305c35d2655"
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:12380f8fbd44efd111eedb56adb55bfc460138d7b813711bfc41fa5b67bdb95b"
+        },
+        {
+          "key": "core:edit-change",
+          "filename": "deltas/core/edit-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:066dc48f36c1a57ffd1f4ebb387c7e16ac3eeaa6aa1b2a0dfe10bde059e5ba15"
+        },
+        {
+          "key": "core:skip-artifact",
+          "filename": "deltas/core/skip-artifact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:50eb063b59bb827b578f17f4e8374f4313831d4c8455601c1d5dd92a26d50f49"
+        },
+        {
+          "key": "core:update-spec-deps",
+          "filename": "deltas/core/update-spec-deps/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:150a7aae6d62f8ba16cb5197c01a2941691dd873b7341b913874e84a3b754a58"
+        },
+        {
+          "key": "core:list-archived",
+          "filename": "deltas/core/list-archived/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2e78d370e3a3dbe0240ba02b4f8132fcb27115a23c2e3ed3bf9f9a8f1fb32d82"
+        },
+        {
+          "key": "core:get-archived-change",
+          "filename": "deltas/core/get-archived-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c86cf55fb2fa95825198f299c1e95f7283e0e9d421bf2e3ece0c473385f240b4"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5acaa2169c3250f057bc6961af598d6b1c17daf0ef6d8ebfafd05cb9dd55399c"
+        },
+        {
+          "key": "core:get-hook-instructions",
+          "filename": "deltas/core/get-hook-instructions/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8c020ad0a505b65534770749f81990400133095364bb430ef8d4577250e9d7c8"
+        },
+        {
+          "key": "core:get-artifact-instruction",
+          "filename": "deltas/core/get-artifact-instruction/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d5f53091a349dee8e730566fc39a0b5c6fdf120ce4656d485d5e3e0f174a4ba2"
+        },
+        {
+          "key": "core:approve-spec",
+          "filename": "deltas/core/approve-spec/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6669af5dbec24904c877363a4c117d82ddc1cd44e31d78ba07d65a3713550126"
+        },
+        {
+          "key": "core:approve-signoff",
+          "filename": "deltas/core/approve-signoff/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:68448ef542e1afa461cb9ad9d2c7a8298f004b99e91ee066fa45ecf0dd9aab3a"
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:711bdb9290bc601a5f1c739591e6bdae059a1e57294168e49131bcb22d70d4d9"
+        },
+        {
+          "key": "core:get-spec",
+          "filename": "deltas/core/get-spec/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02d3958063531775bdad9eb94401cd0d42ac36736862587195b4dcf4a87b78fb"
+        },
+        {
+          "key": "core:save-spec-metadata",
+          "filename": "deltas/core/save-spec-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:84248ea80435b76bf3c250852e5e9cd1abfe53c3a29465859a51c1e830eb947c"
+        },
+        {
+          "key": "core:invalidate-spec-metadata",
+          "filename": "deltas/core/invalidate-spec-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dab909b1b0e20158e0ef48c7349479216488ba1ee8f1bbbef87d49d5463d2b2e"
+        },
+        {
+          "key": "core:get-active-schema",
+          "filename": "deltas/core/get-active-schema/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92ee12d9a61e4b64b888c9fa94c3d1456e76d012b32490129ddce150ff69bd57"
+        },
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c80a9092f70ac9d4262c2e55b00129b94e96389b67bd6f4265df2a1aabaa6e6b"
+        },
+        {
+          "key": "core:generate-metadata",
+          "filename": "deltas/core/generate-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:adedeafab2aeaaca3fdcc0f354a3949353907d47bf96399dc5cc2672c95ed1fc"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e26147f2412d31ba6409b7b4d1bdd112a7849230b368aee89a2107d10f19900d"
+        },
+        {
+          "key": "core:list-workspaces",
+          "filename": "deltas/core/list-workspaces/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bd59bb685f252d0e30d8161cfa7b279f1458b407e42866c3c98d87fe4d56083b"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f40f5511d4202d3c79faf7c626eac5192de6472cdc9862c625cba90c0327ebe3"
+        },
+        {
+          "key": "core:get-config",
+          "filename": "deltas/core/get-config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:10d2dd7b11bf021d30ddea6bdad86862093e102720d64532dc7885e582aacad1"
+        },
+        {
+          "key": "core:project-metadata",
+          "filename": "deltas/core/project-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e6cd585c0f83bb948f8e618d80009d5f6667e6f4c48a85416cf419774d315fa3"
+        },
+        {
+          "key": "core:update-project-metadata",
+          "filename": "deltas/core/update-project-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6a8a14edae2687da817016b7bf772f363ce347095fb1ae2debe41788d53a7db0"
+        },
+        {
+          "key": "core:resolve-schema",
+          "filename": "deltas/core/resolve-schema/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5b7f97966dce2d5674723c96e64f0b5863314c13e5cc5313a840e9c58d432a4e"
+        },
+        {
+          "key": "core:spec-overlap",
+          "filename": "deltas/core/spec-overlap/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8cb5b2a5d8731bf04ce457c0e0e89aa061852f1dce1033ee9188d14c53712e8e"
+        },
+        {
+          "key": "core:get-draft",
+          "filename": "deltas/core/get-draft/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:16e12e967f76731e8732c6fdd37e12fa6e2250a63447ca810ca348b155c7c173"
+        },
+        {
+          "key": "core:get-discarded",
+          "filename": "deltas/core/get-discarded/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f2078817461b1bc8ce9eaa3112ab73a765fb8dd267339647b5fff61532388bd8"
+        },
+        {
+          "key": "core:invalidate-change",
+          "filename": "deltas/core/invalidate-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8d199d317f1d152f308ce247e8b9b330cfad1807fdc9bf838fbe5cfd9ed67162"
+        },
+        {
+          "key": "core:search-specs",
+          "filename": "deltas/core/search-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a545ba178a79620bd833edc1fddea3063fa5af8d05528080748d83bd319006b7"
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4f8591a58c8240e5331077a99c32eb6b53dee30c439f3d959d32d2dc6941bc32"
+        },
+        {
+          "key": "core:validate-schema",
+          "filename": "deltas/core/validate-schema/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bd0dd0c7baf00d99e7b8ee0804134b79e15ee38a1aeb0a6bc0212fbee6f3fa02"
+        },
+        {
+          "key": "core:get-spec-outline",
+          "filename": "deltas/core/get-spec-outline/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02d748223c9572cfcc2446da0f921240a2e5d03ab6131816e2788222a358afc7"
+        },
+        {
+          "key": "core:update-implementation-tracking",
+          "filename": "specs/core/update-implementation-tracking/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:d27d68dfe11f77cf0e5ea0b80f14632f9921e1feb98d9b1dba4bff1c097e5964"
+        },
+        {
+          "key": "core:refresh-implementation-tracking",
+          "filename": "deltas/core/refresh-implementation-tracking/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0b2e98bec860413f10c604ce8f523ea81d8d75b841fe0a08ca4786b1ba7f14fd"
+        },
+        {
+          "key": "core:get-implementation-review",
+          "filename": "specs/core/get-implementation-review/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:3c7c4ba9af91a53ab7f1d2a772c5879e53092f3bdff867f0da55fd1b010ca6bf"
+        },
+        {
+          "key": "core:update-spec-metadata",
+          "filename": "deltas/core/update-spec-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:04fc99fff8e76e8d439ec601fc1c1ffe12693a8a73abcaf47bd1a5125a1e249c"
+        },
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d8dfbfae50c4999c6eaaa77979632daebe0383d4b6a480fcc09b2bec6f34662b"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d0ca24e274ae404800ec0686ed5346f863102b1e7c65000ff5b637a30bd837c1"
+        },
+        {
+          "key": "cli:change-implementation",
+          "filename": "deltas/cli/change-implementation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:609e89413f0b8dd142723f8fcb3825882c7bdd9f7482f75057ca3b137c0fc8f4"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:24b40f73be28dbaf14a5c36ef161f6cfc6cf46377ec5d32b33f6a10d1898cd4b"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:bc223f94389ce69ea92c4099ecb057b1445c1cb7fa8a1d270bab038b76a9c023"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:fcf4596e1b18e8e13ca0f5e1c5deecd67e45e9b8c4bf41e37b90232075ccd120"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-03T13:32:57.899Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:composition", "core:kernel", "default:_global/architecture"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T13:32:57.913Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:composition"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T13:35:49.757Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T13:53:27.361Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:kernel", "default:_global/architecture"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:kernel", "default:_global/architecture"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T13:53:27.366Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:10:15.645Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:13:22.713Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:13:41.069Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T14:13:41.078Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:create-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:draft-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:restore-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:discard-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:create-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:draft-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:restore-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:discard-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:27:11.456Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T14:27:11.459Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:composition-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition-resolver"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:44:40.557Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T14:44:40.585Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "specs",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-changes"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-drafts"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "specs",
+          "key": "core:edit-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:skip-artifact"
+        },
+        {
+          "type": "specs",
+          "key": "core:update-spec-deps"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-archived"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-archived-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:run-step-hooks"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-hook-instructions"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-artifact-instruction"
+        },
+        {
+          "type": "specs",
+          "key": "core:approve-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:approve-signoff"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:save-spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:invalidate-spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-active-schema"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:generate-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-workspaces"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-config"
+        },
+        {
+          "type": "specs",
+          "key": "core:project-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:update-project-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:resolve-schema"
+        },
+        {
+          "type": "specs",
+          "key": "core:spec-overlap"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-changes"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-drafts"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "verify",
+          "key": "core:edit-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:skip-artifact"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-spec-deps"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-archived"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-archived-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:run-step-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-hook-instructions"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-artifact-instruction"
+        },
+        {
+          "type": "verify",
+          "key": "core:approve-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:approve-signoff"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:save-spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:invalidate-spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-active-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:generate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-workspaces"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-config"
+        },
+        {
+          "type": "verify",
+          "key": "core:project-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-project-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:resolve-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-overlap"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:50:24.637Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T14:50:24.671Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-draft"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-discarded"
+        },
+        {
+          "type": "specs",
+          "key": "core:invalidate-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:search-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-schema"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec-outline"
+        },
+        {
+          "type": "specs",
+          "key": "core:update-implementation-tracking"
+        },
+        {
+          "type": "specs",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-implementation-review"
+        },
+        {
+          "type": "specs",
+          "key": "core:update-spec-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-draft"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-discarded"
+        },
+        {
+          "type": "verify",
+          "key": "core:invalidate-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:search-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec-outline"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-implementation-tracking"
+        },
+        {
+          "type": "verify",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-implementation-review"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-summary"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:52:06.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T14:52:06.423Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/docs"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/docs"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T14:55:12.966Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T14:55:12.973Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:change-implementation"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-implementation"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T15:08:42.204Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:approve-signoff, core:approve-spec, core:archive-change, core:compile-context, core:create-change, core:discard-change, core:draft-change, core:edit-change, core:generate-metadata, core:get-active-schema, core:get-archived-change, core:get-artifact-instruction, core:get-config, core:get-discarded, core:get-draft, core:get-hook-instructions, core:get-project-context, core:get-project-summary, core:get-spec, core:get-spec-context, core:get-spec-outline, core:get-status, core:invalidate-change, core:invalidate-spec-metadata, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs, core:list-workspaces, core:preview-spec, core:project-metadata, core:refresh-implementation-tracking, core:resolve-schema, core:restore-change, core:run-step-hooks, core:save-spec-metadata, core:search-specs, core:skip-artifact, core:spec-overlap, core:transition-change, core:update-project-metadata, core:update-spec-deps, core:update-spec-metadata, core:validate-artifacts, core:validate-schema, core:validate-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "core:approve-signoff",
+            "core:approve-spec",
+            "core:archive-change",
+            "core:compile-context",
+            "core:create-change",
+            "core:discard-change",
+            "core:draft-change",
+            "core:edit-change",
+            "core:generate-metadata",
+            "core:get-active-schema",
+            "core:get-archived-change",
+            "core:get-artifact-instruction",
+            "core:get-config",
+            "core:get-discarded",
+            "core:get-draft",
+            "core:get-hook-instructions",
+            "core:get-project-context",
+            "core:get-project-summary",
+            "core:get-spec",
+            "core:get-spec-context",
+            "core:get-spec-outline",
+            "core:get-status",
+            "core:invalidate-change",
+            "core:invalidate-spec-metadata",
+            "core:list-archived",
+            "core:list-changes",
+            "core:list-discarded",
+            "core:list-drafts",
+            "core:list-specs",
+            "core:list-workspaces",
+            "core:preview-spec",
+            "core:project-metadata",
+            "core:refresh-implementation-tracking",
+            "core:resolve-schema",
+            "core:restore-change",
+            "core:run-step-hooks",
+            "core:save-spec-metadata",
+            "core:search-specs",
+            "core:skip-artifact",
+            "core:spec-overlap",
+            "core:transition-change",
+            "core:update-project-metadata",
+            "core:update-spec-deps",
+            "core:update-spec-metadata",
+            "core:validate-artifacts",
+            "core:validate-schema",
+            "core:validate-specs"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T15:19:48.084Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:validate-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:validate-specs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T15:22:47.883Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T15:26:40.444Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:approve-signoff, core:approve-spec, core:archive-change, core:compile-context, core:create-change, core:discard-change, core:draft-change, core:edit-change, core:generate-metadata, core:get-active-schema, core:get-archived-change, core:get-artifact-instruction, core:get-config, core:get-discarded, core:get-draft, core:get-hook-instructions, core:get-project-context, core:get-project-summary, core:get-spec, core:get-spec-context, core:get-spec-outline, core:get-status, core:invalidate-change, core:invalidate-spec-metadata, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs, core:list-workspaces, core:preview-spec, core:project-metadata, core:refresh-implementation-tracking, core:resolve-schema, core:restore-change, core:run-step-hooks, core:save-spec-metadata, core:search-specs, core:skip-artifact, core:spec-overlap, core:transition-change, core:update-project-metadata, core:update-spec-deps, core:update-spec-metadata, core:validate-artifacts, core:validate-schema, core:validate-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:approve-signoff",
+            "core:approve-spec",
+            "core:archive-change",
+            "core:compile-context",
+            "core:create-change",
+            "core:discard-change",
+            "core:draft-change",
+            "core:edit-change",
+            "core:generate-metadata",
+            "core:get-active-schema",
+            "core:get-archived-change",
+            "core:get-artifact-instruction",
+            "core:get-config",
+            "core:get-discarded",
+            "core:get-draft",
+            "core:get-hook-instructions",
+            "core:get-project-context",
+            "core:get-project-summary",
+            "core:get-spec",
+            "core:get-spec-context",
+            "core:get-spec-outline",
+            "core:get-status",
+            "core:invalidate-change",
+            "core:invalidate-spec-metadata",
+            "core:list-archived",
+            "core:list-changes",
+            "core:list-discarded",
+            "core:list-drafts",
+            "core:list-specs",
+            "core:list-workspaces",
+            "core:preview-spec",
+            "core:project-metadata",
+            "core:refresh-implementation-tracking",
+            "core:resolve-schema",
+            "core:restore-change",
+            "core:run-step-hooks",
+            "core:save-spec-metadata",
+            "core:search-specs",
+            "core:skip-artifact",
+            "core:spec-overlap",
+            "core:transition-change",
+            "core:update-project-metadata",
+            "core:update-spec-deps",
+            "core:update-spec-metadata",
+            "core:validate-artifacts",
+            "core:validate-schema",
+            "core:validate-specs"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T15:26:40.444Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T16:15:48.970Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:create-change]; verify [core:create-change]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:create-change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:create-change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T16:16:31.555Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:discard-change, core:draft-change, core:get-status, core:restore-change, core:transition-change]; verify [core:discard-change, core:draft-change, core:get-status, core:restore-change, core:transition-change]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:discard-change",
+            "core:draft-change",
+            "core:get-status",
+            "core:restore-change",
+            "core:transition-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:discard-change",
+            "core:draft-change",
+            "core:get-status",
+            "core:restore-change",
+            "core:transition-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T16:17:42.698Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:approve-signoff, core:approve-spec, core:archive-change, core:compile-context, core:edit-change, core:generate-metadata, core:get-active-schema, core:get-archived-change, core:get-artifact-instruction, core:get-config, core:get-discarded, core:get-draft, core:get-hook-instructions, core:get-implementation-review, core:get-project-context, core:get-project-summary, core:get-spec, core:get-spec-context, core:get-spec-outline, core:invalidate-change, core:invalidate-spec-metadata, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs, core:list-workspaces, core:preview-spec, core:project-metadata, core:refresh-implementation-tracking, core:resolve-schema, core:run-step-hooks, core:save-spec-metadata, core:search-specs, core:skip-artifact, core:spec-overlap, core:update-implementation-tracking, core:update-project-metadata, core:update-spec-deps, core:update-spec-metadata, core:validate-artifacts, core:validate-schema, core:validate-specs]; verify [core:approve-signoff, core:approve-spec, core:archive-change, core:compile-context, core:edit-change, core:generate-metadata, core:get-active-schema, core:get-archived-change, core:get-artifact-instruction, core:get-config, core:get-discarded, core:get-draft, core:get-hook-instructions, core:get-implementation-review, core:get-project-context, core:get-project-summary, core:get-spec, core:get-spec-context, core:get-spec-outline, core:invalidate-change, core:invalidate-spec-metadata, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs, core:list-workspaces, core:preview-spec, core:project-metadata, core:refresh-implementation-tracking, core:resolve-schema, core:run-step-hooks, core:save-spec-metadata, core:search-specs, core:skip-artifact, core:spec-overlap, core:update-implementation-tracking, core:update-project-metadata, core:update-spec-deps, core:update-spec-metadata, core:validate-artifacts, core:validate-schema, core:validate-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:approve-signoff",
+            "core:approve-spec",
+            "core:archive-change",
+            "core:compile-context",
+            "core:edit-change",
+            "core:generate-metadata",
+            "core:get-active-schema",
+            "core:get-archived-change",
+            "core:get-artifact-instruction",
+            "core:get-config",
+            "core:get-discarded",
+            "core:get-draft",
+            "core:get-hook-instructions",
+            "core:get-implementation-review",
+            "core:get-project-context",
+            "core:get-project-summary",
+            "core:get-spec",
+            "core:get-spec-context",
+            "core:get-spec-outline",
+            "core:invalidate-change",
+            "core:invalidate-spec-metadata",
+            "core:list-archived",
+            "core:list-changes",
+            "core:list-discarded",
+            "core:list-drafts",
+            "core:list-specs",
+            "core:list-workspaces",
+            "core:preview-spec",
+            "core:project-metadata",
+            "core:refresh-implementation-tracking",
+            "core:resolve-schema",
+            "core:run-step-hooks",
+            "core:save-spec-metadata",
+            "core:search-specs",
+            "core:skip-artifact",
+            "core:spec-overlap",
+            "core:update-implementation-tracking",
+            "core:update-project-metadata",
+            "core:update-spec-deps",
+            "core:update-spec-metadata",
+            "core:validate-artifacts",
+            "core:validate-schema",
+            "core:validate-specs"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:approve-signoff",
+            "core:approve-spec",
+            "core:archive-change",
+            "core:compile-context",
+            "core:edit-change",
+            "core:generate-metadata",
+            "core:get-active-schema",
+            "core:get-archived-change",
+            "core:get-artifact-instruction",
+            "core:get-config",
+            "core:get-discarded",
+            "core:get-draft",
+            "core:get-hook-instructions",
+            "core:get-implementation-review",
+            "core:get-project-context",
+            "core:get-project-summary",
+            "core:get-spec",
+            "core:get-spec-context",
+            "core:get-spec-outline",
+            "core:invalidate-change",
+            "core:invalidate-spec-metadata",
+            "core:list-archived",
+            "core:list-changes",
+            "core:list-discarded",
+            "core:list-drafts",
+            "core:list-specs",
+            "core:list-workspaces",
+            "core:preview-spec",
+            "core:project-metadata",
+            "core:refresh-implementation-tracking",
+            "core:resolve-schema",
+            "core:run-step-hooks",
+            "core:save-spec-metadata",
+            "core:search-specs",
+            "core:skip-artifact",
+            "core:spec-overlap",
+            "core:update-implementation-tracking",
+            "core:update-project-metadata",
+            "core:update-spec-deps",
+            "core:update-spec-metadata",
+            "core:validate-artifacts",
+            "core:validate-schema",
+            "core:validate-specs"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T16:26:52.914Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:get-implementation-review, core:update-implementation-tracking]; verify [core:get-implementation-review, core:update-implementation-tracking]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:get-implementation-review", "core:update-implementation-tracking"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-implementation-review", "core:update-implementation-tracking"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T23:12:10.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T23:13:17.082Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T07:31:17.861Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T07:49:22.994Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T07:49:22.994Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T17:52:00.304Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T17:53:02.606Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T18:00:53.622Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T18:13:56.796Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T18:14:24.938Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-05T07:50:53.620Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-05T07:50:53.620Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-05T07:54:57.590Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-05T07:54:57.601Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-project-status-snapshot"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T06:12:58.019Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T06:14:08.546Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T06:26:58.804Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T06:26:58.804Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T06:38:04.151Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T06:42:45.980Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T07:17:00.178Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "default:_global/architecture",
+            "core:kernel-builder",
+            "core:create-change",
+            "core:get-status",
+            "core:transition-change",
+            "core:draft-change",
+            "core:restore-change",
+            "core:discard-change",
+            "core:archive-change",
+            "core:composition-resolver",
+            "core:validate-artifacts",
+            "core:compile-context",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:edit-change",
+            "core:skip-artifact",
+            "core:update-spec-deps",
+            "core:list-archived",
+            "core:get-archived-change",
+            "core:run-step-hooks",
+            "core:get-hook-instructions",
+            "core:get-artifact-instruction",
+            "core:approve-spec",
+            "core:approve-signoff",
+            "core:list-specs",
+            "core:get-spec",
+            "core:save-spec-metadata",
+            "core:invalidate-spec-metadata",
+            "core:get-active-schema",
+            "core:validate-specs",
+            "core:generate-metadata",
+            "core:get-spec-context",
+            "core:list-workspaces",
+            "core:get-project-context",
+            "core:get-config",
+            "core:project-metadata",
+            "core:update-project-metadata",
+            "core:resolve-schema",
+            "core:spec-overlap",
+            "core:get-draft",
+            "core:get-discarded",
+            "core:invalidate-change",
+            "core:search-specs",
+            "core:preview-spec",
+            "core:validate-schema",
+            "core:get-spec-outline",
+            "core:update-implementation-tracking",
+            "core:refresh-implementation-tracking",
+            "core:get-implementation-review",
+            "core:update-spec-metadata",
+            "core:get-project-summary",
+            "default:_global/docs",
+            "cli:change-implementation",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T07:17:00.178Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T13:24:08.791Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T13:24:45.735Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T13:48:18.840Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T13:57:47.480Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T13:58:07.330Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-06T14:03:07.438Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Normalize @specd/core composition factories around canonical createX(deps) and convenience createX(config, options?) entry points backed by a shared CompositionResolver. Make the kernel and kernel builder pure orchestration over that same resolver path, remove core-owned graph-store extensibility, and align compile-context, get-project-context, and project-status graph behavior with the merged specs."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-06T14:21:46.881Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:kernel': extracted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:config-writer-port, core:list-workspaces, core:get-project-context, core:get-config, core:project-metadata, core:update-project-metadata, core:resolve-schema, core:spec-overlap] do not match persisted dependencies [default:_global/architecture, core:composition, core:create-change, core:get-status, core:transition-change, core:draft-change, core:restore-change, core:discard-change, core:archive-change, core:validate-artifacts, core:compile-context, core:list-changes, core:list-drafts, core:list-discarded, core:edit-change, core:skip-artifact, core:update-spec-deps, core:list-archived, core:get-archived-change, core:run-step-hooks, core:get-hook-instructions, core:get-artifact-instruction, core:approve-spec, core:approve-signoff, core:list-specs, core:get-spec, core:save-spec-metadata, core:invalidate-spec-metadata, core:get-active-schema, core:validate-specs, core:generate-metadata, core:get-spec-context, core:config-writer-port, core:list-workspaces, core:get-project-context, core:get-config, core:project-metadata, core:update-project-metadata, core:resolve-schema, core:spec-overlap, core:kernel-builder, core:composition-resolver]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-06T14:22:20.763Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'default:_global/docs': extracted dependencies [default:_global/conventions] do not match persisted dependencies [default:_global/conventions, core:composition,core:kernel,core:kernel-builder,core:composition-resolver]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-06T14:22:36.293Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:change-implementation': extracted dependencies [core:change, code-graph:symbol-model, core:update-implementation-tracking, core:get-implementation-review, core:refresh-implementation-tracking] do not match persisted dependencies [core:change, code-graph:symbol-model, core:update-implementation-tracking,core:get-implementation-review,core:refresh-implementation-tracking]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T14:22:54.026Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-06T14:22:55.476Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

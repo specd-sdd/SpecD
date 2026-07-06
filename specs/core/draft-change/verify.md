@@ -108,3 +108,15 @@
 
 - **WHEN** `DraftChange` is instantiated
 - **THEN** it requires an `ActorResolver` port in its constructor
+
+### Requirement: Config-based factory delegates through resolveDraftChangeDeps
+
+#### Scenario: createDraftChange config form derives DraftChangeDeps through resolveDraftChangeDeps
+
+- **WHEN** `createDraftChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `DraftChangeDeps` through `resolveDraftChangeDeps(resolver)`
+- **AND** `resolveDraftChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- **AND** the factory delegates to canonical `createDraftChange(deps)`

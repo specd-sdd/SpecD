@@ -26,3 +26,15 @@
 
 - **WHEN** `UpdateSpecMetadata` completes the merge
 - **THEN** it calls `SaveSpecMetadata` with the complete merged object
+
+### Requirement: Config-based factory delegates through resolveUpdateSpecMetadataDeps
+
+#### Scenario: createUpdateSpecMetadata config form derives UpdateSpecMetadataDeps through resolveUpdateSpecMetadataDeps
+
+- **WHEN** `createUpdateSpecMetadata(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `UpdateSpecMetadataDeps` through `resolveUpdateSpecMetadataDeps(resolver)`
+- **AND** `resolveUpdateSpecMetadataDeps(resolver)` resolves:
+- `generateMetadata: GenerateSpecMetadata`
+- `saveMetadata: SaveSpecMetadata`
+- **AND** the factory delegates to canonical `createUpdateSpecMetadata(deps)`

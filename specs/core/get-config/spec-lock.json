@@ -3,15 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:config", "default:_global/architecture"],
+  "dependsOn": ["core:config", "default:_global/architecture", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-config.ts",
-      "symbols": ["GetConfig"]
-    },
-    {
-      "file": "core:src/composition/use-cases/get-config.ts",
-      "symbols": ["createGetConfig", "GetConfigOptions"]
+      "file": "core:src/composition/use-cases/get-config.ts"
     }
   ]
 }

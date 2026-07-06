@@ -110,6 +110,19 @@ is silently skipped.
 - `ActorResolver` — for resolving the current actor identity
 - `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`
 
+### Requirement: Config-based factory delegates through resolveEditChangeDeps
+
+The config-based `createEditChange(config, options?)` form MUST derive `EditChangeDeps` through `resolveEditChangeDeps(resolver)` and then delegate to canonical `createEditChange(deps)`.
+
+`resolveEditChangeDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT modify workspaces directly — they are always derived from `specIds`
@@ -118,5 +131,6 @@ is silently skipped.
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — `Change` entity, `updateSpecIds`, approval invalidation semantics
-- [`core:composition`](../composition/spec.md) — wiring and port injection
+- [`core:change`](../change/spec.md)
+- [`core:composition`](../composition/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

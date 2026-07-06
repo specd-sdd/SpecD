@@ -61,6 +61,20 @@
     },
     {
       "requirement": "buildProjectStatusSnapshot orchestration",
+      "name": "Hotspots failure clears the whole graph snapshot",
+      "when": [
+        "buildProjectStatusSnapshot(ctx, { includeGraph: true, includeHotspots: true }) is called",
+        "AND graph health loads successfully",
+        "AND hotspot loading fails afterwards"
+      ],
+      "then": [
+        "graphHealth is null",
+        "AND hotspots is null",
+        "AND the function resolves without throwing"
+      ]
+    },
+    {
+      "requirement": "buildProjectStatusSnapshot orchestration",
       "name": "Hotspots included when requested",
       "when": [
         "buildProjectStatusSnapshot(ctx, { includeGraph: true, includeHotspots: true }) is called"
@@ -102,6 +116,12 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "sdk:build-project-status-snapshot",
+        "file": "sdk:test/orchestration/build-project-status-snapshot.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "sdk:build-project-status-snapshot",
@@ -112,7 +132,7 @@
   },
   "contentHashes": {
     "spec.md": "sha256:9e02987a1a2b89ecf489e9c994f251d3cc956c9ed1afd6a8de0505a58ad5f7a3",
-    "verify.md": "sha256:ab15316419e449efdbcfe210f0bcec90084019a3620fe0d4678738d434e0dd8c"
+    "verify.md": "sha256:1cce7f24b82f7740d5470b7737b312fe4133fc8ea422b8bd00ae5cae31429bf1"
   },
   "generatedBy": "core"
 }

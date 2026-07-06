@@ -7,7 +7,8 @@
     "core:config",
     "core:change",
     "core:template-variables",
-    "core:archive-repository-port"
+    "core:archive-repository-port",
+    "core:composition-resolver"
   ],
   "context": [
     "Workflow steps declare `instruction:` hooks — text blocks that guide agent behaviour at step boundaries. These instructions are distinct from context (specs, metadata, artifact rules) and must be retrieved separately. `GetHookInstructions` is the sole consumer of `instruction:` hooks: it returns instruction text for a given step and phase, optionally filtered by hook ID. Both native specd skills and external agent tools (e.g. Claude Code hooks) use this to retrieve step instructions independently from context compilation."
@@ -59,6 +60,12 @@
       "requirement": "Result shape",
       "rules": [
         "`GetHookInstructions.execute` MUST return a result object containing:\n\n- `phase` (`'pre'` | `'post'`) — the queried phase (always matches the input)\n- `instructions` — array of instruction entries, each with:\n  - `id` (string) — the hook's `id`\n  - `text` (string) — the instruction text verbatim\n\nWhen no `instruction:` hooks exist for the step+phase, the result is `{ phase, instructions: [] }`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetHookInstructionsDeps",
+      "rules": [
+        "The config-based `createGetHookInstructions(config, options?)` form MUST derive `GetHookInstructionsDeps` through `resolveGetHookInstructionsDeps(resolver)` and then delegate to canonical `createGetHookInstructions(deps)`.\n\n`resolveGetHookInstructionsDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `archive: ArchiveRepository`\n- `schemaProvider: SchemaProvider`\n- `templates: TemplateExpander`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -231,13 +238,30 @@
         "ChangeNotFoundError is thrown immediately",
         "AND ArchiveRepository.get() is not called"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetHookInstructionsDeps",
+      "name": "createGetHookInstructions config form derives GetHookInstructionsDeps through resolveGetHookInstructionsDeps",
+      "when": ["createGetHookInstructions(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetHookInstructionsDeps through resolveGetHookInstructionsDeps(resolver)",
+        "AND resolveGetHookInstructionsDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetHookInstructions(deps)"
+      ]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:a0d8cf408deb5b63dbabfad3b5ea3720216f07727c7c13159872ccfae23602cd",
-    "verify.md": "sha256:a01691d80efea5bf5d07840017ac623fd948d5844dab175903457df20bd87682"
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:get-hook-instructions",
+        "file": "core:src/composition/use-cases/get-hook-instructions.ts"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Workflow steps declare instruction: hooks — text blocks that guide agent behaviour at step boundaries.",
-  "optimizedContext": "# GetHookInstructions\n\n## Rules\n- Ports and constructor: GetHookInstructions receives at construction time: ChangeRepository, ArchiveRepository, SchemaProvider, and TemplateExpander.\n- Input: GetHookInstructions.execute receives: - name (string, required) — the change name - step (string, required) — the workflow step name - phase ('pre' | 'post', required) — which…\n- Change lookup: GetHookInstructions loads the change by name via ChangeRepository.\n- Schema name guard: After resolving the schema, GetHookInstructions MUST compare schema.name() with change.schemaName.\n- Step resolution: GetHookInstructions validates that step is a valid ChangeState (a lifecycle state defined by the domain, which includes archiving).\n- Instruction collection: For the matched step and phase, GetHookInstructions MUST collect instruction: hooks from workflow[step].hooks[phase] — only entries with type: 'instruction', in declaration order.\n- Hook filtering with --only: When only is provided, the result MUST contain only the hook whose id matches.\n- Result shape: GetHookInstructions.execute MUST return a result object containing: - phase ('pre' | 'post') — the queried phase (always matches the input) - instructions — array of instruction…\n- Dependencies: core:hook-execution-model, core:schema-format, core:config, core:change, core:template-variables, core:archive-repository-port\n\n## Constraints\n- This use case is read-only — it does not modify the change or execute any commands\n- run: hooks are always excluded from results\n- Schema-level hooks precede project-level hooks, consistent with hook ordering\n- This use case does not evaluate step availability — it returns instructions regardless of whether the step is currently available\n"
+  "contentHashes": {
+    "spec.md": "sha256:a5f59de8d77a400c309345e1bd0fdd434d0f453a68d5d99c93995736ca3f53d5",
+    "verify.md": "sha256:385d1badb3ac9e4e2b1ad91b4fe5519fc4ff4e36c6fbdbb7023f218751425fc0"
+  },
+  "generatedBy": "core"
 }

@@ -7,7 +7,7 @@ When the extension point is registry-driven rather than a direct application-lay
 - register the capability under a stable id
 - select the active id separately when the caller needs exactly one active backend
 
-The code-graph backend selection surface follows this model with `graphStoreFactories` plus `graphStoreId`, and the builder mirrors it with `registerGraphStore(id, factory)` plus `useGraphStore(id)`.
+For core-owned extension points this covers things like storage factories, parsers, extractor transforms, actor providers, and hook runners. Code-graph backend selection is outside `@specd/core`; register those backends with `@specd/code-graph` or at the SDK host-composition layer instead.
 
 ## The two port shapes
 
@@ -460,7 +460,7 @@ console.log(kernel.registry.externalHookRunners.has('http')) // true
 Use the builder when you want fluent incremental registration before construction.
 
 ```typescript
-import { createKernelBuilder } from '@specd/core'
+import { createKernelBuilder } from '@specd/core/extensions'
 
 const kernel = await createKernelBuilder(config)
   .registerParser('plaintext-plus', new PlainTextParser())
@@ -498,36 +498,27 @@ const createChange = createCreateChange(config)
 const change = await createChange.execute({ name: 'add-oauth-login', … })
 ```
 
-### Explicit (context + options) form
+### Explicit deps form
 
-Each factory also accepts an explicit context and options object — useful for custom paths in tests or integration scenarios:
+Each factory also accepts explicit dependencies — useful when you want full control over the ports and sub-use-cases without bootstrapping from `SpecdConfig`:
 
 ```typescript
 import { createCreateChange } from '@specd/core'
 
-const createChange = createCreateChange(
-  {
-    workspace: 'default',
-    ownership: 'owned',
-    isExternal: false,
-    configPath: '/project/specd.yaml',
-  },
-  {
-    changesPath: '/tmp/test/changes',
-    draftsPath: '/tmp/test/drafts',
-    discardedPath: '/tmp/test/discarded',
-    listWorkspaces,
-    getActiveSchema,
-    detectOverlap,
-  },
-)
+const createChange = createCreateChange({
+  changes: changeRepo,
+  listWorkspaces,
+  actor,
+  getActiveSchema,
+  detectOverlap,
+})
 ```
 
-`listWorkspaces`, `getActiveSchema`, and `detectOverlap` are the orchestration dependencies required by `CreateChange` — wire them explicitly when bypassing the `SpecdConfig` overload.
+`changeRepo`, `listWorkspaces`, `actor`, `getActiveSchema`, and `detectOverlap` are the explicit orchestration dependencies required by `CreateChange` when bypassing the `SpecdConfig` overload.
 
 ### Custom adapters without the kernel
 
-If you do not want the full kernel, construct your adapter class directly and pass it to the use case constructor. The single-use-case factories wire the built-in `fs` adapters only:
+If you do not want the full kernel, either call `createX(deps)` with your own resolved ports or construct the use case directly:
 
 ```typescript
 import { CreateChange } from '@specd/core'

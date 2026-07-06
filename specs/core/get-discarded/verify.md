@@ -91,3 +91,14 @@
 
 - **WHEN** `GetDiscarded.execute` runs
 - **THEN** `SchemaProvider` is not consulted
+
+### Requirement: Config-based factory delegates through resolveGetDiscardedDeps
+
+#### Scenario: createGetDiscarded config form derives GetDiscardedDeps through resolveGetDiscardedDeps
+
+- **WHEN** `createGetDiscarded(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetDiscardedDeps` through `resolveGetDiscardedDeps(resolver)`
+- **AND** `resolveGetDiscardedDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- **AND** the factory delegates to canonical `createGetDiscarded(deps)`

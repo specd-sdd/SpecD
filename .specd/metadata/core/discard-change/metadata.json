@@ -1,7 +1,7 @@
 {
   "title": "DiscardChange",
   "description": "Sometimes a change becomes obsolete or is superseded, and the team needs a way to permanently abandon it while preserving an audit trail of why. The `DiscardChange` use case appends a `discarded` event to the change's history and the repository moves its directory to `discarded/`. Discarding is a terminal operation — discarded changes cannot be restored.",
-  "dependsOn": ["core:change", "default:_global/architecture"],
+  "dependsOn": ["core:change", "default:_global/architecture", "core:composition-resolver"],
   "context": [
     "Sometimes a change becomes obsolete or is superseded, and the team needs a way to permanently abandon it while preserving an audit trail of why. The `DiscardChange` use case appends a `discarded` event to the change's history and the repository moves its directory to `discarded/`. Discarding is a terminal operation — discarded changes cannot be restored."
   ],
@@ -46,6 +46,12 @@
       "requirement": "Dependencies",
       "rules": [
         "`DiscardChange` depends on two ports injected via constructor:\n\n- `ChangeRepository` — for loading and persistence\n- `ActorResolver` — for resolving the current actor identity"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveDiscardChangeDeps",
+      "rules": [
+        "The config-based `createDiscardChange(config, options?)` form MUST derive `DiscardChangeDeps` through `resolveDiscardChangeDeps(resolver)` and then delegate to canonical `createDiscardChange(deps)`.\n\n`resolveDiscardChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -172,22 +178,30 @@
       "name": "Uses ActorResolver port",
       "when": ["DiscardChange is instantiated"],
       "then": ["it requires an ActorResolver port in its constructor"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveDiscardChangeDeps",
+      "name": "createDiscardChange config form derives DiscardChangeDeps through resolveDiscardChangeDeps",
+      "when": ["createDiscardChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives DiscardChangeDeps through resolveDiscardChangeDeps(resolver)",
+        "AND resolveDiscardChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createDiscardChange(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:discard-change",
-        "file": "core:src/application/use-cases/discard-change.ts",
-        "symbol": "DiscardChange"
+        "file": "core:src/composition/use-cases/discard-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3a4a0de823eb11f1e9ea3c88e7bf39fa2d98d15bade46ff2926e6e609cbd5901",
-    "verify.md": "sha256:f85153f46da1e42281046e0e99ad268f1874d42f7f8882005fba9cdb2716004c"
+    "spec.md": "sha256:245ba4ef6b444c02606244ca4676daeafe17ec04325046b3fb32ee3eaf6e20d5",
+    "verify.md": "sha256:3ca130bd338c2b09f96bb6f116b1fa6a12ede1208d210c21e7e4ad40a023240c"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`DiscardChange` permanently abandons active or drafted change by appending `discarded` history and moving storage into `discarded/`.",
-  "optimizedContext": "# DiscardChange\n\n## Rules\n- `DiscardChangeInput` requires `name` and `reason`; accepts optional `supersededBy` and `force`.\n- Locate change from active storage via `get(name)` or, if absent, drafted storage via `getDraft(name)`; otherwise throw `ChangeNotFoundError`.\n- Resolve actor via `ActorResolver` and record it in `discarded` event.\n- Respect historical implementation guard: if change ever reached `implementing`, fail unless `force === true`.\n- Append discard history via `change.discard(reason, actor, supersededBy, force)`.\n- Persist through `ChangeRepository.mutate` for active changes or `mutateDraft` for drafted changes; repository writes manifest and relocates directory into `discarded/`.\n\n## Constraints\n- No lifecycle transition; discard is orthogonal to lifecycle state.\n- `reason` is mandatory.\n- Discarded changes are terminal; repository relocation belongs to storage adapter.\n"
+  "generatedBy": "core"
 }

@@ -117,3 +117,17 @@
 - **GIVEN** `ResolveSchema` was constructed with specific config
 - **WHEN** `execute()` is called twice
 - **THEN** both calls produce an equivalent `Schema` object
+
+### Requirement: Config-based factory delegates through resolveResolveSchemaDeps
+
+#### Scenario: createResolveSchema config form derives ResolveSchemaDeps through resolveResolveSchemaDeps
+
+- **WHEN** `createResolveSchema(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ResolveSchemaDeps` through `resolveResolveSchemaDeps(resolver)`
+- **AND** `resolveResolveSchemaDeps(resolver)` resolves:
+- `schemas: SchemaRegistry`
+- `schemaRef: string`
+- `schemaPlugins: readonly string[]`
+- `schemaOverrides: SchemaOperations | undefined`
+- **AND** the factory delegates to canonical `createResolveSchema(deps)`

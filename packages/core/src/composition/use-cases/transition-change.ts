@@ -1,189 +1,139 @@
-import * as path from 'node:path'
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { TransitionChange } from '../../application/use-cases/transition-change.js'
-import { RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
-import { RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { createArchiveRepository } from '../archive-repository.js'
-import { NodeHookRunner } from '../../infrastructure/node/hook-runner.js'
-import { Logger } from '../../application/logger.js'
-import { TemplateExpander } from '../../application/template-expander.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
-import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
-import { GitVcsAdapter } from '../../infrastructure/git/vcs-adapter.js'
-import { VcsImplementationDetector } from '../../infrastructure/vcs/vcs-implementation-detector.js'
+import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
+import { type RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import { type ApprovalGates } from '../../application/use-cases/transition-change.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+
 /**
- * Domain context for a `ChangeRepository` bound to a single workspace.
+ * Explicit dependencies for {@link createTransitionChange}.
  */
-export interface TransitionChangeContext {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
+export interface TransitionChangeDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Actor resolver used by the use case. */
+  readonly actor: ActorResolver
+  /** Schema provider used by the use case. */
+  readonly schemaProvider: SchemaProvider
+  /** Step hook runner used by the use case. */
+  readonly runStepHooks: RunStepHooks
+  /** Refresh implementation tracking use case used by the use case. */
+  readonly refreshImplementationTracking: RefreshImplementationTracking
+  /** Approval gate configuration used by the use case. */
+  readonly approvals: ApprovalGates
 }
 
 /**
- * Filesystem adapter paths for `createTransitionChange(context, options)`.
+ * Resolves {@link TransitionChangeDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `TransitionChange`
  */
-export interface FsTransitionChangeOptions {
-  /** Absolute path to the `changes/` directory. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
-  readonly discardedPath: string
-  /** Absolute path to the archive root directory. */
-  readonly archivePath: string
-  /** Optional archive directory pattern (e.g. `'{{year}}/{{change.archivedName}}'`). */
-  readonly archivePattern?: string
-  /** Additional `node_modules` directories for schema resolution. */
-  readonly nodeModulesPaths: readonly string[]
-  /** Project root directory for resolving relative schema paths. */
-  readonly configDir: string
-  /** Schema reference string from config. */
-  readonly schemaRef: string
-  /** Map of workspace name → schema repository instance. */
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Absolute path to the project root. */
-  readonly projectRoot: string
-  /** Approval gate configuration from project config. */
-  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+export function resolveTransitionChangeDeps(resolver: CompositionResolver): TransitionChangeDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    actor: resolver.getActorResolver(),
+    schemaProvider: resolver.getSchemaProvider(),
+    runStepHooks: resolver.getRunStepHooks(),
+    refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
+    approvals: resolver.config.approvals,
+  }
 }
 
 /**
- * Constructs a `TransitionChange` use case wired to the default workspace.
+ * Constructs a `TransitionChange` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createTransitionChange(deps: TransitionChangeDeps): TransitionChange
+/**
+ * Constructs a `TransitionChange` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel-level overrides
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createTransitionChange(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): TransitionChange
 /**
- * Constructs a `TransitionChange` use case with explicit context and fs paths.
+ * Constructs a `TransitionChange` instance from explicit deps or config bootstrap.
  *
- * @param context - Workspace domain context
- * @param options - Filesystem adapter paths
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createTransitionChange(
-  context: TransitionChangeContext,
-  options: FsTransitionChangeOptions,
-): TransitionChange
-/**
- * Constructs a `TransitionChange` instance wired with filesystem adapters.
- *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
- * @returns The pre-wired use case instance
- */
-export function createTransitionChange(
-  configOrContext: SpecdConfig | TransitionChangeContext,
-  options?: FsTransitionChangeOptions | { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: TransitionChangeDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): TransitionChange {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const ws = getDefaultWorkspace(config)
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((w) => w.schemasPath !== null)
-        .map((w) => [
-          w.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: w.name,
-              ownership: w.ownership,
-              isExternal: w.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: w.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
-    return createTransitionChange(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        archivePath: config.storage.archivePath,
-        ...(config.storage.archivePattern !== undefined
-          ? { archivePattern: config.storage.archivePattern }
-          : {}),
-        nodeModulesPaths: [
-          path.join(config.projectRoot, 'node_modules'),
-          ...(kernelOpts?.extraNodeModulesPaths ?? []),
-        ],
-        configDir: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: schemaRepos,
-        projectRoot: config.projectRoot,
-        approvals: config.approvals,
-      },
+  const normalized = normalizeCompositionFactoryArgs(
+    'createTransitionChange',
+    depsOrConfig,
+    options,
+    isTransitionChangeDeps,
+  )
+  return createTransitionChangeFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `TransitionChange` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createTransitionChangeFromNormalized(
+  input: FactoryInput<TransitionChangeDeps, CompositionResolutionOptions>,
+): TransitionChange {
+  if (input.kind === 'deps') {
+    const {
+      changes,
+      actor,
+      schemaProvider,
+      runStepHooks,
+      refreshImplementationTracking,
+      approvals,
+    } = input.deps
+    return new TransitionChange(
+      changes,
+      actor,
+      schemaProvider,
+      runStepHooks,
+      refreshImplementationTracking,
+      approvals,
+      undefined,
     )
   }
-  const opts = options as FsTransitionChangeOptions
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    discardedPath: opts.discardedPath,
-  })
-  const archiveRepo = createArchiveRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    archivePath: opts.archivePath,
-    ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
-  })
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.configDir,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
-  const hooks = new NodeHookRunner(expander)
-  const actor = createVcsActorResolver()
-  const runStepHooks = new RunStepHooks(changeRepo, archiveRepo, hooks, new Map(), schemaProvider)
-  const files = new FsFileReader()
-  const implementationDetector = new VcsImplementationDetector(
-    opts.projectRoot,
-    new GitVcsAdapter(opts.projectRoot),
-  )
-  const refreshImplementationTracking = new RefreshImplementationTracking(
-    changeRepo,
-    archiveRepo,
-    implementationDetector,
-    files,
-    opts.projectRoot,
-  )
-  return new TransitionChange(
-    changeRepo,
-    actor,
-    schemaProvider,
-    runStepHooks,
-    refreshImplementationTracking,
-    opts.approvals,
-    new LifecycleEngine(Logger.debug.bind(Logger)),
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createTransitionChange(resolveTransitionChangeDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `TransitionChangeDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isTransitionChangeDeps(
+  value: TransitionChangeDeps | SpecdConfig,
+): value is TransitionChangeDeps {
+  return (
+    'changes' in value &&
+    'actor' in value &&
+    'schemaProvider' in value &&
+    'runStepHooks' in value &&
+    'refreshImplementationTracking' in value &&
+    'approvals' in value
   )
 }

@@ -1,78 +1,91 @@
+import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
 import { ListArchived } from '../../application/use-cases/list-archived.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createArchiveRepository } from '../archive-repository.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createListArchived(context, options)`. */
-export interface ListArchivedContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createListArchived(context, options)`. */
-export interface FsListArchivedOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly archivePath: string
-  readonly archivePattern?: string
+/**
+ * Explicit dependencies for {@link createListArchived}.
+ */
+export interface ListArchivedDeps {
+  /** Archive repository used by the use case. */
+  readonly archive: ArchiveRepository
 }
 
 /**
- * Constructs a `ListArchived` use case with full project config.
+ * Resolves {@link ListArchivedDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ListArchived`
+ */
+export function resolveListArchivedDeps(resolver: CompositionResolver): ListArchivedDeps {
+  return { archive: resolver.getArchiveRepository() }
+}
+
+/**
+ * Constructs a `ListArchived` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createListArchived(deps: ListArchivedDeps): ListArchived
+/**
+ * Constructs a `ListArchived` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createListArchived(config: SpecdConfig): ListArchived
-/**
- * Constructs a `ListArchived` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for archive resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createListArchived(
-  context: ListArchivedContext,
-  options: FsListArchivedOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ListArchived
 /**
- * Constructs a `ListArchived` instance wired with filesystem adapters.
+ * Constructs a `ListArchived` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createListArchived(
-  configOrContext: SpecdConfig | ListArchivedContext,
-  options?: FsListArchivedOptions,
+  depsOrConfig: ListArchivedDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ListArchived {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    return createListArchived(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        archivePath: config.storage.archivePath,
-        ...(config.storage.archivePattern !== undefined
-          ? { archivePattern: config.storage.archivePattern }
-          : {}),
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createListArchived',
+    depsOrConfig,
+    options,
+    isListArchivedDeps,
+  )
+  return createListArchivedFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ListArchived` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createListArchivedFromNormalized(
+  input: FactoryInput<ListArchivedDeps, CompositionResolutionOptions>,
+): ListArchived {
+  if (input.kind === 'deps') {
+    return new ListArchived(input.deps.archive)
   }
-  const archiveRepo = createArchiveRepository('fs', configOrContext, {
-    changesPath: options!.changesPath,
-    draftsPath: options!.draftsPath,
-    archivePath: options!.archivePath,
-    ...(options!.archivePattern !== undefined ? { pattern: options!.archivePattern } : {}),
-  })
-  return new ListArchived(archiveRepo)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createListArchived(resolveListArchivedDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ListArchivedDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isListArchivedDeps(value: ListArchivedDeps | SpecdConfig): value is ListArchivedDeps {
+  return 'archive' in value
 }

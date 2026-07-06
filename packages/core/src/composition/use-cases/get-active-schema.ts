@@ -1,102 +1,108 @@
-import * as path from 'node:path'
+import { type SchemaRegistry } from '../../application/ports/schema-registry.js'
 import { GetActiveSchema } from '../../application/use-cases/get-active-schema.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { type ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
 import { buildSchema } from '../../domain/services/build-schema.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { createSchemaRegistry } from '../schema-registry.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Filesystem adapter options for `createGetActiveSchema(options)`. */
-export interface FsGetActiveSchemaOptions {
-  readonly nodeModulesPaths: readonly string[]
-  readonly configDir: string
+/**
+ * Explicit dependencies for {@link createGetActiveSchema}.
+ */
+export interface GetActiveSchemaDeps {
+  /** Shared resolve-schema use case. */
+  readonly resolveSchema: ResolveSchema
+  /** Shared schema registry. */
+  readonly schemas: SchemaRegistry
+  /** Active schema reference string. */
   readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  readonly schemaPlugins?: readonly string[]
-  readonly schemaOverrides?: SchemaOperations
-}
-
-/** Extra options when constructing from a `SpecdConfig`. */
-export interface GetActiveSchemaKernelOptions {
-  readonly extraNodeModulesPaths?: readonly string[]
 }
 
 /**
- * Constructs a `GetActiveSchema` use case with full project config.
+ * Resolves {@link GetActiveSchemaDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetActiveSchema`
+ */
+export function resolveGetActiveSchemaDeps(resolver: CompositionResolver): GetActiveSchemaDeps {
+  return {
+    resolveSchema: resolver.getResolveSchema(),
+    schemas: resolver.getSchemaRegistry(),
+    schemaRef: resolver.config.schemaRef,
+  }
+}
+
+/**
+ * Constructs a `GetActiveSchema` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetActiveSchema(deps: GetActiveSchemaDeps): GetActiveSchema
+/**
+ * Constructs a `GetActiveSchema` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param opts - Optional kernel options for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetActiveSchema(
   config: SpecdConfig,
-  opts?: GetActiveSchemaKernelOptions,
+  options?: CompositionResolutionOptions,
 ): GetActiveSchema
 /**
- * Constructs a `GetActiveSchema` use case with explicit adapter options.
+ * Constructs a `GetActiveSchema` instance from explicit deps or config bootstrap.
  *
- * @param options - Filesystem adapter options for schema resolution
- * @returns The pre-wired use case instance
- */
-export function createGetActiveSchema(options: FsGetActiveSchemaOptions): GetActiveSchema
-/**
- * Constructs a `GetActiveSchema` instance wired with filesystem adapters.
- *
- * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
- * @param kernelOpts - Optional kernel options; only used with `SpecdConfig`
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createGetActiveSchema(
-  configOrOptions: SpecdConfig | FsGetActiveSchemaOptions,
-  kernelOpts?: GetActiveSchemaKernelOptions,
+  depsOrConfig: GetActiveSchemaDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetActiveSchema {
-  if (isSpecdConfig(configOrOptions)) {
-    const schemaRepos = new Map(
-      configOrOptions.workspaces
-        .filter((ws) => ws.schemasPath !== null)
-        .map((ws) => [
-          ws.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws.name,
-              ownership: ws.ownership,
-              isExternal: ws.isExternal,
-              configPath: configOrOptions.configPath,
-            },
-            { schemasPath: ws.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
-    const schemas = createSchemaRegistry('fs', {
-      nodeModulesPaths: [
-        path.join(configOrOptions.projectRoot, 'node_modules'),
-        ...(kernelOpts?.extraNodeModulesPaths ?? []),
-      ],
-      configDir: configOrOptions.projectRoot,
-      schemaRepositories: schemaRepos,
-    })
-    const schemaRef = configOrOptions.schemaRef
-    const resolveSchema = new ResolveSchema(
-      schemas,
-      schemaRef,
-      configOrOptions.schemaPlugins ?? [],
-      configOrOptions.schemaOverrides,
-    )
-    return new GetActiveSchema(resolveSchema, schemas, buildSchema, schemaRef)
-  }
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: configOrOptions.nodeModulesPaths,
-    configDir: configOrOptions.configDir,
-    schemaRepositories: configOrOptions.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(
-    schemas,
-    configOrOptions.schemaRef,
-    configOrOptions.schemaPlugins ?? [],
-    configOrOptions.schemaOverrides,
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetActiveSchema',
+    depsOrConfig,
+    options,
+    isGetActiveSchemaDeps,
   )
-  return new GetActiveSchema(resolveSchema, schemas, buildSchema, configOrOptions.schemaRef)
+  return createGetActiveSchemaFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetActiveSchema` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetActiveSchemaFromNormalized(
+  input: FactoryInput<GetActiveSchemaDeps, CompositionResolutionOptions>,
+): GetActiveSchema {
+  if (input.kind === 'deps') {
+    return new GetActiveSchema(
+      input.deps.resolveSchema,
+      input.deps.schemas,
+      buildSchema,
+      input.deps.schemaRef,
+    )
+  }
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetActiveSchema(resolveGetActiveSchemaDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetActiveSchemaDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetActiveSchemaDeps(
+  value: GetActiveSchemaDeps | SpecdConfig,
+): value is GetActiveSchemaDeps {
+  return 'resolveSchema' in value && 'schemas' in value && 'schemaRef' in value
 }

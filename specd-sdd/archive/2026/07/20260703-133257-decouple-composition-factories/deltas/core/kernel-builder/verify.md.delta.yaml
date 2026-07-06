@@ -1,0 +1,66 @@
+- op: modified
+  description: 'Restrict builder registration accumulation to core-owned concerns'
+  selector:
+    type: section
+    matches: 'Scenario: Registrations accumulate before build'
+  content: |
+    #### Scenario: Registrations accumulate before build
+
+    - **GIVEN** a builder created for a resolved `SpecdConfig`
+    - **WHEN** storage, parser, VCS, actor, and external hook runner registrations are added before `build()`
+    - **THEN** the builder retains all of them as pending additive registrations
+    - **AND** no built kernel is mutated before `build()` is called
+- op: removed
+  description: 'Remove graph-store selection from builder fluent-method verification'
+  selector:
+    type: section
+    matches: 'Scenario: useGraphStore selects the active backend id'
+- op: modified
+  description: 'Remove graph-store backend equivalence from builder verification'
+  selector:
+    type: section
+    matches: 'Scenario: Equivalent registrations produce equivalent kernels'
+  content: |
+    #### Scenario: Equivalent registrations produce equivalent kernels
+
+    - **GIVEN** the same resolved config and the same additive registrations
+    - **WHEN** one kernel is produced through the builder and another through `createKernel(config, options)`
+    - **THEN** both kernels preserve the built-in capabilities
+    - **AND** both expose the same merged registry contents
+    - **AND** both construct shared adapters once before returning an immutable kernel
+- op: removed
+  description: 'Remove unknown graph-store scenario from builder conflict verification'
+  selector:
+    type: section
+    matches: 'Scenario: Unknown graph-store id is rejected'
+- op: added
+  description: 'Verify builder shares the resolver-backed assembly path'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Builder reuses the shared composition-resolver path
+
+    #### Scenario: Builder does not define separate per-use-case composition semantics
+
+    - **WHEN** a kernel is built through `createKernelBuilder()`
+    - **THEN** its use-case assembly flows through the same shared composition-resolver path as `createKernel(...)`
+    - **AND** the builder does not introduce an alternate standalone-factory model
+- op: added
+  description: 'Verify builder does not own separate registry semantics'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Builder reuses the shared composition-resolver path'
+  content: |
+    ### Requirement: Builder shares composition-owned registry primitives
+
+    #### Scenario: Builder does not introduce a second registry source of truth
+
+    - **WHEN** additive registrations are accumulated through the builder
+    - **THEN** they are merged through the same composition-owned registry primitives reused by resolver and kernel assembly
+    - **AND** the builder does not define a builder-specific registry ownership model

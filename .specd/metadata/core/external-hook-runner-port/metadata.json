@@ -89,5 +89,7 @@
     "spec.md": "sha256:e2fcf698dfdae70f066071c88f4078e009418f7004b0c067143bcf700740a8a5",
     "verify.md": "sha256:9a0c211e0f2e4768e700c8a502c547b6e12a48bfd226db2c439c9437e78fd701"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Workflow hooks dispatch external execution backends such Docker HTTP cannot forced through internal shell-oriented HookRunner conflating two differen…",
+  "optimizedContext": "# External Hook Runner Port\n\n## Rules\n- External hook runners declare accepted types: ExternalHookRunner SHALL declare which explicit external hook types accepts. declaration SHALL machine-readable so runtime can determine whether given runner can handle hook entry before dispatching it. accepted-type declaration MUST treated source truth dispatch. Runtime dispatch MUST NOT guess based solely registration name implementation class.\n- External hook runners execute explicit external hooks: ExternalHookRunner SHALL execute explicit external hook entries using: - nested external. type - nested external. config payload - workflow template variables current execution context runner contract SHALL separate HookRunner, which remains responsible shell run: hooks only.\n- Unknown external hook types are errors: If no registered external hook runner declares support given external hook type, runtime MUST fail clear error. Unknown external hook types not ignored not treated no-ops.\n- Runner results are workflow-compatible: External hook execution SHALL produce results compatible workflow hook execution semantics so pre-phase failures, post-phase reporting, CLI/user-facing behavior can handled consistently alongside shell hook execution."
 }

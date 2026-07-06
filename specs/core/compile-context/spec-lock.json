@@ -17,12 +17,19 @@
     "core:preview-spec",
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
-    "core:core/project-metadata"
+    "core:core/project-metadata",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
+      "file": "core:src/composition/use-cases/compile-context.ts"
+    },
+    {
       "file": "core:src/application/use-cases/compile-context.ts",
       "symbols": ["CompileContext"]
+    },
+    {
+      "file": "core:test/application/use-cases/compile-context.spec.ts"
     }
   ]
 }

@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:kernel",
+    "core:composition",
+    "default:_global/architecture",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel-builder.ts"
+    },
+    {
+      "file": "core:src/composition/composition-registries.ts",
+      "symbols": [
+        "CompositionRegistryView",
+        "createBuiltinCompositionRegistry",
+        "createCompositionRegistryView"
+      ]
+    }
+  ]
+}

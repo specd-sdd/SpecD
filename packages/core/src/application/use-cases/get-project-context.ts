@@ -150,7 +150,7 @@ export class GetProjectContext {
 
     warnings.push(...optimizationWarnings)
 
-    if (isFresh && projectMeta) {
+    if (config.llmOptimizedContext === true && isFresh && projectMeta) {
       // ALL FRESH! Return optimized context.
       return {
         contextEntries: [projectMeta.optimized.context],

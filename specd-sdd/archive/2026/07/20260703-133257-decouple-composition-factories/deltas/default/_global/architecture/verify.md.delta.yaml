@@ -1,0 +1,16 @@
+- op: modified
+  description: 'Verify config-based factories delegate through the shared resolver path'
+  selector:
+    type: section
+    matches: 'Requirement: Composition layer for use-case wiring'
+  content: |
+    #### Scenario: Config-based public factory delegates through shared resolver path
+
+    - **WHEN** a kernel-mounted public `createX(config, options?)` factory is implemented
+    - **THEN** it resolves dependencies through the shared composition-resolver path
+    - **AND** it delegates to canonical `createX(deps)` construction
+
+    #### Scenario: Kernel and builder do not define separate per-use-case semantics
+
+    - **WHEN** `createKernel(...)` or `createKernelBuilder()` assembles kernel-mounted use cases
+    - **THEN** both reuse the same underlying factory assembly semantics as standalone `createX(...)` factories

@@ -66,6 +66,18 @@ type GetActiveSchemaResult =
 
 All lower-level dependencies (schema ref, plugins, overrides) are provided to `ResolveSchema` at its construction time.
 
+### Requirement: Config-based factory delegates through resolveGetActiveSchemaDeps
+
+The config-based `createGetActiveSchema(config, options?)` form MUST derive `GetActiveSchemaDeps` through `resolveGetActiveSchemaDeps(resolver)` and then delegate to canonical `createGetActiveSchema(deps)`.
+
+`resolveGetActiveSchemaDeps(resolver)` MUST resolve:
+
+- `resolveSchema: ResolveSchema`
+- `schemas: SchemaRegistry`
+- `buildSchemaFn: ( ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>, )`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - For project mode without `raw`, the use case contains no business logic — it is a thin delegation to `ResolveSchema`.
@@ -76,9 +88,10 @@ All lower-level dependencies (schema ref, plugins, overrides) are provided to `R
 
 ## Spec Dependencies
 
-- [`core:resolve-schema`](../resolve-schema/spec.md) — full schema resolution pipeline (project mode)
-- [`core:config`](../config/spec.md) — schema reference field and resolution semantics
-- [`core:schema-format`](../schema-format/spec.md) — `Schema` value object structure
-- [`core:schema-registry-port`](../schema-registry-port/spec.md) — `SchemaRegistry` port for ref and file resolution
-- [`core:build-schema`](../build-schema/spec.md) — `buildSchema` domain service for Schema construction
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — port/adapter design constraints
+- [`core:resolve-schema`](../resolve-schema/spec.md)
+- [`core:config`](../config/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:schema-registry-port`](../schema-registry-port/spec.md)
+- [`core:build-schema`](../build-schema/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

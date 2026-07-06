@@ -47,3 +47,14 @@
 
 - **WHEN** `GetSpecInput` is used
 - **THEN** it contains `workspace` (string) and `specPath` (SpecPath value object)
+
+### Requirement: Config-based factory delegates through resolveGetSpecDeps
+
+#### Scenario: createGetSpec config form derives GetSpecDeps through resolveGetSpecDeps
+
+- **WHEN** `createGetSpec(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetSpecDeps` through `resolveGetSpecDeps(resolver)`
+- **AND** `resolveGetSpecDeps(resolver)` resolves:
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+- **AND** the factory delegates to canonical `createGetSpec(deps)`

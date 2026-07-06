@@ -1,0 +1,27 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveRestoreChangeDeps
+
+    The config-based `createRestoreChange(config, options?)` form MUST derive `RestoreChangeDeps` through `resolveRestoreChangeDeps(resolver)` and then delegate to canonical `createRestoreChange(deps)`.
+
+    `resolveRestoreChangeDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `actor: ActorResolver`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:draft-change`](../draft-change/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

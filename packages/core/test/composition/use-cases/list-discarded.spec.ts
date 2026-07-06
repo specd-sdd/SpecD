@@ -3,7 +3,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ListDiscarded } from '../../../src/application/use-cases/list-discarded.js'
-import { createListDiscarded } from '../../../src/composition/use-cases/list-discarded.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
+import {
+  createListDiscarded,
+  type ListDiscardedDeps,
+} from '../../../src/composition/use-cases/list-discarded.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
@@ -66,5 +70,21 @@ describe('createListDiscarded', () => {
     const useCase = createListDiscarded(config)
 
     expect(useCase).toBeInstanceOf(ListDiscarded)
+  })
+
+  it('accepts explicit deps without config bootstrap', () => {
+    const changes = { listDiscarded: async () => [] } as never
+    const deps: ListDiscardedDeps = { changes }
+
+    expect(createListDiscarded(deps)).toBeInstanceOf(ListDiscarded)
+  })
+
+  it('rejects deps plus composition options', () => {
+    const changes = { listDiscarded: async () => [] } as never
+    const deps: ListDiscardedDeps = { changes }
+
+    expect(() =>
+      createListDiscarded(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
+    ).toThrow(InvalidCompositionFactoryArgumentsError)
   })
 })

@@ -1,7 +1,12 @@
 {
   "title": "DraftChange",
   "description": "Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted.",
-  "dependsOn": ["core:change", "default:_global/architecture", "core:drafted-change-view"],
+  "dependsOn": [
+    "core:change",
+    "default:_global/architecture",
+    "core:drafted-change-view",
+    "core:composition-resolver"
+  ],
   "context": [
     "Users need to pause work on a change without losing its state or history — for example, to context-switch or wait on a dependency. The `DraftChange` use case shelves an existing change by appending a `drafted` event to its history, and the repository implementation moves the change directory from `changes/` to `drafts/` when persisted."
   ],
@@ -46,6 +51,12 @@
       "requirement": "Dependencies",
       "rules": [
         "`DraftChange` depends on two ports injected via constructor:\n\n- `ChangeRepository` — for loading and persistence\n- `ActorResolver` — for resolving the current actor identity"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveDraftChangeDeps",
+      "rules": [
+        "The config-based `createDraftChange(config, options?)` form MUST derive `DraftChangeDeps` through `resolveDraftChangeDeps(resolver)` and then delegate to canonical `createDraftChange(deps)`.\n\n`resolveDraftChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -175,22 +186,30 @@
       "name": "Uses ActorResolver port",
       "when": ["DraftChange is instantiated"],
       "then": ["it requires an ActorResolver port in its constructor"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveDraftChangeDeps",
+      "name": "createDraftChange config form derives DraftChangeDeps through resolveDraftChangeDeps",
+      "when": ["createDraftChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives DraftChangeDeps through resolveDraftChangeDeps(resolver)",
+        "AND resolveDraftChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createDraftChange(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:draft-change",
-        "file": "core:src/application/use-cases/draft-change.ts",
-        "symbol": "DraftChange"
+        "file": "core:src/composition/use-cases/draft-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:aad623324259d102e16a2897bd5301d5ba19f396eec35817045ff50e6db011f9",
-    "verify.md": "sha256:eaf34977a91b1fa58ffca27cf3d9b49bcb697e9c2ae3fc647b8f50e5e290cdfd"
+    "spec.md": "sha256:05829143da1637946ae404820d0a0a9e8b4777360274a4743d269aa4cac98bd0",
+    "verify.md": "sha256:9cffb3a56786f970b76a5271b7d1a1df4b4b1737dc5c71de6e7f9a2b5224246a"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`DraftChange` shelves active change by appending `drafted` history and moving persisted storage from `changes/` to `drafts/`.",
-  "optimizedContext": "# DraftChange\n\n## Rules\n- `DraftChangeInput` requires `name`; accepts optional `reason` and `force`.\n- Load active change only via `ChangeRepository.get(name)`; if missing throw `ChangeNotFoundError`; drafted-only names do not qualify.\n- Resolve actor via `ActorResolver` and record it in `drafted` event.\n- Respect historical implementation guard: if change ever reached `implementing`, fail unless `force === true`.\n- Append drafted history via `change.draft(actor, reason, force)`.\n- Persist through `ChangeRepository.mutate(name, fn)`; repository writes fresh manifest and relocates directory from `changes/` to `drafts/`.\n\n## Constraints\n- No lifecycle transition; drafting is orthogonal to lifecycle state.\n- Directory relocation belongs to repository layer.\n- `isDrafted` derives from latest drafted/restored history event.\n"
+  "generatedBy": "core"
 }

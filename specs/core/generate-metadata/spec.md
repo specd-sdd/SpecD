@@ -79,6 +79,21 @@ The final metadata object merges:
 
 The result is returned with `hasExtraction: true`.
 
+### Requirement: Config-based factory delegates through resolveGenerateSpecMetadataDeps
+
+The config-based `createGenerateSpecMetadata(config, options?)` form MUST derive `GenerateSpecMetadataDeps` through `resolveGenerateSpecMetadataDeps(resolver)` and then delegate to canonical `createGenerateSpecMetadata(deps)`.
+
+`resolveGenerateSpecMetadataDeps(resolver)` MUST resolve:
+
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `hasher: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - No LLM involvement — extraction is purely deterministic via the schema's `metadataExtraction` engine
@@ -88,8 +103,9 @@ The result is returned with `hasExtraction: true`.
 
 ## Spec Dependencies
 
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata format, fields, validation
-- [`core:content-extraction`](../content-extraction/spec.md) — the `extractMetadata()` domain service
-- [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and artifact type definitions
-- [`core:spec-id-format`](../spec-id-format/spec.md) — `parseSpecId()` resolution
-- [`core:spec-repository-port`](../spec-repository-port/spec.md) — repository-backed path resolution used by dependency-normalizing transforms
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:content-extraction`](../content-extraction/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:spec-repository-port`](../spec-repository-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

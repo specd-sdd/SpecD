@@ -2,11 +2,11 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { createKernelInternals } from '../../src/composition/kernel-internals.js'
 import {
-  createBuiltinKernelRegistry,
-  createKernelInternals,
-} from '../../src/composition/kernel-internals.js'
-import { createKernelRegistryView } from '../../src/composition/kernel-registries.js'
+  createBuiltinCompositionRegistry,
+  createCompositionRegistryView,
+} from '../../src/composition/composition-registries.js'
 import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 import { NullVcsAdapter } from '../../src/infrastructure/null/vcs-adapter.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
@@ -72,16 +72,16 @@ describe('createKernelInternals', () => {
 
     const internals = await createKernelInternals(
       config,
-      createKernelRegistryView(createBuiltinKernelRegistry()),
+      createCompositionRegistryView(createBuiltinCompositionRegistry()),
     )
 
     expect(internals.actor).toBeInstanceOf(NullActorResolver)
     expect(internals.vcs).toBeInstanceOf(NullVcsAdapter)
   })
 
-  it('exposes built-in graph-store ids in the merged registry view', async () => {
-    const registry = createKernelRegistryView(createBuiltinKernelRegistry())
+  it('keeps the merged core registry limited to core-owned composition capabilities', async () => {
+    const registry = createCompositionRegistryView(createBuiltinCompositionRegistry())
 
-    expect([...registry.graphStores.keys()]).toEqual(expect.arrayContaining(['ladybug', 'sqlite']))
+    expect('graphStores' in registry).toBe(false)
   })
 })

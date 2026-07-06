@@ -7,7 +7,8 @@
     "core:schema-format",
     "core:schema-registry-port",
     "core:build-schema",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:composition-resolver"
   ],
   "context": [
     "Delivery mechanisms (CLI, MCP, plugins) need a single canonical way to obtain a resolved schema — either the project's active schema or an arbitrary schema identified by reference or file path — without duplicating multi-step resolution logic. `GetActiveSchema` provides this by delegating to `ResolveSchema` for the project's active schema, or by resolving a ref/file through the `SchemaRegistry` with extends chain resolution, and returning the resulting `Schema` entity."
@@ -35,6 +36,12 @@
       "requirement": "Construction dependencies",
       "rules": [
         "`GetActiveSchema` MUST be constructed with:\n\n- `resolveSchema` (`ResolveSchema`) — the use case that orchestrates the full schema resolution pipeline (used for project mode).\n- `schemas` (`SchemaRegistry`) — the registry port for resolving schema references (used for ref and file modes).\n- `buildSchemaFn` (`(ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>) => Schema`) — the domain service for building the Schema entity (used for ref and file modes).\n\nAll lower-level dependencies (schema ref, plugins, overrides) are provided to `ResolveSchema` at its construction time."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetActiveSchemaDeps",
+      "rules": [
+        "The config-based `createGetActiveSchema(config, options?)` form MUST derive `GetActiveSchemaDeps` through `resolveGetActiveSchemaDeps(resolver)` and then delegate to canonical `createGetActiveSchema(deps)`.\n\n`resolveGetActiveSchemaDeps(resolver)` MUST resolve:\n\n- `resolveSchema: ResolveSchema`\n- `schemas: SchemaRegistry`\n- `buildSchemaFn: ( ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>, )`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -187,14 +194,30 @@
       "given": ["GetActiveSchema was constructed with specific config"],
       "when": ["execute() is called twice without arguments"],
       "then": ["both calls produce an equivalent Schema object"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetActiveSchemaDeps",
+      "name": "createGetActiveSchema config form derives GetActiveSchemaDeps through resolveGetActiveSchemaDeps",
+      "when": ["createGetActiveSchema(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetActiveSchemaDeps through resolveGetActiveSchemaDeps(resolver)",
+        "AND resolveGetActiveSchemaDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetActiveSchema(deps)"
+      ]
     }
   ],
-  "implementation": {},
-  "contentHashes": {
-    "spec.md": "sha256:1468b3c62f3505b7e7491ec9f3aa633ced4bd3c654d3275bd6208d0bc1b236a5",
-    "verify.md": "sha256:10555b5b64c11507f2b1793a5d2455e152341b3390104c67857dcb6468a7db7e"
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:get-active-schema",
+        "file": "core:src/composition/use-cases/get-active-schema.ts"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`GetActiveSchema` resolves active, referenced, or file-backed schema, or returns raw schema data when callers request unresolved form.",
-  "optimizedContext": "# GetActiveSchema\n\n## Rules\n- `execute()` accepts no input for project mode, or `{ mode: \"ref\", ref }`, or `{ mode: \"file\", filePath }`; any mode may request raw output.\n- Project mode delegates directly to `ResolveSchema.execute()` and does not implement schema resolution logic itself.\n- Ref/file modes call `SchemaRegistry.resolveRaw()`, resolve extends chain, merge templates, and build final `Schema` through injected `buildSchemaFn`.\n- When `raw` is `true`, return unresolved `SchemaYamlData` / `SchemaRawResult` and skip extends resolution plus `buildSchema`.\n- Constructor dependencies are `ResolveSchema`, `SchemaRegistry`, and `buildSchemaFn`; project schema ref is fixed at construction time.\n\n## Constraints\n- Project-mode non-raw path is thin delegation only.\n- Ref/file non-raw path must mirror canonical schema-build pipeline.\n- Method is async and returns `Promise<GetActiveSchemaResult>`.\n"
+  "contentHashes": {
+    "spec.md": "sha256:543072cc83d087e63c623754bd2ce2cc6e2536a80c9e5366142873156ad02c70",
+    "verify.md": "sha256:2476d5f22774d6bc6cf7d66528a56054d9e52d726035f1043e528649c80ad148"
+  },
+  "generatedBy": "core"
 }

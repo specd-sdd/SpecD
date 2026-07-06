@@ -8,7 +8,8 @@
     "core:kernel",
     "default:_global/architecture",
     "core:archived-change-index-entry",
-    "core:read-only-change-view"
+    "core:read-only-change-view",
+    "core:composition-resolver"
   ],
   "context": [
     "When inspecting the archive — for audit, diffing, or post-mortem — users need to retrieve a specific archived change by name rather than scanning the full list. `GetArchivedChange` is a read-only query that looks up a single archived change by name and throws `ChangeNotFoundError` when the requested change does not exist."
@@ -48,6 +49,12 @@
       "requirement": "No side effects",
       "rules": [
         "`GetArchivedChange` MUST NOT mutate any state. It SHALL NOT write to any repository, run hooks, or trigger any lifecycle operations. It is a pure read-only query (aside from the potential `index.jsonl` recovery append performed internally by `ArchiveRepository.get()`)."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetArchivedChangeDeps",
+      "rules": [
+        "The config-based `createGetArchivedChange(config, options?)` form MUST derive `GetArchivedChangeDeps` through `resolveGetArchivedChangeDeps(resolver)` and then delegate to canonical `createGetArchivedChange(deps)`.\n\n`resolveGetArchivedChangeDeps(resolver)` MUST resolve:\n\n- `archive: ArchiveRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -133,30 +140,30 @@
       "name": "Constructor accepts ArchiveRepository",
       "when": ["GetArchivedChange is instantiated"],
       "then": ["it requires an ArchiveRepository in its constructor"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetArchivedChangeDeps",
+      "name": "createGetArchivedChange config form derives GetArchivedChangeDeps through resolveGetArchivedChangeDeps",
+      "when": ["createGetArchivedChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetArchivedChangeDeps through resolveGetArchivedChangeDeps(resolver)",
+        "AND resolveGetArchivedChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetArchivedChange(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:get-archived-change",
-        "file": "core:src/domain/read-only-change-view.ts",
-        "symbol": "ArchivedChange"
-      },
-      {
-        "specId": "core:get-archived-change",
-        "file": "core:src/domain/read-only-change-view.ts",
-        "symbol": "toArchivedChangeView"
-      },
-      {
-        "specId": "core:get-archived-change",
-        "file": "core:src/application/use-cases/get-archived-change.ts",
-        "symbol": "GetArchivedChange"
+        "file": "core:src/composition/use-cases/get-archived-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:36573d7c1f7eeaec5a2165e8ceab7176e4b34303c2c0762f23ed586281d15311",
-    "verify.md": "sha256:745f875634fbf7f6128c1385ad8828f03a174a4102e490495d58db52c55ee3eb"
+    "spec.md": "sha256:394450d21b57ce3c7d1d787ac5c78d1778deb14574e33ddd0d4246ae90064ecb",
+    "verify.md": "sha256:d1c89675fd9fd5ea6466d0a999c0049de681da6515c65cc8f49c7a04d67759ee"
   },
   "generatedBy": "core"
 }

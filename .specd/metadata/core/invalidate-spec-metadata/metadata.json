@@ -1,7 +1,7 @@
 {
   "title": "Invalidate Spec Metadata",
   "description": "When a spec's content changes outside the normal archive flow, its metadata becomes untrustworthy but deleting the entire file would lose curated fields like `dependsOn` and `description`. The `InvalidateSpecMetadata` use case marks the metadata as stale by removing only the `contentHashes` field, which causes all downstream consumers (staleness detection, `spec list --metadata-status`) to treat it as stale and forces regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.",
-  "dependsOn": ["core:spec-metadata", "core:storage"],
+  "dependsOn": ["core:spec-metadata", "core:storage", "core:composition-resolver"],
   "context": [
     "When a spec's content changes outside the normal archive flow, its metadata becomes untrustworthy but deleting the entire file would lose curated fields like `dependsOn` and `description`. The `InvalidateSpecMetadata` use case marks the metadata as stale by removing only the `contentHashes` field, which causes all downstream consumers (staleness detection, `spec list --metadata-status`) to treat it as stale and forces regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved."
   ],
@@ -34,6 +34,12 @@
       "requirement": "No strict validation on write",
       "rules": [
         "Because the use case intentionally removes `contentHashes` (a required field in `strictSpecMetadataSchema`), it bypasses `SaveSpecMetadata` and writes directly through `SpecRepository.saveMetadata()`. This is the only use case that writes metadata without strict validation."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveInvalidateSpecMetadataDeps",
+      "rules": [
+        "The config-based `createInvalidateSpecMetadata(config, options?)` form MUST derive `InvalidateSpecMetadataDeps` through `resolveInvalidateSpecMetadataDeps(resolver)` and then delegate to canonical `createInvalidateSpecMetadata(deps)`.\n\n`resolveInvalidateSpecMetadataDeps(resolver)` MUST resolve:\n\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -110,11 +116,30 @@
         "the metadata is written directly via SpecRepository.saveMetadata() without going through SaveSpecMetadata",
         "AND the force: true option is used to bypass conflict detection"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveInvalidateSpecMetadataDeps",
+      "name": "createInvalidateSpecMetadata config form derives InvalidateSpecMetadataDeps through resolveInvalidateSpecMetadataDeps",
+      "when": ["createInvalidateSpecMetadata(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives InvalidateSpecMetadataDeps through resolveInvalidateSpecMetadataDeps(resolver)",
+        "AND resolveInvalidateSpecMetadataDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createInvalidateSpecMetadata(deps)"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:invalidate-spec-metadata",
+        "file": "core:src/composition/use-cases/invalidate-spec-metadata.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e720c4f2225d09c2766b23bc3f66981f21316363384ec410d1a9963efcb0f2c3",
-    "verify.md": "sha256:5f0aba0a69dd47e41f7351899ce4ee5ffcb9bfcac584d7a34b7cc35356d91979"
+    "spec.md": "sha256:87425994c3a78247134c9997ca8185d626918c7299c64ac9028cfd6072b2d4e9",
+    "verify.md": "sha256:85f0679281feb6178229ec5d9fbe0d34ebdedbaf704597faddfce1202513d762"
   },
   "generatedBy": "core"
 }

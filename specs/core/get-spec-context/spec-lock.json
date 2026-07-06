@@ -10,12 +10,12 @@
     "core:storage",
     "core:workspace",
     "core:spec-id-format",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-spec-context.ts",
-      "symbols": ["GetSpecContext"]
+      "file": "core:src/composition/use-cases/get-spec-context.ts"
     }
   ]
 }

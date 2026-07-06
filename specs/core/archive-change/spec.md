@@ -407,6 +407,28 @@ By default, `ArchiveChange` MUST fail when those out-of-scope updates would occu
 
 Proceeding with those external sidecar updates requires an explicit `--allow-out-of-scope` override.
 
+### Requirement: Config-based factory delegates through resolveArchiveChangeDeps
+
+The config-based `createArchiveChange(config, options?)` form MUST derive `ArchiveChangeDeps` through `resolveArchiveChangeDeps(resolver)` and then delegate to canonical `createArchiveChange(deps)`.
+
+`resolveArchiveChangeDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `archive: ArchiveRepository`
+- `runStepHooks: RunStepHooks`
+- `actor: ActorResolver`
+- `parsers: ArtifactParserRegistry`
+- `schemaProvider: SchemaProvider`
+- `generateMetadata: GenerateSpecMetadata`
+- `saveMetadata: SaveSpecMetadata`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `projectRoot: string`
+- `batchSnapshot: ArchiveBatchSnapshotPort`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - `change.assertArchivable()` must be called before any hooks, snapshots, or file modifications
@@ -421,20 +443,21 @@ Proceeding with those external sidecar updates requires an explicit `--allow-out
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — Change entity, `assertArchivable()`, `ArchivedChange`
-- [`core:schema-format`](../schema-format/spec.md) — `artifacts[].delta`, `artifacts[].format`, workflow hooks
-- [`core:delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `apply()`, `DeltaApplicationError`, `ArtifactParserRegistry`
-- [`core:validate-artifacts`](../validate-artifacts/spec.md) — artifact validation gate before archive
-- [`core:storage`](../storage/spec.md) — archive directory naming, `index.jsonl`, `FsArchiveRepository.archive()`
-- [`core:run-step-hooks`](../run-step-hooks/spec.md) — shared hook execution engine
-- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution semantics
-- [`core:template-variables`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
-- [`core:spec-metadata`](../spec-metadata/spec.md) — deterministic metadata generation at archive time; `SaveSpecMetadata` for writing
-- [`core:content-extraction`](../content-extraction/spec.md) — `extractMetadata()` engine used to extract metadata fields from spec artifacts
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — port-per-workspace pattern; manual DI at entry points
-- [`core:workspace`](../workspace/spec.md) — primary workspace for archive path template resolution
-- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format for `specIds`
-- [`core:spec-overlap`](../spec-overlap/spec.md) — `detectSpecOverlap` domain service for overlap detection
-- [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for archive preparation, staged commit, and failure diagnostics
-- [`core:spec-lock`](../spec-lock/spec.md) — archive-time implementation sidecar materialization
-- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+- [`core:change`](../change/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:delta-format`](../delta-format/spec.md)
+- [`core:validate-artifacts`](../validate-artifacts/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:run-step-hooks`](../run-step-hooks/spec.md)
+- [`core:hook-execution-model`](../hook-execution-model/spec.md)
+- [`core:template-variables`](../template-variables/spec.md)
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:content-extraction`](../content-extraction/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:spec-overlap`](../spec-overlap/spec.md)
+- [`default:_global/logging`](../../_global/logging/spec.md)
+- [`core:spec-lock`](../spec-lock/spec.md)
+- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

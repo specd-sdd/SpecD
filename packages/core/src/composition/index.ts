@@ -1,17 +1,21 @@
 export * from './use-cases/index.js'
+export {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from './composition-resolver.js'
 export { createKernel, type Kernel, type KernelOptions } from './kernel.js'
 export { createKernelBuilder, type KernelBuilder } from './kernel-builder.js'
 export {
   type ActorProvider,
   type ArchiveStorageFactory,
   type ChangeStorageFactory,
-  type GraphStoreFactory,
-  type KernelRegistryInput,
-  type KernelRegistryView,
+  type CompositionRegistryInput,
+  type CompositionRegistryView,
   type SchemaStorageFactory,
   type SpecStorageFactory,
   type VcsProvider,
-} from './kernel-registries.js'
+} from './composition-registries.js'
 export { createSchemaRegistry } from './schema-registry.js'
 export { createSchemaRepository } from './schema-repository.js'
 export { createConfigLoader, type FsConfigLoaderOptions } from './config-loader.js'

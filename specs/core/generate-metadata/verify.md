@@ -154,3 +154,19 @@
 
 - **WHEN** `GenerateSpecMetadata.execute` completes with extraction
 - **THEN** the returned `metadata` contains fields from `extractMetadata()` plus `contentHashes` and `generatedBy: 'core'`
+
+### Requirement: Config-based factory delegates through resolveGenerateSpecMetadataDeps
+
+#### Scenario: createGenerateSpecMetadata config form derives GenerateSpecMetadataDeps through resolveGenerateSpecMetadataDeps
+
+- **WHEN** `createGenerateSpecMetadata(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GenerateSpecMetadataDeps` through `resolveGenerateSpecMetadataDeps(resolver)`
+- **AND** `resolveGenerateSpecMetadataDeps(resolver)` resolves:
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `hasher: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- **AND** the factory delegates to canonical `createGenerateSpecMetadata(deps)`

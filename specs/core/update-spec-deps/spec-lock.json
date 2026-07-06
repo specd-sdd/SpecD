@@ -8,7 +8,12 @@
     "core:spec-id-format",
     "core:compile-context",
     "core:composition",
-    "default:_global/error-handling-conventions"
+    "default:_global/error-handling-conventions",
+    "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/update-spec-deps.ts"
+    }
+  ]
 }

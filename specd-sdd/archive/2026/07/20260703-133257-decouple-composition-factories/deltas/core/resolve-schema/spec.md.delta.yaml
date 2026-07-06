@@ -1,0 +1,32 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveResolveSchemaDeps
+
+    The config-based `createResolveSchema(config, options?)` form MUST derive `ResolveSchemaDeps` through `resolveResolveSchemaDeps(resolver)` and then delegate to canonical `createResolveSchema(deps)`.
+
+    `resolveResolveSchemaDeps(resolver)` MUST resolve:
+
+    - `schemas: SchemaRegistry`
+    - `schemaRef: string`
+    - `schemaPlugins: readonly string[]`
+    - `schemaOverrides: SchemaOperations | undefined`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:schema-merge`](../schema-merge/spec.md)
+    - [`core:build-schema`](../build-schema/spec.md)
+    - [`core:schema-registry-port`](../schema-registry-port/spec.md)
+    - [`core:config`](../config/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

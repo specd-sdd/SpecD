@@ -73,3 +73,14 @@
 - **WHEN** `ListDrafts.execute()` reads drafted changes through that repository
 - **THEN** draft artifact states are derived with complete artifact-type and spec-existence bootstrap semantics
 - **AND** the config-based factory does not expose a weaker change repository variant
+
+### Requirement: Config-based factory delegates through resolveListDraftsDeps
+
+#### Scenario: createListDrafts config form derives ListDraftsDeps through resolveListDraftsDeps
+
+- **WHEN** `createListDrafts(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ListDraftsDeps` through `resolveListDraftsDeps(resolver)`
+- **AND** `resolveListDraftsDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- **AND** the factory delegates to canonical `createListDrafts(deps)`

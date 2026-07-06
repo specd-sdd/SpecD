@@ -3,15 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:project-metadata"],
+  "dependsOn": ["core:project-metadata", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/update-project-metadata.ts",
-      "symbols": [
-        "UpdateProjectMetadataInput",
-        "UpdateProjectMetadataResult",
-        "UpdateProjectMetadata"
-      ]
+      "file": "core:src/composition/use-cases/update-project-metadata.ts"
     }
   ]
 }

@@ -1,0 +1,30 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolvePreviewSpecDeps
+
+    The config-based `createPreviewSpec(config, options?)` form MUST derive `PreviewSpecDeps` through `resolvePreviewSpecDeps(resolver)` and then delegate to canonical `createPreviewSpec(deps)`.
+
+    `resolvePreviewSpecDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `specs: ReadonlyMap<string, SpecRepository>`
+    - `schemaProvider: SchemaProvider`
+    - `parsers: ArtifactParserRegistry`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:delta-format`](../delta-format/spec.md)
+    - [`core:artifact-parser-port`](../artifact-parser-port/spec.md)
+    - [`core:change-layout`](../change-layout/spec.md)
+    - [`core:file-reader-port`](../file-reader-port/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

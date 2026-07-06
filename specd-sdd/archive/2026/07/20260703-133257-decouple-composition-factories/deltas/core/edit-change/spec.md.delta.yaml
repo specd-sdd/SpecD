@@ -1,0 +1,28 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveEditChangeDeps
+
+    The config-based `createEditChange(config, options?)` form MUST derive `EditChangeDeps` through `resolveEditChangeDeps(resolver)` and then delegate to canonical `createEditChange(deps)`.
+
+    `resolveEditChangeDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `actor: ActorResolver`
+    - `schemaProvider: SchemaProvider`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:composition`](../composition/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

@@ -22,6 +22,22 @@ The update to `project-metadata.json` SHALL be atomic to prevent corruption.
 
 The use case SHALL only accept the `optimizedContext` string (wrapped in an input object) from the caller. It SHALL NOT allow the caller to provide its own freshness hashes or versioning information. This data is mapped to the internal `optimized.context` field in the persisted file.
 
+### Requirement: Config-based factory delegates through resolveUpdateProjectMetadataDeps
+
+The config-based `createUpdateProjectMetadata(config, options?)` form MUST derive `UpdateProjectMetadataDeps` through `resolveUpdateProjectMetadataDeps(resolver)` and then delegate to canonical `createUpdateProjectMetadata(deps)`.
+
+`resolveUpdateProjectMetadataDeps(resolver)` MUST resolve:
+
+- `config: SpecdConfig`
+- `listWorkspaces: ListWorkspaces`
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+- `files: FileReader`
+- `fileWriter: FileWriter`
+- `hasher: ContentHasher`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Spec Dependencies
 
-- [`core:project-metadata`](../project-metadata/spec.md) — defines the file structure and location
+- [`core:project-metadata`](../project-metadata/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

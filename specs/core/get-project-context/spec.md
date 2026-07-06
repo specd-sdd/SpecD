@@ -111,15 +111,34 @@ At the start of `execute`, `GetProjectContext` MUST build the effective `Compile
 
 When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.
 
+When `llmOptimizedContext` is disabled, the use case MUST NOT return the cached optimized project context as the primary response, even if the cache is fresh. In that case it MUST continue with the standard compilation flow.
+
 The system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
 
 - `specd.yaml`
 - Referenced `contextFiles`
 - Metadata of included specs
 
-If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.
+If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context only when optimization is enabled. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.
 
 The warning message MUST include remediation instructions: "Launch specd-project-context-optimizer agent to generate it".
+
+### Requirement: Config-based factory delegates through resolveGetProjectContextDeps
+
+The config-based `createGetProjectContext(config, options?)` form MUST derive `GetProjectContextDeps` through `resolveGetProjectContextDeps(resolver)` and then delegate to canonical `createGetProjectContext(deps)`.
+
+`resolveGetProjectContextDeps(resolver)` MUST resolve:
+
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `files: FileReader`
+- `parsers: ArtifactParserRegistry`
+- `hasher: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `defaultConfig: CompileContextConfig`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
 ## Constraints
 
@@ -133,9 +152,10 @@ The warning message MUST include remediation instructions: "Launch specd-project
 
 ## Spec Dependencies
 
-- [`core:config`](../config/spec.md) — context entry format, include/exclude pattern semantics, `CompileContextConfig` structure, `contextMode`
-- [`core:compile-context`](../compile-context/spec.md) — shared pattern matching, rendering logic, `ContextSpecEntry` type definition
-- [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
-- [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
-- `default:_global/architecture` — port/adapter design constraints
-- [`core:core/project-metadata`](../project-metadata/spec.md) — for optimization storage and hashing rules
+- [`core:config`](../config/spec.md)
+- [`core:compile-context`](../compile-context/spec.md)
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:core/project-metadata`](../core/project-metadata/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

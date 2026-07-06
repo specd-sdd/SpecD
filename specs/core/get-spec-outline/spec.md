@@ -57,8 +57,21 @@ When hint mode is enabled by the caller, each result also contains:
 
 `outline` entries MUST remain structural and sufficient for selector derivation without embedding repeated hint payload in each node.
 
+### Requirement: Config-based factory delegates through resolveGetSpecOutlineDeps
+
+The config-based `createGetSpecOutline(config, options?)` form MUST derive `GetSpecOutlineDeps` through `resolveGetSpecOutlineDeps(resolver)` and then delegate to canonical `createGetSpecOutline(deps)`.
+
+`resolveGetSpecOutlineDeps(resolver)` MUST resolve:
+
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Spec Dependencies
 
-- [`core:get-spec`](../get-spec/spec.md) — for reading spec artifact content.
-- [`core:artifact-parser-port`](../artifact-parser-port/spec.md) — for generating the outline from the AST.
-- [`core:get-active-schema`](../get-active-schema/spec.md) — for resolving artifact IDs to filenames.
+- [`core:get-spec`](../get-spec/spec.md)
+- [`core:artifact-parser-port`](../artifact-parser-port/spec.md)
+- [`core:get-active-schema`](../get-active-schema/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

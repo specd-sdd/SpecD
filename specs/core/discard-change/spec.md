@@ -65,6 +65,17 @@ Inside the callback, the use case calls `change.discard(reason, actor, supersede
 - `ChangeRepository` — for loading and persistence
 - `ActorResolver` — for resolving the current actor identity
 
+### Requirement: Config-based factory delegates through resolveDiscardChangeDeps
+
+The config-based `createDiscardChange(config, options?)` form MUST derive `DiscardChangeDeps` through `resolveDiscardChangeDeps(resolver)` and then delegate to canonical `createDiscardChange(deps)`.
+
+`resolveDiscardChangeDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT perform any state transitions — discarding is orthogonal to lifecycle state
@@ -75,3 +86,4 @@ Inside the callback, the use case calls `change.discard(reason, actor, supersede
 
 - [`core:change`](../change/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

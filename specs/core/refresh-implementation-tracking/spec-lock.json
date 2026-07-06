@@ -7,12 +7,12 @@
     "core:change",
     "core:implementation-detector-port",
     "core:storage",
-    "core:archive-repository-port"
+    "core:archive-repository-port",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["createKernel"]
+      "file": "core:src/composition/use-cases/refresh-implementation-tracking.ts"
     }
   ]
 }

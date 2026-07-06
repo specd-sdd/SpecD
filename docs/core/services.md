@@ -298,7 +298,7 @@ type ExtractorTransform = (
 Transforms are registered through the kernel:
 
 - `createKernel(config, { extractorTransforms: { myTransform } })`
-- `createKernelBuilder(config).registerExtractorTransform('myTransform', myTransform)`
+- `createKernelBuilder(config).registerExtractorTransform('myTransform', myTransform)` from `@specd/core/extensions`
 
 Built-ins are registered under the same mechanism. `resolveSpecPath` is the standard transform for dependency extraction: it tries the extracted `value` first, then any interpolated args in order, returning the first candidate that normalizes to a canonical spec id. Canonical `workspace:capability-path` candidates are normalized locally; relative candidates are delegated to a repository-backed resolver in transform context. That resolver uses `SpecRepository.resolveFromPath()` in the origin workspace and consumes `crossWorkspaceHint` to route to the correct workspace before confirming existence via `SpecRepository.get()`.
 

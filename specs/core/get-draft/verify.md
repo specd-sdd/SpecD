@@ -93,3 +93,14 @@
 
 - **WHEN** `GetDraft.execute` runs
 - **THEN** `SchemaProvider` is not consulted
+
+### Requirement: Config-based factory delegates through resolveGetDraftDeps
+
+#### Scenario: createGetDraft config form derives GetDraftDeps through resolveGetDraftDeps
+
+- **WHEN** `createGetDraft(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetDraftDeps` through `resolveGetDraftDeps(resolver)`
+- **AND** `resolveGetDraftDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- **AND** the factory delegates to canonical `createGetDraft(deps)`

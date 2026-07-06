@@ -230,23 +230,16 @@
 - **WHEN** `createKernel(config, options)` is called
 - **THEN** the schema registry searches the project's own `node_modules` first, then `/usr/lib/node_modules`
 
-#### Scenario: Graph-store id can be selected in KernelOptions
-
-- **GIVEN** a `KernelOptions` with `graphStoreId: 'ladybug'`
-- **WHEN** `createKernel(config, options)` is called
-- **THEN** the built kernel carries that backend selection through the merged registry view and downstream graph composition
-
 #### Scenario: No options provided
 
 - **WHEN** `createKernel(config)` is called without options
 - **THEN** the schema registry searches only the project's own `node_modules`
-- **AND** the current built-in default graph-store id is used
 
 ### Requirement: KernelOptions supports additive registries
 
 #### Scenario: External registrations extend built-ins
 
-- **GIVEN** built-in storages, graph stores, parsers, VCS providers, actor providers, and external hook runners are available
+- **GIVEN** built-in storages, parsers, VCS providers, actor providers, and external hook runners are available
 - **WHEN** `createKernel(config, options)` is called with additional registrations in one or more categories
 - **THEN** the built kernel uses a merged capability set that includes both the built-ins and the newly registered entries
 - **AND** omitting a category from `KernelOptions` leaves that built-in category unchanged
@@ -257,7 +250,7 @@
 
 - **GIVEN** external registrations were provided during kernel construction
 - **WHEN** the built kernel's registry view is inspected
-- **THEN** it exposes the final merged set of storage factories, graph-store factories, parsers, providers, and external hook runners actually used for construction
+- **THEN** it exposes the final merged set of storage factories, parsers, providers, and external hook runners actually used for construction
 - **AND** the view includes built-ins as well as accepted external registrations
 
 ### Requirement: Kernel rejects invalid registry references
@@ -276,18 +269,6 @@
 - **THEN** specd fails with a clear unknown-reference error
 - **AND** the reference is not ignored or deferred silently
 
-#### Scenario: Unknown graphStoreId fails clearly
-
-- **GIVEN** `KernelOptions` selects `graphStoreId: 'missing-backend'`
-- **WHEN** `createKernel(config, options)` resolves the merged graph-store registry
-- **THEN** kernel construction fails with a clear unknown-backend error
-
-#### Scenario: Conflicting graph-store registrations fail clearly
-
-- **GIVEN** external graph-store registrations include a duplicate id that collides with a built-in or previously registered backend
-- **WHEN** `createKernel(config, options)` processes those registrations
-- **THEN** kernel construction fails with a clear conflict error
-
 ### Requirement: Kernel is a plain object, not a class
 
 #### Scenario: Kernel has no methods or lifecycle
@@ -300,3 +281,11 @@
 
 - **WHEN** `createKernel(config)` returns
 - **THEN** the kernel object and its nested groups are not expected to change — there is no `addUseCase()` or `removeUseCase()` mechanism
+
+### Requirement: Kernel is a facade over composition-owned registry primitives
+
+#### Scenario: Kernel does not own merged-registry semantics
+
+- **WHEN** `createKernel(...)` assembles use cases and exposes merged capabilities
+- **THEN** it reuses composition-owned registry primitives also consumed by the resolver and builder
+- **AND** it does not maintain a separate registry-merging source of truth

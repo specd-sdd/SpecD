@@ -1,0 +1,25 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveSaveSpecMetadataDeps
+
+    The config-based `createSaveSpecMetadata(config, options?)` form MUST derive `SaveSpecMetadataDeps` through `resolveSaveSpecMetadataDeps(resolver)` and then delegate to canonical `createSaveSpecMetadata(deps)`.
+
+    `resolveSaveSpecMetadataDeps(resolver)` MUST resolve:
+
+    - `specRepos: ReadonlyMap<string, SpecRepository>`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

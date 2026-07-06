@@ -3,11 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:kernel"],
+  "dependsOn": ["core:change", "core:kernel", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/list-changes.ts",
-      "symbols": ["createListChanges"]
+      "file": "core:src/composition/use-cases/list-changes.ts"
     }
   ]
 }

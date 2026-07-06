@@ -1,6 +1,6 @@
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
 import { type ActorIdentity } from '../domain/entities/change.js'
-import { type ActorProvider, type AutoDetectActorProvider } from './kernel-registries.js'
+import { type ActorProvider, type AutoDetectActorProvider } from './actor-provider.js'
 import { GitActorResolver } from '../infrastructure/git/actor-resolver.js'
 import { HgActorResolver } from '../infrastructure/hg/actor-resolver.js'
 import { SvnActorResolver } from '../infrastructure/svn/actor-resolver.js'

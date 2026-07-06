@@ -1,7 +1,12 @@
 {
   "title": "Get Spec",
   "description": "Delivery mechanisms need to display or process a complete spec with all its artifacts, but loading and assembling those pieces requires coordinating workspace lookup, spec resolution, and multi-file artifact loading. The `GetSpec` use case handles this by loading a single spec and all of its artifact files by workspace name and spec path, serving as the primary query for reading a complete spec.",
-  "dependsOn": ["core:storage", "core:workspace", "core:spec-id-format"],
+  "dependsOn": [
+    "core:storage",
+    "core:workspace",
+    "core:spec-id-format",
+    "core:composition-resolver"
+  ],
   "context": [
     "Delivery mechanisms need to display or process a complete spec with all its artifacts, but loading and assembling those pieces requires coordinating workspace lookup, spec resolution, and multi-file artifact loading. The `GetSpec` use case handles this by loading a single spec and all of its artifact files by workspace name and spec path, serving as the primary query for reading a complete spec."
   ],
@@ -34,6 +39,12 @@
       "requirement": "Input shape",
       "rules": [
         "`GetSpecInput` MUST include:\n\n- `workspace` — the workspace name (string).\n- `specPath` — a `SpecPath` value object identifying the spec within the workspace."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetSpecDeps",
+      "rules": [
+        "The config-based `createGetSpec(config, options?)` form MUST derive `GetSpecDeps` through `resolveGetSpecDeps(resolver)` and then delegate to canonical `createGetSpec(deps)`.\n\n`resolveGetSpecDeps(resolver)` MUST resolve:\n\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -91,11 +102,30 @@
       "name": "Input contains workspace and specPath",
       "when": ["GetSpecInput is used"],
       "then": ["it contains workspace (string) and specPath (SpecPath value object)"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetSpecDeps",
+      "name": "createGetSpec config form derives GetSpecDeps through resolveGetSpecDeps",
+      "when": ["createGetSpec(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetSpecDeps through resolveGetSpecDeps(resolver)",
+        "AND resolveGetSpecDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetSpec(deps)"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:get-spec",
+        "file": "core:src/composition/use-cases/get-spec.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:f54065da18bba350c9374e4708468ede307681dda65b5193e2398d564ef23586",
-    "verify.md": "sha256:45c72c83076653bd8dc62abf4ebd7715266e8afcae4889321f7dbdfdf53d269c"
+    "spec.md": "sha256:96278ca8545ae6689c5d710cc7148de75b6288a0542b5e41f60871fd5d998104",
+    "verify.md": "sha256:ea80a18b6ff3aba59587fd1a67c0ae949dbd57950c730260cb2d97eec031e786"
   },
   "generatedBy": "core"
 }

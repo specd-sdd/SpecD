@@ -1,0 +1,176 @@
+{
+  "title": "UpdateImplementationTracking",
+  "description": "Implementation tracking needs an application-level mutation primitive so delivery hosts can record file review state and confirmed implementation links without reimplementing change-manifest rules themselves. `UpdateImplementationTracking` is that primitive: it applies one implementation-tracking mutation to a change, enforces file-existence and tracked-entry rules at the core boundary, and persists the resulting implementation-tracking projection.",
+  "dependsOn": ["core:change", "core:refresh-implementation-tracking", "core:composition-resolver"],
+  "context": [
+    "Implementation tracking needs an application-level mutation primitive so delivery hosts can record file review state and confirmed implementation links without reimplementing change-manifest rules themselves. `UpdateImplementationTracking` is that primitive: it applies one implementation-tracking mutation to a change, enforces file-existence and tracked-entry rules at the core boundary, and persists the resulting implementation-tracking projection."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`UpdateImplementationTracking.execute` SHALL accept:\n\n- `name` — change name\n- `action` — one of `add`, `remove`, `ignore`, `resolve`, or `unresolve`\n- `file` — raw project-relative file path\n- `specId` — optional canonical spec ID for link mutations\n- `symbols` — optional symbol refinements for link mutations"
+      ]
+    },
+    {
+      "requirement": "Add mutation creates or enriches implementation links",
+      "rules": [
+        "When `action = add`, the use case MUST require the target file to exist on disk.\n\nIt MUST create or enrich a confirmed implementation link for the given `specId + file` pair, using symbol refinements when provided. When the file is not already tracked, it MUST add a tracked implementation file entry with state `open`."
+      ]
+    },
+    {
+      "requirement": "Remove mutation removes implementation links",
+      "rules": [
+        "When `action = remove`, the use case SHALL remove confirmed implementation links.\n\nWhen symbols are provided, it MUST remove only those symbol refinements. When symbols are omitted, it MUST remove the whole `specId + file` link set."
+      ]
+    },
+    {
+      "requirement": "Resolve mutation closes tracked-file review",
+      "rules": [
+        "When `action = resolve`, the use case MUST require the target file to exist on disk and already be tracked by the change.\n\nIt MUST move the tracked file into the `resolved` review state."
+      ]
+    },
+    {
+      "requirement": "Unresolve mutation reopens tracked-file review",
+      "rules": [
+        "When `action = unresolve`, the use case MUST require the target file to exist on disk and already be tracked.\n\nIt MUST move `resolved` or `ignored` tracked files back to `open`. It MUST NOT reopen tracked files in the `removed` state; those may return to `open` only through refresh-driven resurrection."
+      ]
+    },
+    {
+      "requirement": "Ignore mutation preserves tracked history",
+      "rules": [
+        "When `action = ignore`, the use case SHALL mark the tracked file as `ignored`.\n\nIt MAY ignore a missing file only when that file is already tracked. For an untracked file, physical existence MUST be validated before adding it as `ignored`. Confirmed implementation links for the file MUST be preserved."
+      ]
+    },
+    {
+      "requirement": "Change must exist",
+      "rules": [
+        "If no change with the given name exists, the use case MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Missing-file validation uses typed errors",
+      "rules": [
+        "When a file-required mutation targets a file that is missing on disk or invalid for the requested transition, the use case MUST throw `ImplementationFileNotFoundError` rather than silently mutating state."
+      ]
+    },
+    {
+      "requirement": "Persistence and result projection",
+      "rules": [
+        "The use case MUST persist mutations through `ChangeRepository.mutate`.\n\nIt MUST return the resulting `ImplementationTrackingProjection` after the mutation completes."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateImplementationTrackingDeps",
+      "rules": [
+        "The config-based `createUpdateImplementationTracking(config, options?)` form MUST derive `UpdateImplementationTrackingDeps` through `resolveUpdateImplementationTrackingDeps(resolver)` and then delegate to canonical `createUpdateImplementationTracking(deps)`.\n\n`resolveUpdateImplementationTrackingDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `files: FileReader`\n- `projectRoot: string`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
+    }
+  ],
+  "constraints": [
+    "UpdateImplementationTracking mutates only implementation-tracking state; it does not validate or transition lifecycle state.",
+    "The use case operates on raw project-relative file paths during active-change authoring.",
+    "The use case does not perform autodetection of implementation candidates; that remains RefreshImplementationTracking."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "Execute accepts implementation-tracking mutation input",
+      "when": ["UpdateImplementationTracking.execute(...) is called"],
+      "then": [
+        "it accepts name, action, and file",
+        "AND it optionally accepts specId and symbols for link mutations"
+      ]
+    },
+    {
+      "requirement": "Add mutation creates or enriches implementation links",
+      "name": "Add requires file existence and opens tracking when needed",
+      "given": ["a change exists and the target file exists on disk"],
+      "when": ["action = add is executed for an untracked file"],
+      "then": [
+        "a confirmed implementation link is created or enriched",
+        "AND the file becomes tracked with review state open"
+      ]
+    },
+    {
+      "requirement": "Remove mutation removes implementation links",
+      "name": "Remove with symbols deletes only those refinements",
+      "given": ["a confirmed specId + file link has multiple symbol refinements"],
+      "when": ["action = remove is executed with one symbol"],
+      "then": ["only that symbol refinement is removed"]
+    },
+    {
+      "requirement": "Resolve mutation closes tracked-file review",
+      "name": "Resolve requires tracked existing file",
+      "given": ["a tracked file exists on disk"],
+      "when": ["action = resolve is executed"],
+      "then": ["the tracked file moves to resolved"]
+    },
+    {
+      "requirement": "Unresolve mutation reopens tracked-file review",
+      "name": "Unresolve reopens resolved file",
+      "given": ["a tracked file exists on disk in resolved state"],
+      "when": ["action = unresolve is executed"],
+      "then": ["the tracked file moves to open"]
+    },
+    {
+      "requirement": "Unresolve mutation reopens tracked-file review",
+      "name": "Unresolve refuses removed file",
+      "given": ["a tracked file is in removed state"],
+      "when": ["action = unresolve is executed"],
+      "then": ["the use case throws ImplementationFileNotFoundError"]
+    },
+    {
+      "requirement": "Ignore mutation preserves tracked history",
+      "name": "Ignore preserves confirmed links for tracked file",
+      "given": ["a tracked file has confirmed implementation links"],
+      "when": ["action = ignore is executed"],
+      "then": ["the file moves to ignored", "AND the confirmed links remain present"]
+    },
+    {
+      "requirement": "Change must exist",
+      "name": "Unknown change throws ChangeNotFoundError",
+      "when": ["UpdateImplementationTracking.execute({ name: \"missing\", ... }) is called"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Missing-file validation uses typed errors",
+      "name": "Missing file throws ImplementationFileNotFoundError",
+      "when": ["a file-required mutation targets a missing or invalid file"],
+      "then": ["the use case throws ImplementationFileNotFoundError"]
+    },
+    {
+      "requirement": "Persistence and result projection",
+      "name": "Mutation persists and returns implementation projection",
+      "when": ["a mutation succeeds"],
+      "then": [
+        "it persists through ChangeRepository.mutate",
+        "AND the result includes the resulting ImplementationTrackingProjection"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateImplementationTrackingDeps",
+      "name": "createUpdateImplementationTracking config form derives UpdateImplementationTrackingDeps through resolveUpdateImplementationTrackingDeps",
+      "when": ["createUpdateImplementationTracking(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives UpdateImplementationTrackingDeps through resolveUpdateImplementationTrackingDeps(resolver)",
+        "AND resolveUpdateImplementationTrackingDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createUpdateImplementationTracking(deps)"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:update-implementation-tracking",
+        "file": "core:src/composition/use-cases/update-implementation-tracking.ts"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:6610dbd3f529ef58089a9d273c887068ae90b070b91a22a930604ec20c8b5d64",
+    "verify.md": "sha256:d27d68dfe11f77cf0e5ea0b80f14632f9921e1feb98d9b1dba4bff1c097e5964"
+  },
+  "generatedBy": "core"
+}

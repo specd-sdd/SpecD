@@ -1,53 +1,91 @@
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { GetDiscarded } from '../../application/use-cases/get-discarded.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { type FsListDraftsOptions, type ListDraftsContext } from './list-drafts.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Constructs a `GetDiscarded` use case with full project config.
+ * Explicit dependencies for {@link createGetDiscarded}.
+ */
+export interface GetDiscardedDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+}
+
+/**
+ * Resolves {@link GetDiscardedDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetDiscarded`
+ */
+export function resolveGetDiscardedDeps(resolver: CompositionResolver): GetDiscardedDeps {
+  return { changes: resolver.getChangeRepository() }
+}
+
+/**
+ * Constructs a `GetDiscarded` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetDiscarded(deps: GetDiscardedDeps): GetDiscarded
+/**
+ * Constructs a `GetDiscarded` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createGetDiscarded(config: SpecdConfig): GetDiscarded
-/**
- * Constructs a `GetDiscarded` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for discarded resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetDiscarded(
-  context: ListDraftsContext,
-  options: FsListDraftsOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetDiscarded
 /**
- * Implementation overload for {@link createGetDiscarded}.
+ * Constructs a `GetDiscarded` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - Project config or explicit context
- * @param options - Filesystem paths when using explicit context
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createGetDiscarded(
-  configOrContext: SpecdConfig | ListDraftsContext,
-  options?: FsListDraftsOptions,
+  depsOrConfig: GetDiscardedDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetDiscarded {
-  if (isSpecdConfig(configOrContext)) {
-    return createGetDiscarded(
-      {
-        workspace: getDefaultWorkspace(configOrContext).name,
-        ownership: getDefaultWorkspace(configOrContext).ownership,
-        isExternal: getDefaultWorkspace(configOrContext).isExternal,
-        configPath: configOrContext.configPath,
-      },
-      {
-        changesPath: configOrContext.storage.changesPath,
-        draftsPath: configOrContext.storage.draftsPath,
-        discardedPath: configOrContext.storage.discardedPath,
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetDiscarded',
+    depsOrConfig,
+    options,
+    isGetDiscardedDeps,
+  )
+  return createGetDiscardedFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetDiscarded` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetDiscardedFromNormalized(
+  input: FactoryInput<GetDiscardedDeps, CompositionResolutionOptions>,
+): GetDiscarded {
+  if (input.kind === 'deps') {
+    return new GetDiscarded(input.deps.changes)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  return new GetDiscarded(changeRepo)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetDiscarded(resolveGetDiscardedDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetDiscardedDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetDiscardedDeps(value: GetDiscardedDeps | SpecdConfig): value is GetDiscardedDeps {
+  return 'changes' in value
 }

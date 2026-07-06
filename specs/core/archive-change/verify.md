@@ -664,3 +664,26 @@
 - **GIVEN** a change with implementation files that are currently marked as open in the detector
 - **WHEN** `ArchiveChange` is executed
 - **THEN** `ArchiveImplementationStateError` is thrown
+
+### Requirement: Config-based factory delegates through resolveArchiveChangeDeps
+
+#### Scenario: createArchiveChange config form derives ArchiveChangeDeps through resolveArchiveChangeDeps
+
+- **WHEN** `createArchiveChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ArchiveChangeDeps` through `resolveArchiveChangeDeps(resolver)`
+- **AND** `resolveArchiveChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `archive: ArchiveRepository`
+- `runStepHooks: RunStepHooks`
+- `actor: ActorResolver`
+- `parsers: ArtifactParserRegistry`
+- `schemaProvider: SchemaProvider`
+- `generateMetadata: GenerateSpecMetadata`
+- `saveMetadata: SaveSpecMetadata`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `projectRoot: string`
+- `batchSnapshot: ArchiveBatchSnapshotPort`
+- **AND** the factory delegates to canonical `createArchiveChange(deps)`

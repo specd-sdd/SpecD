@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:update-implementation-tracking",
+    "core:refresh-implementation-tracking",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/get-implementation-review.ts"
+    }
+  ]
+}

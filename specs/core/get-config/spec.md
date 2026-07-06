@@ -36,6 +36,16 @@ Persisting configuration changes to `specd.yaml` MUST go through `ConfigWriter` 
 
 `createGetConfig(config: SpecdConfig)` in `composition/use-cases/` MUST construct and return a `GetConfig` instance without requiring a full kernel.
 
+### Requirement: Config-based factory delegates through resolveGetConfigDeps
+
+The config-based `createGetConfig(config, options?)` form MUST derive `GetConfigDeps` through `resolveGetConfigDeps(resolver)` and then delegate to canonical `createGetConfig(deps)`.
+
+`resolveGetConfigDeps(resolver)` MUST resolve:
+
+- `config: SpecdConfig`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST NOT mutate the internal snapshot after construction.
@@ -43,5 +53,6 @@ Persisting configuration changes to `specd.yaml` MUST go through `ConfigWriter` 
 
 ## Spec Dependencies
 
-- [`core:config`](../config/spec.md) — defines the `SpecdConfig` shape returned to hosts
-- [`default:_global/architecture`](../_global/architecture/spec.md) — use cases live in the application layer with no direct infrastructure imports
+- [`core:config`](../config/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

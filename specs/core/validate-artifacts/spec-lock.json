@@ -13,15 +13,12 @@
     "core:storage",
     "default:_global/architecture",
     "core:spec-id-format",
-    "core:schema-format"
+    "core:schema-format",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/validate-artifacts.ts",
-      "symbols": ["ValidateArtifacts"]
-    },
-    {
-      "file": "core:src/composition/use-cases/edit-change.ts"
+      "file": "core:src/composition/use-cases/validate-artifacts.ts"
     }
   ]
 }

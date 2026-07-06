@@ -1,0 +1,41 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:kernel",
+    "core:kernel-builder"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": [
+        "CompositionResolutionOptions",
+        "CompositionResolver",
+        "createCompositionResolver"
+      ]
+    },
+    {
+      "file": "core:src/domain/errors/invalid-composition-factory-arguments-error.ts",
+      "symbols": ["InvalidCompositionFactoryArgumentsError"]
+    },
+    {
+      "file": "core:src/domain/errors/index.ts"
+    },
+    {
+      "file": "core:src/composition/composition-registries.ts",
+      "symbols": [
+        "CompositionRegistryInput",
+        "CompositionRegistryView",
+        "createBuiltinCompositionRegistry",
+        "createCompositionRegistryView"
+      ]
+    },
+    {
+      "file": "core:test/composition/composition-registries.spec.ts"
+    }
+  ]
+}

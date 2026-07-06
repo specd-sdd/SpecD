@@ -9,7 +9,8 @@
     "core:config",
     "core:change",
     "core:template-variables",
-    "core:archive-repository-port"
+    "core:archive-repository-port",
+    "core:composition-resolver"
   ],
   "context": [
     "Agent-driven workflow steps declare `run:` hooks that need to be executed at step boundaries, but the agent cannot call `HookRunner` directly — it interacts with specd through CLI commands. `RunStepHooks` is the use case that bridges this gap: given a change name, step name, and phase, it resolves the relevant `run:` hooks from the schema and project configuration, executes them via `HookRunner` with the correct failure semantics, and returns per-hook results for the CLI to report. It also serves as a shared hook execution engine for other use cases (`TransitionChange`, `ArchiveChange`) that need to run workflow hooks."
@@ -97,6 +98,12 @@
       "requirement": "Works for any step",
       "rules": [
         "`RunStepHooks` MUST work for any valid `ChangeState`, including `archiving`. While `ArchiveChange` delegates hook execution to `RunStepHooks`, `RunStepHooks` can also be called independently — for example, to run a pre-archive check without performing the full archive, or to retry a failed post-archive hook."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveRunStepHooksDeps",
+      "rules": [
+        "The config-based `createRunStepHooks(config, options?)` form MUST derive `RunStepHooksDeps` through `resolveRunStepHooksDeps(resolver)` and then delegate to canonical `createRunStepHooks(deps)`.\n\n`resolveRunStepHooksDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `archive: ArchiveRepository`\n- `hooks: HookRunner`\n- `externalHookRunners: ReadonlyMap<string, ExternalHookRunner>`\n- `schemaProvider: SchemaProvider`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -349,11 +356,30 @@
       "given": ["the archiving step with pre-hooks [{ id: \"test\", run: \"pnpm test\" }]"],
       "when": ["RunStepHooks.execute is called with step: \"archiving\", phase: \"pre\""],
       "then": ["pnpm test is executed via HookRunner", "AND the result includes the hook outcome"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveRunStepHooksDeps",
+      "name": "createRunStepHooks config form derives RunStepHooksDeps through resolveRunStepHooksDeps",
+      "when": ["createRunStepHooks(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives RunStepHooksDeps through resolveRunStepHooksDeps(resolver)",
+        "AND resolveRunStepHooksDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createRunStepHooks(deps)"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:run-step-hooks",
+        "file": "core:src/composition/use-cases/run-step-hooks.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:51bf125dfe3cad5a7b749c61326198d9cb29ca9d37bf498542001063075dbb62",
-    "verify.md": "sha256:23863a56f142cc5634525ab09a57b9ab2ee5bcebf4da5e2a0e5337a421783401"
+    "spec.md": "sha256:5d9d64c507dcc1952dc57660a5cc50892c9c726668c52c1e5dbd9f8e1bfce89a",
+    "verify.md": "sha256:9901f9af61eb5cea105d8244d571bc63a4498a7279175ebce2c6b40629019137"
   },
   "generatedBy": "core"
 }

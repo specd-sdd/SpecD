@@ -1,7 +1,7 @@
 {
   "title": "GetConfig",
   "description": "Delivery hosts (CLI, SDK, API, MCP) that receive a wired `Kernel` need to read the project configuration snapshot the kernel was built from without maintaining a parallel `SpecdConfig` in host context. `GetConfig` exposes that snapshot as a host-facing, read-only view. It does not re-read `specd.yaml` from disk and does not replace internal use cases that retain the live configuration reference for composition wiring.",
-  "dependsOn": ["core:config", "default:_global/architecture"],
+  "dependsOn": ["core:config", "default:_global/architecture", "core:composition-resolver"],
   "context": [
     "Delivery hosts (CLI, SDK, API, MCP) that receive a wired `Kernel` need to read the project configuration snapshot the kernel was built from without maintaining a parallel `SpecdConfig` in host context. `GetConfig` exposes that snapshot as a host-facing, read-only view. It does not re-read `specd.yaml` from disk and does not replace internal use cases that retain the live configuration reference for composition wiring."
   ],
@@ -34,6 +34,12 @@
       "requirement": "Standalone factory",
       "rules": [
         "`createGetConfig(config: SpecdConfig)` in `composition/use-cases/` MUST construct and return a `GetConfig` instance without requiring a full kernel."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetConfigDeps",
+      "rules": [
+        "The config-based `createGetConfig(config, options?)` form MUST derive `GetConfigDeps` through `resolveGetConfigDeps(resolver)` and then delegate to canonical `createGetConfig(deps)`.\n\n`resolveGetConfigDeps(resolver)` MUST resolve:\n\n- `config: SpecdConfig`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -103,32 +109,30 @@
         "it returns a GetConfig instance",
         "AND execute() returns a readonly snapshot deep-equal to config"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetConfigDeps",
+      "name": "createGetConfig config form derives GetConfigDeps through resolveGetConfigDeps",
+      "when": ["createGetConfig(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetConfigDeps through resolveGetConfigDeps(resolver)",
+        "AND resolveGetConfigDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetConfig(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:get-config",
-        "file": "core:src/application/use-cases/get-config.ts",
-        "symbol": "GetConfig"
-      },
-      {
-        "specId": "core:get-config",
-        "file": "core:src/composition/use-cases/get-config.ts",
-        "symbol": "createGetConfig"
-      },
-      {
-        "specId": "core:get-config",
-        "file": "core:src/composition/use-cases/get-config.ts",
-        "symbol": "GetConfigOptions"
+        "file": "core:src/composition/use-cases/get-config.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:85f900139d34c4ff3d0884d895ce35d6076228a3bba5841f338c5d52f1bda58b",
-    "verify.md": "sha256:4120fc6197c1aeabef87868ef7ea4c1586026a065a6877156ed1f827309aaedd"
+    "spec.md": "sha256:4a68e3aca2c2bffa59b0acb178e07296af9d594a0dc621bdb8bdb0ff5fadc0ac",
+    "verify.md": "sha256:0f9b776f919990b6a54414ef0a1956a42e6f0e35f1230a60f797f4f682880ab0"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`GetConfig` exposes kernel construction-time `SpecdConfig` snapshot to hosts without re-reading disk or leaking live mutable wiring state.",
-  "optimizedContext": "# GetConfig\n\n## Rules\n- Constructor accepts same `SpecdConfig` passed to kernel wiring and stores `structuredClone(config)` as internal snapshot.\n- `GetConfig.execute()` accepts no input and returns read-only host snapshot of construction-time config.\n- Returned snapshot is referentially identical across repeated `execute()` calls on same instance.\n- Use case performs no disk I/O and does not call `ConfigLoader` or `ConfigWriter`.\n- `createGetConfig(config)` must construct standalone instance without full kernel.\n\n## Constraints\n- Do not mutate stored snapshot after construction.\n- Do not expose live `SpecdConfig` reference used by internal composition wiring.\n- Hosts must rebuild kernel to observe later `specd.yaml` changes.\n"
+  "generatedBy": "core"
 }

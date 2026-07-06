@@ -65,6 +65,16 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 Each error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging.
 
+### Requirement: Config-based factory delegates through resolveUpdateSpecDepsDeps
+
+The config-based `createUpdateSpecDeps(config, options?)` form MUST derive `UpdateSpecDepsDeps` through `resolveUpdateSpecDepsDeps(resolver)` and then delegate to canonical `createUpdateSpecDeps(deps)`.
+
+`resolveUpdateSpecDepsDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - Updating `specDependsOn` does NOT trigger approval invalidation — this is a dependency metadata operation, not a spec scope change
@@ -73,8 +83,9 @@ Each error MUST follow the [`default:_global/error-handling-conventions`](../../
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — `Change` entity, `specDependsOn`, `setSpecDependsOn`
-- [`core:spec-id-format`](../spec-id-format/spec.md) — spec ID parsing via `parseSpecId`
-- [`core:compile-context`](../compile-context/spec.md) — consumer of `specDependsOn` for dependency resolution
-- [`core:composition`](../composition/spec.md) — wiring and port injection
-- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) — canonical error handling standards for the monorepo.
+- [`core:change`](../change/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:compile-context`](../compile-context/spec.md)
+- [`core:composition`](../composition/spec.md)
+- [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

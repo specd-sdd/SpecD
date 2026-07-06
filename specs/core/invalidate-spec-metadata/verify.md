@@ -60,3 +60,14 @@
 - **WHEN** `InvalidateSpecMetadata` is executed
 - **THEN** the metadata is written directly via `SpecRepository.saveMetadata()` without going through `SaveSpecMetadata`
 - **AND** the `force: true` option is used to bypass conflict detection
+
+### Requirement: Config-based factory delegates through resolveInvalidateSpecMetadataDeps
+
+#### Scenario: createInvalidateSpecMetadata config form derives InvalidateSpecMetadataDeps through resolveInvalidateSpecMetadataDeps
+
+- **WHEN** `createInvalidateSpecMetadata(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `InvalidateSpecMetadataDeps` through `resolveInvalidateSpecMetadataDeps(resolver)`
+- **AND** `resolveInvalidateSpecMetadataDeps(resolver)` resolves:
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+- **AND** the factory delegates to canonical `createInvalidateSpecMetadata(deps)`

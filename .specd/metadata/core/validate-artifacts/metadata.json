@@ -11,7 +11,8 @@
     "core:storage",
     "default:_global/architecture",
     "core:spec-id-format",
-    "core:schema-format"
+    "core:schema-format",
+    "core:composition-resolver"
   ],
   "context": [
     "Artifacts must be structurally valid and conflict-free before a change can progress, yet no other code path is allowed to mark an artifact complete — a single chokepoint is needed to enforce this invariant. `ValidateArtifacts` is that chokepoint: it checks a change's artifact files against the active schema, enforces required artifacts, validates structural rules, detects delta conflicts, invalidates any outstanding approval when content has changed, and is the only path through which an artifact may reach `complete` status."
@@ -153,6 +154,12 @@
       "requirement": "In-change dependsOn persistence",
       "rules": [
         "When validation of a `scope: spec` artifact succeeds and metadata extraction yields a valid `dependsOn` value, `ValidateArtifacts` MUST persist that value into `change.specDependsOn` for the spec.\n\nValidation rules for this update:\n\n- The extracted value becomes the in-change dependency snapshot used by later workflow steps.\n- If transform execution for extracted `dependsOn` fails, validation fails and the dependency snapshot is not updated.\n- `ValidateArtifacts` MUST NOT fail solely because the current in-change `dependsOn` value differs from the canonical persisted `spec-lock.json` for that spec.\n- Hard consistency checks between archive output and canonical sidecar state are reserved for `ArchiveChange`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveValidateArtifactsDeps",
+      "rules": [
+        "The config-based `createValidateArtifacts(config, options?)` form MUST derive `ValidateArtifactsDeps` through `resolveValidateArtifactsDeps(resolver)` and then delegate to canonical `createValidateArtifacts(deps)`.\n\n`resolveValidateArtifactsDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `listWorkspaces: ListWorkspaces`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `actor: ActorResolver`\n- `hasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `lifecycle: LifecycleEngine`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -1002,26 +1009,30 @@
       "then": [
         "validation passes without comparing the in-change value against the canonical sidecar as a hard error"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveValidateArtifactsDeps",
+      "name": "createValidateArtifacts config form derives ValidateArtifactsDeps through resolveValidateArtifactsDeps",
+      "when": ["createValidateArtifacts(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ValidateArtifactsDeps through resolveValidateArtifactsDeps(resolver)",
+        "AND resolveValidateArtifactsDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createValidateArtifacts(deps)"
+      ]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "core:validate-artifacts",
-        "file": "core:src/composition/use-cases/edit-change.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:validate-artifacts",
-        "file": "core:src/application/use-cases/validate-artifacts.ts",
-        "symbol": "ValidateArtifacts"
+        "file": "core:src/composition/use-cases/validate-artifacts.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a021936d2563fc2b49e660bb506b873bba3ffeaf36e790af9b39882ad3bcff95",
-    "verify.md": "sha256:147c127873cb08d7646f491a5917ed3e0d512248125e7bebda583753ad290f72"
+    "spec.md": "sha256:e81e0d09662f752635b86fdc617e1f6bed41ab1e2866c739991ddabeb0504be6",
+    "verify.md": "sha256:872ddd33b3601324a39c9cdb119fc223087d2df36f9cc61c90869935046a0309"
   },
   "generatedBy": "core"
 }

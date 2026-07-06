@@ -116,30 +116,16 @@
 
 ### Requirement: Composition layer for use-case wiring
 
-#### Scenario: Dependency injection is manual and explicit
+#### Scenario: Config-based public factory delegates through shared resolver path
 
-- **WHEN** a package wires its use cases
-- **THEN** it must do so in a dedicated composition layer
-- **AND** every dependency must be passed explicitly via constructor without using a container
+- **WHEN** a kernel-mounted public `createX(config, options?)` factory is implemented
+- **THEN** it resolves dependencies through the shared composition-resolver path
+- **AND** it delegates to canonical `createX(deps)` construction
 
-#### Scenario: Composition is the only layer importing infrastructure
+#### Scenario: Kernel and builder do not define separate per-use-case semantics
 
-- **WHEN** checking imports in the `composition/` directory
-- **THEN** it may import from `infrastructure/`
-- **AND** no other layer (`domain/`, `application/`) may contain such imports
-
-#### Scenario: Delivery uses createConfigWriter for yaml mutation
-
-- **WHEN** a delivery mechanism in `@specd/cli` mutates `specd.yaml`
-- **THEN** it obtains a `ConfigWriter` via `createConfigWriter()` from `@specd/core`
-- **AND** it does not import `FsConfigWriter` or construct use cases `InitProject`, `AddPlugin`, or `RemovePlugin`
-
-#### Scenario: Kernel use cases receive config at construction
-
-- **GIVEN** a delivery mechanism has called `createKernel(config)` with a resolved `SpecdConfig`
-- **WHEN** it invokes a kernel use case other than `getConfig`
-- **THEN** it does not pass `config` or config-derived approval/plugin subtrees in the `execute()` input
-- **AND** it reads config from `kernel.project.getConfig.execute()` when a fresh snapshot is needed
+- **WHEN** `createKernel(...)` or `createKernelBuilder()` assembles kernel-mounted use cases
+- **THEN** both reuse the same underlying factory assembly semantics as standalone `createX(...)` factories
 
 ### Requirement: YAML inputs validated at the infrastructure boundary
 

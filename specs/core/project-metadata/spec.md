@@ -27,6 +27,18 @@ The `freshness` block SHALL track:
 - The hashes of any `contextFiles` referenced in the configuration
 - The metadata hashes of all specs included in the project context
 
+### Requirement: Config-based factory delegates through resolveGetProjectMetadataDeps
+
+The config-based `createGetProjectMetadata(config, options?)` form MUST derive `GetProjectMetadataDeps` through `resolveGetProjectMetadataDeps(resolver)` and then delegate to canonical `createGetProjectMetadata(deps)`.
+
+`resolveGetProjectMetadataDeps(resolver)` MUST resolve:
+
+- `config: SpecdConfig`
+- `files: FileReader`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Spec Dependencies
 
-- [`core:config`](../config/spec.md) — provides the `configPath` and input file locations
+- [`core:config`](../config/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

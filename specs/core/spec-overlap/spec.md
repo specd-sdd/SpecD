@@ -61,6 +61,16 @@ When the named change is not found among active changes, `DetectOverlap` MUST th
 
 `DetectOverlap` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list()` to retrieve changes.
 
+### Requirement: Config-based factory delegates through resolveDetectOverlapDeps
+
+The config-based `createDetectOverlap(config, options?)` form MUST derive `DetectOverlapDeps` through `resolveDetectOverlapDeps(resolver)` and then delegate to canonical `createDetectOverlap(deps)`.
+
+`resolveDetectOverlapDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The domain service MUST NOT include drafted or discarded changes — only active changes from `ChangeRepository.list()` participate
@@ -68,6 +78,7 @@ When the named change is not found among active changes, `DetectOverlap` MUST th
 
 ## Spec Dependencies
 
-- `core:change` — Change entity, `specIds` getter, lifecycle states
-- `core:list-changes` — `ChangeRepository.list()` contract
-- `core:kernel` — kernel entry for the new use case
+- [`core:change`](../change/spec.md)
+- [`core:list-changes`](../list-changes/spec.md)
+- [`core:kernel`](../kernel/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

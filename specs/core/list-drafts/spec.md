@@ -30,7 +30,18 @@ When `createListDrafts(config)` initializes a `ChangeRepository` from `SpecdConf
 
 The config-based factory MUST NOT construct a weaker repository variant that can derive different draft artifact states for the same persisted change than the canonical listing read path.
 
+### Requirement: Config-based factory delegates through resolveListDraftsDeps
+
+The config-based `createListDrafts(config, options?)` form MUST derive `ListDraftsDeps` through `resolveListDraftsDeps(resolver)` and then delegate to canonical `createListDrafts(deps)`.
+
+`resolveListDraftsDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
 - [`core:kernel`](../kernel/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

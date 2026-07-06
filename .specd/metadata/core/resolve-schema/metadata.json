@@ -7,7 +7,8 @@
     "core:build-schema",
     "core:schema-registry-port",
     "core:config",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:composition-resolver"
   ],
   "context": [
     "Schema resolution involves multiple steps (base lookup, extends chain, plugin merging, overrides) that must execute in a precise order, and scattering this logic across callers would lead to duplication and inconsistency. `ResolveSchema` is the application use case that orchestrates the full resolution pipeline — base schema file, recursive `extends` chain, schema plugins, merge layers via `mergeSchemaLayers`, and final `Schema` construction via `buildSchema` — providing a single entry point for obtaining a fully-resolved, customised schema. `GetActiveSchema` delegates to `ResolveSchema` rather than resolving schemas directly."
@@ -51,6 +52,12 @@
       "requirement": "Multiple executions are idempotent",
       "rules": [
         "`ResolveSchema` is idempotent — multiple executions with the same construction config produce equivalent `Schema` objects. The resolution pipeline has no side effects that alter subsequent calls."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveResolveSchemaDeps",
+      "rules": [
+        "The config-based `createResolveSchema(config, options?)` form MUST derive `ResolveSchemaDeps` through `resolveResolveSchemaDeps(resolver)` and then delegate to canonical `createResolveSchema(deps)`.\n\n`resolveResolveSchemaDeps(resolver)` MUST resolve:\n\n- `schemas: SchemaRegistry`\n- `schemaRef: string`\n- `schemaPlugins: readonly string[]`\n- `schemaOverrides: SchemaOperations | undefined`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -199,13 +206,30 @@
       "given": ["ResolveSchema was constructed with specific config"],
       "when": ["execute() is called twice"],
       "then": ["both calls produce an equivalent Schema object"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveResolveSchemaDeps",
+      "name": "createResolveSchema config form derives ResolveSchemaDeps through resolveResolveSchemaDeps",
+      "when": ["createResolveSchema(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ResolveSchemaDeps through resolveResolveSchemaDeps(resolver)",
+        "AND resolveResolveSchemaDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createResolveSchema(deps)"
+      ]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:a5ee119584348a05b57e1a148108cd00792e3b46c87cd6b1f5859f1eba759679",
-    "verify.md": "sha256:d99418f431079fec1e7e15f178037ef0041ca3da8bac310635fbff08b7e6d09e"
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:resolve-schema",
+        "file": "core:src/composition/use-cases/resolve-schema.ts"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "ResolveSchema builds one deterministic schema from base ref, extends chain, plugins, and inline overrides.",
-  "optimizedContext": "# core:resolve-schema\n\n## Rules\n- `ResolveSchema` ctor inputs fixed at construction: `schemas: SchemaRegistry`, `schemaRef: string`, `workspaceSchemasPaths: ReadonlyMap<string, string>`, `schemaPlugins: readonly string[]`, `schemaOverrides: SchemaOperations | undefined`.\n- `execute()` takes no args; all config supplied at construction.\n- Resolution order is strict and deterministic: resolve base -> resolve recursive `extends` chain -> build `extends` layers root-to-parent -> resolve plugin refs in declaration order -> normalize/build override layer -> `mergeSchemaLayers(...)` -> validate base before merged build when plugins/overrides exist -> `buildSchema(...)` final schema.\n- Base lookup calls `SchemaRegistry.resolve(schemaRef, workspaceSchemasPaths)`; missing base throws `SchemaNotFoundError`.\n- Extends traversal tracks resolved file paths; cycle => `SchemaValidationError`. Each resolved parent becomes `SchemaLayer` with `source: 'extends'`.\n- Plugin refs resolve through same registry/path map. Missing plugin => `SchemaNotFoundError`. Resolved file with `kind: schema` instead of `kind: schema-plugin` => `SchemaValidationError`. Plugin operations become `SchemaLayer` with `source: 'plugin'`.\n- `schemaOverrides` workflow hooks MUST normalize YAML shorthand before layer build: `{ id, run } -> { id, type: 'run', command }`; `{ id, instruction } -> { id, type: 'instruction', text }`. Apply recursively across workflow entries in `append`, `prepend`, `create`, `set`. Override layer source = `'override'`.\n- Merge call = `mergeSchemaLayers(base, [...extendsLayers, ...pluginLayers, ...overrideLayers])`.\n- When plugins or overrides exist, validate inherited/base data first with `buildSchema(schemaRef, inheritedData, templates)` so base validation errors stay attributed to base ref.\n- Final `buildSchema(ref, mergedData, templates)` uses original `schemaRef` when no merge layers applied; otherwise ref MUST be `\"<schemaRef> (resolved)\"` to distinguish merge-induced validation failures.\n- Template loading happens during base resolution. Templates from extends chain accumulate; child template overrides parent template with same relative path.\n- `SchemaRegistry.resolve()` must provide raw `SchemaYamlData`, loaded templates, and resolved file path so merge, build, and cycle detection all work.\n- Result type = `Promise<Schema>`. Multiple executions with same constructor inputs are idempotent and side-effect free.\n\n## Constraints\n- `ResolveSchema` lives in `application/use-cases/`.\n- It may import domain services `mergeSchemaLayers`, `buildSchema`, and SchemaRegistry port only; no infrastructure imports.\n- Pipeline deterministic: same inputs => equivalent schema.\n- Plugin resolution failures are hard errors, never warnings.\n- Extends depth unbounded, but cycles must be detected."
+  "contentHashes": {
+    "spec.md": "sha256:0b57840d11314533eced2b59fc70824768e6108d306beaa4638bc2e1760f86b5",
+    "verify.md": "sha256:e0bc39911eb456cd9ae7cec500115e9cc5f02e506d833825ddab5a6548ffeb70"
+  },
+  "generatedBy": "core"
 }

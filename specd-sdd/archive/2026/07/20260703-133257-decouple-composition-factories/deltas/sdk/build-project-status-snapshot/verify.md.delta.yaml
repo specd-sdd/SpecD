@@ -1,0 +1,38 @@
+- op: modified
+  description: 'Verify that hotspot failures degrade the full graph snapshot'
+  selector:
+    type: section
+    matches: 'Requirement: buildProjectStatusSnapshot orchestration'
+  content: |
+    #### Scenario: Summary only without graph
+
+    - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: false })` is called
+    - **THEN** `kernel.project.getProjectSummary.execute()` is invoked
+    - **AND** no graph provider is opened
+    - **AND** `graphHealth` is null
+
+    #### Scenario: Graph health included when requested
+
+    - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: true })` is called
+    - **THEN** `withOpenGraphProvider` wraps a `GetGraphHealth` execution
+    - **AND** workspaces passed to graph health come from `listWorkspaces`
+
+    #### Scenario: Graph unavailable returns null without throwing
+
+    - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: true })` is called and graph loading fails
+    - **THEN** `graphHealth` is `null`
+    - **AND** the function resolves without throwing
+
+    #### Scenario: Hotspots failure clears the whole graph snapshot
+
+    - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: true, includeHotspots: true })` is called
+    - **AND** graph health loads successfully
+    - **AND** hotspot loading fails afterwards
+    - **THEN** `graphHealth` is `null`
+    - **AND** `hotspots` is `null`
+    - **AND** the function resolves without throwing
+
+    #### Scenario: Hotspots included when requested
+
+    - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: true, includeHotspots: true })` is called
+    - **THEN** `hotspots` is populated from `provider.getHotspots()` when available

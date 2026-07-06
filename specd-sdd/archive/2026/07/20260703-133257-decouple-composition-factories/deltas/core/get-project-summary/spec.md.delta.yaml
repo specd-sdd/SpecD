@@ -1,0 +1,33 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveGetProjectSummaryDeps
+
+    The config-based `createGetProjectSummary(config, options?)` form MUST derive `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)` and then delegate to canonical `createGetProjectSummary(deps)`.
+
+    `resolveGetProjectSummaryDeps(resolver)` MUST resolve:
+
+    - `listChanges: ListChanges`
+    - `listDrafts: ListDrafts`
+    - `listDiscarded: ListDiscarded`
+    - `listArchived: ListArchived`
+    - `listWorkspaces: ListWorkspaces`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:list-workspaces`](../list-workspaces/spec.md)
+    - [`core:list-changes`](../list-changes/spec.md)
+    - [`core:list-drafts`](../list-drafts/spec.md)
+    - [`core:list-discarded`](../list-discarded/spec.md)
+    - [`core:list-archived`](../list-archived/spec.md)
+    - [`core:kernel`](../kernel/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)
