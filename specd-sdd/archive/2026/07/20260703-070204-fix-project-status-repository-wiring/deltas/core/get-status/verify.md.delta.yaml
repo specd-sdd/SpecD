@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add verification for complete repository bootstrap in config-based GetStatus wiring'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Constructor dependencies$'
+  content: |
+    ### Requirement: Config-based factory preserves complete repository bootstrap
+
+    #### Scenario: Config-wired status path preserves schema-driven artifact-state derivation
+
+    - **GIVEN** `createGetStatus(config)` wires `GetStatus` from `SpecdConfig`
+    - **WHEN** `GetStatus.execute()` loads a persisted change whose artifact-state derivation depends on schema-driven artifact-type behavior
+    - **THEN** the returned artifact statuses reflect complete schema-driven artifact-state derivation for that change
+    - **AND** the config-based factory does not report status through a weaker or partial repository bootstrap path

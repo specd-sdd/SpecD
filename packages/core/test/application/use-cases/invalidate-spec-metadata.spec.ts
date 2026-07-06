@@ -16,6 +16,15 @@ const METADATA_WITH_HASHES = JSON.stringify({
   keywords: ['auth'],
 })
 
+const METADATA_WITH_REPO_FIELDS = JSON.stringify({
+  title: 'Auth Login',
+  description: 'Handles login',
+  contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+  keywords: ['auth'],
+  freshness: 'stale',
+  originalHash: 'sha256:test-metadata',
+})
+
 const METADATA_WITHOUT_HASHES = JSON.stringify({
   title: 'Auth Login',
   description: 'Handles login',
@@ -59,6 +68,19 @@ describe('InvalidateSpecMetadata', () => {
     expect(written).toContain('auth')
   })
 
+  it('does not persist repository-managed freshness fields back to metadata', async () => {
+    const { uc, repo } = makeUseCase({
+      specs: [spec],
+      artifacts: { 'auth/login/.specd-metadata.yaml': METADATA_WITH_REPO_FIELDS },
+    })
+
+    await uc.execute({ workspace: 'default', specPath })
+
+    const written = repo.saved.get('.specd-metadata.yaml')!
+    expect(written).not.toContain('freshness')
+    expect(written).not.toContain('originalHash')
+  })
+
   it('returns result even when metadata has no contentHashes', async () => {
     const { uc } = makeUseCase({
       specs: [spec],
@@ -91,13 +113,14 @@ describe('InvalidateSpecMetadata', () => {
     expect(result).toBeNull()
   })
 
-  it('returns null for non-mapping content', async () => {
+  it('treats non-mapping metadata as stale and still invalidates it', async () => {
     const { uc } = makeUseCase({
       specs: [spec],
       artifacts: { 'auth/login/.specd-metadata.yaml': '"just a string"' },
     })
 
     const result = await uc.execute({ workspace: 'default', specPath })
-    expect(result).toBeNull()
+    expect(result).not.toBeNull()
+    expect(result!.spec).toBe('default:auth/login')
   })
 })

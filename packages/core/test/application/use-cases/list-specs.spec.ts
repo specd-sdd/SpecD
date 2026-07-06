@@ -129,6 +129,32 @@ describe('ListSpecs', () => {
     expect(result[0]!.title).toBe('Login Flow')
   })
 
+  it('reports stale metadata status from repository freshness without hiding the title', async () => {
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': '# Login Flow\n\nBody',
+        'auth/login/metadata.json': JSON.stringify({
+          title: 'Login Flow',
+          description: 'Handles user login',
+          contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+        }),
+      },
+    })
+    const specRepos = new Map([['default', repo]])
+
+    const uc = new ListSpecs(
+      makeListWorkspaces(specRepos),
+      makeContentHasher(),
+      makeYamlSerializer(),
+    )
+    const result = await uc.execute({ includeMetadataStatus: true })
+
+    expect(result[0]!.title).toBe('Login Flow')
+    expect(result[0]!.metadataStatus).toBe('stale')
+  })
+
   describe('workspace filtering', () => {
     it('filters to a single workspace', async () => {
       const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])

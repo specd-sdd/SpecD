@@ -60,8 +60,8 @@ When `EditChange.execute` effectively adds a spec ID that was not already presen
 Seeding rules:
 
 - Seeding applies only to spec IDs newly entering the change scope.
-- If a canonical `spec-lock.json` exists for the spec, its `dependsOn` value MUST be used.
-- Otherwise, if legacy `metadata.json.dependsOn` exists for the spec, that value MUST be used.
+- If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.
+- Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.
 - Otherwise, the seeded value is an empty array.
 - If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.
 

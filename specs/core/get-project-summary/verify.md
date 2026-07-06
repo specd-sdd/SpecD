@@ -70,6 +70,15 @@
 - **WHEN** `createGetProjectSummary(config)` is called
 - **THEN** it returns a `GetProjectSummary` instance with all dependencies wired from config
 
+### Requirement: Config-based summary wiring preserves complete repository bootstrap semantics
+
+#### Scenario: Summary path inherits complete bootstrap semantics from downstream factories
+
+- **GIVEN** `createGetProjectSummary(config)` wires `ListChanges`, `ListDrafts`, `ListDiscarded`, and `ListWorkspaces` from `SpecdConfig`
+- **WHEN** `GetProjectSummary.execute()` is called through that config-based path
+- **THEN** change and workspace counts are derived through downstream repositories with complete artifact-type and metadata bootstrap semantics
+- **AND** the summary path does not introduce an alternate or partial repository bootstrap that can produce divergent status or count results
+
 ### Requirement: Kernel exposes use case
 
 #### Scenario: Kernel project namespace includes getProjectSummary

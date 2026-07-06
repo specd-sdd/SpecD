@@ -1,11 +1,9 @@
 import * as path from 'node:path'
 import { GetProjectContext } from '../../application/use-cases/get-project-context.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { createSpecRepository } from '../spec-repository.js'
 import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createSchemaRepository } from '../schema-repository.js'
 import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
 import { LazySchemaProvider } from '../lazy-schema-provider.js'
 import { FsFileReader } from '../../infrastructure/fs/file-reader.js'
@@ -16,6 +14,8 @@ import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spe
 import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { buildCompileContextConfig } from '../build-compile-context-config.js'
 import { type CompileContextConfig } from '../../application/use-cases/compile-context.js'
+import { createSchemaRepositoriesForConfig } from '../schema-resolution.js'
+import { createSharedSpecRepositories } from '../shared-repository-wiring.js'
 
 /** Filesystem adapter options for `createGetProjectContext(options)`. */
 export interface FsGetProjectContextOptions {
@@ -66,42 +66,8 @@ export function createGetProjectContext(
 ): GetProjectContext {
   if (isSpecdConfig(configOrOptions)) {
     const config = configOrOptions
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((ws) => ws.schemasPath !== null)
-        .map((ws) => [
-          ws.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws.name,
-              ownership: ws.ownership,
-              isExternal: ws.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: ws.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
+    const specRepos = createSharedSpecRepositories({ config })
+    const schemaRepos = createSchemaRepositoriesForConfig(config)
     const listWorkspaces = new ListWorkspaces(config, specRepos)
     const defaultConfig = buildCompileContextConfig(config)
     return createGetProjectContext({

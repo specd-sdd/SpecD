@@ -1055,6 +1055,39 @@ describe('CompileContext', () => {
       expect(result.warnings.filter((w) => w.type === 'cycle')).toHaveLength(0)
     })
 
+    it('uses metadata dependsOn even when schema omits dependency extraction', async () => {
+      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const loginContent = '# Auth Login\n'
+      const sharedContent = '# Shared\n'
+      const loginMetadata = freshMetadata(loginContent, { dependsOn: ['default:auth/shared'] })
+      const sharedMetadata = freshMetadata(sharedContent, { description: 'Shared auth spec.' })
+
+      const specRepo = makeSpecRepo([loginSpec, sharedSpec], {
+        'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec.md': loginContent,
+        'auth/shared/.specd-metadata.yaml': sharedMetadata,
+        'auth/shared/spec.md': sharedContent,
+      })
+
+      const change = makeChange('my-change', {
+        specIds: ['default:auth/login'],
+      })
+      const schema = makeSchema({ metadataExtraction: {} })
+
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: noOp,
+        followDeps: true,
+      })
+
+      expect(listSpecIds(result)).toContain('default:auth/shared')
+      expect(result.warnings.filter((w) => w.type === 'missing-metadata')).toHaveLength(0)
+    })
+
     it('dependsOn specs are NOT removed by exclude rules', async () => {
       const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:kernel"],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/list-changes.ts",
+      "symbols": ["createListChanges"]
+    }
+  ]
+}

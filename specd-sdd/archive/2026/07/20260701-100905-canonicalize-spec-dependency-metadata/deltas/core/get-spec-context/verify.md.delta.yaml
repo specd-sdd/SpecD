@@ -1,0 +1,43 @@
+- op: modified
+  description: 'Verify single-spec traversal uses canonical metadata projection'
+  selector:
+    type: section
+    matches: '^Requirement: Transitive dependency traversal$'
+  content: |
+    #### Scenario: Dependencies resolved recursively
+
+    - **GIVEN** spec A depends on spec B, which depends on spec C, all with fresh metadata
+    - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
+    - **THEN** `entries` contains A, B, and C in that order
+
+    #### Scenario: Canonical metadata dependsOn works without extraction
+
+    - **GIVEN** the root spec has fresh `metadata.json.dependsOn: ['default:B']`
+    - **AND** the active schema omits `metadataExtraction.dependsOn`
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** dependency traversal still includes spec B
+
+    #### Scenario: Stale metadata remains usable for dependency traversal with warning
+
+    - **GIVEN** the root spec has persisted `metadata.json.dependsOn: ['default:B']`
+    - **AND** that metadata is marked stale
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** dependency traversal still includes spec B
+    - **AND** the result includes a `stale-metadata` warning
+
+    #### Scenario: Circular dependency does not cause infinite loop
+
+    - **GIVEN** spec A depends on spec B and spec B depends on spec A
+    - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
+    - **THEN** `entries` includes each spec at most once
+
+    #### Scenario: Dependencies not followed when followDeps is false
+
+    - **GIVEN** a spec with `dependsOn` links in its metadata
+    - **WHEN** `execute(input)` is called without `followDeps`
+    - **THEN** `entries` contains only the root spec
+
+    #### Scenario: Transitive dependencies resolved via orchestrator
+
+    - **WHEN** `GetSpecContext.execute()` traverses dependencies
+    - **THEN** it resolves each target `SpecRepository` using the `ListWorkspaces` orchestrator

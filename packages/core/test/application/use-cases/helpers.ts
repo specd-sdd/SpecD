@@ -21,7 +21,7 @@ import {
   type ResolveFromPathResult,
   type SpecSearchResult,
 } from '../../../src/application/ports/spec-repository.js'
-import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
+import { type PersistedSpecMetadata } from '../../../src/domain/services/parse-metadata.js'
 import {
   ArchiveRepository,
   type ArchivePathEntry,
@@ -314,12 +314,46 @@ export class StubSpecRepository extends SpecRepository {
 
   override async delete(): Promise<void> {}
 
-  override async metadata(spec: Spec): Promise<SpecMetadata | null> {
+  override async metadata(spec: Spec): Promise<PersistedSpecMetadata | null> {
     const jsonKey = `${spec.name.toString()}/metadata.json`
     const legacyKey = `${spec.name.toString()}/.specd-metadata.yaml`
     const content = this._artifacts[jsonKey] ?? this._artifacts[legacyKey]
     if (content === undefined || content === null) return null
-    return JSON.parse(content) as SpecMetadata
+
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(content) as Record<string, unknown>
+    } catch {
+      return { originalHash: 'sha256:test-metadata', freshness: 'stale' }
+    }
+
+    const hasher = new NodeContentHasher()
+    const metadataDependsOn = Array.isArray(parsed.dependsOn)
+      ? parsed.dependsOn.filter((entry): entry is string => typeof entry === 'string')
+      : undefined
+    const persistedDependsOn = await this.readPersistedDependsOn(spec)
+    const hashFresh =
+      !parsed.contentHashes ||
+      (isStringRecord(parsed.contentHashes) &&
+        (Object.keys(parsed.contentHashes).length === 0 ||
+          Object.entries(parsed.contentHashes).every(([filename, recorded]) => {
+            const artifactKey = `${spec.name.toString()}/${filename}`
+            const artifactContent = this._artifacts[artifactKey]
+            return (
+              artifactContent !== undefined &&
+              artifactContent !== null &&
+              hasher.hash(artifactContent) === recorded
+            )
+          })))
+    const dependsOnFresh =
+      persistedDependsOn === null ||
+      (metadataDependsOn !== undefined && sameStringSet(metadataDependsOn, persistedDependsOn))
+
+    return {
+      ...parsed,
+      freshness: hashFresh && dependsOnFresh ? 'fresh' : 'stale',
+      originalHash: 'sha256:test-metadata',
+    } as PersistedSpecMetadata
   }
 
   override async saveMetadata(_spec: Spec, content: string): Promise<void> {
@@ -859,4 +893,35 @@ export function makeCreateChange(
     opts.getActiveSchema ?? makeGetActiveSchema(),
     opts.detectOverlap ?? makeDetectOverlap(),
   )
+}
+
+/**
+ * Checks whether a value is a string-to-string record.
+ *
+ * @param value - Candidate record
+ * @returns `true` when every enumerable value is a string
+ */
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  return Object.values(value).every((entry) => typeof entry === 'string')
+}
+
+/**
+ * Compares two string arrays ignoring order.
+ *
+ * @param left - First list
+ * @param right - Second list
+ * @returns `true` when both lists contain the same values
+ */
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
+
+  const sortedLeft = [...left].sort()
+  const sortedRight = [...right].sort()
+  return sortedLeft.every((entry, index) => entry === sortedRight[index])
 }

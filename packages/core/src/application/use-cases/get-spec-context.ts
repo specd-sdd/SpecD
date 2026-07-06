@@ -1,12 +1,16 @@
-import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type PersistedSpecMetadata } from '../../domain/services/parse-metadata.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
+import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
-import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { type ContextWarning } from './_shared/context-warning.js'
 import { WorkspaceNotFoundError } from '../errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
-import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
+import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
+import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
+import { type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 /** Valid section filter flags for spec context queries. */
@@ -79,16 +83,35 @@ export interface GetSpecContextResult {
 export class GetSpecContext {
   private readonly _listWorkspaces: ListWorkspaces
   private readonly _hasher: ContentHasher
+  private readonly _schemaProvider: SchemaProvider | undefined
+  private readonly _parsers: ArtifactParserRegistry | undefined
+  private readonly _extractorTransforms: ExtractorTransformRegistry
+  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
 
   /**
    * Creates a new `GetSpecContext` use case instance.
    *
    * @param listWorkspaces - The project orchestrator
    * @param hasher - Content hasher for metadata freshness checks
+   * @param schemaProvider - Provider for schema-driven dependsOn fallback extraction
+   * @param parsers - Registry of artifact parsers used for fallback extraction
+   * @param extractorTransforms - Shared extractor transform registry
+   * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
-  constructor(listWorkspaces: ListWorkspaces, hasher: ContentHasher) {
+  constructor(
+    listWorkspaces: ListWorkspaces,
+    hasher: ContentHasher,
+    schemaProvider?: SchemaProvider,
+    parsers?: ArtifactParserRegistry,
+    extractorTransforms: ExtractorTransformRegistry = new Map(),
+    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+  ) {
     this._listWorkspaces = listWorkspaces
     this._hasher = hasher
+    this._schemaProvider = schemaProvider
+    this._parsers = parsers
+    this._extractorTransforms = extractorTransforms
+    this._workspaceRoutes = workspaceRoutes
   }
 
   /**
@@ -125,7 +148,7 @@ export class GetSpecContext {
     const rootLabel = `${input.workspace}:${input.specPath.toString()}`
     const metadata = await repo.metadata(spec)
     entries.push(
-      await this._buildEntry(
+      this._buildEntry(
         rootLabel,
         'root',
         mode,
@@ -139,21 +162,39 @@ export class GetSpecContext {
     )
 
     if (input.followDeps) {
-      const maxDepth = input.depth
-      const seen = new Set<string>([rootLabel])
-      await this._traverseDeps(
-        metadata,
+      const includedSpecs = new Map<string, ResolvedSpec>([
+        [rootLabel, { workspace: input.workspace, capPath: input.specPath.toString() }],
+      ])
+      const dependsOnAdded = new Map<string, ResolvedSpec>()
+      await traverseDependsOn(
         input.workspace,
+        input.specPath.toString(),
+        includedSpecs,
+        dependsOnAdded,
+        new Set<string>(),
+        new Set<string>(),
         workspaceMap,
-        entries,
-        seen,
         warnings,
-        mode,
-        input.sections,
-        maxDepth,
+        input.depth,
         0,
-        input.llmOptimizedContext,
+        await this._buildDependsOnFallback(),
       )
+
+      for (const [specLabel, resolved] of dependsOnAdded) {
+        if (specLabel === rootLabel) continue
+
+        const depEntry = await this._buildDependencyEntry(
+          resolved,
+          workspaceMap,
+          warnings,
+          mode,
+          input.sections,
+          input.llmOptimizedContext,
+        )
+        if (depEntry !== null) {
+          entries.push(depEntry)
+        }
+      }
     }
 
     return { entries, warnings }
@@ -173,32 +214,23 @@ export class GetSpecContext {
    * @param llmOptimizedContext - Whether to prefer optimized content
    * @returns The constructed context entry
    */
-  private async _buildEntry(
+  private _buildEntry(
     specLabel: string,
     source: 'root' | 'dependency',
     mode: SpecContextEntry['mode'],
     repo: SpecRepository,
     spec: import('../../domain/entities/spec.js').Spec,
-    metadata: SpecMetadata | null,
+    metadata: PersistedSpecMetadata | null,
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
     warnings: ContextWarning[],
     llmOptimizedContext = false,
-  ): Promise<SpecContextEntry> {
+  ): SpecContextEntry {
     if (mode === 'list') {
       return { spec: specLabel, source, mode, stale: metadata === null }
     }
 
     if (metadata !== null) {
-      const freshnessResult = await checkMetadataFreshness(
-        metadata.contentHashes,
-        async (filename) => {
-          const artifact = await repo.artifact(spec, filename)
-          return artifact?.content ?? null
-        },
-        (c) => this._hasher.hash(c),
-      )
-
-      if (!freshnessResult.allFresh) {
+      if (metadata.freshness === 'stale') {
         warnings.push({
           type: 'stale-metadata',
           path: specLabel,
@@ -216,7 +248,7 @@ export class GetSpecContext {
         }
       }
 
-      if (freshnessResult.allFresh) {
+      if (metadata.freshness === 'fresh') {
         if (mode === 'summary') {
           return {
             spec: specLabel,
@@ -299,101 +331,82 @@ export class GetSpecContext {
   }
 
   /**
-   * Recursively traverses `dependsOn` links from a spec's metadata.
+   * Builds one dependency entry from a resolved spec reference.
    *
-   * @param metadata - Parsed metadata of the current spec, or `null` if absent
-   * @param defaultWorkspace - Workspace to assume when deps omit one
+   * @param resolved - Dependency spec identity
    * @param workspaceMap - Orchestrated workspace map
-   * @param entries - Mutable array collecting resolved entries
-   * @param seen - Set of already-visited spec labels for cycle detection
    * @param warnings - Mutable array to collect warnings
    * @param mode - Context display mode for entries
    * @param sections - Optional section filter flags
-   * @param maxDepth - Maximum traversal depth, or undefined for unlimited
-   * @param currentDepth - Current recursion depth
    * @param llmOptimizedContext - Whether to prefer optimized content
+   * @returns Built entry or `null` when the dependency cannot be resolved
    */
-  private async _traverseDeps(
-    metadata: SpecMetadata | null,
-    defaultWorkspace: string,
+  private async _buildDependencyEntry(
+    resolved: ResolvedSpec,
     workspaceMap: Map<string, ProjectWorkspace>,
-    entries: SpecContextEntry[],
-    seen: Set<string>,
     warnings: ContextWarning[],
     mode: SpecContextEntry['mode'],
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
-    maxDepth: number | undefined,
-    currentDepth: number,
     llmOptimizedContext = false,
-  ): Promise<void> {
-    if (metadata === null) {
+  ): Promise<SpecContextEntry | null> {
+    const depLabel = `${resolved.workspace}:${resolved.capPath}`
+    const ws = workspaceMap.get(resolved.workspace)
+    if (ws === undefined) {
       warnings.push({
-        type: 'missing-metadata',
-        path: `${defaultWorkspace}:unknown`,
-        message: `No metadata found — dependency traversal may be incomplete. Run metadata generation to fix.`,
+        type: 'unknown-workspace',
+        path: resolved.workspace,
+        message: `Dependency workspace '${resolved.workspace}' not found`,
       })
-      return
+      return null
     }
 
-    if (metadata.dependsOn === undefined || metadata.dependsOn.length === 0) return
+    const repo = ws.specRepo
+    const depSpec = await repo.get(SpecPath.parse(resolved.capPath))
+    if (depSpec === null) {
+      warnings.push({
+        type: 'missing-spec',
+        path: depLabel,
+        message: `Dependency '${depLabel}' not found`,
+      })
+      return null
+    }
 
-    if (maxDepth !== undefined && currentDepth >= maxDepth) return
+    const depMetadata = await repo.metadata(depSpec)
+    return this._buildEntry(
+      depLabel,
+      'dependency',
+      mode,
+      repo,
+      depSpec,
+      depMetadata,
+      sections,
+      warnings,
+      llmOptimizedContext,
+    )
+  }
 
-    for (const dep of metadata.dependsOn) {
-      const { workspace: depWorkspace, capPath: depCapPath } = parseSpecId(dep, defaultWorkspace)
-      const depLabel = `${depWorkspace}:${depCapPath}`
+  /**
+   * Builds optional fallback extraction config for dependency traversal.
+   *
+   * @returns Shared fallback config when schema extraction is available
+   */
+  private async _buildDependsOnFallback(): Promise<DependsOnFallback | undefined> {
+    if (this._schemaProvider === undefined || this._parsers === undefined) {
+      return undefined
+    }
 
-      if (seen.has(depLabel)) continue
-      seen.add(depLabel)
+    const schema = await this._schemaProvider.get()
+    const extraction = schema.metadataExtraction()
+    if (extraction === undefined) {
+      return undefined
+    }
 
-      const ws = workspaceMap.get(depWorkspace)
-      if (ws === undefined) {
-        warnings.push({
-          type: 'unknown-workspace',
-          message: `Dependency workspace '${depWorkspace}' not found`,
-        })
-        continue
-      }
-
-      const repo = ws.specRepo
-      const depSpec = await repo.get(SpecPath.parse(depCapPath))
-      if (depSpec === null) {
-        warnings.push({
-          type: 'missing-spec',
-          path: depLabel,
-          message: `Dependency '${depLabel}' not found`,
-        })
-        continue
-      }
-
-      const depMetadata = await repo.metadata(depSpec)
-      entries.push(
-        await this._buildEntry(
-          depLabel,
-          'dependency',
-          mode,
-          repo,
-          depSpec,
-          depMetadata,
-          sections,
-          warnings,
-          llmOptimizedContext,
-        ),
-      )
-
-      await this._traverseDeps(
-        depMetadata,
-        depWorkspace,
-        workspaceMap,
-        entries,
-        seen,
-        warnings,
-        mode,
-        sections,
-        maxDepth,
-        currentDepth + 1,
-        llmOptimizedContext,
-      )
+    return {
+      extraction,
+      schemaArtifacts: schema.artifacts(),
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
+      workspaceRoutes: this._workspaceRoutes,
     }
   }
 }

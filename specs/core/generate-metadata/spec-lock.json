@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:spec-metadata",
+    "core:content-extraction",
+    "core:schema-format",
+    "core:spec-id-format",
+    "core:spec-repository-port"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+      "symbols": ["GenerateSpecMetadata", "projectImplementationMetadata"]
+    }
+  ]
+}

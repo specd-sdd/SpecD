@@ -33,3 +33,12 @@
 - **GIVEN** `specd.yaml` declares five workspaces
 - **WHEN** `ListWorkspaces.execute()` is called
 - **THEN** exactly five `ProjectWorkspace` entities are returned
+
+### Requirement: Config-based factory preserves canonical spec repository bootstrap
+
+#### Scenario: Config-wired workspace repositories use canonical metadata-path semantics
+
+- **GIVEN** `createListWorkspaces(config)` initializes workspace spec repositories from `SpecdConfig`
+- **WHEN** `ListWorkspaces.execute()` returns `ProjectWorkspace.specRepo`
+- **THEN** each returned repository uses canonical metadata-path semantics for that workspace
+- **AND** the config-based factory does not expose a weaker spec repository view than the canonical composition bootstrap

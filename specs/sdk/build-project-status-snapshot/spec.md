@@ -33,6 +33,12 @@ Hotspots MAY be included when `options.includeHotspots` is true and graph is loa
 
 The function MUST return structured data only. Text/JSON/toon formatting remains in CLI presenters (change 12).
 
+### Requirement: No direct repository bootstrap in snapshot orchestration
+
+`buildProjectStatusSnapshot` MUST obtain project summary and workspace information exclusively through project queries exposed by `SdkHostContext`.
+
+The orchestration MUST NOT construct `ChangeRepository` or `SpecRepository` instances directly, and it MUST NOT recreate a parallel or partial repository bootstrap path outside the canonical composition-backed read flow.
+
 ## Spec Dependencies
 
 - [`sdk:host-context`](../host-context/spec.md) — host context for kernel and provider access

@@ -1,7 +1,7 @@
 {
   "title": "Main Kernel Lifecycle",
   "description": "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project.",
-  "dependsOn": ["client:specd-data-port", "sdk:host-context"],
+  "dependsOn": ["sdk:host-context", "client:specd-data-port"],
   "context": [
     "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project."
   ],
@@ -158,7 +158,7 @@
   },
   "contentHashes": {
     "spec.md": "sha256:8dc2df570ca9cc5081b84a634de5fdffb43cbec354726f2b6bce181027f0328b",
-    "verify.md": "sha256:22e577250141df78353b819deb8886a9187eaaacd9cf3f18fa1b32163d5c157e"
+    "verify.md": "sha256:7fc194bb697d43873241d7db307ca696ddfc8c8debc4607d45d73db3ca168a78"
   },
   "generatedBy": "core"
 }

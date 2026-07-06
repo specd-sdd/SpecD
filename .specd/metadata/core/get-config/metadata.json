@@ -128,5 +128,7 @@
     "spec.md": "sha256:85f900139d34c4ff3d0884d895ce35d6076228a3bba5841f338c5d52f1bda58b",
     "verify.md": "sha256:4120fc6197c1aeabef87868ef7ea4c1586026a065a6877156ed1f827309aaedd"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "`GetConfig` exposes kernel construction-time `SpecdConfig` snapshot to hosts without re-reading disk or leaking live mutable wiring state.",
+  "optimizedContext": "# GetConfig\n\n## Rules\n- Constructor accepts same `SpecdConfig` passed to kernel wiring and stores `structuredClone(config)` as internal snapshot.\n- `GetConfig.execute()` accepts no input and returns read-only host snapshot of construction-time config.\n- Returned snapshot is referentially identical across repeated `execute()` calls on same instance.\n- Use case performs no disk I/O and does not call `ConfigLoader` or `ConfigWriter`.\n- `createGetConfig(config)` must construct standalone instance without full kernel.\n\n## Constraints\n- Do not mutate stored snapshot after construction.\n- Do not expose live `SpecdConfig` reference used by internal composition wiring.\n- Hosts must rebuild kernel to observe later `specd.yaml` changes.\n"
 }

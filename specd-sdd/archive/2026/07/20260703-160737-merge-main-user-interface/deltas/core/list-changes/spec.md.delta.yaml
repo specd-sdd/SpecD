@@ -1,0 +1,2 @@
+- op: no-op
+  description: Main already contains the config-based list bootstrap requirement for active changes; no additional spec delta is needed after merge.

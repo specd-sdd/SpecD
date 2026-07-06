@@ -9,19 +9,20 @@
     "core:spec-metadata",
     "core:schema-format",
     "default:_global/architecture",
-    "core:core/project-metadata"
+    "core:project-metadata"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-project-context.ts",
-      "symbols": ["GetProjectContext", "GetProjectContextInput"]
+      "symbols": ["GetProjectContext", "execute"]
     },
     {
       "file": "core:src/composition/use-cases/get-project-context.ts",
       "symbols": ["createGetProjectContext"]
     },
     {
-      "file": "core:test/application/use-cases/get-project-context.spec.ts"
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
     }
   ]
 }

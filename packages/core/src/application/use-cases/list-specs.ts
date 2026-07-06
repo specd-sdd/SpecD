@@ -3,7 +3,7 @@ import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { strictSpecMetadataSchema } from '../../domain/services/parse-metadata.js'
-import { type SpecMetadataStatus, checkMetadataFreshness } from './_shared/metadata-freshness.js'
+import { type SpecMetadataStatus } from './_shared/metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ListWorkspaces } from './list-workspaces.js'
 
@@ -50,7 +50,6 @@ export interface SpecListEntry {
  */
 export class ListSpecs {
   private readonly _listWorkspaces: ListWorkspaces
-  private readonly _hasher: ContentHasher
   private readonly _yaml: YamlSerializer
 
   /**
@@ -62,8 +61,8 @@ export class ListSpecs {
    */
   constructor(listWorkspaces: ListWorkspaces, hasher: ContentHasher, yaml: YamlSerializer) {
     this._listWorkspaces = listWorkspaces
-    this._hasher = hasher
     this._yaml = yaml
+    void hasher
   }
 
   /**
@@ -127,20 +126,21 @@ export class ListSpecs {
     let title: string | undefined
     let description: string | undefined
     let optimizedDescription: string | undefined
-    let contentHashes: Record<string, string> | undefined
     let hasMetadata = false
     let metadataValid = true
+    let metadataStatus: SpecMetadataStatus | undefined
 
-    // Read metadata for title, description, and contentHashes
+    // Read metadata for title, description, and freshness state.
     try {
       const meta = await repo.metadata(spec)
       if (meta !== null) {
         hasMetadata = true
 
-        // Check structural validity when status is requested
         if (includeMetadataStatus) {
-          // The metadata is already parsed via lenient schema; validate against strict
-          metadataValid = strictSpecMetadataSchema.safeParse(meta).success
+          const { originalHash, freshness, ...persisted } = meta
+          void originalHash
+          metadataValid = strictSpecMetadataSchema.safeParse(persisted).success
+          metadataStatus = metadataValid ? freshness : 'invalid'
         }
 
         if (meta.title !== undefined && meta.title.trim().length > 0) {
@@ -154,9 +154,6 @@ export class ListSpecs {
           meta.optimizedDescription.trim().length > 0
         ) {
           optimizedDescription = meta.optimizedDescription.trim()
-        }
-        if (includeMetadataStatus && meta.contentHashes !== undefined) {
-          contentHashes = meta.contentHashes
         }
       }
     } catch {
@@ -188,15 +185,8 @@ export class ListSpecs {
     }
 
     // Status resolution (only when requested)
-    let metadataStatus: SpecMetadataStatus | undefined
     if (includeMetadataStatus) {
-      metadataStatus = await this._resolveStatus(
-        repo,
-        spec,
-        hasMetadata,
-        metadataValid,
-        contentHashes,
-      )
+      metadataStatus = this._resolveStatus(hasMetadata, metadataValid, metadataStatus)
     }
 
     return {
@@ -211,35 +201,18 @@ export class ListSpecs {
   /**
    * Resolves metadata freshness status for a single spec.
    *
-   * @param repo - Spec repository to read artifacts from
-   * @param spec - The spec to check
    * @param hasMetadata - Whether `metadata.json` exists
    * @param metadataValid - Whether the metadata passes structural validation
-   * @param contentHashes - Recorded content hashes from metadata, if any
+   * @param metadataStatus - Repository-reported freshness status, if available
    * @returns The resolved freshness status
    */
-  private async _resolveStatus(
-    repo: SpecRepository,
-    spec: Spec,
+  private _resolveStatus(
     hasMetadata: boolean,
     metadataValid: boolean,
-    contentHashes: Record<string, string> | undefined,
-  ): Promise<SpecMetadataStatus> {
+    metadataStatus: SpecMetadataStatus | undefined,
+  ): SpecMetadataStatus {
     if (!hasMetadata) return 'missing'
     if (!metadataValid) return 'invalid'
-
-    const result = await checkMetadataFreshness(
-      contentHashes,
-      async (filename) => {
-        try {
-          const artifact = await repo.artifact(spec, filename)
-          return artifact?.content ?? null
-        } catch {
-          return null
-        }
-      },
-      (c) => this._hasher.hash(c),
-    )
-    return result.allFresh ? 'fresh' : 'stale'
+    return metadataStatus ?? 'stale'
   }
 }

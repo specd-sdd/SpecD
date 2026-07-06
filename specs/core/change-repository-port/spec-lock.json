@@ -18,7 +18,13 @@
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository", "saveArtifact", "artifactExists"]
+      "symbols": [
+        "FsChangeRepository",
+        "get",
+        "mutate",
+        "artifactReadOnly",
+        "reconcileArtifactDrift"
+      ]
     }
   ]
 }

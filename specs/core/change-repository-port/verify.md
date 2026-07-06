@@ -33,6 +33,12 @@
 - **WHEN** each caller mutates its in-memory instance and only one uses `mutate()`
 - **THEN** the unsynchronized caller must not rely on `save()` alone for a safe persisted update
 
+#### Scenario: get does not write to disk if no drift or sync is detected
+
+- **GIVEN** an active change with no artifact drift and no sync changes needed
+- **WHEN** `get()` is called
+- **THEN** the on-disk manifest file is not modified
+
 ### Requirement: getDraft returns a DraftedChangeView or null
 
 #### Scenario: Drafted change returns view
@@ -114,6 +120,14 @@
 - **WHEN** `mutate(name, fn)` is called and `fn` throws after mutating the in-memory change
 - **THEN** the on-disk manifest is unchanged from before the `mutate` call began
 
+#### Scenario: Load within mutate bypasses intermediate lock and write
+
+- **GIVEN** an active change with drifted files and an initialized repository
+- **WHEN** `mutate()` is executing
+- **THEN** the internal load operation within mutate bypasses any intermediate lock acquisition and manifest writes
+- **AND** does not deadlock
+- **AND** the final `save()` persists the correct accumulated changes
+
 ### Requirement: mutateDraft serializes drafted change updates
 
 #### Scenario: Restore uses mutateDraft
@@ -170,6 +184,22 @@
 - **WHEN** `FsChangeRepository.get()` is called
 - **THEN** no invalidation occurs
 
+#### Scenario: Auto-invalidation is bypassed when repository is uninitialized
+
+- **GIVEN** a change with drifted files
+- **AND** a repository initialized with no artifact types
+- **WHEN** `get()` is called
+- **THEN** no invalidation is performed
+- **AND** the manifest on disk is not updated
+
+#### Scenario: Invalidation is written to disk under change lock
+
+- **GIVEN** a change with drifted files and a fully initialized repository
+- **WHEN** `get()` is called
+- **THEN** the repository acquires the change lock
+- **AND** it reloads the manifest inside the lock
+- **AND** it invalidates and persists the updated manifest to disk under the lock boundary
+
 ### Requirement: Shared drift reconciliation hook
 
 #### Scenario: Save excludes just-written file key
@@ -218,6 +248,22 @@ Drift reconciliation during `get()` MUST NOT rewrite the manifest when artifact-
 - **WHEN** `reconcileArtifactDrift()` completes
 - **THEN** it returns `false`
 - **AND** no manifest write occurs
+
+#### Scenario: Auto-invalidation is bypassed when repository is uninitialized
+
+- **GIVEN** a change with drifted files
+- **AND** a repository initialized with no artifact types
+- **WHEN** `get()` is called
+- **THEN** no invalidation is performed
+- **AND** the manifest on disk is not updated
+
+#### Scenario: Invalidation is written to disk under change lock
+
+- **GIVEN** a change with drifted files and a fully initialized repository
+- **WHEN** `get()` is called
+- **THEN** the repository acquires the change lock
+- **AND** it reloads the manifest inside the lock
+- **AND** it invalidates and persists the updated manifest to disk under the lock boundary
 
 ### Requirement: list returns active changes in creation order
 

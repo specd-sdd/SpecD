@@ -3,6 +3,7 @@ import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
 import { createArchiveRepository } from '../archive-repository.js'
+import { createSharedChangeRepository } from '../shared-repository-wiring.js'
 import {
   type FsGetArchivedChangeOptions,
   type GetArchivedChangeContext,
@@ -45,22 +46,25 @@ export function createGetReadOnlyChangeArtifact(
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
     const ws = getDefaultWorkspace(config)
-    return createGetReadOnlyChangeArtifact(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        archivePath: config.storage.archivePath,
-        ...(config.storage.archivePattern !== undefined
-          ? { archivePattern: config.storage.archivePattern }
-          : {}),
-      },
+    return new GetReadOnlyChangeArtifact(
+      createSharedChangeRepository({ config }),
+      createArchiveRepository(
+        'fs',
+        {
+          workspace: ws.name,
+          ownership: ws.ownership,
+          isExternal: ws.isExternal,
+          configPath: config.configPath,
+        },
+        {
+          changesPath: config.storage.changesPath,
+          draftsPath: config.storage.draftsPath,
+          archivePath: config.storage.archivePath,
+          ...(config.storage.archivePattern !== undefined
+            ? { pattern: config.storage.archivePattern }
+            : {}),
+        },
+      ),
     )
   }
   const changeRepo = createChangeRepository('fs', configOrContext, {

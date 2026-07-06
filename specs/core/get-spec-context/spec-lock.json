@@ -15,7 +15,15 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-spec-context.ts",
-      "symbols": ["GetSpecContextInput", "SpecContextEntry", "_buildEntry", "_traverseDeps"]
+      "symbols": ["GetSpecContext", "execute"]
+    },
+    {
+      "file": "core:src/composition/use-cases/get-spec-context.ts",
+      "symbols": ["createGetSpecContext"]
+    },
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
     }
   ]
 }

@@ -1,0 +1,9 @@
+releases:
+  core:get-project-summary: patch
+  core:list-workspaces: patch
+  core:list-changes: patch
+  core:list-drafts: patch
+  core:list-discarded: patch
+  core:get-status: patch
+  sdk:build-project-status-snapshot: patch
+  cli:project-status: patch

@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add verification that project-status command handler does not bootstrap repositories directly'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: SDK host bootstrap$'
+  content: |
+    ### Requirement: No direct repository bootstrap in command handler
+
+    #### Scenario: Command handler routes repository-backed reads through SDK host context only
+
+    - **WHEN** `project status` assembles repository-backed project information
+    - **THEN** it obtains that information only through the SDK host context and its project queries
+    - **AND** it does not construct `ChangeRepository` or `SpecRepository` instances directly
+    - **AND** it does not assemble an alternate repository bootstrap path with semantics different from the canonical composition-backed status flow

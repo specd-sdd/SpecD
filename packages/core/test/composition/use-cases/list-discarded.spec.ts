@@ -2,9 +2,9 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { GetProjectSummary } from '../../src/application/use-cases/get-project-summary.js'
-import { createGetProjectSummary } from '../../src/composition/use-cases/get-project-summary.js'
-import { type SpecdConfig } from '../../src/application/specd-config.js'
+import { ListDiscarded } from '../../../src/application/use-cases/list-discarded.js'
+import { createListDiscarded } from '../../../src/composition/use-cases/list-discarded.js'
+import { type SpecdConfig } from '../../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
 
@@ -15,13 +15,8 @@ afterEach(async () => {
   }
 })
 
-/**
- * Creates a minimal fs-backed config for getProjectSummary factory tests.
- *
- * @returns A resolved {@link SpecdConfig}
- */
 async function makeConfig(): Promise<SpecdConfig> {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-get-project-summary-'))
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-list-discarded-'))
   const specsPath = path.join(tmpDir, 'specs')
   const changesPath = path.join(tmpDir, '.specd', 'changes')
   const draftsPath = path.join(tmpDir, '.specd', 'drafts')
@@ -65,21 +60,11 @@ async function makeConfig(): Promise<SpecdConfig> {
   }
 }
 
-describe('createGetProjectSummary', () => {
-  it('returns a wired GetProjectSummary instance from SpecdConfig', async () => {
+describe('createListDiscarded', () => {
+  it('returns a wired ListDiscarded instance from SpecdConfig', async () => {
     const config = await makeConfig()
-    const useCase = createGetProjectSummary(config)
+    const useCase = createListDiscarded(config)
 
-    expect(useCase).toBeInstanceOf(GetProjectSummary)
-
-    const summary = await useCase.execute()
-    expect(summary).toEqual({
-      activeCount: 0,
-      draftCount: 0,
-      discardedCount: 0,
-      archivedCount: 0,
-      specsByWorkspace: { default: 0 },
-      workspaceCount: 1,
-    })
+    expect(useCase).toBeInstanceOf(ListDiscarded)
   })
 })

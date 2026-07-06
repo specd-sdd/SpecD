@@ -223,5 +223,7 @@
     "spec.md": "sha256:a51f79669eb561c5ee906c1d85cd47c7fa61899885ca7e49f5d7dd0f14e14158",
     "verify.md": "sha256:ed0e79a16f7db9745d13c16518987c9563adf1664b312210cfe8934561860903"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "`SchemaRegistry` routes schema refs across workspace, npm, and path sources and exposes raw resolution plus schema discovery.",
+  "optimizedContext": "# SchemaRegistry\n\n## Rules\n- Port is TypeScript `interface`, not `abstract class`; methods are `resolve`, `resolveRaw`, `list`.\n- `resolve(ref)` returns `Promise<Schema | null>`; `null` means resolved file missing and caller decides whether to throw `SchemaNotFoundError`.\n- Prefix routing: `@scope/name` from npm, `#workspace:name` from workspace repository, `#name` or bare name from default workspace, filesystem path from direct path resolution.\n- `resolveRaw(ref)` returns parsed `SchemaRawResult | null` with `data`, `templates`, and resolved path before domain construction.\n- `list()` returns `SchemaEntry[]` metadata only; no schema file loading or validation.\n- `list()` orders workspace entries first in workspace declaration order, npm entries last.\n- `SchemaEntry` includes `ref`, `name`, `source`, optional `workspace`, optional `path`.\n- Port module re-exports domain `Schema` type for single import surface.\n\n## Constraints\n- Port lives in application layer.\n- No filesystem, `node_modules`, or I/O dependency at port boundary.\n- Workspace schema access is delegated to `SchemaRepository` instances.\n"
 }

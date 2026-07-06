@@ -1,7 +1,7 @@
 import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
-import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type PersistedSpecMetadata } from '../../domain/services/parse-metadata.js'
 import { Repository, type RepositoryConfig } from './repository.js'
 
 export { type RepositoryConfig as SpecRepositoryConfig }
@@ -156,7 +156,7 @@ export abstract class SpecRepository extends Repository {
    * @param spec - The spec whose metadata to load
    * @returns Parsed metadata with `originalHash`, or `null` if absent
    */
-  abstract metadata(spec: Spec): Promise<SpecMetadata | null>
+  abstract metadata(spec: Spec): Promise<PersistedSpecMetadata | null>
 
   /**
    * Persists raw JSON metadata content for a spec.

@@ -51,11 +51,20 @@ The use case MUST NOT apply workspace-level `contextIncludeSpecs` or `contextExc
 
 ### Requirement: Supports dependsOn traversal when followDeps is true
 
-When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec, using persisted metadata when it is fresh and the schema's `metadataExtraction` declarations as a fallback when metadata is absent or stale.
+When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec.
+
+Traversal resolves dependencies in this order:
+
+1. canonical `metadata.json.dependsOn` when persisted metadata is available
+2. the schema's `metadataExtraction.dependsOn` declarations as a fallback when metadata is absent
+
+If metadata exists but is stale, the use case MAY still traverse using the persisted canonical `dependsOn` projection, but it MUST emit a `stale-metadata` warning. The use case MUST NOT treat stale metadata as though it were missing.
 
 That fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.
 
 If fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent.
+
+The use case MUST NOT read `spec-lock.json` as a generic spec artifact to discover dependencies; persisted sidecars are consumed through the canonical metadata projection.
 
 ### Requirement: Renders spec content from metadata when fresh
 
@@ -129,4 +138,4 @@ The warning message MUST include remediation instructions: "Launch specd-project
 - [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format and content hash freshness model
 - [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` declarations and schema artifacts
 - `default:_global/architecture` — port/adapter design constraints
-- [`core:core/project-metadata`](../project-metadata/spec.md) — for optimization storage and hashing rules
+- [`core:project-metadata`](../project-metadata/spec.md) — for optimization storage and hashing rules

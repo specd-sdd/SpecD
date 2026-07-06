@@ -23,7 +23,7 @@ Once recorded for a persisted spec, this schema identity MUST remain immutable u
 
 `spec-lock.json` MUST store the final persisted `dependsOn` list for the archived spec as canonical spec IDs.
 
-This sidecar list is the durable archived dependency record. Archive-time metadata generation and later metadata regeneration flows SHALL treat it as the authoritative fallback when dependency extraction omits `dependsOn`.
+This sidecar list is the durable archived dependency record. Archive-time metadata generation and later metadata regeneration flows SHALL treat it as the authoritative persisted dependency state when projecting canonical `metadata.json.dependsOn`, including schemas that do not declare dependency extraction in their spec artifacts.
 
 ### Requirement: Archived implementation links
 
@@ -68,3 +68,15 @@ Archive-time materialization MUST:
 
 - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec ID conventions
 - [`core:storage`](../storage/spec.md) — durable sidecar persistence
+
+### Requirement: Sidecar is not a schema artifact
+
+`spec-lock.json` is a persisted semantic sidecar, not a schema-declared spec artifact.
+
+As a consequence:
+
+- it MUST NOT appear in `Spec.filenames`
+- it MUST NOT be accepted by the generic `SpecRepository.artifact()` / `save()` API
+- it is read and written only through the repository's persisted-state semantic operations
+
+This keeps the schema artifact surface stable across single-file and multi-file spec schemas while still allowing persisted dependency and implementation state to exist next to canonical spec artifacts.

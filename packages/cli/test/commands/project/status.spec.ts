@@ -6,7 +6,7 @@ import {
   mockProcessExit,
   captureStdout,
   captureStderr,
-} from './helpers.js'
+} from '../helpers.js'
 
 vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
@@ -17,9 +17,9 @@ vi.mock('@specd/sdk', async () => {
   }
 })
 
-vi.mock('../../src/helpers/cli-context.js', async () => {
-  const actual = await vi.importActual<typeof import('../../src/helpers/cli-context.js')>(
-    '../../src/helpers/cli-context.js',
+vi.mock('../../../src/helpers/cli-context.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/helpers/cli-context.js')>(
+    '../../../src/helpers/cli-context.js',
   )
   return {
     ...actual,
@@ -28,8 +28,8 @@ vi.mock('../../src/helpers/cli-context.js', async () => {
 })
 
 import { openSpecdHost, buildProjectStatusSnapshot, type GetGraphHealthResult } from '@specd/sdk'
-import { registerProjectStatus } from '../../src/commands/project/status.js'
-import { type MockKernel } from './helpers.js'
+import { registerProjectStatus } from '../../../src/commands/project/status.js'
+import { type MockKernel } from '../helpers.js'
 
 const emptySummary = {
   activeCount: 0,

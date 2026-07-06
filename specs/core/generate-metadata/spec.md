@@ -47,11 +47,19 @@ The use case may satisfy that normalization through repository-backed transform 
 
 ### Requirement: dependsOn resolution
 
-`GenerateSpecMetadata` does not perform any field-specific postprocessing for `dependsOn` after extraction.
+`GenerateSpecMetadata` MUST canonicalize `dependsOn` from persisted spec semantics before returning metadata.
+
+Resolution rules:
+
+1. Run schema extraction normally. If extraction yields `dependsOn`, treat that as the candidate extracted dependency set.
+2. Read the repository's persisted dependency state through `SpecRepository.readPersistedDependsOn(spec)`.
+3. If persisted dependency state exists, the returned `metadata.dependsOn` MUST use that persisted value.
+4. If persisted dependency state does not exist and extraction yields `dependsOn`, the returned `metadata.dependsOn` MAY use the extracted value.
+5. If both extraction and persisted state exist and they differ, metadata generation MUST fail explicitly instead of silently choosing one.
 
 If `dependsOn` entries require normalization from artifact-local strings (for example relative spec links) to canonical spec IDs, that behavior must be declared through the schema's extractor transform model and executed during `extractMetadata()`.
 
-The use case supplies the origin context and repository-backed transform runtime needed by those registered transforms, awaits the transformed extraction output, and accepts that output as final. It does not re-run `SpecRepository.resolveFromPath(...)` as a separate ad hoc repair step after extraction.
+The use case supplies the origin context and repository-backed transform runtime needed by those registered transforms, awaits the transformed extraction output, and accepts that output as final before comparing it against persisted dependency state.
 
 If extraction finds dependency values but transform execution cannot normalize them, metadata generation fails explicitly. It does not silently drop those found values and continue with an incomplete `dependsOn` set.
 
@@ -63,7 +71,9 @@ After extraction, the use case computes a SHA-256 hash for each artifact file th
 
 The final metadata object merges:
 
-- All fields from `extractMetadata()` output
+- all fields from `extractMetadata()` output
+- canonical `dependsOn` determined by the dependency-resolution rules above
+- implementation projection from persisted repository semantics
 - `contentHashes` from the hashing step
 - `generatedBy: 'core'`
 

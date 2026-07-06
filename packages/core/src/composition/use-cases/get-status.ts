@@ -4,6 +4,7 @@ import { RefreshImplementationTracking } from '../../application/use-cases/refre
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
+import { createSharedChangeRepository } from '../shared-repository-wiring.js'
 import { createArchiveRepository } from '../archive-repository.js'
 import { createSchemaRegistry } from '../schema-registry.js'
 import { type SchemaRepository } from '../../application/ports/schema-repository.js'
@@ -91,6 +92,7 @@ export function createGetStatus(
     const config = configOrContext
     const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
     const ws = getDefaultWorkspace(config)
+    const changeRepo = createSharedChangeRepository({ config })
     const schemaRepos = new Map(
       config.workspaces
         .filter((w) => w.schemasPath !== null)
@@ -108,7 +110,8 @@ export function createGetStatus(
           ),
         ]),
     ) as ReadonlyMap<string, SchemaRepository>
-    return createGetStatus(
+    const archiveRepo = createArchiveRepository(
+      'fs',
       {
         workspace: ws.name,
         ownership: ws.ownership,
@@ -118,21 +121,40 @@ export function createGetStatus(
       {
         changesPath: config.storage.changesPath,
         draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
         archivePath: config.storage.archivePath,
         ...(config.storage.archivePattern !== undefined
-          ? { archivePattern: config.storage.archivePattern }
+          ? { pattern: config.storage.archivePattern }
           : {}),
-        nodeModulesPaths: [
-          path.join(config.projectRoot, 'node_modules'),
-          ...(kernelOpts?.extraNodeModulesPaths ?? []),
-        ],
-        configDir: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: schemaRepos,
-        approvals: config.approvals,
-        projectRoot: config.projectRoot,
       },
+    )
+    const files = new FsFileReader()
+    const implementationDetector = new VcsImplementationDetector(
+      config.projectRoot,
+      new GitVcsAdapter(config.projectRoot),
+    )
+    const refreshImplementationTracking = new RefreshImplementationTracking(
+      changeRepo,
+      archiveRepo,
+      implementationDetector,
+      files,
+      config.projectRoot,
+    )
+    const schemas = createSchemaRegistry('fs', {
+      nodeModulesPaths: [
+        path.join(config.projectRoot, 'node_modules'),
+        ...(kernelOpts?.extraNodeModulesPaths ?? []),
+      ],
+      configDir: config.projectRoot,
+      schemaRepositories: schemaRepos,
+    })
+    const resolveSchema = new ResolveSchema(schemas, config.schemaRef, [], undefined)
+    const schemaProvider = new LazySchemaProvider(resolveSchema)
+    return new GetStatus(
+      changeRepo,
+      schemaProvider,
+      config.approvals,
+      refreshImplementationTracking,
+      new LifecycleEngine(Logger.debug.bind(Logger)),
     )
   }
   const opts = options as FsGetStatusOptions

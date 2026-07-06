@@ -14,12 +14,20 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus", "GetStatusInput"]
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
     },
     {
       "file": "core:src/composition/use-cases/get-status.ts",
       "symbols": ["createGetStatus"]
+    },
+    {
+      "file": "core:src/application/use-cases/get-status.ts",
+      "symbols": ["GetStatus", "execute"]
+    },
+    {
+      "file": "core:src/composition/use-cases/validate-change-batch.ts",
+      "symbols": ["createValidateChangeBatch"]
     }
   ]
 }

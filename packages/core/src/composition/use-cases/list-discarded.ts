@@ -1,7 +1,7 @@
 import { ListDiscarded } from '../../application/use-cases/list-discarded.js'
 import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
 import { createChangeRepository } from '../change-repository.js'
+import { createSharedChangeRepository } from '../shared-repository-wiring.js'
 
 /** Domain context for `createListDiscarded(context, options)`. */
 export interface ListDiscardedContext {
@@ -49,20 +49,8 @@ export function createListDiscarded(
 ): ListDiscarded {
   if (isSpecdConfig(configOrContext)) {
     const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    return createListDiscarded(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-      },
-    )
+    const changeRepo = createSharedChangeRepository({ config })
+    return new ListDiscarded(changeRepo)
   }
   const changeRepo = createChangeRepository('fs', configOrContext, options!)
   return new ListDiscarded(changeRepo)

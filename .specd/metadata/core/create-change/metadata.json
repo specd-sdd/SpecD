@@ -62,7 +62,7 @@
     {
       "requirement": "Initial specDependsOn seeding",
       "rules": [
-        "When `CreateChange.execute` is called with spec IDs that already exist in a configured spec repository, the newly constructed `Change` MUST seed `change.specDependsOn` for each such spec before persistence.\n\nSeeding rules:\n\n- If a canonical `spec-lock.json` exists for the spec, its `dependsOn` value MUST be used.\n- Otherwise, if legacy `metadata.json.dependsOn` exists for the spec, that value MUST be used.\n- Otherwise, the seeded value is an empty array.\n- Specs that do not yet exist in the repository do not require a seeded dependency entry at creation time.\n\nThis ensures a change created against existing specs starts from the current persisted dependency set instead of leaving `specDependsOn` absent by default."
+        "When `CreateChange.execute` is called with spec IDs that already exist in a configured spec repository, the newly constructed `Change` MUST seed `change.specDependsOn` for each such spec before persistence.\n\nSeeding rules:\n\n- If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.\n- Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.\n- Otherwise, the seeded value is an empty array.\n- Specs that do not yet exist in the repository do not require a seeded dependency entry at creation time.\n\nThis ensures a change created against existing specs starts from the current persisted dependency snapshot without depending on raw sidecar filenames or generic artifact reads."
       ]
     },
     {
@@ -143,23 +143,33 @@
     },
     {
       "requirement": "Initial specDependsOn seeding",
-      "name": "Existing sidecar seeds dependencies at creation time",
+      "name": "Persisted dependency state seeds dependencies at creation time",
       "given": [
         "CreateChange.execute is called with a spec that already exists in a repository",
-        "AND that spec already has spec-lock.json"
+        "AND that repository returns persisted dependencies from readPersistedDependsOn(spec)"
       ],
       "when": ["the change is constructed"],
-      "then": ["the change seeds specDependsOn for that spec from spec-lock.json.dependsOn"]
+      "then": ["the change seeds specDependsOn for that spec from that semantic persisted state"]
     },
     {
       "requirement": "Initial specDependsOn seeding",
-      "name": "Legacy metadata seeds when sidecar is absent",
+      "name": "Legacy metadata seeds when persisted semantic state is absent",
       "given": [
-        "CreateChange.execute is called with a persisted spec that has no sidecar",
+        "CreateChange.execute is called with a persisted spec whose repository returns no semantic persisted dependency state",
         "AND metadata.json.dependsOn exists for that spec"
       ],
       "when": ["the change is constructed"],
       "then": ["the change seeds specDependsOn from metadata.json.dependsOn"]
+    },
+    {
+      "requirement": "Initial specDependsOn seeding",
+      "name": "Stale metadata still seeds as legacy fallback",
+      "given": [
+        "CreateChange.execute is called with a persisted spec whose repository returns no semantic persisted dependency state",
+        "AND metadata.json.dependsOn exists for that spec but the metadata is marked stale"
+      ],
+      "when": ["the change is constructed"],
+      "then": ["the change still seeds specDependsOn from the persisted metadata dependency list"]
     },
     {
       "requirement": "Initial specDependsOn seeding",
@@ -317,48 +327,19 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:create-change",
-        "file": "core:src/application/errors/index.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:create-change",
-        "file": "core:src/application/use-cases/create-change.ts",
-        "symbol": "CreateChange"
-      },
-      {
-        "specId": "core:create-change",
-        "file": "core:src/application/use-cases/create-change.ts",
-        "symbol": "CreateChangeInput"
-      },
-      {
-        "specId": "core:create-change",
-        "file": "core:src/application/use-cases/create-change.ts",
-        "symbol": "CreateChangeResult"
-      },
-      {
-        "specId": "core:create-change",
-        "file": "core:src/application/errors/invalid-create-change-input-error.ts",
-        "symbol": "InvalidCreateChangeInputError"
-      },
-      {
-        "specId": "core:create-change",
-        "file": "core:src/composition/use-cases/create-change.ts",
-        "symbol": "createCreateChange"
-      },
-      {
-        "specId": "core:create-change",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
+        "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts",
+        "symbol": "loadPersistedSpecDependsOn"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3553561180922e149a5d0b35b697d5125744f7f3fb73223e51a3e338063606d2",
-    "verify.md": "sha256:0754576b02151e8cc1d9c7e8e87fe3e7656aae7b8f6c9dfd3a3743a26b3ff874"
+    "spec.md": "sha256:c41dbcfaf1d4e798301615fd831eb63d7d2f4239b152553d514756e7ee5773e8",
+    "verify.md": "sha256:cc12c9aef4804dd27c34c16edae8cb761415e293fd4bfd521136b60e6f89cd2d"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "`CreateChange` creates unique drafted change, resolves schema and actor, seeds `specDependsOn`, scaffolds artifacts, optionally returns overlap report.",
+  "optimizedContext": "# CreateChange\n\n## Rules\n- `CreateChangeInput` requires `name` and `specIds`; accepts optional `description`, `schemaName`, `schemaVersion`, `invalidationPolicy`, `includeOverlapCheck`.\n- If both schema override fields absent, call `GetActiveSchema.execute()` and derive effective schema from returned `Schema`; if only one override field present, reject before persistence.\n- Persist initial invalidation policy as one of `none`, `surgical`, `downstream`, `global`.\n- Enforce unique name via `ChangeRepository`; resolve actor via `ActorResolver`.\n- Append exactly one `created` event with `at`, `by`, `specIds`, effective `schemaName`, effective `schemaVersion`.\n- Seed `change.specDependsOn` per existing spec from `readPersistedDependsOn(spec)`, else canonical `metadata.json.dependsOn`, else `[]`; non-existing specs need no seeded entry.\n- Persist via `ChangeRepository.save`, scaffold via `ChangeRepository.scaffold(change, specExists)`, return `{ change, changePath, overlapReport? }`.\n- If `includeOverlapCheck === true` and `specIds` non-empty, run `DetectOverlap.execute({ name: input.name })` after scaffold; include report when successful, omit when detector fails.\n\n## Constraints\n- No lifecycle transition; new change starts `drafting`.\n- No artifact file reads or writes beyond scaffold directory creation.\n- `created.at` and `Change.createdAt` use same `Date` instance.\n"
 }

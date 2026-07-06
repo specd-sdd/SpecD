@@ -1,0 +1,48 @@
+- op: modified
+  description: Remove adapter-owned sidecars from generic artifact surface.
+  selector:
+    type: section
+    matches: '^Requirement: Spec artifact access is limited to expected artifact files$'
+  content: |
+    `artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on artifact filenames that are valid for that spec under the active schema.
+
+    Adapter-owned metadata sidecars are outside that generic artifact surface. In particular:
+
+    - `spec-lock.json` MUST NOT be exposed through `Spec.filenames`
+    - `spec-lock.json` MUST NOT be readable or writable through `artifact()` / `save()`
+    - sidecar persistence MUST instead flow through the repository's semantic persisted-state operations
+
+    The repository MUST NOT treat the spec directory as a general-purpose file container for arbitrary extra filenames when serving the normal artifact API.
+- op: modified
+  description: Make metadata reads distinguish absence from staleness and simplify persisted-state operations surface.
+  selector:
+    type: section
+    matches: '^Requirement: metadata returns parsed metadata or null$'
+  content: |
+    `metadata(spec)` MUST read the persisted metadata for the given spec and distinguish absence from staleness.
+
+    Read rules:
+
+    1. If no metadata exists on disk, return `null`.
+    2. If metadata exists, return the parsed `SpecMetadata` content together with:
+       - `originalHash` — SHA-256 of the raw stored metadata file for conflict detection
+       - `freshness` — `'fresh'` or `'stale'`
+    3. `freshness: 'stale'` means persisted metadata exists but no longer matches the repository's staleness checks defined by the spec-metadata spec.
+    4. `metadata()` MUST NOT regenerate metadata, rewrite metadata, or silently replace stale persisted content with reconstructed content.
+
+    This method remains the canonical persisted metadata read surface. Consumers decide whether stale metadata is acceptable for their use case or whether they must perform deterministic fallback or fail explicitly.
+- op: modified
+  description: Replace piecemeal persisted-state mutation methods with atomic updatePersistedState surface.
+  selector:
+    type: section
+    matches: '^Requirement: persisted spec semantics and stable spec hash$'
+  content: |
+    `SpecRepository` MUST NOT expose raw sidecar filesystem shapes (like `SpecLockData`) to use cases. Instead, it MUST provide semantic operations for reading and writing persisted spec state:
+
+    1. `readPersistedSchema(spec)` — returns the schema identity `{ name, version }` stored with the spec, or `null`.
+    2. `readPersistedDependsOn(spec)` — returns the dependency list `string[]` stored with the spec, or `null`.
+    3. `readPersistedImplementation(spec)` — returns implementation links stored with the spec, or `null`.
+    4. `updatePersistedState(spec, patch, options?)` — updates one or more persisted semantics atomically with conflict detection.
+    5. `specHash(spec)` — returns a stable SHA-256 hash representing the spec's persisted semantic state.
+
+    These methods are the only application-facing API for persisted sidecar state. Callers MUST NOT depend on sidecar filenames, spec-directory scans, or `Spec.filenames` entries to discover or mutate persisted semantics.

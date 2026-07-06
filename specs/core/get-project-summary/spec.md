@@ -50,6 +50,12 @@ Change counts from `ListChanges`, `ListDrafts`, and `ListDiscarded` MUST be the 
 
 `createGetProjectSummary(config)` in composition MUST construct and wire all dependencies from a resolved `SpecdConfig`, following the same pattern as other `createList*` factories.
 
+### Requirement: Config-based summary wiring preserves complete repository bootstrap semantics
+
+When `createGetProjectSummary(config)` wires `ListChanges`, `ListDrafts`, `ListDiscarded`, and `ListWorkspaces`, the resulting read path MUST preserve complete repository bootstrap semantics for those downstream use cases.
+
+In particular, summary reads MUST inherit schema-driven artifact-type behavior from change repositories and canonical metadata-path behavior from spec repositories through the downstream factories they compose. `GetProjectSummary` MUST NOT introduce an alternate or partial repository bootstrap path that can yield divergent status or count results for the same persisted project state.
+
 ### Requirement: Kernel exposes use case
 
 `createKernel()` MUST wire `GetProjectSummary` on `kernel.project.getProjectSummary`.

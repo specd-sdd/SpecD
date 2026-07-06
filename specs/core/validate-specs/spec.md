@@ -97,3 +97,16 @@ When an artifact type does not specify an explicit `format`, the use case SHALL 
 - [`core:storage`](../storage/spec.md) — `SpecRepository` contract
 - [`core:workspace`](../workspace/spec.md) — workspace resolution
 - [`core:spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` behaviour
+
+### Requirement: Canonical metadata consistency validation
+
+After per-artifact and cross-artifact validation for one spec, `ValidateSpecs` SHALL validate the canonical metadata state exposed through `SpecRepository.metadata()` and the repository's persisted semantic dependency operations.
+
+Validation rules:
+
+1. If metadata exists and its freshness checks indicate stale content hashes, record a `ValidationFailure` indicating that `metadata.json` must be regenerated.
+2. If metadata exists and `metadata.json.dependsOn` differs from `SpecRepository.readPersistedDependsOn(spec)`, record a `ValidationFailure` indicating that the canonical dependency projection is stale or inconsistent.
+3. If the active schema declares `metadataExtraction.dependsOn` for the spec and extraction yields a dependency set that differs from the persisted dependency state, record a `ValidationFailure`.
+4. If the schema omits dependency extraction, validation MUST still accept `metadata.json.dependsOn` when it matches the persisted dependency state.
+
+These checks validate canonical metadata as a cache of persisted spec semantics without treating `spec-lock.json` as a normal schema artifact.

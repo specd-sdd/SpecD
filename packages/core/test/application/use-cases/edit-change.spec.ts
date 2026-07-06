@@ -6,12 +6,15 @@ import {
   makeChangeRepository,
   makeActorResolver,
   makeChange,
+  makeSpecRepository,
   makeSchemaProvider,
   makeSchema,
   testActor,
   makeListWorkspaces,
 } from './helpers.js'
 import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
+import { Spec } from '../../../src/domain/entities/spec.js'
+import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 
 function createEditChange(
   repo = makeChangeRepository(),
@@ -78,6 +81,67 @@ describe('EditChange', () => {
 
       expect(result.change.specIds).toEqual(['auth/login'])
       expect(result.invalidated).toBe(false)
+    })
+
+    it('seeds newly added specs from persisted dependencies before metadata fallback', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [new Spec('default', SpecPath.parse('auth/logout'), [])],
+            artifacts: {
+              'auth/logout/spec-lock.json': JSON.stringify({
+                dependsOn: ['default:shared/persisted'],
+              }),
+              'auth/logout/metadata.json': JSON.stringify({
+                dependsOn: ['default:shared/metadata'],
+              }),
+            },
+          }),
+        ],
+      ])
+      const uc = createEditChange(repo, specs)
+
+      const result = await uc.execute({
+        name: 'c',
+        addSpecIds: ['default:auth/logout'],
+      })
+
+      expect(result.change.specDependsOn.get('default:auth/logout')).toEqual([
+        'default:shared/persisted',
+      ])
+    })
+
+    it('seeds newly added specs from stale metadata when persisted dependencies are absent', async () => {
+      const change = makeChange('c', { specIds: ['auth/login'] })
+      const repo = makeChangeRepository([change])
+      const specs = new Map([
+        [
+          'default',
+          makeSpecRepository({
+            specs: [new Spec('default', SpecPath.parse('auth/logout'), ['spec.md'])],
+            artifacts: {
+              'auth/logout/spec.md': '# Logout flow',
+              'auth/logout/metadata.json': JSON.stringify({
+                dependsOn: ['default:shared/metadata'],
+                contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+              }),
+            },
+          }),
+        ],
+      ])
+      const uc = createEditChange(repo, specs)
+
+      const result = await uc.execute({
+        name: 'c',
+        addSpecIds: ['default:auth/logout'],
+      })
+
+      expect(result.change.specDependsOn.get('default:auth/logout')).toEqual([
+        'default:shared/metadata',
+      ])
     })
   })
 

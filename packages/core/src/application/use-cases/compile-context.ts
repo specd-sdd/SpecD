@@ -13,7 +13,6 @@ import { Schema } from '../../domain/value-objects/schema.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
-import { checkMetadataFreshness } from './_shared/metadata-freshness.js'
 import { checkProjectMetadataFreshness } from './_shared/project-metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type PreviewSpec } from './preview-spec.js'
@@ -459,6 +458,13 @@ export class CompileContext {
 
           if (meta !== null) {
             dependsOnList = meta.dependsOn
+            if (meta.freshness === 'stale') {
+              warnings.push({
+                type: 'stale-metadata',
+                path: specId,
+                message: `Metadata for '${specId}' is stale`,
+              })
+            }
           } else {
             warnings.push({
               type: 'missing-metadata',
@@ -686,12 +692,7 @@ export class CompileContext {
             content = ''
           }
         } else {
-          let isFresh = false
-          if (metadata !== null) {
-            isFresh = await this._isMetadataFresh(specRepo, spec, metadata)
-          }
-
-          if (isFresh && metadata !== null) {
+          if (metadata !== null && metadata.freshness === 'fresh') {
             content = this._renderFromMetadata(metadata, sectionsFilter, shouldUseOptimizedContext)
           } else {
             if (metadata !== null) {
@@ -1067,30 +1068,5 @@ export class CompileContext {
       workspaceRoutes: fallback.workspaceRoutes,
     })
     return extracted.metadata.dependsOn
-  }
-
-  /**
-   * Checks whether a spec's `metadata.json` is fresh by comparing
-   * SHA-256 hashes of current spec artifact files against the recorded hashes.
-   *
-   * @param specRepo - Repository to read spec artifact files from
-   * @param spec - The spec to check
-   * @param metadata - The parsed metadata containing `contentHashes`
-   * @returns `true` if all hashes match, `false` if any mismatch or file is missing
-   */
-  private async _isMetadataFresh(
-    specRepo: SpecRepository,
-    spec: Spec,
-    metadata: SpecMetadata,
-  ): Promise<boolean> {
-    const result = await checkMetadataFreshness(
-      metadata.contentHashes,
-      async (filename) => {
-        const artifact = await specRepo.artifact(spec, filename)
-        return artifact?.content ?? null
-      },
-      (c) => this._hasher.hash(c),
-    )
-    return result.allFresh
   }
 }

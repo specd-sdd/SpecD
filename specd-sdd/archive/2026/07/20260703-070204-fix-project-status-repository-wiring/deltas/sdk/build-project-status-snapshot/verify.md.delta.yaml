@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add verification that SDK snapshot orchestration does not bootstrap repositories directly'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: No presenter formatting$'
+  content: |
+    ### Requirement: No direct repository bootstrap in snapshot orchestration
+
+    #### Scenario: Snapshot orchestration relies only on SDK host context project queries
+
+    - **WHEN** `buildProjectStatusSnapshot` assembles summary and workspace information
+    - **THEN** it obtains them exclusively through `SdkHostContext` project queries
+    - **AND** it does not construct `ChangeRepository` or `SpecRepository` instances directly
+    - **AND** it does not recreate a parallel or partial repository bootstrap path outside the canonical composition-backed read flow

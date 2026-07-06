@@ -87,26 +87,42 @@
 
 #### Scenario: Dependencies resolved recursively
 
-- **GIVEN** spec A depends on spec B, which depends on spec C, all with fresh metadata
+- **GIVEN** spec A depends on spec B and spec B depends on spec C
 - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
 - **THEN** `entries` contains A, B, and C in that order
 
+#### Scenario: Canonical metadata dependsOn works without extraction
+
+- **GIVEN** the root spec has fresh `metadata.json.dependsOn: ['default:B']`
+- **AND** the active schema omits `metadataExtraction.dependsOn`
+- **WHEN** `execute({ ..., followDeps: true })` is called
+- **THEN** dependency traversal still includes spec B
+
+#### Scenario: Stale metadata remains usable for dependency traversal with warning
+
+- **GIVEN** the root spec has persisted `metadata.json.dependsOn: ['default:B']`
+- **AND** that metadata is marked stale
+- **WHEN** `execute({ ..., followDeps: true })` is called
+- **THEN** dependency traversal still includes spec B
+- **AND** the result includes a `stale-metadata` warning
+
 #### Scenario: Circular dependency does not cause infinite loop
 
-- **GIVEN** spec A depends on spec B, and spec B depends on spec A
+- **GIVEN** spec A depends on spec B and spec B depends on spec A
 - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
-- **THEN** `entries` contains A and B (each visited once)
+- **THEN** `entries` includes each spec at most once
 
 #### Scenario: Dependencies not followed when followDeps is false
 
-- **GIVEN** a spec with `dependsOn` links in its metadata
-- **WHEN** `execute(input)` is called without `followDeps`
-- **THEN** `entries` contains only the root spec
+- **GIVEN** spec A depends on spec B
+- **WHEN** `execute({ ..., followDeps: false })` is called on spec A
+- **THEN** `entries` contains only spec A
 
 #### Scenario: Transitive dependencies resolved via orchestrator
 
-- **WHEN** `GetSpecContext.execute()` traverses dependencies
-- **THEN** it resolves each target `SpecRepository` using the `ListWorkspaces` orchestrator
+- **GIVEN** traversal crosses workspaces
+- **WHEN** `execute({ ..., followDeps: true })` is called
+- **THEN** repositories are resolved through the orchestrator for each dependency
 
 ### Requirement: Depth limiting
 
@@ -126,22 +142,21 @@
 
 #### Scenario: Unknown workspace in dependency emits warning
 
-- **GIVEN** a spec whose metadata references `dependsOn: ['unknown-ws:some/spec']`
+- **GIVEN** a dependency refers to an unknown workspace
 - **WHEN** `execute({ ..., followDeps: true })` is called
-- **THEN** `warnings` contains an entry with `type: 'unknown-workspace'`
-- **AND** traversal continues for remaining dependencies
+- **THEN** the result includes a warning for the unknown workspace
 
 #### Scenario: Missing dependency spec emits warning
 
-- **GIVEN** a spec whose metadata references a dependency that does not exist in the target workspace
+- **GIVEN** a dependency spec cannot be found
 - **WHEN** `execute({ ..., followDeps: true })` is called
-- **THEN** `warnings` contains an entry with `type: 'missing-spec'`
+- **THEN** the result includes a warning for the missing spec
 
 #### Scenario: Missing metadata during traversal emits warning
 
-- **GIVEN** a dependency spec with no metadata
-- **WHEN** dependency traversal reaches that spec
-- **THEN** `warnings` contains an entry with `type: 'missing-metadata'`
+- **GIVEN** traversal reaches a dependency with no metadata
+- **WHEN** `execute({ ..., followDeps: true })` is called
+- **THEN** the result includes a `missing-metadata` warning
 
 ### Requirement: Result shape
 

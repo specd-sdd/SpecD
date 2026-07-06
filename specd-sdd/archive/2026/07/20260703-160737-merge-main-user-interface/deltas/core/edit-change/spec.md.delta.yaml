@@ -1,0 +1,17 @@
+- op: modified
+  description: Align added-spec dependency seeding with canonical persisted dependency state.
+  selector:
+    type: section
+    matches: '^Requirement: Seed specDependsOn for added specs$'
+  content: |
+    When `EditChange.execute` effectively adds a spec ID that was not already present in the change, it MUST seed `change.specDependsOn` for that spec before returning the updated change.
+
+    Seeding rules:
+
+    - Seeding applies only to spec IDs newly entering the change scope.
+    - If the repository exposes persisted dependency state for the spec via `readPersistedDependsOn(spec)`, that value MUST be used.
+    - Otherwise, if canonical `metadata.json.dependsOn` exists for the spec, that value MUST be used as the legacy fallback even when the persisted metadata file is stale.
+    - Otherwise, the seeded value is an empty array.
+    - If the spec already has an entry in `change.specDependsOn`, `EditChange` MUST NOT overwrite it just because the scope was edited again later.
+
+    This seeding establishes the baseline dependency snapshot for the change so later artifact validation and archive do not start from an empty dependency set for existing specs.

@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add verification for canonical spec repository bootstrap in config-based workspace listing'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Handle all configured workspaces$'
+  content: |
+    ### Requirement: Config-based factory preserves canonical spec repository bootstrap
+
+    #### Scenario: Config-wired workspace repositories use canonical metadata-path semantics
+
+    - **GIVEN** `createListWorkspaces(config)` initializes workspace spec repositories from `SpecdConfig`
+    - **WHEN** `ListWorkspaces.execute()` returns `ProjectWorkspace.specRepo`
+    - **THEN** each returned repository uses canonical metadata-path semantics for that workspace
+    - **AND** the config-based factory does not expose a weaker spec repository view than the canonical composition bootstrap

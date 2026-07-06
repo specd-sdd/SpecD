@@ -23,6 +23,12 @@
       "rules": [
         "The function MUST return structured data only. Text/JSON/toon formatting remains in CLI presenters (change 12)."
       ]
+    },
+    {
+      "requirement": "No direct repository bootstrap in snapshot orchestration",
+      "rules": [
+        "`buildProjectStatusSnapshot` MUST obtain project summary and workspace information exclusively through project queries exposed by `SdkHostContext`.\n\nThe orchestration MUST NOT construct `ChangeRepository` or `SpecRepository` instances directly, and it MUST NOT recreate a parallel or partial repository bootstrap path outside the canonical composition-backed read flow."
+      ]
     }
   ],
   "scenarios": [
@@ -83,20 +89,20 @@
         "the result is a plain object with summary, graphHealth, approvals, and llmOptimizedContext fields",
         "AND no formatted text output is produced"
       ]
+    },
+    {
+      "requirement": "No direct repository bootstrap in snapshot orchestration",
+      "name": "Snapshot orchestration relies only on SDK host context project queries",
+      "when": ["buildProjectStatusSnapshot assembles summary and workspace information"],
+      "then": [
+        "it obtains them exclusively through SdkHostContext project queries",
+        "AND it does not construct ChangeRepository or SpecRepository instances directly",
+        "AND it does not recreate a parallel or partial repository bootstrap path outside the canonical composition-backed read flow"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
-      {
-        "specId": "sdk:build-project-status-snapshot",
-        "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
-        "symbol": "BuildProjectStatusSnapshotOptions"
-      },
-      {
-        "specId": "sdk:build-project-status-snapshot",
-        "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
-        "symbol": "BuildProjectStatusSnapshotResult"
-      },
       {
         "specId": "sdk:build-project-status-snapshot",
         "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
@@ -105,8 +111,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:46cf574b2dd01a71f4349e6f51da7401c236018415f8da0d4077b72b9c205568",
-    "verify.md": "sha256:8322250dde3eb00e7fdec3aedbdb05a8b2baa614184a2ff97933315b4dd467df"
+    "spec.md": "sha256:9e02987a1a2b89ecf489e9c994f251d3cc956c9ed1afd6a8de0505a58ad5f7a3",
+    "verify.md": "sha256:ab15316419e449efdbcfe210f0bcec90084019a3620fe0d4678738d434e0dd8c"
   },
   "generatedBy": "core"
 }

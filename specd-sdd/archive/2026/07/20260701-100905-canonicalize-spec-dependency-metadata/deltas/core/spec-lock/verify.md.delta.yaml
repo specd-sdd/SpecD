@@ -1,0 +1,22 @@
+- op: added
+  description: 'Verify spec-lock stays outside the generic artifact surface'
+  position:
+    after:
+      type: section
+      matches: '^Requirement: Sidecar location and naming$'
+  content: |
+    ### Requirement: Sidecar is not a schema artifact
+
+    #### Scenario: Sidecar is omitted from generic artifact metadata
+
+    - **GIVEN** an archived spec persisted with `spec.md`, `verify.md`, and `spec-lock.json`
+    - **WHEN** the repository returns the spec's normal artifact metadata
+    - **THEN** `Spec.filenames` includes only schema-declared artifacts
+    - **AND** `spec-lock.json` is not exposed as a normal artifact filename
+
+    #### Scenario: Generic artifact reads reject the sidecar
+
+    - **GIVEN** an archived spec persisted with `spec-lock.json`
+    - **WHEN** application logic attempts to load `spec-lock.json` through the generic artifact API
+    - **THEN** the repository rejects the request
+    - **AND** callers must use persisted-state semantic operations instead

@@ -1,0 +1,67 @@
+- op: modified
+  description: 'Align spec-context traversal scenarios with canonical metadata dependency behavior.'
+  selector:
+    type: section
+    matches: '^Requirement: Transitive dependency traversal$'
+  content: |
+    #### Scenario: Dependencies resolved recursively
+
+    - **GIVEN** spec A depends on spec B and spec B depends on spec C
+    - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
+    - **THEN** `entries` contains A, B, and C in that order
+
+    #### Scenario: Canonical metadata dependsOn works without extraction
+
+    - **GIVEN** the root spec has fresh `metadata.json.dependsOn: ['default:B']`
+    - **AND** the active schema omits `metadataExtraction.dependsOn`
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** dependency traversal still includes spec B
+
+    #### Scenario: Stale metadata remains usable for dependency traversal with warning
+
+    - **GIVEN** the root spec has persisted `metadata.json.dependsOn: ['default:B']`
+    - **AND** that metadata is marked stale
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** dependency traversal still includes spec B
+    - **AND** the result includes a `stale-metadata` warning
+
+    #### Scenario: Circular dependency does not cause infinite loop
+
+    - **GIVEN** spec A depends on spec B and spec B depends on spec A
+    - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
+    - **THEN** `entries` includes each spec at most once
+
+    #### Scenario: Dependencies not followed when followDeps is false
+
+    - **GIVEN** spec A depends on spec B
+    - **WHEN** `execute({ ..., followDeps: false })` is called on spec A
+    - **THEN** `entries` contains only spec A
+
+    #### Scenario: Transitive dependencies resolved via orchestrator
+
+    - **GIVEN** traversal crosses workspaces
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** repositories are resolved through the orchestrator for each dependency
+- op: modified
+  description: 'Retain warning coverage for unresolved dependencies.'
+  selector:
+    type: section
+    matches: '^Requirement: Warnings for unresolvable dependencies$'
+  content: |
+    #### Scenario: Unknown workspace in dependency emits warning
+
+    - **GIVEN** a dependency refers to an unknown workspace
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** the result includes a warning for the unknown workspace
+
+    #### Scenario: Missing dependency spec emits warning
+
+    - **GIVEN** a dependency spec cannot be found
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** the result includes a warning for the missing spec
+
+    #### Scenario: Missing metadata during traversal emits warning
+
+    - **GIVEN** traversal reaches a dependency with no metadata
+    - **WHEN** `execute({ ..., followDeps: true })` is called
+    - **THEN** the result includes a `missing-metadata` warning

@@ -1,0 +1,31 @@
+- op: modified
+  description: Reframe dependency traversal around canonical metadata projection and stale warnings.
+  selector:
+    type: section
+    matches: '^Requirement: Transitive dependency traversal$'
+  content: |
+    When `input.followDeps` is true, `GetSpecContext` SHALL recursively traverse dependencies starting from the requested spec.
+
+    Dependency resolution order:
+
+    1. Resolve the canonical dependency list from `metadata.json.dependsOn` when persisted metadata is available.
+    2. If metadata is missing, MAY fall back to the schema's `metadataExtraction.dependsOn` declarations when the schema provides them.
+    3. If metadata exists but is stale, the use case MAY continue using its persisted `dependsOn` projection for traversal, but it MUST emit a `stale-metadata` warning for that spec.
+    4. If neither canonical metadata nor extraction yields dependencies, treat the spec as having no outgoing dependencies.
+
+    Traversal SHALL use DFS with cycle detection.
+- op: modified
+  description: Tighten stale-metadata wording and forbid generic spec-lock artifact reads.
+  selector:
+    type: section
+    matches: '^Requirement: Warnings for unresolvable dependencies$'
+  content: |
+    During dependency traversal, the use case SHALL emit warnings (not throw) for:
+
+    - Missing spec IDs in `dependsOn` — `type: 'missing-spec'`.
+    - Workspace qualifiers that do not resolve — `type: 'unknown-workspace'`.
+    - Stale metadata on any resolved entry whose persisted dependency projection is still being used — `type: 'stale-metadata'`.
+
+    Warnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal.
+
+    The use case MUST NOT read `spec-lock.json` through generic artifact access in order to continue traversal. Persisted sidecars influence traversal only through repository semantic state that has already been projected into metadata.

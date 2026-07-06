@@ -24,6 +24,12 @@ Each `ProjectWorkspace` entity MUST include the following immutable properties d
 
 The use case MUST include every workspace declared in the `specd.yaml` (or its local overrides). If a workspace is configured but its repository cannot be initialized, the use case SHALL still include the workspace in the list but MAY mark the repository as unavailable or throw a project-level initialization error, depending on the failure severity.
 
+### Requirement: Config-based factory preserves canonical spec repository bootstrap
+
+When `createListWorkspaces(config)` initializes `SpecRepository` instances from `SpecdConfig`, each repository MUST be bootstrapped with canonical metadata-path semantics for that workspace.
+
+The config-based factory MUST NOT derive a weaker or divergent metadata lookup strategy than the canonical repository bootstrap used by the composition layer. Status and context consumers that receive `ProjectWorkspace.specRepo` from `ListWorkspaces` MUST observe a complete and stable spec repository view.
+
 ## Constraints
 
 - The use case MUST NOT modify the configuration or the repository states.

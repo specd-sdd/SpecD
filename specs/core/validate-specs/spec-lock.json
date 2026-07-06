@@ -1,0 +1,27 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:validate-artifacts",
+    "core:schema-format",
+    "core:storage",
+    "core:workspace",
+    "core:spec-id-format"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/validate-specs.ts",
+      "symbols": ["ValidateSpecs", "execute"]
+    },
+    {
+      "file": "core:src/composition/use-cases/validate-specs.ts",
+      "symbols": ["createValidateSpecs"]
+    },
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
+    }
+  ]
+}

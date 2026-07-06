@@ -186,7 +186,7 @@ export class FsChangeRepository extends ChangeRepository {
    */
   override async mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
     return this._withChangeLock(name, async () => {
-      const change = await this.get(name)
+      const change = await this._getInternal(name, { skipWrite: true })
       if (change === null) {
         throw new ChangeNotFoundError(name)
       }
@@ -240,11 +240,54 @@ export class FsChangeRepository extends ChangeRepository {
    * @returns The change with current artifact state, or `null` if not found in active storage
    */
   override async get(name: string): Promise<Change | null> {
+    return this._getInternal(name, { skipWrite: false })
+  }
+
+  /**
+   * Internal read path shared by {@link get} and {@link mutate}.
+   *
+   * Loads the change and reconstructs the domain entity (including any
+   * in-memory sync/drift handling) without persisting. If sync or drift
+   * detection flagged the in-memory manifest as needing persistence, and the
+   * caller has not requested `skipWrite`, this method acquires the change's
+   * `_withChangeLock`, reloads the manifest from disk, re-applies the
+   * detection, and writes the updated manifest under the lock before
+   * returning.
+   *
+   * `skipWrite` is used by `mutate()` so that the load it performs does not
+   * try to acquire a nested lock or write a manifest that is about to be
+   * written again by the subsequent `save()`.
+   *
+   * @param name - The change slug name to look up
+   * @param options - Internal read options
+   * @param options.skipWrite - When `true`, skip lock acquisition and disk
+   *   writes — return the in-memory change directly. Used by `mutate()`.
+   * @returns The change with current artifact state, or `null` if not found
+   */
+  private async _getInternal(
+    name: string,
+    options: { skipWrite: boolean },
+  ): Promise<Change | null> {
     const dir = await this._resolveActiveDir(name)
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
-    return this._manifestToChange(manifest, dir)
+    const { change, hasChangesToPersist } = await this._manifestToChange(manifest, dir)
+
+    if (hasChangesToPersist && this._artifactTypesResolved && !options.skipWrite) {
+      return this._withChangeLock(name, async () => {
+        const freshManifest = await this._loadManifest(dir)
+        const { change: freshChange, hasChangesToPersist: stillNeedsPersist } =
+          await this._manifestToChange(freshManifest, dir)
+
+        if (stillNeedsPersist) {
+          await this._writeManifestAtomic(dir, changeToManifest(freshChange))
+        }
+        return freshChange
+      })
+    }
+
+    return change
   }
 
   /**
@@ -258,7 +301,7 @@ export class FsChangeRepository extends ChangeRepository {
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
-    const change = await this._manifestToChange(manifest, dir)
+    const { change } = await this._manifestToChange(manifest, dir)
     return toDraftedChangeView(change)
   }
 
@@ -273,7 +316,7 @@ export class FsChangeRepository extends ChangeRepository {
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
-    const change = await this._manifestToChange(manifest, dir)
+    const { change } = await this._manifestToChange(manifest, dir)
     return toDiscardedChangeView(change)
   }
 
@@ -292,7 +335,7 @@ export class FsChangeRepository extends ChangeRepository {
     if (dir === null) return null
 
     const manifest = await this._loadManifest(dir)
-    const change = await this._manifestToChange(manifest, dir)
+    const { change } = await this._manifestToChange(manifest, dir)
     return this.artifact(change, filename)
   }
 
@@ -312,7 +355,7 @@ export class FsChangeRepository extends ChangeRepository {
       }
 
       const manifest = await this._loadManifest(dir)
-      const change = await this._manifestToChange(manifest, dir)
+      const { change } = await this._manifestToChange(manifest, dir)
       this._draftMutationInProgress.add(name)
       try {
         const result = await fn(change)
@@ -343,9 +386,13 @@ export class FsChangeRepository extends ChangeRepository {
 
     const changes: Change[] = []
     for (const dirName of dirs) {
-      const dir = path.join(this._changesPath, dirName)
-      const manifest = await this._loadManifest(dir)
-      changes.push(await this._manifestToChange(manifest, dir))
+      const match = dirName.match(/^\d{8}-\d{6}-(.+)$/)
+      if (match === null) continue
+      const name = match[1]!
+      const change = await this.get(name)
+      if (change !== null) {
+        changes.push(change)
+      }
     }
     return changes
   }
@@ -371,7 +418,7 @@ export class FsChangeRepository extends ChangeRepository {
     for (const dirName of dirs) {
       const dir = path.join(this._draftsPath, dirName)
       const manifest = await this._loadManifest(dir)
-      const change = await this._manifestToChange(manifest, dir)
+      const { change } = await this._manifestToChange(manifest, dir)
       views.push(toDraftedChangeView(change))
     }
     return views
@@ -398,7 +445,7 @@ export class FsChangeRepository extends ChangeRepository {
     for (const dirName of dirs) {
       const dir = path.join(this._discardedPath, dirName)
       const manifest = await this._loadManifest(dir)
-      const change = await this._manifestToChange(manifest, dir)
+      const { change } = await this._manifestToChange(manifest, dir)
       views.push(toDiscardedChangeView(change))
     }
     return views
@@ -1063,16 +1110,31 @@ export class FsChangeRepository extends ChangeRepository {
    * Artifact/file state is primarily rehydrated from the manifest. When older
    * manifests omit `state`, the repository falls back to deriving it from disk.
    *
+   * This method is pure with respect to disk: it never writes the manifest.
+   * Drift/sync results are applied in memory to the returned `Change`, and the
+   * `hasChangesToPersist` flag tells callers whether the on-disk manifest is
+   * stale and needs to be rewritten. Callers that need to persist updates must
+   * do so under `_withChangeLock`.
+   *
+   * When the repository is not fully initialized with resolved artifact types
+   * (`artifactTypes.length === 0`), all drift detection and artifact sync logic
+   * is bypassed — the manifest is returned as-is.
+   *
    * @param manifest - The parsed manifest data
    * @param dir - Absolute path to the change directory (used for artifact status derivation)
-   * @returns A fully reconstructed `Change` entity with current artifact state
+   * @returns The reconstructed `Change` entity and a flag indicating whether the
+   *          on-disk manifest is out of date and needs to be rewritten
    */
-  private async _manifestToChange(manifest: ChangeManifest, dir: string): Promise<Change> {
+  private async _manifestToChange(
+    manifest: ChangeManifest,
+    dir: string,
+  ): Promise<{ change: Change; hasChangesToPersist: boolean }> {
     const artifactMap = new Map<string, ChangeArtifact>()
     const artifactTypes = await this._ensureArtifactTypes()
     const artifactTypeMap = new Map(artifactTypes.map((t) => [t.id, t]))
     const specExistence = await this._buildSpecExistenceMap(manifest.specIds)
     let manifestNormalized = false
+    let hasChangesToPersist = false
 
     // Validate schema compatibility
     if (this._activeSchema !== undefined) {
@@ -1193,8 +1255,11 @@ export class FsChangeRepository extends ChangeRepository {
         : {}),
     })
 
-    // Sync artifacts against schema to reconcile with current artifact types and specIds
-    // (artifactTypes already resolved above for manifest loading)
+    // Sync artifacts against schema to reconcile with current artifact types and specIds.
+    // Drift detection, sync, and normalization are all bypassed when the repository is
+    // not fully initialized with resolved artifact types. This prevents uninitialized
+    // repositories (e.g. those used by `project status`) from detecting false drift
+    // and writing stale state to disk.
     if (artifactTypes.length > 0) {
       const changed = change.syncArtifacts(artifactTypes, specExistence)
 
@@ -1227,15 +1292,71 @@ export class FsChangeRepository extends ChangeRepository {
         }
       }
 
-      // Persist the manifest if sync produced changes or legacy filenames were normalized
+      // Mark the in-memory manifest as needing persistence when sync produced
+      // changes or legacy filenames were normalized. The actual write is
+      // deferred to the caller (under `_withChangeLock`).
       if (changed || manifestNormalized) {
-        await this._writeManifestAtomic(dir, changeToManifest(change))
+        hasChangesToPersist = true
+      }
+
+      // Auto-invalidate if any previously validated file drifted from its stored hash.
+      const driftedFilesByArtifact = new Map<string, Set<string>>()
+      for (const [, artifact] of change.artifacts) {
+        for (const [, file] of artifact.files) {
+          if (file.validatedHash === undefined || file.validatedHash === SKIPPED_SENTINEL) continue
+          if (
+            file.status === 'pending-review' ||
+            file.status === 'drifted-pending-review' ||
+            file.status === 'skipped'
+          ) {
+            continue
+          }
+          let drifted = false
+          if (file.status === 'complete') {
+            const derivedStatus = await this._deriveFileStatus(
+              {
+                key: file.key,
+                filename: file.filename,
+                state: file.status,
+                validatedHash: file.validatedHash,
+              },
+              dir,
+              artifact.optional,
+              artifactTypeMap.get(artifact.type)?.preHashCleanup ?? [],
+            )
+            drifted = derivedStatus !== 'complete'
+          } else {
+            drifted = true
+          }
+          if (drifted) {
+            const keys = driftedFilesByArtifact.get(artifact.type) ?? new Set<string>()
+            keys.add(file.key)
+            driftedFilesByArtifact.set(artifact.type, keys)
+          }
+        }
+      }
+      if (driftedFilesByArtifact.size > 0) {
+        const affectedArtifacts = [...driftedFilesByArtifact.entries()].map(([type, files]) => ({
+          type,
+          files: [...files].sort(),
+        }))
+        const beforeHistoryLength = change.history.length
+        change.invalidate(
+          'artifact-drift',
+          SYSTEM_ACTOR,
+          `Invalidated because validated artifacts drifted: ${affectedArtifacts
+            .map((artifact) => `${artifact.type} [${artifact.files.join(', ')}]`)
+            .join('; ')}`,
+          affectedArtifacts,
+          ArtifactDag.from(artifactTypes),
+        )
+        if (change.history.length > beforeHistoryLength) {
+          hasChangesToPersist = true
+        }
       }
     }
 
-    await this._reconcileArtifactDrift(change, dir, artifactTypeMap, artifactTypes)
-
-    return change
+    return { change, hasChangesToPersist }
   }
 
   /**

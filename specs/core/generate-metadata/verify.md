@@ -83,6 +83,20 @@
 - **THEN** the transformed `dependsOn` value is `default:_global/architecture`
 - **AND** it is not normalized to `core:_global/architecture`
 
+#### Scenario: Persisted dependency state overrides omitted extracted dependsOn
+
+- **GIVEN** extraction does not yield `dependsOn`
+- **AND** `SpecRepository.readPersistedDependsOn(spec)` returns `['core:storage']`
+- **WHEN** `GenerateSpecMetadata` assembles metadata
+- **THEN** the returned `metadata.dependsOn` is `['core:storage']`
+
+#### Scenario: Mismatched extracted and persisted dependencies fail generation
+
+- **GIVEN** extraction yields `dependsOn: ['core:config']`
+- **AND** `SpecRepository.readPersistedDependsOn(spec)` returns `['core:storage']`
+- **WHEN** `GenerateSpecMetadata` executes
+- **THEN** metadata generation fails explicitly instead of silently choosing one set
+
 #### Scenario: Unresolvable dependency value fails extraction instead of being omitted
 
 - **GIVEN** extraction yields a `dependsOn` value like `https://example.com`

@@ -394,6 +394,101 @@ describe('FsChangeRepository', () => {
       expect((await ctx.repo.get('add-auth'))?.state).toBe('designing')
       await expect(fs.access(lockDir)).rejects.toThrow()
     })
+
+    it('given a change with drifted artifacts loaded inside mutate, when mutate completes, then the lock is not acquired a second time during the internal load and the mutation is persisted', async () => {
+      const content = '# Proposal\n'
+      const hash = sha256(content)
+      const at = new Date('2024-01-15T10:00:00.000Z')
+
+      // Create an initialized repo with a single artifact type
+      const repoWithTypes = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        artifactTypes: [
+          new ArtifactType({
+            id: 'proposal',
+            scope: 'change',
+            output: 'proposal.md',
+            requires: [],
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+          }),
+        ],
+      })
+
+      const change = new Change({
+        name: 'add-auth',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: hash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+      await repoWithTypes.save(change)
+
+      // Write proposal.md so validatedHash matches — no drift on first load
+      const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      await fs.writeFile(path.join(dir, 'proposal.md'), content, 'utf8')
+
+      // Spy on the private lock method to count acquisitions
+      const repoAsAny = repoWithTypes as unknown as {
+        _withChangeLock: (name: string, fn: () => Promise<unknown>) => Promise<unknown>
+      }
+      let lockAcquisitions = 0
+      const original = repoAsAny._withChangeLock.bind(repoWithTypes)
+      repoAsAny._withChangeLock = async (name: string, fn: () => Promise<unknown>) => {
+        lockAcquisitions++
+        return original(name, fn)
+      }
+
+      // mutate should acquire lock exactly once (for the outer mutation); the inner
+      // _getInternal(skipWrite:true) call must NOT re-acquire it
+      await repoWithTypes.mutate('add-auth', (loaded) => {
+        loaded.updateDescription('updated', actor)
+        return 'ok'
+      })
+
+      expect(lockAcquisitions).toBe(1)
+
+      // Confirm the final save went through
+      const after = await repoWithTypes.get('add-auth')
+      expect(after?.description).toBe('updated')
+    })
   })
 
   describe('save — directory movement', () => {
@@ -521,6 +616,29 @@ describe('FsChangeRepository', () => {
   })
 
   describe('artifact status derivation', () => {
+    beforeEach(() => {
+      ctx.repo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        artifactTypes: [
+          new ArtifactType({
+            id: 'proposal',
+            scope: 'change',
+            output: 'proposal.md',
+            requires: [],
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+          }),
+        ],
+      })
+    })
+
     function makeChangeWithArtifact(name: string, validatedHash: string | null): Change {
       const change = makeChange(name)
       const fileProps: { key: string; filename: string; validatedHash?: string } = {
@@ -643,6 +761,70 @@ describe('FsChangeRepository', () => {
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
+    })
+
+    it('given tasks artifact type with preHashCleanup, when get is called on a change where task checklist progress was updated, then the artifact status remains complete', async () => {
+      const tasksType = new ArtifactType({
+        id: 'tasks',
+        scope: 'change',
+        output: 'tasks.md',
+        hasTasks: true,
+        requires: [],
+        validations: [],
+        deltaValidations: [],
+        preHashCleanup: [
+          {
+            id: 'normalize-checkboxes',
+            pattern: '^([ \\t]*-\\s+)\\[x\\]',
+            replacement: '$1[ ]',
+          },
+        ],
+      })
+
+      const repoWithResolver = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        resolveArtifactTypes: async () => [tasksType],
+      })
+
+      const initialContent = '- [ ] Task 1\n'
+      const { applyPreHashCleanup } =
+        await import('../../../src/domain/services/pre-hash-cleanup.js')
+      const cleaned = applyPreHashCleanup(initialContent, tasksType.preHashCleanup)
+      const validatedHash = sha256(cleaned)
+
+      const change = makeChange('c1')
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'tasks',
+          optional: false,
+          requires: [],
+          files: new Map([
+            [
+              'tasks',
+              new ArtifactFile({
+                key: 'tasks',
+                filename: 'tasks.md',
+                status: 'complete',
+                validatedHash,
+              }),
+            ],
+          ]),
+        }),
+      )
+
+      await repoWithResolver.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-c1')
+      await fs.writeFile(path.join(dir, 'tasks.md'), '- [x] Task 1\n', 'utf8')
+
+      const loaded = await repoWithResolver.get('c1')
+      expect(loaded?.getArtifact('tasks')?.status).toBe('complete')
     })
   })
 
@@ -1126,7 +1308,7 @@ describe('FsChangeRepository', () => {
         workspace: 'default',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: path.join(basePath, 'config'),
         changesPath: path.join(basePath, 'changes'),
         draftsPath: path.join(basePath, 'drafts'),
         discardedPath: path.join(basePath, 'discarded'),
@@ -1232,7 +1414,7 @@ describe('FsChangeRepository', () => {
         workspace: 'default',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: path.join(basePath, 'config'),
         changesPath: path.join(basePath, 'changes'),
         draftsPath: path.join(basePath, 'drafts'),
         discardedPath: path.join(basePath, 'discarded'),
@@ -1593,6 +1775,74 @@ describe('FsChangeRepository', () => {
       expect(manifest.history.filter((event) => event.type === 'invalidated')).toHaveLength(0)
     })
 
+    it('given an initialized repository and a change with a drifted artifact, when get is called, then the lock is acquired, the invalidation is persisted to disk, and the returned change reflects the invalidation', async () => {
+      const proposalContent = '# Proposal\n'
+      const proposalHash = sha256(proposalContent)
+
+      const at = new Date('2024-01-15T10:00:00.000Z')
+      const change = new Change({
+        name: 'drift-lock-test',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: proposalHash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      const repo = makeRepoWithTypes(ctx.tmpDir, makeArtifactTypes())
+      await repo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-drift-lock-test')
+      await fs.writeFile(path.join(dir, 'proposal.md'), 'DRIFTED CONTENT', 'utf8')
+
+      let lockAcquisitions = 0
+      const repoAsAny = repo as unknown as {
+        _withChangeLock: (name: string, fn: () => Promise<unknown>) => Promise<unknown>
+      }
+      const originalLock = repoAsAny._withChangeLock.bind(repo)
+      repoAsAny._withChangeLock = async (name: string, fn: () => Promise<unknown>) => {
+        lockAcquisitions++
+        return originalLock(name, fn)
+      }
+
+      const loaded = await repo.get('drift-lock-test')
+
+      expect(lockAcquisitions).toBe(1)
+      expect(loaded?.state).toBe('designing')
+
+      const reloaded = await repo.get('drift-lock-test')
+      expect(reloaded?.state).toBe(loaded?.state)
+    })
+
     it('repeated get with unchanged drift scope does not rewrite manifest', async () => {
       const designContent = '# Design\n'
       const designHash = sha256(designContent)
@@ -1923,7 +2173,7 @@ describe('FsChangeRepository', () => {
         workspace: 'default',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: path.join(basePath, 'config'),
         changesPath: path.join(basePath, 'changes'),
         draftsPath: path.join(basePath, 'drafts'),
         discardedPath: path.join(basePath, 'discarded'),
@@ -2160,6 +2410,102 @@ describe('FsChangeRepository', () => {
       expect(loaded?.state).toBe('designing')
       expect(loaded?.getArtifact('proposal')?.status).toBe('pending-review')
       expect(loaded?.getArtifact('design')?.status).toBe('drifted-pending-review')
+    })
+
+    it('given an uninitialized repository (no artifactTypes) and a change with a drifted artifact, when get is called, then no invalidation occurs and no manifest is written to disk', async () => {
+      const content = '# Proposal\n'
+      const hash = sha256(content)
+      const at = new Date('2024-01-15T10:00:00.000Z')
+
+      // Uninitialized repo: artifactTypes not provided
+      const uninitRepo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+      })
+
+      const change = new Change({
+        name: 'uninit-drift-test',
+        createdAt: at,
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at,
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: '@specd/schema-std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'drafting', to: 'designing', at, by: actor },
+          { type: 'transitioned', from: 'designing', to: 'ready', at, by: actor },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at, by: actor },
+        ],
+        artifacts: new Map([
+          [
+            'proposal',
+            new ChangeArtifact({
+              type: 'proposal',
+              requires: [],
+              files: new Map([
+                [
+                  'proposal',
+                  new ArtifactFile({
+                    key: 'proposal',
+                    filename: 'proposal.md',
+                    validatedHash: hash,
+                  }),
+                ],
+              ]),
+            }),
+          ],
+        ]),
+      })
+
+      // Use an initialized repo just to persist the initial manifest
+      const initRepo = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        artifactTypes: [
+          new ArtifactType({
+            id: 'proposal',
+            scope: 'change',
+            output: 'proposal.md',
+            requires: [],
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+          }),
+        ],
+      })
+      await initRepo.save(change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-uninit-drift-test')
+
+      // Capture the manifest content before the read
+      const manifestBefore = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+
+      // Drift the file — mismatches the stored hash
+      await fs.writeFile(path.join(dir, 'proposal.md'), 'DRIFTED CONTENT', 'utf8')
+
+      // Read via uninitialized repo — must bypass drift detection entirely
+      const loaded = await uninitRepo.get('uninit-drift-test')
+
+      // State must be unchanged (no invalidation)
+      expect(loaded?.state).toBe('implementing')
+
+      // Manifest must not have been rewritten
+      const manifestAfter = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+      expect(manifestAfter).toBe(manifestBefore)
     })
   })
 

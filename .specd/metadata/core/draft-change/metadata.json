@@ -190,5 +190,7 @@
     "spec.md": "sha256:aad623324259d102e16a2897bd5301d5ba19f396eec35817045ff50e6db011f9",
     "verify.md": "sha256:eaf34977a91b1fa58ffca27cf3d9b49bcb697e9c2ae3fc647b8f50e5e290cdfd"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "`DraftChange` shelves active change by appending `drafted` history and moving persisted storage from `changes/` to `drafts/`.",
+  "optimizedContext": "# DraftChange\n\n## Rules\n- `DraftChangeInput` requires `name`; accepts optional `reason` and `force`.\n- Load active change only via `ChangeRepository.get(name)`; if missing throw `ChangeNotFoundError`; drafted-only names do not qualify.\n- Resolve actor via `ActorResolver` and record it in `drafted` event.\n- Respect historical implementation guard: if change ever reached `implementing`, fail unless `force === true`.\n- Append drafted history via `change.draft(actor, reason, force)`.\n- Persist through `ChangeRepository.mutate(name, fn)`; repository writes fresh manifest and relocates directory from `changes/` to `drafts/`.\n\n## Constraints\n- No lifecycle transition; drafting is orthogonal to lifecycle state.\n- Directory relocation belongs to repository layer.\n- `isDrafted` derives from latest drafted/restored history event.\n"
 }

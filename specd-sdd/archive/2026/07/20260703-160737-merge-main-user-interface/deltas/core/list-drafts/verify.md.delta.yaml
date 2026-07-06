@@ -1,0 +1,2 @@
+- op: no-op
+  description: Main already contains the config-wired draft listing bootstrap verification scenario; no additional verify delta is needed after merge.

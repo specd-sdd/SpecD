@@ -1,0 +1,131 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: get returns a Change or null'
+  content: |
+    #### Scenario: Active change exists
+
+    - **WHEN** `get("add-oauth-login")` is called and a change with that name exists under `changes/`
+    - **THEN** a `Change` is returned with persisted artifact and file state loaded from the manifest
+
+    #### Scenario: Drafted-only name returns null
+
+    - **GIVEN** a change exists only under `drafts/`
+    - **WHEN** `get(name)` is called
+    - **THEN** it returns `null`
+
+    #### Scenario: Discarded-only name returns null
+
+    - **GIVEN** a change exists only under `discarded/`
+    - **WHEN** `get(name)` is called
+    - **THEN** it returns `null`
+
+    #### Scenario: Missing state defaults to missing on load
+
+    - **GIVEN** a manifest entry without a `state` field
+    - **WHEN** `get()` loads that active change
+    - **THEN** the missing artifact or file state defaults to `missing`
+
+    #### Scenario: get returns a snapshot, not a serialized mutation context
+
+    - **GIVEN** two callers both loaded the same active change via `get()`
+    - **WHEN** each caller mutates its in-memory instance and only one uses `mutate()`
+    - **THEN** the unsynchronized caller must not rely on `save()` alone for a safe persisted update
+
+    #### Scenario: get does not write to disk if no drift or sync is detected
+
+    - **GIVEN** an active change with no artifact drift and no sync changes needed
+    - **WHEN** `get()` is called
+    - **THEN** the on-disk manifest file is not modified
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Auto-invalidation on get when artifact files drift'
+  content: |
+    #### Scenario: Repository collects all drifted files before invalidating
+
+    - **GIVEN** a change with two validated spec files under the same artifact
+    - **AND** both files have changed on disk
+    - **WHEN** `FsChangeRepository.get()` is called
+    - **THEN** the invalidation captures both file keys in a single grouped invalidation
+
+    #### Scenario: Drift invalidates even while already designing
+
+    - **GIVEN** a change already in `designing`
+    - **AND** a previously validated artifact file drifts on disk
+    - **WHEN** `FsChangeRepository.get()` is called
+    - **THEN** the change remains in `designing`
+    - **AND** the drifted file becomes `drifted-pending-review`
+
+    #### Scenario: Drift preserves drifted files and downgrades others to pending review
+
+    - **GIVEN** a change with validated artifacts
+    - **AND** one file drifts on disk
+    - **WHEN** `FsChangeRepository.get()` auto-invalidates the change
+    - **THEN** the drifted file is `drifted-pending-review`
+    - **AND** other previously validated files become `pending-review`
+
+    #### Scenario: No drift — no invalidation
+
+    - **GIVEN** a change whose validated files still match their stored hashes
+    - **WHEN** `FsChangeRepository.get()` is called
+    - **THEN** no invalidation occurs
+
+    #### Scenario: Auto-invalidation is bypassed when repository is uninitialized
+
+    - **GIVEN** a change with drifted files
+    - **AND** a repository initialized with no artifact types
+    - **WHEN** `get()` is called
+    - **THEN** no invalidation is performed
+    - **AND** the manifest on disk is not updated
+
+    #### Scenario: Invalidation is written to disk under change lock
+
+    - **GIVEN** a change with drifted files and a fully initialized repository
+    - **WHEN** `get()` is called
+    - **THEN** the repository acquires the change lock
+    - **AND** it reloads the manifest inside the lock
+    - **AND** it invalidates and persists the updated manifest to disk under the lock boundary
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: mutate serializes persisted change updates'
+  content: |
+    #### Scenario: Missing active change is rejected
+
+    - **WHEN** `mutate("missing-change", fn)` is called and no active change with that name exists
+    - **THEN** `ChangeNotFoundError` is thrown
+
+    #### Scenario: Drafted-only name is rejected
+
+    - **GIVEN** a change exists only under `drafts/`
+    - **WHEN** `mutate(name, fn)` is called
+    - **THEN** `ChangeNotFoundError` is thrown
+
+    #### Scenario: Discarded-only name is rejected
+
+    - **GIVEN** a change exists only under `discarded/`
+    - **WHEN** `mutate(name, fn)` is called
+    - **THEN** `ChangeNotFoundError` is thrown
+
+    #### Scenario: Second mutation sees the first mutation's persisted result
+
+    - **GIVEN** two callers both request `mutate()` for the same active change name
+    - **AND** the first callback appends a history event and resolves
+    - **WHEN** the second callback starts executing
+    - **THEN** it receives a freshly reloaded `Change` that already includes the first callback's persisted update
+
+    #### Scenario: Failing callback does not persist a partial manifest update
+
+    - **WHEN** `mutate(name, fn)` is called and `fn` throws after mutating the in-memory change
+    - **THEN** the on-disk manifest is unchanged from before the `mutate` call began
+
+    #### Scenario: Load within mutate bypasses intermediate lock and write
+
+    - **GIVEN** an active change with drifted files and an initialized repository
+    - **WHEN** `mutate()` is executing
+    - **THEN** the internal load operation within mutate bypasses any intermediate lock acquisition and manifest writes
+    - **AND** does not deadlock
+    - **AND** the final `save()` persists the correct accumulated changes

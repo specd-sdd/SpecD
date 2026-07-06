@@ -1,0 +1,2 @@
+- op: no-op
+  description: Main already contains the SDK-host-only project status verification scenario; no additional verify delta is needed after merge.

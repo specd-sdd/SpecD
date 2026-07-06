@@ -31,6 +31,15 @@ context:
       specs in context. Always write artifacts, code, comments, and
       documentation in english.
 
+# Global constraints always in context regardless of change scope
+contextIncludeSpecs:
+  - 'default:*'
+
+contextExcludeSpecs:
+  - 'default:_global/commits'
+
+llmOptimizedContext: false
+
 workspaces:
   default:
     prefix: _global
@@ -62,6 +71,8 @@ workspaces:
         path: specs/core
     codeRoot: packages/core
     ownership: owned
+    contextIncludeSpecs:
+      - 'core:composition'
 
   schema-std:
     specs:
@@ -248,15 +259,6 @@ storage:
 approvals:
   spec: false
   signoff: false
-
-# Global constraints always in context regardless of change scope
-contextIncludeSpecs:
-  - 'default:*'
-
-contextExcludeSpecs:
-  - 'default:_global/commits'
-
-llmOptimizedContext: true
 
 schemaOverrides:
   append:

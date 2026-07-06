@@ -45,7 +45,7 @@
     {
       "requirement": "dependsOn resolution",
       "rules": [
-        "`GenerateSpecMetadata` does not perform any field-specific postprocessing for `dependsOn` after extraction.\n\nIf `dependsOn` entries require normalization from artifact-local strings (for example relative spec links) to canonical spec IDs, that behavior must be declared through the schema's extractor transform model and executed during `extractMetadata()`.\n\nThe use case supplies the origin context and repository-backed transform runtime needed by those registered transforms, awaits the transformed extraction output, and accepts that output as final. It does not re-run `SpecRepository.resolveFromPath(...)` as a separate ad hoc repair step after extraction.\n\nIf extraction finds dependency values but transform execution cannot normalize them, metadata generation fails explicitly. It does not silently drop those found values and continue with an incomplete `dependsOn` set."
+        "`GenerateSpecMetadata` MUST canonicalize `dependsOn` from persisted spec semantics before returning metadata.\n\nResolution rules:\n\n1. Run schema extraction normally. If extraction yields `dependsOn`, treat that as the candidate extracted dependency set.\n2. Read the repository's persisted dependency state through `SpecRepository.readPersistedDependsOn(spec)`.\n3. If persisted dependency state exists, the returned `metadata.dependsOn` MUST use that persisted value.\n4. If persisted dependency state does not exist and extraction yields `dependsOn`, the returned `metadata.dependsOn` MAY use the extracted value.\n5. If both extraction and persisted state exist and they differ, metadata generation MUST fail explicitly instead of silently choosing one.\n\nIf `dependsOn` entries require normalization from artifact-local strings (for example relative spec links) to canonical spec IDs, that behavior must be declared through the schema's extractor transform model and executed during `extractMetadata()`.\n\nThe use case supplies the origin context and repository-backed transform runtime needed by those registered transforms, awaits the transformed extraction output, and accepts that output as final before comparing it against persisted dependency state.\n\nIf extraction finds dependency values but transform execution cannot normalize them, metadata generation fails explicitly. It does not silently drop those found values and continue with an incomplete `dependsOn` set."
       ]
     },
     {
@@ -57,7 +57,7 @@
     {
       "requirement": "Assembled result",
       "rules": [
-        "The final metadata object merges:\n\n- All fields from `extractMetadata()` output\n- `contentHashes` from the hashing step\n- `generatedBy: 'core'`\n\nThe result is returned with `hasExtraction: true`."
+        "The final metadata object merges:\n\n- all fields from `extractMetadata()` output\n- canonical `dependsOn` determined by the dependency-resolution rules above\n- implementation projection from persisted repository semantics\n- `contentHashes` from the hashing step\n- `generatedBy: 'core'`\n\nThe result is returned with `hasExtraction: true`."
       ]
     }
   ],
@@ -174,6 +174,26 @@
     },
     {
       "requirement": "dependsOn resolution",
+      "name": "Persisted dependency state overrides omitted extracted dependsOn",
+      "given": [
+        "extraction does not yield dependsOn",
+        "AND SpecRepository.readPersistedDependsOn(spec) returns ['core:storage']"
+      ],
+      "when": ["GenerateSpecMetadata assembles metadata"],
+      "then": ["the returned metadata.dependsOn is ['core:storage']"]
+    },
+    {
+      "requirement": "dependsOn resolution",
+      "name": "Mismatched extracted and persisted dependencies fail generation",
+      "given": [
+        "extraction yields dependsOn: ['core:config']",
+        "AND SpecRepository.readPersistedDependsOn(spec) returns ['core:storage']"
+      ],
+      "when": ["GenerateSpecMetadata executes"],
+      "then": ["metadata generation fails explicitly instead of silently choosing one set"]
+    },
+    {
+      "requirement": "dependsOn resolution",
       "name": "Unresolvable dependency value fails extraction instead of being omitted",
       "given": [
         "extraction yields a dependsOn value like https://example.com",
@@ -244,9 +264,23 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:generate-metadata",
+        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+        "symbol": "GenerateSpecMetadata"
+      },
+      {
+        "specId": "core:generate-metadata",
+        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+        "symbol": "projectImplementationMetadata"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:eb0a45ef5f1cc3b1ee9753f9e3e9e2ef848fa5aef1599916a14456f956c24766",
-    "verify.md": "sha256:1ece538051244dbc0871ebe83ed5671fb6dda3bbd0ca88fc35398382dda0dac0"
+    "spec.md": "sha256:756c43b6d0ea81d2dbad3dc45236b0aef7b805db081ee7a5b09dd0e1d9f1f613",
+    "verify.md": "sha256:7beb1ffc917b0523be23ed7730663dddc43049b1482cba24309db9a079f6f9bb"
   },
   "generatedBy": "core"
 }

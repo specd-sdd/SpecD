@@ -2,6 +2,7 @@ import path from 'node:path'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
+import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ArtifactType } from '../../domain/value-objects/artifact-type.js'
 import { type CrossArtifactValidationRule } from '../../domain/value-objects/cross-artifact-validation.js'
 import { type ValidationFailure, type ValidationWarning } from './validate-artifacts.js'
@@ -12,7 +13,15 @@ import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { evaluateRules } from '../../domain/services/rule-evaluator.js'
 import { evaluateCrossArtifactRule } from '../../domain/services/cross-artifact-rule-evaluator.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
+import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
 import { type ReadyArtifactParticipant } from './_shared/cross-artifact-participant-state.js'
+import {
+  extractMetadataFromSpecArtifacts,
+  type MetadataArtifactInput,
+} from './_shared/extract-metadata-from-spec-artifacts.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
+import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
+import { type Schema } from '../../domain/value-objects/schema.js'
 
 /** Input for the {@link ValidateSpecs} use case. */
 export interface ValidateSpecsInput {
@@ -57,6 +66,9 @@ export class ValidateSpecs {
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
+  private readonly _hasher: ContentHasher
+  private readonly _extractorTransforms: ExtractorTransformRegistry
+  private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
 
   /**
    * Creates a new `ValidateSpecs` use case instance.
@@ -64,15 +76,28 @@ export class ValidateSpecs {
    * @param specs - Spec repositories keyed by workspace name
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
+   * @param hasher - Content hasher for metadata freshness validation
+   * @param extractorTransforms - Shared extractor transform registry
+   * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
+    hasher?: ContentHasher,
+    extractorTransforms: ExtractorTransformRegistry = new Map(),
+    workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
   ) {
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
+    this._hasher = hasher ?? {
+      hash(content: string): string {
+        return content
+      },
+    }
+    this._extractorTransforms = extractorTransforms
+    this._workspaceRoutes = workspaceRoutes
   }
 
   /**
@@ -107,6 +132,7 @@ export class ValidateSpecs {
         spec.filenames,
         specArtifactTypes,
         crossRules,
+        schema,
       )
       entries.push(entry)
     } else if (input.workspace !== undefined) {
@@ -123,6 +149,7 @@ export class ValidateSpecs {
           spec.filenames,
           specArtifactTypes,
           crossRules,
+          schema,
         )
         entries.push(entry)
       }
@@ -137,6 +164,7 @@ export class ValidateSpecs {
             spec.filenames,
             specArtifactTypes,
             crossRules,
+            schema,
           )
           entries.push(entry)
         }
@@ -161,6 +189,7 @@ export class ValidateSpecs {
    * @param filenames - Filenames present in the spec directory
    * @param specArtifactTypes - Spec-scoped artifact types from the active schema
    * @param crossRules - Cross-artifact validation rules scoped to spec artifacts
+   * @param schema - Active schema governing extraction and validation behavior
    * @returns Validation entry with failures and warnings
    */
   private async _validateSpec(
@@ -170,6 +199,7 @@ export class ValidateSpecs {
     filenames: readonly string[],
     specArtifactTypes: readonly ArtifactType[],
     crossRules: readonly CrossArtifactValidationRule[],
+    schema: Schema,
   ): Promise<SpecValidationEntry> {
     const label = `${workspace}:${capabilityPath}`
     const failures: ValidationFailure[] = []
@@ -258,11 +288,133 @@ export class ValidateSpecs {
       )
     }
 
+    if (spec !== null) {
+      await this._validateMetadataConsistency({
+        specRepo,
+        spec,
+        label,
+        schema,
+        specArtifactTypes,
+        failures,
+      })
+    }
+
     return {
       spec: label,
       passed: failures.length === 0,
       failures,
       warnings,
     }
+  }
+
+  /**
+   * Validates that persisted semantic state and cached metadata remain aligned.
+   *
+   * @param args - Metadata consistency inputs for one spec
+   * @param args.specRepo - Repository that owns the spec
+   * @param args.spec - Spec entity under validation
+   * @param args.label - Fully-qualified spec id used in diagnostics
+   * @param args.schema - Effective schema for extraction checks
+   * @param args.specArtifactTypes - Spec artifact definitions from the schema
+   * @param args.failures - Mutable validation failures sink
+   */
+  private async _validateMetadataConsistency(args: {
+    readonly specRepo: SpecRepository
+    readonly spec: import('../../domain/entities/spec.js').Spec
+    readonly label: string
+    readonly schema: Schema
+    readonly specArtifactTypes: readonly ArtifactType[]
+    readonly failures: ValidationFailure[]
+  }): Promise<void> {
+    const metadata = await args.specRepo.metadata(args.spec)
+    if (metadata === null) {
+      return
+    }
+
+    if (metadata.freshness === 'stale') {
+      args.failures.push({
+        artifactId: 'metadata',
+        description: `Metadata for '${args.label}' has stale or incomplete contentHashes`,
+      })
+    }
+
+    const persistedDependsOn = await args.specRepo.readPersistedDependsOn(args.spec)
+    if (persistedDependsOn !== null) {
+      if (
+        metadata.dependsOn === undefined ||
+        !DependsOnOverwriteError.areSame(metadata.dependsOn, persistedDependsOn)
+      ) {
+        args.failures.push({
+          artifactId: 'metadata',
+          description: `Metadata for '${args.label}' has dependsOn that does not match persisted dependencies`,
+        })
+      }
+
+      const extractedDependsOn = await this._extractDependsOn(args)
+      if (
+        extractedDependsOn !== undefined &&
+        !DependsOnOverwriteError.areSame(extractedDependsOn, persistedDependsOn)
+      ) {
+        args.failures.push({
+          artifactId: 'metadata',
+          description: `Extracted dependsOn for '${args.label}' does not match persisted dependencies`,
+        })
+      }
+    }
+  }
+
+  /**
+   * Extracts `dependsOn` from spec artifacts when the schema declares it.
+   *
+   * @param args - Metadata consistency inputs for one spec
+   * @param args.specRepo - Repository that owns the spec
+   * @param args.spec - Spec entity under validation
+   * @param args.label - Fully-qualified spec id used in diagnostics
+   * @param args.schema - Effective schema for extraction checks
+   * @param args.specArtifactTypes - Spec artifact definitions from the schema
+   * @returns Extracted dependsOn values, or `undefined` when extraction is not declared
+   */
+  private async _extractDependsOn(args: {
+    readonly specRepo: SpecRepository
+    readonly spec: import('../../domain/entities/spec.js').Spec
+    readonly label: string
+    readonly schema: Schema
+    readonly specArtifactTypes: readonly ArtifactType[]
+  }): Promise<readonly string[] | undefined> {
+    const extraction = args.schema.metadataExtraction()
+    if (extraction?.dependsOn === undefined) {
+      return undefined
+    }
+
+    const artifacts: MetadataArtifactInput[] = []
+    for (const artifactType of args.specArtifactTypes) {
+      const filename = path.basename(artifactType.output)
+      const format = artifactType.format ?? inferFormat(filename) ?? 'plaintext'
+      const parser = this._parsers.get(format)
+      if (parser === undefined) continue
+
+      const artifact = await args.specRepo.artifact(args.spec, filename)
+      if (artifact === null) continue
+
+      artifacts.push({
+        artifactId: artifactType.id,
+        filename,
+        format,
+        content: artifact.content,
+      })
+    }
+
+    const { workspace, capPath } = parseSpecId(args.label)
+    const extracted = await extractMetadataFromSpecArtifacts({
+      effectiveSpecSchema: args.schema,
+      workspace,
+      specPath: SpecPath.parse(capPath),
+      artifacts,
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
+      repositories: this._specs,
+      workspaceRoutes: this._workspaceRoutes,
+    })
+    return extracted.metadata.dependsOn
   }
 }

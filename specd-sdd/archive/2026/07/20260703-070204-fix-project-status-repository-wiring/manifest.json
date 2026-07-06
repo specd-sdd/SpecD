@@ -1,0 +1,802 @@
+{
+  "name": "fix-project-status-repository-wiring",
+  "createdAt": "2026-07-03T07:02:04.043Z",
+  "description": "Aligns the project status command and all directly affected core read/composition factories with the canonical repository wiring. Standardizes bootstrapping for ChangeRepository and SpecRepository by resolving schema-driven artifact-type behavior, metadata-path semantics, and spec existence check hooks through shared composition logic. This ensures that status-oriented reads observe consistent repository state and prevents false positives regarding artifact-drift, particularly on checklist task checkbox updates.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:get-project-summary",
+    "core:list-workspaces",
+    "core:list-changes",
+    "core:list-drafts",
+    "core:list-discarded",
+    "core:get-status",
+    "sdk:build-project-status-snapshot",
+    "cli:project-status"
+  ],
+  "specDependsOn": {
+    "core:get-project-summary": [
+      "core:list-workspaces",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:list-archived",
+      "core:kernel"
+    ],
+    "core:list-workspaces": ["core:config", "core:workspace", "core:spec-repository-port"],
+    "core:list-changes": ["core:change", "core:kernel"],
+    "core:list-drafts": ["core:change", "core:kernel"],
+    "core:list-discarded": [
+      "core:change",
+      "core:kernel",
+      "core:discarded-change-view",
+      "core:change-repository-port"
+    ],
+    "core:get-status": [
+      "core:change",
+      "core:kernel",
+      "core:transition-change",
+      "core:schema-format",
+      "core:config",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking"
+    ],
+    "sdk:build-project-status-snapshot": [
+      "sdk:host-context",
+      "core:get-project-summary",
+      "code-graph:get-graph-health"
+    ],
+    "cli:project-status": [
+      "core:list-workspaces",
+      "core:get-project-summary",
+      "core:get-project-context",
+      "sdk:build-project-status-snapshot",
+      "sdk:host-context"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-workspaces.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-changes.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-drafts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-discarded.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/shared-repository-wiring.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/get-project-summary.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-summary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-summary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-changes.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-discarded.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-drafts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-workspaces.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:list-workspaces",
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSharedSpecRepositories"]
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSharedChangeRepository"]
+    },
+    {
+      "specId": "core:list-workspaces",
+      "file": "packages/core/src/composition/use-cases/list-workspaces.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createListWorkspaces"]
+    },
+    {
+      "specId": "core:list-changes",
+      "file": "packages/core/src/composition/use-cases/list-changes.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createListChanges"]
+    },
+    {
+      "specId": "core:list-drafts",
+      "file": "packages/core/src/composition/use-cases/list-drafts.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createListDrafts"]
+    },
+    {
+      "specId": "core:list-discarded",
+      "file": "packages/core/src/composition/use-cases/list-discarded.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createListDiscarded"]
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetStatus"]
+    },
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetProjectSummary"]
+    },
+    {
+      "specId": "sdk:build-project-status-snapshot",
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildProjectStatusSnapshot"]
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectStatus"]
+    },
+    {
+      "specId": "core:list-workspaces",
+      "file": "packages/core/test/composition/shared-repository-wiring.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/test/composition/shared-repository-wiring.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/test/application/use-cases/get-project-summary.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:a45f930682e4771fc52d4081881cd76248494b06ee620141796b61f673505ec9"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ff31f5bfef0d741864e94829056a92b7c68223b146767678ce7ae29210846899"
+        },
+        {
+          "key": "core:list-workspaces",
+          "filename": "deltas/core/list-workspaces/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a5e701d732b4120d8507a9f9c12b5c98e6370ed924bd4de4eb390aa83e6e4fe1"
+        },
+        {
+          "key": "core:list-changes",
+          "filename": "deltas/core/list-changes/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:49f2ad02b126bd8b021e75dd8442d48b5eace63d7426fc60f464bf9af3fa0ae7"
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:76b1ea2f113dd96e91f7907ea76d018c6084a0ab1cd5e38fbbe72b85cbd32858"
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ec5fecdd86d5aaddc69306e3f6eb9636385f54d87794ce7395652cf59d40ca7f"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:787bf6deb85976923bb755e030dd42a83b3cb3fee4735bed9a6ccac2cba3179b"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92a68c36cc0aa50cace94ae855ee2dc4e25cba6bd34c4a354b8c9be9d8864960"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:401acdf3d3e93805d5a5c531685d89e679bc98c4ca9897692bd621fa652848a3"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5eac2cc743daa9978683f8de68755c1fbb6f43aba0f0e67f753a14cca0cf71ee"
+        },
+        {
+          "key": "core:list-workspaces",
+          "filename": "deltas/core/list-workspaces/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:526e3fb9310022186fcfeaa3ffee867dee0c360af8c46314bde228f14a66196b"
+        },
+        {
+          "key": "core:list-changes",
+          "filename": "deltas/core/list-changes/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a9520e12886fe51f76bdce6a5ddc38cf34815f591571963c0459739ba4850fcf"
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2fc20e08cf8c11acdacdd87b0f972c399856b8d8a888d6bf77483afd318434a0"
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cb8c9af455751202fd41eab623ccf6dafbac2bad5ddbd32ab03642b2b5a9cb63"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:df7171581b54d0eb035c69a318b497d6b00c256017e37d1a64fec6060d5ee9d9"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0e16223002e0b1c1750a85bb46f4396f919ce9d781b6d8399ced0dea8ab92d1a"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:990fd3ed8ea4df516cbd80ba9567abf147f22f2ae1ecd5c407da02971941dd9c"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:fb283b3ea6ea09b4262eacc566ff3013f0f2f1ca4d0844e1dc00773d720b82c9"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:72cd712763c7de4a30d4f7baf13b41075f66da761712a87c89c8f81f21953897"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-03T07:02:04.043Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:get-project-summary",
+        "core:list-workspaces",
+        "core:list-changes",
+        "core:list-drafts",
+        "core:list-discarded",
+        "core:get-status",
+        "sdk:build-project-status-snapshot",
+        "cli:project-status"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-03T07:02:04.058Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-workspaces"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-changes"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-drafts"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-workspaces"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-changes"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-drafts"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:04:24.385Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T07:16:28.479Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:project-status, core:get-project-summary, core:get-status, core:list-changes, core:list-discarded, core:list-drafts, core:list-workspaces, sdk:build-project-status-snapshot]; verify [cli:project-status, core:get-project-summary, core:get-status, core:list-changes, core:list-discarded, core:list-drafts, core:list-workspaces, sdk:build-project-status-snapshot]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:project-status",
+            "core:get-project-summary",
+            "core:get-status",
+            "core:list-changes",
+            "core:list-discarded",
+            "core:list-drafts",
+            "core:list-workspaces",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:project-status",
+            "core:get-project-summary",
+            "core:get-status",
+            "core:list-changes",
+            "core:list-discarded",
+            "core:list-drafts",
+            "core:list-workspaces",
+            "sdk:build-project-status-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:37:59.901Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T07:38:42.988Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "core:list-workspaces",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:get-status",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "core:list-workspaces",
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:get-status",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:38:42.988Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:39:35.384Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:47:40.034Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-03T07:52:28.364Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:52:28.364Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:55:34.456Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:55:35.906Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T07:58:57.441Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T08:16:10.066Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T08:32:51.558Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T08:47:53.316Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T08:48:06.136Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-03T08:52:09.294Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Aligns the project status command and all directly affected core read/composition factories with the canonical repository wiring. Standardizes bootstrapping for ChangeRepository and SpecRepository by resolving schema-driven artifact-type behavior, metadata-path semantics, and spec existence check hooks through shared composition logic. This ensures that status-oriented reads observe consistent repository state and prevents false positives regarding artifact-drift, particularly on checklist task checkbox updates."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-03T08:53:29.828Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-03T08:53:29.910Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

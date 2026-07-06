@@ -298,6 +298,7 @@
       ]
     }
   ],
+  "dependsOn": [],
   "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:1e58ce2a5b1b3424684b8d6ee4a0c2848c41ac467a0f6e324c51037b701dc9cd",

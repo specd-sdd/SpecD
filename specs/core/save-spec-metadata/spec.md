@@ -37,6 +37,8 @@ After resolving the workspace, the use case MUST look up the spec via `SpecRepos
 
 When `force` is not set, the use case MUST load the existing metadata (if any) via `SpecRepository.metadata()` and capture its `originalHash`. This hash is passed to `SpecRepository.saveMetadata()` so that the repository layer can detect concurrent modifications. When `force` is set, this step is skipped entirely — no existing metadata is loaded.
 
+If `SpecRepository.metadata()` returns persisted metadata with `freshness: 'stale'`, `SaveSpecMetadata` MUST still use its `originalHash` for optimistic concurrency. Staleness does not make the persisted file unreadable for this use case because the purpose of the read is to protect the existing serialized snapshot on disk, not to reconstruct canonical metadata.
+
 ### Requirement: dependsOn overwrite protection
 
 When `force` is not set and existing metadata exists on disk, the use case MUST check whether the incoming content would change the `dependsOn` array:
@@ -46,6 +48,8 @@ When `force` is not set and existing metadata exists on disk, the use case MUST 
 3. Compare the two arrays using `DependsOnOverwriteError.areSame()`, which performs order-independent comparison
 4. If the existing metadata has a non-empty `dependsOn` and the incoming `dependsOn` differs, throw `DependsOnOverwriteError`
 5. If the existing metadata has no `dependsOn` (absent or empty), any incoming `dependsOn` is allowed
+
+If the existing metadata file is stale, `SaveSpecMetadata` still performs this comparison against the persisted `dependsOn` value currently on disk. The overwrite check protects against silently discarding that persisted snapshot; it does not attempt deterministic metadata regeneration.
 
 When `force` is set, this check MUST be skipped entirely.
 

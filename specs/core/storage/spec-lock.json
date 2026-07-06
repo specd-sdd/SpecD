@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:change",
+    "core:change-manifest",
+    "default:_global/logging"
+  ],
+  "implementation": []
+}

@@ -24,6 +24,12 @@ Callers MUST NOT receive a `Change` aggregate from this use case.
 
 When the repository contains no discarded changes, `execute()` MUST return an empty array. It MUST NOT throw.
 
+### Requirement: Config-based factory preserves complete change repository bootstrap
+
+When `createListDiscarded(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.
+
+The config-based factory MUST NOT construct a weaker repository variant that can derive different discarded artifact states for the same persisted change than the canonical listing read path.
+
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)

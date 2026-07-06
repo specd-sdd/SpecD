@@ -1,0 +1,2 @@
+- op: no-op
+  description: Main already contains the canonical metadata consistency validation requirement; no additional spec delta is needed after merge.

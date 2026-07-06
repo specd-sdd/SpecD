@@ -1,0 +1,80 @@
+- op: modified
+  description: 'Add sidecar visibility constraints to artifact access coverage.'
+  selector:
+    type: section
+    matches: '^Requirement: Spec artifact access is limited to expected artifact files$'
+  content: |
+    #### Scenario: Expected spec artifact file can be read
+
+    - **GIVEN** a spec contains an expected artifact file
+    - **WHEN** `artifact(spec, "<artifact-file>")` is called
+    - **THEN** the repository returns that artifact content
+
+    #### Scenario: Unexpected extra file is rejected
+
+    - **GIVEN** a spec directory contains an extra file not declared as an expected artifact
+    - **WHEN** `artifact(spec, "<extra-file>")` or `save(spec, artifact("<extra-file>"))` is called
+    - **THEN** the repository rejects the operation
+
+    #### Scenario: spec-lock is not exposed as a normal artifact
+
+    - **GIVEN** a persisted spec directory contains `spec-lock.json`
+    - **WHEN** `get()` or `list()` returns the spec metadata
+    - **THEN** `spec-lock.json` does not appear in `Spec.filenames`
+    - **AND** `artifact(spec, "spec-lock.json")` is rejected
+- op: modified
+  description: 'Clarify stable hash semantics and canonical persisted dependency reads.'
+  selector:
+    type: section
+    matches: '^Requirement: persisted spec semantics and stable spec hash$'
+  content: |
+    #### Scenario: specHash remains stable when state is unchanged
+
+    - **GIVEN** a persisted spec with unchanged artifacts, persisted dependencies, and implementation links
+    - **WHEN** the repository is asked for its stable spec hash twice
+    - **THEN** both calls return the same hash
+
+    #### Scenario: specHash changes when state is modified
+
+    - **GIVEN** a persisted spec with an initial stable spec hash
+    - **WHEN** the repository updates persisted dependencies or implementation state for that spec
+    - **THEN** the returned hash differs from the previous value
+
+    #### Scenario: persisted dependency state is read semantically
+
+    - **GIVEN** a persisted spec with archived dependency state
+    - **WHEN** application logic needs the canonical persisted `dependsOn` list
+    - **THEN** it reads that value through `readPersistedDependsOn(spec)`
+    - **AND** it does not need `Spec.filenames` or generic artifact reads to discover the sidecar
+- op: modified
+  description: 'Ensure stale metadata remains observable without implicit regeneration.'
+  selector:
+    type: section
+    matches: '^Requirement: metadata returns parsed metadata or null$'
+  content: |
+    #### Scenario: ReadOnly workspace rejects saveMetadata
+
+    - **GIVEN** a workspace is read-only
+    - **WHEN** `saveMetadata(spec, metadata)` is called
+    - **THEN** the repository rejects the write
+
+    #### Scenario: Metadata exists
+
+    - **GIVEN** a spec has persisted metadata
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the repository returns the parsed metadata
+
+    #### Scenario: Metadata does not exist
+
+    - **GIVEN** a spec has no persisted metadata
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the result is `null`
+
+    #### Scenario: Stale metadata remains readable
+
+    - **GIVEN** a spec has persisted `metadata.json`
+    - **AND** staleness detection marks it stale
+    - **WHEN** `metadata(spec)` is called
+    - **THEN** the repository returns the parsed persisted metadata
+    - **AND** the result includes `freshness: 'stale'`
+    - **AND** the repository does not regenerate metadata implicitly

@@ -251,3 +251,11 @@ export interface SpecMetadata {
   readonly optimizedDescription?: string
   readonly optimizedContext?: string
 }
+
+/** Persisted metadata read result returned by repository adapters. */
+export interface PersistedSpecMetadata extends SpecMetadata {
+  /** Hash of the raw persisted `metadata.json` file. */
+  readonly originalHash: string
+  /** Whether the persisted metadata matches repository freshness checks. */
+  readonly freshness: 'fresh' | 'stale'
+}

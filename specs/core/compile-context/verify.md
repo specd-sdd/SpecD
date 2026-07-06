@@ -150,34 +150,47 @@
 
 #### Scenario: Missing metadata during dependsOn traversal emits warning
 
-- **GIVEN** `change.specIds` includes `auth/login`
-- **AND** `auth/login` has no metadata
+- **GIVEN** a traversed persisted spec has no metadata
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
 - **THEN** `result.warnings` includes a `missing-metadata` warning for `auth/login`
+
+#### Scenario: Canonical metadata dependency projection works without extraction
+
+- **GIVEN** a traversed persisted spec has fresh `metadata.json.dependsOn`
+- **AND** the active schema omits `metadataExtraction.dependsOn`
+- **WHEN** `CompileContext.execute` is called with `followDeps: true`
+- **THEN** traversal still uses that metadata dependency list
+
+#### Scenario: Stale metadata dependency projection remains second-tier input
+
+- **GIVEN** `change.specDependsOn` has no entry for a traversed spec
+- **AND** that spec has persisted `metadata.json.dependsOn`
+- **AND** the metadata is marked stale
+- **WHEN** `CompileContext.execute` is called with `followDeps: true`
+- **THEN** traversal still uses the persisted metadata dependency list before any extraction fallback
+- **AND** `result.warnings` includes `stale-metadata`
 
 #### Scenario: Fallback to transform-backed extraction when metadata absent in dependsOn traversal
 
 - **GIVEN** the schema declares `metadataExtraction.dependsOn`
-- **AND** a spec in the `dependsOn` traversal has no metadata
-- **AND** the spec's artifact content contains extractable dependency references
+- **AND** a traversed spec has no metadata
+- **AND** its artifact content contains dependency references that are extracted
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** dependencies are extracted from the spec content via the `metadataExtraction` engine using the shared transform registry and origin context
-- **AND** a `missing-metadata` warning is still emitted
+- **THEN** traversal uses the extracted dependency list
 
 #### Scenario: Fallback dependency extraction does not silently drop found values
 
-- **GIVEN** a spec in the `dependsOn` traversal has no metadata
+- **GIVEN** a traversed spec has no metadata
 - **AND** its artifact content contains dependency references that are extracted
 - **AND** transform execution cannot normalize those found values
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** the fallback extraction fails explicitly instead of treating the spec as having no dependencies
+- **THEN** the traversal fails explicitly instead of treating the spec as having no dependencies
 
 #### Scenario: Manifest specDependsOn used as primary source for dependencies
 
-- **GIVEN** `change.specDependsOn` has an entry for `auth/login` with `['auth/shared']`
-- **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
-- **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** `auth/shared` is used as the dependency from the manifest, not `auth/jwt` from metadata
+- **GIVEN** a change includes a spec with `specDependsOn`
+- **WHEN** `CompileContext.execute` is called for that change with `followDeps: true`
+- **THEN** traversal uses the manifest dependency snapshot before persisted metadata or extraction fallback
 
 ### Requirement: Unknown workspace qualifiers emit a warning
 

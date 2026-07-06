@@ -23,10 +23,17 @@
 
 ### Requirement: Artifact status derivation
 
-#### Scenario: Artifact edited after validation
+#### Scenario: Valid hash matches file content
 
-- **WHEN** an artifact file is modified after `ValidateArtifacts` ran and stored its hash
-- **THEN** `FsChangeRepository` recomputes the hash on next load and returns `in-progress`
+- **GIVEN** an artifact was validated with content `some content` (hash stored as `validatedHash`)
+- **WHEN** the file is loaded
+- **THEN** its status becomes `complete`
+
+#### Scenario: Hash mismatch triggers in-progress status
+
+- **GIVEN** an artifact was validated with content `some content`
+- **WHEN** the file is edited to `different content`
+- **THEN** its status becomes `in-progress`
 
 #### Scenario: Artifact file missing
 
@@ -48,6 +55,12 @@
 #### Scenario: validatedHash cleared on rollback — complete becomes in-progress
 
 - **GIVEN** an artifact with `validatedHash: "sha256:abc"` and its file still present
+- **WHEN** all `validatedHash` values are cleared
+- **THEN** its status becomes `in-progress` — file present but no valid hash
+
+#### Scenario: Missing validatedHash defaults to in-progress
+
+- **GIVEN** a file present on disk
 - **WHEN** all `validatedHash` values are cleared
 - **THEN** its status becomes `in-progress` — file present but no valid hash
 
@@ -74,6 +87,13 @@
 - **WHEN** the file content is unchanged
 - **THEN** `sha256(rawContent) === validatedHash`
 - **AND** the derived status is `complete`
+
+#### Scenario: Status derivation bypassed when repository is uninitialized
+
+- **GIVEN** a repository initialized without artifact types (`artifactTypes.length === 0`)
+- **WHEN** a change is loaded
+- **THEN** drift detection and status derivation are bypassed
+- **AND** files do not report drift or trigger auto-invalidations
 
 ### Requirement: Artifact dependency cascade
 

@@ -114,27 +114,43 @@
 
 #### Scenario: DependsOn traversal discovers additional specs
 
-- **GIVEN** spec A's metadata has `dependsOn: ["default:B"]` and spec B exists
-- **WHEN** `execute` is called with `followDeps: true` and spec A is in the include set
-- **THEN** `specs` contains both spec A and spec B
+- **GIVEN** the directly selected specs depend on other specs
+- **WHEN** `execute` is called with `followDeps: true`
+- **THEN** the dependent specs are included in the result
 
 #### Scenario: DependsOn traversal respects depth limit
 
-- **GIVEN** spec A depends on B, B depends on C
+- **GIVEN** spec A depends on B and B depends on C
 - **WHEN** `execute` is called with `followDeps: true` and `depth: 1`
 - **THEN** `specs` contains A and B but not C
+
+#### Scenario: Canonical metadata dependency projection works without extraction
+
+- **GIVEN** an included persisted spec has fresh `metadata.json.dependsOn`
+- **AND** the active schema omits `metadataExtraction.dependsOn`
+- **WHEN** `execute` is called with `followDeps: true`
+- **THEN** traversal still discovers those dependencies from metadata
+
+#### Scenario: Stale metadata remains distinct from missing metadata
+
+- **GIVEN** an included persisted spec has `metadata.json.dependsOn`
+- **AND** that metadata is marked stale
+- **WHEN** `execute` is called with `followDeps: true`
+- **THEN** traversal still sees the persisted dependency projection
+- **AND** the result includes a `stale-metadata` warning
+- **AND** the use case does not treat that spec as metadata-missing
 
 #### Scenario: DependsOn traversal falls back to transform-backed extraction
 
 - **GIVEN** a spec has no fresh metadata
-- **AND** the schema declares `metadataExtraction.dependsOn` with a transform such as `resolveSpecPath`
+- **AND** the schema declares `metadataExtraction.dependsOn`
 - **WHEN** `execute` is called with `followDeps: true`
-- **THEN** traversal uses live extraction with the shared transform registry and origin context to discover additional specs
+- **THEN** traversal can derive dependencies through extraction
 
 #### Scenario: DependsOn traversal does not silently drop found dependency values
 
-- **GIVEN** live fallback extraction finds dependency values for a spec
-- **AND** transform execution cannot normalize those found values
+- **GIVEN** extraction finds dependency values for a stale or metadata-less spec
+- **AND** transform execution cannot normalize those values
 - **WHEN** `execute` is called with `followDeps: true`
 - **THEN** traversal fails explicitly instead of treating the spec as having no dependencies
 

@@ -7,7 +7,10 @@ import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { SpecPublicationError } from '../../domain/errors/spec-publication-error.js'
-import { specMetadataSchema, type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import {
+  specMetadataSchema,
+  type PersistedSpecMetadata,
+} from '../../domain/services/parse-metadata.js'
 import {
   parseSpecLock,
   type SpecLockData,
@@ -26,6 +29,7 @@ import { isEnoent } from './is-enoent.js'
 import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { sha256 } from './hash.js'
+import { checkMetadataFreshness } from '../../application/use-cases/_shared/metadata-freshness.js'
 
 const SPEC_LOCK_FILENAME = 'spec-lock.json'
 
@@ -389,7 +393,7 @@ export class FsSpecRepository extends SpecRepository {
    * @param spec - The spec whose metadata to load
    * @returns Parsed metadata with `originalHash`, or `null` if absent
    */
-  override async metadata(spec: Spec): Promise<SpecMetadata | null> {
+  override async metadata(spec: Spec): Promise<PersistedSpecMetadata | null> {
     const filePath = this._metadataFilePath(spec.name)
 
     let content: string
@@ -401,14 +405,16 @@ export class FsSpecRepository extends SpecRepository {
     }
 
     const hash = sha256(content)
+    const persistedDependsOn = await this.readPersistedDependsOn(spec)
 
     try {
       const parsed = JSON.parse(content) as unknown
       const result = specMetadataSchema.safeParse(parsed)
-      const metadata = result.success ? (result.data as SpecMetadata) : {}
-      return { ...metadata, originalHash: hash }
+      const metadata = result.success ? result.data : {}
+      const freshness = await this._classifyMetadataFreshness(spec, metadata, persistedDependsOn)
+      return { ...metadata, originalHash: hash, freshness } as PersistedSpecMetadata
     } catch {
-      return { originalHash: hash }
+      return { originalHash: hash, freshness: 'stale' }
     }
   }
 
@@ -664,6 +670,42 @@ export class FsSpecRepository extends SpecRepository {
       dependsOn: [],
       implementation: [],
     }
+  }
+
+  /**
+   * Classifies persisted metadata freshness for one spec.
+   *
+   * @param spec - The spec whose metadata is being evaluated
+   * @param metadata - Parsed metadata object
+   * @param persistedDependsOn - Persisted dependency state from semantic storage
+   * @returns `'fresh'` when hashes and projected dependencies match, otherwise `'stale'`
+   */
+  private async _classifyMetadataFreshness(
+    spec: Spec,
+    metadata: Record<string, unknown>,
+    persistedDependsOn: readonly string[] | null,
+  ): Promise<'fresh' | 'stale'> {
+    const freshness = await checkMetadataFreshness(
+      isStringRecord(metadata.contentHashes) ? metadata.contentHashes : undefined,
+      async (filename) => {
+        const artifact = await this.artifact(spec, filename)
+        return artifact?.content ?? null
+      },
+      sha256,
+    )
+
+    if (!freshness.allFresh) {
+      return 'stale'
+    }
+
+    if (
+      persistedDependsOn !== null &&
+      (!Array.isArray(metadata.dependsOn) || !sameStringSet(metadata.dependsOn, persistedDependsOn))
+    ) {
+      return 'stale'
+    }
+
+    return 'fresh'
   }
 
   /**
@@ -923,7 +965,7 @@ export class FsSpecRepository extends SpecRepository {
     )
     for (const { entry, isDir, isFile } of stats) {
       if (isDir) subdirs.push(entry)
-      else if (isFile) files.push(entry)
+      else if (isFile && entry !== SPEC_LOCK_FILENAME) files.push(entry)
     }
 
     if (files.length > 0) {
@@ -969,24 +1011,21 @@ export class FsSpecRepository extends SpecRepository {
       entries.map(async (entry) => {
         try {
           const stat = await fs.lstat(path.join(dir, entry))
-          return { isDir: stat.isDirectory(), isFile: stat.isFile() }
+          return { entry, isDir: stat.isDirectory(), isFile: stat.isFile() }
         } catch {
-          return { isDir: false, isFile: false }
+          return { entry, isDir: false, isFile: false }
         }
       }),
     )
 
-    for (const { isDir, isFile } of stats) {
-      if (isDir)
-        subdirs.push('dummy') // we only care that it's a directory
-      else if (isFile) hasFile = true
+    for (const { entry, isDir, isFile } of stats) {
+      if (isDir) subdirs.push(entry)
+      else if (isFile && entry !== SPEC_LOCK_FILENAME) hasFile = true
     }
 
     let count = hasFile ? 1 : 0
     const subdirCounts = await Promise.all(
-      entries
-        .filter((_, i) => stats[i]!.isDir)
-        .map((entry) => this._countSpecs(path.join(dir, entry))),
+      subdirs.map((entry) => this._countSpecs(path.join(dir, entry))),
     )
 
     for (const subCount of subdirCounts) {
@@ -1040,7 +1079,7 @@ async function filterFiles(dir: string, entries: string[]): Promise<string[]> {
       }
     }),
   )
-  return checks.filter((c) => c.isFile).map((c) => c.entry)
+  return checks.filter((c) => c.isFile && c.entry !== SPEC_LOCK_FILENAME).map((c) => c.entry)
 }
 
 /**
@@ -1052,7 +1091,40 @@ async function filterFiles(dir: string, entries: string[]): Promise<string[]> {
 function allowedSpecArtifactFilenames(spec: Spec): ReadonlySet<string> {
   const allowed = new Set<string>(['spec.md', 'verify.md'])
   for (const filename of spec.filenames) {
-    allowed.add(normalizeRelativePath(filename))
+    const normalized = normalizeRelativePath(filename)
+    if (normalized === SPEC_LOCK_FILENAME) continue
+    allowed.add(normalized)
   }
   return allowed
+}
+
+/**
+ * Checks whether a value is a string-to-string record.
+ *
+ * @param value - Candidate record
+ * @returns `true` when every enumerable value is a string
+ */
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  return Object.values(value).every((entry) => typeof entry === 'string')
+}
+
+/**
+ * Compares two dependency lists ignoring order.
+ *
+ * @param left - First list
+ * @param right - Second list
+ * @returns `true` when both lists contain the same entries
+ */
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
+
+  const sortedLeft = [...left].sort()
+  const sortedRight = [...right].sort()
+  return sortedLeft.every((entry, index) => entry === sortedRight[index])
 }

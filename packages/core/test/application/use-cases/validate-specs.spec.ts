@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import { ValidateSpecs } from '../../../src/application/use-cases/validate-specs.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
@@ -12,6 +13,7 @@ import {
   makeSchema,
   makeParsers,
   makeParser,
+  makeContentHasher,
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
@@ -420,5 +422,184 @@ describe('ValidateSpecs', () => {
 
     expect(result.passed).toBe(1)
     expect(result.entries[0]!.failures).toEqual([])
+  })
+
+  it('fails when metadata content hashes are stale', async () => {
+    const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': '# Auth Login\n',
+        'auth/login/metadata.json': JSON.stringify({
+          title: 'Login',
+          contentHashes: { 'spec.md': 'sha256:stale' },
+        }),
+      },
+    })
+
+    const result = await new ValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      makeContentHasher(),
+    ).execute({})
+
+    expect(result.failed).toBe(1)
+    expect(
+      result.entries[0]?.failures.some((failure) =>
+        failure.description.includes('stale or incomplete contentHashes'),
+      ),
+    ).toBe(true)
+  })
+
+  it('fails when metadata dependsOn drifts from persisted dependencies', async () => {
+    const hasher = makeContentHasher()
+    const specContent = '# Auth Login\n'
+    const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': specContent,
+        'auth/login/metadata.json': JSON.stringify({
+          title: 'Login',
+          dependsOn: ['default:auth/metadata'],
+          contentHashes: { 'spec.md': hasher.hash(specContent) },
+        }),
+        'auth/login/spec-lock.json': JSON.stringify({
+          dependsOn: ['default:auth/persisted'],
+        }),
+      },
+    })
+
+    const result = await new ValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      hasher,
+    ).execute({})
+
+    expect(result.failed).toBe(1)
+    expect(
+      result.entries[0]?.failures.some((failure) =>
+        failure.description.includes('does not match persisted dependencies'),
+      ),
+    ).toBe(true)
+  })
+
+  it('fails when extracted dependsOn mismatches persisted dependencies', async () => {
+    const hasher = makeContentHasher()
+    const schema = makeSchema({
+      artifacts: [
+        makeArtifactType('specs', {
+          scope: 'spec',
+          output: 'spec.md',
+          format: 'markdown',
+        }),
+      ],
+      metadataExtraction: {
+        dependsOn: {
+          artifact: 'specs',
+          extractor: {
+            selector: { type: 'section', matches: '^Spec Dependencies$' },
+            extract: 'content',
+            capture:
+              '(?:^|\\n)\\s*-\\s+(?:\\[`?|`)?([^`\\]\\n]+?)(?:(?:`?\\]\\(([^)]+)\\)|`)|(?=\\s*(?:—|$)))',
+            transform: { name: 'resolveSpecPath', args: ['$2'] },
+          },
+        },
+      },
+    })
+    const specContent =
+      '# Auth Login\n\n## Spec Dependencies\n\n- [`default:auth/extracted`](../extracted/spec.md)\n'
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': specContent,
+        'auth/login/metadata.json': JSON.stringify({
+          title: 'Login',
+          dependsOn: ['default:auth/persisted'],
+          contentHashes: { 'spec.md': hasher.hash(specContent) },
+        }),
+        'auth/login/spec-lock.json': JSON.stringify({
+          dependsOn: ['default:auth/persisted'],
+        }),
+      },
+    })
+    const markdownParser = makeParser({
+      parse: () => ({
+        root: {
+          type: 'document',
+          children: [
+            {
+              type: 'section',
+              label: 'Spec Dependencies',
+              children: [
+                {
+                  type: 'paragraph',
+                  value: '- [`default:auth/extracted`](../extracted/spec.md)',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      renderSubtree: (node) =>
+        (node.value as string | undefined) ??
+        (node.children ?? [])
+          .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
+          .join('\n'),
+    })
+
+    const result = await new ValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(markdownParser),
+      hasher,
+      createBuiltinExtractorTransforms(),
+    ).execute({})
+
+    expect(result.failed).toBe(1)
+    expect(
+      result.entries[0]?.failures.some((failure) =>
+        failure.description.includes("Extracted dependsOn for 'default:auth/login'"),
+      ),
+    ).toBe(true)
+  })
+
+  it('passes when extraction is omitted and metadata matches persisted dependencies', async () => {
+    const hasher = makeContentHasher()
+    const specContent = '# Auth Login\n'
+    const schema = makeSchema({
+      artifacts: [makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })],
+      metadataExtraction: {},
+    })
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': specContent,
+        'auth/login/metadata.json': JSON.stringify({
+          title: 'Login',
+          dependsOn: ['default:auth/persisted'],
+          contentHashes: { 'spec.md': hasher.hash(specContent) },
+        }),
+        'auth/login/spec-lock.json': JSON.stringify({
+          dependsOn: ['default:auth/persisted'],
+        }),
+      },
+    })
+
+    const result = await new ValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      hasher,
+    ).execute({})
+
+    expect(result.failed).toBe(0)
+    expect(result.passed).toBe(1)
   })
 })

@@ -108,15 +108,22 @@
 
 #### Scenario: Expected spec artifact file can be read
 
-- **GIVEN** `spec.md` is a valid artifact file for the target spec
-- **WHEN** `artifact(spec, "spec.md")` is called
-- **THEN** the repository returns that artifact
+- **GIVEN** a spec contains an expected artifact file
+- **WHEN** `artifact(spec, "<artifact-file>")` is called
+- **THEN** the repository returns that artifact content
 
 #### Scenario: Unexpected extra file is rejected
 
-- **GIVEN** an extra file exists in the spec directory but is not a valid artifact or adapter-owned metadata file
+- **GIVEN** a spec directory contains an extra file not declared as an expected artifact
 - **WHEN** `artifact(spec, "<extra-file>")` or `save(spec, artifact("<extra-file>"))` is called
 - **THEN** the repository rejects the operation
+
+#### Scenario: spec-lock is not exposed as a normal artifact
+
+- **GIVEN** a persisted spec directory contains `spec-lock.json`
+- **WHEN** `get()` or `list()` returns the spec metadata
+- **THEN** `spec-lock.json` does not appear in `Spec.filenames`
+- **AND** `artifact(spec, "spec-lock.json")` is rejected
 
 ### Requirement: Spec artifact path confinement
 
@@ -203,24 +210,30 @@
 
 #### Scenario: ReadOnly workspace rejects saveMetadata
 
-- **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
-- **WHEN** `saveMetadata(spec, content)` is called
-- **THEN** `ReadOnlyWorkspaceError` is thrown
-- **AND** no file is written to disk
+- **GIVEN** a workspace is read-only
+- **WHEN** `saveMetadata(spec, metadata)` is called
+- **THEN** the repository rejects the write
 
 #### Scenario: Metadata exists
 
-- **GIVEN** a spec `core:config` with a `metadata.json` in the metadata storage
+- **GIVEN** a spec has persisted metadata
 - **WHEN** `metadata(spec)` is called
-- **THEN** the result contains the parsed JSON content with `originalHash`
-- **AND** `saveMetadata(spec, '{"title":"Config"}')` persists the JSON content
-- **AND** the file can be read back via `metadata(spec)` with `title: "Config"`
+- **THEN** the repository returns the parsed metadata
 
 #### Scenario: Metadata does not exist
 
-- **GIVEN** a spec with no metadata on disk
+- **GIVEN** a spec has no persisted metadata
 - **WHEN** `metadata(spec)` is called
-- **THEN** `null` is returned
+- **THEN** the result is `null`
+
+#### Scenario: Stale metadata remains readable
+
+- **GIVEN** a spec has persisted `metadata.json`
+- **AND** staleness detection marks it stale
+- **WHEN** `metadata(spec)` is called
+- **THEN** the repository returns the parsed persisted metadata
+- **AND** the result includes `freshness: 'stale'`
+- **AND** the repository does not regenerate metadata implicitly
 
 ### Requirement: search returns specs matching a text query
 
@@ -260,15 +273,22 @@
 
 #### Scenario: specHash remains stable when state is unchanged
 
-- **GIVEN** a spec with existing persisted semantic state
-- **WHEN** the repository is asked for its stable spec hash multiple times
-- **THEN** the returned hash is identical in every call
+- **GIVEN** a persisted spec with unchanged artifacts, persisted dependencies, and implementation links
+- **WHEN** the repository is asked for its stable spec hash twice
+- **THEN** both calls return the same hash
 
 #### Scenario: specHash changes when state is modified
 
-- **GIVEN** a spec whose persisted schema, dependencies, or implementation links are updated
-- **WHEN** the repository is asked for its stable spec hash again
+- **GIVEN** a persisted spec with an initial stable spec hash
+- **WHEN** the repository updates persisted dependencies or implementation state for that spec
 - **THEN** the returned hash differs from the previous value
+
+#### Scenario: persisted dependency state is read semantically
+
+- **GIVEN** a persisted spec with archived dependency state
+- **WHEN** application logic needs the canonical persisted `dependsOn` list
+- **THEN** it reads that value through `readPersistedDependsOn(spec)`
+- **AND** it does not need `Spec.filenames` or generic artifact reads to discover the sidecar
 
 ### Requirement: Filesystem-backed specs capability
 
@@ -283,3 +303,12 @@
 - **GIVEN** a repository implementation not backed by a directly addressable filesystem
 - **WHEN** it implements the `SpecRepository` contract
 - **THEN** it is not required to expose `specsPath`
+
+#### Scenario: Stale metadata remains readable
+
+- **GIVEN** a spec has persisted `metadata.json`
+- **AND** staleness detection marks it stale
+- **WHEN** `metadata(spec)` is called
+- **THEN** the repository returns the parsed persisted metadata
+- **AND** the result includes `freshness: 'stale'`
+- **AND** the repository does not regenerate metadata implicitly

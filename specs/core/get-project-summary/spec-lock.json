@@ -13,31 +13,12 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-project-summary.ts",
-      "symbols": ["GetProjectSummary", "GetProjectSummaryResult"]
-    },
-    {
-      "file": "core:src/composition/use-cases/get-project-summary.ts",
-      "symbols": ["createGetProjectSummary"]
-    },
-    {
       "file": "core:src/composition/kernel.ts",
       "symbols": ["createKernel"]
     },
     {
-      "file": "core:test/application/use-cases/get-project-summary.spec.ts"
-    },
-    {
-      "file": "core:test/composition/get-project-summary.spec.ts"
-    },
-    {
-      "file": "core:src/application/index.ts"
-    },
-    {
-      "file": "core:src/composition/use-cases/index.ts"
-    },
-    {
-      "file": "core:test/composition/kernel-get-config.spec.ts"
+      "file": "core:src/composition/use-cases/get-project-summary.ts",
+      "symbols": ["createGetProjectSummary"]
     }
   ]
 }

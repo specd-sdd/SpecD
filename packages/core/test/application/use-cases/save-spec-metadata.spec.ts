@@ -203,6 +203,18 @@ describe('SaveSpecMetadata — dependsOn overwrite protection', () => {
     expect(result!.spec).toBe('default:auth/login')
   })
 
+  it('still protects dependsOn when the existing metadata is stale', async () => {
+    const { uc } = makeUseCase([spec], {
+      'auth/login/spec.md': '# Changed after metadata generation',
+      'auth/login/.specd-metadata.yaml': existingMetadata,
+    })
+    const incoming = JSON.stringify({ ...VALID_BASE_OBJ, dependsOn: ['core:change'] })
+
+    await expect(uc.execute({ workspace: 'default', specPath, content: incoming })).rejects.toThrow(
+      DependsOnOverwriteError,
+    )
+  })
+
   it('allows dependsOn change when force is true', async () => {
     const { uc } = makeUseCase([spec], {
       'auth/login/.specd-metadata.yaml': existingMetadata,

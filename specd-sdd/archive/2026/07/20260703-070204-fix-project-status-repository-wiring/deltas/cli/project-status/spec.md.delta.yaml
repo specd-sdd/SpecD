@@ -1,0 +1,15 @@
+- op: added
+  description: 'Require CLI project-status to avoid direct repository bootstrap'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: SDK host bootstrap$'
+  content: |
+    ### Requirement: No direct repository bootstrap in command handler
+
+    The `project status` command handler MUST obtain repository-backed project information only through the SDK host context and its project queries.
+
+    The handler MUST NOT construct `ChangeRepository` or `SpecRepository` instances directly, and it MUST NOT assemble an alternate read path whose repository bootstrap semantics differ from the canonical composition-backed status flow.

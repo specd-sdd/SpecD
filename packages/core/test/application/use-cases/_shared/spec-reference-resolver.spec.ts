@@ -9,7 +9,7 @@ import {
   type SpecSearchResult,
   SpecRepository,
 } from '../../../../src/application/ports/spec-repository.js'
-import { type SpecMetadata } from '../../../../src/domain/services/parse-metadata.js'
+import { type PersistedSpecMetadata } from '../../../../src/domain/services/parse-metadata.js'
 import {
   createSpecReferenceResolver,
   type SpecWorkspaceRoute,
@@ -47,7 +47,7 @@ class FakeSpecRepository extends SpecRepository {
     return null
   }
 
-  override async metadata(_spec: Spec): Promise<SpecMetadata | null> {
+  override async metadata(_spec: Spec): Promise<PersistedSpecMetadata | null> {
     return null
   }
 

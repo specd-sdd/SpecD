@@ -318,6 +318,50 @@ describe('GetProjectContext', () => {
     expect(result.warnings.some((warning) => warning.type === 'missing-metadata')).toBe(true)
   })
 
+  it('uses metadata dependsOn even when the schema omits dependency extraction', async () => {
+    const schema = makeSchema({ metadataExtraction: {} })
+    const hasher = makeContentHasher()
+    const loginContent = '# Auth Login\n'
+    const sharedContent = '# Shared\n'
+    const repo = makeSpecRepository({
+      specs: [
+        new Spec('default', SpecPath.parse('auth/login'), ['spec.md']),
+        new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+      ],
+      artifacts: {
+        'auth/login/spec.md': loginContent,
+        'auth/login/.specd-metadata.yaml': JSON.stringify({
+          title: 'Login',
+          dependsOn: ['default:auth/shared'],
+          contentHashes: { 'spec.md': hasher.hash(loginContent) },
+        }),
+        'auth/shared/spec.md': sharedContent,
+        'auth/shared/.specd-metadata.yaml': JSON.stringify({
+          title: 'Shared',
+          contentHashes: { 'spec.md': hasher.hash(sharedContent) },
+        }),
+      },
+    })
+
+    const uc = makeGetProjectContext(
+      makeListWorkspaces(new Map([['default', repo]])),
+      makeSchemaProvider(schema),
+      makeFileReader(),
+      makeParsers(),
+      hasher,
+    )
+
+    const result = await uc.execute({
+      config: {
+        contextIncludeSpecs: ['default:auth/login'],
+      },
+      followDeps: true,
+    })
+
+    expect(result.specs.some((spec) => spec.specId === 'default:auth/shared')).toBe(true)
+    expect(result.warnings.filter((warning) => warning.type === 'missing-metadata')).toHaveLength(0)
+  })
+
   it('normalizes ../../_global/architecture/spec.md during followDeps fallback extraction', async () => {
     const specType = makeArtifactType('specs', {
       scope: 'spec',

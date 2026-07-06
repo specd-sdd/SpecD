@@ -194,5 +194,7 @@
     "spec.md": "sha256:1468b3c62f3505b7e7491ec9f3aa633ced4bd3c654d3275bd6208d0bc1b236a5",
     "verify.md": "sha256:10555b5b64c11507f2b1793a5d2455e152341b3390104c67857dcb6468a7db7e"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "`GetActiveSchema` resolves active, referenced, or file-backed schema, or returns raw schema data when callers request unresolved form.",
+  "optimizedContext": "# GetActiveSchema\n\n## Rules\n- `execute()` accepts no input for project mode, or `{ mode: \"ref\", ref }`, or `{ mode: \"file\", filePath }`; any mode may request raw output.\n- Project mode delegates directly to `ResolveSchema.execute()` and does not implement schema resolution logic itself.\n- Ref/file modes call `SchemaRegistry.resolveRaw()`, resolve extends chain, merge templates, and build final `Schema` through injected `buildSchemaFn`.\n- When `raw` is `true`, return unresolved `SchemaYamlData` / `SchemaRawResult` and skip extends resolution plus `buildSchema`.\n- Constructor dependencies are `ResolveSchema`, `SchemaRegistry`, and `buildSchemaFn`; project schema ref is fixed at construction time.\n\n## Constraints\n- Project-mode non-raw path is thin delegation only.\n- Ref/file non-raw path must mirror canonical schema-build pipeline.\n- Method is async and returns `Promise<GetActiveSchemaResult>`.\n"
 }

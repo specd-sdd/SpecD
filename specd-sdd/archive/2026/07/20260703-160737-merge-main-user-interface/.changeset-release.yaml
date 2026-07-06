@@ -1,0 +1,17 @@
+releases:
+  core:compile-context: patch
+  core:edit-change: patch
+  core:get-project-context: patch
+  core:get-project-summary: patch
+  core:get-spec-context: patch
+  core:get-status: patch
+  core:list-changes: patch
+  core:list-discarded: patch
+  core:list-drafts: patch
+  core:list-workspaces: patch
+  core:spec-repository-port: patch
+  core:validate-specs: patch
+  sdk:build-project-status-snapshot: patch
+  cli:project-status: patch
+  core:change-repository-port: patch
+  core:storage: patch

@@ -29,6 +29,12 @@
       "rules": [
         "When the repository contains no active changes (all are drafted, discarded, or none exist), `execute()` MUST return an empty array. It MUST NOT throw."
       ]
+    },
+    {
+      "requirement": "Config-based factory preserves complete change repository bootstrap",
+      "rules": [
+        "When `createListChanges(config)` initializes a `ChangeRepository` from `SpecdConfig`, the repository MUST preserve complete artifact-type and spec-existence bootstrap semantics.\n\nThe config-based factory MUST NOT construct a weaker repository variant that can derive different artifact states for the same persisted change than the canonical status/listing read path."
+      ]
     }
   ],
   "scenarios": [
@@ -78,13 +84,30 @@
       "given": ["the repository contains only drafted and discarded changes"],
       "when": ["execute() is called"],
       "then": ["the result is an empty array"]
+    },
+    {
+      "requirement": "Config-based factory preserves complete change repository bootstrap",
+      "name": "Config-wired active listing preserves artifact-type repository semantics",
+      "given": ["createListChanges(config) initializes a ChangeRepository from SpecdConfig"],
+      "when": ["ListChanges.execute() reads active changes through that repository"],
+      "then": [
+        "artifact states are derived with complete artifact-type and spec-existence bootstrap semantics",
+        "AND the config-based factory does not expose a weaker change repository variant"
+      ]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:43ed668e45c05bd391f4d7efaf667cf04f8dca886adec285f93e437d527ffa13",
-    "verify.md": "sha256:a5704d239bb59c65987d8800695e25324f16ca91c8ac1311968d0b40a8e38f62"
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:list-changes",
+        "file": "core:src/composition/use-cases/list-changes.ts",
+        "symbol": "createListChanges"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically.",
-  "optimizedContext": "# ListChanges\n\n## Rules\n- Returns all active changes: ListChanges.execute() MUST return all changes that are neither drafted nor discarded.\n- Returns Change entities without content: The returned Change[] MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content.\n- Constructor accepts a ChangeRepository: ListChanges MUST accept a ChangeRepository as its sole constructor argument.\n- Returns an empty array when no active changes exist: When the repository contains no active changes (all are drafted, discarded, or none exist), execute() MUST return an empty array.\n- Dependencies: core:change, core:kernel\n\n## Constraints\n- None explicit.\n"
+  "contentHashes": {
+    "spec.md": "sha256:f2b3bfebf561632711f5e523ec2f08b62a7ea74298d1fac78c6a4af25930c0ea",
+    "verify.md": "sha256:0c1da317c9a0b9e63a92abd69d9f2e0b804b518e80f2ca7167e713e507d84c5a"
+  },
+  "generatedBy": "core"
 }

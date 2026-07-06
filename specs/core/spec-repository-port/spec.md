@@ -28,7 +28,13 @@ Each `SpecRepository` instance is bound to exactly one workspace. All operations
 
 ### Requirement: Spec artifact access is limited to expected artifact files
 
-`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on artifact filenames that are valid for that spec under the active schema or adapter-owned metadata contract.
+`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on artifact filenames that are valid for that spec under the active schema.
+
+Adapter-owned metadata sidecars are outside that generic artifact surface. In particular:
+
+- `spec-lock.json` MUST NOT be exposed through `Spec.filenames`
+- `spec-lock.json` MUST NOT be readable or writable through `artifact()` / `save()`
+- sidecar persistence MUST instead flow through the repository's semantic persisted-state operations
 
 The repository MUST NOT treat the spec directory as a general-purpose file container for arbitrary extra filenames when serving the normal artifact API.
 
@@ -66,7 +72,18 @@ Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY r
 
 ### Requirement: metadata returns parsed metadata or null
 
-`metadata(spec)` MUST load the metadata for the given spec and return the parsed content as a `SpecMetadata` object, or `null` if no metadata exists. The returned object MUST match the structure defined in the spec-metadata spec (title, description, dependsOn, keywords, contentHashes, rules, constraints, scenarios). When loaded from storage, the returned object MUST include an `originalHash` property (SHA-256 of the raw file content) to enable conflict detection on subsequent saves. This method replaces the previous pattern of `artifact(spec, '.specd-metadata.yaml')` for metadata access.
+`metadata(spec)` MUST read the persisted metadata for the given spec and distinguish absence from staleness.
+
+Read rules:
+
+1. If no metadata exists on disk, return `null`.
+2. If metadata exists, return the parsed `SpecMetadata` content together with:
+   - `originalHash` — SHA-256 of the raw stored metadata file for conflict detection
+   - `freshness` — `'fresh'` or `'stale'`
+3. `freshness: 'stale'` means persisted metadata exists but no longer matches the repository's staleness checks defined by the spec-metadata spec.
+4. `metadata()` MUST NOT regenerate metadata, rewrite metadata, or silently replace stale persisted content with reconstructed content.
+
+This method remains the canonical persisted metadata read surface. Consumers decide whether stale metadata is acceptable for their use case or whether they must perform deterministic fallback or fail explicitly.
 
 ### Requirement: saveMetadata persists metadata with conflict detection
 
@@ -80,15 +97,11 @@ If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MU
 
 1. `readPersistedSchema(spec)` — returns the schema identity `{ name, version }` stored with the spec, or `null`.
 2. `readPersistedDependsOn(spec)` — returns the dependency list `string[]` stored with the spec, or `null`.
-3. `readPersistedImplementation(spec)` — returns the implementation links `Array<{ file, symbols? }>` stored with the spec, or `null`.
-4. `specHash(spec)` — returns a stable SHA-256 hash representing the current persisted spec state, or `null` if no state exists. This hash is used by incremental indexing to detect changes without loading full semantics.
-5. `updatePersistedSchema(spec, schema, options?)` — updates the schema identity.
-6. `updatePersistedDependsOn(spec, dependsOn, options?)` — updates the dependency list.
-7. `updatePersistedImplementation(spec, implementation, options?)` — updates implementation links.
+3. `readPersistedImplementation(spec)` — returns implementation links stored with the spec, or `null`.
+4. `updatePersistedState(spec, patch, options?)` — updates one or more persisted semantics atomically with conflict detection.
+5. `specHash(spec)` — returns a stable SHA-256 hash representing the spec's persisted semantic state.
 
-All `update` operations MUST support optimistic concurrency control via `options.originalHash`. If the current spec state hash does not match `originalHash`, the operation MUST throw `ArtifactConflictError`.
-
-`update` operations MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` before any filesystem operation or conflict detection.
+These methods are the only application-facing API for persisted sidecar state. Callers MUST NOT depend on sidecar filenames, spec-directory scans, or `Spec.filenames` entries to discover or mutate persisted semantics.
 
 ### Requirement: search returns specs matching a text query
 

@@ -1,0 +1,239 @@
+{
+  "name": "harden-studio-project-poll",
+  "createdAt": "2026-07-02T06:54:28.717Z",
+  "updatedAt": "2026-07-04T07:53:44.218Z",
+  "description": "Reduce Studio/UI polling churn and isolate host-specific read paths that amplify lifecycle invalidation loops around project and change status.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "ui:hooks-project",
+    "ui:hooks-changes-read",
+    "ui:shell-layout",
+    "client:port-project",
+    "studio-desktop:desktop-local-data-adapter"
+  ],
+  "specDependsOn": {
+    "ui:hooks-project": ["client:specd-data-port", "client:port-project"],
+    "ui:hooks-changes-read": ["client:specd-data-port", "client:port-changes-read"],
+    "ui:shell-layout": [
+      "ui:design-system",
+      "client:specd-data-port",
+      "ui:hooks-workspaces-specs",
+      "ui:sidebar-changes-in-progress",
+      "ui:sidebar-workspaces-tree",
+      "ui:sidebar-graph-entry",
+      "studio-desktop:main-window-manager"
+    ],
+    "client:port-project": ["default:_global/architecture", "client:specd-data-port"],
+    "studio-desktop:desktop-local-data-adapter": ["client:specd-data-port"]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "missing",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "ui:hooks-project",
+          "filename": "deltas/ui/hooks-project/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "ui:hooks-changes-read",
+          "filename": "deltas/ui/hooks-changes-read/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "ui:shell-layout",
+          "filename": "deltas/ui/shell-layout/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "client:port-project",
+          "filename": "deltas/client/port-project/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "studio-desktop:desktop-local-data-adapter",
+          "filename": "deltas/studio-desktop/desktop-local-data-adapter/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "ui:hooks-project",
+          "filename": "deltas/ui/hooks-project/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "ui:hooks-changes-read",
+          "filename": "deltas/ui/hooks-changes-read/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "ui:shell-layout",
+          "filename": "deltas/ui/shell-layout/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "client:port-project",
+          "filename": "deltas/client/port-project/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "studio-desktop:desktop-local-data-adapter",
+          "filename": "deltas/studio-desktop/desktop-local-data-adapter/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-02T06:54:28.717Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "ui:hooks-project",
+        "ui:hooks-changes-read",
+        "ui:shell-layout",
+        "client:port-project",
+        "studio-desktop:desktop-local-data-adapter"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-02T06:54:28.731Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "ui:hooks-project"
+        },
+        {
+          "type": "specs",
+          "key": "ui:hooks-changes-read"
+        },
+        {
+          "type": "specs",
+          "key": "ui:shell-layout"
+        },
+        {
+          "type": "specs",
+          "key": "client:port-project"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:desktop-local-data-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "ui:hooks-project"
+        },
+        {
+          "type": "verify",
+          "key": "ui:hooks-changes-read"
+        },
+        {
+          "type": "verify",
+          "key": "ui:shell-layout"
+        },
+        {
+          "type": "verify",
+          "key": "client:port-project"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:desktop-local-data-adapter"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    }
+  ]
+}
