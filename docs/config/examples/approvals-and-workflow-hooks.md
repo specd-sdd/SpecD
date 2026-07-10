@@ -18,9 +18,10 @@ context:
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
 
 # always include global architecture specs regardless of which change is active
 contextIncludeSpecs:
@@ -28,22 +29,26 @@ contextIncludeSpecs:
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
-      pattern: '{{year}}/{{change.archivedName}}'
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
+        pattern: '{{year}}/{{change.archivedName}}'
 
 approvals:
   spec: true # human approval required before implementation may begin

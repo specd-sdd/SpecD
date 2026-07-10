@@ -240,6 +240,16 @@
 - **WHEN** `createSpecRepository('fs', context, options)` is called from `@specd/core` `"."`
 - **THEN** a `SpecRepository` is returned without calling `createKernel`
 
+#### Scenario: Repository factories resolve adapter IDs through composition registries
+
+- **WHEN** `createSpecRepository('invalid', context, options)` is called
+- **THEN** it throws `UnknownAdapterError`
+
+#### Scenario: Options validated by Zod at construction
+
+- **WHEN** `createSpecRepository('fs', context, { path: 123 })` is called
+- **THEN** it throws a validation error
+
 ### Requirement: Extension registration surface
 
 #### Scenario: ChangeStorageFactory exported from extensions subpath

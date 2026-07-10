@@ -47,15 +47,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/kernel.ts"
-    },
-    {
-      "file": "core:src/composition/kernel-internals.ts",
-      "symbols": ["KernelInternals", "createKernelInternals"]
-    },
-    {
-      "file": "core:src/composition/composition-registries.ts",
-      "symbols": ["CompositionRegistryView", "createCompositionRegistryView"]
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["KernelOptions", "createKernel"]
     }
   ]
 }

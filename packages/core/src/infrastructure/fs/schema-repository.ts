@@ -1,5 +1,8 @@
 import fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { z } from 'zod'
+import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import { isEnoent } from './is-enoent.js'
 import { SchemaRepository } from '../../application/ports/schema-repository.js'
 import { type RepositoryConfig } from '../../application/ports/repository.js'
@@ -10,12 +13,15 @@ import { parseSchemaYaml } from '../schema-yaml-parser.js'
 import { buildSchema } from '../../domain/services/build-schema.js'
 
 /**
- * Construction configuration for {@link FsSchemaRepository}.
+ * Configuration options for the filesystem schema repository.
  */
-export interface FsSchemaRepositoryConfig extends RepositoryConfig {
-  /** Absolute path to the workspace's schemas directory. */
-  readonly schemasPath: string
+export interface FsSchemaRepositoryConfig {
+  readonly path: string
 }
+
+export const FsSchemaOptionsSchema = z.object({
+  path: z.string(),
+})
 
 /**
  * Filesystem implementation of the {@link SchemaRepository} port.
@@ -30,11 +36,53 @@ export class FsSchemaRepository extends SchemaRepository {
   /**
    * Creates a new `FsSchemaRepository`.
    *
-   * @param config - Repository configuration including the workspace's schemas path
+   * @param config - Legacy repository configuration including the workspace's schemas path
    */
-  constructor(config: FsSchemaRepositoryConfig) {
-    super(config)
-    this._schemasPath = config.schemasPath
+  constructor(config: RepositoryConfig & { schemasPath: string })
+  /**
+   * Creates a new `FsSchemaRepository`.
+   *
+   * @param context - Shared repository context
+   * @param config - Adapter options
+   */
+  constructor(context: RepositoryConfig, config: FsSchemaRepositoryConfig)
+  /**
+   * Creates a new `FsSchemaRepository` instance.
+   *
+   * @param contextOrConfig - Shared repository context or legacy config
+   * @param config - Adapter options or undefined for legacy constructor
+   */
+  constructor(contextOrConfig: unknown, config?: unknown) {
+    let context: RepositoryConfig
+    let parsedConfig: FsSchemaRepositoryConfig
+    if (config === undefined) {
+      const legacy = contextOrConfig as RepositoryConfig & { schemasPath: string }
+      context = legacy
+      parsedConfig = { path: legacy.schemasPath }
+    } else {
+      context = contextOrConfig as RepositoryConfig
+      const typedConfig = config as { readonly path?: string; readonly schemasPath?: string }
+      const normalized = {
+        path: typedConfig.path ?? typedConfig.schemasPath,
+      }
+      parsedConfig = FsSchemaOptionsSchema.parse(normalized)
+    }
+
+    super(context)
+
+    // Verify paths exist on disk
+    if (!existsSync(parsedConfig.path)) {
+      const defaultSchemasPath = path.resolve(context.configPath, '..', 'schemas')
+      const isDefaultFallback = parsedConfig.path === defaultSchemasPath
+      if (!isDefaultFallback) {
+        throw new StorageDirectoryNotFoundError(
+          parsedConfig.path,
+          'Schemas directory does not exist',
+        )
+      }
+    }
+
+    this._schemasPath = parsedConfig.path
   }
 
   /**

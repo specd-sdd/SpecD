@@ -35,3 +35,5 @@ export {
 export { InvalidInputError } from './invalid-input-error.js'
 export { DraftedChangeReadOnlyError } from './drafted-change-read-only-error.js'
 export { InvalidCompositionFactoryArgumentsError } from './invalid-composition-factory-arguments-error.js'
+export { StorageDirectoryNotFoundError } from './storage-directory-not-found-error.js'
+export { UnknownAdapterError } from './unknown-adapter-error.js'

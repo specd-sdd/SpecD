@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'SDK composition exports remain the same — no changes needed'

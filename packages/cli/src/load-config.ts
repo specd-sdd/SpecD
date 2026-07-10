@@ -11,13 +11,21 @@ import { createConfigLoader, type SpecdConfig } from '@specd/sdk'
  * @returns The fully-resolved project configuration
  * @throws {ConfigValidationError} If the config file fails validation
  */
-export function loadConfig(options?: { configPath?: string | undefined }): Promise<SpecdConfig> {
+export async function loadConfig(options?: {
+  configPath?: string | undefined
+}): Promise<SpecdConfig> {
   const loader = createConfigLoader(
     options?.configPath !== undefined
       ? { configPath: options.configPath }
       : { startDir: process.cwd() },
   )
-  return loader.load()
+  const config = await loader.load()
+  if (config.warnings !== undefined && config.warnings.length > 0) {
+    for (const warning of config.warnings) {
+      console.warn(`warning: ${warning}`)
+    }
+  }
+  return config
 }
 
 /**

@@ -33,7 +33,7 @@
     {
       "requirement": "InitProject behaviour",
       "rules": [
-        "The `initProject` method MUST:\n\n1. Create a `specd.yaml` file in `projectRoot` with the schema, workspace, and storage configuration\n2. Create the required storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)\n3. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present"
+        "The `initProject` method MUST:\n\n1. Create a `specd.yaml` file in `projectRoot` with the schema and default workspace configuration. The `storage` block is omitted by default, allowing storage paths to resolve automatically to standard `fs` defaults under `specdPath`.\n2. Create the workspace specs directory (e.g. `specs/`) and the required default storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)\n3. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present"
       ]
     },
     {
@@ -81,7 +81,9 @@
       "given": ["a directory with no existing specd.yaml"],
       "when": ["initProject is called with valid options"],
       "then": [
-        "a specd.yaml is created, storage directories are created, and both specd.local.yaml and specd.local.*.yaml are appended to .gitignore"
+        "a specd.yaml is created with the schema reference and default workspace config (omitting the storage block by default)",
+        "AND the workspace specs directory and standard storage directories under .specd/ are created",
+        "AND both specd.local.yaml and specd.local.*.yaml are appended to .gitignore"
       ]
     },
     {
@@ -171,16 +173,14 @@
     "symbols": [
       {
         "specId": "core:config-writer-port",
-        "file": "core:src/composition/config-writer.ts",
-        "symbol": "createConfigWriter"
+        "file": "core:src/infrastructure/fs/config-writer.ts",
+        "symbol": "FsConfigWriter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c2fa70a7da672911bff2fa71c6ae429399fbc88ed58ac21e0550b5ccc5d447d7",
-    "verify.md": "sha256:a70289394d9ddf8a358f1cd44b5719368f333f7b19d8c660f6471e5b0029adda"
+    "spec.md": "sha256:762bcc673d4a94229142276b2d61e1ae10bb64500199b88319c61a3d7a63437b",
+    "verify.md": "sha256:4e0590564cec94e56c485e3d3a1be5e95599844668a089a017ca43b15b3bb431"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "ConfigWriter is composition-facing write port for project init and plugin declaration mutation in `specd.yaml`.",
-  "optimizedContext": "# core:config-writer-port\n\n## Rules\n- `ConfigWriter` MUST be TypeScript `interface`, not abstract class.\n- Required methods: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- `initProject(options: InitProjectOptions): Promise<InitProjectResult>`.\n- `InitProjectOptions` fields: `projectRoot`, `schemaRef`, `workspaceId`, `specsPath`, optional `force`.\n- `InitProjectResult` fields: `configPath`, `schemaRef`, `workspaces`.\n- `initProject` behavior: create `specd.yaml`; create storage dirs `.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`; append both `specd.local.yaml` and `specd.local.*.yaml` to `.gitignore` if absent.\n- Existing `specd.yaml` without `force` => throw `AlreadyInitialisedError`. With `force: true`, overwrite existing config.\n- `addPlugin(configPath, type, name, config?)` returns `Promise<void>` and writes plugin entry into `plugins.<type>` in `specd.yaml`. Existing plugin MUST NOT duplicate; if present, update existing entry.\n- `removePlugin(configPath, type, name)` returns `Promise<void>` and removes named plugin from `plugins.<type>`.\n- Delivery mechanisms MUST obtain writer through `createConfigWriter()` from `@specd/core`. They may call `initProject`, `addPlugin`, `removePlugin` on returned port instance, but MUST NOT import `FsConfigWriter` or construct concrete implementations directly.\n- `listPlugins` remains for infrastructure compatibility; delivery MUST NOT use it for declaration reads when `SpecdConfig` snapshot already exists.\n\n## Constraints\n- Port lives in `application/ports/` under hexagonal boundary.\n- Port contract has no direct `node:fs`, YAML library, or other I/O dependency.\n- `AlreadyInitialisedError` is application-layer error.\n- `plugins` shape in `specd.yaml` = `{ agents: Array<{ name: string, config?: Record<string, unknown> }> }` for agent entries."
+  "generatedBy": "core"
 }

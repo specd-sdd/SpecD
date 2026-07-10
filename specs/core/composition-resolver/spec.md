@@ -20,6 +20,8 @@ The resolver contract MUST expose those dependencies in a way that is independen
 
 The generic registry, merged-registry-view, and built-in-capability primitives consumed below the resolver SHALL belong to composition infrastructure. They MUST NOT be defined as kernel-owned concepts in the architecture contract.
 
+For `ChangeRepository` resolution, the resolver SHALL assemble the nested options object for drafts and discarded configurations from their separate YAML configs, forwarding the unified options object to the storage factory.
+
 ### Requirement: Resolver is lazy and cacheable
 
 The resolver MUST resolve shared dependencies lazily. It MUST NOT eagerly instantiate the entire kernel dependency graph when only one standalone public factory is requested.

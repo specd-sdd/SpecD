@@ -24,6 +24,7 @@ export async function setupCompositionFactoryConfig(prefix: string): Promise<{
   const fixture: CompositionFactoryFixture = { tmpDir: undefined }
   fixture.tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `${prefix}-`))
   const specsPath = path.join(fixture.tmpDir, 'specs')
+  const metadataPath = path.join(fixture.tmpDir, '.specd', 'metadata')
   const changesPath = path.join(fixture.tmpDir, '.specd', 'changes')
   const draftsPath = path.join(fixture.tmpDir, '.specd', 'drafts')
   const discardedPath = path.join(fixture.tmpDir, '.specd', 'discarded')
@@ -31,6 +32,7 @@ export async function setupCompositionFactoryConfig(prefix: string): Promise<{
 
   await Promise.all([
     fs.mkdir(specsPath, { recursive: true }),
+    fs.mkdir(metadataPath, { recursive: true }),
     fs.mkdir(changesPath, { recursive: true }),
     fs.mkdir(draftsPath, { recursive: true }),
     fs.mkdir(discardedPath, { recursive: true }),
@@ -42,6 +44,7 @@ export async function setupCompositionFactoryConfig(prefix: string): Promise<{
     config: {
       projectRoot: fixture.tmpDir,
       configPath: path.join(fixture.tmpDir, 'specd.yaml'),
+      specdPath: path.join(fixture.tmpDir, '.specd'),
       schemaRef: '@specd/schema-std',
       workspaces: [
         {

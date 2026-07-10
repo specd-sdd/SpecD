@@ -36,6 +36,13 @@ describe('graph index integration', () => {
   it('indexes a bootstrap repository through the real SDK path with --force', async () => {
     tmpDir = mkdtempSync(join(tmpdir(), 'specd-graph-index-int-'))
     mkdirSync(join(tmpDir, 'src'), { recursive: true })
+    mkdirSync(join(tmpDir, 'specs'), { recursive: true })
+    mkdirSync(join(tmpDir, '.specd', 'metadata'), { recursive: true })
+    mkdirSync(join(tmpDir, '.specd', 'changes'), { recursive: true })
+    mkdirSync(join(tmpDir, '.specd', 'drafts'), { recursive: true })
+    mkdirSync(join(tmpDir, '.specd', 'discarded'), { recursive: true })
+    mkdirSync(join(tmpDir, '.specd', 'archive'), { recursive: true })
+    mkdirSync(join(tmpDir, '.specd', 'config', 'schemas'), { recursive: true })
     writeFileSync(join(tmpDir, 'src', 'index.ts'), 'export const value = 1\n')
     execSync('git init', { cwd: tmpDir })
     execSync('git config user.email test@example.com', { cwd: tmpDir })

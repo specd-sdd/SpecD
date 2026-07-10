@@ -55,6 +55,12 @@ import { createVcsAdapter } from './vcs-adapter.js'
 export interface CompositionResolutionOptions extends CompositionRegistryInput {
   /** Additional `node_modules` directories searched after the project-local one. */
   readonly extraNodeModulesPaths?: readonly string[]
+  readonly repositories?: {
+    readonly changes?: ChangeRepository
+    readonly archive?: ArchiveRepository
+    readonly specs?: ReadonlyMap<string, SpecRepository>
+    readonly schemas?: ReadonlyMap<string, SchemaRepository>
+  }
 }
 
 /**
@@ -248,21 +254,30 @@ function resolveMetadataPathForWorkspace(
   config: SpecdConfig,
   workspace: SpecdWorkspaceConfig,
 ): string {
+  const specdPath = config.specdPath ?? '.specd'
+  let metadataPath: string
   if (workspace.specsAdapter.adapter !== 'fs') {
-    return path.join(config.projectRoot, '.specd', 'metadata')
-  }
-
-  let current = path.resolve(workspace.specsPath)
-  while (true) {
-    if (fs.existsSync(path.join(current, '.git'))) {
-      return path.join(current, '.specd', 'metadata')
+    metadataPath = path.join(specdPath, 'metadata')
+  } else {
+    let current = path.resolve(workspace.specsPath)
+    const specdName = path.basename(specdPath)
+    metadataPath = path.join(workspace.specsPath, '..', specdName, 'metadata')
+    while (true) {
+      if (fs.existsSync(path.join(current, '.git'))) {
+        metadataPath = path.join(current, specdName, 'metadata')
+        break
+      }
+      const parent = path.dirname(current)
+      if (parent === current) break
+      current = parent
     }
-    const parent = path.dirname(current)
-    if (parent === current) break
-    current = parent
   }
 
-  return path.join(workspace.specsPath, '..', '.specd', 'metadata')
+  if (!fs.existsSync(metadataPath)) {
+    fs.mkdirSync(metadataPath, { recursive: true })
+  }
+
+  return metadataPath
 }
 
 /**
@@ -312,11 +327,13 @@ export function createCompositionResolver(
     configPath: config.configPath,
   }
 
-  let specRepositories: ReadonlyMap<string, SpecRepository> | undefined
-  let schemaRepositories: ReadonlyMap<string, SchemaRepository> | undefined
+  let specRepositories: ReadonlyMap<string, SpecRepository> | undefined =
+    resolvedOptions.repositories?.specs
+  let schemaRepositories: ReadonlyMap<string, SchemaRepository> | undefined =
+    resolvedOptions.repositories?.schemas
   let schemaRegistry: SchemaRegistry | undefined
-  let changeRepository: ChangeRepository | undefined
-  let archiveRepository: ArchiveRepository | undefined
+  let changeRepository: ChangeRepository | undefined = resolvedOptions.repositories?.changes
+  let archiveRepository: ArchiveRepository | undefined = resolvedOptions.repositories?.archive
   let actorResolver: ActorResolver | undefined
   let vcsAdapterPromise: Promise<VcsAdapter> | undefined
   let hookRunner: HookRunner | undefined
@@ -350,10 +367,11 @@ export function createCompositionResolver(
         registry.storages.changes,
         config.storage.changesAdapter.adapter,
       )
-      changeRepository = factory.create(defaultContext, {
-        ...config.storage.changesAdapter.config,
-        drafts: config.storage.draftsAdapter.config,
-        discarded: config.storage.discardedAdapter.config,
+      const context = {
+        ...defaultContext,
+        specdPath: config.specdPath ?? '.specd',
+        draftsPath: config.storage.draftsPath,
+        discardedPath: config.storage.discardedPath,
         resolveArtifactTypes: async () => {
           const schema = await resolver.getSchemaRegistry().resolve(config.schemaRef)
           return schema !== null ? schema.artifacts() : []
@@ -365,7 +383,12 @@ export function createCompositionResolver(
           const spec = await specRepo.get(SpecPath.parse(capPath))
           return spec !== null
         },
-      })
+      }
+      const repoConfig = {
+        ...config.storage.changesAdapter.config,
+        path: config.storage.changesPath,
+      }
+      changeRepository = factory.create(context, repoConfig)
       return changeRepository
     },
 
@@ -377,14 +400,20 @@ export function createCompositionResolver(
         registry.storages.archive,
         config.storage.archiveAdapter.adapter,
       )
-      archiveRepository = factory.create(defaultContext, {
+      const context = {
+        ...defaultContext,
+        specdPath: config.specdPath ?? '.specd',
+        changesPath: config.storage.changesPath,
+        draftsPath: config.storage.draftsPath,
+      }
+      const repoConfig = {
         ...config.storage.archiveAdapter.config,
-        changes: config.storage.changesAdapter.config,
-        drafts: config.storage.draftsAdapter.config,
+        path: config.storage.archivePath,
         ...(config.storage.archivePattern !== undefined
           ? { pattern: config.storage.archivePattern }
           : {}),
-      })
+      }
+      archiveRepository = factory.create(context, repoConfig)
       return archiveRepository
     },
 
@@ -407,11 +436,12 @@ export function createCompositionResolver(
               ownership: workspace.ownership,
               isExternal: workspace.isExternal,
               configPath: config.configPath,
+              ...(workspace.prefix !== undefined ? { prefix: workspace.prefix } : {}),
             },
             {
               ...workspace.specsAdapter.config,
+              path: workspace.specsAdapter.config.path as string,
               metadataPath,
-              ...(workspace.prefix !== undefined ? { prefix: workspace.prefix } : {}),
             },
           ),
         )

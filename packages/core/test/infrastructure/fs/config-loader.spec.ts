@@ -657,7 +657,8 @@ context:
       const config = await loader.load()
 
       expect(config.context).toHaveLength(2)
-      expect(config.context?.[0]).toEqual({ file: 'AGENTS.md' })
+      const configDir = path.dirname(configPath)
+      expect(config.context?.[0]).toEqual({ file: path.resolve(configDir, 'AGENTS.md') })
       expect(config.context?.[1]).toEqual({ instruction: 'Always prefer editing existing files.' })
     })
 
@@ -831,6 +832,66 @@ storage:
 
       const loader = new FsConfigLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/schema/)
+    })
+
+    it('emits warnings when legacy config format is used', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter: fs
+      fs:
+        path: specs
+storage:
+  changes:
+    adapter: fs
+    fs:
+      path: .specd/changes
+  drafts:
+    adapter: fs
+    fs:
+      path: .specd/drafts
+  discarded:
+    adapter: fs
+    fs:
+      path: .specd/discarded
+  archive:
+    adapter: fs
+    fs:
+      path: .specd/archive
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.warnings).toBeDefined()
+      expect(config.warnings).toContain(
+        "Legacy configuration format detected at 'workspaces.default.specs'. Please migrate to 'adapter: { type: \"fs\", config: ... }' (the legacy format will be removed in future versions).",
+      )
+      expect(config.warnings).toContain(
+        "Legacy configuration format detected at 'storage.changes'. Please migrate to 'adapter: { type: \"fs\", config: ... }' (the legacy format will be removed in future versions).",
+      )
+    })
+
+    it('does not emit warnings when storage is omitted and defaults are applied', async () => {
+      const configPath = await writeConfig(
+        `
+schema: "@specd/schema-std"
+workspaces:
+  default:
+    specs:
+      adapter:
+        type: fs
+        config:
+          path: specs
+`.trim(),
+      )
+
+      const loader = new FsConfigLoader({ configPath })
+      const config = await loader.load()
+      expect(config.warnings).toBeUndefined()
     })
 
     it('parses schemaPlugins from config', async () => {
@@ -1890,7 +1951,7 @@ remove:
       const config = await loader.load()
 
       expect(config.context).toHaveLength(1)
-      expect(config.context?.[0]).toEqual({ file: 'AGENTS.md' })
+      expect(config.context?.[0]).toEqual({ file: path.resolve(tmpDir, 'AGENTS.md') })
     })
 
     it('remove.plugins.agents strips by name', async () => {

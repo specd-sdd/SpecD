@@ -557,18 +557,16 @@ describe('list — directory without schema.yaml is skipped', () => {
 describe('list — missing schemas path returns empty', () => {
   it('returns no entries when the schemas path does not exist', async () => {
     const nonexistentPath = path.join(ctx.tmpDir, 'nonexistent')
-    const schemaRepositories: Map<string, SchemaRepository> = new Map([
-      [
-        'default',
-        new FsSchemaRepository({
-          workspace: 'default',
-          ownership: 'owned',
-          isExternal: false,
-          configPath: '/test',
-          schemasPath: nonexistentPath,
-        }),
-      ],
-    ])
+    await fs.mkdir(nonexistentPath, { recursive: true })
+    const repo = new FsSchemaRepository({
+      workspace: 'default',
+      ownership: 'owned',
+      isExternal: false,
+      configPath: '/test',
+      schemasPath: nonexistentPath,
+    })
+    await fs.rm(nonexistentPath, { recursive: true, force: true })
+    const schemaRepositories: Map<string, SchemaRepository> = new Map([['default', repo]])
     const registry = new FsSchemaRegistry({
       nodeModulesPaths: [ctx.nodeModulesPath],
       configDir: ctx.tmpDir,

@@ -75,14 +75,14 @@ The `schema` field identifies the schema that governs this project. It is requir
 
 The value uses a prefix convention that determines exactly where SpecD looks:
 
-| Value                            | Resolves from                                                                    |
-| -------------------------------- | -------------------------------------------------------------------------------- |
-| `'@specd/schema-std'`            | npm package — `node_modules/@specd/schema-std/schema.yaml`                       |
-| `'spec-driven'`                  | Bare name — default workspace's `schemas.fs.path/spec-driven/schema.yaml`        |
-| `'#spec-driven'`                 | Hash prefix — equivalent to bare name, resolves from `default` workspace         |
-| `'#billing:my-schema'`           | Workspace-qualified — `workspaces.billing.schemas.fs.path/my-schema/schema.yaml` |
-| `'./schemas/custom/schema.yaml'` | Relative path from the `specd.yaml` directory                                    |
-| `'/absolute/path/schema.yaml'`   | Absolute path                                                                    |
+| Value                            | Resolves from                                                                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| `'@specd/schema-std'`            | npm package — `node_modules/@specd/schema-std/schema.yaml`                                   |
+| `'spec-driven'`                  | Bare name — default workspace's `schemas.adapter.config.path/spec-driven/schema.yaml`        |
+| `'#spec-driven'`                 | Hash prefix — equivalent to bare name, resolves from `default` workspace                     |
+| `'#billing:my-schema'`           | Workspace-qualified — `workspaces.billing.schemas.adapter.config.path/my-schema/schema.yaml` |
+| `'./schemas/custom/schema.yaml'` | Relative path from the `specd.yaml` directory                                                |
+| `'/absolute/path/schema.yaml'`   | Absolute path                                                                                |
 
 Schema resolution happens at command dispatch time, immediately before the command body executes. Commands that do not require the schema — `--help`, `--version`, `specd project init`, `specd config validate`, and `specd plugin` subcommands — skip resolution entirely.
 schema resolution entirely.
@@ -163,17 +163,29 @@ Workspace names must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved
 | Field                 | Required        | Default   | Description                                                                                                           |
 | --------------------- | --------------- | --------- | --------------------------------------------------------------------------------------------------------------------- |
 | `specs`               | yes             | —         | Where this workspace's spec files live.                                                                               |
-| `specs.adapter`       | yes             | —         | Storage adapter name. Built-in kernels provide `fs`; external adapters may be registered at kernel construction time. |
-| `specs.<adapter>`     | yes             | —         | Adapter-owned config block. For `fs`, this is `fs.path`.                                                              |
+| `specs.adapter`       | yes             | —         | Storage adapter configuration. Expects a type and a config block (e.g. `{ type: 'fs', config: { path: 'specs/' } }`). |
 | `schemas`             | no              | see below | Where named local schemas for this workspace are stored.                                                              |
-| `schemas.adapter`     | yes if declared | —         | Storage adapter name for schemas.                                                                                     |
-| `schemas.<adapter>`   | yes if declared | —         | Adapter-owned config block. For `fs`, this is `fs.path`.                                                              |
+| `schemas.adapter`     | yes if declared | —         | Storage adapter configuration for schemas.                                                                            |
 | `codeRoot`            | no / yes        | see below | Directory where implementation code lives.                                                                            |
 | `ownership`           | no              | see below | Relationship this project has with specs in this workspace.                                                           |
 | `contextIncludeSpecs` | no              | `['*']`   | Spec patterns included when this workspace is active.                                                                 |
 | `contextExcludeSpecs` | no              | `[]`      | Spec patterns excluded when this workspace is active.                                                                 |
 
-**`schemas`** — for the `default` workspace, if omitted, defaults to `adapter: fs` with `fs.path: .specd/schemas`. For non-`default` workspaces, omitting it means no local schemas — schema references targeting that workspace produce an error.
+**`specs` and `schemas` Adapter Format**:
+Every workspace spec and schema directory requires an `adapter` configuration mapping. Since version 0.2.0, the format has been generalized:
+
+```yaml
+specs:
+  adapter:
+    type: fs
+    config:
+      path: specs/
+      metadataPath: .specd/metadata # optional
+```
+
+_Note: A legacy string format is supported for backward compatibility (e.g. `adapter: fs` with a sibling `fs:` block), but it is deprecated and will be removed in future versions (emitting warnings at startup)._
+
+**`schemas`** — for the `default` workspace, if omitted, defaults to `adapter: { type: fs, config: { path: .specd/schemas } }`. For non-`default` workspaces, omitting it means no local schemas.
 
 **`codeRoot`** — for the `default` workspace, defaults to the project root (the directory containing `specd.yaml`). For non-`default` workspaces, `codeRoot` is required — there is no sensible default.
 
@@ -188,24 +200,22 @@ Workspace names must match `/^[a-z][a-z0-9-]*$/`. The name `default` is reserved
 ```yaml
 workspaces:
   default:
+    prefix: _global
     specs:
-      adapter: fs
-      fs:
-        path: specs/
-    schemas: # optional — defaults to .specd/schemas
-      adapter: fs
-      fs:
-        path: .specd/schemas
-    codeRoot: ./ # optional for default — project root is the default
-    ownership: owned # optional for default — owned is the default
+      adapter:
+        type: fs
+        config:
+          path: specs/_global
+    ownership: owned
 
   billing:
     specs:
-      adapter: fs
-      fs:
-        path: ../billing/specd/specs
-    codeRoot: ../billing # required for non-default workspaces
-    ownership: readOnly # optional — readOnly is the default for non-default
+      adapter:
+        type: fs
+        config:
+          path: ../billing/specd/specs
+    codeRoot: ../billing
+    ownership: readOnly
 ```
 
 ### Context spec selection
@@ -248,25 +258,29 @@ A spec matched by multiple include patterns appears only once, at the position o
 ```yaml
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
 
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
 
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
 
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
-      pattern: '{{change.archivedName}}' # optional; this is the default
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
+        pattern: '{{change.archivedName}}' # optional; this is the default
 ```
 
 | Sub-key     | Description                                                                                 |
@@ -284,16 +298,16 @@ The built-in `fs` adapter resolves `path` values to absolute paths during config
 
 ### Named adapter bindings
 
-Every workspace and storage declaration preserves two pieces of information into the resolved `SpecdConfig`:
+Every workspace and storage declaration preserves the generic adapter binding into the resolved `SpecdConfig`:
 
-- the selected adapter name
-- the adapter-owned config block
+- `adapter.type`: the selected adapter name (e.g. `'fs'`)
+- `adapter.config`: the adapter-owned config block (e.g. `{ path: '...' }`)
 
-For `fs`, the loader also resolves `path` to an absolute path and keeps the legacy `*Path` fields populated for backward compatibility. For non-`fs` adapters, the opaque config block is passed through unchanged and the kernel validates the adapter name against the merged storage registry when it is constructed.
+For `fs`, the loader also resolves `path` to an absolute path and keeps the legacy `*Path` fields populated in memory for backward compatibility. For non-`fs` adapters, the config block is passed through unchanged and the kernel validates the adapter name against the merged storage registry when it is constructed.
 
 ### Archive pattern
 
-The `storage.archive.fs.pattern` field controls the directory name given to each archived change. It supports template variable interpolation:
+The `storage.archive.adapter.config.pattern` field controls the directory name given to each archived change. It supports template variable interpolation:
 
 | Variable                  | Value                                                                    |
 | ------------------------- | ------------------------------------------------------------------------ |
@@ -505,29 +519,30 @@ Display status reflects drift even under `none`: files show `complete-with-drift
 
 SpecD validates `specd.yaml` before executing any command that requires a config. The following conditions are hard errors — SpecD exits immediately:
 
-| Condition                                                                       | Error                                                            |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `schema` field is missing                                                       | Config is invalid without a schema reference.                    |
-| `workspaces` section is missing or has no `default` workspace                   | Every project must declare a default workspace.                  |
-| `specs` section is missing in any workspace                                     | SpecD cannot locate specs without a specs path.                  |
-| `codeRoot` is missing in any non-`default` workspace                            | Required for non-default workspaces; no sensible default exists. |
-| `storage` section is missing, or `changes` or `archive` sub-key is absent       | Both are required.                                               |
-| `adapter` is missing in any `specs`, `schemas`, or storage section              | Required in every storage declaration.                           |
-| Required adapter-specific fields are absent (e.g. `fs.path` when `adapter: fs`) | The adapter cannot function without its required fields.         |
-| An adapter name has no registered factory at kernel construction time           | The kernel rejects unknown named adapters with a clear error.    |
-| Storage path resolves outside the repo root                                     | Paths must stay within the repository.                           |
-| Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax           | e.g. `*` in a disallowed position.                               |
-| `llmOptimizedContext` is not a boolean                                          | Any other type is a startup validation error.                    |
-| Legacy `artifactRules` field is present                                         | Use `schemaOverrides` instead.                                   |
+| Condition                                                                        | Error                                                            |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `schema` field is missing                                                        | Config is invalid without a schema reference.                    |
+| `workspaces` section is missing or has no `default` workspace                    | Every project must declare a default workspace.                  |
+| `specs` section is missing in any workspace                                      | SpecD cannot locate specs without a specs path.                  |
+| `codeRoot` is missing in any non-`default` workspace                             | Required for non-default workspaces; no sensible default exists. |
+| `storage` section is missing, or `changes` or `archive` sub-key is absent        | Both are required.                                               |
+| `adapter` is missing in any `specs`, `schemas`, or storage section               | Required in every storage declaration.                           |
+| Required adapter-specific fields are absent (e.g. `config.path` when `type: fs`) | The adapter cannot function without its required fields.         |
+| An adapter name has no registered factory at kernel construction time            | The kernel rejects unknown named adapters with a clear error.    |
+| Storage path resolves outside the repo root                                      | Paths must stay within the repository.                           |
+| Invalid `contextIncludeSpecs` or `contextExcludeSpecs` pattern syntax            | e.g. `*` in a disallowed position.                               |
+| `llmOptimizedContext` is not a boolean                                           | Any other type is a startup validation error.                    |
+| Legacy `artifactRules` field is present                                          | Use `schemaOverrides` instead.                                   |
 
 Commands that skip validation entirely: `--help`, `--version`, `specd project init`, `specd config validate`, and `specd plugin` subcommands.
 
 ### Warnings that allow startup to proceed
 
-| Condition                                                       | Warning                                                    |
-| --------------------------------------------------------------- | ---------------------------------------------------------- |
-| Duplicate workspace names                                       | YAML retains last-wins; the duplicate is a likely mistake. |
-| Unknown workspace qualifier in a context pattern (runtime only) | A typo silently excludes specs.                            |
+| Condition                                                       | Warning                                                                                                    |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Duplicate workspace names                                       | YAML retains last-wins; the duplicate is a likely mistake.                                                 |
+| Unknown workspace qualifier in a context pattern (runtime only) | A typo silently excludes specs.                                                                            |
+| Legacy configuration format declared                            | Emits a startup warning indicating the legacy format is deprecated and will be removed in future versions. |
 
 ### What `specd config validate` checks additionally
 

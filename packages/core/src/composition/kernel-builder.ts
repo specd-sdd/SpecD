@@ -3,6 +3,10 @@ import { RegistryConflictError } from '../application/errors/registry-conflict-e
 import { type ExternalHookRunner } from '../application/ports/external-hook-runner.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { type ExtractorTransform } from '../domain/services/content-extraction.js'
+import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { type ArchiveRepository } from '../application/ports/archive-repository.js'
+import { type SpecRepository } from '../application/ports/spec-repository.js'
+import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import {
   createBuiltinCompositionRegistry,
   createCompositionRegistryView,
@@ -29,6 +33,12 @@ interface KernelBuilderState {
   readonly vcsProviders: VcsProvider[]
   readonly actorProviders: ActorProvider[]
   readonly externalHookRunners: ExternalHookRunner[]
+  readonly repositories: {
+    changes?: ChangeRepository
+    archive?: ArchiveRepository
+    specs?: ReadonlyMap<string, SpecRepository>
+    schemas?: ReadonlyMap<string, SchemaRepository>
+  }
 }
 
 /**
@@ -74,6 +84,38 @@ export interface KernelBuilder {
    * @throws {@link RegistryConflictError} When the adapter name already exists
    */
   registerArchiveStorage(adapter: string, factory: ArchiveStorageFactory): this
+
+  /**
+   * Registers a direct ChangeRepository instance override.
+   *
+   * @param repo - The repository instance to use
+   * @returns The same builder for fluent chaining
+   */
+  registerChangeRepository(repo: ChangeRepository): this
+
+  /**
+   * Registers a direct ArchiveRepository instance override.
+   *
+   * @param repo - The repository instance to use
+   * @returns The same builder for fluent chaining
+   */
+  registerArchiveRepository(repo: ArchiveRepository): this
+
+  /**
+   * Registers a direct SpecRepository map override.
+   *
+   * @param repos - The map of workspace name to SpecRepository instance to use
+   * @returns The same builder for fluent chaining
+   */
+  registerSpecRepositories(repos: ReadonlyMap<string, SpecRepository>): this
+
+  /**
+   * Registers a direct SchemaRepository map override.
+   *
+   * @param repos - The map of workspace name to SchemaRepository instance to use
+   * @returns The same builder for fluent chaining
+   */
+  registerSchemaRepositories(repos: ReadonlyMap<string, SchemaRepository>): this
 
   /**
    * Registers an artifact parser for a named format.
@@ -177,6 +219,9 @@ function cloneOptions(base?: Partial<KernelOptions>): KernelBuilderState {
     vcsProviders: [...(base?.vcsProviders ?? [])],
     actorProviders: [...(base?.actorProviders ?? [])],
     externalHookRunners: [...(base?.externalHookRunners ?? [])],
+    repositories: {
+      ...(base?.repositories ?? {}),
+    },
   }
 }
 
@@ -211,6 +256,9 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
     ...(state.actorProviders.length > 0 ? { actorProviders: [...state.actorProviders] } : {}),
     ...(state.externalHookRunners.length > 0
       ? { externalHookRunners: [...state.externalHookRunners] }
+      : {}),
+    ...(state.repositories && Object.keys(state.repositories).length > 0
+      ? { repositories: { ...state.repositories } }
       : {}),
   }
 }
@@ -268,6 +316,26 @@ export function createKernelBuilder(
         throw new RegistryConflictError('archiveStorageFactories', adapter)
       }
       options.archiveStorageFactories[adapter] = factory
+      return builder
+    },
+
+    registerChangeRepository(repo: ChangeRepository): KernelBuilder {
+      options.repositories.changes = repo
+      return builder
+    },
+
+    registerArchiveRepository(repo: ArchiveRepository): KernelBuilder {
+      options.repositories.archive = repo
+      return builder
+    },
+
+    registerSpecRepositories(repos: ReadonlyMap<string, SpecRepository>): KernelBuilder {
+      options.repositories.specs = repos
+      return builder
+    },
+
+    registerSchemaRepositories(repos: ReadonlyMap<string, SchemaRepository>): KernelBuilder {
+      options.repositories.schemas = repos
       return builder
     },
 

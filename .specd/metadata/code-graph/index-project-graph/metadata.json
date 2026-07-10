@@ -110,5 +110,7 @@
     "spec.md": "sha256:080fbf710b81634dc07b36ebb28e21c716d1cd73b8fd4c67a3b75e62d9bc3058",
     "verify.md": "sha256:72b27944bee9c70cf7f7cbdf4e93d3eb62a46e5bd2b680a9ba20e0b542c82222"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Orchestrates graph indexing with prepared inputs, optional force recreate, and no host-side lock or provider lifecycle work.",
+  "optimizedContext": "# IndexProjectGraph\n## Rules\n- `IndexProjectGraph.execute(input)` MUST call `provider.index()` with `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, optional `vcsRef`, optional `onProgress`; return `IndexResult` unchanged.\n- If `input.force` is `true`, MUST call `provider.recreate()` before `provider.index()`; otherwise MUST NOT recreate store.\n- `IndexProjectGraphInput` MUST include opened `provider`, `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, optional `vcsRef`, optional `force`, optional `onProgress`.\n- `createIndexProjectGraph()` MUST return stateless `IndexProjectGraph`.\n## Constraints\n- MUST NOT open or close provider.\n- MUST NOT acquire or release graph indexing lock.\n- MUST NOT resolve workspaces from `specd.yaml` or spawn worker processes; callers supply prepared targets and config.\n- Per-file parse failures stay in `IndexResult.errors`; use case MUST NOT throw for them."
 }

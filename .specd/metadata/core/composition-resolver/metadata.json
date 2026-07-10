@@ -20,7 +20,7 @@
     {
       "requirement": "Resolver exposes normalized shared dependencies",
       "rules": [
-        "The resolver SHALL expose normalized access to shared composition dependencies such as repositories, schema-resolution services, actor resolution, VCS integration, hook execution infrastructure, parsers, and other shared composition primitives required by kernel-mounted public factories.\n\nThe resolver contract MUST expose those dependencies in a way that is independent of fs-shaped public factory inputs.\n\nThe generic registry, merged-registry-view, and built-in-capability primitives consumed below the resolver SHALL belong to composition infrastructure. They MUST NOT be defined as kernel-owned concepts in the architecture contract."
+        "The resolver SHALL expose normalized access to shared composition dependencies such as repositories, schema-resolution services, actor resolution, VCS integration, hook execution infrastructure, parsers, and other shared composition primitives required by kernel-mounted public factories.\n\nThe resolver contract MUST expose those dependencies in a way that is independent of fs-shaped public factory inputs.\n\nThe generic registry, merged-registry-view, and built-in-capability primitives consumed below the resolver SHALL belong to composition infrastructure. They MUST NOT be defined as kernel-owned concepts in the architecture contract.\n\nFor `ChangeRepository` resolution, the resolver SHALL assemble the nested options object for drafts and discarded configurations from their separate YAML configs, forwarding the unified options object to the storage factory."
       ]
     },
     {
@@ -84,6 +84,15 @@
       ]
     },
     {
+      "requirement": "Resolver exposes normalized shared dependencies",
+      "name": "Resolver assembles nested change repository options",
+      "when": ["ChangeRepository is requested from the resolver"],
+      "then": [
+        "the resolver retrieves changes, drafts, and discarded config bindings",
+        "AND it passes drafts and discarded config nested under the options object to the storage factory"
+      ]
+    },
+    {
       "requirement": "Resolver is lazy and cacheable",
       "name": "Single standalone factory does not force full-kernel bootstrap",
       "when": ["one createX(config, options?) call is assembled through the resolver"],
@@ -137,16 +146,6 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:composition-resolver",
-        "file": "core:src/domain/errors/index.ts"
-      },
-      {
-        "specId": "core:composition-resolver",
-        "file": "core:test/composition/composition-registries.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:composition-resolver",
@@ -156,43 +155,23 @@
       {
         "specId": "core:composition-resolver",
         "file": "core:src/composition/composition-resolver.ts",
-        "symbol": "CompositionResolver"
-      },
-      {
-        "specId": "core:composition-resolver",
-        "file": "core:src/composition/composition-resolver.ts",
         "symbol": "createCompositionResolver"
       },
       {
         "specId": "core:composition-resolver",
-        "file": "core:src/domain/errors/invalid-composition-factory-arguments-error.ts",
-        "symbol": "InvalidCompositionFactoryArgumentsError"
+        "file": "core:src/composition/shared-repository-wiring.ts",
+        "symbol": "createSharedSpecRepositories"
       },
       {
         "specId": "core:composition-resolver",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "CompositionRegistryInput"
-      },
-      {
-        "specId": "core:composition-resolver",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "CompositionRegistryView"
-      },
-      {
-        "specId": "core:composition-resolver",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "createBuiltinCompositionRegistry"
-      },
-      {
-        "specId": "core:composition-resolver",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "createCompositionRegistryView"
+        "file": "core:src/composition/shared-repository-wiring.ts",
+        "symbol": "createSharedChangeRepository"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1eb2e3e97775981e497d73a10851590350fb7d1d08aa3f3b9334c826652771e0",
-    "verify.md": "sha256:637964925dcac04e482d40a1e349f87f785fa1b6a819361b03c46431bf54b803"
+    "spec.md": "sha256:7d12c6936b3325a9476b13d50e4edc330a397220aa0aae09b43e254ce0a5beab",
+    "verify.md": "sha256:2eeb462004191e2418ab199628f42eac525fd42600f372a309cb70110ad3bcec"
   },
   "generatedBy": "core"
 }

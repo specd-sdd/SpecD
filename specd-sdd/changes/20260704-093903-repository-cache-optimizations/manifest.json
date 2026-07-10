@@ -1,0 +1,884 @@
+{
+  "name": "repository-cache-optimizations",
+  "createdAt": "2026-07-04T09:39:03.390Z",
+  "updatedAt": "2026-07-06T21:25:26.068Z",
+  "description": "Implement dual-level caching (L1 RAM, L2 JSONL/JSON disk) for specs, changes, and archive repositories",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:list-changes",
+    "core:list-drafts",
+    "core:list-discarded",
+    "core:list-specs",
+    "core:list-archived",
+    "core:get-project-summary"
+  ],
+  "specDependsOn": {
+    "core:list-changes": ["core:change", "core:kernel"],
+    "core:list-drafts": ["core:change", "core:kernel"],
+    "core:list-discarded": [
+      "core:change",
+      "core:kernel",
+      "core:discarded-change-view",
+      "core:change-repository-port"
+    ],
+    "core:list-specs": [
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:storage",
+      "core:workspace",
+      "core:list-workspaces"
+    ],
+    "core:list-archived": [
+      "core:archive-change",
+      "core:storage",
+      "core:kernel",
+      "default:_global/architecture",
+      "core:archived-change-index-entry"
+    ],
+    "core:get-project-summary": [
+      "core:list-workspaces",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:list-archived",
+      "core:kernel"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:bbefa60452e52ba6ce32c12f34a6a34e61c55660d1b881344ff9ec4c65c192c6"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:list-changes",
+          "filename": "deltas/core/list-changes/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-archived",
+          "filename": "deltas/core/list-archived/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:list-changes",
+          "filename": "deltas/core/list-changes/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-drafts",
+          "filename": "deltas/core/list-drafts/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-discarded",
+          "filename": "deltas/core/list-discarded/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:list-archived",
+          "filename": "deltas/core/list-archived/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-04T09:39:03.390Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:list-changes",
+        "core:list-drafts",
+        "core:list-discarded",
+        "core:list-specs",
+        "core:list-archived",
+        "core:get-project-summary"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-04T09:39:03.405Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-changes"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-drafts"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-archived"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-changes"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-drafts"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-discarded"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-archived"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-04T09:41:19.704Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T09:45:35.813Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T09:47:59.539Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T09:48:12.418Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T09:54:04.336Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T09:54:44.190Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T09:57:07.383Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T10:00:39.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T11:02:04.863Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-04T11:03:34.890Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:21:45.926Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:get-project-summary, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:18.949Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:get-project-summary, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:34.785Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:get-project-summary, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:52.425Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:get-project-summary, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

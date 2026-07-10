@@ -235,6 +235,12 @@
 - **WHEN** `createKernel(config)` is called without options
 - **THEN** the schema registry searches only the project's own `node_modules`
 
+#### Scenario: Repository overrides provided in KernelOptions
+
+- **GIVEN** a mock `ChangeRepository` passed in `options.repositories`
+- **WHEN** `createKernel(config, options)` is called
+- **THEN** `kernel.changes.repo` is the mock instance
+
 ### Requirement: KernelOptions supports additive registries
 
 #### Scenario: External registrations extend built-ins

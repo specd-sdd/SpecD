@@ -11,15 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/kernel-builder.ts"
-    },
-    {
-      "file": "core:src/composition/composition-registries.ts",
-      "symbols": [
-        "CompositionRegistryView",
-        "createBuiltinCompositionRegistry",
-        "createCompositionRegistryView"
-      ]
+      "file": "core:src/composition/kernel-builder.ts",
+      "symbols": ["KernelBuilder", "createKernelBuilder"]
     }
   ]
 }

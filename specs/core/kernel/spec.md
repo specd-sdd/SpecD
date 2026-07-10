@@ -82,6 +82,13 @@ The kernel must expose the underlying `ChangeRepository` as `changes.repo` and t
 
 `createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.
 
+#### Scenario: Repository overrides provided in KernelOptions
+
+- **GIVEN** a `KernelOptions` with injected repository overrides
+- **WHEN** `createKernel(config, options)` is called
+- **THEN** the kernel reuses the injected repository instances for use case execution
+- **AND** does not instantiate new ones
+
 ### Requirement: KernelOptions supports additive registries
 
 `KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:

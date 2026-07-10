@@ -40,8 +40,8 @@ The `InitProjectResult` interface MUST contain:
 
 The `initProject` method MUST:
 
-1. Create a `specd.yaml` file in `projectRoot` with the schema, workspace, and storage configuration
-2. Create the required storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)
+1. Create a `specd.yaml` file in `projectRoot` with the schema and default workspace configuration. The `storage` block is omitted by default, allowing storage paths to resolve automatically to standard `fs` defaults under `specdPath`.
+2. Create the workspace specs directory (e.g. `specs/`) and the required default storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)
 3. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present
 
 ### Requirement: InitProject already-initialised guard

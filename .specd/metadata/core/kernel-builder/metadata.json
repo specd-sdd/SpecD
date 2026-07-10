@@ -14,7 +14,7 @@
     {
       "requirement": "Builder accumulates additive kernel registrations",
       "rules": [
-        "A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.\n\nThe builder SHALL be a pre-construction composition surface only. It MUST NOT mutate an already-built kernel.\n\nThe builder MUST NOT own code-graph-specific backend composition. Graph-store registration and backend selection remain outside the core builder contract."
+        "A fluent kernel builder SHALL exist as a public composition entry point for `@specd/core`. It SHALL accumulate the same additive registrations supported by `KernelOptions`, including storage factories, parsers, VCS providers, actor providers, and external hook runners, before kernel construction occurs.\n\nThe builder SHALL be a pre-construction composition surface only. It MUST NOT mutate an already-built kernel.\n\nThe builder MUST NOT own code-graph-specific backend composition. Graph-store registration and backend selection remain outside the core builder contract.\n\n#### Scenario: Repository overrides in builder\n\n- **WHEN** repository overrides are set on the builder\n- **THEN** they are passed to the kernel options when `build()` is called"
       ]
     },
     {
@@ -72,6 +72,13 @@
         "the builder retains all of them as pending additive registrations",
         "AND no built kernel is mutated before build() is called"
       ]
+    },
+    {
+      "requirement": "Builder accumulates additive kernel registrations",
+      "name": "Repository overrides in builder",
+      "given": ["a mock ChangeRepository set on the builder"],
+      "when": ["build() is called"],
+      "then": ["the returned kernel reuses that mock instance"]
     },
     {
       "requirement": "Builder supports fluent registration methods",
@@ -137,33 +144,22 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:kernel-builder",
-        "file": "core:src/composition/kernel-builder.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:kernel-builder",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "CompositionRegistryView"
+        "file": "core:src/composition/kernel-builder.ts",
+        "symbol": "KernelBuilder"
       },
       {
         "specId": "core:kernel-builder",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "createBuiltinCompositionRegistry"
-      },
-      {
-        "specId": "core:kernel-builder",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "createCompositionRegistryView"
+        "file": "core:src/composition/kernel-builder.ts",
+        "symbol": "createKernelBuilder"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1051c8a818199d0d3ad7e8b4934d00673e924fe49733a1a6a97b87da605f248f",
-    "verify.md": "sha256:c5f218c2dbd062d0d5c370abe045625e5d4707cbe455829030719c1b0583903b"
+    "spec.md": "sha256:16d2e303bc2afc2e600ae884f5f9c5db09da4a0e2b283484f849b163785d2201",
+    "verify.md": "sha256:2e12e7c91952f332e92c565cb0c47b1a69da1bbb29824fb9290db862ec30055c"
   },
   "generatedBy": "core"
 }

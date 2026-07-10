@@ -112,5 +112,7 @@
     "spec.md": "sha256:cdb7ff3afb185e8c744a8a3187272525c443783ffcc10d89675a3d308bafd717",
     "verify.md": "sha256:946ed8fda6df02bae52e02a0245ddd7fcabd63b9c2313decac5bbe99cef84484"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Loads change by name and aggregates `GetSpecCoverage` results for each change spec in manifest declaration order.",
+  "optimizedContext": "# GetChangeSpecCoverage\n## Rules\n- `GetChangeSpecCoverage.execute(input)` MUST return `GetChangeSpecCoverageResult` with `changeName` and `specs`.\n- `specs` MUST contain one `GetSpecCoverageResult` per change `specId`, in manifest declaration order.\n- MUST load change via `input.changes.get(input.changeName)`.\n- If change missing, MUST throw `ChangeNotFoundError` from `@specd/core`.\n- For each loaded `specId`, MUST delegate to `GetSpecCoverage.execute({ provider, specId })`.\n- `GetChangeSpecCoverageInput` MUST include opened `provider`, `changes`, and `changeName`.\n- `createGetChangeSpecCoverage(getSpecCoverage)` MUST inject `GetSpecCoverage` dependency.\n## Constraints\n- MUST NOT open or close provider.\n- MUST NOT mutate change.\n- MUST NOT load change artifact content beyond `ChangeRepository.get` result needed for `specIds`.\n- MUST NOT modify graph data."
 }

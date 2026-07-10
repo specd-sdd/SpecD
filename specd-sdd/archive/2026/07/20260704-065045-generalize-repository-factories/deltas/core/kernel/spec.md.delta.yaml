@@ -1,0 +1,15 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: createKernel accepts optional KernelOptions'
+    after:
+      type: section
+      matches: 'Scenario: No options provided'
+  content: |
+    #### Scenario: Repository overrides provided in KernelOptions
+
+    - **GIVEN** a `KernelOptions` with injected repository overrides
+    - **WHEN** `createKernel(config, options)` is called
+    - **THEN** the kernel reuses the injected repository instances for use case execution
+    - **AND** does not instantiate new ones

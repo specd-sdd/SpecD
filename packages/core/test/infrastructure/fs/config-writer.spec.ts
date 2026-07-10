@@ -48,7 +48,13 @@ describe('FsConfigWriter', () => {
       const parsed = yamlParse(content) as Record<string, unknown>
       expect(parsed['schema']).toBe('@specd/schema-std')
       expect(parsed['workspaces']).toHaveProperty('default')
-      expect(parsed['storage']).toBeDefined()
+      const workspaces = parsed['workspaces'] as Record<string, unknown>
+      const ws = workspaces['default'] as Record<string, unknown>
+      const specs = ws['specs'] as Record<string, unknown>
+      const adapter = specs['adapter'] as Record<string, unknown>
+      expect(adapter['type']).toBe('fs')
+      expect((adapter['config'] as Record<string, unknown>)['path']).toBe('specs/')
+      expect(parsed['storage']).toBeUndefined()
     })
 
     it('creates storage directories', async () => {
@@ -60,6 +66,14 @@ describe('FsConfigWriter', () => {
         const stat = await fs.stat(path.join(storageBase, dir))
         expect(stat.isDirectory()).toBe(true)
       }
+    })
+
+    it('creates workspace specs directory', async () => {
+      await writer.initProject(defaultOptions())
+
+      const specsPath = path.join(tmpDir, 'specs')
+      const stat = await fs.stat(specsPath)
+      expect(stat.isDirectory()).toBe(true)
     })
 
     it('appends both specd.local.yaml and specd.local.*.yaml to .gitignore', async () => {
@@ -110,8 +124,9 @@ describe('FsConfigWriter', () => {
       const workspaces = parsed['workspaces'] as Record<string, unknown>
       const ws = workspaces['default'] as Record<string, unknown>
       const specs = ws['specs'] as Record<string, unknown>
-      const fsConf = specs['fs'] as Record<string, unknown>
-      expect(fsConf['path']).toBe('my-specs/')
+      const adapter = specs['adapter'] as Record<string, unknown>
+      expect(adapter['type']).toBe('fs')
+      expect((adapter['config'] as Record<string, unknown>)['path']).toBe('my-specs/')
     })
   })
 

@@ -175,6 +175,18 @@ Each repository factory MUST accept an adapter id as its first argument. Builtin
 
 Integrators MUST be able to obtain default filesystem storage (for example `createSpecRepository('fs', ...)`) without calling `createKernel`.
 
+#### Scenario: Repository factories resolve adapter IDs through composition registries
+
+- **WHEN** a public repository factory is called with an adapter type
+- **THEN** it resolves that type through the merged composition registry
+- **AND** it throws an error if the adapter type is unknown
+
+#### Scenario: Options validated by Zod at construction
+
+- **WHEN** a public repository factory instantiates a repository
+- **THEN** options are validated by Zod inside the concrete repository constructor
+- **AND** it throws a validation error if options are invalid
+
 ### Requirement: Extension registration surface
 
 `"./extensions"` MUST export `SpecStorageFactory`, `ChangeStorageFactory`, `ArchiveStorageFactory`, `SchemaStorageFactory`, `CompositionRegistryInput`, `CompositionRegistryView`, `KernelBuilder`, `createKernelBuilder`, `ActorProvider`, `VcsProvider`, `ExternalHookRunner`, and `RegistryConflictError`. Builtin `FS_*` storage factory markers MUST remain internal.

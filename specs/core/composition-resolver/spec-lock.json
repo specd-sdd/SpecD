@@ -12,30 +12,11 @@
   "implementation": [
     {
       "file": "core:src/composition/composition-resolver.ts",
-      "symbols": [
-        "CompositionResolutionOptions",
-        "CompositionResolver",
-        "createCompositionResolver"
-      ]
+      "symbols": ["CompositionResolutionOptions", "createCompositionResolver"]
     },
     {
-      "file": "core:src/domain/errors/invalid-composition-factory-arguments-error.ts",
-      "symbols": ["InvalidCompositionFactoryArgumentsError"]
-    },
-    {
-      "file": "core:src/domain/errors/index.ts"
-    },
-    {
-      "file": "core:src/composition/composition-registries.ts",
-      "symbols": [
-        "CompositionRegistryInput",
-        "CompositionRegistryView",
-        "createBuiltinCompositionRegistry",
-        "createCompositionRegistryView"
-      ]
-    },
-    {
-      "file": "core:test/composition/composition-registries.spec.ts"
+      "file": "core:src/composition/shared-repository-wiring.ts",
+      "symbols": ["createSharedSpecRepositories", "createSharedChangeRepository"]
     }
   ]
 }

@@ -18,6 +18,12 @@
 - **THEN** it receives normalized shared composition primitives rather than fs-shaped public input fragments
 - **AND** those shared primitives are defined as composition infrastructure rather than kernel-owned registry concepts
 
+#### Scenario: Resolver assembles nested change repository options
+
+- **WHEN** `ChangeRepository` is requested from the resolver
+- **THEN** the resolver retrieves changes, drafts, and discarded config bindings
+- **AND** it passes drafts and discarded config nested under the options object to the storage factory
+
 ### Requirement: Resolver is lazy and cacheable
 
 #### Scenario: Single standalone factory does not force full-kernel bootstrap

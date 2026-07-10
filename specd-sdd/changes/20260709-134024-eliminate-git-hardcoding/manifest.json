@@ -1,0 +1,1471 @@
+{
+  "name": "eliminate-git-hardcoding",
+  "createdAt": "2026-07-09T13:40:24.880Z",
+  "description": "Replace direct git calls with VcsAdapter.identity() and remove duplicate VCS detection in actor-resolver composition",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:vcs-adapter-port",
+    "core:vcs-adapter",
+    "core:actor-resolver-port",
+    "core:actor-resolver",
+    "core:actor-resolver-git",
+    "core:actor-resolver-hg",
+    "core:actor-resolver-svn",
+    "core:actor-provider",
+    "core:config-loader",
+    "code-graph:indexer",
+    "core:config",
+    "code-graph:workspace-integration",
+    "cli:entrypoint",
+    "cli:host-context",
+    "core:vcs-actor-resolver",
+    "core:composition",
+    "sdk:host-context"
+  ],
+  "specDependsOn": {
+    "core:vcs-adapter-port": ["default:_global/architecture", "core:vcs-adapter"],
+    "core:vcs-adapter": ["core:composition", "default:_global/architecture"],
+    "core:actor-resolver-port": ["core:actor-resolver", "core:change"],
+    "core:actor-resolver": [
+      "core:actor-provider",
+      "core:actor-resolver-privacy",
+      "core:composition",
+      "core:vcs-adapter"
+    ],
+    "core:actor-resolver-git": ["core:actor-provider"],
+    "core:actor-resolver-hg": ["core:actor-provider"],
+    "core:actor-resolver-svn": ["core:actor-provider"],
+    "core:actor-provider": ["core:actor-resolver-port"],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:vcs-adapter-port"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:vcs-adapter-port"
+    ],
+    "core:config": [
+      "core:schema-format",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:storage",
+      "core:spec-metadata",
+      "core:workspace",
+      "default:_global/logging",
+      "core:vcs-adapter-port"
+    ],
+    "code-graph:workspace-integration": ["core:config", "core:vcs-adapter-port"],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
+    "cli:host-context": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
+    "core:vcs-actor-resolver": [],
+    "core:composition": [
+      "default:_global/architecture",
+      "core:resolve-schema",
+      "core:config-writer-port",
+      "core:kernel-builder",
+      "core:composition-resolver"
+    ],
+    "sdk:host-context": ["sdk:composition", "core:kernel", "core:composition"]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:02b1a11bdb322d5305de7ba896e4d53d7a83a0bd53fab5c28cd2622d9f843164"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:vcs-adapter-port",
+          "filename": "deltas/core/vcs-adapter-port/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-adapter",
+          "filename": "deltas/core/vcs-adapter/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-port",
+          "filename": "deltas/core/actor-resolver-port/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver",
+          "filename": "deltas/core/actor-resolver/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-git",
+          "filename": "deltas/core/actor-resolver-git/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-hg",
+          "filename": "deltas/core/actor-resolver-hg/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-svn",
+          "filename": "deltas/core/actor-resolver-svn/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-provider",
+          "filename": "deltas/core/actor-provider/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-actor-resolver",
+          "filename": "specs/core/vcs-actor-resolver/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:vcs-adapter-port",
+          "filename": "deltas/core/vcs-adapter-port/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-adapter",
+          "filename": "deltas/core/vcs-adapter/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-port",
+          "filename": "deltas/core/actor-resolver-port/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver",
+          "filename": "deltas/core/actor-resolver/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-git",
+          "filename": "deltas/core/actor-resolver-git/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-hg",
+          "filename": "deltas/core/actor-resolver-hg/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-resolver-svn",
+          "filename": "deltas/core/actor-resolver-svn/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:actor-provider",
+          "filename": "deltas/core/actor-provider/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-actor-resolver",
+          "filename": "specs/core/vcs-actor-resolver/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-09T13:40:24.880Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:vcs-adapter-port",
+        "core:vcs-adapter",
+        "core:actor-resolver-port",
+        "core:actor-resolver",
+        "core:actor-resolver-git",
+        "core:actor-resolver-hg",
+        "core:actor-resolver-svn",
+        "core:actor-resolver-null",
+        "core:actor-resolver-privacy",
+        "core:actor-provider",
+        "core:config-loader",
+        "code-graph:indexer"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-09T13:40:24.908Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:vcs-adapter-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:vcs-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-git"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-hg"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-svn"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-null"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-privacy"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-provider"
+        },
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-adapter-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-git"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-hg"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-svn"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-null"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-privacy"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-provider"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T13:48:07.876Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T13:52:15.707Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-resolver-null",
+            "core:actor-resolver-privacy",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-resolver-null",
+            "core:actor-resolver-privacy",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-09T13:52:15.709Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-null"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver-privacy"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-null"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver-privacy"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:11:05.361Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:12:25.482Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:18:05.881Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:25:37.365Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:28:47.397Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-09T14:28:47.402Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:workspace-integration"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:33:28.099Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-09T14:33:28.106Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "specs",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:host-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:41:01.707Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:44:12.783Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:45:15.839Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-09T14:45:15.848Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:vcs-actor-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-actor-resolver"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T14:45:25.195Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-09T14:45:25.205Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:33:34.221Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition, core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:08:24.920Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition, core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:08:28.480Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition, core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:01.414Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition, core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:09.390Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition, core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:14.743Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition, core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

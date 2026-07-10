@@ -123,7 +123,7 @@
     {
       "requirement": "Repository factories on public root",
       "rules": [
-        "The `\".\"` public barrel MUST export `createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, and `createSchemaRegistry`, plus their public option/config types (for example `FsSpecRepositoryOptions`).\n\nEach repository factory MUST accept an adapter id as its first argument. Builtin `'fs'` MUST be supported. Future plugin-registered adapter ids (for example `'db'`) are resolved through `*StorageFactory` registration on `./extensions`; full registry dispatch wiring in factories is out of scope for the initial barrel split but the public factory signatures MUST be designed to accept extensible adapter ids.\n\nIntegrators MUST be able to obtain default filesystem storage (for example `createSpecRepository('fs', ...)`) without calling `createKernel`."
+        "The `\".\"` public barrel MUST export `createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, and `createSchemaRegistry`, plus their public option/config types (for example `FsSpecRepositoryOptions`).\n\nEach repository factory MUST accept an adapter id as its first argument. Builtin `'fs'` MUST be supported. Future plugin-registered adapter ids (for example `'db'`) are resolved through `*StorageFactory` registration on `./extensions`; full registry dispatch wiring in factories is out of scope for the initial barrel split but the public factory signatures MUST be designed to accept extensible adapter ids.\n\nIntegrators MUST be able to obtain default filesystem storage (for example `createSpecRepository('fs', ...)`) without calling `createKernel`.\n\n#### Scenario: Repository factories resolve adapter IDs through composition registries\n\n- **WHEN** a public repository factory is called with an adapter type\n- **THEN** it resolves that type through the merged composition registry\n- **AND** it throws an error if the adapter type is unknown\n\n#### Scenario: Options validated by Zod at construction\n\n- **WHEN** a public repository factory instantiates a repository\n- **THEN** options are validated by Zod inside the concrete repository constructor\n- **AND** it throws a validation error if options are invalid"
       ]
     },
     {
@@ -422,6 +422,18 @@
       "then": ["a SpecRepository is returned without calling createKernel"]
     },
     {
+      "requirement": "Repository factories on public root",
+      "name": "Repository factories resolve adapter IDs through composition registries",
+      "when": ["createSpecRepository('invalid', context, options) is called"],
+      "then": ["it throws UnknownAdapterError"]
+    },
+    {
+      "requirement": "Repository factories on public root",
+      "name": "Options validated by Zod at construction",
+      "when": ["createSpecRepository('fs', context, { path: 123 }) is called"],
+      "then": ["it throws a validation error"]
+    },
+    {
       "requirement": "Extension registration surface",
       "name": "ChangeStorageFactory exported from extensions subpath",
       "when": ["importing from @specd/core/extensions"],
@@ -449,41 +461,63 @@
     "files": [
       {
         "specId": "core:composition",
-        "file": "core:src/composition/shared-repository-wiring.ts"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/index.ts"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/use-cases/index.ts"
-      },
-      {
-        "specId": "core:composition",
         "file": "core:src/public.ts"
       },
       {
         "specId": "core:composition",
-        "file": "core:src/extensions.ts"
+        "file": "core:test/composition/repository-factories.spec.ts"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:test/barrel.spec.ts"
       }
     ],
     "symbols": [
       {
         "specId": "core:composition",
-        "file": "core:src/composition/normalize-factory-args.ts",
-        "symbol": "FactoryInput"
+        "file": "core:src/composition/spec-repository.ts",
+        "symbol": "createSpecRepository"
       },
       {
         "specId": "core:composition",
-        "file": "core:src/composition/normalize-factory-args.ts",
-        "symbol": "normalizeCompositionFactoryArgs"
+        "file": "core:src/composition/schema-repository.ts",
+        "symbol": "createSchemaRepository"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/composition/change-repository.ts",
+        "symbol": "createChangeRepository"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/composition/archive-repository.ts",
+        "symbol": "createArchiveRepository"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/composition/composition-registries.ts",
+        "symbol": "createBuiltinCompositionRegistry"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/domain/errors/index.ts",
+        "symbol": "StorageDirectoryNotFoundError,UnknownAdapterError"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/domain/errors/storage-directory-not-found-error.ts",
+        "symbol": "StorageDirectoryNotFoundError"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/domain/errors/unknown-adapter-error.ts",
+        "symbol": "UnknownAdapterError"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:83df82d0f7a36e6ade545bb57c78f0fc8d231ab42079c2d33f7c228600dcfaf5",
-    "verify.md": "sha256:899fc02af4017cf50ec48a992623e22e143754891770e7928d85e16287ff374b"
+    "spec.md": "sha256:8e382f8fe86a8c2bc41e865de57f640623212c92789c631514b98fc4a197eeea",
+    "verify.md": "sha256:a3b7740ff3edd99834fa068cd86d865a5d18732114095a9a126c5e595ad9aea5"
   },
   "generatedBy": "core"
 }

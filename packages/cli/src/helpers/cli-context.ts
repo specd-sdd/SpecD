@@ -91,6 +91,11 @@ export async function resolveCliContext(options?: {
     ...(options?.configPath !== undefined ? { configPath: options.configPath } : {}),
     kernelOptions: buildCliKernelOptions({ onLog: options?.onLog }),
   })
+  if (host.config.warnings !== undefined && host.config.warnings.length > 0) {
+    for (const warning of host.config.warnings) {
+      console.warn(`warning: ${warning}`)
+    }
+  }
   return {
     config: host.config,
     configFilePath: host.configFilePath,

@@ -14,6 +14,11 @@ The builder SHALL be a pre-construction composition surface only. It MUST NOT mu
 
 The builder MUST NOT own code-graph-specific backend composition. Graph-store registration and backend selection remain outside the core builder contract.
 
+#### Scenario: Repository overrides in builder
+
+- **WHEN** repository overrides are set on the builder
+- **THEN** they are passed to the kernel options when `build()` is called
+
 ### Requirement: Builder supports fluent registration methods
 
 The builder SHALL expose fluent registration methods for each additive registry category that this change introduces. At minimum, it SHALL support:

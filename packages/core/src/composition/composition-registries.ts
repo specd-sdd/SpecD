@@ -4,28 +4,25 @@ import {
   type ArtifactParserRegistry,
 } from '../application/ports/artifact-parser.js'
 import { type ExternalHookRunner } from '../application/ports/external-hook-runner.js'
-import { type ArchiveRepository } from '../application/ports/archive-repository.js'
-import { type ChangeRepository } from '../application/ports/change-repository.js'
-import { type SchemaRepository } from '../application/ports/schema-repository.js'
-import { type SpecRepository } from '../application/ports/spec-repository.js'
+
 import {
   type ExtractorTransform,
   type ExtractorTransformRegistry,
 } from '../domain/services/content-extraction.js'
 import { createArtifactParserRegistry } from '../infrastructure/artifact-parser/registry.js'
-import { createArchiveRepository } from './archive-repository.js'
 import { type ActorProvider } from './actor-provider.js'
 import { BUILTIN_ACTOR_PROVIDERS } from './actor-resolver.js'
-import { createChangeRepository } from './change-repository.js'
 import { createBuiltinExtractorTransforms } from './extractor-transforms/index.js'
 import { type ArchiveStorageFactory } from './archive-storage-factory.js'
 import { type ChangeStorageFactory } from './change-storage-factory.js'
-import { createSchemaRepository } from './schema-repository.js'
 import { type SchemaStorageFactory } from './schema-storage-factory.js'
-import { createSpecRepository } from './spec-repository.js'
 import { type SpecStorageFactory } from './spec-storage-factory.js'
 import { BUILTIN_VCS_PROVIDERS } from './vcs-adapter.js'
 import { type VcsProvider } from './vcs-provider.js'
+import { createFsSpecStorageFactory } from './spec-repository.js'
+import { createFsSchemaStorageFactory } from './schema-repository.js'
+import { createFsChangeStorageFactory } from './change-repository.js'
+import { createFsArchiveStorageFactory } from './archive-repository.js'
 
 export type { ActorProvider, AutoDetectActorProvider } from './actor-provider.js'
 export type { VcsProvider } from './vcs-provider.js'
@@ -88,156 +85,16 @@ export interface CompositionRegistryView {
 }
 
 /**
- * Reads a required string option from an opaque factory options record.
- *
- * @param options - Adapter-owned resolved options
- * @param key - Required property name
- * @returns The string option value
- * @throws {TypeError} When the option is missing or not a string
- */
-function readStringOption(options: Readonly<Record<string, unknown>>, key: string): string {
-  const value = options[key]
-  if (typeof value !== 'string') {
-    throw new TypeError(`expected string option '${key}'`)
-  }
-  return value
-}
-
-/**
- * Reads an optional string option from an opaque factory options record.
- *
- * @param options - Adapter-owned resolved options
- * @param key - Optional property name
- * @returns The string option value, or `undefined` when absent
- * @throws {TypeError} When the option is present but not a string
- */
-function readOptionalStringOption(
-  options: Readonly<Record<string, unknown>>,
-  key: string,
-): string | undefined {
-  const value = options[key]
-  if (value === undefined) return undefined
-  if (typeof value !== 'string') {
-    throw new TypeError(`expected string option '${key}'`)
-  }
-  return value
-}
-
-/**
- * Reads a required object option from an opaque factory options record.
- *
- * @param options - Adapter-owned resolved options
- * @param key - Required property name
- * @returns The nested object value
- * @throws {TypeError} When the option is missing or not an object
- */
-function readRecordOption(
-  options: Readonly<Record<string, unknown>>,
-  key: string,
-): Readonly<Record<string, unknown>> {
-  const value = options[key]
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError(`expected object option '${key}'`)
-  }
-  return value as Readonly<Record<string, unknown>>
-}
-
-/**
- * Reads an optional async artifact-type resolver from opaque factory options.
- *
- * @param options - Adapter-owned resolved options
- * @returns The resolver function when present
- */
-function readResolveArtifactTypes(
-  options: Readonly<Record<string, unknown>>,
-):
-  | (() => Promise<readonly import('../domain/value-objects/artifact-type.js').ArtifactType[]>)
-  | undefined {
-  const value = options.resolveArtifactTypes
-  return typeof value === 'function'
-    ? (value as () => Promise<
-        readonly import('../domain/value-objects/artifact-type.js').ArtifactType[]
-      >)
-    : undefined
-}
-
-/**
- * Reads an optional async spec-existence resolver from opaque factory options.
- *
- * @param options - Adapter-owned resolved options
- * @returns The resolver function when present
- */
-function readResolveSpecExists(
-  options: Readonly<Record<string, unknown>>,
-): ((specId: string) => Promise<boolean>) | undefined {
-  const value = options.resolveSpecExists
-  return typeof value === 'function' ? (value as (specId: string) => Promise<boolean>) : undefined
-}
-
-/** Built-in `fs` factory for spec repositories. */
-const FS_SPEC_STORAGE_FACTORY: SpecStorageFactory = {
-  create(context, options): SpecRepository {
-    const prefix = readOptionalStringOption(options, 'prefix')
-    return createSpecRepository('fs', context, {
-      specsPath: readStringOption(options, 'path'),
-      metadataPath: readStringOption(options, 'metadataPath'),
-      ...(prefix !== undefined ? { prefix } : {}),
-    })
-  },
-}
-
-/** Built-in `fs` factory for schema repositories. */
-const FS_SCHEMA_STORAGE_FACTORY: SchemaStorageFactory = {
-  create(context, options): SchemaRepository {
-    return createSchemaRepository('fs', context, {
-      schemasPath: readStringOption(options, 'path'),
-    })
-  },
-}
-
-/** Built-in `fs` factory for change repositories. */
-const FS_CHANGE_STORAGE_FACTORY: ChangeStorageFactory = {
-  create(context, options): ChangeRepository {
-    const drafts = readRecordOption(options, 'drafts')
-    const discarded = readRecordOption(options, 'discarded')
-    const resolveArtifactTypes = readResolveArtifactTypes(options)
-    const resolveSpecExists = readResolveSpecExists(options)
-    return createChangeRepository('fs', context, {
-      changesPath: readStringOption(options, 'path'),
-      draftsPath: readStringOption(drafts, 'path'),
-      discardedPath: readStringOption(discarded, 'path'),
-      ...(resolveArtifactTypes !== undefined ? { resolveArtifactTypes } : {}),
-      ...(resolveSpecExists !== undefined ? { resolveSpecExists } : {}),
-    })
-  },
-}
-
-/** Built-in `fs` factory for archive repositories. */
-const FS_ARCHIVE_STORAGE_FACTORY: ArchiveStorageFactory = {
-  create(context, options): ArchiveRepository {
-    const changes = readRecordOption(options, 'changes')
-    const drafts = readRecordOption(options, 'drafts')
-    const pattern = readOptionalStringOption(options, 'pattern')
-    return createArchiveRepository('fs', context, {
-      changesPath: readStringOption(changes, 'path'),
-      draftsPath: readStringOption(drafts, 'path'),
-      archivePath: readStringOption(options, 'path'),
-      ...(pattern !== undefined ? { pattern } : {}),
-    })
-  },
-}
-
-/**
  * Returns the built-in composition registry set before additive extension.
  *
  * @returns The built-in storage factories, parsers, providers, and hook runners
  */
 export function createBuiltinCompositionRegistry(): CompositionRegistryInput {
   return {
-    specStorageFactories: { fs: FS_SPEC_STORAGE_FACTORY },
-    schemaStorageFactories: { fs: FS_SCHEMA_STORAGE_FACTORY },
-    changeStorageFactories: { fs: FS_CHANGE_STORAGE_FACTORY },
-    archiveStorageFactories: { fs: FS_ARCHIVE_STORAGE_FACTORY },
+    specStorageFactories: { fs: createFsSpecStorageFactory() },
+    schemaStorageFactories: { fs: createFsSchemaStorageFactory() },
+    changeStorageFactories: { fs: createFsChangeStorageFactory() },
+    archiveStorageFactories: { fs: createFsArchiveStorageFactory() },
     parsers: createArtifactParserRegistry(),
     extractorTransforms: createBuiltinExtractorTransforms(),
     vcsProviders: BUILTIN_VCS_PROVIDERS,

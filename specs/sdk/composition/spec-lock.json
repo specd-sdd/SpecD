@@ -11,8 +11,10 @@
   ],
   "implementation": [
     {
-      "file": "sdk:src/index.ts",
-      "symbols": ["openSpecdHost", "createGetStatus"]
+      "file": "sdk:src/core-reexports.ts"
+    },
+    {
+      "file": "sdk:test/barrel.spec.ts"
     }
   ]
 }

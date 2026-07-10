@@ -1,0 +1,163 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Storage configuration'
+  content: |
+    #### Scenario: Storage layout uses generic adapter bindings
+
+    - **GIVEN** a configuration where `storage.changes.adapter` is `{ type: 'fs', config: { path: 'specd/changes' } }`
+    - **WHEN** the config is loaded
+    - **THEN** it resolves successfully
+    - **AND** `config.storage.changesAdapter.type` is `'fs'`
+    - **AND** `config.storage.changesAdapter.config.path` is absolute
+
+    #### Scenario: Legacy storage layout is normalized at load time
+
+    - **GIVEN** a legacy config using the old shape `changes: { adapter: 'fs', fs: { path: 'specd/changes' } }`
+    - **WHEN** the config is loaded
+    - **THEN** it is normalized in-memory to `{ type: 'fs', config: { path: 'specd/changes' } }`
+
+    #### Scenario: Omitted storage section resolves to standard fs defaults
+
+    - **GIVEN** a config that completely omits the `storage` key
+    - **WHEN** the config is loaded
+    - **THEN** all storage adapter bindings default to `'fs'`
+    - **AND** their paths resolve to subdirectories under `config.specdPath`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Config path and derived directories'
+  content: |
+    #### Scenario: specdPath defaults to repo-local .specd directory
+
+    - **GIVEN** `specd.yaml` omits `specdPath`
+    - **WHEN** the config is loaded
+    - **THEN** `specdPath` resolves to `.specd` relative to the config file
+    - **AND** `configPath` resolves to `.specd/config`
+    - **AND** the derived directories are `{specdPath}/graph` and `{specdPath}/tmp`
+
+    #### Scenario: Explicit specdPath stays project-level
+
+    - **GIVEN** `specd.yaml` declares `specdPath: custom-specd`
+    - **WHEN** the config is loaded
+    - **THEN** `specdPath` resolves to `custom-specd` relative to the config file
+    - **AND** `configPath` resolves to `custom-specd/config`
+    - **AND** the derived directories are `{specdPath}/graph` and `{specdPath}/tmp`
+
+    #### Scenario: configPath also defines change-locks directory
+
+    - **GIVEN** `configPath` is set to `.specd/config`
+    - **WHEN** `FsChangeRepository` needs to acquire a change lock
+    - **THEN** the lock file is placed under `{configPath}/tmp/change-locks/`
+    - **AND** not under the changes storage directory
+
+    #### Scenario: Missing directories throw StorageDirectoryNotFoundError
+
+    - **GIVEN** a config is loaded
+    - **AND** one or more resolved directories in `SpecdConfig` do not exist on disk
+    - **WHEN** the config is loaded
+    - **THEN** the loader throws a `StorageDirectoryNotFoundError`
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Startup validation'
+  content: |
+    #### Scenario: Valid minimal config passes validation
+
+    - **GIVEN** a `specd.yaml` with only `schema: schema-std@1`
+    - **WHEN** config is validated at startup
+    - **THEN** validation passes with defaults applied
+
+    #### Scenario: Invalid contextMode value rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: partial`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` identifying the invalid `contextMode` value
+
+    #### Scenario: Legacy lazy contextMode rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: lazy`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` because lazy is no longer accepted
+
+    #### Scenario: contextMode in workspace entry rejected with specific message
+
+    - **GIVEN** `specd.yaml` contains a workspace with `contextMode: summary`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` with the message "`contextMode` is not valid inside a workspace — it is a project-level setting"
+
+    #### Scenario: artifactRules rejected at startup
+
+    - **GIVEN** `specd.yaml` contains `artifactRules: { specs: [...] }`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` suggesting migration to `schemaOverrides`
+
+    #### Scenario: skills field rejected at startup
+
+    - **GIVEN** `specd.yaml` contains a `skills` field
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` explaining skills are managed via the plugin system
+
+    #### Scenario: Invalid level string
+
+    - **GIVEN** `specd.yaml` with `logging: { level: 'verbose' }` (not a recognized level)
+    - **WHEN** config is validated at startup
+    - **THEN** validation MUST fail with a `ConfigValidationError`
+
+    #### Scenario: remove without extends is rejected
+
+    - **GIVEN** a config file declares `remove` but no `extends`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Invalid extends value is rejected
+
+    - **GIVEN** a config file declares `extends: { from: ./specd.yaml }`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Required root field cannot be removed
+
+    - **GIVEN** an inheriting config declares `remove: { root: [schema] }`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Unknown workspace removal target is rejected
+
+    - **GIVEN** an inheriting config declares `remove: { workspaces: [billing] }`
+    - **AND** no inherited `billing` workspace exists
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Explicit extends outside the active chain is skipped
+
+    - **GIVEN** a discovered config declares `extends: ./unrelated.yaml`
+    - **AND** `unrelated.yaml` is not active in the discovery chain
+    - **WHEN** config is loaded in discovery mode
+    - **THEN** that candidate is skipped (no error)
+
+    ### Requirement: Legacy configuration warnings
+
+    #### Scenario: Legacy config format emits warnings
+
+    - **GIVEN** a config file declares a legacy workspace spec adapter format:
+      ```yaml
+      workspaces:
+        default:
+          specs:
+            adapter: fs
+            fs:
+              path: specs
+      ```
+    - **WHEN** config is loaded
+    - **THEN** it resolves successfully
+    - **AND** `config.warnings` contains a warning string for `'workspaces.default.specs'`
+
+    #### Scenario: Omitted storage defaults do not emit legacy configuration warnings
+
+    - **GIVEN** a config file that completely omits the `storage` key
+    - **WHEN** config is loaded
+    - **THEN** it resolves successfully
+    - **AND** `config.warnings` is undefined or does not contain warnings for storage

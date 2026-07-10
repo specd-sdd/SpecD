@@ -98,7 +98,7 @@
     {
       "requirement": "createKernel accepts optional KernelOptions",
       "rules": [
-        "`createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy."
+        "`createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.\n\n#### Scenario: Repository overrides provided in KernelOptions\n\n- **GIVEN** a `KernelOptions` with injected repository overrides\n- **WHEN** `createKernel(config, options)` is called\n- **THEN** the kernel reuses the injected repository instances for use case execution\n- **AND** does not instantiate new ones"
       ]
     },
     {
@@ -473,6 +473,13 @@
       "then": ["the schema registry searches only the project's own node_modules"]
     },
     {
+      "requirement": "createKernel accepts optional KernelOptions",
+      "name": "Repository overrides provided in KernelOptions",
+      "given": ["a mock ChangeRepository passed in options.repositories"],
+      "when": ["createKernel(config, options) is called"],
+      "then": ["kernel.changes.repo is the mock instance"]
+    },
+    {
       "requirement": "KernelOptions supports additive registries",
       "name": "External registrations extend built-ins",
       "given": [
@@ -548,38 +555,22 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:kernel",
-        "file": "core:src/composition/kernel.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:kernel",
-        "file": "core:src/composition/kernel-internals.ts",
-        "symbol": "KernelInternals"
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "KernelOptions"
       },
       {
         "specId": "core:kernel",
-        "file": "core:src/composition/kernel-internals.ts",
-        "symbol": "createKernelInternals"
-      },
-      {
-        "specId": "core:kernel",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "CompositionRegistryView"
-      },
-      {
-        "specId": "core:kernel",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "createCompositionRegistryView"
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b40905d2faa9aa68ca7721d4c037b13baaca1bcb463e05793e5663881d28a8b0",
-    "verify.md": "sha256:b1f280380f71eb613337b4755811496608d6e3b3b95f22bd32896c9ba201097f"
+    "spec.md": "sha256:feae4716c4ba7143001ba1150eb0ce6ed926799e5da444850d4216b9ef8263e8",
+    "verify.md": "sha256:d65d6af7de12ca827ecca025a5f3167de06ea92bc49b7ae86135ca3e89023e7e"
   },
   "generatedBy": "core"
 }

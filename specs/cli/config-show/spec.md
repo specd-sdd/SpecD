@@ -20,18 +20,19 @@ In `text` mode (default), the command prints the resolved config as structured k
 
 ```
 projectRoot:  <absolute-path>
+specdPath:    <absolute-path>
 schemaRef:    <schema-ref>
 approvals:    spec=<true|false>  signoff=<true|false>
 
 workspaces:
-  <name>  <ownership>  <specsPath>
+  <name>  <ownership>  [type: <adapter-type>]  config: <serialized-config>
   ...
 
 storage:
-  changes:   <absolute-path>
-  drafts:    <absolute-path>
-  discarded: <absolute-path>
-  archive:   <absolute-path>
+  changes:   [type: <adapter-type>]  config: <serialized-config>
+  drafts:    [type: <adapter-type>]  config: <serialized-config>
+  discarded: [type: <adapter-type>]  config: <serialized-config>
+  archive:   [type: <adapter-type>]  config: <serialized-config>
 ```
 
 Optional fields are shown only when present in the config:
@@ -80,17 +81,18 @@ If the config cannot be loaded (discovery failure or parse error), exits per the
 ```
 $ specd config show
 projectRoot:  /home/user/project
+specdPath:    /home/user/project/.specd
 schemaRef:    @specd/schema-std
 approvals:    spec=false  signoff=false
 
 workspaces:
-  default   owned   /home/user/project/specs
+  default   owned   [type: fs]  config: {"path":"/home/user/project/specs"}
 
 storage:
-  changes:   /home/user/project/.specd/changes
-  drafts:    /home/user/project/.specd/drafts
-  discarded: /home/user/project/.specd/discarded
-  archive:   /home/user/project/.specd/archive
+  changes:   [type: fs]  config: {"path":"/home/user/project/.specd/changes"}
+  drafts:    [type: fs]  config: {"path":"/home/user/project/.specd/drafts"}
+  discarded: [type: fs]  config: {"path":"/home/user/project/.specd/discarded"}
+  archive:   [type: fs]  config: {"path":"/home/user/project/.specd/archive"}
 
 contextIncludeSpecs: default:*
 llmOptimizedContext: true

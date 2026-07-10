@@ -18,22 +18,22 @@ export {
 export {
   createSchemaRepository,
   type SchemaRepositoryConfig,
-  type FsSchemaRepositoryOptions,
+  type FsSchemaRepositoryConfig as FsSchemaRepositoryOptions,
 } from './composition/schema-repository.js'
 export {
   createSpecRepository,
   type SpecRepositoryConfig,
-  type FsSpecRepositoryOptions,
+  type FsSpecRepositoryConfig as FsSpecRepositoryOptions,
 } from './composition/spec-repository.js'
 export {
   createChangeRepository,
   type ChangeRepositoryConfig,
-  type FsChangeRepositoryOptions,
+  type FsChangeRepositoryConfig as FsChangeRepositoryOptions,
 } from './composition/change-repository.js'
 export {
   createArchiveRepository,
   type ArchiveRepositoryConfig,
-  type FsArchiveRepositoryOptions,
+  type FsArchiveRepositoryConfig as FsArchiveRepositoryOptions,
 } from './composition/archive-repository.js'
 export {
   type SpecdConfig,

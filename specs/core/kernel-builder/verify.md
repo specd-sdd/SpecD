@@ -11,6 +11,12 @@
 - **THEN** the builder retains all of them as pending additive registrations
 - **AND** no built kernel is mutated before `build()` is called
 
+#### Scenario: Repository overrides in builder
+
+- **GIVEN** a mock `ChangeRepository` set on the builder
+- **WHEN** `build()` is called
+- **THEN** the returned kernel reuses that mock instance
+
 ### Requirement: Builder supports fluent registration methods
 
 #### Scenario: Registration methods are chainable
