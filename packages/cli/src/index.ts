@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
-import { createConfigLoader } from '@specd/sdk'
+import { createDefaultConfigLoader } from '@specd/sdk'
 import { handleError } from './handle-error.js'
 import { renderBanner } from './banner.js'
 import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from './version.js'
@@ -251,7 +251,7 @@ program.action(async () => {
 
   // No explicit path — probe for specd.yaml using the same discovery logic as
   // load(), without parsing YAML or throwing on not-found.
-  const loader = createConfigLoader({ startDir: process.cwd() })
+  const loader = await createDefaultConfigLoader({ startDir: process.cwd() })
   const found = await loader.resolvePath()
   if (found === null) {
     program.help()

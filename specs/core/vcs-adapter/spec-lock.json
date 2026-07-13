@@ -7,19 +7,28 @@
   "implementation": [
     {
       "file": "core:src/infrastructure/git/vcs-adapter.ts",
-      "symbols": ["GitVcsAdapter", "GitVcsAdapter.refAt", "GitVcsAdapter.modifiedFiles"]
+      "symbols": ["GitVcsAdapter"]
     },
     {
       "file": "core:src/infrastructure/hg/vcs-adapter.ts",
-      "symbols": ["HgVcsAdapter", "HgVcsAdapter.refAt", "HgVcsAdapter.modifiedFiles"]
-    },
-    {
-      "file": "core:src/infrastructure/null/vcs-adapter.ts",
-      "symbols": ["NullVcsAdapter", "NullVcsAdapter.refAt", "NullVcsAdapter.modifiedFiles"]
+      "symbols": ["HgVcsAdapter"]
     },
     {
       "file": "core:src/infrastructure/svn/vcs-adapter.ts",
-      "symbols": ["SvnVcsAdapter", "SvnVcsAdapter.refAt", "SvnVcsAdapter.modifiedFiles"]
+      "symbols": ["SvnVcsAdapter"]
+    },
+    {
+      "file": "core:src/infrastructure/null/vcs-adapter.ts",
+      "symbols": ["NullVcsAdapter"]
+    },
+    {
+      "file": "core:test/infrastructure/git/vcs-adapter.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/hg/vcs-adapter.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/svn/vcs-adapter.spec.ts"
     }
   ]
 }

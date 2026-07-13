@@ -470,13 +470,13 @@ const kernel = await createKernelBuilder(config)
 
 ### Loading the config
 
-Use `createConfigLoader` to discover and load `specd.yaml` before calling `createKernel`:
+Use `createDefaultConfigLoader` to discover and load `specd.yaml` before calling `createKernel`:
 
 ```typescript
-import { createConfigLoader, createKernel } from '@specd/core'
+import { createDefaultConfigLoader, createKernel } from '@specd/core'
 
-// Discovery mode: walks up from CWD, bounded by the git root
-const loader = createConfigLoader({ startDir: process.cwd() })
+// Discovery mode: walks up from CWD, bounded by the VCS root
+const loader = await createDefaultConfigLoader({ startDir: process.cwd() })
 const config = await loader.load()
 const kernel = await createKernel(config)
 ```
@@ -484,7 +484,7 @@ const kernel = await createKernel(config)
 When the CLI is invoked with `--config path/to/specd.yaml`, use forced mode instead:
 
 ```typescript
-const loader = createConfigLoader({ configPath: options.config })
+const loader = await createDefaultConfigLoader({ configPath: options.config })
 ```
 
 ### Using a single use-case factory

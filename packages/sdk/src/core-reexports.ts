@@ -1,6 +1,6 @@
 // Bootstrap
 export { createKernel, type Kernel, type KernelOptions } from '@specd/core'
-export { createConfigLoader, type FsConfigLoaderOptions } from '@specd/core'
+export { createDefaultConfigLoader, type FsConfigLoaderOptions } from '@specd/core'
 export { createConfigWriter, type FsConfigWriterOptions } from '@specd/core'
 export { createVcsAdapter } from '@specd/core'
 export { createVcsActorResolver } from '@specd/core'

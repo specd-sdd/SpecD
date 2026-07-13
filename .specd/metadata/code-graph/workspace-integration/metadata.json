@@ -51,7 +51,7 @@
     {
       "requirement": "WorkspaceIndexTarget",
       "rules": [
-        "`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:\n\n```ts\ninterface ProjectGraphConfig {\n  readonly includePaths?: readonly string[]\n  readonly excludePaths?: readonly string[]\n  readonly workspaces?: ReadonlyMap<\n    string,\n    {\n      readonly allowedPaths?: readonly string[]\n      readonly excludePaths?: readonly string[]\n      readonly respectGitignore?: boolean\n    }\n  >\n}\n\ninterface IndexOptions {\n  readonly projectRoot: string\n  readonly workspaces: readonly ProjectWorkspace[]\n  readonly graphConfig: ProjectGraphConfig\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n  readonly vcsRef?: string\n}\n```\n\nThe `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.\n\n`ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`."
+        "`IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:\n\n```ts\ninterface ProjectGraphConfig {\n  readonly includePaths?: readonly string[]\n  readonly excludePaths?: readonly string[]\n  readonly workspaces?: ReadonlyMap<\n    string,\n    {\n      readonly allowedPaths?: readonly string[]\n      readonly excludePaths?: readonly string[]\n      readonly respectGitignore?: boolean\n    }\n  >\n}\n\ninterface IndexOptions {\n  readonly projectRoot: string\n  readonly workspaces: readonly ProjectWorkspace[]\n  readonly graphConfig: ProjectGraphConfig\n  readonly onProgress?: IndexProgressCallback\n  readonly chunkBytes?: number\n  readonly vcsRef?: string\n  readonly vcsRoot: string | null\n}\n```\n\nThe `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.\n\n`ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`."
       ]
     },
     {
@@ -63,7 +63,7 @@
     {
       "requirement": ".gitignore handling for codeRoot",
       "rules": [
-        "When discovering files from a `codeRoot`, `.gitignore` handling is controlled by `WorkspaceIndexTarget.respectGitignore` (default `true`):\n\nWhen `respectGitignore` is `true`:\n\n1. Find the git root by walking up from `codeRoot` looking for `.git/`\n2. Load `.gitignore` from the git root\n3. Load any `.gitignore` files found in subdirectories during the walk\n4. Apply rules relative to the directory containing each `.gitignore`\n5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files\n\nWhen `respectGitignore` is `false`:\n\n- `.gitignore` files are not loaded or applied\n- Only `excludePaths` patterns govern file exclusion"
+        "When discovering files from a `codeRoot`, `.gitignore` handling is controlled by `WorkspaceIndexTarget.respectGitignore` (default `true`):\n\nWhen `respectGitignore` is `true`:\n\n1. Use the provided `vcsRoot` in options, which is resolved upstream from `VcsAdapter.rootDir()`.\n2. When `vcsRoot` is non-null, load `.gitignore` from that VCS root.\n3. Load any `.gitignore` files found in subdirectories during the walk.\n4. Apply rules relative to the directory containing each `.gitignore`.\n5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files.\n\nWhen `vcsRoot` is `null`:\n\n- repository-root `.gitignore` is not loaded\n- file discovery MUST NOT probe for `.git/`, `.hg/`, or `.svn/` markers\n\nWhen `respectGitignore` is `false`:\n\n- `.gitignore` files are not loaded or applied\n- Only `excludePaths` patterns govern file exclusion"
       ]
     }
   ],
@@ -247,11 +247,21 @@
     },
     {
       "requirement": ".gitignore handling for codeRoot",
-      "name": "Hierarchical gitignore loading",
-      "when": ["codeRoot is /project/packages/core and git root is /project"],
+      "name": "Hierarchical gitignore loading from VCS root",
+      "when": ["codeRoot is /project/packages/core and VCS root is /project"],
       "then": [
         ".gitignore from /project SHALL be loaded and applied",
         "AND any .gitignore files in subdirectories SHALL also be applied"
+      ]
+    },
+    {
+      "requirement": ".gitignore handling for codeRoot",
+      "name": "Null vcsRoot does not trigger repository probing",
+      "given": ["vcsRoot is null"],
+      "when": ["file discovery runs for that workspace"],
+      "then": [
+        "repository-root .gitignore is not loaded",
+        "AND discovery does not probe for .git/, .hg/, or .svn/ markers"
       ]
     },
     {
@@ -269,18 +279,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "code-graph:workspace-integration",
-        "file": "code-graph:src/domain/value-objects/index-options.ts"
+        "file": "code-graph:src/application/use-cases/index-project-graph.ts",
+        "symbol": "indexProjectGraph"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0783697b0cc03378f2d58929ab97602910a73e121f201e8592e7020a5d9c8d53",
-    "verify.md": "sha256:f39fbe63305258331b5ac34abad305822e0ee2c511f9695a3f6127ff8f9db312"
+    "spec.md": "sha256:373f45bab5892c462c083b13b1ca9b5cfb57aee82b31c84f3ce3aa1122e648c0",
+    "verify.md": "sha256:f637ae8331d07a7bbd073990099a9515844adfc710cf386dad66f7740c15b0e9"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Multi-workspace graph integration: globally unique file/symbol identities via workspace prefixing, cross-workspace import resolution, SpecRepository-based spec indexing.",
-  "optimizedContext": "# Workspace Integration\n## Rules\n- FileNode path semantics: globally unique via `{workspaceName}:{relativeToCodeRoot}`. Root namespace `root:{projectRelativePath}` for project-global includes. Workspace identity wins over root. Each node stores `configRelativePath` for CLI lookups.\n- SymbolNode ID includes workspace: `id = {filePath}:{kind}:{name}:{line}:{column}`. column disambiguates overloaded declarations.\n- SpecNode workspace field: workspace name. Spec IDs format `{workspace}:{specPath}`.\n- File discovery from codeRoot: per-workspace from SpecdWorkspaceConfig.codeRoot. `discoverFiles` workspace-agnostic — prefixing done by indexer.\n- Config-relative file lookup: indexer computes configRelativePath from active specd.yaml to file. Forward-slash normalized, no leading `./`. Supports `..` segments. Does not replace canonical identity.\n- Spec resolution via SpecRepository: indexer uses SpecRepository directly — list(), specHash(), artifact(), metadata(), readPersistedDependsOn(), readPersistedImplementation(). No CLI callbacks, no filesystem fallback.\n- Cross-workspace import resolution: Pass 2 resolves across workspaces. Relative imports → same workspace. Package imports → packageName→workspaceName map. PHP qualified names → global. In-memory SymbolIndex holds all workspaces before Pass 2.\n- IndexOptions: projectRoot, workspaces (ProjectWorkspace[]), graphConfig (ProjectGraphConfig with includePaths, excludePaths, per-workspace settings), onProgress, chunkBytes (20MB default), vcsRef.\n- IndexResult breakdown: WorkspaceIndexBreakdown — name, filesDiscovered/indexed/skipped/removed, specsDiscovered/indexed.\n- .gitignore handling: respectGitignore (default true). When true: find git root, load .gitignore recursively, apply rules. Gitignore exclusions absolute — excludePaths cannot re-include. When false: no .gitignore loading, only excludePaths.\n## Constraints\n- @specd/code-graph depends on @specd/core (types, domain services)\n- Single .specd/code-graph.lbug file for whole project\n- discoverFiles workspace-agnostic — prefixing/config-relative derivation in indexer\n- Spec resolution uses SpecRepository exclusively — no filesystem fallback\n- Existing stores incompatible after file identity metadata changes — full rebuild required"
+  "generatedBy": "core"
 }

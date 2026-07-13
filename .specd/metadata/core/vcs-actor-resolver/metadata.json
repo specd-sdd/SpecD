@@ -1,0 +1,74 @@
+{
+  "title": "VCS Actor Resolver",
+  "description": "To resolve the current actor's identity from the active version control system without duplicating VCS detection or CLI execution logic. `VcsActorResolver` implements the `ActorResolver` port by wrapping a `VcsAdapter` and delegating identity queries directly to it.",
+  "dependsOn": ["core:actor-resolver-port", "core:vcs-adapter-port"],
+  "context": [
+    "To resolve the current actor's identity from the active version control system without duplicating VCS detection or CLI execution logic. `VcsActorResolver` implements the `ActorResolver` port by wrapping a `VcsAdapter` and delegating identity queries directly to it."
+  ],
+  "rules": [
+    {
+      "requirement": "Implementation of ActorResolver port",
+      "rules": ["`VcsActorResolver` MUST implement the `ActorResolver` port interface."]
+    },
+    {
+      "requirement": "Constructor receives VcsAdapter",
+      "rules": [
+        "`VcsActorResolver` MUST accept a `VcsAdapter` instance as its constructor parameter."
+      ]
+    },
+    {
+      "requirement": "Identity resolution delegates to VcsAdapter",
+      "rules": [
+        "When `identity()` is called, `VcsActorResolver` MUST invoke `identity()` on its wrapped `VcsAdapter` and return the resulting `ActorIdentity` (mapping the `VcsIdentity` fields)."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "requirement": "Implementation of ActorResolver port",
+      "name": "Interface satisfaction",
+      "given": ["a VcsActorResolver instance"],
+      "then": ["it satisfies the ActorResolver interface"]
+    },
+    {
+      "requirement": "Constructor receives VcsAdapter",
+      "name": "Instantiation with VcsAdapter",
+      "given": ["a mock VcsAdapter instance"],
+      "when": ["VcsActorResolver is constructed with it"],
+      "then": ["construction succeeds"]
+    },
+    {
+      "requirement": "Identity resolution delegates to VcsAdapter",
+      "name": "Successful delegation",
+      "given": [
+        "a mock VcsAdapter whose identity() resolves to { name: \"Developer\", email: \"dev@example.com\", provider: \"git\" }",
+        "AND a VcsActorResolver constructed with that mock"
+      ],
+      "when": ["identity() is called on the resolver"],
+      "then": [
+        "it calls identity() on the mock adapter",
+        "AND resolves to { name: \"Developer\", email: \"dev@example.com\", provider: \"git\" }"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:vcs-actor-resolver",
+        "file": "core:test/infrastructure/vcs-actor-resolver.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:vcs-actor-resolver",
+        "file": "core:src/infrastructure/vcs-actor-resolver.ts",
+        "symbol": "VcsActorResolver"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:0c9f2f68443340b74a0be3827062b9f9110856f097fcdb0eceef03aa7dd2f4d8",
+    "verify.md": "sha256:3287a671e58c3ad330950109e4d2f29737c1882cf86322c34f3e7492915fcaa9"
+  },
+  "generatedBy": "core"
+}

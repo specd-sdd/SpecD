@@ -4,49 +4,17 @@
 
 ### Requirement: Config file location and format
 
-#### Scenario: Config found — nearest directory with candidates used
+#### Scenario: Discover config walking up to VCS root
 
-- **GIVEN** a repo where `/repo/app/specd.local.dev.yaml` exists and `/repo/specd.yaml` also exists
-- **WHEN** specd runs from `/repo/app/src`
-- **THEN** discovery resolves the candidate set from `/repo/app`
-- **AND** it does not continue walking to `/repo`
+- **GIVEN** target directory is inside a subfolder of a VCS repository
+- **WHEN** config discovery runs
+- **THEN** it walks up the directory structure and stops at the nearest VCS root
 
-#### Scenario: Monorepo — package config directory takes precedence
+#### Scenario: No VCS repo checks only CWD
 
-- **GIVEN** `/repo/specd.yaml` exists at the monorepo root
-- **AND** `/repo/packages/api/specd.yaml` exists inside one package
-- **WHEN** specd runs from `/repo/packages/api/src`
-- **THEN** discovery resolves the package directory candidate set
-- **AND** the root-level config directory is not consulted
-
-#### Scenario: Config not found inside repo
-
-- **GIVEN** no discoverable config candidates exist between CWD and the git root
-- **WHEN** specd starts
-- **THEN** startup fails with a config validation error
-
-#### Scenario: Invoked outside a git repo
-
-- **GIVEN** the current directory is not inside any git repository
-- **AND** the parent directory contains discoverable config candidates but the current directory does not
-- **WHEN** specd starts
-- **THEN** discovery checks only the current directory
-- **AND** startup fails because no local candidates exist there
-
-#### Scenario: Explicit config flag resolves only the selected chain
-
-- **GIVEN** `/repo/specd.local.dev.yaml` declares `extends: true`
-- **AND** `/repo/specd.local.zz-last.yaml` also exists
-- **WHEN** the CLI is invoked with `--config /repo/specd.local.dev.yaml`
-- **THEN** specd resolves `/repo/specd.local.dev.yaml` and its `extends` chain only
-- **AND** `/repo/specd.local.zz-last.yaml` is not added by discovery
-
-#### Scenario: Command-specific bootstrap mode does not redefine --config
-
-- **GIVEN** a command defines bootstrap mode in its own spec
-- **WHEN** the same command is invoked with `--config path/to/file.yaml`
-- **THEN** `--config` still means an explicit config entrypoint
-- **AND** bootstrap mode does not reinterpret it as a repository root selector
+- **GIVEN** target directory is not inside any VCS repository
+- **WHEN** config discovery runs
+- **THEN** it checks only the current working directory
 
 ### Requirement: Privacy settings
 
@@ -722,6 +690,13 @@
 - **AND** `unrelated.yaml` is not active in the discovery chain
 - **WHEN** config is loaded in discovery mode
 - **THEN** that candidate is skipped (no error)
+
+#### Scenario: No VCS repo — containment check skipped
+
+- **GIVEN** startDir is not inside a VCS repository
+- **AND** storage paths resolve to arbitrary locations
+- **WHEN** `load()` is called
+- **THEN** no containment error is thrown
 
 ### Requirement: Legacy configuration warnings
 

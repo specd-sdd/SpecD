@@ -3,7 +3,10 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { execSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { FsConfigLoader } from '../../../src/infrastructure/fs/config-loader.js'
+import {
+  FsConfigLoader,
+  type FsConfigLoaderOptions,
+} from '../../../src/infrastructure/fs/config-loader.js'
 import { ConfigValidationError } from '../../../src/domain/errors/config-validation-error.js'
 
 // ---------------------------------------------------------------------------
@@ -70,6 +73,31 @@ ${extra}
 `.trim()
 }
 
+/**
+ * Creates an `FsConfigLoader` using the explicit root-boundary constructor.
+ *
+ * Tests still construct the infrastructure adapter directly, so this helper
+ * mirrors the composition-layer root resolution contract.
+ *
+ * @param options - Loader construction options
+ * @returns A filesystem config loader
+ */
+function createLoader(options: FsConfigLoaderOptions): FsConfigLoader {
+  const probeDir = 'configPath' in options ? path.dirname(options.configPath) : options.startDir
+  const rootPath = (() => {
+    try {
+      return execSync('git rev-parse --show-toplevel', {
+        cwd: probeDir,
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
+    } catch {
+      return null
+    }
+  })()
+  return new FsConfigLoader(rootPath, options)
+}
+
 // ---------------------------------------------------------------------------
 // Requirement: Project-level contextIncludeSpecs / contextExcludeSpecs
 // ---------------------------------------------------------------------------
@@ -78,7 +106,7 @@ describe('FsConfigLoader', () => {
   describe('Requirement: Logging configuration', () => {
     it('defaults logging level to info when logging section is absent', async () => {
       const configPath = await writeConfig(minimalYaml())
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.logging?.level).toBe('info')
@@ -92,7 +120,7 @@ logging:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.logging?.level).toBe('debug')
@@ -103,7 +131,7 @@ logging:
     it('defaults configPath to .specd/config under the config directory', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.configPath).toBe(path.join(tmpDir, '.specd', 'config'))
@@ -116,7 +144,7 @@ configPath: .specd/custom-config
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.configPath).toBe(path.join(tmpDir, '.specd', 'custom-config'))
@@ -130,9 +158,9 @@ configPath: ../outside
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
 
-      await expect(loader.load()).rejects.toThrow(/configPath resolves outside repo root/)
+      await expect(loader.load()).rejects.toThrow(/configPath resolves outside VCS root/)
     })
   })
 
@@ -140,7 +168,7 @@ configPath: ../outside
     it('preserves named fs adapter bindings with resolved absolute paths', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.workspaces[0]?.specsAdapter).toEqual({
@@ -183,7 +211,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.workspaces[0]?.specsAdapter).toEqual({
@@ -203,7 +231,7 @@ contextIncludeSpecs:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextIncludeSpecs).toEqual(['default:*', 'billing:arch/*'])
@@ -217,7 +245,7 @@ contextExcludeSpecs:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextExcludeSpecs).toEqual(['default:drafts/*'])
@@ -226,7 +254,7 @@ contextExcludeSpecs:
     it('omits contextIncludeSpecs from SpecdConfig when not declared', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextIncludeSpecs).toBeUndefined()
@@ -235,7 +263,7 @@ contextExcludeSpecs:
     it('omits contextExcludeSpecs from SpecdConfig when not declared', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextExcludeSpecs).toBeUndefined()
@@ -279,7 +307,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -318,7 +346,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -328,7 +356,7 @@ storage:
     it('omits workspace contextIncludeSpecs when not declared', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -372,7 +400,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -382,7 +410,7 @@ storage:
     it('omits prefix from SpecdWorkspaceConfig when not declared', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -420,7 +448,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -458,7 +486,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
     })
 
@@ -493,7 +521,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
     })
 
@@ -528,7 +556,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
     })
 
@@ -563,7 +591,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
     })
   })
@@ -583,7 +611,7 @@ contextIncludeSpecs:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.contextIncludeSpecs).toEqual(['default:local-only/*'])
@@ -605,7 +633,7 @@ contextIncludeSpecs:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       // local override wins — default:arch/* not default:*
@@ -622,7 +650,7 @@ contextIncludeSpecs:
       // tmpDir has no .git — outside any git repo
       await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.projectRoot).toBe(tmpDir)
@@ -634,7 +662,7 @@ contextIncludeSpecs:
       const childDir = path.join(tmpDir, 'nested')
       await fs.mkdir(childDir, { recursive: true })
 
-      const loader = new FsConfigLoader({ startDir: childDir })
+      const loader = createLoader({ startDir: childDir })
       await expect(loader.load()).rejects.toThrow('no specd.yaml found')
     })
   })
@@ -653,7 +681,7 @@ context:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.context).toHaveLength(2)
@@ -665,7 +693,7 @@ context:
     it('omits context from SpecdConfig when not declared', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.context).toBeUndefined()
@@ -684,7 +712,7 @@ contextMode: 'list'
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextMode).toBe('list')
@@ -697,7 +725,7 @@ contextMode: 'summary'
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextMode).toBe('summary')
@@ -710,7 +738,7 @@ contextMode: 'full'
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextMode).toBe('full')
@@ -723,7 +751,7 @@ contextMode: 'hybrid'
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextMode).toBe('hybrid')
@@ -732,7 +760,7 @@ contextMode: 'hybrid'
     it('omits contextMode from SpecdConfig when not declared', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.contextMode).toBeUndefined()
@@ -745,7 +773,7 @@ contextMode: 'lazy'
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
     })
 
@@ -756,7 +784,7 @@ contextMode: 'partial'
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow()
     })
 
@@ -791,7 +819,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(
         /`contextMode` is not valid inside a workspace — it is a project-level setting/,
       )
@@ -830,7 +858,7 @@ storage:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/schema/)
     })
 
@@ -864,7 +892,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.warnings).toBeDefined()
       expect(config.warnings).toContain(
@@ -889,7 +917,7 @@ workspaces:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.warnings).toBeUndefined()
     })
@@ -903,7 +931,7 @@ schemaPlugins:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.schemaPlugins).toEqual(['@specd/plugin-agent-claude', '#local-plugin'])
@@ -919,7 +947,7 @@ schemaOverrides:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.schemaOverrides).toBeDefined()
@@ -939,7 +967,7 @@ approvals:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.approvals).toEqual({ spec: true, signoff: false })
@@ -952,7 +980,7 @@ llmOptimizedContext: true
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.llmOptimizedContext).toBe(true)
@@ -965,7 +993,7 @@ llmOptimizedContext: "yes"
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/llmOptimizedContext/)
     })
 
@@ -978,7 +1006,7 @@ artifactRules:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/schemaOverrides/)
     })
 
@@ -991,7 +1019,7 @@ skills:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/managed via the plugin system/)
     })
   })
@@ -1009,7 +1037,7 @@ plugins:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.plugins).toEqual({
@@ -1033,7 +1061,7 @@ plugins:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/plugins\.agents\[0\]\.name/)
     })
   })
@@ -1050,7 +1078,7 @@ contextIncludeSpecs:
   - '*'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.contextIncludeSpecs).toEqual(['*'])
     })
@@ -1062,7 +1090,7 @@ contextIncludeSpecs:
   - 'billing:*'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.contextIncludeSpecs).toEqual(['billing:*'])
     })
@@ -1074,7 +1102,7 @@ contextIncludeSpecs:
   - '_global/*'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.contextIncludeSpecs).toEqual(['_global/*'])
     })
@@ -1086,7 +1114,7 @@ contextIncludeSpecs:
   - 'default:auth/*'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.contextIncludeSpecs).toEqual(['default:auth/*'])
     })
@@ -1098,7 +1126,7 @@ contextExcludeSpecs:
   - 'auth/login'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.contextExcludeSpecs).toEqual(['auth/login'])
     })
@@ -1110,7 +1138,7 @@ contextIncludeSpecs:
   - 'auth/lo*in'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/disallowed position/)
     })
 
@@ -1121,7 +1149,7 @@ contextIncludeSpecs:
   - 'auth*'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/disallowed position/)
     })
 
@@ -1132,7 +1160,7 @@ contextIncludeSpecs:
   - '*/*'
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/disallowed position/)
     })
 
@@ -1143,7 +1171,7 @@ contextIncludeSpecs:
   - ''
 `),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/invalid pattern/)
     })
 
@@ -1178,7 +1206,7 @@ storage:
       path: .specd/archive
 `.trim(),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/disallowed position/)
     })
   })
@@ -1218,10 +1246,10 @@ storage:
 `.trim()
 
       const configPath = await writeConfig(yaml)
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
 
       await expect(loader.load()).rejects.toThrow(
-        /storage path 'changes' resolves outside repo root/,
+        /storage path 'changes' resolves outside VCS root/,
       )
     })
 
@@ -1229,7 +1257,7 @@ storage:
       execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
 
       const configPath = await writeConfig(minimalYaml())
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.storage.changesPath).toContain('.specd')
@@ -1245,7 +1273,7 @@ storage:
       execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
       await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const result = await loader.resolvePath()
 
       expect(result).toBe(path.join(tmpDir, 'specd.yaml'))
@@ -1254,7 +1282,7 @@ storage:
     it('given discovery mode and no config file found, returns null without throwing', async () => {
       execSync('git init', { cwd: tmpDir, stdio: 'ignore' })
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const result = await loader.resolvePath()
 
       expect(result).toBeNull()
@@ -1265,7 +1293,7 @@ storage:
       await writeConfig(minimalYaml(), 'specd.yaml')
       await writeConfig(minimalYaml(), 'specd.local.yaml')
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const result = await loader.resolvePath()
 
       expect(result).toBe(path.join(tmpDir, 'specd.local.yaml'))
@@ -1274,21 +1302,21 @@ storage:
     it('given forced mode, returns resolved absolute path even when file does not exist', async () => {
       const nonExistent = path.join(tmpDir, 'custom', 'specd.yaml')
 
-      const loader = new FsConfigLoader({ configPath: nonExistent })
+      const loader = createLoader({ configPath: nonExistent })
       const result = await loader.resolvePath()
 
       expect(result).toBe(nonExistent)
     })
 
     it('given forced mode with relative path, returns resolved absolute path', async () => {
-      const loader = new FsConfigLoader({ configPath: './specd.yaml' })
+      const loader = createLoader({ configPath: './specd.yaml' })
       const result = await loader.resolvePath()
 
       expect(result).toBe(path.resolve('./specd.yaml'))
     })
 
     it('never throws regardless of filesystem state', async () => {
-      const loader = new FsConfigLoader({ startDir: path.join(tmpDir, 'nonexistent', 'deep') })
+      const loader = createLoader({ startDir: path.join(tmpDir, 'nonexistent', 'deep') })
 
       await expect(loader.resolvePath()).resolves.not.toThrow()
     })
@@ -1298,7 +1326,7 @@ storage:
     it('defaults schemasPath to .specd/schemas when no schemas section is configured', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((ws) => ws.name === 'default')
@@ -1347,7 +1375,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -1359,7 +1387,7 @@ storage:
     it('graph field is undefined on workspace when graph block is absent', async () => {
       const configPath = await writeConfig(minimalYaml())
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -1400,7 +1428,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const defaultWs = config.workspaces.find((w) => w.name === 'default')
@@ -1439,7 +1467,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph\.respectGitignore/)
     })
 
@@ -1475,7 +1503,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph\.excludePaths/)
     })
 
@@ -1511,7 +1539,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph\.allowedPaths/)
     })
 
@@ -1547,7 +1575,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default\.graph/)
     })
   })
@@ -1565,7 +1593,7 @@ graph:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.graph?.includePaths).toEqual(['docs/**', 'package.json'])
@@ -1580,7 +1608,7 @@ graph:
 `),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/graph\.includePaths/)
     })
   })
@@ -1622,7 +1650,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.root.*reserved/)
     })
   })
@@ -1648,7 +1676,7 @@ contextIncludeSpecs:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       // Arrays are appended: both entries present
@@ -1666,7 +1694,7 @@ contextIncludeSpecs:
         'specd.ci.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.contextIncludeSpecs).toEqual(['default:ci/*'])
@@ -1684,7 +1712,7 @@ contextIncludeSpecs:
         'specd.production.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       // Only specd.yaml is active; production overlay is skipped
@@ -1707,7 +1735,7 @@ contextIncludeSpecs:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       // Only the standalone local config matters
@@ -1733,7 +1761,7 @@ context:
         'specd.staging.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       // Both overlays attach; arrays are appended in order
@@ -1753,7 +1781,7 @@ context:
         'specd.local.mono.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.context).toHaveLength(1)
@@ -1803,7 +1831,7 @@ approvals:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       // Object merged: spec overridden, signoff preserved
@@ -1820,7 +1848,7 @@ contextMode: full
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.contextMode).toBe('full')
@@ -1845,7 +1873,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.contextIncludeSpecs).toBeUndefined()
@@ -1896,7 +1924,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.workspaces.map((w) => w.name)).toEqual(['default'])
@@ -1922,7 +1950,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.context).toHaveLength(1)
@@ -1947,7 +1975,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.context).toHaveLength(1)
@@ -1974,7 +2002,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const config = await loader.load()
 
       expect(config.plugins?.agents).toHaveLength(1)
@@ -1992,7 +2020,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/'remove' is only valid/)
     })
 
@@ -2008,7 +2036,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/cannot remove required field 'schema'/)
     })
 
@@ -2030,7 +2058,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/ambiguous match/)
     })
 
@@ -2051,7 +2079,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/no matching entry/)
     })
   })
@@ -2059,7 +2087,7 @@ remove:
   describe('Requirement: Forced mode cascade (closed chain)', () => {
     it('forced mode loads a single file without extends', async () => {
       const configPath = await writeConfig(minimalYaml())
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.projectRoot).toBe(tmpDir)
@@ -2075,7 +2103,7 @@ contextMode: full
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ configPath: overlayPath })
+      const loader = createLoader({ configPath: overlayPath })
       const config = await loader.load()
 
       // Base merged from specd.yaml, overlay applied
@@ -2093,7 +2121,7 @@ context:
         'specd.ci.yaml',
       )
 
-      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.ci.yaml') })
+      const loader = createLoader({ configPath: path.join(tmpDir, 'specd.ci.yaml') })
       const config = await loader.load()
 
       expect(config.context).toHaveLength(1)
@@ -2124,7 +2152,7 @@ context:
         'specd.local.otro.yaml',
       )
 
-      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.otro.yaml') })
+      const loader = createLoader({ configPath: path.join(tmpDir, 'specd.local.otro.yaml') })
       const config = await loader.load()
 
       expect(config.context).toHaveLength(3)
@@ -2157,7 +2185,7 @@ context:
         'specd.local.otro.yaml',
       )
 
-      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.otro.yaml') })
+      const loader = createLoader({ configPath: path.join(tmpDir, 'specd.local.otro.yaml') })
       const config = await loader.load()
 
       expect(config.context).toHaveLength(3)
@@ -2177,7 +2205,7 @@ context:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.yaml') })
+      const loader = createLoader({ configPath: path.join(tmpDir, 'specd.local.yaml') })
       await expect(loader.load()).rejects.toThrow(ConfigValidationError)
       await expect(loader.load()).rejects.toThrow(/not found/)
     })
@@ -2192,7 +2220,7 @@ context:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ configPath: overlayPath })
+      const loader = createLoader({ configPath: overlayPath })
       await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
 
@@ -2215,7 +2243,7 @@ context:
         'specd.local.b.yaml',
       )
 
-      const loader = new FsConfigLoader({ configPath: path.join(tmpDir, 'specd.local.a.yaml') })
+      const loader = createLoader({ configPath: path.join(tmpDir, 'specd.local.a.yaml') })
       await expect(loader.load()).rejects.toThrow(/circular extends chain/)
     })
   })
@@ -2224,7 +2252,7 @@ context:
     it('accepts valid invalidationPolicy values', async () => {
       for (const policy of ['none', 'surgical', 'downstream', 'global']) {
         const configPath = await writeConfig(minimalYaml(`invalidationPolicy: ${policy}`))
-        const loader = new FsConfigLoader({ configPath })
+        const loader = createLoader({ configPath })
         const config = await loader.load()
         expect(config.invalidationPolicy).toBe(policy)
       }
@@ -2232,7 +2260,7 @@ context:
 
     it('rejects unknown invalidationPolicy value', async () => {
       const configPath = await writeConfig(minimalYaml('invalidationPolicy: aggressive'))
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
   })
@@ -2271,7 +2299,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.default.*required/)
     })
 
@@ -2312,7 +2340,7 @@ storage:
 `.trim(),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       await expect(loader.load()).rejects.toThrow(/workspaces\.billing\.codeRoot.*required/)
     })
   })
@@ -2320,7 +2348,7 @@ storage:
   describe('Requirement: Workspace field defaults', () => {
     it('defaults default workspace ownership to owned', async () => {
       const configPath = await writeConfig(minimalYaml())
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const ws = config.workspaces.find((w) => w.name === 'default')
@@ -2364,7 +2392,7 @@ storage:
       path: .specd/archive
 `.trim(),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const ws = config.workspaces.find((w) => w.name === 'billing')
@@ -2373,7 +2401,7 @@ storage:
 
     it('defaults default workspace codeRoot to config directory', async () => {
       const configPath = await writeConfig(minimalYaml())
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const ws = config.workspaces.find((w) => w.name === 'default')
@@ -2417,7 +2445,7 @@ storage:
       path: .specd/archive
 `.trim(),
       )
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const ws = config.workspaces.find((w) => w.name === 'billing')
@@ -2429,7 +2457,7 @@ storage:
     it('sets isExternal false when specsPath is inside git root', async () => {
       execSync('git init', { cwd: tmpDir })
       const configPath = await writeConfig(minimalYaml())
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       const ws = config.workspaces.find((w) => w.name === 'default')
@@ -2479,7 +2507,7 @@ storage:
 `.trim(),
         )
 
-        const loader = new FsConfigLoader({ configPath })
+        const loader = createLoader({ configPath })
         const config = await loader.load()
 
         const extWs = config.workspaces.find((w) => w.name === 'ext')
@@ -2499,7 +2527,7 @@ storage:
         ),
       )
 
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
 
       expect(config.storage.archivePattern).toBe('{{year}}/{{change.archivedName}}')
@@ -2519,7 +2547,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/remove\.workspaces.*not found/)
     })
 
@@ -2535,7 +2563,7 @@ remove:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(/remove\.storage.*not found/)
     })
   })
@@ -2576,7 +2604,7 @@ storage:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
 
@@ -2614,7 +2642,7 @@ storage:
         'specd.local.yaml',
       )
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       await expect(loader.load()).rejects.toThrow(ConfigValidationError)
     })
   })
@@ -2622,7 +2650,7 @@ storage:
   describe('Requirement: resolvePath returns root of active chain', () => {
     it('returns specd.yaml as root when no overlays are active', async () => {
       await writeConfig(minimalYaml())
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const result = await loader.resolvePath()
 
       expect(result).toBe(path.join(tmpDir, 'specd.yaml'))
@@ -2632,7 +2660,7 @@ storage:
       await writeConfig(minimalYaml())
       await writeConfig('extends: true', 'specd.local.yaml')
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const result = await loader.resolvePath()
 
       // Root is specd.yaml, not the overlay
@@ -2642,7 +2670,7 @@ storage:
     it('returns standalone local file as root when it has no extends', async () => {
       await writeConfig(minimalYaml(), 'specd.local.yaml')
 
-      const loader = new FsConfigLoader({ startDir: tmpDir })
+      const loader = createLoader({ startDir: tmpDir })
       const result = await loader.resolvePath()
 
       expect(result).toBe(path.join(tmpDir, 'specd.local.yaml'))
@@ -2654,7 +2682,7 @@ describe('Requirement: Privacy settings and Environment support', () => {
   it('loads environment variables from .env', async () => {
     await fs.writeFile(path.join(tmpDir, '.env'), 'SPECD_PRIVACY_MODE=mask\n')
     const configPath = await writeConfig(minimalYaml())
-    const loader = new FsConfigLoader({ configPath })
+    const loader = createLoader({ configPath })
     const config = await loader.load()
 
     expect(config.privacy?.mode).toBe('mask')
@@ -2667,7 +2695,7 @@ describe('Requirement: Privacy settings and Environment support', () => {
       'SPECD_PRIVACY_MODE=hash\nSPECD_PRIVACY_SALT=secret\n',
     )
     const configPath = await writeConfig(minimalYaml())
-    const loader = new FsConfigLoader({ configPath })
+    const loader = createLoader({ configPath })
     const config = await loader.load()
 
     expect(config.privacy?.mode).toBe('hash')
@@ -2678,7 +2706,7 @@ describe('Requirement: Privacy settings and Environment support', () => {
     const configPath = await writeConfig(minimalYaml('privacy:\n  mode: anonymous'))
     process.env['SPECD_PRIVACY_MODE'] = 'mask'
     try {
-      const loader = new FsConfigLoader({ configPath })
+      const loader = createLoader({ configPath })
       const config = await loader.load()
       expect(config.privacy?.mode).toBe('mask')
     } finally {
@@ -2688,7 +2716,7 @@ describe('Requirement: Privacy settings and Environment support', () => {
 
   it('validates that hash mode requires a salt', async () => {
     const configPath = await writeConfig(minimalYaml('privacy:\n  mode: hash'))
-    const loader = new FsConfigLoader({ configPath })
+    const loader = createLoader({ configPath })
     await expect(loader.load()).rejects.toThrow(
       /privacy\.salt: When privacy\.mode is set to hash, a salt MUST be provided/,
     )
@@ -2696,7 +2724,7 @@ describe('Requirement: Privacy settings and Environment support', () => {
 
   it('accepts actorProvider selection', async () => {
     const configPath = await writeConfig(minimalYaml('actorProvider: ldap'))
-    const loader = new FsConfigLoader({ configPath })
+    const loader = createLoader({ configPath })
     const config = await loader.load()
     expect(config.actorProvider).toBe('ldap')
   })

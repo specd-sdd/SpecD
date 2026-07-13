@@ -88,10 +88,11 @@ Textual fallback SHALL decode document content using this policy:
 - Otherwise accept `windows-1252` only when the file does not contain NUL bytes
 - Otherwise skip the file as non-textual
 
-`discoverFiles` accepts a root directory plus optional exclusion options:
+`discoverFiles` accepts a root directory plus exclusion options:
 
 - **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically and applied with absolute priority.
-- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer.
+- **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer. Built-in default excludes MUST include `.git/`, `.hg/`, and `.svn/`.
+- **`vcsRoot`** (`string | null`): the root directory of the VCS repository, resolved upstream from `VcsAdapter.rootDir()` and used to bound hierarchical `.gitignore` searches. Callers MUST pass `null` explicitly when no repository root exists. `discoverFiles` MUST NOT probe for repository markers on its own.
 
 ### Requirement: Binary file filtering
 

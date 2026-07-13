@@ -25,7 +25,7 @@ describe('@specd/sdk barrel', () => {
   })
 
   it('re-exports core bootstrap factories', () => {
-    expect(typeof sdk.createConfigLoader).toBe('function')
+    expect(typeof sdk.createDefaultConfigLoader).toBe('function')
     expect(typeof sdk.createConfigWriter).toBe('function')
     expect(typeof sdk.createKernel).toBe('function')
     expect(typeof sdk.createGetStatus).toBe('function')

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No verification changes for CLI host context'

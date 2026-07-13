@@ -137,11 +137,18 @@
 
 ### Requirement: .gitignore handling for codeRoot
 
-#### Scenario: Hierarchical gitignore loading
+#### Scenario: Hierarchical gitignore loading from VCS root
 
-- **WHEN** codeRoot is `/project/packages/core` and git root is `/project`
+- **WHEN** codeRoot is `/project/packages/core` and VCS root is `/project`
 - **THEN** `.gitignore` from `/project` SHALL be loaded and applied
 - **AND** any `.gitignore` files in subdirectories SHALL also be applied
+
+#### Scenario: Null vcsRoot does not trigger repository probing
+
+- **GIVEN** `vcsRoot` is `null`
+- **WHEN** file discovery runs for that workspace
+- **THEN** repository-root `.gitignore` is not loaded
+- **AND** discovery does not probe for `.git/`, `.hg/`, or `.svn/` markers
 
 #### Scenario: respectGitignore false disables gitignore loading
 

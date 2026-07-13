@@ -7,13 +7,7 @@
   "implementation": [
     {
       "file": "sdk:src/composition/host-context.ts",
-      "symbols": [
-        "SdkHostContext",
-        "OpenSpecdHostInput",
-        "OpenSpecdHostResult",
-        "createSdkContext",
-        "openSpecdHost"
-      ]
+      "symbols": ["openSpecdHost"]
     }
   ]
 }

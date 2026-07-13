@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Factory scenarios remain valid — interface changes checked by type compiler'

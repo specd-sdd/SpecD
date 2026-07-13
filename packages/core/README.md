@@ -56,12 +56,12 @@ The `infrastructure/` layer is intentionally not importable directly. All concre
 
 ### Create a kernel
 
-The `Kernel` is the standard entry point. Load config with `createConfigLoader`, then pass it to `createKernel`:
+The `Kernel` is the standard entry point. Load config with `createDefaultConfigLoader`, then pass it to `createKernel`:
 
 ```typescript
-import { createConfigLoader, createKernel } from '@specd/core'
+import { createDefaultConfigLoader, createKernel } from '@specd/core'
 
-const loader = createConfigLoader({ startDir: process.cwd() })
+const loader = await createDefaultConfigLoader({ startDir: process.cwd() })
 const config = await loader.load()
 
 const kernel = await createKernel(config)
@@ -96,9 +96,9 @@ await kernel.changes.transition.execute({
 When you only need one or two use cases, the individual `create*` factory functions wire a single use case to the filesystem without constructing the full kernel:
 
 ```typescript
-import { createConfigLoader, createListChanges } from '@specd/core'
+import { createDefaultConfigLoader, createListChanges } from '@specd/core'
 
-const loader = createConfigLoader({ startDir: process.cwd() })
+const loader = await createDefaultConfigLoader({ startDir: process.cwd() })
 const config = await loader.load()
 
 const listChanges = createListChanges(config)
@@ -112,7 +112,7 @@ Everything exported from `@specd/core` is a domain type, an application type, or
 - **Entities** — `Change`, `Spec`, `ChangeArtifact`, `Delta`, `ArchivedChange`
 - **Port interfaces** — `ChangeRepository`, `SpecRepository`, `ArchiveRepository`, `SchemaRegistry`, `HookRunner`, `VcsAdapter`, `FileReader`, `ArtifactParser`, and more
 - **~30 use cases** — grouped as `kernel.changes.*`, `kernel.specs.*`, `kernel.project.*`
-- **Composition factories** — `createKernel`, `createConfigLoader`, `createSchemaRegistry`, `createVcsAdapter`, VCS adapter classes
+- **Composition factories** — `createKernel`, `createDefaultConfigLoader`, `createSchemaRegistry`, `createVcsAdapter`, VCS adapter classes
 - **Domain errors** — all extend `SpecdError` and carry a typed `code` property
 
 See the full export reference in [docs/core/overview.md](../../docs/core/overview.md).

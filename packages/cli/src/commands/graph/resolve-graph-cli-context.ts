@@ -102,11 +102,7 @@ async function createBootstrapContext(startPath: string): Promise<GraphCliContex
 async function resolveRepoRoot(startPath: string): Promise<string> {
   try {
     const vcs = await createVcsAdapter(startPath)
-    const root = await vcs.rootDir()
-    if (root === null) {
-      throw new CliValidationError('No repository root found')
-    }
-    return root
+    return vcs.rootDir()
   } catch (err) {
     if (err instanceof CliValidationError) throw err
     throw new CliValidationError(

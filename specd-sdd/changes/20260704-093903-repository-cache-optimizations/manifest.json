@@ -1,7 +1,6 @@
 {
   "name": "repository-cache-optimizations",
   "createdAt": "2026-07-04T09:39:03.390Z",
-  "updatedAt": "2026-07-06T21:25:26.068Z",
   "description": "Implement dual-level caching (L1 RAM, L2 JSONL/JSON disk) for specs, changes, and archive repositories",
   "schema": {
     "name": "schema-std",
@@ -53,13 +52,14 @@
       "type": "proposal",
       "optional": false,
       "requires": [],
-      "state": "complete",
+      "state": "drifted-pending-review",
       "files": [
         {
           "key": "proposal",
           "filename": "proposal.md",
-          "state": "complete",
-          "validatedHash": "sha256:bbefa60452e52ba6ce32c12f34a6a34e61c55660d1b881344ff9ec4c65c192c6"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:bbefa60452e52ba6ce32c12f34a6a34e61c55660d1b881344ff9ec4c65c192c6",
+          "hasDrift": true
         }
       ]
     },
@@ -848,6 +848,53 @@
       "cause": "spec-overlap-conflict",
       "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:get-project-summary, core:list-archived, core:list-changes, core:list-discarded, core:list-drafts, core:list-specs",
       "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:list-changes",
+            "core:list-drafts",
+            "core:list-discarded",
+            "core:list-specs",
+            "core:list-archived",
+            "core:get-project-summary"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:10:35.219Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
         {
           "type": "specs",
           "files": [

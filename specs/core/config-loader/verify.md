@@ -6,8 +6,9 @@
 
 #### Scenario: Factory returns a ConfigLoader
 
-- **WHEN** `createConfigLoader({ startDir: '/some/dir' })` is called
-- **THEN** the returned object satisfies the `ConfigLoader` interface
+- **WHEN** `createDefaultConfigLoader({ startDir: '/some/dir' })` is called
+- **THEN** the returned object satisfies the `ConfigLoader` interface (abstract class)
+- **AND** it is bounded by a resolved `rootPath` value rather than retaining a `VcsAdapter`
 - **AND** it exposes a `load()` method returning `Promise<SpecdConfig>`
 - **AND** it exposes a `resolvePath()` method returning `Promise<string | null>`
 
@@ -21,7 +22,7 @@
 
 #### Scenario: Discovery mode returns null when no config found
 
-- **GIVEN** no discoverable config candidates exist between `startDir` and the git root
+- **GIVEN** no discoverable config candidates exist between `startDir` and the VCS root
 - **WHEN** `resolvePath()` is called
 - **THEN** it returns `null`
 
@@ -53,7 +54,7 @@
 #### Scenario: Config found in ancestor directory
 
 - **GIVEN** the start directory has no discoverable candidates
-- **AND** the nearest ancestor directory before the git root does
+- **AND** the nearest ancestor directory before the VCS root does
 - **WHEN** `load()` is called
 - **THEN** the loader resolves the ancestor directory's active chain
 
@@ -72,16 +73,16 @@
 - **THEN** `specd.local.yaml` becomes the active root
 - **AND** previously accumulated shared layers are not inherited further
 
-#### Scenario: Walk stops at git root
+#### Scenario: Walk stops at VCS root
 
-- **GIVEN** no discoverable candidates exist between startDir and the git root
+- **GIVEN** no discoverable candidates exist between startDir and the VCS root
 - **WHEN** `load()` is called
-- **THEN** the walk stops at the git root
+- **THEN** the walk stops at the VCS root
 - **AND** it does not inspect parent directories above that root
 
-#### Scenario: No git repo — checks only startDir
+#### Scenario: No VCS repo — checks only startDir
 
-- **GIVEN** `startDir` is not inside any git repository
+- **GIVEN** `startDir` is not inside any VCS repository
 - **AND** discoverable config candidates exist only in the parent directory
 - **WHEN** `load()` is called
 - **THEN** `load()` throws `ConfigValidationError`
@@ -244,42 +245,44 @@
 
 ### Requirement: Storage path containment
 
-#### Scenario: Storage path outside git root
+#### Scenario: Storage path outside VCS root
 
-- **GIVEN** the git root is `/repo/` and `storage.changes.fs.path` resolves to `/other/changes`
+- **GIVEN** the loader `rootPath` is `/repo/` and `storage.changes.fs.path` resolves to `/other/changes`
 - **WHEN** `load()` is called
-- **THEN** `load()` throws `ConfigValidationError` indicating the storage path resolves outside the repo root
+- **THEN** `load()` throws `ConfigValidationError` indicating the storage path resolves outside `rootPath`
 
-#### Scenario: Storage path at git root is valid
+#### Scenario: Storage path at VCS root is valid
 
-- **GIVEN** the git root is `/repo/` and a storage path resolves to exactly `/repo`
+- **GIVEN** the loader `rootPath` is `/repo/` and a storage path resolves to exactly `/repo`
 - **WHEN** `load()` is called
 - **THEN** the storage path is accepted without error
 
-#### Scenario: No git repo — containment check skipped
+#### Scenario: No VCS repo — containment check skipped
 
-- **GIVEN** startDir is not inside a git repository
+- **GIVEN** `createVcsAdapter()` resolves to `NullVcsAdapter`
+- **AND** `createDefaultConfigLoader()` normalizes `NullVcsAdapter.rootDir()` throwing into `rootPath = null`
 - **AND** storage paths resolve to arbitrary locations
 - **WHEN** `load()` is called
 - **THEN** no containment error is thrown
 
 ### Requirement: isExternal inference for workspaces
 
-#### Scenario: Workspace specsPath inside git root
+#### Scenario: Workspace specsPath inside VCS root
 
-- **GIVEN** the git root is `/repo/` and a workspace's `specsPath` resolves to `/repo/specs`
+- **GIVEN** the loader `rootPath` is `/repo/` and a workspace's `specsPath` resolves to `/repo/specs`
 - **WHEN** `load()` is called
 - **THEN** the workspace's `isExternal` is `false`
 
-#### Scenario: Workspace specsPath outside git root
+#### Scenario: Workspace specsPath outside VCS root
 
-- **GIVEN** the git root is `/repo/` and a workspace's `specsPath` resolves to `/other-repo/specs`
+- **GIVEN** the loader `rootPath` is `/repo/` and a workspace's `specsPath` resolves to `/other-repo/specs`
 - **WHEN** `load()` is called
 - **THEN** the workspace's `isExternal` is `true`
 
-#### Scenario: No git repo — all workspaces are not external
+#### Scenario: No VCS repo — all workspaces are not external
 
-- **GIVEN** startDir is not inside a git repository
+- **GIVEN** `createVcsAdapter()` resolves to `NullVcsAdapter`
+- **AND** `createDefaultConfigLoader()` normalizes `NullVcsAdapter.rootDir()` throwing into `rootPath = null`
 - **WHEN** `load()` is called
 - **THEN** all workspaces have `isExternal` set to `false`
 

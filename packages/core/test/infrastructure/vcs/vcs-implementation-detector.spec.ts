@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Change, type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { VcsImplementationDetector } from '../../../src/infrastructure/vcs/vcs-implementation-detector.js'
 import { NullVcsAdapter } from '../../../src/infrastructure/null/vcs-adapter.js'
-import { type VcsAdapter } from '../../../src/application/ports/vcs-adapter.js'
+import { VcsAdapter } from '../../../src/application/ports/vcs-adapter.js'
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 
@@ -29,19 +29,67 @@ function makeChange(): Change {
   })
 }
 
+function createAdapter(overrides: {
+  readonly rootDir?: () => string
+  readonly branch?: () => Promise<string>
+  readonly isClean?: () => Promise<boolean>
+  readonly ref?: () => Promise<string | null>
+  readonly refAt?: (at: string) => Promise<string | null>
+  readonly modifiedFiles?: (baseRef: string) => Promise<readonly string[]>
+  readonly show?: (ref: string, filePath: string) => Promise<string | null>
+  readonly identity?: () => Promise<{ name: string; email: string; provider: string }>
+}): VcsAdapter {
+  class TestVcsAdapter extends VcsAdapter {
+    constructor() {
+      super('/repo')
+    }
+
+    rootDir(): string {
+      return overrides.rootDir?.() ?? '/repo'
+    }
+
+    branch(): Promise<string> {
+      return overrides.branch?.() ?? Promise.resolve('main')
+    }
+
+    isClean(): Promise<boolean> {
+      return overrides.isClean?.() ?? Promise.resolve(true)
+    }
+
+    ref(): Promise<string | null> {
+      return overrides.ref?.() ?? Promise.resolve('HEAD')
+    }
+
+    refAt(at: string): Promise<string | null> {
+      return overrides.refAt?.(at) ?? Promise.resolve('base-abc')
+    }
+
+    modifiedFiles(baseRef: string): Promise<readonly string[]> {
+      return overrides.modifiedFiles?.(baseRef) ?? Promise.resolve([])
+    }
+
+    show(ref: string, filePath: string): Promise<string | null> {
+      return overrides.show?.(ref, filePath) ?? Promise.resolve(null)
+    }
+
+    identity(): Promise<{ name: string; email: string; provider: string }> {
+      return (
+        overrides.identity?.() ??
+        Promise.resolve({ name: 'Alice', email: 'alice@example.com', provider: 'git' })
+      )
+    }
+  }
+
+  return new TestVcsAdapter()
+}
+
 describe('VcsImplementationDetector', () => {
   it('resolves historical base ref and normalizes repo files to project-relative paths', async () => {
     const calls: string[] = []
-    const adapter: VcsAdapter = {
-      async rootDir() {
+    const adapter = createAdapter({
+      rootDir() {
         calls.push('rootDir')
         return '/repo'
-      },
-      async branch() {
-        return 'main'
-      },
-      async isClean() {
-        return true
       },
       async ref() {
         calls.push('ref')
@@ -58,7 +106,10 @@ describe('VcsImplementationDetector', () => {
       async show() {
         return null
       },
-    }
+      async identity() {
+        return { name: 'Alice', email: 'alice@example.com', provider: 'git' }
+      },
+    })
 
     const detector = new VcsImplementationDetector('/repo', adapter)
     const result = await detector.detectModifiedFiles(makeChange())
@@ -69,15 +120,9 @@ describe('VcsImplementationDetector', () => {
   })
 
   it('falls back to current ref when historical lookup is unavailable', async () => {
-    const adapter: VcsAdapter = {
-      async rootDir() {
+    const adapter = createAdapter({
+      rootDir() {
         return '/repo'
-      },
-      async branch() {
-        return 'main'
-      },
-      async isClean() {
-        return true
       },
       async ref() {
         return 'HEAD'
@@ -92,7 +137,10 @@ describe('VcsImplementationDetector', () => {
       async show() {
         return null
       },
-    }
+      async identity() {
+        return { name: 'Alice', email: 'alice@example.com', provider: 'git' }
+      },
+    })
 
     const detector = new VcsImplementationDetector('/repo', adapter)
     await expect(detector.detectModifiedFiles(makeChange())).resolves.toEqual([
@@ -112,29 +160,15 @@ describe('NullVcsAdapter', () => {
 
 describe('VcsImplementationDetector exclusion filtering', () => {
   function makeAdapter(files: string[]): VcsAdapter {
-    return {
-      async rootDir() {
-        return '/repo'
-      },
-      async branch() {
-        return 'main'
-      },
-      async isClean() {
-        return true
-      },
-      async ref() {
-        return 'HEAD'
-      },
-      async refAt() {
-        return 'base-abc'
-      },
+    return makeAdapterFromFiles(files)
+  }
+
+  function makeAdapterFromFiles(files: string[]): VcsAdapter {
+    return createAdapter({
       async modifiedFiles() {
         return files
       },
-      async show() {
-        return null
-      },
-    }
+    })
   }
 
   it('excludes files under specified excludePaths prefixes', async () => {

@@ -1,52 +1,35 @@
 {
   "title": "Actor Resolver Hg",
-  "description": "Provides actor identity resolution using the local Mercurial configuration.",
-  "dependsOn": ["core:actor-provider"],
-  "context": ["Provides actor identity resolution using the local Mercurial configuration."],
+  "description": "This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`.",
+  "context": [
+    "This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`."
+  ],
   "rules": [
     {
-      "requirement": "Implementation of AutoDetectActorProvider",
-      "rules": [
-        "The Hg actor provider MUST implement the `AutoDetectActorProvider` interface.\n\n- **`name`**: MUST be `\"hg\"`."
-      ]
-    },
-    {
-      "requirement": "Detection logic",
-      "rules": [
-        "The provider MUST detect Hg presence by looking for a `.hg` directory in the `cwd` or its parents."
-      ]
-    },
-    {
-      "requirement": "Identity resolution",
-      "rules": [
-        "The resulting resolver MUST retrieve identity from Hg config.\n\n- `provider`: MUST be set to `\"hg\"`."
-      ]
+      "requirement": "Deprecated",
+      "rules": ["This specification is deprecated."]
     }
   ],
   "scenarios": [
     {
-      "requirement": "Implementation of AutoDetectActorProvider",
-      "name": "Interface satisfaction",
-      "given": ["an HgActorProvider instance"],
-      "then": ["it satisfies the AutoDetectActorProvider interface"]
-    },
-    {
-      "requirement": "Detection logic",
-      "name": "Repo detected",
-      "given": ["the directory has a .hg folder"],
-      "when": ["detect() is called"],
-      "then": ["it returns an HgActorResolver"]
-    },
-    {
-      "requirement": "Identity resolution",
-      "name": "Provider field present",
-      "when": ["identity() resolves"],
-      "then": ["the provider field is \"hg\""]
+      "requirement": "Deprecated",
+      "name": "Spec is deprecated",
+      "when": ["this specification is referenced"],
+      "then": ["it is recognized as deprecated and eliminated"]
     }
   ],
+  "dependsOn": ["core:actor-provider"],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:actor-resolver-hg",
+        "file": "core:src/infrastructure/vcs-actor-resolver.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:2d8e6b449c9eb351a1c5923f135b697805fcbc9ced1e82ba8730a73cbbb5e16f",
-    "verify.md": "sha256:881173dc3980ada8af2e000656c2dd5b6be8fb4f54d65743b74cf09807c72dfb"
+    "spec.md": "sha256:d5690373c2c34d037924d8c82d326c7cd4f030c17696885e767c099f8d7c46d8",
+    "verify.md": "sha256:af6d9077142ee0ffd01d12f12d6b7d203518954ca06e1ae5efac834a95175082"
   },
   "generatedBy": "core"
 }

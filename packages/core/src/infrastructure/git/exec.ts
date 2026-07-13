@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
@@ -14,4 +14,17 @@ const execFileAsync = promisify(execFile)
 export async function git(cwd: string, ...args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', args, { cwd })
   return stdout.trim()
+}
+
+/**
+ * Runs `git <args>` synchronously in the given working directory and returns
+ * trimmed stdout.
+ *
+ * @param cwd - Working directory for the git command
+ * @param args - Arguments to pass to the git binary
+ * @returns Trimmed stdout from the git process
+ * @throws When the git process exits with a non-zero code
+ */
+export function gitSync(cwd: string, ...args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim()
 }

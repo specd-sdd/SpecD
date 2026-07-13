@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
-import { type ConfigLoader } from '../../application/ports/config-loader.js'
+import { ConfigLoader } from '../../application/ports/config-loader.js'
 import { isEnoent } from './is-enoent.js'
 import { isInvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import {
@@ -16,7 +16,6 @@ import {
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
 import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
-import { git } from '../git/exec.js'
 
 // ---------------------------------------------------------------------------
 // Options
@@ -460,19 +459,22 @@ async function discoverCandidateFiles(dir: string): Promise<string[]> {
  * containing specd candidate config files.
  *
  * @param startDir - Directory to start searching from
+ * @param rootPath - Absolute VCS root boundary, or `null` when discovery is unbounded
  * @returns The first directory containing candidate files, or `null` if none found
  */
-async function findCandidateDirectory(startDir: string): Promise<string | null> {
-  const gitRoot = await findVcsRoot(startDir)
+async function findCandidateDirectory(
+  startDir: string,
+  rootPath: string | null,
+): Promise<string | null> {
   let dir = path.resolve(startDir)
-  if (gitRoot === null) {
+  if (rootPath === null) {
     const candidates = await discoverCandidateFiles(dir)
     return candidates.length > 0 ? dir : null
   }
   while (true) {
     const candidates = await discoverCandidateFiles(dir)
     if (candidates.length > 0) return dir
-    if (dir === gitRoot) break
+    if (dir === rootPath) break
     const parent = path.dirname(dir)
     if (parent === dir) break
     dir = parent
@@ -1086,15 +1088,17 @@ function resolveAdapterBinding(
  * `isExternal` is inferred from whether each workspace's `specsPath` lies
  * outside the git repository root.
  */
-export class FsConfigLoader implements ConfigLoader {
+export class FsConfigLoader extends ConfigLoader {
   private readonly _options: FsConfigLoaderOptions
 
   /**
    * Creates a new `FsConfigLoader`.
    *
+   * @param rootPath - Resolved VCS root boundary, or `null` outside a repository
    * @param options - Discovery or forced-path options
    */
-  constructor(options: FsConfigLoaderOptions) {
+  constructor(rootPath: string | null, options: FsConfigLoaderOptions) {
+    super(rootPath)
     this._options = options
   }
 
@@ -1142,7 +1146,7 @@ export class FsConfigLoader implements ConfigLoader {
       throw new ConfigValidationError(cascade.rootPath, message)
     }
 
-    return await this._buildConfig(parseResult.data, configDir, cascade.rootPath, options)
+    return this._buildConfig(parseResult.data, configDir, cascade.rootPath, options)
   }
 
   /**
@@ -1160,7 +1164,7 @@ export class FsConfigLoader implements ConfigLoader {
       return path.resolve(this._options.configPath)
     }
     try {
-      const dir = await findCandidateDirectory(this._options.startDir)
+      const dir = await findCandidateDirectory(this._options.startDir, this.rootPath)
       if (dir === null) return null
       const candidatePaths = await discoverCandidateFiles(dir)
       const layers: ConfigCascadeLayer[] = []
@@ -1193,11 +1197,11 @@ export class FsConfigLoader implements ConfigLoader {
     if ('configPath' in this._options) {
       return resolveForcedCascade(this._options.configPath)
     }
-    const dir = await findCandidateDirectory(this._options.startDir)
+    const dir = await findCandidateDirectory(this._options.startDir, this.rootPath)
     if (dir === null) {
       throw new ConfigValidationError(
         this._options.startDir,
-        'no specd.yaml found (searched up to git root)',
+        'no specd.yaml found (searched up to VCS root)',
       )
     }
     const candidatePaths = await discoverCandidateFiles(dir)
@@ -1218,13 +1222,14 @@ export class FsConfigLoader implements ConfigLoader {
    * @param options - Optional loader options
    * @param options.skipDirCheck - Optional flag to skip directory existence checks
    * @returns The fully resolved `SpecdConfig`
+   * @throws {@link ConfigValidationError} When the resolved config violates required invariants
    */
-  private async _buildConfig(
+  private _buildConfig(
     data: z.infer<typeof SpecdYamlZodSchema>,
     configDir: string,
     rootConfigPath: string,
     options?: { readonly skipDirCheck?: boolean },
-  ): Promise<SpecdConfig> {
+  ): SpecdConfig {
     const specdPath = path.resolve(configDir, data.specdPath ?? '.specd')
     const resolvedConfigPath = path.resolve(
       configDir,
@@ -1241,7 +1246,6 @@ export class FsConfigLoader implements ConfigLoader {
       )
     }
 
-    const gitRoot = await findVcsRoot(configDir)
     const warnings: string[] = []
 
     const workspaces: SpecdWorkspaceConfig[] = Object.entries(data.workspaces).map(([name, ws]) => {
@@ -1285,9 +1289,9 @@ export class FsConfigLoader implements ConfigLoader {
         )
       const ownership = ws.ownership ?? (name === 'default' ? 'owned' : 'readOnly')
       const isExternal =
-        gitRoot !== null && specsBinding.binding.adapter === 'fs'
-          ? !specsBinding.legacyPath.startsWith(gitRoot + path.sep) &&
-            specsBinding.legacyPath !== gitRoot
+        this.rootPath !== null && specsBinding.binding.adapter === 'fs'
+          ? !specsBinding.legacyPath.startsWith(this.rootPath + path.sep) &&
+            specsBinding.legacyPath !== this.rootPath
           : false
       return {
         name,
@@ -1386,9 +1390,12 @@ export class FsConfigLoader implements ConfigLoader {
       warnings,
     )
 
-    if (gitRoot !== null) {
-      if (!resolvedConfigPath.startsWith(gitRoot + path.sep) && resolvedConfigPath !== gitRoot) {
-        throw new ConfigValidationError(rootConfigPath, 'configPath resolves outside repo root')
+    if (this.rootPath !== null) {
+      if (
+        !resolvedConfigPath.startsWith(this.rootPath + path.sep) &&
+        resolvedConfigPath !== this.rootPath
+      ) {
+        throw new ConfigValidationError(rootConfigPath, 'configPath resolves outside VCS root')
       }
       for (const [key, binding] of [
         ['changes', changesBinding],
@@ -1397,10 +1404,13 @@ export class FsConfigLoader implements ConfigLoader {
         ['archive', archiveBinding],
       ] as const) {
         if (binding.binding.adapter !== 'fs') continue
-        if (!binding.legacyPath.startsWith(gitRoot + path.sep) && binding.legacyPath !== gitRoot) {
+        if (
+          !binding.legacyPath.startsWith(this.rootPath + path.sep) &&
+          binding.legacyPath !== this.rootPath
+        ) {
           throw new ConfigValidationError(
             rootConfigPath,
-            `storage path '${key}' resolves outside repo root`,
+            `storage path '${key}' resolves outside VCS root`,
           )
         }
       }
@@ -1516,23 +1526,5 @@ export class FsConfigLoader implements ConfigLoader {
           }
         : {}),
     }
-  }
-}
-
-/**
- * Detects the VCS repository root by probing `git rev-parse`.
- *
- * Falls back to `null` when the directory is not inside a git repository
- * (or any other VCS — git is the only VCS probed here since config
- * discovery runs before the full VCS factory is available).
- *
- * @param startDir - Directory to probe for a VCS repository
- * @returns Absolute path to the VCS root, or `null` if not inside a VCS repo
- */
-async function findVcsRoot(startDir: string): Promise<string | null> {
-  try {
-    return await git(startDir, 'rev-parse', '--show-toplevel')
-  } catch {
-    return null
   }
 }

@@ -5,7 +5,8 @@
     "core:config",
     "core:composition",
     "core:schema-merge",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:vcs-adapter-port"
   ],
   "context": [
     "Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`."
@@ -14,7 +15,7 @@
     {
       "requirement": "Factory signature and return type",
       "rules": [
-        "`createConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:\n\n- `{ startDir: string }` — discovery mode\n- `{ configPath: string }` — forced mode\n\nThe returned `ConfigLoader` exposes two methods:\n\n- `load(): Promise<SpecdConfig>` — loads, validates, and returns the fully-resolved config. Throws `ConfigValidationError` on any failure.\n- `resolvePath(): Promise<string | null>` — resolves and returns the path to the active config file without loading or parsing it. Returns `null` when no config file can be located (discovery mode) or when the adapter has no concept of a file path. Never throws."
+        "`createDefaultConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:\n\n- `{ startDir: string }` — discovery mode\n- `{ configPath: string }` — forced mode\n\n`createDefaultConfigLoader()` MAY resolve a `VcsAdapter` internally to derive the repository boundary, but that adapter is not part of `FsConfigLoaderOptions`, and the returned `ConfigLoader` MUST depend only on the resolved `rootPath` data.\n\nThe returned `ConfigLoader` is an abstract class that accepts `rootPath` in its constructor:\n\n```typescript\nexport abstract class ConfigLoader {\n  constructor(protected readonly rootPath: string | null) {}\n  abstract load(): Promise<SpecdConfig>\n  abstract resolvePath(): Promise<string | null>\n}\n```"
       ]
     },
     {
@@ -26,7 +27,7 @@
     {
       "requirement": "Discovery mode",
       "rules": [
-        "When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate the nearest directory containing discoverable config candidates, bounded by the nearest git repository root.\n\nDiscoverable candidates within one directory are evaluated in this order:\n\n1. `specd.yaml`\n2. `specd.*.yaml` in ascending alphabetical order\n3. `specd.local.yaml`\n4. `specd.local.*.yaml` in ascending alphabetical order\n\nThe loader MUST build an active chain from those candidates rather than selecting a single winning file.\n\nCandidate activation rules are:\n\n- a file with no `extends` becomes a standalone root from that point\n- a file with `extends: true` attaches to the previous active layer\n- a file with `extends: <path>` attaches only when the referenced base file is already active in the current chain; otherwise that candidate is skipped in normal discovery\n\nThe walk MUST stop at the git repository root and SHALL NOT traverse above it. If no config candidates are found before or at the git root, `load()` MUST throw `ConfigValidationError`.\n\nWhen `startDir` is not inside a git repository, the loader MUST check only the starting directory and SHALL NOT walk further up. If no discoverable candidates exist there, `load()` MUST throw `ConfigValidationError`."
+        "When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate the nearest directory containing discoverable config candidates, bounded by the nearest VCS repository root.\n\nDiscoverable candidates within one directory are evaluated in this order:\n\n1. `specd.yaml`\n2. `specd.*.yaml` in ascending alphabetical order\n3. `specd.local.yaml`\n4. `specd.local.*.yaml` in ascending alphabetical order\n\nThe loader MUST build an active chain from those candidates rather than selecting a single winning file.\n\nCandidate activation rules are:\n\n- a file with no `extends` becomes a standalone root from that point\n- a file with `extends: true` attaches to the previous active layer\n- a file with `extends: <path>` attaches only when the referenced base file is already active in the current chain; otherwise that candidate is skipped in normal discovery\n\nThe walk MUST stop at the VCS repository root and SHALL NOT traverse above it. If no config candidates are found before or at the VCS root, `load()` MUST throw `ConfigValidationError`.\n\nWhen `startDir` is not inside a VCS repository, the loader MUST check only the starting directory and SHALL NOT walk further up. If no discoverable candidates exist there, `load()` MUST throw `ConfigValidationError`."
       ]
     },
     {
@@ -68,13 +69,13 @@
     {
       "requirement": "Storage path containment",
       "rules": [
-        "When inside a git repository, every resolved storage path (`changes`, `drafts`, `discarded`, `archive`) MUST resolve to a location within or equal to the git repository root. If any storage path resolves outside the git root, `load()` MUST throw `ConfigValidationError` identifying the offending storage key.\n\nWhen not inside a git repository, the containment check SHALL NOT apply — storage paths are accepted as resolved."
+        "When `rootPath` is non-null, every resolved storage path (`changes`, `drafts`, `discarded`, `archive`) MUST resolve to a location within or equal to `rootPath`. If any storage path resolves outside `rootPath`, `load()` MUST throw `ConfigValidationError` identifying the offending storage key.\n\nWhen `rootPath` is `null`, the containment check SHALL NOT apply — storage paths are accepted as resolved."
       ]
     },
     {
       "requirement": "isExternal inference for workspaces",
       "rules": [
-        "For each workspace, the loader MUST infer the `isExternal` flag by comparing the resolved `specsPath` against the git repository root. A workspace is external when its `specsPath` neither equals the git root nor starts with the git root followed by a path separator.\n\nWhen not inside a git repository, `isExternal` MUST be `false` for all workspaces."
+        "For each workspace, the loader MUST infer the `isExternal` flag by comparing the resolved `specsPath` against `rootPath`. A workspace is external when its `specsPath` neither equals `rootPath` nor starts with `rootPath` followed by a path separator.\n\nWhen `rootPath` is `null`, `isExternal` MUST be `false` for all workspaces."
       ]
     },
     {
@@ -120,9 +121,10 @@
     {
       "requirement": "Factory signature and return type",
       "name": "Factory returns a ConfigLoader",
-      "when": ["createConfigLoader({ startDir: '/some/dir' }) is called"],
+      "when": ["createDefaultConfigLoader({ startDir: '/some/dir' }) is called"],
       "then": [
-        "the returned object satisfies the ConfigLoader interface",
+        "the returned object satisfies the ConfigLoader interface (abstract class)",
+        "AND it is bounded by a resolved rootPath value rather than retaining a VcsAdapter",
         "AND it exposes a load() method returning Promise<SpecdConfig>",
         "AND it exposes a resolvePath() method returning Promise<string | null>"
       ]
@@ -139,7 +141,7 @@
     {
       "requirement": "Path probe",
       "name": "Discovery mode returns null when no config found",
-      "given": ["no discoverable config candidates exist between startDir and the git root"],
+      "given": ["no discoverable config candidates exist between startDir and the VCS root"],
       "when": ["resolvePath() is called"],
       "then": ["it returns null"]
     },
@@ -177,7 +179,7 @@
       "name": "Config found in ancestor directory",
       "given": [
         "the start directory has no discoverable candidates",
-        "AND the nearest ancestor directory before the git root does"
+        "AND the nearest ancestor directory before the VCS root does"
       ],
       "when": ["load() is called"],
       "then": ["the loader resolves the ancestor directory's active chain"]
@@ -204,19 +206,19 @@
     },
     {
       "requirement": "Discovery mode",
-      "name": "Walk stops at git root",
-      "given": ["no discoverable candidates exist between startDir and the git root"],
+      "name": "Walk stops at VCS root",
+      "given": ["no discoverable candidates exist between startDir and the VCS root"],
       "when": ["load() is called"],
       "then": [
-        "the walk stops at the git root",
+        "the walk stops at the VCS root",
         "AND it does not inspect parent directories above that root"
       ]
     },
     {
       "requirement": "Discovery mode",
-      "name": "No git repo — checks only startDir",
+      "name": "No VCS repo — checks only startDir",
       "given": [
-        "startDir is not inside any git repository",
+        "startDir is not inside any VCS repository",
         "AND discoverable config candidates exist only in the parent directory"
       ],
       "when": ["load() is called"],
@@ -412,25 +414,28 @@
     },
     {
       "requirement": "Storage path containment",
-      "name": "Storage path outside git root",
-      "given": ["the git root is /repo/ and storage.changes.fs.path resolves to /other/changes"],
+      "name": "Storage path outside VCS root",
+      "given": [
+        "the loader rootPath is /repo/ and storage.changes.fs.path resolves to /other/changes"
+      ],
       "when": ["load() is called"],
       "then": [
-        "load() throws ConfigValidationError indicating the storage path resolves outside the repo root"
+        "load() throws ConfigValidationError indicating the storage path resolves outside rootPath"
       ]
     },
     {
       "requirement": "Storage path containment",
-      "name": "Storage path at git root is valid",
-      "given": ["the git root is /repo/ and a storage path resolves to exactly /repo"],
+      "name": "Storage path at VCS root is valid",
+      "given": ["the loader rootPath is /repo/ and a storage path resolves to exactly /repo"],
       "when": ["load() is called"],
       "then": ["the storage path is accepted without error"]
     },
     {
       "requirement": "Storage path containment",
-      "name": "No git repo — containment check skipped",
+      "name": "No VCS repo — containment check skipped",
       "given": [
-        "startDir is not inside a git repository",
+        "createVcsAdapter() resolves to NullVcsAdapter",
+        "AND createDefaultConfigLoader() normalizes NullVcsAdapter.rootDir() throwing into rootPath = null",
         "AND storage paths resolve to arbitrary locations"
       ],
       "when": ["load() is called"],
@@ -438,22 +443,29 @@
     },
     {
       "requirement": "isExternal inference for workspaces",
-      "name": "Workspace specsPath inside git root",
-      "given": ["the git root is /repo/ and a workspace's specsPath resolves to /repo/specs"],
+      "name": "Workspace specsPath inside VCS root",
+      "given": [
+        "the loader rootPath is /repo/ and a workspace's specsPath resolves to /repo/specs"
+      ],
       "when": ["load() is called"],
       "then": ["the workspace's isExternal is false"]
     },
     {
       "requirement": "isExternal inference for workspaces",
-      "name": "Workspace specsPath outside git root",
-      "given": ["the git root is /repo/ and a workspace's specsPath resolves to /other-repo/specs"],
+      "name": "Workspace specsPath outside VCS root",
+      "given": [
+        "the loader rootPath is /repo/ and a workspace's specsPath resolves to /other-repo/specs"
+      ],
       "when": ["load() is called"],
       "then": ["the workspace's isExternal is true"]
     },
     {
       "requirement": "isExternal inference for workspaces",
-      "name": "No git repo — all workspaces are not external",
-      "given": ["startDir is not inside a git repository"],
+      "name": "No VCS repo — all workspaces are not external",
+      "given": [
+        "createVcsAdapter() resolves to NullVcsAdapter",
+        "AND createDefaultConfigLoader() normalizes NullVcsAdapter.rootDir() throwing into rootPath = null"
+      ],
       "when": ["load() is called"],
       "then": ["all workspaces have isExternal set to false"]
     },
@@ -607,9 +619,23 @@
       "then": ["the thrown error is ConfigValidationError"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "FsConfigLoader"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/composition/config-loader.ts",
+        "symbol": "createDefaultConfigLoader"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:062cc4afc648e73f09062b4633e2af28924d34de3b7fda083ef86334fe3d2bd1",
-    "verify.md": "sha256:19290502deecaffcb98e4195767fddab469f054f62d5fa1c504aae4677819ca0"
+    "spec.md": "sha256:51972ac98e3d33f3d0804f3824df8bdb84b49000952aa160ee9bafeaa93b7ef8",
+    "verify.md": "sha256:6285bbd0750a1059a4f842ff1cd36bfcb3abbbd66d57b0138d950ba476a54b1f"
   },
   "generatedBy": "core"
 }

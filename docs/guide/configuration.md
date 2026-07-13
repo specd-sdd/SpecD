@@ -10,7 +10,7 @@ This guide walks through the main configuration areas conceptually, with practic
 
 Run `specd project init` in your project root. SpecD creates a `specd.yaml` with sensible defaults for a single-repo project. You will then edit it to reflect your team's structure and policies.
 
-SpecD discovers its configuration by walking up from the current working directory to the git repo root, collecting all `specd.yaml`, `specd.*.yaml`, `specd.local.yaml`, and `specd.local.*.yaml` candidate files from the first directory that contains at least one. The candidates are resolved into an active chain, deep-merged, and validated as one config. See [Config cascade and local variants](#config-cascade-and-local-variants) below for details.
+SpecD discovers its configuration by walking up from the current working directory to the active VCS root, collecting all `specd.yaml`, `specd.*.yaml`, `specd.local.yaml`, and `specd.local.*.yaml` candidate files from the first directory that contains at least one. The candidates are resolved into an active chain, deep-merged, and validated as one config. See [Config cascade and local variants](#config-cascade-and-local-variants) below for details.
 
 ---
 
@@ -161,7 +161,7 @@ When SpecD searches for configuration, it looks for files in this order within t
 3. `specd.local.yaml` — personal local override
 4. `specd.local.*.yaml` — named local variants (e.g. `specd.local.mono.yaml`), sorted lexicographically
 
-Discovery walks up from the current working directory to the git root and stops at the first directory containing at least one candidate file. `specd.yaml` must exist for discovery to succeed.
+Discovery walks up from the current working directory to the active VCS root and stops at the first directory containing at least one candidate file. `specd.yaml` must exist for discovery to succeed.
 
 ### Cascade resolution
 

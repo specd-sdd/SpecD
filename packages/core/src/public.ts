@@ -2,7 +2,10 @@ import { createRequire } from 'module'
 
 // Bootstrap
 export { createKernel, type Kernel, type KernelOptions } from './composition/kernel.js'
-export { createConfigLoader, type FsConfigLoaderOptions } from './composition/config-loader.js'
+export {
+  createDefaultConfigLoader,
+  type FsConfigLoaderOptions,
+} from './composition/config-loader.js'
 export { createConfigWriter, type FsConfigWriterOptions } from './composition/config-writer.js'
 export { createVcsAdapter } from './composition/vcs-adapter.js'
 export { createVcsActorResolver } from './composition/actor-resolver.js'

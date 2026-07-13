@@ -8,9 +8,9 @@ Use cases need VCS state (repo root, branch, revision, file history) but must no
 
 ### Requirement: rootDir returns the repository root
 
-`rootDir()` MUST return a `Promise<string>` resolving to the absolute path of the repository root directory. The returned path MUST be absolute, not relative.
+`rootDir()` MUST return a `string` representing the absolute path of the repository root directory. The returned path MUST be absolute, not relative.
 
-When the current working directory is not inside a VCS repository, `rootDir()` MUST reject with an `Error`.
+When the current working directory is not inside a VCS repository, `rootDir()` MUST throw an `Error`.
 
 ### Requirement: branch returns the current branch name
 
@@ -50,21 +50,44 @@ The returned array contains repository-relative file paths that differ between t
 
 Missing or empty results MUST be represented as an empty array, not as `null`.
 
-### Requirement: Interface-only declaration
+### Requirement: Abstract class base
 
-`VcsAdapter` MUST be declared as a TypeScript `interface`, not an abstract class. Unlike repository ports, `VcsAdapter` has no invariant constructor arguments shared across all implementations, so an interface is the appropriate abstraction.
+`VcsAdapter` MUST be declared as an abstract class, not a TypeScript interface. It MUST accept `cwd` as a protected read-only constructor parameter, which represents the working directory context.
 
 ### Requirement: Null fallback implementation
 
 A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:
 
-- `rootDir()` MUST reject with an `Error` containing a message indicating no VCS was detected.
+- `rootDir()` MUST throw an `Error` containing a message indicating no VCS was detected.
 - `branch()` MUST resolve to `"none"`.
 - `isClean()` MUST resolve to `true`.
 - `ref()` MUST resolve to `null`.
 - `refAt()` MUST resolve to `null` for any timestamp.
 - `show()` MUST resolve to `null` for any arguments.
 - `modifiedFiles()` MUST resolve to an empty array for any baseline.
+- `identity()` MUST resolve to `{ name: 'unknown', email: '', provider: 'null' }`.
+
+### Requirement: identity resolves version control identity
+
+`identity()` MUST return a `Promise<VcsIdentity>` resolving to the version control author identity configured for the repository.
+
+The returned `VcsIdentity` has the structure:
+
+```typescript
+export interface VcsIdentity {
+  readonly name: string
+  readonly email: string
+  readonly provider: string
+}
+```
+
+`name` MUST be a non-empty string when resolved successfully, and `email` MAY be empty for backends that do not natively store email (like SVN).
+
+### Requirement: static detect detects active VCS
+
+`VcsAdapter` MUST define a static `detect(cwd: string): Promise<VcsAdapter | null>` method.
+
+By default, `VcsAdapter.detect()` MUST return `null`. Concrete subclasses override this to asynchronously detect if the given `cwd` is inside their repository type, resolve the repository root, and return an instance of themselves.
 
 ## Constraints
 

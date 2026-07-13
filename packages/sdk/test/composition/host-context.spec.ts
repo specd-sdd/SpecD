@@ -7,7 +7,7 @@ const mockProviderB = { id: 'provider-b' }
 let providerCallCount = 0
 
 const createKernel = vi.fn(async () => mockKernel)
-const createConfigLoader = vi.fn(() => ({ load, resolvePath }))
+const createDefaultConfigLoader = vi.fn(async () => ({ load, resolvePath }))
 const createCodeGraphProvider = vi.fn(() => {
   providerCallCount += 1
   return providerCallCount === 1 ? mockProviderA : mockProviderB
@@ -17,7 +17,7 @@ const resolvePath = vi.fn()
 
 vi.mock('@specd/core', () => ({
   createKernel,
-  createConfigLoader,
+  createDefaultConfigLoader,
 }))
 
 vi.mock('@specd/code-graph', () => ({
@@ -75,6 +75,6 @@ describe('openSpecdHost', () => {
 
   it('uses forced configPath when provided', async () => {
     await openSpecdHost({ configPath: '/forced/specd.yaml' })
-    expect(createConfigLoader).toHaveBeenCalledWith({ configPath: '/forced/specd.yaml' })
+    expect(createDefaultConfigLoader).toHaveBeenCalledWith({ configPath: '/forced/specd.yaml' })
   })
 })

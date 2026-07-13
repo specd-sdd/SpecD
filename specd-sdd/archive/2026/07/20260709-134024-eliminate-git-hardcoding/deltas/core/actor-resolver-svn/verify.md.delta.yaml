@@ -1,0 +1,22 @@
+- op: modified
+  description: 'Rename requirement. Needs #### Scenario: placeholder for validator regex.'
+  selector:
+    type: section
+    matches: 'Requirement: Implementation of AutoDetectActorProvider'
+  rename: 'Requirement: Deprecated'
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Interface satisfaction'
+  rename: 'Scenario: Spec is deprecated'
+  content: |
+    - **WHEN** this specification is referenced
+    - **THEN** it is recognized as deprecated and eliminated
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Detection logic'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Identity resolution'

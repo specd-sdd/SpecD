@@ -38,6 +38,20 @@
       "then": ["it returns a resolver"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:actor-provider",
+        "file": "core:src/composition/actor-resolver.ts",
+        "symbol": "createVcsActorResolver"
+      },
+      {
+        "specId": "core:actor-provider",
+        "file": "core:src/composition/actor-resolver.ts",
+        "symbol": "createLazyVcsActorResolver"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:c3ee4dde91d692a63d1ca651f8089d4214dfa8d41a195c6d9cbe74f8eab5e5bc",
     "verify.md": "sha256:58ea6cb9255b86c5307ac06eeb4da86d115bdec1828ccea61caea965e3a8faf1"

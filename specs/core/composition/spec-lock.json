@@ -12,45 +12,7 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/spec-repository.ts",
-      "symbols": ["createSpecRepository"]
-    },
-    {
-      "file": "core:src/composition/schema-repository.ts",
-      "symbols": ["createSchemaRepository"]
-    },
-    {
-      "file": "core:src/composition/change-repository.ts",
-      "symbols": ["createChangeRepository"]
-    },
-    {
-      "file": "core:src/composition/archive-repository.ts",
-      "symbols": ["createArchiveRepository"]
-    },
-    {
-      "file": "core:src/composition/composition-registries.ts",
-      "symbols": ["createBuiltinCompositionRegistry"]
-    },
-    {
-      "file": "core:src/public.ts"
-    },
-    {
-      "file": "core:test/composition/repository-factories.spec.ts"
-    },
-    {
-      "file": "core:test/barrel.spec.ts"
-    },
-    {
-      "file": "core:src/domain/errors/index.ts",
-      "symbols": ["StorageDirectoryNotFoundError,UnknownAdapterError"]
-    },
-    {
-      "file": "core:src/domain/errors/storage-directory-not-found-error.ts",
-      "symbols": ["StorageDirectoryNotFoundError"]
-    },
-    {
-      "file": "core:src/domain/errors/unknown-adapter-error.ts",
-      "symbols": ["UnknownAdapterError"]
+      "file": "core:src/composition/composition-resolver.ts"
     }
   ]
 }

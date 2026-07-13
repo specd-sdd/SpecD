@@ -1,7 +1,7 @@
 {
   "name": "eliminate-git-hardcoding",
   "createdAt": "2026-07-09T13:40:24.880Z",
-  "description": "Replace direct git calls with VcsAdapter.identity() and remove duplicate VCS detection in actor-resolver composition",
+  "description": "This change removes git-specific hardcoding from config loading, actor resolution, and graph indexing by routing repository detection and identity lookups through the VcsAdapter contract. It introduces VCS-neutral root handling across git, hg, svn, and null environments, replaces the public default config-loader factory name with createDefaultConfigLoader, and aligns first-party code, tests, and documentation with that contract. The result is one shared VCS detection path with less duplicated composition logic and consistent behavior across CLI, SDK, and code-graph entry points.",
   "schema": {
     "name": "schema-std",
     "version": 1
@@ -32,8 +32,7 @@
     "core:actor-resolver": [
       "core:actor-provider",
       "core:actor-resolver-privacy",
-      "core:composition",
-      "core:vcs-adapter"
+      "core:composition"
     ],
     "core:actor-resolver-git": ["core:actor-provider"],
     "core:actor-resolver-hg": ["core:actor-provider"],
@@ -54,23 +53,13 @@
       "core:config",
       "core:spec-repository-port",
       "core:list-workspaces",
-      "code-graph:document-model",
-      "core:vcs-adapter-port"
+      "code-graph:document-model"
     ],
-    "core:config": [
-      "core:schema-format",
-      "core:schema-merge",
-      "default:_global/architecture",
-      "core:storage",
-      "core:spec-metadata",
-      "core:workspace",
-      "default:_global/logging",
-      "core:vcs-adapter-port"
-    ],
-    "code-graph:workspace-integration": ["core:config", "core:vcs-adapter-port"],
+    "core:config": ["core:vcs-adapter-port", "default:_global/architecture"],
+    "code-graph:workspace-integration": ["core:config"],
     "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
     "cli:host-context": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
-    "core:vcs-actor-resolver": [],
+    "core:vcs-actor-resolver": ["core:actor-resolver-port", "core:vcs-adapter-port"],
     "core:composition": [
       "default:_global/architecture",
       "core:resolve-schema",
@@ -81,18 +70,383 @@
     "sdk:host-context": ["sdk:composition", "core:kernel", "core:composition"]
   },
   "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/null/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs-actor-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/actor-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/load-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs-actor-resolver.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/git/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/hg/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/svn/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/init.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/exec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/exec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/exec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/actor-resolver.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/null/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/discover-files.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/config/config-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/examples/implementing-a-port.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/get-config.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/schemas/examples/delta-files.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/README.md",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/src/application/ports/vcs-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["VcsAdapter", "VcsIdentity"]
+    },
+    {
+      "specId": "core:vcs-adapter",
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GitVcsAdapter"]
+    },
+    {
+      "specId": "core:vcs-adapter",
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HgVcsAdapter"]
+    },
+    {
+      "specId": "core:vcs-adapter",
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SvnVcsAdapter"]
+    },
+    {
+      "specId": "core:vcs-adapter",
+      "file": "packages/core/src/infrastructure/null/vcs-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["NullVcsAdapter"]
+    },
+    {
+      "specId": "core:vcs-actor-resolver",
+      "file": "packages/core/src/infrastructure/vcs-actor-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["VcsActorResolver"]
+    },
+    {
+      "specId": "core:actor-resolver",
+      "file": "packages/core/src/composition/actor-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createVcsActorResolver", "createLazyVcsActorResolver"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigLoader"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/composition/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createDefaultConfigLoader"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["discoverFiles"]
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["indexProjectGraph"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/load-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadConfig"]
+    },
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["openSpecdHost"]
+    },
+    {
+      "specId": "core:vcs-actor-resolver",
+      "file": "packages/core/test/infrastructure/vcs-actor-resolver.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter",
+      "file": "packages/core/test/infrastructure/git/vcs-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter",
+      "file": "packages/core/test/infrastructure/hg/vcs-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter",
+      "file": "packages/core/test/infrastructure/svn/vcs-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/ports/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ConfigLoader"]
+    },
+    {
+      "specId": "core:actor-resolver-port",
+      "file": "packages/core/src/infrastructure/vcs-actor-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["VcsActorResolver"]
+    },
+    {
+      "specId": "core:actor-provider",
+      "file": "packages/core/src/composition/actor-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createVcsActorResolver", "createLazyVcsActorResolver"]
+    },
+    {
+      "specId": "core:actor-resolver-hg",
+      "file": "packages/core/src/infrastructure/vcs-actor-resolver.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:actor-resolver-git",
+      "file": "packages/core/src/infrastructure/vcs-actor-resolver.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:actor-resolver-svn",
+      "file": "packages/core/src/infrastructure/vcs-actor-resolver.ts",
+      "fileLinkExplicit": true
+    }
+  ],
   "artifacts": [
     {
       "type": "proposal",
       "optional": false,
       "requires": [],
-      "state": "pending-review",
+      "state": "complete",
       "files": [
         {
           "key": "proposal",
           "filename": "proposal.md",
-          "state": "pending-review",
-          "validatedHash": "sha256:02b1a11bdb322d5305de7ba896e4d53d7a83a0bd53fab5c28cd2622d9f843164"
+          "state": "complete",
+          "validatedHash": "sha256:3e46518945656bafe2a8f254ff458a7529719ad63ba5bc6946ad2229aed8f05c"
         }
       ]
     },
@@ -100,109 +454,109 @@
       "type": "specs",
       "optional": false,
       "requires": ["proposal"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "core:vcs-adapter-port",
           "filename": "deltas/core/vcs-adapter-port/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:01cbf7d2a2e7573e514bbc361b6c6ef9c77bb10724b8f884a0500281b55725df"
         },
         {
           "key": "core:vcs-adapter",
           "filename": "deltas/core/vcs-adapter/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:2266a2eb03dc0868347d65fd29daa92f5f081d62d85696b247687cce5835c71c"
         },
         {
           "key": "core:actor-resolver-port",
           "filename": "deltas/core/actor-resolver-port/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:958a7319a4fe483f5917e914a3a1bac7186a3243d2f2b00c6ba021ff9d6f19dd"
         },
         {
           "key": "core:actor-resolver",
           "filename": "deltas/core/actor-resolver/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:8aa0235fbd2af67d6eb4a6b0e47c08dced47512ef4d1b0a490619db9d79c33cb"
         },
         {
           "key": "core:actor-resolver-git",
           "filename": "deltas/core/actor-resolver-git/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:78468fe24244f39b6b4230eaf47f19e07d935693dc6efce4a17518517b28316e"
         },
         {
           "key": "core:actor-resolver-hg",
           "filename": "deltas/core/actor-resolver-hg/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:78468fe24244f39b6b4230eaf47f19e07d935693dc6efce4a17518517b28316e"
         },
         {
           "key": "core:actor-resolver-svn",
           "filename": "deltas/core/actor-resolver-svn/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:78468fe24244f39b6b4230eaf47f19e07d935693dc6efce4a17518517b28316e"
         },
         {
           "key": "core:actor-provider",
           "filename": "deltas/core/actor-provider/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:61cfc8b0ad4ef1848a86942f003d0c2a9594506cc6df1d4961f238b42d7f3277"
         },
         {
           "key": "core:config-loader",
           "filename": "deltas/core/config-loader/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:0303947f7d0a45bd92f38e29b06161373490805274f6f457f35e00af9b9193e4"
         },
         {
           "key": "code-graph:indexer",
           "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:351c588d3f4ae3dcc14406d2f59552406f3c2b3ee772dd3f1761f14ffcd6f5b9"
         },
         {
           "key": "core:config",
           "filename": "deltas/core/config/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:79f803cdbe95298ac8b7e04dfb99a18454f1249eaf8943356d572967e6707399"
         },
         {
           "key": "code-graph:workspace-integration",
           "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:9b154a762104c077b1c1cabf68ff7c065e444871c2f3dfd42df76e6e89754e8a"
         },
         {
           "key": "cli:entrypoint",
           "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:f7d8a02c0638203f58c0927d57edd6a2586cabb43f3f390ff69cb9e030303111"
         },
         {
           "key": "cli:host-context",
           "filename": "deltas/cli/host-context/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:98efe3404c54f7f7cd594f5b9a4844263f48f40676d58eaa5a55d1fbdd40d849"
         },
         {
           "key": "core:vcs-actor-resolver",
           "filename": "specs/core/vcs-actor-resolver/spec.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:0c9f2f68443340b74a0be3827062b9f9110856f097fcdb0eceef03aa7dd2f4d8"
         },
         {
           "key": "core:composition",
           "filename": "deltas/core/composition/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:83369fc25eda34f834312913e93843006c6d1678f59c78de9ccd1e926dd5b336"
         },
         {
           "key": "sdk:host-context",
           "filename": "deltas/sdk/host-context/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:b06c3688c30c7f451772c014de309e9eb7917c5c5f0075c7e1094611750eee33"
         }
       ]
     },
@@ -210,109 +564,109 @@
       "type": "verify",
       "optional": false,
       "requires": ["specs"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "core:vcs-adapter-port",
           "filename": "deltas/core/vcs-adapter-port/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:88cecae7d329e77a89f79572e76f21f8b39edc1fc857af40af533a37d877ec85"
         },
         {
           "key": "core:vcs-adapter",
           "filename": "deltas/core/vcs-adapter/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:2c176588187c734bec0988a16a2e9dec04e7608948d2fff491f1d8d8b9d0947c"
         },
         {
           "key": "core:actor-resolver-port",
           "filename": "deltas/core/actor-resolver-port/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:958a7319a4fe483f5917e914a3a1bac7186a3243d2f2b00c6ba021ff9d6f19dd"
         },
         {
           "key": "core:actor-resolver",
           "filename": "deltas/core/actor-resolver/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:3bcc9b1cd213209383f6281321fc2a0beb6401b6b1f397526e37b224ad7e265e"
         },
         {
           "key": "core:actor-resolver-git",
           "filename": "deltas/core/actor-resolver-git/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:4d712b8200b3863e2917530238bad6613f48cf1142c0b7b8a0f159befd906783"
         },
         {
           "key": "core:actor-resolver-hg",
           "filename": "deltas/core/actor-resolver-hg/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:4d712b8200b3863e2917530238bad6613f48cf1142c0b7b8a0f159befd906783"
         },
         {
           "key": "core:actor-resolver-svn",
           "filename": "deltas/core/actor-resolver-svn/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:4d712b8200b3863e2917530238bad6613f48cf1142c0b7b8a0f159befd906783"
         },
         {
           "key": "core:actor-provider",
           "filename": "deltas/core/actor-provider/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:c9b6965d0e511ab6eb3a383c6f718a65d2f71c4570fa6e9dc43071ca3906757b"
         },
         {
           "key": "core:config-loader",
           "filename": "deltas/core/config-loader/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:534442de3602d8c8cc7b5ff684d2130da3872ac513aeac394f43c0f1b2daf726"
         },
         {
           "key": "code-graph:indexer",
           "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:49cfe4dc5e8535b8ddd9a784d8b83f7d5f1a20008d38a12ec267e48e82483645"
         },
         {
           "key": "core:config",
           "filename": "deltas/core/config/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:996a54dea6497e42b0f8cc3f5a11e205e36abf58eb8e5dc15eb2f146f4edcbd5"
         },
         {
           "key": "code-graph:workspace-integration",
           "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:188a4b416b7125d9a2ba6ddfa2ee9e79677bf9977cd04709bc20a360411631a6"
         },
         {
           "key": "cli:entrypoint",
           "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:0075581ee4b6006b27b27e8f1f616671347768ee651aaedf9015e1340bc47aa7"
         },
         {
           "key": "cli:host-context",
           "filename": "deltas/cli/host-context/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:7dafba1f104ad71b14da9bb20df691fba1887b978ed93d6f536ccc9b61d6b79e"
         },
         {
           "key": "core:vcs-actor-resolver",
           "filename": "specs/core/vcs-actor-resolver/verify.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:3287a671e58c3ad330950109e4d2f29737c1882cf86322c34f3e7492915fcaa9"
         },
         {
           "key": "core:composition",
           "filename": "deltas/core/composition/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:a150405c5a4409ce4754ccd56ef9d579268e45ec202a3deef2d965004f87a241"
         },
         {
           "key": "sdk:host-context",
           "filename": "deltas/sdk/host-context/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:c5ba7929d0620f5194509ecceff9389c186297088af67867111ac1268b19e309"
         }
       ]
     },
@@ -320,13 +674,13 @@
       "type": "design",
       "optional": false,
       "requires": ["proposal", "specs", "verify"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "design",
           "filename": "design.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:c14fa336de7ebc5a995447f4cb88c80f5db8a79c9f4e74742b3d05aca5d054b6"
         }
       ]
     },
@@ -334,13 +688,13 @@
       "type": "tasks",
       "optional": false,
       "requires": ["specs", "design"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "tasks",
           "filename": "tasks.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:d29f903b9cfb5c197e2aab80567819b9da78710d2a01a28555a1db9615b24bc2"
         }
       ]
     }
@@ -1466,6 +1820,551 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T11:48:17.925Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver",
+            "core:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver",
+            "core:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T11:48:54.863Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver",
+            "core:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver",
+            "core:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T11:49:48.103Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-13T11:51:41.955Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T11:55:24.809Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T12:53:17.918Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:vcs-actor-resolver]; verify [core:vcs-actor-resolver]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-actor-resolver"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-actor-resolver"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T12:53:17.918Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T12:56:59.671Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:actor-provider]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:actor-provider"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver",
+            "core:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T13:19:33.920Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:composition, core:config-loader]; verify [core:composition, core:config-loader]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition", "core:config-loader"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:config-loader"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T13:25:57.951Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer, code-graph:workspace-integration]; verify [code-graph:indexer]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer", "code-graph:workspace-integration"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T13:29:13.944Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config-loader]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config-loader"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:vcs-adapter-port",
+            "core:vcs-adapter",
+            "core:actor-resolver-port",
+            "core:actor-resolver",
+            "core:actor-resolver-git",
+            "core:actor-resolver-hg",
+            "core:actor-resolver-svn",
+            "core:actor-provider",
+            "core:config-loader",
+            "code-graph:indexer",
+            "core:config",
+            "code-graph:workspace-integration",
+            "cli:entrypoint",
+            "cli:host-context",
+            "core:vcs-actor-resolver",
+            "core:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T13:34:00.018Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer, code-graph:workspace-integration]; verify [code-graph:indexer, code-graph:workspace-integration]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer", "code-graph:workspace-integration"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer", "code-graph:workspace-integration"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T13:52:58.633Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:composition, core:config-loader]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:composition", "core:config-loader"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T13:54:32.789Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T13:55:55.967Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T14:43:53.324Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T15:05:31.497Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T15:05:52.352Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-13T15:20:08.959Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "This change removes git-specific hardcoding from config loading, actor resolution, and graph indexing by routing repository detection and identity lookups through the VcsAdapter contract. It introduces VCS-neutral root handling across git, hg, svn, and null environments, replaces the public default config-loader factory name with createDefaultConfigLoader, and aligns first-party code, tests, and documentation with that contract. The result is one shared VCS detection path with less duplicated composition logic and consistent behavior across CLI, SDK, and code-graph entry points."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-13T15:25:43.597Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:actor-resolver': extracted dependencies [core:actor-provider, core:actor-resolver-privacy, core:composition] do not match persisted dependencies [core:actor-provider, core:actor-resolver-privacy, core:composition, core:vcs-adapter]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-13T15:26:08.561Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:indexer': extracted dependencies [code-graph:graph-store, code-graph:language-adapter, code-graph:symbol-model, code-graph:workspace-integration, core:config, core:spec-repository-port, core:list-workspaces, code-graph:document-model] do not match persisted dependencies [code-graph:graph-store, code-graph:language-adapter, code-graph:symbol-model, code-graph:workspace-integration, core:config, core:spec-repository-port, core:list-workspaces, code-graph:document-model, core:vcs-adapter-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-13T15:26:19.522Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:config': extracted dependencies [core:vcs-adapter-port, default:_global/architecture] do not match persisted dependencies [core:schema-format, core:schema-merge, default:_global/architecture, core:storage, core:spec-metadata, core:workspace, default:_global/logging, core:vcs-adapter-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-13T15:26:31.709Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:workspace-integration': extracted dependencies [core:config] do not match persisted dependencies [core:config, core:vcs-adapter-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T15:26:42.979Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
     }
-  ]
+  ],
+  "archivedAt": "2026-07-13T15:26:43.464Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }

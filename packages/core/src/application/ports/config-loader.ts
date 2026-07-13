@@ -23,14 +23,21 @@ import { type SpecdConfig } from '../specd-config.js'
  *   explicit entrypoint and resolves only its own `extends` chain as a closed
  *   set. Normal filename discovery does not add additional layers.
  */
-export interface ConfigLoader {
+export abstract class ConfigLoader {
+  /**
+   * Creates a new `ConfigLoader`.
+   *
+   * @param rootPath - Resolved VCS root boundary, or `null` outside a repository
+   */
+  protected constructor(protected readonly rootPath: string | null) {}
+
   /**
    * Loads, validates, and returns the fully-resolved project configuration.
    *
    * @returns The resolved `SpecdConfig` with all paths made absolute
    * @throws {@link ConfigValidationError} When no config file is found or the YAML is invalid
    */
-  load(): Promise<SpecdConfig>
+  abstract load(): Promise<SpecdConfig>
 
   /**
    * Resolves the path to the active config file without loading or parsing it.
@@ -49,5 +56,5 @@ export interface ConfigLoader {
    *
    * @returns Absolute path to the config file, or `null` if not locatable
    */
-  resolvePath(): Promise<string | null>
+  abstract resolvePath(): Promise<string | null>
 }

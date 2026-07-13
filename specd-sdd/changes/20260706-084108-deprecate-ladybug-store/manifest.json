@@ -117,13 +117,14 @@
       "type": "proposal",
       "optional": false,
       "requires": [],
-      "state": "complete",
+      "state": "drifted-pending-review",
       "files": [
         {
           "key": "proposal",
           "filename": "proposal.md",
-          "state": "complete",
-          "validatedHash": "sha256:d4fb5cae88e680a5d656ccc9fb985e25ab676681efef54a68d861acf209bf94d"
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:d4fb5cae88e680a5d656ccc9fb985e25ab676681efef54a68d861acf209bf94d",
+          "hasDrift": true
         }
       ]
     },
@@ -1785,6 +1786,214 @@
         {
           "type": "verify",
           "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:10:35.245Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:25:43.094Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:08.083Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:18.930Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:31.156Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:42.375Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
         },
         {
           "type": "design",

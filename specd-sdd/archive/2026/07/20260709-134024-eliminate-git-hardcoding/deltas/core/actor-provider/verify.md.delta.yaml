@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Provider interfaces verification remains valid — no changes needed'

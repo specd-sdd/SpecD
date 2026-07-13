@@ -90,7 +90,7 @@ import { Repository, type RepositoryConfig } from '@specd/core'
 interface RepositoryConfig {
   workspace: string // workspace name from specd.yaml (e.g. 'billing', 'default')
   ownership: 'owned' | 'shared' | 'readOnly'
-  isExternal: boolean // true if data lives outside the current git root
+  isExternal: boolean // true if data lives outside the current VCS root
 }
 ```
 
@@ -108,7 +108,7 @@ Ownership levels:
 | -------------- | ----------------------------------- | -------------------------------------------------------------------- |
 | `workspace()`  | `string`                            | The workspace name this repository is bound to.                      |
 | `ownership()`  | `'owned' \| 'shared' \| 'readOnly'` | The ownership level declared in `specd.yaml`.                        |
-| `isExternal()` | `boolean`                           | Whether this repository points to data outside the current git root. |
+| `isExternal()` | `boolean`                           | Whether this repository points to data outside the current VCS root. |
 
 ---
 

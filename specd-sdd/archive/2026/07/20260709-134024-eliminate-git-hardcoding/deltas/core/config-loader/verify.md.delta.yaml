@@ -1,0 +1,104 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Factory returns a ConfigLoader'
+  content: |
+    - **WHEN** `createDefaultConfigLoader({ startDir: '/some/dir' })` is called
+    - **THEN** the returned object satisfies the `ConfigLoader` interface (abstract class)
+    - **AND** it is bounded by a resolved `rootPath` value rather than retaining a `VcsAdapter`
+    - **AND** it exposes a `load()` method returning `Promise<SpecdConfig>`
+    - **AND** it exposes a `resolvePath()` method returning `Promise<string | null>`
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Discovery mode returns null when no config found'
+  content: |
+    - **GIVEN** no discoverable config candidates exist between `startDir` and the VCS root
+    - **WHEN** `resolvePath()` is called
+    - **THEN** it returns `null`
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Config found in ancestor directory'
+  content: |
+    - **GIVEN** the start directory has no discoverable candidates
+    - **AND** the nearest ancestor directory before the VCS root does
+    - **WHEN** `load()` is called
+    - **THEN** the loader resolves the ancestor directory's active chain
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Walk stops at git root'
+  rename: 'Scenario: Walk stops at VCS root'
+  content: |
+    - **GIVEN** no discoverable candidates exist between startDir and the VCS root
+    - **WHEN** `load()` is called
+    - **THEN** the walk stops at the VCS root
+    - **AND** it does not inspect parent directories above that root
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: No git repo — checks only startDir'
+  rename: 'Scenario: No VCS repo — checks only startDir'
+  content: |
+    - **GIVEN** `startDir` is not inside any VCS repository
+    - **AND** discoverable config candidates exist only in the parent directory
+    - **WHEN** `load()` is called
+    - **THEN** `load()` throws `ConfigValidationError`
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Storage path outside git root'
+  rename: 'Scenario: Storage path outside VCS root'
+  content: |
+    - **GIVEN** the loader `rootPath` is `/repo/` and `storage.changes.fs.path` resolves to `/other/changes`
+    - **WHEN** `load()` is called
+    - **THEN** `load()` throws `ConfigValidationError` indicating the storage path resolves outside `rootPath`
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Storage path at git root is valid'
+  rename: 'Scenario: Storage path at VCS root is valid'
+  content: |
+    - **GIVEN** the loader `rootPath` is `/repo/` and a storage path resolves to exactly `/repo`
+    - **WHEN** `load()` is called
+    - **THEN** the storage path is accepted without error
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: No git repo — containment check skipped'
+  rename: 'Scenario: No VCS repo — containment check skipped'
+  content: |
+    - **GIVEN** `createVcsAdapter()` resolves to `NullVcsAdapter`
+    - **AND** `createDefaultConfigLoader()` normalizes `NullVcsAdapter.rootDir()` throwing into `rootPath = null`
+    - **AND** storage paths resolve to arbitrary locations
+    - **WHEN** `load()` is called
+    - **THEN** no containment error is thrown
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Workspace specsPath inside git root'
+  rename: 'Scenario: Workspace specsPath inside VCS root'
+  content: |
+    - **GIVEN** the loader `rootPath` is `/repo/` and a workspace's `specsPath` resolves to `/repo/specs`
+    - **WHEN** `load()` is called
+    - **THEN** the workspace's `isExternal` is `false`
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Workspace specsPath outside git root'
+  rename: 'Scenario: Workspace specsPath outside VCS root'
+  content: |
+    - **GIVEN** the loader `rootPath` is `/repo/` and a workspace's `specsPath` resolves to `/other-repo/specs`
+    - **WHEN** `load()` is called
+    - **THEN** the workspace's `isExternal` is `true`
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: No git repo — all workspaces are not external'
+  rename: 'Scenario: No VCS repo — all workspaces are not external'
+  content: |
+    - **GIVEN** `createVcsAdapter()` resolves to `NullVcsAdapter`
+    - **AND** `createDefaultConfigLoader()` normalizes `NullVcsAdapter.rootDir()` throwing into `rootPath = null`
+    - **WHEN** `load()` is called
+    - **THEN** all workspaces have `isExternal` set to `false`

@@ -15,7 +15,7 @@
     {
       "requirement": "Use-case factories are the unit of composition",
       "rules": [
-        "The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.\n\nConfig I/O is an exception: `createConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes."
+        "The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.\n\nConfig I/O is an exception: `createDefaultConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes."
       ]
     },
     {
@@ -51,7 +51,7 @@
     {
       "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
       "rules": [
-        "Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver()` instead of constructing a specific implementation (e.g. `new GitActorResolver()`). The auto-detect chain (git → hg → svn → null) ensures the correct implementation is selected based on the project's actual VCS.\n\nThe same applies to any factory that needs a `VcsAdapter` — it must call `createVcsAdapter()`."
+        "Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver(vcsAdapter)` or resolve the `VcsAdapter` first and pass it, instead of constructing a specific implementation (e.g. `new GitActorResolver()`).\n\nThe same applies to any factory that needs repository-root awareness — it must call `createVcsAdapter()`, derive `rootPath` from that adapter, and pass the resolved `rootPath` data into the downstream port instead of passing the adapter object when the port only needs the root boundary."
       ]
     },
     {
@@ -238,11 +238,32 @@
     },
     {
       "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
-      "name": "Standalone factory uses auto-detect for actor resolution",
+      "name": "Standalone factory uses composition for actor resolution",
       "when": [
         "any standalone use-case factory in composition/use-cases/ constructs an ActorResolver"
       ],
-      "then": ["it calls createVcsActorResolver() instead of new GitActorResolver()"]
+      "then": [
+        "it calls createVcsActorResolver(vcsAdapter) or resolves the VcsAdapter and passes it"
+      ]
+    },
+    {
+      "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
+      "name": "Config loader factory passes root data, not the full adapter",
+      "when": ["createDefaultConfigLoader() constructs FsConfigLoader"],
+      "then": [
+        "it derives rootPath from createVcsAdapter()",
+        "AND it passes the resolved rootPath boundary into the loader instead of retaining the VcsAdapter"
+      ]
+    },
+    {
+      "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
+      "name": "NullVcsAdapter normalizes to null rootPath",
+      "given": ["createVcsAdapter() returns NullVcsAdapter"],
+      "when": ["createDefaultConfigLoader() derives the repository boundary"],
+      "then": [
+        "it treats NullVcsAdapter.rootDir() throwing as rootPath = null",
+        "AND it still constructs FsConfigLoader without propagating the throw"
+      ]
     },
     {
       "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
@@ -461,63 +482,13 @@
     "files": [
       {
         "specId": "core:composition",
-        "file": "core:src/public.ts"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:test/composition/repository-factories.spec.ts"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:test/barrel.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/spec-repository.ts",
-        "symbol": "createSpecRepository"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/schema-repository.ts",
-        "symbol": "createSchemaRepository"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/change-repository.ts",
-        "symbol": "createChangeRepository"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/archive-repository.ts",
-        "symbol": "createArchiveRepository"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/composition-registries.ts",
-        "symbol": "createBuiltinCompositionRegistry"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/domain/errors/index.ts",
-        "symbol": "StorageDirectoryNotFoundError,UnknownAdapterError"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/domain/errors/storage-directory-not-found-error.ts",
-        "symbol": "StorageDirectoryNotFoundError"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/domain/errors/unknown-adapter-error.ts",
-        "symbol": "UnknownAdapterError"
+        "file": "core:src/composition/composition-resolver.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8e382f8fe86a8c2bc41e865de57f640623212c92789c631514b98fc4a197eeea",
-    "verify.md": "sha256:a3b7740ff3edd99834fa068cd86d865a5d18732114095a9a126c5e595ad9aea5"
+    "spec.md": "sha256:3eebce9d3b54892752f13a7dbe7a95a0df95c5e59276622a9587f12df16e437f",
+    "verify.md": "sha256:fec92a579a42808ec616bea9691cbea45c5530f203dce85c0c8e6325fb6e6e9f"
   },
   "generatedBy": "core"
 }

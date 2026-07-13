@@ -1352,6 +1352,151 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:25:43.079Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:08.074Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:18.921Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:31.148Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:42.363Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

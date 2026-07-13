@@ -32,7 +32,7 @@ The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST 
 
 `openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:
 
-1. Use `createConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`
+1. Use `createDefaultConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`
 2. Await `createSdkContext(config, input.kernelOptions)`
 3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
 
@@ -46,4 +46,4 @@ Host context bootstrap MUST NOT perform config file writes. `initProject`, `addP
 
 - [`sdk:composition`](../composition/spec.md) — package placement and export surface
 - [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type and `createKernel`
-- [`core:composition`](../../../../specs/core/composition/spec.md) — `createConfigLoader` factory
+- [`core:composition`](../../../../specs/core/composition/spec.md) — `createDefaultConfigLoader` factory

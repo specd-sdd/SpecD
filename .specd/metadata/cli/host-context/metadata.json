@@ -72,23 +72,8 @@
     "symbols": [
       {
         "specId": "cli:host-context",
-        "file": "cli:src/helpers/cli-context.ts",
-        "symbol": "buildCliKernelOptions"
-      },
-      {
-        "specId": "cli:host-context",
-        "file": "cli:src/helpers/cli-context.ts",
-        "symbol": "resolveCliContext"
-      },
-      {
-        "specId": "cli:host-context",
-        "file": "cli:src/helpers/sdk-host.ts",
-        "symbol": "resolveSdkHostContext"
-      },
-      {
-        "specId": "cli:host-context",
-        "file": "cli:src/helpers/cli-context-types.ts",
-        "symbol": "CliContext"
+        "file": "cli:src/load-config.ts",
+        "symbol": "loadConfig"
       }
     ]
   },
@@ -96,7 +81,5 @@
     "spec.md": "sha256:da5cf666bf91a0ebca76f464a189d8c8f6dc8cffe7c69d722c1ae2ea0931070a",
     "verify.md": "sha256:b80b12fdf3382e7d166c20860102b8a4fe6a43d94eb3c742999e1975f207665a"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "CLI host bootstrap funnels through `resolveCliContext` -> `openSpecdHost`, preserving CLI logging options and SDK-only runtime deps.",
-  "optimizedContext": "# CLI Host Context\n\n## Rules\n- `resolveCliContext` in `packages/cli/src/helpers/cli-context.ts` MUST call `openSpecdHost` from `@specd/sdk`.\n- Passed input MUST include caller `configPath` when provided.\n- Passed `kernelOptions` MUST preserve CLI-specific logging config: verbosity from argv, console destination, optional `onLog` callback destination, TTY-aware formatting.\n- Return shape is stable `CliContext`: `{ config, configFilePath, kernel }`.\n- Command handlers/helpers outside tests MUST obtain host context through `resolveCliContext` or `openSpecdHost` for steady-state bootstrap.\n- `@specd/cli` runtime deps MUST include `@specd/sdk` as sole direct workspace dependency among `@specd/core` / `@specd/code-graph` / `@specd/sdk`. Core/code-graph symbols used by CLI import from `@specd/sdk` re-exports.\n\n## Constraints\n- No extra explicit constraints beyond rules."
+  "generatedBy": "core"
 }

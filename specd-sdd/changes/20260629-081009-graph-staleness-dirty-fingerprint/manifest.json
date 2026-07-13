@@ -1,7 +1,6 @@
 {
   "name": "graph-staleness-dirty-fingerprint",
   "createdAt": "2026-06-29T08:10:09.775Z",
-  "updatedAt": "2026-07-06T21:25:39.112Z",
   "description": "Improve code-graph freshness detection with vcs-group/workspace content scopes, diff fingerprints, and cached stale state without persisting user paths",
   "schema": {
     "name": "schema-std",
@@ -198,6 +197,162 @@
         }
       ],
       "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:25:43.062Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T15:25:43.062Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:08.052Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:18.912Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:31.133Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:42.352Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

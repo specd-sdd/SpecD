@@ -1,5 +1,5 @@
-import { readdirSync, lstatSync, readFileSync, existsSync } from 'node:fs'
-import { join, relative, dirname, extname } from 'node:path'
+import { readdirSync, lstatSync, readFileSync } from 'node:fs'
+import { join, relative, extname } from 'node:path'
 import ignore from 'ignore'
 
 /**
@@ -9,6 +9,8 @@ import ignore from 'ignore'
 export const DEFAULT_EXCLUDE_PATHS: readonly string[] = [
   'node_modules/',
   '.git/',
+  '.hg/',
+  '.svn/',
   '.specd/',
   'dist/',
   'build/',
@@ -55,21 +57,11 @@ export interface DiscoverFilesOptions {
    * If provided, only files matching at least one pattern SHALL be returned.
    */
   readonly allowedPaths?: readonly string[]
-}
-
-/**
- * Finds the git root by walking up from the given directory looking for `.git/`.
- * @param startDir - Absolute path to start searching from.
- * @returns The git root path, or undefined if not found.
- */
-function findGitRoot(startDir: string): string | undefined {
-  let dir = startDir
-  while (true) {
-    if (existsSync(join(dir, '.git'))) return dir
-    const parent = dirname(dir)
-    if (parent === dir) return undefined
-    dir = parent
-  }
+  /**
+   * Resolved VCS root used to bound repository-level `.gitignore` loading.
+   * Must be passed explicitly as `null` outside VCS.
+   */
+  readonly vcsRoot: string | null
 }
 
 /**
@@ -124,11 +116,10 @@ export function discoverFiles(
     }
   }
 
-  let gitRoot: string | undefined
+  let gitRoot: string | null = null
   if (options?.respectGitignore !== false) {
-    // Load .gitignore from git root (patterns apply relative to root)
-    gitRoot = findGitRoot(root)
-    if (gitRoot) {
+    gitRoot = options?.vcsRoot ?? null
+    if (gitRoot !== null) {
       loadIgnoreFile(gitRoot)
     }
 

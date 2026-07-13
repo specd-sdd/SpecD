@@ -6,14 +6,9 @@ specd needs to identify the current user (for approvals, sign-offs, and audit tr
 
 ## Requirements
 
-### Requirement: Detection probes in priority order
+### Requirement: VCS adapter composition
 
-`createVcsActorResolver` MUST determine the provider to use based on the following precedence:
-
-1. **Forced Provider**: If `actorProvider` is configured, the factory MUST attempt to load that specific provider by name. If not found, it SHALL throw. If found, it MUST call `create()` on that provider, bypassing all other probes.
-2. **Auto-Detection**: If no forced provider is set, the factory MUST iterate through all registered `AutoDetectActorProvider` instances (e.g. git, hg, svn) in priority order and call `detect()`.
-
-The first successful provider (manual or auto) determines the base resolver.
+`createVcsActorResolver` MUST receive a `VcsAdapter` instance (or resolve one using the active VCS factory) and return an `ActorResolver` wired to that adapter (e.g. `VcsActorResolver`). It SHALL NOT perform separate VCS detection.
 
 ### Requirement: External providers run before built-in probes
 
@@ -23,7 +18,7 @@ If no external or built-in provider matches, the factory SHALL continue to fall 
 
 ### Requirement: Fallback to NullActorResolver
 
-When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw.
+When the active or provided adapter is a `NullVcsAdapter`, `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw.
 
 ### Requirement: Optional cwd parameter
 

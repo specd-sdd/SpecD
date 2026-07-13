@@ -242,17 +242,17 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the composition layer — repository and schema factories:**
 
-| Export                   | Kind      | Description                                                                        |
-| ------------------------ | --------- | ---------------------------------------------------------------------------------- |
-| `createSchemaRegistry`   | function  | Constructs a `SchemaRegistry` for the given adapter type (`'fs'`).                 |
-| `createSchemaRepository` | function  | Constructs a `SchemaRepository` for the given adapter type.                        |
-| `createConfigLoader`     | function  | Creates a filesystem-backed `ConfigLoader` that discovers and parses `specd.yaml`. |
-| `SpecStorageFactory`     | interface | Named storage factory for workspace specs repositories.                            |
-| `SchemaStorageFactory`   | interface | Named storage factory for workspace schema repositories.                           |
-| `ChangeStorageFactory`   | interface | Named storage factory for active and shelved changes.                              |
-| `ArchiveStorageFactory`  | interface | Named storage factory for archived changes.                                        |
-| `VcsProvider`            | interface | External-first VCS detection provider used by the composition registry layer.      |
-| `ActorProvider`          | interface | External-first actor detection provider used by the composition registry layer.    |
+| Export                      | Kind      | Description                                                                        |
+| --------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `createSchemaRegistry`      | function  | Constructs a `SchemaRegistry` for the given adapter type (`'fs'`).                 |
+| `createSchemaRepository`    | function  | Constructs a `SchemaRepository` for the given adapter type.                        |
+| `createDefaultConfigLoader` | function  | Creates a filesystem-backed `ConfigLoader` that discovers and parses `specd.yaml`. |
+| `SpecStorageFactory`        | interface | Named storage factory for workspace specs repositories.                            |
+| `SchemaStorageFactory`      | interface | Named storage factory for workspace schema repositories.                           |
+| `ChangeStorageFactory`      | interface | Named storage factory for active and shelved changes.                              |
+| `ArchiveStorageFactory`     | interface | Named storage factory for archived changes.                                        |
+| `VcsProvider`               | interface | External-first VCS detection provider used by the composition registry layer.      |
+| `ActorProvider`             | interface | External-first actor detection provider used by the composition registry layer.    |
 
 **From the composition layer — VCS and actor adapters:**
 

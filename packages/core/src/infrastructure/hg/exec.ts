@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
@@ -14,4 +14,17 @@ const execFileAsync = promisify(execFile)
 export async function hg(cwd: string, ...args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('hg', args, { cwd })
   return stdout.trim()
+}
+
+/**
+ * Runs `hg <args>` synchronously in the given working directory and returns
+ * trimmed stdout.
+ *
+ * @param cwd - Working directory for the hg command
+ * @param args - Arguments to pass to the hg binary
+ * @returns Trimmed stdout from the hg process
+ * @throws When the hg process exits with a non-zero code
+ */
+export function hgSync(cwd: string, ...args: string[]): string {
+  return execFileSync('hg', args, { cwd, encoding: 'utf-8' }).trim()
 }

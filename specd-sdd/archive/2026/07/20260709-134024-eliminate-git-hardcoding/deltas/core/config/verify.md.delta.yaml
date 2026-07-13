@@ -1,0 +1,101 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Config file location and format'
+  content: |
+    #### Scenario: Discover config walking up to VCS root
+
+    - **GIVEN** target directory is inside a subfolder of a VCS repository
+    - **WHEN** config discovery runs
+    - **THEN** it walks up the directory structure and stops at the nearest VCS root
+
+    #### Scenario: No VCS repo checks only CWD
+
+    - **GIVEN** target directory is not inside any VCS repository
+    - **WHEN** config discovery runs
+    - **THEN** it checks only the current working directory
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Startup validation'
+  content: |
+    #### Scenario: Valid minimal config passes validation
+
+    - **GIVEN** a `specd.yaml` with only `schema: schema-std@1`
+    - **WHEN** config is validated at startup
+    - **THEN** validation passes with defaults applied
+
+    #### Scenario: Invalid contextMode value rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: partial`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` identifying the invalid `contextMode` value
+
+    #### Scenario: Legacy lazy contextMode rejected
+
+    - **GIVEN** `specd.yaml` contains `contextMode: lazy`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` because lazy is no longer accepted
+
+    #### Scenario: contextMode in workspace entry rejected with specific message
+
+    - **GIVEN** `specd.yaml` contains a workspace with `contextMode: summary`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with a `ConfigValidationError` with the message "`contextMode` is not valid inside a workspace — it is a project-level setting"
+
+    #### Scenario: artifactRules rejected at startup
+
+    - **GIVEN** `specd.yaml` contains `artifactRules: { specs: [...] }`
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` suggesting migration to `schemaOverrides`
+
+    #### Scenario: skills field rejected at startup
+
+    - **GIVEN** `specd.yaml` contains a `skills` field
+    - **WHEN** config is validated at startup
+    - **THEN** validation fails with `ConfigValidationError` explaining skills are managed via the plugin system
+
+    #### Scenario: Invalid level string
+
+    - **GIVEN** `specd.yaml` with `logging: { level: 'verbose' }` (not a recognized level)
+    - **WHEN** config is validated at startup
+    - **THEN** validation MUST fail with a `ConfigValidationError`
+
+    #### Scenario: remove without extends is rejected
+
+    - **GIVEN** a config file declares `remove` but no `extends`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Invalid extends value is rejected
+
+    - **GIVEN** a config file declares `extends: { from: ./specd.yaml }`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Required root field cannot be removed
+
+    - **GIVEN** an inheriting config declares `remove: { root: [schema] }`
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Unknown workspace removal target is rejected
+
+    - **GIVEN** an inheriting config declares `remove: { workspaces: [billing] }`
+    - **AND** no inherited `billing` workspace exists
+    - **WHEN** config is loaded
+    - **THEN** startup fails with `ConfigValidationError`
+
+    #### Scenario: Explicit extends outside the active chain is skipped
+
+    - **GIVEN** a discovered config declares `extends: ./unrelated.yaml`
+    - **AND** `unrelated.yaml` is not active in the discovery chain
+    - **WHEN** config is loaded in discovery mode
+    - **THEN** that candidate is skipped (no error)
+
+    #### Scenario: No VCS repo — containment check skipped
+
+    - **GIVEN** startDir is not inside a VCS repository
+    - **AND** storage paths resolve to arbitrary locations
+    - **WHEN** `load()` is called
+    - **THEN** no containment error is thrown

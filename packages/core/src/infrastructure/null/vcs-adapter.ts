@@ -1,4 +1,4 @@
-import { type VcsAdapter } from '../../application/ports/vcs-adapter.js'
+import { VcsAdapter, type VcsIdentity } from '../../application/ports/vcs-adapter.js'
 
 /**
  * Null implementation of the {@link VcsAdapter} port.
@@ -6,10 +6,17 @@ import { type VcsAdapter } from '../../application/ports/vcs-adapter.js'
  * Used when no VCS is detected. `rootDir()` throws because there is no
  * repository root to return. Other methods return safe defaults.
  */
-export class NullVcsAdapter implements VcsAdapter {
+export class NullVcsAdapter extends VcsAdapter {
+  /**
+   * Creates a new `NullVcsAdapter`.
+   */
+  constructor() {
+    super(process.cwd())
+  }
+
   /** @inheritdoc */
-  rootDir(): Promise<string> {
-    return Promise.reject(new Error('no VCS detected'))
+  rootDir(): string {
+    throw new Error('no VCS detected')
   }
 
   /** @inheritdoc */
@@ -43,5 +50,10 @@ export class NullVcsAdapter implements VcsAdapter {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   show(ref: string, filePath: string): Promise<string | null> {
     return Promise.resolve(null)
+  }
+
+  /** @inheritdoc */
+  identity(): Promise<VcsIdentity> {
+    return Promise.resolve({ name: 'unknown', email: '', provider: 'null' })
   }
 }

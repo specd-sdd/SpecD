@@ -10,7 +10,7 @@ Delivery mechanisms must not know how ports, adapters, and use cases are wired t
 
 The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.
 
-Config I/O is an exception: `createConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes.
+Config I/O is an exception: `createDefaultConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes.
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
@@ -60,9 +60,9 @@ Port implementations that have a single concrete class and no caller-visible con
 
 ### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
 
-Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver()` instead of constructing a specific implementation (e.g. `new GitActorResolver()`). The auto-detect chain (git → hg → svn → null) ensures the correct implementation is selected based on the project's actual VCS.
+Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver(vcsAdapter)` or resolve the `VcsAdapter` first and pass it, instead of constructing a specific implementation (e.g. `new GitActorResolver()`).
 
-The same applies to any factory that needs a `VcsAdapter` — it must call `createVcsAdapter()`.
+The same applies to any factory that needs repository-root awareness — it must call `createVcsAdapter()`, derive `rootPath` from that adapter, and pass the resolved `rootPath` data into the downstream port instead of passing the adapter object when the port only needs the root boundary.
 
 ### Requirement: FsChangeRepository options include artifact type resolution
 

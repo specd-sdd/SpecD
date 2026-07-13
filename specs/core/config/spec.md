@@ -11,8 +11,8 @@ Every tool in the specd ecosystem needs a shared, authoritative source for proje
 `specd.yaml` must be a valid YAML file. specd discovers and resolves configuration using the following strategy, in order:
 
 1. **`--config` flag** — if the CLI is invoked with `--config path/to/file.yaml`, that file becomes the single explicit entrypoint. specd MUST resolve that file and only its own `extends` chain. Normal filename discovery MUST NOT add any additional layers on top of the explicit chain.
-2. **Walk up from CWD, bounded by the git repo root** — specd walks up from the current working directory, checking each directory for discoverable config candidates. The walk stops at the **first directory containing any matching config files** (nearest to CWD) or at the git repo root (the nearest ancestor directory containing `.git/`), whichever comes first. If no discoverable config files are found before or at the repo root, specd exits with an error.
-3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists, specd checks only the current working directory and stops there. It does not walk further up.
+2. **Walk up from CWD, bounded by the VCS root** — specd walks up from the current working directory, checking each directory for discoverable config candidates. The walk stops at the **first directory containing any matching config files** (nearest to CWD) or at the VCS root (the nearest ancestor directory containing a `.git/`, `.hg/`, or `.svn/` directory, or as resolved by the active VCS adapter), whichever comes first. If no discoverable config files are found before or at the VCS root, specd exits with an error.
+3. **CWD only, when not inside a VCS repository** — if no VCS root ancestor exists, specd checks only the current working directory and stops there. It does not walk further up.
 
 Within the selected directory, normal discovery MUST evaluate candidate files in this order:
 
@@ -23,7 +23,7 @@ Within the selected directory, normal discovery MUST evaluate candidate files in
 
 A discovered file without `extends` becomes a standalone root from that point. A discovered file with `extends: true` MUST inherit from the previous active layer in the resolved chain. A discovered file with `extends: <path>` MUST only activate when that explicit base file is already part of the active chain being resolved; otherwise the discovered file is ignored during normal discovery.
 
-The search never goes above the git repo root. This prevents accidentally picking up a config from a parent repository in nested or sibling monorepo layouts.
+The search never goes above the VCS repository root. This prevents accidentally picking up a config from a parent repository in nested or sibling monorepo layouts.
 
 Some command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file entrypoint, never a repository root selector.
 
@@ -762,13 +762,8 @@ schemaOverrides:
 
 ## Spec Dependencies
 
-- [`core:schema-format`](../schema-format/spec.md) — schema structure, `kind`, `extends`, and resolution order
-- [`core:schema-merge`](../schema-merge/spec.md) — merge engine operations used by `schemaOverrides`
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design
-- [`core:storage`](../storage/spec.md) — storage adapter behavior
-- [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal in step 5
-- [`core:workspace`](../workspace/spec.md) — workspace identity, properties, ownership, and prefix semantics
-- [`default:_global/logging`](../../_global/logging/spec.md) — global logging standards followed by the config schema
+- [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — configuration bounding relies on vcs adapter
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
 
 ## ADRs
 

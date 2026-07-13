@@ -1,59 +1,14 @@
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
 import { type ActorIdentity } from '../domain/entities/change.js'
 import { type ActorProvider, type AutoDetectActorProvider } from './actor-provider.js'
-import { GitActorResolver } from '../infrastructure/git/actor-resolver.js'
-import { HgActorResolver } from '../infrastructure/hg/actor-resolver.js'
-import { SvnActorResolver } from '../infrastructure/svn/actor-resolver.js'
+import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
 import { NullActorResolver } from '../infrastructure/null/actor-resolver.js'
+import { NullVcsAdapter } from '../infrastructure/null/vcs-adapter.js'
+import { VcsActorResolver } from '../infrastructure/vcs-actor-resolver.js'
 import { NullAutoDetectActorProvider } from './null-actor-provider.js'
-import { git } from '../infrastructure/git/exec.js'
-import { hg } from '../infrastructure/hg/exec.js'
-import { svn } from '../infrastructure/svn/exec.js'
 
 /** Built-in actor providers in their default detection order. */
 export const BUILTIN_ACTOR_PROVIDERS: readonly AutoDetectActorProvider[] = [
-  {
-    name: 'git',
-    async create(options: { cwd?: string }): Promise<ActorResolver> {
-      return await Promise.resolve(new GitActorResolver(options.cwd))
-    },
-    async detect(cwd: string): Promise<ActorResolver | null> {
-      try {
-        await git(cwd, 'rev-parse', '--is-inside-work-tree')
-        return new GitActorResolver(cwd)
-      } catch {
-        return null
-      }
-    },
-  },
-  {
-    name: 'hg',
-    async create(options: { cwd?: string }): Promise<ActorResolver> {
-      return await Promise.resolve(new HgActorResolver(options.cwd))
-    },
-    async detect(cwd: string): Promise<ActorResolver | null> {
-      try {
-        await hg(cwd, 'root')
-        return new HgActorResolver(cwd)
-      } catch {
-        return null
-      }
-    },
-  },
-  {
-    name: 'svn',
-    async create(options: { cwd?: string }): Promise<ActorResolver> {
-      return await Promise.resolve(new SvnActorResolver(options.cwd))
-    },
-    async detect(cwd: string): Promise<ActorResolver | null> {
-      try {
-        await svn(cwd, 'info', '--show-item', 'wc-root')
-        return new SvnActorResolver(cwd)
-      } catch {
-        return null
-      }
-    },
-  },
   NullAutoDetectActorProvider,
 ]
 
@@ -99,22 +54,16 @@ async function resolveBaseActorResolver(
  * through the composition-layer identity entry point.
  */
 class LazyActorResolver implements ActorResolver {
-  private readonly _cwd: string
-  private readonly _providers: readonly ActorProvider[]
-  private readonly _actorProvider: string | undefined
+  private readonly _resolve: () => Promise<ActorResolver>
   private _resolverPromise?: Promise<ActorResolver>
 
   /**
    * Creates a lazily-resolving actor resolver.
    *
-   * @param cwd - Directory to probe when identity is first requested
-   * @param providers - Detection providers in priority order
-   * @param actorProvider - Optional forced provider name
+   * @param resolve - Resolver callback invoked on first identity lookup
    */
-  constructor(cwd: string, providers: readonly ActorProvider[], actorProvider?: string) {
-    this._cwd = cwd
-    this._providers = providers
-    this._actorProvider = actorProvider
+  constructor(resolve: () => Promise<ActorResolver>) {
+    this._resolve = resolve
   }
 
   /**
@@ -123,11 +72,7 @@ class LazyActorResolver implements ActorResolver {
    * @returns The resolved concrete `ActorResolver`
    */
   private resolveResolver(): Promise<ActorResolver> {
-    this._resolverPromise ??= resolveBaseActorResolver(
-      this._cwd,
-      this._providers,
-      this._actorProvider,
-    )
+    this._resolverPromise ??= this._resolve()
     return this._resolverPromise
   }
 
@@ -162,50 +107,37 @@ export async function resolveActorResolver(
 }
 
 /**
- * Auto-detects the active VCS in the given directory and returns the
- * corresponding {@link ActorResolver} implementation.
+ * Creates an actor resolver backed by a resolved `VcsAdapter`.
  *
- * Probes providers in the supplied order. Falls back to
- * {@link NullActorResolver} when no provider detects a VCS.
- *
- * @param providers - Detection providers in priority order
- * @returns A lazily-detecting `ActorResolver` for the current working directory
+ * @param vcsAdapter - Resolved VCS adapter
+ * @returns An actor resolver for the provided adapter
  */
-export function createVcsActorResolver(providers?: readonly ActorProvider[]): ActorResolver
+export function createVcsActorResolver(vcsAdapter: VcsAdapter): ActorResolver {
+  return vcsAdapter instanceof NullVcsAdapter
+    ? new NullActorResolver()
+    : new VcsActorResolver(vcsAdapter)
+}
+
 /**
- * Auto-detects the active VCS in the given directory immediately and returns
- * the corresponding concrete {@link ActorResolver} implementation.
+ * Creates a lazily-resolving VCS-backed actor resolver.
  *
- * @param cwd - Directory to probe
- * @param providers - Detection providers in priority order
- * @returns A promise for the detected concrete `ActorResolver`
+ * @param resolveVcsAdapter - Callback returning the VCS adapter to wrap
+ * @returns A lazy actor resolver
  */
-export function createVcsActorResolver(
-  cwd: string,
-  providers?: readonly ActorProvider[],
-): Promise<ActorResolver>
+export function createLazyVcsActorResolver(
+  resolveVcsAdapter: () => Promise<VcsAdapter>,
+): ActorResolver {
+  return new LazyActorResolver(async () => createVcsActorResolver(await resolveVcsAdapter()))
+}
+
 /**
- * Creates an actor resolver backed by the composition-layer VCS auto-detect flow.
+ * Creates a lazily-resolving actor resolver from an arbitrary resolver callback.
  *
- * Without an explicit `cwd`, the returned resolver defers detection until
- * `identity()` is called so synchronous use-case factories keep their current
- * contract. With an explicit `cwd`, detection happens immediately and returns
- * the concrete resolver for that repository.
- *
- * @param cwdOrProviders - Optional directory to probe immediately, or providers for lazy mode
- * @param maybeProviders - Optional providers when `cwd` is supplied
- * @returns A lazy resolver or a promise for the detected concrete resolver
+ * @param resolveActorResolver - Callback returning the concrete actor resolver
+ * @returns A lazy actor resolver
  */
-export function createVcsActorResolver(
-  cwdOrProviders?: string | readonly ActorProvider[],
-  maybeProviders?: readonly ActorProvider[],
-): ActorResolver | Promise<ActorResolver> {
-  const cwd = typeof cwdOrProviders === 'string' ? cwdOrProviders : undefined
-  const providers =
-    (typeof cwdOrProviders === 'string' ? maybeProviders : cwdOrProviders) ??
-    BUILTIN_ACTOR_PROVIDERS
-  const dir = cwd ?? process.cwd()
-  return cwd === undefined
-    ? new LazyActorResolver(dir, providers)
-    : resolveBaseActorResolver(dir, providers)
+export function createLazyActorResolver(
+  resolveActorResolver: () => Promise<ActorResolver>,
+): ActorResolver {
+  return new LazyActorResolver(resolveActorResolver)
 }

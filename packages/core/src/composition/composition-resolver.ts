@@ -34,7 +34,11 @@ import { NodeContentHasher } from '../infrastructure/node/content-hasher.js'
 import { NodeHookRunner } from '../infrastructure/node/hook-runner.js'
 import { NodeYamlSerializer } from '../infrastructure/node/yaml-serializer.js'
 import { VcsImplementationDetector } from '../infrastructure/vcs/vcs-implementation-detector.js'
-import { createVcsActorResolver } from './actor-resolver.js'
+import {
+  createLazyActorResolver,
+  createLazyVcsActorResolver,
+  resolveActorResolver,
+} from './actor-resolver.js'
 import { buildCompileContextConfig } from './build-compile-context-config.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import {
@@ -554,7 +558,16 @@ export function createCompositionResolver(
 
     getActorResolver(): ActorResolver {
       if (actorResolver !== undefined) return actorResolver
-      const baseActor = createVcsActorResolver(registry.actorProviders)
+      const baseActor =
+        config.actorProvider === undefined
+          ? createLazyVcsActorResolver(() => resolver.getVcsAdapter())
+          : createLazyActorResolver(async () =>
+              resolveActorResolver(
+                config.projectRoot,
+                registry.actorProviders,
+                config.actorProvider,
+              ),
+            )
       actorResolver =
         config.privacy === undefined
           ? baseActor

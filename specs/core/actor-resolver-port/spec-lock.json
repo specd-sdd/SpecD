@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:actor-resolver", "core:change"],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/vcs-actor-resolver.ts",
+      "symbols": ["VcsActorResolver"]
+    }
+  ]
+}

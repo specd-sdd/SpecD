@@ -15,10 +15,10 @@ Every SpecD project has exactly one active configuration file at a time. Normall
 SpecD locates its configuration using the following strategy, in order:
 
 1. **`--config` flag** — if the CLI is invoked with `--config path/to/specd.yaml`, that exact file is used. No discovery takes place and no `specd.local.yaml` lookup is performed.
-2. **Walk up from CWD, bounded by the git repo root** — SpecD walks up from the current working directory, checking each directory for `specd.local.yaml` first, then `specd.yaml`. The walk stops at the first match or at the git repo root (the nearest ancestor containing `.git/`), whichever comes first. If no config is found, SpecD exits with an error.
-3. **CWD only, when not inside a git repo** — if no `.git/` ancestor exists, SpecD checks only the current working directory and stops there.
+2. **Walk up from CWD, bounded by the VCS root** — SpecD walks up from the current working directory, checking each directory for `specd.local.yaml` first, then `specd.yaml`. The walk stops at the first match or at the active VCS root, whichever comes first. If no config is found, SpecD exits with an error.
+3. **CWD only, when not inside a supported VCS** — if no VCS root can be resolved, SpecD checks only the current working directory and stops there.
 
-The walk never crosses the git repo root. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running SpecD from within that package — the root-level file is not considered.
+The walk never crosses the VCS root. In a monorepo where each package has its own `specd.yaml`, the package-level file is used when running SpecD from within that package — the root-level file is not considered.
 
 ## Bootstrap mode exceptions
 

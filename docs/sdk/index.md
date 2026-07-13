@@ -86,7 +86,7 @@ Both return structured data — formatting stays in CLI presenters.
 
 The SDK root exports explicit symbols from the curated `@specd/core` and `@specd/code-graph` public barrels, including:
 
-- `createConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
+- `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
 - Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`
 - Graph helpers: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`

@@ -2,28 +2,14 @@
 
 ## Purpose
 
-Provides actor identity resolution using the local Git configuration.
+This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`.
 
 ## Requirements
 
-### Requirement: Implementation of AutoDetectActorProvider
+### Requirement: Deprecated
 
-The Git actor provider MUST implement the `AutoDetectActorProvider` interface.
-
-- **`name`**: MUST be `"git"`.
-
-### Requirement: Detection logic
-
-The provider MUST detect Git presence by looking for a `.git` directory in the `cwd` or its parents.
-
-### Requirement: Identity resolution
-
-The resulting resolver MUST retrieve identity from Git config:
-
-- `name`: `git config user.name`
-- `email`: `git config user.email`
-- `provider`: MUST be set to `"git"`.
+This specification is deprecated.
 
 ## Spec Dependencies
 
-- [`core:actor-provider`](../actor-provider/spec.md)
+_none_

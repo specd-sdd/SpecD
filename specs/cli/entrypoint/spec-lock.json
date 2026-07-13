@@ -6,7 +6,7 @@
   "dependsOn": ["core:config", "default:_global/error-handling-conventions"],
   "implementation": [
     {
-      "file": "cli:package.json"
+      "file": "cli:src/index.ts"
     }
   ]
 }

@@ -98,6 +98,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     const result = await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -144,6 +145,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -173,6 +175,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     const result = await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -205,6 +208,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -234,6 +238,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -265,6 +270,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -301,6 +307,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -345,6 +352,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     const result = await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -378,6 +386,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -436,6 +445,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'ws1',
@@ -483,6 +493,7 @@ describe('Workspace indexing', () => {
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       codeGraphVersion: CODE_GRAPH_VERSION,
       workspaces: [workspace],
       graphConfig,
@@ -515,6 +526,7 @@ describe('Workspace indexing', () => {
 
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [workspace],
       graphConfig,
     })
@@ -523,6 +535,7 @@ describe('Workspace indexing', () => {
     await store.clear()
     await uc.execute({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       codeGraphVersion: CODE_GRAPH_VERSION,
       workspaces: [workspace],
       graphConfig,

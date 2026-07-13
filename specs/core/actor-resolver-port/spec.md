@@ -26,10 +26,6 @@ export interface ActorIdentity {
 
 When the actor identity cannot be determined (e.g. git `user.name` or `user.email` is not configured), `identity()` MUST reject with an `Error`. It MUST NOT return an `ActorIdentity` with empty or placeholder values.
 
-### Requirement: Decoupled from VcsAdapter
-
-`ActorResolver` MUST NOT extend, import, or depend on `VcsAdapter`. Use cases that need both VCS state and actor identity receive each port independently via dependency injection. The two ports MAY share an underlying provider (e.g. both backed by git), but the interfaces are separate.
-
 ### Requirement: Interface-only declaration
 
 `ActorResolver` MUST be declared as a TypeScript `interface`, not an abstract class, consistent with the `VcsAdapter` port design.

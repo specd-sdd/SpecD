@@ -27,7 +27,7 @@ const AVAILABLE_AGENT_PLUGINS = [
 async function resolveProjectRoot(): Promise<string> {
   try {
     const vcs = await createVcsAdapter()
-    return await vcs.rootDir()
+    return vcs.rootDir()
   } catch {
     return process.cwd()
   }

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Provider interfaces remain valid — only the specific VCS concrete providers are simplified/removed'

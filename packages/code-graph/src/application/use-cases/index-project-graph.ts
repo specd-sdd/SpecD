@@ -13,6 +13,7 @@ export interface IndexProjectGraphInput {
   readonly workspaces: readonly WorkspaceIndexTarget[]
   readonly graphConfig: ProjectGraphConfig
   readonly codeGraphVersion: string
+  readonly vcsRoot: string | null
   readonly vcsRef?: string
   readonly force?: boolean
   readonly onProgress?: IndexProgressCallback
@@ -38,6 +39,7 @@ export class IndexProjectGraph {
       workspaces: [...input.workspaces],
       graphConfig: input.graphConfig,
       codeGraphVersion: input.codeGraphVersion,
+      vcsRoot: input.vcsRoot,
       ...(input.vcsRef !== undefined ? { vcsRef: input.vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
     })

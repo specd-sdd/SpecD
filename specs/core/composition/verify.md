@@ -78,10 +78,23 @@
 
 ### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
 
-#### Scenario: Standalone factory uses auto-detect for actor resolution
+#### Scenario: Standalone factory uses composition for actor resolution
 
 - **WHEN** any standalone use-case factory in `composition/use-cases/` constructs an `ActorResolver`
-- **THEN** it calls `createVcsActorResolver()` instead of `new GitActorResolver()`
+- **THEN** it calls `createVcsActorResolver(vcsAdapter)` or resolves the `VcsAdapter` and passes it
+
+#### Scenario: Config loader factory passes root data, not the full adapter
+
+- **WHEN** `createDefaultConfigLoader()` constructs `FsConfigLoader`
+- **THEN** it derives `rootPath` from `createVcsAdapter()`
+- **AND** it passes the resolved `rootPath` boundary into the loader instead of retaining the `VcsAdapter`
+
+#### Scenario: NullVcsAdapter normalizes to null rootPath
+
+- **GIVEN** `createVcsAdapter()` returns `NullVcsAdapter`
+- **WHEN** `createDefaultConfigLoader()` derives the repository boundary
+- **THEN** it treats `NullVcsAdapter.rootDir()` throwing as `rootPath = null`
+- **AND** it still constructs `FsConfigLoader` without propagating the throw
 
 #### Scenario: No hardcoded VCS imports in standalone factories
 

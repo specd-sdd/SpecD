@@ -3,23 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": [
-    "core:schema-format",
-    "core:schema-merge",
-    "default:_global/architecture",
-    "core:storage",
-    "core:spec-metadata",
-    "core:workspace",
-    "default:_global/logging"
-  ],
+  "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture"],
   "implementation": [
     {
-      "file": "core:src/application/specd-config.ts",
-      "symbols": ["SpecdConfig"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["FsConfigLoader", "resolveAdapterBinding"]
+      "file": "core:src/application/ports/config-loader.ts",
+      "symbols": ["ConfigLoader"]
     }
   ]
 }

@@ -2,14 +2,13 @@
 
 ## Requirements
 
-### Requirement: Interface-only declaration
+### Requirement: Abstract class base
 
-#### Scenario: VcsAdapter is a TypeScript interface
+#### Scenario: VcsAdapter is an abstract class
 
-- **WHEN** the `VcsAdapter` type is examined
-- **THEN** it is declared as a TypeScript `interface`
-- **AND** not as an abstract class
-- **AND** implementations can be provided by any concrete class
+- **WHEN** the `VcsAdapter` class is examined
+- **THEN** it is declared as an abstract class
+- **AND** it has a protected constructor that receives `cwd`
 
 ### Requirement: rootDir returns the repository root
 
@@ -90,10 +89,10 @@
 
 ### Requirement: Null fallback implementation
 
-#### Scenario: NullVcsAdapter rootDir rejects
+#### Scenario: NullVcsAdapter rootDir throws
 
 - **WHEN** `rootDir()` is called on a `NullVcsAdapter`
-- **THEN** the promise MUST reject with an `Error` whose message indicates no VCS was detected
+- **THEN** it MUST throw an `Error` whose message indicates no VCS was detected
 
 #### Scenario: NullVcsAdapter branch returns sentinel
 
@@ -124,3 +123,24 @@
 
 - **WHEN** `modifiedFiles(baseRef)` is called on a `NullVcsAdapter`
 - **THEN** the promise MUST resolve to an empty array
+
+#### Scenario: NullVcsAdapter identity returns null identity
+
+- **WHEN** `identity()` is called on a `NullVcsAdapter`
+- **THEN** the promise MUST resolve to `{ name: "unknown", email: "", provider: "null" }`
+
+### Requirement: identity resolves version control identity
+
+#### Scenario: Git user identity resolved
+
+- **GIVEN** git configured with name "John Doe" and email "john@example.com"
+- **WHEN** `identity()` is called on a `GitVcsAdapter`
+- **THEN** the promise MUST resolve to `{ name: "John Doe", email: "john@example.com", provider: "git" }`
+
+### Requirement: static detect detects active VCS
+
+#### Scenario: Git detection inside git repo
+
+- **GIVEN** a directory inside a git repository
+- **WHEN** `VcsAdapter.detect(cwd)` is called
+- **THEN** the promise MUST resolve to a `GitVcsAdapter` instance

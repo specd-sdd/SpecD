@@ -1,39 +1,49 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const { gitMock, gitSyncMock } = vi.hoisted(() => ({
+  gitMock: vi.fn<(cwd: string, ...args: string[]) => Promise<string>>(),
+  gitSyncMock: vi.fn<(cwd: string, ...args: string[]) => string>(),
+}))
+
+vi.mock('../../../src/infrastructure/git/exec.js', () => ({
+  git: gitMock,
+  gitSync: gitSyncMock,
+}))
+
 import { GitVcsAdapter } from '../../../src/infrastructure/git/vcs-adapter.js'
 
 describe('GitVcsAdapter', () => {
-  it('returns the repository root directory', async () => {
-    const adapter = new GitVcsAdapter()
-    const root = await adapter.rootDir()
-    expect(root).toBeDefined()
-    expect(typeof root).toBe('string')
+  beforeEach(() => {
+    gitMock.mockReset()
+    gitSyncMock.mockReset()
   })
 
-  it('returns the current branch name', async () => {
-    const adapter = new GitVcsAdapter()
-    const branch = await adapter.branch()
-    expect(typeof branch).toBe('string')
-    expect(branch.length).toBeGreaterThan(0)
+  it('returns the cached repository root synchronously when provided', () => {
+    const adapter = new GitVcsAdapter('/repo/worktree', '/repo')
+
+    expect(adapter.rootDir()).toBe('/repo')
+    expect(gitSyncMock).not.toHaveBeenCalled()
   })
 
-  it('returns a boolean for isClean', async () => {
-    const adapter = new GitVcsAdapter()
-    const clean = await adapter.isClean()
-    expect(typeof clean).toBe('boolean')
+  it('queries git synchronously for the repository root when uncached', () => {
+    gitSyncMock.mockReturnValue('/repo')
+    const adapter = new GitVcsAdapter('/repo/worktree')
+
+    expect(adapter.rootDir()).toBe('/repo')
+    expect(gitSyncMock).toHaveBeenCalledWith('/repo/worktree', 'rev-parse', '--show-toplevel')
   })
 
-  it('returns a short ref or null', async () => {
-    const adapter = new GitVcsAdapter()
-    const ref = await adapter.ref()
-    // In a git repo with commits, ref should be a string
-    expect(ref === null || typeof ref === 'string').toBe(true)
-  })
+  it('resolves actor identity from git config', async () => {
+    gitMock.mockResolvedValueOnce('Developer').mockResolvedValueOnce('dev@example.com')
 
-  it('returns null for show with a non-existent path', async () => {
-    const adapter = new GitVcsAdapter()
-    const ref = await adapter.ref()
-    if (ref === null) return
-    const content = await adapter.show(ref, 'non-existent-file-xyz.txt')
-    expect(content).toBeNull()
+    const adapter = new GitVcsAdapter('/repo/worktree')
+
+    await expect(adapter.identity()).resolves.toEqual({
+      name: 'Developer',
+      email: 'dev@example.com',
+      provider: 'git',
+    })
+    expect(gitMock).toHaveBeenNthCalledWith(1, '/repo/worktree', 'config', 'user.name')
+    expect(gitMock).toHaveBeenNthCalledWith(2, '/repo/worktree', 'config', 'user.email')
   })
 })

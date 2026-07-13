@@ -51,6 +51,16 @@ export async function runIndexProjectGraph(
   const projectRoot = config.projectRoot
   const vcs = await createVcsAdapter(projectRoot).catch(() => null)
   const vcsRef = (await vcs?.ref()) ?? undefined
+  const vcsRoot =
+    vcs === null
+      ? null
+      : (() => {
+          try {
+            return vcs.rootDir()
+          } catch {
+            return null
+          }
+        })()
 
   const graphConfig = buildProjectGraphConfig(config, {
     ...(input.excludePaths !== undefined ? { excludePaths: [...input.excludePaths] } : {}),
@@ -69,6 +79,7 @@ export async function runIndexProjectGraph(
         workspaces,
         graphConfig,
         codeGraphVersion,
+        vcsRoot,
         ...(input.force !== undefined ? { force: input.force } : {}),
         ...(vcsRef !== undefined ? { vcsRef } : {}),
         ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
