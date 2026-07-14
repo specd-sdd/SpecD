@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: createKernel accepts optional KernelOptions'
+    after:
+      type: section
+      matches: 'Scenario: No options provided'
+  content: |
+    #### Scenario: Repository overrides provided in KernelOptions
+
+    - **GIVEN** a mock `ChangeRepository` passed in `options.repositories`
+    - **WHEN** `createKernel(config, options)` is called
+    - **THEN** `kernel.changes.repo` is the mock instance

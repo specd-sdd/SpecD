@@ -132,6 +132,7 @@ describe('CodeGraphProvider', () => {
 
     const result = await provider.index({
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'default',

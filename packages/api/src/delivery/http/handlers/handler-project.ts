@@ -25,7 +25,7 @@ export function registerProjectRoutes(app: FastifyInstance): void {
     { ...apiRouteSchema({ response: { 200: 'ProjectStatusDto' } }) },
     apiHandler(async (ctx) => {
       const snapshot = await buildProjectStatusSnapshot(ctx, { includeGraph: true })
-      return toProjectStatusDtoFromSnapshot(snapshot)
+      return toProjectStatusDtoFromSnapshot(snapshot, ctx.authType)
     }),
   )
 

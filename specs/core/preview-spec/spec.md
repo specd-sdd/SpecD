@@ -112,6 +112,19 @@ The preview MUST always succeed — partial results are acceptable, total failur
 
 After obtaining the schema from `SchemaProvider`, `PreviewSpec` MUST compare `schema.name()` with `change.schemaName`. If they differ, it MUST throw `SchemaMismatchError`.
 
+### Requirement: Config-based factory delegates through resolvePreviewSpecDeps
+
+The config-based `createPreviewSpec(config, options?)` form MUST derive `PreviewSpecDeps` through `resolvePreviewSpecDeps(resolver)` and then delegate to canonical `createPreviewSpec(deps)`.
+
+`resolvePreviewSpecDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - `PreviewSpec` is read-only — it MUST NOT mutate any canonical spec content, change state, or artifact status
@@ -121,7 +134,8 @@ After obtaining the schema from `SchemaProvider`, `PreviewSpec` MUST compare `sc
 
 ## Spec Dependencies
 
-- `core:delta-format` — delta file format, `parseDelta`, and `apply` semantics
-- `core:artifact-parser-port` — `ArtifactParser` interface for parse/apply/serialize
-- `core:change-layout` — directory layout for locating delta and new-spec files
-- `core:file-reader-port` — not directly used; `ChangeRepository` and `SpecRepository` handle file access
+- [`core:delta-format`](../delta-format/spec.md)
+- [`core:artifact-parser-port`](../artifact-parser-port/spec.md)
+- [`core:change-layout`](../change-layout/spec.md)
+- [`core:file-reader-port`](../file-reader-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

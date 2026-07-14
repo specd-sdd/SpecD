@@ -396,3 +396,20 @@
 
 - **WHEN** `TransitionChange` is assembled
 - **THEN** it receives `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`
+
+### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
+
+#### Scenario: createTransitionChange config form derives TransitionChangeDeps through resolveTransitionChangeDeps
+
+- **WHEN** `createTransitionChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)`
+- **AND** `resolveTransitionChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+- `runStepHooks: RunStepHooks`
+- `refreshImplementationTracking: RefreshImplementationTracking`
+- `approvals: ApprovalGates`
+- `lifecycle: LifecycleEngine`
+- **AND** the factory delegates to canonical `createTransitionChange(deps)`

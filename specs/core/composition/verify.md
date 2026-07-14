@@ -22,15 +22,46 @@
 
 ### Requirement: Use-case factories accept SpecdConfig or explicit options
 
-#### Scenario: Factory called with SpecdConfig
+#### Scenario: Canonical deps form constructs one use case from resolved dependencies
 
-- **WHEN** `createArchiveChange(config)` is called with a valid `SpecdConfig`
-- **THEN** it returns a pre-wired `ArchiveChange` with all ports constructed from the config values
+- **WHEN** a caller invokes a kernel-mounted public `createX(deps)` factory
+- **THEN** the factory accepts already-resolved dependencies only
+- **AND** it does not require filesystem paths or adapter ids
 
-#### Scenario: Factory called with explicit context and options
+#### Scenario: Config-based form delegates through resolver-backed assembly
 
-- **WHEN** `createArchiveChange(context, options)` is called with an explicit context and options object
-- **THEN** it returns a pre-wired `ArchiveChange` using those values directly
+- **WHEN** a caller invokes `createX(config, options?)`
+- **THEN** the factory creates a composition resolver scoped to that composition session
+- **AND** it resolves `XDeps` through the shared resolver path before delegating to canonical deps construction
+
+#### Scenario: Invalid deps-plus-options input throws shared error
+
+- **WHEN** a caller supplies a deps-form invocation plus composition options
+- **THEN** the factory path throws `InvalidCompositionFactoryArgumentsError`
+- **AND** the error identifies the target `createX(...)` factory
+
+### Requirement: Shared composition resolver normalizes config-based factory bootstrap
+
+#### Scenario: Config-based public factory delegates through resolver path
+
+- **WHEN** `createX(config, options?)` is invoked
+- **THEN** the factory creates a resolver, derives `XDeps`, and delegates to canonical `createX(deps)`
+
+### Requirement: Reusable registry primitives are composition-owned
+
+#### Scenario: Kernel does not remain the owner of generic registry semantics
+
+- **WHEN** public factory bootstrap, kernel assembly, and builder assembly reuse the same merged capability model
+- **THEN** that model is defined as composition infrastructure
+- **AND** the kernel remains a facade over it rather than a second source of truth
+
+### Requirement: Shared factory-argument validation error
+
+#### Scenario: Invalid deps-plus-options combination throws shared error
+
+- **WHEN** a public factory receives deps together with composition options
+- **THEN** it throws `InvalidCompositionFactoryArgumentsError`
+- **AND** the error identifies the target factory or use-case name
 
 ### Requirement: Internal ports are never exported
 
@@ -39,17 +70,31 @@
 - **WHEN** the public export surface of `@specd/core` is inspected
 - **THEN** `NodeHookRunner`, `GitVcsAdapter`, and `FsFileReader` are not present
 
-#### Scenario: Repository factories not in public exports
+#### Scenario: Repository factories on public root return port types only
 
 - **WHEN** the public export surface of `@specd/core` is inspected
-- **THEN** `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` are not present
+- **THEN** `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` are present
+- **AND** they return port contracts rather than concrete adapter classes
 
 ### Requirement: Use-case factories must use auto-detect for VCS-dependent adapters
 
-#### Scenario: Standalone factory uses auto-detect for actor resolution
+#### Scenario: Standalone factory uses composition for actor resolution
 
 - **WHEN** any standalone use-case factory in `composition/use-cases/` constructs an `ActorResolver`
-- **THEN** it calls `createVcsActorResolver()` instead of `new GitActorResolver()`
+- **THEN** it calls `createVcsActorResolver(vcsAdapter)` or resolves the `VcsAdapter` and passes it
+
+#### Scenario: Config loader factory passes root data, not the full adapter
+
+- **WHEN** `createDefaultConfigLoader()` constructs `FsConfigLoader`
+- **THEN** it derives `rootPath` from `createVcsAdapter()`
+- **AND** it passes the resolved `rootPath` boundary into the loader instead of retaining the `VcsAdapter`
+
+#### Scenario: NullVcsAdapter normalizes to null rootPath
+
+- **GIVEN** `createVcsAdapter()` returns `NullVcsAdapter`
+- **WHEN** `createDefaultConfigLoader()` derives the repository boundary
+- **THEN** it treats `NullVcsAdapter.rootDir()` throwing as `rootPath = null`
+- **AND** it still constructs `FsConfigLoader` without propagating the throw
 
 #### Scenario: No hardcoded VCS imports in standalone factories
 
@@ -208,12 +253,27 @@
 - **WHEN** `createSpecRepository('fs', context, options)` is called from `@specd/core` `"."`
 - **THEN** a `SpecRepository` is returned without calling `createKernel`
 
+#### Scenario: Repository factories resolve adapter IDs through composition registries
+
+- **WHEN** `createSpecRepository('invalid', context, options)` is called
+- **THEN** it throws `UnknownAdapterError`
+
+#### Scenario: Options validated by Zod at construction
+
+- **WHEN** `createSpecRepository('fs', context, { path: 123 })` is called
+- **THEN** it throws a validation error
+
 ### Requirement: Extension registration surface
 
 #### Scenario: ChangeStorageFactory exported from extensions subpath
 
 - **WHEN** importing from `@specd/core/extensions`
-- **THEN** `ChangeStorageFactory` and `createKernelBuilder` are available
+- **THEN** `ChangeStorageFactory`, `CompositionRegistryInput`, `CompositionRegistryView`, and `createKernelBuilder` are available
+
+#### Scenario: Core extensions surface does not export graph-store registration types
+
+- **WHEN** importing from `@specd/core/extensions`
+- **THEN** graph-store-specific extension hooks are not part of the core extensions surface
 
 #### Scenario: Builtin FS storage factory markers stay internal
 

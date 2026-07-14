@@ -6,7 +6,8 @@
     "core:content-extraction",
     "core:storage",
     "core:workspace",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "core:composition-resolver"
   ],
   "context": [
     "Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It supports optional workspace filtering so callers can restrict results to one or more named workspaces. It is the primary query for discovery UIs and CLI listing commands."
@@ -46,6 +47,12 @@
       "requirement": "SpecListEntry shape",
       "rules": [
         "Each entry MUST include the following required fields:\n\n- `workspace` — the workspace name the spec belongs to.\n- `path` — the spec's capability path rendered with `/` separators.\n- `title` — the resolved title string.\n\nOptional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested and successfully resolved.\n\nWhen workspace filtering is active, the result array contains entries only from the filtered workspaces. Callers that need all configured workspace names (including those with no matching specs) MUST consult the config directly."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListSpecsDeps",
+      "rules": [
+        "The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.\n\n`resolveListSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `hasher: ContentHasher`\n- `yaml: YamlSerializer`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -212,20 +219,30 @@
       "name": "Entry may contain optional fields when requested",
       "when": ["execute({ includeSummary: true, includeMetadataStatus: true }) is called"],
       "then": ["entries may contain summary and metadataStatus in addition to required fields"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListSpecsDeps",
+      "name": "createListSpecs config form derives ListSpecsDeps through resolveListSpecsDeps",
+      "when": ["createListSpecs(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ListSpecsDeps through resolveListSpecsDeps(resolver)",
+        "AND resolveListSpecsDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createListSpecs(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:list-specs",
-        "file": "core:src/application/use-cases/list-specs.ts",
-        "symbol": "ListSpecs"
+        "file": "core:src/composition/use-cases/list-specs.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f3dc9f6d7df93b016c9b2dc9c626346ae6de89d76eb5f66e395175eb991ebd35",
-    "verify.md": "sha256:b395fba595928634da16c247b8eb85b6d2109b4a6dea7bb6835f98674a396620"
+    "spec.md": "sha256:afa098eb930f285fedee46e38fd406c86cc6b3a3d7743290bd2e3aeb778ab9fc",
+    "verify.md": "sha256:37be6dce0e445478030d84a5fb189db3454e9db26e38038422082871f296eb25"
   },
   "generatedBy": "core"
 }

@@ -1,139 +1,135 @@
-import * as path from 'node:path'
-import { GetArtifactInstruction } from '../../application/use-cases/get-artifact-instruction.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
-import { createSchemaRepositoriesForConfig } from '../schema-resolution.js'
-import { TemplateExpander } from '../../application/template-expander.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { Logger } from '../../application/logger.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
-import { createResolveSchema } from './resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
+import { type TemplateExpander } from '../../application/template-expander.js'
+import { GetArtifactInstruction } from '../../application/use-cases/get-artifact-instruction.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createGetArtifactInstruction(context, options)`. */
-export interface GetArtifactInstructionContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createGetArtifactInstruction(context, options)`. */
-export interface FsGetArtifactInstructionOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
-  readonly projectRoot: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
-  readonly nodeModulesPaths: readonly string[]
+/**
+ * Explicit dependencies for {@link createGetArtifactInstruction}.
+ */
+export interface GetArtifactInstructionDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Spec repositories keyed by workspace. */
+  readonly specs: ReadonlyMap<string, SpecRepository>
+  /** Schema provider used by the use case. */
+  readonly schemaProvider: SchemaProvider
+  /** Artifact parser registry used by the use case. */
+  readonly parsers: ArtifactParserRegistry
+  /** Template expander used by the use case. */
+  readonly templateExpander: TemplateExpander
+  /** Lifecycle engine used by the use case. */
+  readonly lifecycle: LifecycleEngine
 }
 
 /**
- * Constructs a `GetArtifactInstruction` use case with full project config.
+ * Resolves `GetArtifactInstruction` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetArtifactInstruction`
+ */
+export function resolveGetArtifactInstructionDeps(
+  resolver: CompositionResolver,
+): GetArtifactInstructionDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    specs: resolver.getSpecRepositories(),
+    schemaProvider: resolver.getSchemaProvider(),
+    parsers: resolver.getArtifactParserRegistry(),
+    templateExpander: resolver.getTemplateExpander(),
+    lifecycle: resolver.getLifecycleEngine(),
+  }
+}
+
+/**
+ * Constructs `GetArtifactInstruction` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetArtifactInstruction(
+  deps: GetArtifactInstructionDeps,
+): GetArtifactInstruction
+/**
+ * Constructs `GetArtifactInstruction` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel overrides for schema resolution
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetArtifactInstruction(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): GetArtifactInstruction
 /**
- * Constructs a `GetArtifactInstruction` use case with explicit context and options.
+ * Constructs `GetArtifactInstruction` from explicit deps or config bootstrap.
  *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths and schema wiring
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetArtifactInstruction(
-  context: GetArtifactInstructionContext,
-  options: FsGetArtifactInstructionOptions,
-): GetArtifactInstruction
-/**
- * Constructs a `GetArtifactInstruction` instance wired with filesystem adapters.
- *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
- * @returns The pre-wired use case instance
- */
-export function createGetArtifactInstruction(
-  configOrContext: SpecdConfig | GetArtifactInstructionContext,
-  options?: FsGetArtifactInstructionOptions | { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: GetArtifactInstructionDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetArtifactInstruction {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const ws = getDefaultWorkspace(config)
-    const specRepos = new Map(
-      config.workspaces.map((workspace) => [
-        workspace.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: workspace.name,
-            ownership: workspace.ownership,
-            isExternal: workspace.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: workspace.specsPath,
-            metadataPath: path.join(workspace.specsPath, '..', '.specd', 'metadata'),
-            ...(workspace.prefix !== undefined ? { prefix: workspace.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    return createGetArtifactInstruction(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        projectRoot: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: createSchemaRepositoriesForConfig(config),
-        specRepositories: specRepos,
-        nodeModulesPaths: [
-          path.join(config.projectRoot, 'node_modules'),
-          ...(kernelOpts?.extraNodeModulesPaths ?? []),
-        ],
-      },
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetArtifactInstruction',
+    depsOrConfig,
+    options,
+    isGetArtifactInstructionDeps,
+  )
+  return createGetArtifactInstructionFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetArtifactInstruction` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetArtifactInstructionFromNormalized(
+  input: FactoryInput<GetArtifactInstructionDeps, CompositionResolutionOptions>,
+): GetArtifactInstruction {
+  if (input.kind === 'deps') {
+    const { changes, specs, schemaProvider, parsers, templateExpander, lifecycle } = input.deps
+    return new GetArtifactInstruction(
+      changes,
+      specs,
+      schemaProvider,
+      parsers,
+      templateExpander,
+      lifecycle,
     )
   }
-  const opts = options as FsGetArtifactInstructionOptions
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    discardedPath: opts.discardedPath,
-  })
-  const resolveSchema = createResolveSchema({
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.projectRoot,
-    schemaRef: opts.schemaRef,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
-  const parsers = createArtifactParserRegistry()
-  return new GetArtifactInstruction(
-    changeRepo,
-    opts.specRepositories,
-    schemaProvider,
-    parsers,
-    expander,
-    new LifecycleEngine(Logger.debug.bind(Logger)),
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetArtifactInstruction(resolveGetArtifactInstructionDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetArtifactInstructionDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetArtifactInstructionDeps(
+  value: GetArtifactInstructionDeps | SpecdConfig,
+): value is GetArtifactInstructionDeps {
+  return (
+    'changes' in value &&
+    'specs' in value &&
+    'schemaProvider' in value &&
+    'parsers' in value &&
+    'templateExpander' in value &&
+    'lifecycle' in value
   )
 }

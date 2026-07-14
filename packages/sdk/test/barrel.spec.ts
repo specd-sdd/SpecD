@@ -3,6 +3,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import * as sdk from '../src/index.js'
+import * as sdkPorts from '../src/ports.js'
+import * as sdkExtensions from '../src/extensions.js'
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
@@ -23,7 +25,7 @@ describe('@specd/sdk barrel', () => {
   })
 
   it('re-exports core bootstrap factories', () => {
-    expect(typeof sdk.createConfigLoader).toBe('function')
+    expect(typeof sdk.createDefaultConfigLoader).toBe('function')
     expect(typeof sdk.createConfigWriter).toBe('function')
     expect(typeof sdk.createKernel).toBe('function')
     expect(typeof sdk.createGetStatus).toBe('function')
@@ -63,5 +65,16 @@ describe('@specd/sdk barrel', () => {
 
   it('does not export infrastructure implementation classes', () => {
     expect('FsConfigLoader' in sdk).toBe(false)
+  })
+
+  it('exposes core port contracts via /ports subpath', () => {
+    expect(sdkPorts.ChangeRepository).toBeDefined()
+    expect(sdkPorts.SpecRepository).toBeDefined()
+    expect(typeof sdkPorts.ChangeRepository).toBe('function')
+  })
+
+  it('exposes core extensions via /extensions subpath', () => {
+    expect(typeof sdkExtensions.createKernelBuilder).toBe('function')
+    expect(sdkExtensions.RegistryConflictError).toBeDefined()
   })
 })

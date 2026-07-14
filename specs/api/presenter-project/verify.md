@@ -53,3 +53,12 @@
 - **GIVEN** `buildProjectStatusSnapshot` with `graphHealth` fixture
 - **WHEN** project status DTO is built
 - **THEN** `graph.warnings` matches `toGraphStatusDto` output for the same health result
+
+### Requirement: project status presentation uses the canonical client mapper
+
+#### Scenario: API delegates final status DTO construction
+
+- **GIVEN** a project status snapshot, graph health, approvals, and effective auth type
+- **WHEN** the API presenter builds the status response
+- **THEN** it passes structural input to the `@specd/client` mapper
+- **AND** the returned value is used as the HTTP DTO without a second field mapping

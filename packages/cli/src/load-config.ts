@@ -1,7 +1,7 @@
-import { createConfigLoader, type SpecdConfig } from '@specd/sdk'
+import { createDefaultConfigLoader, type SpecdConfig } from '@specd/sdk'
 
 /**
- * Loads the project configuration using `createConfigLoader`.
+ * Loads the project configuration using `createDefaultConfigLoader`.
  *
  * If `configPath` is provided (from `--config`), loads that file directly.
  * Otherwise, discovers `specd.yaml` by walking up from `process.cwd()`.
@@ -11,13 +11,21 @@ import { createConfigLoader, type SpecdConfig } from '@specd/sdk'
  * @returns The fully-resolved project configuration
  * @throws {ConfigValidationError} If the config file fails validation
  */
-export function loadConfig(options?: { configPath?: string | undefined }): Promise<SpecdConfig> {
-  const loader = createConfigLoader(
+export async function loadConfig(options?: {
+  configPath?: string | undefined
+}): Promise<SpecdConfig> {
+  const loader = await createDefaultConfigLoader(
     options?.configPath !== undefined
       ? { configPath: options.configPath }
       : { startDir: process.cwd() },
   )
-  return loader.load()
+  const config = await loader.load()
+  if (config.warnings !== undefined && config.warnings.length > 0) {
+    for (const warning of config.warnings) {
+      console.warn(`warning: ${warning}`)
+    }
+  }
+  return config
 }
 
 /**
@@ -27,10 +35,10 @@ export function loadConfig(options?: { configPath?: string | undefined }): Promi
  * @param options.configPath - Optional absolute path to `specd.yaml`
  * @returns Absolute path to the config file, or `null` if not locatable
  */
-export function resolveConfigPath(options?: {
+export async function resolveConfigPath(options?: {
   configPath?: string | undefined
 }): Promise<string | null> {
-  const loader = createConfigLoader(
+  const loader = await createDefaultConfigLoader(
     options?.configPath !== undefined
       ? { configPath: options.configPath }
       : { startDir: process.cwd() },

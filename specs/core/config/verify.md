@@ -4,49 +4,17 @@
 
 ### Requirement: Config file location and format
 
-#### Scenario: Config found — nearest directory with candidates used
+#### Scenario: Discover config walking up to VCS root
 
-- **GIVEN** a repo where `/repo/app/specd.local.dev.yaml` exists and `/repo/specd.yaml` also exists
-- **WHEN** specd runs from `/repo/app/src`
-- **THEN** discovery resolves the candidate set from `/repo/app`
-- **AND** it does not continue walking to `/repo`
+- **GIVEN** target directory is inside a subfolder of a VCS repository
+- **WHEN** config discovery runs
+- **THEN** it walks up the directory structure and stops at the nearest VCS root
 
-#### Scenario: Monorepo — package config directory takes precedence
+#### Scenario: No VCS repo checks only CWD
 
-- **GIVEN** `/repo/specd.yaml` exists at the monorepo root
-- **AND** `/repo/packages/api/specd.yaml` exists inside one package
-- **WHEN** specd runs from `/repo/packages/api/src`
-- **THEN** discovery resolves the package directory candidate set
-- **AND** the root-level config directory is not consulted
-
-#### Scenario: Config not found inside repo
-
-- **GIVEN** no discoverable config candidates exist between CWD and the git root
-- **WHEN** specd starts
-- **THEN** startup fails with a config validation error
-
-#### Scenario: Invoked outside a git repo
-
-- **GIVEN** the current directory is not inside any git repository
-- **AND** the parent directory contains discoverable config candidates but the current directory does not
-- **WHEN** specd starts
-- **THEN** discovery checks only the current directory
-- **AND** startup fails because no local candidates exist there
-
-#### Scenario: Explicit config flag resolves only the selected chain
-
-- **GIVEN** `/repo/specd.local.dev.yaml` declares `extends: true`
-- **AND** `/repo/specd.local.zz-last.yaml` also exists
-- **WHEN** the CLI is invoked with `--config /repo/specd.local.dev.yaml`
-- **THEN** specd resolves `/repo/specd.local.dev.yaml` and its `extends` chain only
-- **AND** `/repo/specd.local.zz-last.yaml` is not added by discovery
-
-#### Scenario: Command-specific bootstrap mode does not redefine --config
-
-- **GIVEN** a command defines bootstrap mode in its own spec
-- **WHEN** the same command is invoked with `--config path/to/file.yaml`
-- **THEN** `--config` still means an explicit config entrypoint
-- **AND** bootstrap mode does not reinterpret it as a repository root selector
+- **GIVEN** target directory is not inside any VCS repository
+- **WHEN** config discovery runs
+- **THEN** it checks only the current working directory
 
 ### Requirement: Privacy settings
 
@@ -302,15 +270,26 @@
 
 ### Requirement: Storage configuration
 
-#### Scenario: Default storage layout
+#### Scenario: Storage layout uses generic adapter bindings
 
-- **WHEN** `specd.yaml` uses `adapter: fs` with `fs.path: specd/changes` and `fs.path: specd/archive`
-- **THEN** active changes are at `specd/changes/` and archived changes at `specd/archive/`
+- **GIVEN** a configuration where `storage.changes.adapter` is `{ type: 'fs', config: { path: 'specd/changes' } }`
+- **WHEN** the config is loaded
+- **THEN** it resolves successfully
+- **AND** `config.storage.changesAdapter.type` is `'fs'`
+- **AND** `config.storage.changesAdapter.config.path` is absolute
 
-#### Scenario: Unknown adapter
+#### Scenario: Legacy storage layout is normalized at load time
 
-- **WHEN** `storage.changes.adapter` is set to an unrecognised value (e.g. `"s3"`)
-- **THEN** specd exits with a validation error listing supported adapters
+- **GIVEN** a legacy config using the old shape `changes: { adapter: 'fs', fs: { path: 'specd/changes' } }`
+- **WHEN** the config is loaded
+- **THEN** it is normalized in-memory to `{ type: 'fs', config: { path: 'specd/changes' } }`
+
+#### Scenario: Omitted storage section resolves to standard fs defaults
+
+- **GIVEN** a config that completely omits the `storage` key
+- **WHEN** the config is loaded
+- **THEN** all storage adapter bindings default to `'fs'`
+- **AND** their paths resolve to subdirectories under `config.specdPath`
 
 ### Requirement: Named storage adapters
 
@@ -331,19 +310,21 @@
 
 ### Requirement: Config path and derived directories
 
-#### Scenario: configPath defaults to repo-local config directory
+#### Scenario: specdPath defaults to repo-local .specd directory
 
-- **GIVEN** `specd.yaml` omits `configPath`
+- **GIVEN** `specd.yaml` omits `specdPath`
 - **WHEN** the config is loaded
-- **THEN** `configPath` resolves to `.specd/config` relative to the config file
-- **AND** the derived directories are `.specd/config/graph`, `.specd/config/tmp`, and `.specd/config/tmp/change-locks`
+- **THEN** `specdPath` resolves to `.specd` relative to the config file
+- **AND** `configPath` resolves to `.specd/config`
+- **AND** the derived directories are `{specdPath}/graph` and `{specdPath}/tmp`
 
-#### Scenario: Explicit configPath stays project-level
+#### Scenario: Explicit specdPath stays project-level
 
-- **GIVEN** `specd.yaml` declares `configPath: .specd/state`
+- **GIVEN** `specd.yaml` declares `specdPath: custom-specd`
 - **WHEN** the config is loaded
-- **THEN** the derived directories are `.specd/state/graph`, `.specd/state/tmp`, and `.specd/state/tmp/change-locks`
-- **AND** `storage.changes`, `storage.drafts`, `storage.discarded`, and `storage.archive` remain governed by the separate storage section
+- **THEN** `specdPath` resolves to `custom-specd` relative to the config file
+- **AND** `configPath` resolves to `custom-specd/config`
+- **AND** the derived directories are `{specdPath}/graph` and `{specdPath}/tmp`
 
 #### Scenario: configPath also defines change-locks directory
 
@@ -351,6 +332,13 @@
 - **WHEN** `FsChangeRepository` needs to acquire a change lock
 - **THEN** the lock file is placed under `{configPath}/tmp/change-locks/`
 - **AND** not under the changes storage directory
+
+#### Scenario: Missing directories throw StorageDirectoryNotFoundError
+
+- **GIVEN** a config is loaded
+- **AND** one or more resolved directories in `SpecdConfig` do not exist on disk
+- **WHEN** the config is loaded
+- **THEN** the loader throws a `StorageDirectoryNotFoundError`
 
 ### Requirement: Template variables
 
@@ -702,6 +690,29 @@
 - **AND** `unrelated.yaml` is not active in the discovery chain
 - **WHEN** config is loaded in discovery mode
 - **THEN** that candidate is skipped (no error)
+
+#### Scenario: No VCS repo — containment check skipped
+
+- **GIVEN** startDir is not inside a VCS repository
+- **AND** storage paths resolve to arbitrary locations
+- **WHEN** `load()` is called
+- **THEN** no containment error is thrown
+
+### Requirement: Legacy configuration warnings
+
+#### Scenario: Legacy config format emits warnings
+
+- **GIVEN** a config file declares a legacy workspace spec adapter format:
+- **WHEN** config is loaded
+- **THEN** it resolves successfully
+- **AND** `config.warnings` contains a warning string for `'workspaces.default.specs'`
+
+#### Scenario: Omitted storage defaults do not emit legacy configuration warnings
+
+- **GIVEN** a config file that completely omits the `storage` key
+- **WHEN** config is loaded
+- **THEN** it resolves successfully
+- **AND** `config.warnings` is undefined or does not contain warnings for storage
 
 ### Requirement: Project context instructions
 

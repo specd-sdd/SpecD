@@ -42,6 +42,16 @@ When `ArchiveRepository.get(name)` returns `null`, `GetArchivedChange` MUST thro
 
 `GetArchivedChange` MUST NOT mutate any state. It SHALL NOT write to any repository, run hooks, or trigger any lifecycle operations. It is a pure read-only query (aside from the potential `index.jsonl` recovery append performed internally by `ArchiveRepository.get()`).
 
+### Requirement: Config-based factory delegates through resolveGetArchivedChangeDeps
+
+The config-based `createGetArchivedChange(config, options?)` form MUST derive `GetArchivedChangeDeps` through `resolveGetArchivedChangeDeps(resolver)` and then delegate to canonical `createGetArchivedChange(deps)`.
+
+`resolveGetArchivedChangeDeps(resolver)` MUST resolve:
+
+- `archive: ArchiveRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The only error thrown by `GetArchivedChange` itself is `ChangeNotFoundError` -- any other errors originate from the `ArchiveRepository` infrastructure
@@ -50,10 +60,11 @@ When `ArchiveRepository.get(name)` returns `null`, `GetArchivedChange` MUST thro
 
 ## Spec Dependencies
 
-- [`core:archive-change`](../archive-change/spec.md) — `ArchiveChange` use case that produces archived changes; `ArchivedChange` read model
-- [`core:storage`](../storage/spec.md) — `ArchiveRepository` port, `get()` lookup strategy with index search and fallback glob scan
-- [`core:change`](../change/spec.md) — `ChangeNotFoundError` shared error type
-- [`core:kernel`](../kernel/spec.md) — kernel wiring under `changes.getArchived`
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — port-based architecture, manual DI
-- `core:archived-change-index-entry` — index row type used by archive listing APIs
-- [`core:read-only-change-view`](../read-only-change-view/spec.md) — shared read-only surface for manifest-backed archive reads
+- [`core:archive-change`](../archive-change/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:kernel`](../kernel/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md)
+- [`core:read-only-change-view`](../read-only-change-view/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

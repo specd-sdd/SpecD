@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No behavioral changes to CLI host context — only internal import path changes from renaming config loader'

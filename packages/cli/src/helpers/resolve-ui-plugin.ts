@@ -1,8 +1,4 @@
-import {
-  type SpecdConfig,
-  UiPluginNotConfiguredError,
-  UiPluginTypeMismatchError,
-} from '@specd/core'
+import { type SpecdConfig, UiPluginNotConfiguredError, UiPluginTypeMismatchError } from '@specd/sdk'
 import { LoadPlugin, createPluginLoader, isUiPlugin, type UiPlugin } from '@specd/plugin-manager'
 
 /**

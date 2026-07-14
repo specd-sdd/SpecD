@@ -49,6 +49,16 @@ The `items` array contains the archived changes, ordered oldest first (chronolog
 
 `ListArchived` MUST NOT mutate any state. It SHALL NOT write to any repository, run hooks, or trigger any lifecycle operations. It is a pure read-only query.
 
+### Requirement: Config-based factory delegates through resolveListArchivedDeps
+
+The config-based `createListArchived(config, options?)` form MUST derive `ListArchivedDeps` through `resolveListArchivedDeps(resolver)` and then delegate to canonical `createListArchived(deps)`.
+
+`resolveListArchivedDeps(resolver)` MUST resolve:
+
+- `archive: ArchiveRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - `ListArchived` has no error cases of its own -- any errors originate from the `ArchiveRepository` infrastructure
@@ -57,8 +67,9 @@ The `items` array contains the archived changes, ordered oldest first (chronolog
 
 ## Spec Dependencies
 
-- [`core:archive-change`](../archive-change/spec.md) -- `ArchiveChange` use case that produces archived changes; archived records
-- [`core:storage`](../storage/spec.md) -- `ArchiveRepository` port, `index.jsonl` ordering guarantees
-- [`core:kernel`](../kernel/spec.md) -- kernel wiring under `changes.listArchived`
-- [`default:_global/architecture`](../../_global/architecture/spec.md) -- port-based architecture, manual DI
-- `core:archived-change-index-entry` — index row type returned by `ArchiveRepository.list()`
+- [`core:archive-change`](../archive-change/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:kernel`](../kernel/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

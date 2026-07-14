@@ -1,0 +1,19 @@
+- op: added
+  description: 'Verify the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveUpdateSpecDepsDeps
+
+    #### Scenario: createUpdateSpecDeps config form derives UpdateSpecDepsDeps through resolveUpdateSpecDepsDeps
+
+    - **WHEN** `createUpdateSpecDeps(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `UpdateSpecDepsDeps` through `resolveUpdateSpecDepsDeps(resolver)`
+    - **AND** `resolveUpdateSpecDepsDeps(resolver)` resolves:
+
+    - `changes: ChangeRepository`
+
+    - **AND** the factory delegates to canonical `createUpdateSpecDeps(deps)`

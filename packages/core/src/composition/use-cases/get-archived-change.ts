@@ -1,78 +1,93 @@
+import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
 import { GetArchivedChange } from '../../application/use-cases/get-archived-change.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createArchiveRepository } from '../archive-repository.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createGetArchivedChange(context, options)`. */
-export interface GetArchivedChangeContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createGetArchivedChange(context, options)`. */
-export interface FsGetArchivedChangeOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly archivePath: string
-  readonly archivePattern?: string
+/**
+ * Explicit dependencies for {@link createGetArchivedChange}.
+ */
+export interface GetArchivedChangeDeps {
+  /** Archive repository used by the use case. */
+  readonly archive: ArchiveRepository
 }
 
 /**
- * Constructs a `GetArchivedChange` use case with full project config.
+ * Resolves {@link GetArchivedChangeDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetArchivedChange`
+ */
+export function resolveGetArchivedChangeDeps(resolver: CompositionResolver): GetArchivedChangeDeps {
+  return { archive: resolver.getArchiveRepository() }
+}
+
+/**
+ * Constructs a `GetArchivedChange` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetArchivedChange(deps: GetArchivedChangeDeps): GetArchivedChange
+/**
+ * Constructs a `GetArchivedChange` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createGetArchivedChange(config: SpecdConfig): GetArchivedChange
-/**
- * Constructs a `GetArchivedChange` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for archive resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetArchivedChange(
-  context: GetArchivedChangeContext,
-  options: FsGetArchivedChangeOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetArchivedChange
 /**
- * Constructs a `GetArchivedChange` instance wired with filesystem adapters.
+ * Constructs a `GetArchivedChange` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createGetArchivedChange(
-  configOrContext: SpecdConfig | GetArchivedChangeContext,
-  options?: FsGetArchivedChangeOptions,
+  depsOrConfig: GetArchivedChangeDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetArchivedChange {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    return createGetArchivedChange(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        archivePath: config.storage.archivePath,
-        ...(config.storage.archivePattern !== undefined
-          ? { archivePattern: config.storage.archivePattern }
-          : {}),
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetArchivedChange',
+    depsOrConfig,
+    options,
+    isGetArchivedChangeDeps,
+  )
+  return createGetArchivedChangeFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetArchivedChange` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetArchivedChangeFromNormalized(
+  input: FactoryInput<GetArchivedChangeDeps, CompositionResolutionOptions>,
+): GetArchivedChange {
+  if (input.kind === 'deps') {
+    return new GetArchivedChange(input.deps.archive)
   }
-  const archiveRepo = createArchiveRepository('fs', configOrContext, {
-    changesPath: options!.changesPath,
-    draftsPath: options!.draftsPath,
-    archivePath: options!.archivePath,
-    ...(options!.archivePattern !== undefined ? { pattern: options!.archivePattern } : {}),
-  })
-  return new GetArchivedChange(archiveRepo)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetArchivedChange(resolveGetArchivedChangeDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetArchivedChangeDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetArchivedChangeDeps(
+  value: GetArchivedChangeDeps | SpecdConfig,
+): value is GetArchivedChangeDeps {
+  return 'archive' in value
 }

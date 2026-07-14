@@ -1,0 +1,631 @@
+{
+  "name": "graph-change-context",
+  "createdAt": "2026-06-05T09:04:05.476Z",
+  "updatedAt": "2026-07-14T12:01:52.089Z",
+  "description": "New CLI command to gather consolidated code-graph context for a change, covering specs, covered files/symbols, spec dependencies, combined impact analysis, and hotspots scoped to the change.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:traversal",
+    "cli:graph-impact",
+    "code-graph:change-context",
+    "cli:graph-change-context"
+  ],
+  "specDependsOn": {
+    "code-graph:traversal": ["code-graph:symbol-model", "code-graph:graph-store"],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:change-context": ["code-graph:traversal"],
+    "cli:graph-change-context": ["cli:graph-impact", "code-graph:change-context"]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "missing",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:change-context",
+          "filename": "specs/code-graph/change-context/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-change-context",
+          "filename": "specs/cli/graph-change-context/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:change-context",
+          "filename": "specs/code-graph/change-context/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-change-context",
+          "filename": "specs/cli/graph-change-context/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-05T09:04:05.476Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:traversal",
+        "cli:graph-impact",
+        "code-graph:change-context",
+        "cli:graph-change-context"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-05T09:04:05.488Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:change-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-change-context"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:change-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-change-context"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-06-05T09:15:43.419Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-25T09:22:45.435Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'code-graph-logic-refactor' was archived with overlapping specs: cli:graph-impact, code-graph:traversal",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:traversal", "cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:traversal", "cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-25T09:23:05.468Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'code-graph-logic-refactor' was archived with overlapping specs: cli:graph-impact, code-graph:traversal",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:traversal", "cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:traversal", "cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-25T09:23:12.808Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'code-graph-logic-refactor' was archived with overlapping specs: cli:graph-impact, code-graph:traversal",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:traversal", "cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:traversal", "cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:02:01.099Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:02:33.889Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:02:44.994Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:02:54.503Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:03:28.331Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:03:37.070Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:03:46.515Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:03:48.731Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:03:50.948Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:03:53.069Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-06-29T11:03:55.499Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

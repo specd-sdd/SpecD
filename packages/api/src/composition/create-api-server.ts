@@ -4,7 +4,7 @@ import fastifyStatic from '@fastify/static'
 import fastifySwagger from '@fastify/swagger'
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify'
 import {
-  createConfigLoader,
+  createDefaultConfigLoader,
   createLogFormatter,
   createSdkContext,
   Logger,
@@ -66,7 +66,7 @@ async function sendApiNotFound(reply: FastifyReply): Promise<FastifyReply> {
  * @param options - Server bootstrap options
  */
 export async function createApiServer(options: CreateApiServerOptions): Promise<ApiServer> {
-  const loader = createConfigLoader({ startDir: options.projectRoot })
+  const loader = await createDefaultConfigLoader({ startDir: options.projectRoot })
   const config: SpecdConfig = await loader.load()
   const auth = options.auth ?? config.api?.auth ?? { type: 'disabled' as const }
   if (auth.type !== 'disabled') {

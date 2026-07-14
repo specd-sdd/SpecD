@@ -211,12 +211,6 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "api:handler-project",
-        "file": "api:src/delivery/http/handlers/handler-project-logs.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "api:handler-project",

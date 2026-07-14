@@ -80,3 +80,16 @@
 - **THEN** each result includes root-level `selectorHints` keyed by node type
 - **AND** hint values use placeholders such as `"<value>"`, `"<contains>"`, `"<level>"`
 - **AND** per-node outline entries do not duplicate hints
+
+### Requirement: Config-based factory delegates through resolveGetSpecOutlineDeps
+
+#### Scenario: createGetSpecOutline config form derives GetSpecOutlineDeps through resolveGetSpecOutlineDeps
+
+- **WHEN** `createGetSpecOutline(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetSpecOutlineDeps` through `resolveGetSpecOutlineDeps(resolver)`
+- **AND** `resolveGetSpecOutlineDeps(resolver)` resolves:
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- **AND** the factory delegates to canonical `createGetSpecOutline(deps)`

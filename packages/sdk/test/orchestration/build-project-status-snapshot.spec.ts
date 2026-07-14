@@ -104,6 +104,25 @@ describe('buildProjectStatusSnapshot', () => {
     expect(result.hotspots).toEqual(hotspotData)
   })
 
+  it('degrades graph health when hotspot loading fails', async () => {
+    withOpenGraphProvider.mockImplementation(
+      async (
+        _ctx: SdkHostContext,
+        fn: (provider: { getHotspots: () => Promise<unknown> }) => Promise<void>,
+      ) => {
+        await fn({ getHotspots: vi.fn().mockRejectedValue(new Error('hotspots failed')) })
+      },
+    )
+
+    const result = await buildProjectStatusSnapshot(ctx, {
+      includeGraph: true,
+      includeHotspots: true,
+    })
+
+    expect(result.graphHealth).toBeNull()
+    expect(result.hotspots).toBeNull()
+  })
+
   it('returns null graphHealth when graph loading fails', async () => {
     withOpenGraphProvider.mockRejectedValue(new Error('graph open failed'))
     const result = await buildProjectStatusSnapshot(ctx, { includeGraph: true })

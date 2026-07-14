@@ -366,6 +366,7 @@ export class IndexCodeGraph {
         const wsGraph = effectiveGraphConfig.workspaces.get(ws.name)
         const discovered = discoverFiles(ws.codeRoot, undefined, {
           respectGitignore: wsGraph?.respectGitignore ?? true,
+          vcsRoot: options.vcsRoot,
           ...(wsGraph?.excludePaths !== undefined ? { excludePaths: wsGraph.excludePaths } : {}),
           ...(wsGraph?.allowedPaths ? { allowedPaths: wsGraph.allowedPaths } : {}),
         })
@@ -400,6 +401,7 @@ export class IndexCodeGraph {
         const rootDiscovered = discoverFiles(options.projectRoot, undefined, {
           allowedPaths: effectiveGraphConfig.includePaths,
           excludePaths: effectiveGraphConfig.rootExcludePaths,
+          vcsRoot: options.vcsRoot,
         })
         const filteredRootDiscovered = rootDiscovered.filter((relPath) => {
           const absPath = join(options.projectRoot, relPath)

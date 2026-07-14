@@ -1,122 +1,119 @@
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ApprovalGates } from '../../application/use-cases/transition-change.js'
 import { ApproveSignoff } from '../../application/use-cases/approve-signoff.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Domain context for a `ChangeRepository` bound to a single workspace.
+ * Explicit dependencies for {@link createApproveSignoff}.
  */
-export interface ApproveSignoffContext {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
+export interface ApproveSignoffDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Actor resolver used by the use case. */
+  readonly actor: ActorResolver
+  /** Schema provider used by the use case. */
+  readonly schemaProvider: SchemaProvider
+  /** Content hasher used by the use case. */
+  readonly contentHasher: ContentHasher
+  /** Approval gate configuration used by the use case. */
+  readonly approvals: ApprovalGates
 }
 
 /**
- * Filesystem adapter paths for `createApproveSignoff(context, options)`.
+ * Resolves {@link ApproveSignoffDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ApproveSignoff`
  */
-export interface FsApproveSignoffOptions {
-  /** Absolute path to the `changes/` directory. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
-  readonly discardedPath: string
-  /** Absolute path to the project root (for schema resolution). */
-  readonly projectRoot: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Approval gate configuration from project config. */
-  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+export function resolveApproveSignoffDeps(resolver: CompositionResolver): ApproveSignoffDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    actor: resolver.getActorResolver(),
+    schemaProvider: resolver.getSchemaProvider(),
+    contentHasher: resolver.getContentHasher(),
+    approvals: resolver.config.approvals,
+  }
 }
 
 /**
- * Constructs an `ApproveSignoff` use case wired to the default workspace.
+ * Constructs `ApproveSignoff` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createApproveSignoff(deps: ApproveSignoffDeps): ApproveSignoff
+/**
+ * Constructs `ApproveSignoff` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createApproveSignoff(config: SpecdConfig): ApproveSignoff
-/**
- * Constructs an `ApproveSignoff` use case with explicit context and fs paths.
- *
- * @param context - Workspace domain context
- * @param options - Filesystem adapter paths
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createApproveSignoff(
-  context: ApproveSignoffContext,
-  options: FsApproveSignoffOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ApproveSignoff
 /**
- * Constructs an `ApproveSignoff` instance wired with filesystem adapters.
+ * Constructs `ApproveSignoff` from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createApproveSignoff(
-  configOrContext: SpecdConfig | ApproveSignoffContext,
-  options?: FsApproveSignoffOptions,
+  depsOrConfig: ApproveSignoffDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ApproveSignoff {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((ws2) => ws2.schemasPath !== null)
-        .map((ws2) => [
-          ws2.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws2.name,
-              ownership: ws2.ownership,
-              isExternal: ws2.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: ws2.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
-    return createApproveSignoff(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        projectRoot: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: schemaRepos,
-        approvals: config.approvals,
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createApproveSignoff',
+    depsOrConfig,
+    options,
+    isApproveSignoffDeps,
+  )
+  return createApproveSignoffFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ApproveSignoff` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createApproveSignoffFromNormalized(
+  input: FactoryInput<ApproveSignoffDeps, CompositionResolutionOptions>,
+): ApproveSignoff {
+  if (input.kind === 'deps') {
+    const { changes, actor, schemaProvider, contentHasher, approvals } = input.deps
+    return new ApproveSignoff(changes, actor, schemaProvider, contentHasher, approvals)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const actor = createVcsActorResolver()
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: [options!.projectRoot + '/node_modules'],
-    configDir: options!.projectRoot,
-    schemaRepositories: options!.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, options!.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const hasher = new NodeContentHasher()
-  return new ApproveSignoff(changeRepo, actor, schemaProvider, hasher, options!.approvals)
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createApproveSignoff(resolveApproveSignoffDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ApproveSignoffDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isApproveSignoffDeps(
+  value: ApproveSignoffDeps | SpecdConfig,
+): value is ApproveSignoffDeps {
+  return (
+    'changes' in value &&
+    'actor' in value &&
+    'schemaProvider' in value &&
+    'contentHasher' in value &&
+    'approvals' in value
+  )
 }

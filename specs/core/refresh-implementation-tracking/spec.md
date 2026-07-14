@@ -99,6 +99,20 @@ This use case MUST NOT reference CLI commands, MCP servers, filesystem watchers,
 
 It exposes only the VCS-backed refresh contract. Other adapters MAY update tracked files through different strategies without calling this use case.
 
+### Requirement: Config-based factory delegates through resolveRefreshImplementationTrackingDeps
+
+The config-based `createRefreshImplementationTracking(config, options?)` form MUST derive `RefreshImplementationTrackingDeps` through `resolveRefreshImplementationTrackingDeps(resolver)` and then delegate to canonical `createRefreshImplementationTracking(deps)`.
+
+`resolveRefreshImplementationTrackingDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `archives: ArchiveRepository`
+- `implementationDetector: ImplementationDetector`
+- `files: FileReader`
+- `projectRoot: string`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - Detection is demand-driven per invocation, not background polling.
@@ -107,7 +121,8 @@ It exposes only the VCS-backed refresh contract. Other adapters MAY update track
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — historical implementing guard and tracked-file semantics
-- [`core:implementation-detector-port`](../implementation-detector-port/spec.md) — `ImplementationDetector` port
-- [`core:storage`](../storage/spec.md) — `ChangeRepository` persistence
-- [`core:archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` for internal path discovery
+- [`core:change`](../change/spec.md)
+- [`core:implementation-detector-port`](../implementation-detector-port/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:archive-repository-port`](../archive-repository-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

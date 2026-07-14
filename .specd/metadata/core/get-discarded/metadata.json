@@ -1,7 +1,12 @@
 {
   "title": "GetDiscarded",
   "description": "Callers need to load a single discarded change by name for audit and CLI display. `GetDiscarded` resolves a name in `discarded/` only. It exists because `ChangeRepository.get` and `GetStatus` intentionally exclude discarded storage (so discarded names may be reused and terminal changes are not mutable via `mutate`).",
-  "dependsOn": ["core:discarded-change-view", "core:change", "core:change-repository-port"],
+  "dependsOn": [
+    "core:discarded-change-view",
+    "core:change",
+    "core:change-repository-port",
+    "core:composition-resolver"
+  ],
   "context": [
     "Callers need to load a single discarded change by name for audit and CLI display. `GetDiscarded` resolves a name in `discarded/` only. It exists because `ChangeRepository.get` and `GetStatus` intentionally exclude discarded storage (so discarded names may be reused and terminal changes are not mutable via `mutate`)."
   ],
@@ -27,6 +32,12 @@
     {
       "requirement": "Dependencies",
       "rules": ["`GetDiscarded` depends on `ChangeRepository` injected via constructor."]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetDiscardedDeps",
+      "rules": [
+        "The config-based `createGetDiscarded(config, options?)` form MUST derive `GetDiscardedDeps` through `resolveGetDiscardedDeps(resolver)` and then delegate to canonical `createGetDiscarded(deps)`.\n\n`resolveGetDiscardedDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
     }
   ],
   "constraints": [
@@ -139,20 +150,30 @@
       "name": "Does not require SchemaProvider",
       "when": ["GetDiscarded.execute runs"],
       "then": ["SchemaProvider is not consulted"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetDiscardedDeps",
+      "name": "createGetDiscarded config form derives GetDiscardedDeps through resolveGetDiscardedDeps",
+      "when": ["createGetDiscarded(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetDiscardedDeps through resolveGetDiscardedDeps(resolver)",
+        "AND resolveGetDiscardedDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetDiscarded(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:get-discarded",
-        "file": "core:src/application/use-cases/get-discarded.ts",
-        "symbol": "GetDiscarded"
+        "file": "core:src/composition/use-cases/get-discarded.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a4f652d5e3d5faa5fe816acee21fa9630044588eb51b70a432635ef55c0b74f8",
-    "verify.md": "sha256:9c844a1c18b7058766cc23e8a50c45fbbe2a19659dfec1cf07890df380ce6f5e"
+    "spec.md": "sha256:51d6fc3a31de070a216a2dc2357a212363b8bb0340d028db5e8cb30cda7816a2",
+    "verify.md": "sha256:fb6f6a794bf65f8d325c7c6033b771ad96653b0e34500d9d1c14c101caf89666"
   },
   "generatedBy": "core"
 }

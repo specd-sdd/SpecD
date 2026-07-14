@@ -16,6 +16,7 @@ function touch(root: string, relPath: string, content = ''): void {
 
 /** A hasAdapter predicate that accepts all `.ts` files. */
 const allTs = (filePath: string): boolean => filePath.endsWith('.ts')
+const noVcs = { vcsRoot: null } as const
 
 describe('discoverFiles', () => {
   let root: string
@@ -65,7 +66,10 @@ describe('discoverFiles', () => {
       touch(root, 'src/index.ts')
       touch(root, 'node_modules/dep/index.ts')
 
-      const files = discoverFiles(root, allTs, { excludePaths: ['custom-exclude/'] })
+      const files = discoverFiles(root, allTs, {
+        ...noVcs,
+        excludePaths: ['custom-exclude/'],
+      })
 
       expect(files).toContain('src/index.ts')
       expect(files).toContain('node_modules/dep/index.ts')
@@ -75,7 +79,10 @@ describe('discoverFiles', () => {
       touch(root, 'src/index.ts')
       touch(root, 'fixtures/helper.ts')
 
-      const files = discoverFiles(root, allTs, { excludePaths: ['fixtures/'] })
+      const files = discoverFiles(root, allTs, {
+        ...noVcs,
+        excludePaths: ['fixtures/'],
+      })
 
       expect(files).toContain('src/index.ts')
       expect(files).not.toContain('fixtures/helper.ts')
@@ -89,6 +96,7 @@ describe('discoverFiles', () => {
       touch(root, '.specd/metadata/spec.ts')
 
       const files = discoverFiles(root, allTs, {
+        ...noVcs,
         excludePaths: ['.specd/*', '!.specd/metadata/'],
       })
 
@@ -105,7 +113,10 @@ describe('discoverFiles', () => {
       writeFileSync(join(root, '.gitignore'), 'generated.ts\n')
 
       const filesWithGitignore = discoverFiles(root, allTs)
-      const filesWithout = discoverFiles(root, allTs, { respectGitignore: false })
+      const filesWithout = discoverFiles(root, allTs, {
+        ...noVcs,
+        respectGitignore: false,
+      })
 
       expect(filesWithGitignore).not.toContain('src/generated.ts')
       expect(filesWithout).toContain('src/generated.ts')
@@ -119,6 +130,7 @@ describe('discoverFiles', () => {
       writeFileSync(join(root, '.gitignore'), 'generated/\n')
 
       const files = discoverFiles(root, allTs, {
+        ...noVcs,
         excludePaths: ['node_modules/', '!generated/'],
       })
 
@@ -132,7 +144,10 @@ describe('discoverFiles', () => {
       touch(root, 'src/index.ts')
       touch(root, 'node_modules/dep/index.ts')
 
-      const files = discoverFiles(root, allTs, { excludePaths: [] })
+      const files = discoverFiles(root, allTs, {
+        ...noVcs,
+        excludePaths: [],
+      })
 
       expect(files).toContain('src/index.ts')
       expect(files).toContain('node_modules/dep/index.ts')

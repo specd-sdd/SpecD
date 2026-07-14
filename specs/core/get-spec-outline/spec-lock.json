@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:get-spec",
+    "core:artifact-parser-port",
+    "core:get-active-schema",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/get-spec-outline.ts"
+    }
+  ]
+}

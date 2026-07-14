@@ -5,7 +5,8 @@
     "core:spec-repository-port",
     "core:list-specs",
     "core:workspace",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "core:composition-resolver"
   ],
   "context": [
     "Consumers need a core-level use case to search spec content by keyword without depending on the code graph. `SearchSpecs` provides content-based search across all configured workspaces by delegating to each workspace's `SpecRepository.search()` method. It is the fallback search path when the code graph is unavailable, and the primary search path for consumers that do not have graph access."
@@ -45,6 +46,12 @@
       "requirement": "Empty results",
       "rules": [
         "When no specs match across all searched workspaces, the use case MUST return an empty array (not an error)."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveSearchSpecsDeps",
+      "rules": [
+        "The config-based `createSearchSpecs(config, options?)` form MUST derive `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)` and then delegate to canonical `createSearchSpecs(deps)`.\n\n`resolveSearchSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `hasher: ContentHasher`\n- `yaml: YamlSerializer`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -128,20 +135,30 @@
       "given": ["no spec in any workspace matches the query"],
       "when": ["execute(\"zzzznonexistent\") is called"],
       "then": ["the result is an empty array (not an error)"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveSearchSpecsDeps",
+      "name": "createSearchSpecs config form derives SearchSpecsDeps through resolveSearchSpecsDeps",
+      "when": ["createSearchSpecs(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives SearchSpecsDeps through resolveSearchSpecsDeps(resolver)",
+        "AND resolveSearchSpecsDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createSearchSpecs(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:search-specs",
-        "file": "core:src/application/use-cases/search-specs.ts",
-        "symbol": "SearchSpecs"
+        "file": "core:src/composition/use-cases/search-specs.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a059d24c054d32dc2975108847622822807f071963fada05969565dee8bee198",
-    "verify.md": "sha256:9d371182732856f300f1f016db6dcfc9dda73553ab4f01eae1bc904f99fe8ec3"
+    "spec.md": "sha256:5d15a6b42badeb7f1ef5592372d58254d8ef6d9abee748ce599e7bfb011f30b7",
+    "verify.md": "sha256:53ea13dd424f4c66acf50447623678b4ce35c6287d10fdcb880f132d4b361cd8"
   },
   "generatedBy": "core"
 }

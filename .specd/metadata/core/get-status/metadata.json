@@ -8,7 +8,8 @@
     "core:schema-format",
     "core:config",
     "core:lifecycle-engine",
-    "core:refresh-implementation-tracking"
+    "core:refresh-implementation-tracking",
+    "core:composition-resolver"
   ],
   "context": [
     "Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`."
@@ -96,6 +97,12 @@
       "requirement": "Graceful degradation when schema resolution fails",
       "rules": [
         "If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present with degraded values:\n\n- `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)\n- `availableTransitions` MUST be an empty array\n- `blockers` MUST be an empty array\n- `approvals` MUST be populated normally (it is injected config, independent of schema)\n- `nextArtifact` MUST be `null`\n- `changePath` MUST be populated normally\n- `schemaInfo` MUST be `null`\n\nThe use case MUST NOT throw when schema resolution fails — it degrades the lifecycle fields silently. It MUST wrap the `SchemaProvider.get()` call in a `try/catch` to achieve this."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetStatusDeps",
+      "rules": [
+        "The config-based `createGetStatus(config, options?)` form MUST derive `GetStatusDeps` through `resolveGetStatusDeps(resolver)` and then delegate to canonical `createGetStatus(deps)`.\n\n`resolveGetStatusDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `schemaProvider: SchemaProvider`\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }`\n- `refreshImplementationTracking: RefreshImplementationTracking`\n- `lifecycle: LifecycleEngine`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -512,40 +519,30 @@
       "then": [
         "the returned blockers array contains machine-readable blocker entries describing those conditions"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetStatusDeps",
+      "name": "createGetStatus config form derives GetStatusDeps through resolveGetStatusDeps",
+      "when": ["createGetStatus(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetStatusDeps through resolveGetStatusDeps(resolver)",
+        "AND resolveGetStatusDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetStatus(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:get-status",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/composition/use-cases/get-status.ts",
-        "symbol": "createGetStatus"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "GetStatus"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/application/use-cases/get-status.ts",
-        "symbol": "execute"
-      },
-      {
-        "specId": "core:get-status",
-        "file": "core:src/composition/use-cases/validate-change-batch.ts",
-        "symbol": "createValidateChangeBatch"
+        "file": "core:src/composition/use-cases/get-status.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:190628ec9d1e6b2819984d15277d647e43f52588b8aa6cfe16966908e65dd16d",
-    "verify.md": "sha256:098e5e7e19bc0e6c32ef550cfcad1a4d2a8ade4e9f8d397e706957cfbd0a1bd4"
+    "spec.md": "sha256:4800123d5e941d22be588e41a2726d0a881996e24f09f44a156fa29e5af60c6f",
+    "verify.md": "sha256:b39161f8fb7eeb270de29b1c64309c70c284934cb8c1862ffe96ae2a539c6064"
   },
   "generatedBy": "core"
 }

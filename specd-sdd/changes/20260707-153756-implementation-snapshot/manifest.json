@@ -1,0 +1,1793 @@
+{
+  "name": "implementation-snapshot",
+  "createdAt": "2026-07-07T15:37:56.057Z",
+  "updatedAt": "2026-07-14T12:22:09.504Z",
+  "description": "Add VCS-agnostic working tree snapshot capability with mtime+hash baseline filtering and indexed patch restore as safety net against accidental data loss",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:change",
+    "core:vcs-adapter",
+    "core:implementation-detector-port",
+    "core:vcs-implementation-detector",
+    "core:refresh-implementation-tracking",
+    "core:update-implementation-tracking",
+    "cli:change-implementation",
+    "core:get-implementation-snapshots",
+    "core:take-implementation-snapshot",
+    "core:show-implementation-snapshot",
+    "core:composition",
+    "core:implementation-snapshot",
+    "core:get-implementation-snapshot-file",
+    "core:restore-implementation-snapshot"
+  ],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port"
+    ],
+    "core:vcs-adapter": [
+      "core:composition",
+      "default:_global/architecture",
+      "core:implementation-detector-port",
+      "core:vcs-implementation-detector"
+    ],
+    "core:implementation-detector-port": ["core:change", "core:refresh-implementation-tracking"],
+    "core:vcs-implementation-detector": [
+      "core:implementation-detector-port",
+      "core:vcs-adapter-port"
+    ],
+    "core:refresh-implementation-tracking": [
+      "core:change",
+      "core:implementation-detector-port",
+      "core:storage",
+      "core:archive-repository-port",
+      "core:composition-resolver",
+      "core:vcs-implementation-detector"
+    ],
+    "core:update-implementation-tracking": [
+      "core:change",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver"
+    ],
+    "cli:change-implementation": [
+      "core:change",
+      "code-graph:symbol-model",
+      "core:update-implementation-tracking",
+      "core:get-implementation-review",
+      "core:refresh-implementation-tracking"
+    ],
+    "core:get-implementation-snapshots": [],
+    "core:take-implementation-snapshot": [],
+    "core:show-implementation-snapshot": [],
+    "core:composition": [
+      "default:_global/architecture",
+      "core:resolve-schema",
+      "core:config-writer-port",
+      "core:kernel-builder",
+      "core:composition-resolver"
+    ],
+    "core:implementation-snapshot": [],
+    "core:get-implementation-snapshot-file": [],
+    "core:restore-implementation-snapshot": []
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "drifted-pending-review",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:e4eb715ba80283361add11bf9b7c666e54515e6be06e07276aea4cdbe97299f5",
+          "hasDrift": true
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-adapter",
+          "filename": "deltas/core/vcs-adapter/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:implementation-detector-port",
+          "filename": "deltas/core/implementation-detector-port/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-implementation-detector",
+          "filename": "deltas/core/vcs-implementation-detector/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:refresh-implementation-tracking",
+          "filename": "deltas/core/refresh-implementation-tracking/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:update-implementation-tracking",
+          "filename": "deltas/core/update-implementation-tracking/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:change-implementation",
+          "filename": "deltas/cli/change-implementation/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-implementation-snapshots",
+          "filename": "specs/core/get-implementation-snapshots/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:take-implementation-snapshot",
+          "filename": "specs/core/take-implementation-snapshot/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:show-implementation-snapshot",
+          "filename": "specs/core/show-implementation-snapshot/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:implementation-snapshot",
+          "filename": "specs/core/implementation-snapshot/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-implementation-snapshot-file",
+          "filename": "specs/core/get-implementation-snapshot-file/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:restore-implementation-snapshot",
+          "filename": "specs/core/restore-implementation-snapshot/spec.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-adapter",
+          "filename": "deltas/core/vcs-adapter/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:implementation-detector-port",
+          "filename": "deltas/core/implementation-detector-port/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:vcs-implementation-detector",
+          "filename": "deltas/core/vcs-implementation-detector/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:refresh-implementation-tracking",
+          "filename": "deltas/core/refresh-implementation-tracking/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:update-implementation-tracking",
+          "filename": "deltas/core/update-implementation-tracking/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:change-implementation",
+          "filename": "deltas/cli/change-implementation/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-implementation-snapshots",
+          "filename": "specs/core/get-implementation-snapshots/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:take-implementation-snapshot",
+          "filename": "specs/core/take-implementation-snapshot/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:show-implementation-snapshot",
+          "filename": "specs/core/show-implementation-snapshot/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:implementation-snapshot",
+          "filename": "specs/core/implementation-snapshot/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:get-implementation-snapshot-file",
+          "filename": "specs/core/get-implementation-snapshot-file/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:restore-implementation-snapshot",
+          "filename": "specs/core/restore-implementation-snapshot/verify.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-07T15:37:56.057Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:change",
+        "core:vcs-adapter",
+        "core:implementation-detector-port",
+        "core:vcs-implementation-detector",
+        "core:refresh-implementation-tracking",
+        "core:update-implementation-tracking",
+        "cli:change-implementation"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T15:37:56.078Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:vcs-adapter"
+        },
+        {
+          "type": "specs",
+          "key": "core:implementation-detector-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:vcs-implementation-detector"
+        },
+        {
+          "type": "specs",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "specs",
+          "key": "core:update-implementation-tracking"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-implementation"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "core:implementation-detector-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-implementation-detector"
+        },
+        {
+          "type": "verify",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-implementation-tracking"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-implementation"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-07T15:41:35.353Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T15:55:58.451Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T15:55:58.537Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T15:55:58.538Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:diff-patch-reader"
+        },
+        {
+          "type": "verify",
+          "key": "core:diff-patch-reader"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T16:47:13.070Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T16:47:13.075Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-implementation-snapshots"
+        },
+        {
+          "type": "specs",
+          "key": "core:take-implementation-snapshot"
+        },
+        {
+          "type": "specs",
+          "key": "core:show-implementation-snapshot"
+        },
+        {
+          "type": "specs",
+          "key": "core:apply-implementation-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-implementation-snapshots"
+        },
+        {
+          "type": "verify",
+          "key": "core:take-implementation-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:show-implementation-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:apply-implementation-snapshot"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T16:49:41.509Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T16:49:41.512Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T06:23:00.355Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-08T06:23:00.359Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-snapshot-file"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-snapshot-file"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T06:26:58.785Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:get-snapshot-file"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:diff-patch-reader",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:get-snapshot-file"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-08T06:26:58.787Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:working-tree-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:working-tree-snapshot"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:diff-patch-reader"
+        },
+        {
+          "type": "verify",
+          "key": "core:diff-patch-reader"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T06:27:29.361Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:get-snapshot-file",
+            "core:working-tree-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:get-snapshot-file",
+            "core:working-tree-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-08T06:27:29.362Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:implementation-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:implementation-snapshot"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:working-tree-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:working-tree-snapshot"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T06:28:24.131Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:get-snapshot-file",
+            "core:implementation-snapshot"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:get-snapshot-file",
+            "core:implementation-snapshot"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-08T06:28:24.133Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-implementation-snapshot-file"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-implementation-snapshot-file"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:get-snapshot-file"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-snapshot-file"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T07:06:12.903Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:implementation-snapshot",
+            "core:get-implementation-snapshot-file"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:vcs-adapter",
+            "core:implementation-detector-port",
+            "core:vcs-implementation-detector",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation",
+            "core:get-implementation-snapshots",
+            "core:take-implementation-snapshot",
+            "core:show-implementation-snapshot",
+            "core:apply-implementation-snapshot",
+            "core:composition",
+            "core:implementation-snapshot",
+            "core:get-implementation-snapshot-file"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-08T07:06:12.906Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:restore-implementation-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:restore-implementation-snapshot"
+        }
+      ],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:apply-implementation-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "core:apply-implementation-snapshot"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:33:34.243Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:08:24.934Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:08:28.488Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:01.422Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:09.405Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:14.763Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:25:43.079Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:08.074Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:18.921Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:31.148Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:42.363Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:composition, core:vcs-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:vcs-adapter", "core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:20:13.687Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:20:32.962Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:20:54.395Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:10.469Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:27.708Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:45.542Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:52.333Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:57.707Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:22:03.586Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:22:09.504Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

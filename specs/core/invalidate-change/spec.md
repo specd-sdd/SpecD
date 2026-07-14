@@ -119,6 +119,18 @@ On success, the use case MUST return:
 
 This affected set is the authoritative result for human-facing reporting.
 
+### Requirement: Config-based factory delegates through resolveInvalidateChangeDeps
+
+The config-based `createInvalidateChange(config, options?)` form MUST derive `InvalidateChangeDeps` through `resolveInvalidateChangeDeps(resolver)` and then delegate to canonical `createInvalidateChange(deps)`.
+
+`resolveInvalidateChangeDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - `InvalidateChange` MUST NOT perform filesystem drift detection itself.
@@ -127,7 +139,8 @@ This affected set is the authoritative result for human-facing reporting.
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — `Change.invalidate()` owns lifecycle rollback and policy-aware artifact mutation.
-- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — downstream consequences are interpreted later from canonical artifact states.
-- [`core:config`](../config/spec.md) — the persisted `invalidationPolicy` originates from project/change configuration.
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — use-case orchestration versus entity-owned invalidation rules.
+- [`core:change`](../change/spec.md)
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+- [`core:config`](../config/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

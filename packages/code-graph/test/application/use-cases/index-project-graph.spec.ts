@@ -28,6 +28,7 @@ function makeProvider(): CodeGraphHostPort {
 
 const baseInput = {
   projectRoot: '/project',
+  vcsRoot: null,
   workspaces: [],
   graphConfig: {
     projectRoot: '/project',

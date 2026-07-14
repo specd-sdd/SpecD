@@ -32,21 +32,21 @@
 
 ### Requirement: types are shared or generated from API schemas
 
-#### Scenario: Types imported from shared package
+#### Scenario: Structural input maps all canonical status fields
 
-- **WHEN** client and api packages build
-- **THEN** DTO definitions have single source
-- **AND** no duplicated interface copies
+- **GIVEN** structural input containing counts, graph diagnostics, approvals, and auth
+- **WHEN** the client mapper is called
+- **THEN** it returns the canonical `ProjectStatusDto` without renaming or dropping fields
+- **AND** optional fields are omitted only when their source values are absent
 
-#### Scenario: OpenAPI generation feeds both sides
+#### Scenario: Client mapper has no core or SDK dependency
 
-- **GIVEN** OpenAPI schema generated from Zod
-- **WHEN** client types generated or re-exported
-- **THEN** schemas align with `api:dto-*` spec
-- **AND** Studio release notes document changes
+- **WHEN** the client package dependency graph and public mapper signature are inspected
+- **THEN** neither imports `@specd/core` nor `@specd/sdk`
+- **AND** the mapper accepts serializable structural data rather than domain entities
 
-#### Scenario: Manual duplicate DTO is rejected in review
+#### Scenario: HTTP and IPC use one mapper implementation
 
-- **WHEN** contributor adds parallel interface in client
-- **THEN** lint or architectural test fails
-- **AND** must use shared/generated types
+- **WHEN** API and desktop project-status presenters are inspected
+- **THEN** both import the mapper from `@specd/client`
+- **AND** neither defines a parallel `ProjectStatusDto` mapping

@@ -1,128 +1,127 @@
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { CreateChange } from '../../application/use-cases/create-change.js'
+import { DetectOverlap } from '../../application/use-cases/detect-overlap.js'
 import { type GetActiveSchema } from '../../application/use-cases/get-active-schema.js'
-import { type DetectOverlap } from '../../application/use-cases/detect-overlap.js'
-import * as path from 'node:path'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { createSpecRepository } from '../spec-repository.js'
-import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
-import { createGetActiveSchema } from './get-active-schema.js'
-import { createDetectOverlap } from './detect-overlap.js'
+import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Domain context for a `ChangeRepository` bound to a single workspace.
- *
- * Passed to `createCreateChange(context, options)` when constructing the use
- * case without a full `SpecdConfig`.
+ * Explicit dependencies for {@link createCreateChange}.
  */
-export interface CreateChangeContext {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/**
- * Filesystem adapter paths for `createCreateChange(context, options)`.
- */
-export interface FsCreateChangeOptions {
-  /** Absolute path to the `changes/` directory for active changes. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory for shelved changes. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory for abandoned changes. */
-  readonly discardedPath: string
-  /** The project orchestrator. */
+export interface CreateChangeDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Workspace orchestrator used by the use case. */
   readonly listWorkspaces: ListWorkspaces
-  /** Resolves the project's active schema for create orchestration. */
+  /** Actor resolver used by the use case. */
+  readonly actor: ActorResolver
+  /** Active schema lookup used by the use case. */
   readonly getActiveSchema: GetActiveSchema
-  /** Detects spec overlap across active changes. */
+  /** Overlap detection used by the use case. */
   readonly detectOverlap: DetectOverlap
 }
 
 /**
- * Constructs a `CreateChange` use case wired to the default workspace.
+ * Resolves {@link CreateChangeDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `CreateChange`
+ */
+export function resolveCreateChangeDeps(resolver: CompositionResolver): CreateChangeDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    listWorkspaces: resolver.getListWorkspaces(),
+    actor: resolver.getActorResolver(),
+    getActiveSchema: resolver.getGetActiveSchema(),
+    detectOverlap: createDetectOverlapFromResolver(resolver),
+  }
+}
+
+/**
+ * Constructs a `CreateChange` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createCreateChange(deps: CreateChangeDeps): CreateChange
+/**
+ * Constructs a `CreateChange` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createCreateChange(config: SpecdConfig): CreateChange
-/**
- * Constructs a `CreateChange` use case with explicit context and fs paths.
- *
- * @param context - Workspace domain context
- * @param options - Filesystem adapter paths and orchestration dependencies
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createCreateChange(
-  context: CreateChangeContext,
-  options: FsCreateChangeOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): CreateChange
 /**
- * Constructs a `CreateChange` instance wired with filesystem adapters.
+ * Constructs a `CreateChange` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createCreateChange(
-  configOrContext: SpecdConfig | CreateChangeContext,
-  options?: FsCreateChangeOptions,
+  depsOrConfig: CreateChangeDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): CreateChange {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    const changeRepo = createChangeRepository(
-      'fs',
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-      },
-    )
-    const specRepos = new Map(
-      config.workspaces.map((workspace) => [
-        workspace.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: workspace.name,
-            ownership: workspace.ownership,
-            isExternal: workspace.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: workspace.specsPath,
-            metadataPath: path.join(workspace.specsPath, '..', '.specd', 'metadata'),
-            ...(workspace.prefix !== undefined ? { prefix: workspace.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    const actor = createVcsActorResolver()
-    const listWorkspaces = new ListWorkspaces(config, specRepos)
-    const getActiveSchema = createGetActiveSchema(config)
-    const detectOverlap = createDetectOverlap(config)
-    return new CreateChange(changeRepo, listWorkspaces, actor, getActiveSchema, detectOverlap)
+  const normalized = normalizeCompositionFactoryArgs(
+    'createCreateChange',
+    depsOrConfig,
+    options,
+    isCreateChangeDeps,
+  )
+  return createCreateChangeFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `CreateChange` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createCreateChangeFromNormalized(
+  input: FactoryInput<CreateChangeDeps, CompositionResolutionOptions>,
+): CreateChange {
+  if (input.kind === 'deps') {
+    const { changes, listWorkspaces, actor, getActiveSchema, detectOverlap } = input.deps
+    return new CreateChange(changes, listWorkspaces, actor, getActiveSchema, detectOverlap)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const actor = createVcsActorResolver()
-  return new CreateChange(
-    changeRepo,
-    options!.listWorkspaces,
-    actor,
-    options!.getActiveSchema,
-    options!.detectOverlap,
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createCreateChange(resolveCreateChangeDeps(resolver))
+}
+
+/**
+ * Creates the overlap detector dependency from resolver-backed collaborators.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The overlap detector used by `CreateChange`
+ */
+function createDetectOverlapFromResolver(resolver: CompositionResolver): DetectOverlap {
+  return new DetectOverlap(resolver.getChangeRepository())
+}
+
+/**
+ * Type guard for explicit `CreateChangeDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isCreateChangeDeps(value: CreateChangeDeps | SpecdConfig): value is CreateChangeDeps {
+  return (
+    'changes' in value &&
+    'listWorkspaces' in value &&
+    'actor' in value &&
+    'getActiveSchema' in value &&
+    'detectOverlap' in value
   )
 }

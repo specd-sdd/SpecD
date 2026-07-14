@@ -1,0 +1,4 @@
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Decoupled from VcsAdapter'

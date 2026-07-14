@@ -161,3 +161,16 @@
 - **GIVEN** a schema ref that extends `@specd/schema-std` resolved from `/path/to/schema.yaml`
 - **WHEN** `execute` is called with `{ mode: 'ref', ref: '#default:child' }`
 - **THEN** `warnings` contains `extends '@specd/schema-std' resolved from /path/to/schema.yaml`
+
+### Requirement: Config-based factory delegates through resolveValidateSchemaDeps
+
+#### Scenario: createValidateSchema config form derives ValidateSchemaDeps through resolveValidateSchemaDeps
+
+- **WHEN** `createValidateSchema(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ValidateSchemaDeps` through `resolveValidateSchemaDeps(resolver)`
+- **AND** `resolveValidateSchemaDeps(resolver)` resolves:
+- `schemas: SchemaRegistry`
+- `schemaRef: string`
+- `buildSchemaFn: ( ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>, )`
+- **AND** the factory delegates to canonical `createValidateSchema(deps)`

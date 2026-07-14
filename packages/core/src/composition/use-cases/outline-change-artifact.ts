@@ -1,45 +1,103 @@
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { OutlineChangeArtifact } from '../../application/use-cases/outline-change-artifact.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { type FsListDraftsOptions, type ListDraftsContext } from './list-drafts.js'
-import { createSharedChangeRepository } from '../shared-repository-wiring.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Constructs an `OutlineChangeArtifact` use case with full project config.
+ * Explicit dependencies for {@link createOutlineChangeArtifact}.
+ */
+export interface OutlineChangeArtifactDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Artifact parser registry used to build the outline. */
+  readonly parsers: ArtifactParserRegistry
+}
+
+/**
+ * Resolves {@link OutlineChangeArtifactDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `OutlineChangeArtifact`
+ */
+export function resolveOutlineChangeArtifactDeps(
+  resolver: CompositionResolver,
+): OutlineChangeArtifactDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    parsers: resolver.getArtifactParserRegistry(),
+  }
+}
+
+/**
+ * Constructs an `OutlineChangeArtifact` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createOutlineChangeArtifact(deps: OutlineChangeArtifactDeps): OutlineChangeArtifact
+/**
+ * Constructs an `OutlineChangeArtifact` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createOutlineChangeArtifact(config: SpecdConfig): OutlineChangeArtifact
-/**
- * Constructs an `OutlineChangeArtifact` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for change resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createOutlineChangeArtifact(
-  context: ListDraftsContext,
-  options: FsListDraftsOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): OutlineChangeArtifact
 /**
- * Implementation overload for {@link createOutlineChangeArtifact}.
+ * Constructs an `OutlineChangeArtifact` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - Project config or explicit context
- * @param options - Filesystem paths when using explicit context
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createOutlineChangeArtifact(
-  configOrContext: SpecdConfig | ListDraftsContext,
-  options?: FsListDraftsOptions,
+  depsOrConfig: OutlineChangeArtifactDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): OutlineChangeArtifact {
-  if (isSpecdConfig(configOrContext)) {
-    return new OutlineChangeArtifact(
-      createSharedChangeRepository({ config: configOrContext }),
-      createArtifactParserRegistry(),
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createOutlineChangeArtifact',
+    depsOrConfig,
+    options,
+    isOutlineChangeArtifactDeps,
+  )
+  return createOutlineChangeArtifactFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `OutlineChangeArtifact` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createOutlineChangeArtifactFromNormalized(
+  input: FactoryInput<OutlineChangeArtifactDeps, CompositionResolutionOptions>,
+): OutlineChangeArtifact {
+  if (input.kind === 'deps') {
+    const { changes, parsers } = input.deps
+    return new OutlineChangeArtifact(changes, parsers)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  return new OutlineChangeArtifact(changeRepo, createArtifactParserRegistry())
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createOutlineChangeArtifact(resolveOutlineChangeArtifactDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `OutlineChangeArtifactDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isOutlineChangeArtifactDeps(
+  value: OutlineChangeArtifactDeps | SpecdConfig,
+): value is OutlineChangeArtifactDeps {
+  return 'changes' in value && 'parsers' in value
 }

@@ -45,3 +45,14 @@
 - **WHEN** `listArchived.execute()` is called multiple times
 - **THEN** each call returns the same result
 - **AND** no repository write methods are invoked
+
+### Requirement: Config-based factory delegates through resolveListArchivedDeps
+
+#### Scenario: createListArchived config form derives ListArchivedDeps through resolveListArchivedDeps
+
+- **WHEN** `createListArchived(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ListArchivedDeps` through `resolveListArchivedDeps(resolver)`
+- **AND** `resolveListArchivedDeps(resolver)` resolves:
+- `archive: ArchiveRepository`
+- **AND** the factory delegates to canonical `createListArchived(deps)`

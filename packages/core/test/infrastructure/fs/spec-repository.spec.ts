@@ -22,7 +22,11 @@ interface RepoContext {
 async function setupRepo(): Promise<RepoContext> {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-test-'))
   const specsPath = path.join(tmpDir, 'specs')
-  await fs.mkdir(specsPath, { recursive: true })
+  const metadataPath = path.join(tmpDir, '.specd', 'metadata')
+  await Promise.all([
+    fs.mkdir(specsPath, { recursive: true }),
+    fs.mkdir(metadataPath, { recursive: true }),
+  ])
 
   const repo = new FsSpecRepository({
     workspace: 'default',
@@ -30,7 +34,7 @@ async function setupRepo(): Promise<RepoContext> {
     isExternal: false,
     configPath: '/test',
     specsPath,
-    metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+    metadataPath,
   })
 
   return { repo, specsPath, tmpDir }
@@ -485,7 +489,11 @@ describe('FsSpecRepository', () => {
     beforeEach(async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-prefix-'))
       const specsPath = path.join(tmpDir, 'specs')
-      await fs.mkdir(specsPath, { recursive: true })
+      const metaDir = path.join(tmpDir, '.specd', 'metadata')
+      await Promise.all([
+        fs.mkdir(specsPath, { recursive: true }),
+        fs.mkdir(metaDir, { recursive: true }),
+      ])
 
       const repo = new FsSpecRepository({
         workspace: 'default',
@@ -493,7 +501,7 @@ describe('FsSpecRepository', () => {
         isExternal: false,
         configPath: '/test',
         specsPath,
-        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+        metadataPath: metaDir,
         prefix: '_global',
       })
 
@@ -570,7 +578,11 @@ describe('FsSpecRepository', () => {
     it('multi-segment prefix works correctly', async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-multiprefix-'))
       const specsPath = path.join(tmpDir, 'specs')
-      await fs.mkdir(specsPath, { recursive: true })
+      const metaDir = path.join(tmpDir, '.specd', 'metadata')
+      await Promise.all([
+        fs.mkdir(specsPath, { recursive: true }),
+        fs.mkdir(metaDir, { recursive: true }),
+      ])
 
       const repo = new FsSpecRepository({
         workspace: 'shared',
@@ -578,7 +590,7 @@ describe('FsSpecRepository', () => {
         isExternal: false,
         configPath: '/test',
         specsPath,
-        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+        metadataPath: metaDir,
         prefix: 'team_1/shared',
       })
 
@@ -645,7 +657,11 @@ describe('FsSpecRepository', () => {
     it('given a prefix-configured repo, prepends prefix segments', async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-resolve-'))
       const specsPath = path.join(tmpDir, 'specs')
-      await fs.mkdir(specsPath, { recursive: true })
+      const metaDir = path.join(tmpDir, '.specd', 'metadata')
+      await Promise.all([
+        fs.mkdir(specsPath, { recursive: true }),
+        fs.mkdir(metaDir, { recursive: true }),
+      ])
 
       const repo = new FsSpecRepository({
         workspace: 'core',
@@ -653,7 +669,7 @@ describe('FsSpecRepository', () => {
         isExternal: false,
         configPath: '/test',
         specsPath,
-        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+        metadataPath: metaDir,
         prefix: 'core',
       })
 
@@ -714,7 +730,11 @@ describe('FsSpecRepository', () => {
     it('given a relative path with prefix-configured repo, prepends prefix', async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-resolve-'))
       const specsPath = path.join(tmpDir, 'specs')
-      await fs.mkdir(specsPath, { recursive: true })
+      const metaDir = path.join(tmpDir, '.specd', 'metadata')
+      await Promise.all([
+        fs.mkdir(specsPath, { recursive: true }),
+        fs.mkdir(metaDir, { recursive: true }),
+      ])
 
       const repo = new FsSpecRepository({
         workspace: 'core',
@@ -722,7 +742,7 @@ describe('FsSpecRepository', () => {
         isExternal: false,
         configPath: '/test',
         specsPath,
-        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+        metadataPath: metaDir,
         prefix: 'core',
       })
 
@@ -794,7 +814,11 @@ describe('FsSpecRepository', () => {
     beforeEach(async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-ro-'))
       const specsPath = path.join(tmpDir, 'specs')
-      await fs.mkdir(specsPath, { recursive: true })
+      const metadataPath = path.join(tmpDir, '.specd', 'metadata')
+      await Promise.all([
+        fs.mkdir(specsPath, { recursive: true }),
+        fs.mkdir(metadataPath, { recursive: true }),
+      ])
 
       const repo = new FsSpecRepository({
         workspace: 'platform',
@@ -869,8 +893,12 @@ describe('FsSpecRepository', () => {
     it('includes workspace name in metadata path', async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-metadata-ws-'))
       const specsPath = path.join(tmpDir, 'specs')
-      await fs.mkdir(specsPath, { recursive: true })
-      await fs.mkdir(path.join(specsPath, 'get-skill'), { recursive: true })
+      const metaDir = path.join(tmpDir, '.specd', 'metadata')
+      await Promise.all([
+        fs.mkdir(specsPath, { recursive: true }),
+        fs.mkdir(metaDir, { recursive: true }),
+        fs.mkdir(path.join(specsPath, 'get-skill'), { recursive: true }),
+      ])
       await fs.writeFile(path.join(specsPath, 'get-skill', 'spec.md'), '# Get Skill', 'utf8')
 
       const repo = new FsSpecRepository({
@@ -879,7 +907,7 @@ describe('FsSpecRepository', () => {
         isExternal: false,
         configPath: '/test',
         specsPath,
-        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+        metadataPath: metaDir,
       })
 
       const spec = await repo.get(SpecPath.parse('get-skill'))
@@ -910,8 +938,12 @@ describe('FsSpecRepository', () => {
     it('includes workspace AND prefix in metadata path when both exist', async () => {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-metadata-prefix-'))
       const specsPath = path.join(tmpDir, 'specs')
-      await fs.mkdir(specsPath, { recursive: true })
-      await fs.mkdir(path.join(specsPath, 'config'), { recursive: true })
+      const metaDir = path.join(tmpDir, '.specd', 'metadata')
+      await Promise.all([
+        fs.mkdir(specsPath, { recursive: true }),
+        fs.mkdir(metaDir, { recursive: true }),
+        fs.mkdir(path.join(specsPath, 'config'), { recursive: true }),
+      ])
       await fs.writeFile(path.join(specsPath, 'config', 'spec.md'), '# Config', 'utf8')
 
       const repo = new FsSpecRepository({
@@ -920,7 +952,7 @@ describe('FsSpecRepository', () => {
         isExternal: false,
         configPath: '/test',
         specsPath,
-        metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+        metadataPath: metaDir,
         prefix: 'core',
       })
 

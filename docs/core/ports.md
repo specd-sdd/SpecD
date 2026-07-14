@@ -10,37 +10,63 @@ All ports are exported from `@specd/core`.
 
 ## Kernel composition surface
 
-The primary composition entrypoint remains `createKernel(config, options)`. `options` now supports additive registrations for storage factories, graph-store factories, artifact parsers, extractor transforms, VCS providers, actor providers, and external hook runners.
+The primary composition entrypoint remains `createKernel(config, options)`. `options` supports additive registrations for storage factories, artifact parsers, extractor transforms, VCS providers, actor providers, and external hook runners.
 
-Built kernels expose the final merged registry as `kernel.registry`, so callers can inspect which built-in and additive capabilities are available after construction.
+Standalone use-case factories follow the same composition model. Public factories now accept either explicit deps (`createX(deps)`) or a resolved `SpecdConfig` plus optional additive registrations (`createX(config, options?)`). Config-based calls bootstrap through the same shared `CompositionResolver` semantics used by the kernel.
 
-Graph-store selection follows the same additive pattern, but with a separate active-id choice:
+Built kernels expose the final merged registry as `kernel.registry`, so callers can inspect which built-in and additive core capabilities are available after construction.
 
-- `graphStoreFactories` extends the set of available backends
-- `graphStoreId` selects the single backend id that downstream code-graph composition should use for this kernel construction path
+Graph-store backend composition is no longer a core concern. If you need to choose or register code-graph stores, do that in `@specd/code-graph` or the higher-level `@specd/sdk` bootstrap that creates the graph provider. `@specd/core` does not expose `graphStoreFactories`, `graphStoreId`, `registerGraphStore(...)`, or `useGraphStore(...)`.
 
-This is an internal composition concern. It is not a `specd.yaml` setting.
-
-For incremental setup, `@specd/core` also exports `createKernelBuilder(config, base?)`. The builder accumulates the same additive registrations as `KernelOptions` and delegates `build()` to `createKernel(...)` with equivalent semantics.
+For incremental setup, `@specd/core/extensions` exports `createKernelBuilder(config, base?)`. The builder accumulates the same additive registrations as `KernelOptions` and delegates `build()` to `createKernel(...)` with equivalent semantics.
 
 ```typescript
-import { createKernelBuilder } from '@specd/core'
+import { createKernelBuilder } from '@specd/core/extensions'
 
 const kernel = await createKernelBuilder(config)
-  .registerGraphStore('custom-sqlite', customSqliteFactory)
-  .useGraphStore('sqlite')
   .registerParser('plaintext-plus', parser)
   .registerExtractorTransform('trim', async (value) => value.trim())
   .registerExternalHookRunner('http-runner', httpRunner)
   .build()
 
-console.log(kernel.registry.graphStores.has('sqlite')) // true
 console.log(kernel.registry.parsers.has('plaintext-plus')) // true
 console.log(kernel.registry.extractorTransforms.has('trim')) // true
 console.log(kernel.registry.externalHookRunners.has('http')) // true
 ```
 
-Extractor transforms use the same additive merge rules as other kernel registries:
+If you need several standalone factories but do not want to build the full kernel, create one shared `CompositionResolver` and derive explicit deps from it. This keeps adapter construction and cache scope aligned across those factories:
+
+```typescript
+import { createCompositionResolver, createGetProjectSummary, createGetStatus } from '@specd/core'
+
+const resolver = createCompositionResolver(config, {
+  extraNodeModulesPaths: ['/custom/node_modules'],
+})
+
+const getStatus = createGetStatus({
+  changes: resolver.getChangeRepository(),
+  schemaProvider: resolver.getSchemaProvider(),
+  approvals: resolver.config.approvals,
+  refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
+  lifecycle: resolver.getLifecycleEngine(),
+})
+
+const getProjectSummary = createGetProjectSummary({
+  listChanges: resolver.getListChanges(),
+  listDrafts: resolver.getListDrafts(),
+  listDiscarded: resolver.getListDiscarded(),
+  listArchived: resolver.getListArchived(),
+  listWorkspaces: resolver.getListWorkspaces(),
+})
+```
+
+Use this pattern when you want:
+
+- shared adapter instances across a few standalone factories
+- additive registrations available to all of them
+- kernel-equivalent resolver semantics without constructing the full grouped kernel
+
+Extractor transforms use the same additive merge rules as other composition registries:
 
 - built-ins such as `resolveSpecPath` are always registered first
 - `createKernel(..., { extractorTransforms })` adds external transforms
@@ -64,7 +90,7 @@ import { Repository, type RepositoryConfig } from '@specd/core'
 interface RepositoryConfig {
   workspace: string // workspace name from specd.yaml (e.g. 'billing', 'default')
   ownership: 'owned' | 'shared' | 'readOnly'
-  isExternal: boolean // true if data lives outside the current git root
+  isExternal: boolean // true if data lives outside the current VCS root
 }
 ```
 
@@ -82,7 +108,7 @@ Ownership levels:
 | -------------- | ----------------------------------- | -------------------------------------------------------------------- |
 | `workspace()`  | `string`                            | The workspace name this repository is bound to.                      |
 | `ownership()`  | `'owned' \| 'shared' \| 'readOnly'` | The ownership level declared in `specd.yaml`.                        |
-| `isExternal()` | `boolean`                           | Whether this repository points to data outside the current git root. |
+| `isExternal()` | `boolean`                           | Whether this repository points to data outside the current VCS root. |
 
 ---
 

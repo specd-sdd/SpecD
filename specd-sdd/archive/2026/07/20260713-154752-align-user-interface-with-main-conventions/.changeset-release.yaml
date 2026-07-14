@@ -1,0 +1,26 @@
+releases:
+  core:composition: patch
+  core:kernel: patch
+  core:config: patch
+  core:config-loader: patch
+  core:get-project-context: patch
+  core:get-spec-context: patch
+  core:validate-specs: patch
+  sdk:composition: patch
+  core:get-change-artifact: patch
+  core:get-read-only-change-artifact: patch
+  core:outline-change-artifact: patch
+  core:read-log: patch
+  core:save-change-artifact: patch
+  core:validate-change-batch: patch
+  cli:entrypoint: patch
+  api:composition-create-api-server: patch
+  api:routes-project-logs: patch
+  studio-desktop:ipc-handler-registry: patch
+  studio-desktop:main-kernel-lifecycle: patch
+  code-graph-electron:composition: patch
+  client:dto-project-status: patch
+  api:dto-project-status: patch
+  api:presenter-project: patch
+  api:handler-project: patch
+  sdk:host-context: patch

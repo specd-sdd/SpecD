@@ -15,7 +15,7 @@
   "implementation": [
     {
       "file": "api:src/composition/create-api-server.ts",
-      "symbols": ["createApiServer", "CreateApiServerOptions", "ApiServer"]
+      "symbols": ["createApiServer"]
     }
   ]
 }

@@ -19,12 +19,6 @@
       ]
     },
     {
-      "requirement": "Decoupled from VcsAdapter",
-      "rules": [
-        "`ActorResolver` MUST NOT extend, import, or depend on `VcsAdapter`. Use cases that need both VCS state and actor identity receive each port independently via dependency injection. The two ports MAY share an underlying provider (e.g. both backed by git), but the interfaces are separate."
-      ]
-    },
-    {
       "requirement": "Interface-only declaration",
       "rules": [
         "`ActorResolver` MUST be declared as a TypeScript `interface`, not an abstract class, consistent with the `VcsAdapter` port design."
@@ -78,21 +72,24 @@
       ]
     },
     {
-      "requirement": "Decoupled from VcsAdapter",
-      "name": "ActorResolver does not import VcsAdapter",
-      "when": ["examining the imports in ActorResolver port declaration"],
-      "then": ["no import of VcsAdapter or VCS-related types appears"]
-    },
-    {
       "requirement": "Interface-only declaration",
       "name": "ActorResolver is an interface",
       "when": ["ActorResolver is declared in the codebase"],
       "then": ["it is declared as a type or interface, not an abstract class"]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:actor-resolver-port",
+        "file": "core:src/infrastructure/vcs-actor-resolver.ts",
+        "symbol": "VcsActorResolver"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:d8bdb1334030c0b239c8241d3c43a98a20393d6874dac64736c58abd58e90a60",
-    "verify.md": "sha256:c5951ffda1caac3e6324eb76cd6ce23baf9b9373295cfc0b651ec606c76a21c6"
+    "spec.md": "sha256:969c25d340ee638249386ecd1a2950c60064d69d9069305479ed910361278186",
+    "verify.md": "sha256:112e727d29a3c13552a1a163caaa5c0b07950d5f6cb95236d992877fd092791e"
   },
   "generatedBy": "core"
 }

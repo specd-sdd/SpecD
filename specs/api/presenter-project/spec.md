@@ -20,6 +20,12 @@ When mapping `buildProjectStatusSnapshot.graphHealth`, the project presenter MUS
 
 Count fields (`symbolCount`, `specCount`, `indexed`) MUST continue to reflect graph statistics when graph health is included.
 
+### Requirement: project status presentation uses the canonical client mapper
+
+The API project-status presenter MUST delegate final DTO construction to the pure mapper exported by `@specd/client`.
+
+API-specific code MAY assemble structural inputs from SDK results and server auth state, but MUST NOT maintain a divergent project-status field mapping.
+
 ## Constraints
 
 - HTTP handlers MUST NOT import `@specd/core` from `@specd/ui` or `@specd/client`.
@@ -32,4 +38,6 @@ Count fields (`symbolCount`, `specCount`, `indexed`) MUST continue to reflect gr
 
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
-- [`api:dto-project`](../dto-project/spec.md) — wire shape
+- [`api:dto-project`](../dto-project/spec.md) — project wire shape
+- [`api:dto-project-status`](../dto-project-status/spec.md) — project-status wire shape
+- [`client:dto-project-status`](../../client/dto-project-status/spec.md) — canonical status DTO and pure mapper shared with IPC

@@ -18,7 +18,19 @@ The use case SHALL merge the provided partial metadata payload into the freshly 
 
 The resulting merged metadata SHALL be validated against `strictSpecMetadataSchema` and persisted via `SaveSpecMetadata`.
 
+### Requirement: Config-based factory delegates through resolveUpdateSpecMetadataDeps
+
+The config-based `createUpdateSpecMetadata(config, options?)` form MUST derive `UpdateSpecMetadataDeps` through `resolveUpdateSpecMetadataDeps(resolver)` and then delegate to canonical `createUpdateSpecMetadata(deps)`.
+
+`resolveUpdateSpecMetadataDeps(resolver)` MUST resolve:
+
+- `generateMetadata: GenerateSpecMetadata`
+- `saveMetadata: SaveSpecMetadata`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Spec Dependencies
 
-- [`core:spec-metadata`](../spec-metadata/spec.md) — defines the metadata schema
-- [`core:save-spec-metadata`](../save-spec-metadata/spec.md) — handles the persistence and conflict detection
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:save-spec-metadata`](../save-spec-metadata/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

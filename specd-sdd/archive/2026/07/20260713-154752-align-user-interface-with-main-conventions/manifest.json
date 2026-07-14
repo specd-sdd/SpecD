@@ -1,0 +1,4545 @@
+{
+  "name": "align-user-interface-with-main-conventions",
+  "createdAt": "2026-07-13T15:47:52.305Z",
+  "updatedAt": "2026-07-14T12:22:10.253Z",
+  "description": "Merged the post-2026-07-03 mainline composition, config-loading, VCS, and host-bootstrap conventions into feat/user-interface while preserving the branch-only API, desktop, client, artifact, validation, and log-readback capabilities. The branch now uses the canonical resolver-backed core composition, SDK host bootstrap for API and desktop, and a single shared project-status mapper in @specd/client so HTTP and IPC expose the same DTO contract.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:composition",
+    "core:kernel",
+    "core:config",
+    "core:config-loader",
+    "core:get-project-context",
+    "core:get-spec-context",
+    "core:validate-specs",
+    "sdk:composition",
+    "core:get-change-artifact",
+    "core:get-read-only-change-artifact",
+    "core:outline-change-artifact",
+    "core:read-log",
+    "core:save-change-artifact",
+    "core:validate-change-batch",
+    "cli:entrypoint",
+    "api:composition-create-api-server",
+    "api:routes-project-logs",
+    "studio-desktop:ipc-handler-registry",
+    "studio-desktop:main-kernel-lifecycle",
+    "code-graph-electron:composition",
+    "client:dto-project-status",
+    "api:dto-project-status",
+    "api:presenter-project",
+    "api:handler-project",
+    "sdk:host-context"
+  ],
+  "specDependsOn": {
+    "core:composition": [
+      "default:_global/architecture",
+      "core:resolve-schema",
+      "core:config-writer-port",
+      "core:kernel-builder",
+      "core:composition-resolver"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:save-spec-metadata",
+      "core:invalidate-spec-metadata",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap"
+    ],
+    "core:config": ["core:vcs-adapter-port", "default:_global/architecture"],
+    "core:config-loader": [
+      "core:config",
+      "core:composition",
+      "core:schema-merge",
+      "core:vcs-adapter-port",
+      "default:_global/architecture"
+    ],
+    "core:get-project-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:core/project-metadata",
+      "core:composition-resolver"
+    ],
+    "core:get-spec-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:list-workspaces",
+      "core:composition-resolver"
+    ],
+    "core:validate-specs": [
+      "core:validate-artifacts",
+      "core:schema-format",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:composition-resolver"
+    ],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context"
+    ],
+    "core:get-change-artifact": ["core:change-repository-port", "core:change"],
+    "core:get-read-only-change-artifact": [
+      "core:change-repository-port",
+      "core:read-only-change-view",
+      "core:get-draft",
+      "core:get-discarded",
+      "core:get-change-artifact"
+    ],
+    "core:outline-change-artifact": [
+      "core:outline-artifact-content",
+      "core:get-change-artifact",
+      "core:change-repository-port"
+    ],
+    "core:read-log": ["core:log-formatter", "core:kernel", "default:_global/architecture"],
+    "core:save-change-artifact": ["core:change-repository-port", "core:change"],
+    "core:validate-change-batch": ["core:validate-artifacts", "core:change"],
+    "cli:entrypoint": ["core:config", "default:_global/error-handling-conventions"],
+    "api:composition-create-api-server": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "api:auth-adapter-registry",
+      "api:middleware-auth",
+      "core:kernel",
+      "sdk:host-context",
+      "sdk:composition"
+    ],
+    "api:routes-project-logs": [
+      "core:read-log",
+      "api:composition-create-api-server",
+      "default:_global/architecture"
+    ],
+    "studio-desktop:ipc-handler-registry": [
+      "client:specd-data-port",
+      "client:ipc-message-envelope",
+      "sdk:host-context",
+      "client:dto-project-status"
+    ],
+    "studio-desktop:main-kernel-lifecycle": ["client:specd-data-port", "sdk:host-context"],
+    "code-graph-electron:composition": [
+      "code-graph:composition",
+      "code-graph:sqlite-graph-store",
+      "default:_global/architecture"
+    ],
+    "client:dto-project-status": ["default:_global/architecture", "api:dto-project-status"],
+    "api:dto-project-status": ["default:_global/architecture", "default:_global/conventions"],
+    "api:presenter-project": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "api:dto-project",
+      "client:dto-project-status",
+      "api:dto-project-status"
+    ],
+    "api:handler-project": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "sdk:composition",
+      "api:routes-project"
+    ],
+    "sdk:host-context": ["sdk:composition", "core:kernel", "core:composition"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "MAIN_FOLLOW_UPS.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260706-decouple-composition-factories-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260706-decouple-composition-factories.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260710-generalize-repository-factories-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260710-generalize-repository-factories.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260713-eliminate-git-hardcoding-specd.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".changeset/20260713-eliminate-git-hardcoding.md",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-implementation/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/config-show/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/host-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-change-spec-coverage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-graph-health/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-spec-coverage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/index-project-graph/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/indexer/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/staleness-detection/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/workspace-integration/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-provider/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-git/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-hg/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-svn/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/approve-signoff/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/approve-spec/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/artifact-ast/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/artifact-parser-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/build-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-manifest/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/compile-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition-resolver/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config-loader/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config-writer-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/content-extraction/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/create-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/discard-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/draft-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/edit-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/external-hook-runner-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/file-reader-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/fs-archive-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/fs-change-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/fs-schema-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/fs-spec-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/generate-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-active-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-archived-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-artifact-instruction/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-discarded/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-draft/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-hook-instructions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-implementation-review/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-summary/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-outline/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-status/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/hook-execution-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/hook-runner-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/implementation-detector-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/invalidate-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/invalidate-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel-builder/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-archived/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-changes/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-discarded/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-drafts/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-workspaces/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/parse-schema-yaml/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/preview-spec/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/refresh-implementation-tracking/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/resolve-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/restore-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/run-step-hooks/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/save-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-merge/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/search-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/skip-artifact/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-lock/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-overlap/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/storage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/template-variables/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/transition-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-implementation-tracking/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-spec-deps/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-artifacts/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/vcs-actor-resolver/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/vcs-adapter-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/vcs-adapter/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/build-project-status-snapshot/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/host-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "core_config_preview.txt",
+      "state": "ignored"
+    },
+    {
+      "file": "core_config_writer_port_preview.txt",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0015-use-case-level-composition.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0018-graduated-composition-levels.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/config-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/approvals-and-workflow-hooks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/multi-repo-coordinator.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/single-repo-local-schema.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/single-repo-minimal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/examples/implementing-a-port.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/get-config.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/services.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/configuration.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/schemas/examples/delta-files.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/composition/create-api-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/composition/create-api-server.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/dto/project-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-project.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/openapi-schemas.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/presenters/presenter-project.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/test/presenter-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/config/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/init.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/load-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/dto/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/client/src/dto/project-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/discover-files.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/errors/registry-conflict-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/actor-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/archive-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/normalize-factory-args.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/null-actor-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/schema-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/approve-signoff.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/approve-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/create-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/detect-overlap.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/discard-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/draft-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/generate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-active-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-archived-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-artifact-instruction.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-change-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-discarded.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-draft.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-hook-instructions.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-implementation-review.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-read-only-change-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-spec-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-spec-outline.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/invalidate-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/invalidate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-archived.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-changes.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-discarded.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-drafts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/list-workspaces.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/outline-change-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/preview-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/refresh-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/resolve-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/restore-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/run-step-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/save-change-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/save-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/search-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/skip-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-project-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-spec-deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-artifacts.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/invalid-composition-factory-arguments-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/storage-directory-not-found-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/unknown-adapter-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/extensions.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/schema-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/exec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/exec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/null/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/exec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs-actor-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/actor-resolver.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/archive-batch-snapshot-port.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/composition-registries.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/composition-resolver.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-builder.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/repository-factories.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/approve-signoff.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/approve-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/compile-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/create-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-implementation-review.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-summary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-changes.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-discarded.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/list-drafts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/preview-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/resolve-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/transition-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/update-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-writer.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/schema-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/schema-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/git/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/hg/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/null/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/svn/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs-actor-resolver.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-project-status-snapshot.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/_global/architecture/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/architecture/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/architecture/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/_global/docs/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-implementation/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-implementation/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/config-show/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/config-show/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/entrypoint/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/host-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-provider/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-git/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-git/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-git/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-hg/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-hg/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-hg/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-svn/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-svn/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver-svn/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/actor-resolver/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-signoff/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-signoff/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-signoff/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-spec/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-spec/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/approve-spec/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/compile-context/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/compile-context/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition-resolver/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition-resolver/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition-resolver/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-loader/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-loader/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-loader/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-writer-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/create-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/create-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/create-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/discard-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/discard-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/discard-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/draft-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/draft-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/draft-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/edit-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/edit-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/edit-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-change-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-change-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-change-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-schema-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-schema-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-schema-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/generate-metadata/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-active-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-active-schema/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-active-schema/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-archived-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-archived-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-archived-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-artifact-instruction/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-artifact-instruction/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-artifact-instruction/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-config/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-config/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-config/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-discarded/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-discarded/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-discarded/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-draft/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-draft/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-draft/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-hook-instructions/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-hook-instructions/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-hook-instructions/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-implementation-review/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-implementation-review/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-implementation-review/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-context/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-context/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-summary/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-summary/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-summary/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-outline/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-outline/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-outline/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-spec-metadata/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/invalidate-spec-metadata/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel-builder/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel-builder/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel-builder/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-archived/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-archived/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-archived/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-changes/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-changes/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-changes/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-discarded/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-discarded/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-discarded/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-drafts/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-drafts/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-drafts/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-specs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-specs/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-specs/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-workspaces/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-workspaces/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-workspaces/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/preview-spec/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/preview-spec/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/preview-spec/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/project-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/project-metadata/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/project-metadata/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/resolve-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/resolve-schema/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/resolve-schema/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/restore-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/restore-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/restore-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/run-step-hooks/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/save-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/save-spec-metadata/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/save-spec-metadata/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/search-specs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/search-specs/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/search-specs/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/skip-artifact/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/skip-artifact/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/skip-artifact/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-overlap/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-overlap/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-overlap/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-change/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-change/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-project-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-project-metadata/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-project-metadata/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-spec-deps/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-spec-deps/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-spec-deps/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-spec-metadata/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-spec-metadata/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-artifacts/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-schema/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-schema/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-specs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-specs/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-specs/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-actor-resolver/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-actor-resolver/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-actor-resolver/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter-port/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter-port/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/vcs-adapter/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-project-status-snapshot/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-project-status-snapshot/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/host-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/host-context/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/sdk/host-context/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/client/test/project-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/read-log.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-change-batch.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/retained-branch-factories.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/test/project.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/build-project-graph-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/serve/serve-api.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/resolve-ui-plugin.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/resolve-ui-serve-cors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/build-project-graph-config.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-electron/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/desktop-host-lifecycle.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createKernel"]
+    },
+    {
+      "specId": "core:get-change-artifact",
+      "file": "packages/core/src/composition/use-cases/get-change-artifact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetChangeArtifact"]
+    },
+    {
+      "specId": "core:get-read-only-change-artifact",
+      "file": "packages/core/src/composition/use-cases/get-read-only-change-artifact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetReadOnlyChangeArtifact"]
+    },
+    {
+      "specId": "core:save-change-artifact",
+      "file": "packages/core/src/composition/use-cases/save-change-artifact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSaveChangeArtifact"]
+    },
+    {
+      "specId": "core:outline-change-artifact",
+      "file": "packages/core/src/composition/use-cases/outline-change-artifact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createOutlineChangeArtifact"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/composition/use-cases/get-project-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetProjectContext"]
+    },
+    {
+      "specId": "core:get-spec-context",
+      "file": "packages/core/src/composition/use-cases/get-spec-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetSpecContext"]
+    },
+    {
+      "specId": "core:validate-specs",
+      "file": "packages/core/src/composition/use-cases/validate-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createValidateSpecs"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/core-reexports.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:entrypoint",
+      "file": "packages/cli/src/load-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["loadConfig"]
+    },
+    {
+      "specId": "client:dto-project-status",
+      "file": "packages/client/src/dto/project-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["mapProjectStatusDto"]
+    },
+    {
+      "specId": "api:composition-create-api-server",
+      "file": "packages/api/src/composition/create-api-server.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createApiServer"]
+    },
+    {
+      "specId": "api:routes-project-logs",
+      "file": "packages/api/src/composition/create-api-server.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createApiServer"]
+    },
+    {
+      "specId": "api:dto-project-status",
+      "file": "packages/api/src/delivery/http/dto/project-status.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "api:presenter-project",
+      "file": "packages/api/src/delivery/http/presenters/presenter-project.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["toProjectStatusDtoFromSnapshot"]
+    },
+    {
+      "specId": "api:handler-project",
+      "file": "packages/api/src/delivery/http/handlers/handler-project.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectRoutes"]
+    },
+    {
+      "specId": "studio-desktop:ipc-handler-registry",
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["dispatchIpc"]
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["onSessionChangeMain"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/specd-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdConfig", "SpecdWorkspaceConfig"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigLoader"]
+    },
+    {
+      "specId": "core:read-log",
+      "file": "packages/core/src/composition/use-cases/read-log.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createReadLog"]
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/src/composition/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createDefaultConfigLoader"]
+    },
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:validate-change-batch",
+      "file": "packages/core/src/composition/use-cases/validate-change-batch.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createValidateChangeBatch", "resolveValidateChangeBatchDeps"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config-loader",
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/test/composition/use-cases/retained-branch-factories.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSdkContext"]
+    },
+    {
+      "specId": "code-graph-electron:composition",
+      "file": "packages/code-graph-electron/package.json",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:6fee883b6699247074ba1341868906a4d31135b86be8b7492baf7c91c7663a6d"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:get-change-artifact",
+          "filename": "deltas/core/get-change-artifact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:get-read-only-change-artifact",
+          "filename": "deltas/core/get-read-only-change-artifact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:outline-change-artifact",
+          "filename": "deltas/core/outline-change-artifact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:read-log",
+          "filename": "deltas/core/read-log/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:save-change-artifact",
+          "filename": "deltas/core/save-change-artifact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "core:validate-change-batch",
+          "filename": "deltas/core/validate-change-batch/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "api:composition-create-api-server",
+          "filename": "deltas/api/composition-create-api-server/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "api:routes-project-logs",
+          "filename": "deltas/api/routes-project-logs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "studio-desktop:ipc-handler-registry",
+          "filename": "deltas/studio-desktop/ipc-handler-registry/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f09d95c1860b5dde70eed0c61daf2c956b9b218eac3a0fe1605905c7405a8922"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:49d255832af6c9a504ebcfdc2b25c1f63f68bc84539eb3987493851233370cf8"
+        },
+        {
+          "key": "code-graph-electron:composition",
+          "filename": "deltas/code-graph-electron/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "client:dto-project-status",
+          "filename": "deltas/client/dto-project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:683c7691b84029f8b69700bdae29d6af0ec4352d28734c30a469e2ab720c2ba5"
+        },
+        {
+          "key": "api:dto-project-status",
+          "filename": "deltas/api/dto-project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "api:presenter-project",
+          "filename": "deltas/api/presenter-project/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7e4cd5ac0fa71acad3f44cddc7bcc60f60b1c88f8e45e99a57cfceadd1a25b5c"
+        },
+        {
+          "key": "api:handler-project",
+          "filename": "deltas/api/handler-project/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b08d1bd75d7dcc2108fcd7b650bec26094bc2c55dd1af658fdd59b7ec4db8a2b"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:59259fa5cdfb99aaf8c667f51900b7ab8c2072b57673699d42557d4fe43ab190"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:config-loader",
+          "filename": "deltas/core/config-loader/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:get-change-artifact",
+          "filename": "deltas/core/get-change-artifact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:get-read-only-change-artifact",
+          "filename": "deltas/core/get-read-only-change-artifact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:outline-change-artifact",
+          "filename": "deltas/core/outline-change-artifact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:read-log",
+          "filename": "deltas/core/read-log/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:save-change-artifact",
+          "filename": "deltas/core/save-change-artifact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "core:validate-change-batch",
+          "filename": "deltas/core/validate-change-batch/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "cli:entrypoint",
+          "filename": "deltas/cli/entrypoint/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "api:composition-create-api-server",
+          "filename": "deltas/api/composition-create-api-server/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "api:routes-project-logs",
+          "filename": "deltas/api/routes-project-logs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "studio-desktop:ipc-handler-registry",
+          "filename": "deltas/studio-desktop/ipc-handler-registry/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:746247d9855a380c033510a074a2579d2faf137e5eb9fba431250a2490b67ebe"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bbe8bee6cbd808e9d941b91e35ed586a345e24e7f1316a84c2dfb9c0ac2deb0b"
+        },
+        {
+          "key": "code-graph-electron:composition",
+          "filename": "deltas/code-graph-electron/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "client:dto-project-status",
+          "filename": "deltas/client/dto-project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:70b088f9c8bba11f929bb4da82c7c896bb0e9d636eaf4c9e72abc5c58ee1dd5a"
+        },
+        {
+          "key": "api:dto-project-status",
+          "filename": "deltas/api/dto-project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "api:presenter-project",
+          "filename": "deltas/api/presenter-project/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d942b0a16a1ca2467c585315aacbda1ed26f91ef24af5be12f2e9b12ab17595c"
+        },
+        {
+          "key": "api:handler-project",
+          "filename": "deltas/api/handler-project/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c53f735972c9d185c076816c24f376cbf5b805c741523ec611bb66244a8b3e03"
+        },
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e5e2bf6bba19b0d4ce9ae4b8c9289e42dcae5db72c1a5f85f5e33b2fb0fc7053"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:6756a56e4cde0229926a97b10a7ba3240b8b192068fa9e97a167246cfe89a15c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:55aded69163d3c889fd9f29d5d1100bead9f57e7e40aa2b7b19cc90063adff92"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-13T15:47:52.305Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "default:_global/architecture",
+        "default:_global/conventions",
+        "core:composition",
+        "core:kernel",
+        "core:config",
+        "core:config-loader",
+        "core:compile-context",
+        "core:get-project-context",
+        "core:get-spec-context",
+        "core:get-status",
+        "core:validate-specs",
+        "sdk:composition",
+        "sdk:host-context"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-13T15:47:52.327Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "specs",
+          "key": "core:composition"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "specs",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "specs",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-loader"
+        },
+        {
+          "type": "verify",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T15:51:26.844Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T16:16:02.329Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "default:_global/architecture",
+            "default:_global/conventions",
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:compile-context",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:get-status",
+            "core:validate-specs",
+            "sdk:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/architecture",
+            "default:_global/conventions",
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:compile-context",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:get-status",
+            "core:validate-specs",
+            "sdk:composition",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-13T16:16:02.368Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-change-artifact"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-read-only-change-artifact"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "specs",
+          "key": "core:outline-change-artifact"
+        },
+        {
+          "type": "specs",
+          "key": "core:read-log"
+        },
+        {
+          "type": "specs",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "specs",
+          "key": "core:save-change-artifact"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-change-batch"
+        },
+        {
+          "type": "specs",
+          "key": "core:vcs-implementation-detector"
+        },
+        {
+          "type": "specs",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-create-api-server"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "api:routes-project-logs"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:ipc-handler-registry"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph-electron:composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-change-artifact"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-read-only-change-artifact"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:outline-change-artifact"
+        },
+        {
+          "type": "verify",
+          "key": "core:read-log"
+        },
+        {
+          "type": "verify",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "verify",
+          "key": "core:save-change-artifact"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-change-batch"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-implementation-detector"
+        },
+        {
+          "type": "verify",
+          "key": "cli:entrypoint"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-create-api-server"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "api:routes-project-logs"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:ipc-handler-registry"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph-electron:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T16:26:06.205Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "default:_global/architecture",
+            "default:_global/conventions",
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:compile-context",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:get-status",
+            "core:validate-specs",
+            "sdk:composition",
+            "sdk:host-context",
+            "core:actor-resolver",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:kernel-builder",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:refresh-implementation-tracking",
+            "core:save-change-artifact",
+            "core:transition-change",
+            "core:validate-change-batch",
+            "core:vcs-implementation-detector",
+            "cli:entrypoint",
+            "cli:graph-cli-context",
+            "cli:host-context",
+            "code-graph:composition",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider",
+            "api:composition-create-api-context",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/architecture",
+            "default:_global/conventions",
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:compile-context",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:get-status",
+            "core:validate-specs",
+            "sdk:composition",
+            "sdk:host-context",
+            "core:actor-resolver",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:kernel-builder",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:refresh-implementation-tracking",
+            "core:save-change-artifact",
+            "core:transition-change",
+            "core:validate-change-batch",
+            "core:vcs-implementation-detector",
+            "cli:entrypoint",
+            "cli:graph-cli-context",
+            "cli:host-context",
+            "code-graph:composition",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider",
+            "api:composition-create-api-context",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-13T16:26:06.220Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "client:dto-project-status"
+        },
+        {
+          "type": "specs",
+          "key": "client:port-project"
+        },
+        {
+          "type": "specs",
+          "key": "api:dto-project-status"
+        },
+        {
+          "type": "specs",
+          "key": "api:presenter-project"
+        },
+        {
+          "type": "specs",
+          "key": "api:handler-project"
+        },
+        {
+          "type": "specs",
+          "key": "api:routes-project"
+        },
+        {
+          "type": "verify",
+          "key": "client:dto-project-status"
+        },
+        {
+          "type": "verify",
+          "key": "client:port-project"
+        },
+        {
+          "type": "verify",
+          "key": "api:dto-project-status"
+        },
+        {
+          "type": "verify",
+          "key": "api:presenter-project"
+        },
+        {
+          "type": "verify",
+          "key": "api:handler-project"
+        },
+        {
+          "type": "verify",
+          "key": "api:routes-project"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T16:36:19.430Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [api:presenter-project, studio-desktop:ipc-handler-registry]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["api:presenter-project", "studio-desktop:ipc-handler-registry"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/architecture",
+            "default:_global/conventions",
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:compile-context",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:get-status",
+            "core:validate-specs",
+            "sdk:composition",
+            "sdk:host-context",
+            "core:actor-resolver",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:kernel-builder",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:refresh-implementation-tracking",
+            "core:save-change-artifact",
+            "core:transition-change",
+            "core:validate-change-batch",
+            "core:vcs-implementation-detector",
+            "cli:entrypoint",
+            "cli:graph-cli-context",
+            "cli:host-context",
+            "code-graph:composition",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider",
+            "api:composition-create-api-context",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "client:port-project",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project",
+            "api:routes-project"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T16:46:52.661Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T16:58:43.792Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [sdk:host-context, studio-desktop:main-kernel-lifecycle]; verify [sdk:host-context, studio-desktop:main-kernel-lifecycle]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["sdk:host-context", "studio-desktop:main-kernel-lifecycle"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:host-context", "studio-desktop:main-kernel-lifecycle"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T17:02:10.231Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "default:_global/architecture",
+            "default:_global/conventions",
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:compile-context",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:get-status",
+            "core:validate-specs",
+            "sdk:composition",
+            "sdk:host-context",
+            "core:actor-resolver",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:kernel-builder",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:refresh-implementation-tracking",
+            "core:save-change-artifact",
+            "core:transition-change",
+            "core:validate-change-batch",
+            "core:vcs-implementation-detector",
+            "cli:entrypoint",
+            "cli:graph-cli-context",
+            "cli:host-context",
+            "code-graph:composition",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider",
+            "api:composition-create-api-context",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "client:port-project",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project",
+            "api:routes-project"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "default:_global/architecture",
+            "default:_global/conventions",
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:compile-context",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:get-status",
+            "core:validate-specs",
+            "sdk:composition",
+            "sdk:host-context",
+            "core:actor-resolver",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:kernel-builder",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:refresh-implementation-tracking",
+            "core:save-change-artifact",
+            "core:transition-change",
+            "core:validate-change-batch",
+            "core:vcs-implementation-detector",
+            "cli:entrypoint",
+            "cli:graph-cli-context",
+            "cli:host-context",
+            "code-graph:composition",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider",
+            "api:composition-create-api-context",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "client:port-project",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project",
+            "api:routes-project"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-13T17:02:10.253Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "specs",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "specs",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "specs",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "specs",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "specs",
+          "key": "core:vcs-implementation-detector"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "client:port-project"
+        },
+        {
+          "type": "specs",
+          "key": "api:routes-project"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/architecture"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "verify",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:actor-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:refresh-implementation-tracking"
+        },
+        {
+          "type": "verify",
+          "key": "core:transition-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-implementation-detector"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "client:port-project"
+        },
+        {
+          "type": "verify",
+          "key": "api:routes-project"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T19:38:11.419Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [studio-desktop:main-kernel-lifecycle]; verify [studio-desktop:main-kernel-lifecycle]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["studio-desktop:main-kernel-lifecycle"]
+        },
+        {
+          "type": "verify",
+          "files": ["studio-desktop:main-kernel-lifecycle"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T19:59:31.775Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T20:12:07.572Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-13T21:43:58.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T06:18:24.629Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:validate-specs",
+            "sdk:composition",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:save-change-artifact",
+            "core:validate-change-batch",
+            "cli:entrypoint",
+            "api:composition-create-api-server",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:validate-specs",
+            "sdk:composition",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:save-change-artifact",
+            "core:validate-change-batch",
+            "cli:entrypoint",
+            "api:composition-create-api-server",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T06:18:24.629Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T06:26:41.010Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:validate-specs",
+            "sdk:composition",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:save-change-artifact",
+            "core:validate-change-batch",
+            "cli:entrypoint",
+            "api:composition-create-api-server",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:validate-specs",
+            "sdk:composition",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:save-change-artifact",
+            "core:validate-change-batch",
+            "cli:entrypoint",
+            "api:composition-create-api-server",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-14T06:26:41.013Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T06:55:08.568Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T06:58:06.933Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T07:48:54.718Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T08:10:51.357Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:validate-specs",
+            "sdk:composition",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:save-change-artifact",
+            "core:validate-change-batch",
+            "cli:entrypoint",
+            "api:composition-create-api-server",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "core:kernel",
+            "core:config",
+            "core:config-loader",
+            "core:get-project-context",
+            "core:get-spec-context",
+            "core:validate-specs",
+            "sdk:composition",
+            "core:get-change-artifact",
+            "core:get-read-only-change-artifact",
+            "core:outline-change-artifact",
+            "core:read-log",
+            "core:save-change-artifact",
+            "core:validate-change-batch",
+            "cli:entrypoint",
+            "api:composition-create-api-server",
+            "api:routes-project-logs",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "code-graph-electron:composition",
+            "client:dto-project-status",
+            "api:dto-project-status",
+            "api:presenter-project",
+            "api:handler-project",
+            "sdk:host-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T08:10:51.357Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T08:25:07.133Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T08:29:18.445Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T08:42:46.130Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T12:07:14.075Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T12:07:45.990Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-14T12:18:11.133Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Merged the post-2026-07-03 mainline composition, config-loading, VCS, and host-bootstrap conventions into feat/user-interface while preserving the branch-only API, desktop, client, artifact, validation, and log-readback capabilities. The branch now uses the canonical resolver-backed core composition, SDK host bootstrap for API and desktop, and a single shared project-status mapper in @specd/client so HTTP and IPC expose the same DTO contract."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:20:13.735Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"sdk:host-context\" points outside workspace \"sdk\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:20:33.036Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"sdk:host-context\" points outside workspace \"sdk\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:20:54.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:composition': extracted dependencies [default:_global/architecture, core:resolve-schema, core:config-writer-port, core:kernel-builder, core:composition-resolver] do not match persisted dependencies [default:_global/architecture, core:resolve-schema, core:config-writer-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:21:11.510Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:config': extracted dependencies [core:vcs-adapter-port, default:_global/architecture] do not match persisted dependencies [core:schema-format, core:schema-merge, default:_global/architecture, core:storage, core:spec-metadata, core:workspace, default:_global/logging]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:21:28.534Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:config-loader': extracted dependencies [core:config, core:composition, core:schema-merge, core:vcs-adapter-port, default:_global/architecture] do not match persisted dependencies [core:config, core:composition, core:schema-merge, default:_global/architecture]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:21:46.448Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:config-loader': extracted dependencies [core:config, core:composition, core:schema-merge, core:vcs-adapter-port, default:_global/architecture] do not match persisted dependencies [core:config, core:composition, core:schema-merge, default:_global/architecture]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:21:53.849Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:get-project-context': extracted dependencies [core:config, core:compile-context, core:spec-metadata, core:schema-format, default:_global/architecture, core:core/project-metadata, core:composition-resolver] do not match persisted dependencies [core:config, core:compile-context, core:spec-metadata, core:schema-format, default:_global/architecture, core:project-metadata]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:21:58.225Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:get-spec-context': extracted dependencies [core:config, core:compile-context, core:spec-metadata, core:storage, core:workspace, core:spec-id-format, core:list-workspaces, core:composition-resolver] do not match persisted dependencies [core:config, core:compile-context, core:spec-metadata, core:storage, core:workspace, core:spec-id-format, core:list-workspaces]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-14T12:22:04.882Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:validate-specs': extracted dependencies [core:validate-artifacts, core:schema-format, core:storage, core:workspace, core:spec-id-format, core:composition-resolver] do not match persisted dependencies [core:validate-artifacts, core:schema-format, core:storage, core:workspace, core:spec-id-format]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T12:22:10.253Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-14T12:22:11.626Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

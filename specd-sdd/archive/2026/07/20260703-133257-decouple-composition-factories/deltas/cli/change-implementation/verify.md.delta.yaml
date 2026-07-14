@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Spec changes only adjust explicit dependencies; existing CLI verification headings remain valid'

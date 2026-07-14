@@ -1,7 +1,7 @@
 {
   "title": "Main Kernel Lifecycle",
   "description": "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project.",
-  "dependsOn": ["sdk:host-context", "client:specd-data-port"],
+  "dependsOn": ["client:specd-data-port", "sdk:host-context"],
   "context": [
     "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project."
   ],
@@ -21,7 +21,7 @@
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
       "rules": [
-        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-electron` for desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated\n  vendored Electron SQLite addon\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nDesktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted\nnative addon are present in git. The first successful desktop start on a fresh clone\nMAY require a local native rebuild when the generated addon is missing or stale for\nthe current Electron version, platform, or architecture.\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from `@specd/code-graph`."
+        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-electron` for desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated\n  vendored Electron SQLite addon\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nDesktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted\nnative addon are present in git. The first successful desktop start on a fresh clone\nMAY require a local native rebuild when the generated addon is missing or stale for\nthe current Electron version, platform, or architecture.\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from the standard non-Electron graph\nruntime exposed through `@specd/sdk` and backed by `@specd/code-graph`."
       ]
     },
     {
@@ -101,11 +101,11 @@
     },
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
-      "name": "CLI and API keep the standard graph package",
-      "when": ["CLI and API package dependencies are inspected"],
+      "name": "CLI and API keep the standard SDK-backed graph runtime",
+      "when": ["CLI and API package dependencies and bootstrap code are inspected"],
       "then": [
-        "they depend on @specd/code-graph",
-        "AND they do not depend on @specd/code-graph-electron"
+        "they do not depend on @specd/code-graph-electron",
+        "AND they access the standard graph runtime through @specd/sdk"
       ]
     },
     {
@@ -137,28 +137,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:src/main/index.ts"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:package.json"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:tsup.main.config.ts"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:test/desktop-graph-runtime.spec.ts"
+        "file": "studio-desktop:src/main/ipc-handlers.ts",
+        "symbol": "onSessionChangeMain"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8dc2df570ca9cc5081b84a634de5fdffb43cbec354726f2b6bce181027f0328b",
-    "verify.md": "sha256:7fc194bb697d43873241d7db307ca696ddfc8c8debc4607d45d73db3ca168a78"
+    "spec.md": "sha256:c65c59dd414c8f44bc2896392e4d44fb899d464216c8a0f67edf6ddac7916988",
+    "verify.md": "sha256:52ed189f51e4e522d1cf83ddd636e3c1a37af7e7b0b122add82eb023e2dc163f"
   },
   "generatedBy": "core"
 }

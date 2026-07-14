@@ -7,6 +7,20 @@
     "core:config",
     "core:composition",
     "core:schema-merge",
+    "core:vcs-adapter-port",
     "default:_global/architecture"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/fs/config-loader.ts",
+      "symbols": ["FsConfigLoader"]
+    },
+    {
+      "file": "core:src/composition/config-loader.ts",
+      "symbols": ["createDefaultConfigLoader"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
+    }
   ]
 }

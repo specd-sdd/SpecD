@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:kernel",
+    "core:composition",
+    "default:_global/architecture",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel-builder.ts",
+      "symbols": ["KernelBuilder", "createKernelBuilder"]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "title": "Spec Overlap",
   "description": "When multiple active changes target the same spec, conflicts are only discovered late — at archive time, when delta application fails or drift is detected. There is no proactive mechanism to warn users that overlapping work may collide. The spec overlap feature provides early awareness by scanning active change manifests and reporting which specs are targeted by more than one change.",
-  "dependsOn": ["core:change", "core:list-changes", "core:kernel"],
+  "dependsOn": ["core:change", "core:list-changes", "core:kernel", "core:composition-resolver"],
   "context": [
     "When multiple active changes target the same spec, conflicts are only discovered late — at archive time, when delta application fails or drift is detected. There is no proactive mechanism to warn users that overlapping work may collide. The spec overlap feature provides early awareness by scanning active change manifests and reporting which specs are targeted by more than one change."
   ],
@@ -46,6 +46,12 @@
       "requirement": "Constructor accepts a ChangeRepository",
       "rules": [
         "`DetectOverlap` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list()` to retrieve changes."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveDetectOverlapDeps",
+      "rules": [
+        "The config-based `createDetectOverlap(config, options?)` form MUST derive `DetectOverlapDeps` through `resolveDetectOverlapDeps(resolver)` and then delegate to canonical `createDetectOverlap(deps)`.\n\n`resolveDetectOverlapDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -164,11 +170,30 @@
         "the instance is created successfully",
         "AND execute() delegates to changeRepository.list()"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveDetectOverlapDeps",
+      "name": "createDetectOverlap config form derives DetectOverlapDeps through resolveDetectOverlapDeps",
+      "when": ["createDetectOverlap(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives DetectOverlapDeps through resolveDetectOverlapDeps(resolver)",
+        "AND resolveDetectOverlapDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createDetectOverlap(deps)"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:spec-overlap",
+        "file": "core:src/composition/use-cases/detect-overlap.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:aeedad1f9963f7516c1c6bd89424e41f56096bd4e2759d583887e95c440cc53b",
-    "verify.md": "sha256:9fe98c1019d8487fe5cbed4422e9a51d93f1a662db5242505318a1e51ec40318"
+    "spec.md": "sha256:6d3c61eda5b205c5511fd18c5acd9ba03cee9abd0a7c1478693955a36963a47a",
+    "verify.md": "sha256:8e4844e4f55df6b35eb9474e34161b172e71ebfca9684a0275cdcb7385cb9877"
   },
   "generatedBy": "core"
 }

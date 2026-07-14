@@ -1,0 +1,13 @@
+releases:
+  core:composition: patch
+  sdk:composition: patch
+  core:composition-resolver: patch
+  core:kernel-builder: patch
+  core:kernel: patch
+  core:config: patch
+  core:config-writer-port: patch
+  cli:config-show: patch
+  core:fs-change-repository: patch
+  core:fs-spec-repository: patch
+  core:fs-archive-repository: patch
+  core:fs-schema-repository: patch

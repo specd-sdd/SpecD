@@ -12,27 +12,32 @@ schema: '@specd/schema-std'
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
 ```
 
 ## What this configuration does

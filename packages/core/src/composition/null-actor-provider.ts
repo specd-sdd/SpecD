@@ -1,5 +1,5 @@
 import { type ActorResolver } from '../application/ports/actor-resolver.js'
-import { type AutoDetectActorProvider } from './kernel-registries.js'
+import { type AutoDetectActorProvider } from './actor-provider.js'
 import { NullActorResolver } from '../infrastructure/null/actor-resolver.js'
 
 /**

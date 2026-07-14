@@ -1,0 +1,38 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Multi-workspace file discovery'
+  content: |
+    The indexer SHALL discover files from two sources:
+
+    **1. Workspace Discovery**
+    For each `ProjectWorkspace` provided in options:
+
+    - Resolve one effective exclusion set composed of global `graph.excludePaths`, repository-derived spec-root exclusions, and the workspace's `excludePaths`
+    - Call `discoverFiles` on `codeRoot`, filtered by the workspace's `allowedPaths` (if configured)
+    - Prefix each path with `{workspaceName}:`
+    - Diff against the store filtered by workspace prefix
+
+    **2. Project-Global Discovery**
+
+    - Call `discoverFiles` on the project root using patterns from `graphConfig.includePaths`
+    - Prefix each path with `root:` to form the globally unique identity
+    - Resources discovered here are treated as project-global documents or scripts only when they are outside every configured workspace `codeRoot`
+
+    Files matching a language adapter become `FileNode`. Files without an adapter but with textual content become `DocumentNode` under the same identity format.
+
+    When a workspace repository exposes a filesystem-backed `specsPath`, the indexer SHALL derive a synthetic exclusion for that root and apply it to file/document discovery. Spec artifacts MUST be indexed through spec indexing only, not as files or documents.
+
+    Textual fallback SHALL decode document content using this policy:
+
+    - Detect and accept BOM-marked `utf-8`, `utf-16le`, and `utf-16be`
+    - Otherwise try `utf-8`
+    - Otherwise accept `utf-16le` or `utf-16be` when the byte pattern matches UTF-16 null-byte layout
+    - Otherwise accept `windows-1252` only when the file does not contain NUL bytes
+    - Otherwise skip the file as non-textual
+
+    `discoverFiles` accepts a root directory plus exclusion options:
+
+    - **`respectGitignore`** (default `true`): when `true`, `.gitignore` files are loaded hierarchically and applied with absolute priority.
+    - **`excludePaths`** (default: built-in list): gitignore-syntax patterns applied as an additional exclusion layer. Built-in default excludes MUST include `.git/`, `.hg/`, and `.svn/`.
+    - **`vcsRoot`** (`string | null`): the root directory of the VCS repository, resolved upstream from `VcsAdapter.rootDir()` and used to bound hierarchical `.gitignore` searches. Callers MUST pass `null` explicitly when no repository root exists. `discoverFiles` MUST NOT probe for repository markers on its own.

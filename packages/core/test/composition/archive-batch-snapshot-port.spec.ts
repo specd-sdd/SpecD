@@ -37,14 +37,18 @@ describe('resolveArchiveBatchSnapshotPort', () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-compose-snapshot-'))
     tmpDirs.push(tmpDir)
     const specsPath = path.join(tmpDir, 'specs')
-    await fs.mkdir(specsPath, { recursive: true })
+    const metadataPath = path.join(tmpDir, '.specd', 'metadata')
+    await Promise.all([
+      fs.mkdir(specsPath, { recursive: true }),
+      fs.mkdir(metadataPath, { recursive: true }),
+    ])
     const repo = new FsSpecRepository({
       workspace: 'default',
       ownership: 'owned',
       isExternal: false,
       configPath: '/test',
       specsPath,
-      metadataPath: path.join(tmpDir, '.specd', 'metadata'),
+      metadataPath,
     })
 
     const port = resolveArchiveBatchSnapshotPort(makeListWorkspaces(new Map([['default', repo]])))

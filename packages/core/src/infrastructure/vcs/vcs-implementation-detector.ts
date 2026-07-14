@@ -65,7 +65,7 @@ export class VcsImplementationDetector implements ImplementationDetector {
     }
 
     const repoFiles = await vcs.modifiedFiles(baseRef)
-    const projectFiles = await this._normalizeToProjectRelativePaths(vcs, repoFiles)
+    const projectFiles = this._normalizeToProjectRelativePaths(vcs, repoFiles)
 
     const excludePaths = options?.excludePaths
     const filtered =
@@ -110,13 +110,13 @@ export class VcsImplementationDetector implements ImplementationDetector {
    * @param repoFiles - Repository-relative file paths from the VCS adapter
    * @returns Raw project-relative file paths
    */
-  private async _normalizeToProjectRelativePaths(
+  private _normalizeToProjectRelativePaths(
     vcs: VcsAdapter,
     repoFiles: readonly string[],
-  ): Promise<readonly string[]> {
+  ): readonly string[] {
     let repoRoot: string
     try {
-      repoRoot = await vcs.rootDir()
+      repoRoot = vcs.rootDir()
     } catch {
       return []
     }

@@ -176,3 +176,19 @@
 - **AND** `metadata.json.dependsOn` matches the persisted dependency state
 - **WHEN** `ValidateSpecs` validates that spec
 - **THEN** no dependency-projection failure is recorded for that check
+
+### Requirement: Config-based factory delegates through resolveValidateSpecsDeps
+
+#### Scenario: createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps
+
+- **WHEN** `createValidateSpecs(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)`
+- **AND** `resolveValidateSpecsDeps(resolver)` resolves:
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `hasher?: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- **AND** the factory delegates to canonical `createValidateSpecs(deps)`

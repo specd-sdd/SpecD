@@ -16,13 +16,20 @@ describe('Project API', () => {
       discarded: number
       archived: number
       specsByWorkspace: Record<string, number>
-      graph: { fileCount: number | null }
+      approvals?: { specEnabled: boolean; signoffEnabled: boolean }
+      auth: { type: string }
+      graph?: { fileCount?: number | null; warnings?: Array<{ type: string }> }
     }>('/project/status')
     expect(res.ok).toBe(true)
     expect(data.activeChanges).toBeGreaterThanOrEqual(0)
     expect(data.drafts).toBeGreaterThanOrEqual(0)
+    expect(data.discarded).toBeGreaterThanOrEqual(0)
+    expect(data.archived).toBeGreaterThanOrEqual(0)
     expect(Object.keys(data.specsByWorkspace).length).toBeGreaterThan(0)
+    expect(data.auth.type).toBe('disabled')
+    expect(data.approvals).toEqual({ specEnabled: false, signoffEnabled: false })
     expect(data.graph).toBeDefined()
+    expect(Array.isArray(data.graph?.warnings ?? [])).toBe(true)
   })
 
   it('given api server, when GET /project/context, then returns compiled content', async () => {

@@ -63,6 +63,16 @@ interface IdentityCandidatePredicateSql {
   readonly params: string[]
 }
 
+function shouldResetDatabaseFromProbeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+
+  if (message.includes('database is locked') || message.includes('busy')) {
+    return false
+  }
+
+  return true
+}
+
 /**
  * SQLite-backed GraphStore implementation.
  */
@@ -1035,7 +1045,10 @@ export class SQLiteGraphStore extends GraphStore {
       } finally {
         if (db.open) db.close()
       }
-    } catch {
+    } catch (error) {
+      if (!shouldResetDatabaseFromProbeError(error)) {
+        throw error
+      }
       rmSync(this.dbPath, { force: true })
     }
   }

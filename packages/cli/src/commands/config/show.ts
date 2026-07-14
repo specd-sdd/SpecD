@@ -11,19 +11,26 @@ import { type SpecdConfig } from '@specd/sdk'
  * @returns Lines of text output
  */
 function renderText(config: SpecdConfig): string[] {
+  const formatAdapter = (binding: { adapter: string; config: Record<string, unknown> }) => {
+    return `[type: ${binding.adapter}]  config: ${JSON.stringify(binding.config)}`
+  }
+
   const lines = [
     `projectRoot:  ${config.projectRoot}`,
+    `specdPath:    ${config.specdPath ?? ''}`,
     `schemaRef:    ${config.schemaRef}`,
     `approvals:    spec=${String(config.approvals.spec)}  signoff=${String(config.approvals.signoff)}`,
     '',
     `workspaces:`,
-    ...config.workspaces.map((ws) => `  ${ws.name}  ${ws.ownership}  ${ws.specsPath}`),
+    ...config.workspaces.map(
+      (ws) => `  ${ws.name}  ${ws.ownership}  ${formatAdapter(ws.specsAdapter)}`,
+    ),
     '',
     `storage:`,
-    `  changes:   ${config.storage.changesPath}`,
-    `  drafts:    ${config.storage.draftsPath}`,
-    `  discarded: ${config.storage.discardedPath}`,
-    `  archive:   ${config.storage.archivePath}`,
+    `  changes:   ${formatAdapter(config.storage.changesAdapter)}`,
+    `  drafts:    ${formatAdapter(config.storage.draftsAdapter)}`,
+    `  discarded: ${formatAdapter(config.storage.discardedAdapter)}`,
+    `  archive:   ${formatAdapter(config.storage.archiveAdapter)}`,
   ]
 
   if (config.storage.archivePattern !== undefined) {

@@ -3,18 +3,19 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "core:resolve-schema", "core:config-writer-port"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:resolve-schema",
+    "core:config-writer-port",
+    "core:kernel-builder",
+    "core:composition-resolver"
+  ],
   "implementation": [
     {
-      "file": "core:src/public.ts",
-      "symbols": ["createKernel", "createGetStatus", "createSpecRepository"]
+      "file": "core:src/composition/index.ts"
     },
     {
-      "file": "core:src/ports.ts"
-    },
-    {
-      "file": "core:src/extensions.ts",
-      "symbols": ["createKernelBuilder"]
+      "file": "core:src/public.ts"
     }
   ]
 }

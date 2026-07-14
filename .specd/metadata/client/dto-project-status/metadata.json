@@ -21,7 +21,7 @@
     {
       "requirement": "types are shared or generated from API schemas",
       "rules": [
-        "DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI."
+        "`@specd/client` SHALL own the canonical `ProjectStatusDto` type and SHALL export a pure mapper from structural project-status input to that DTO.\n\nThe mapper input MUST describe only serializable status, graph-health, approval, and auth data. It MUST NOT import or accept `@specd/core` or `@specd/sdk` entities as part of its public contract.\n\nAPI HTTP presentation and desktop IPC presentation MUST use this mapper so both adapters preserve the same fields and optional-property semantics."
       ]
     }
   ],
@@ -61,22 +61,31 @@
     },
     {
       "requirement": "types are shared or generated from API schemas",
-      "name": "Types imported from shared package",
-      "when": ["client and api packages build"],
-      "then": ["DTO definitions have single source", "AND no duplicated interface copies"]
+      "name": "Structural input maps all canonical status fields",
+      "given": ["structural input containing counts, graph diagnostics, approvals, and auth"],
+      "when": ["the client mapper is called"],
+      "then": [
+        "it returns the canonical ProjectStatusDto without renaming or dropping fields",
+        "AND optional fields are omitted only when their source values are absent"
+      ]
     },
     {
       "requirement": "types are shared or generated from API schemas",
-      "name": "OpenAPI generation feeds both sides",
-      "given": ["OpenAPI schema generated from Zod"],
-      "when": ["client types generated or re-exported"],
-      "then": ["schemas align with api:dto-* spec", "AND Studio release notes document changes"]
+      "name": "Client mapper has no core or SDK dependency",
+      "when": ["the client package dependency graph and public mapper signature are inspected"],
+      "then": [
+        "neither imports @specd/core nor @specd/sdk",
+        "AND the mapper accepts serializable structural data rather than domain entities"
+      ]
     },
     {
       "requirement": "types are shared or generated from API schemas",
-      "name": "Manual duplicate DTO is rejected in review",
-      "when": ["contributor adds parallel interface in client"],
-      "then": ["lint or architectural test fails", "AND must use shared/generated types"]
+      "name": "HTTP and IPC use one mapper implementation",
+      "when": ["API and desktop project-status presenters are inspected"],
+      "then": [
+        "both import the mapper from @specd/client",
+        "AND neither defines a parallel ProjectStatusDto mapping"
+      ]
     }
   ],
   "implementation": {
@@ -84,18 +93,13 @@
       {
         "specId": "client:dto-project-status",
         "file": "client:src/dto/project-status.ts",
-        "symbol": "ProjectGraphSummaryDto"
-      },
-      {
-        "specId": "client:dto-project-status",
-        "file": "client:src/dto/project-status.ts",
-        "symbol": "ProjectStatusDto"
+        "symbol": "mapProjectStatusDto"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8948efb55bb3015173c7dfc5d68bd9a301327f55384ecb844e4d192722e1458f",
-    "verify.md": "sha256:ad9c9c0e906d80129968e3e962ee889b988a50b67160cebc797d9cf5daff16c7"
+    "spec.md": "sha256:64df9c3e40011867baa4a00a6f62b8aae978f29cd0454edea5982ab3947a77f9",
+    "verify.md": "sha256:44684c8232d7fe869ca2e0f9869ef2d23a6cdea33c8089d3f6a9df6353c45e82"
   },
   "generatedBy": "core"
 }

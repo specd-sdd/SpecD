@@ -435,3 +435,7 @@
 - **GIVEN** a spec with `optimizedDescription: "AI Summary"` and `description: "Manual"`
 - **WHEN** indexing the spec
 - **THEN** the resulting `SpecNode` in the graph has `description: "AI Summary"`
+
+\[object Object]
+
+\[object Object]

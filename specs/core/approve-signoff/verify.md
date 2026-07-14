@@ -94,3 +94,18 @@
 - **GIVEN** the active schema name differs from the change `schemaName`
 - **WHEN** `execute({ name, reason })` is called
 - **THEN** a `SchemaMismatchError` is thrown before `mutate` is invoked
+
+### Requirement: Config-based factory delegates through resolveApproveSignoffDeps
+
+#### Scenario: createApproveSignoff config form derives ApproveSignoffDeps through resolveApproveSignoffDeps
+
+- **WHEN** `createApproveSignoff(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ApproveSignoffDeps` through `resolveApproveSignoffDeps(resolver)`
+- **AND** `resolveApproveSignoffDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+- `hasher: ContentHasher`
+- `approvals: ApprovalGates`
+- **AND** the factory delegates to canonical `createApproveSignoff(deps)`

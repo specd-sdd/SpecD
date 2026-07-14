@@ -1,7 +1,13 @@
 {
   "title": "ApproveSpec",
   "description": "Changes need a controlled gate where a human confirms the spec is correct before implementation proceeds, and artifact hashes must be captured at that moment to detect later tampering. The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the spec approval gate in the change lifecycle.",
-  "dependsOn": ["core:change", "core:schema-format", "core:composition", "core:kernel"],
+  "dependsOn": [
+    "core:change",
+    "core:schema-format",
+    "core:composition",
+    "core:kernel",
+    "core:composition-resolver"
+  ],
   "context": [
     "Changes need a controlled gate where a human confirms the spec is correct before implementation proceeds, and artifact hashes must be captured at that moment to detect later tampering. The `ApproveSpec` use case records a spec approval on a change and transitions it to the `spec-approved` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the spec approval gate in the change lifecycle."
   ],
@@ -46,6 +52,12 @@
       "requirement": "Approval gate baked at construction",
       "rules": [
         "`ApproveSpec` SHALL accept approval gate configuration at construction time:\n\n```typescript\ntype ApprovalGates = { readonly spec: boolean; readonly signoff: boolean }\n```\n\nThe constructor MUST receive `approvals: ApprovalGates`. `createApproveSpec(config)` and kernel wiring MUST pass `config.approvals`.\n\n`ApproveSpec.execute` MUST evaluate the spec gate using `approvals.spec` from construction. Callers MUST NOT supply gate flags per invocation."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveApproveSpecDeps",
+      "rules": [
+        "The config-based `createApproveSpec(config, options?)` form MUST derive `ApproveSpecDeps` through `resolveApproveSpecDeps(resolver)` and then delegate to canonical `createApproveSpec(deps)`.\n\n`resolveApproveSpecDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n- `schemaProvider: SchemaProvider`\n- `hasher: ContentHasher`\n- `approvals: ApprovalGates`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -161,20 +173,30 @@
       ],
       "when": ["execute({ name, reason }) is called"],
       "then": ["a SchemaMismatchError is thrown before mutate is invoked"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveApproveSpecDeps",
+      "name": "createApproveSpec config form derives ApproveSpecDeps through resolveApproveSpecDeps",
+      "when": ["createApproveSpec(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ApproveSpecDeps through resolveApproveSpecDeps(resolver)",
+        "AND resolveApproveSpecDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createApproveSpec(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:approve-spec",
-        "file": "core:src/application/use-cases/approve-spec.ts",
-        "symbol": "ApproveSpec"
+        "file": "core:src/composition/use-cases/approve-spec.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0ba4314c33dbbfb05ce491eb6dcf462e757339e3345f0498454a16d41b9d82df",
-    "verify.md": "sha256:88b139901c3adcd452eab7a53ca64070a14387097a5cf0a8a8b9ae2c9e97185c"
+    "spec.md": "sha256:c9e012e5582bb9acd1b346f64d11d5de050ebfa70ca3617fa348734fb2628360",
+    "verify.md": "sha256:986df9bc7a3dea4b28a2ac01fbcaad538fb942d41319e40574b9713402d451e3"
   },
   "generatedBy": "core"
 }

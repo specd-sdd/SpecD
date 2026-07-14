@@ -12,36 +12,42 @@ schema: 'spec-driven' # resolved from .specd/schemas/spec-driven/schema.yaml
 workspaces:
   default:
     specs:
-      adapter: fs
-      fs:
-        path: specs/
+      adapter:
+        type: fs
+        config:
+          path: specs/
     schemas:
-      adapter: fs
-      fs:
-        path: .specd/schemas # contains spec-driven/schema.yaml
+      adapter:
+        type: fs
+        config:
+          path: .specd/schemas # contains spec-driven/schema.yaml
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: .specd/changes
+    adapter:
+      type: fs
+      config:
+        path: .specd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: .specd/archive
+    adapter:
+      type: fs
+      config:
+        path: .specd/archive
 ```
 
 ## What this configuration does
 
-**Schema reference** — the bare name `spec-driven` resolves from the `default` workspace's `schemas.fs.path`. SpecD looks for the schema at `.specd/schemas/spec-driven/schema.yaml`. The full resolution path is:
+**Schema reference** — the bare name `spec-driven` resolves from the `default` workspace's `schemas.adapter.config.path`. SpecD looks for the schema at `.specd/schemas/spec-driven/schema.yaml`. The full resolution path is:
 
 ```
 .specd/schemas/
@@ -55,7 +61,7 @@ storage:
 
 You can also write the schema reference as `'#spec-driven'` (with the hash prefix) — it is equivalent to the bare name and also resolves from the `default` workspace.
 
-**Schemas directory** — the `schemas` block under `default` is shown explicitly here for clarity, but it is not required: SpecD defaults to `adapter: fs` with `fs.path: .specd/schemas` for the `default` workspace. You only need to declare it if you want to use a different path.
+**Schemas directory** — the `schemas` block under `default` is shown explicitly here for clarity, but it is not required: SpecD defaults to `adapter: { type: fs, config: { path: .specd/schemas } }` for the `default` workspace. You only need to declare it if you want to use a different path.
 
 **Schema authoring** — the schema file at `.specd/schemas/spec-driven/schema.yaml` is committed to your repository and versioned alongside your specs. When you evolve the schema, changes take effect for all new changes created after the update. Existing changes record the `schemaName` and `schemaVersion` they were created with; SpecD emits a warning if the active schema version differs from what a change was created with, but the change remains fully usable.
 

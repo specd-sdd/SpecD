@@ -1331,6 +1331,7 @@ describe('CompileContext', () => {
       })
       const change = makeChange('my-change', { artifacts: [tasksArtifact] })
       const schema = makeSchema({ workflow: [workflowStep] })
+      change.transition('ready', testActor)
 
       const { sut } = makeSut({ change, schema })
 
@@ -1343,6 +1344,32 @@ describe('CompileContext', () => {
 
       expect(result.stepAvailable).toBe(true)
       expect(result.blockingArtifacts).toHaveLength(0)
+    })
+
+    it('returns stepAvailable: false when the step is structurally ready but not permitted', async () => {
+      const workflowStep: WorkflowStep = {
+        step: 'implementing',
+        requires: [],
+        requiresTaskCompletion: [],
+        hooks: { pre: [], post: [] },
+      }
+      const change = makeChange('my-change')
+      const schema = makeSchema({ workflow: [workflowStep] })
+
+      const { sut } = makeSut({ change, schema })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'implementing',
+
+        config: noOp,
+      })
+
+      expect(result.stepAvailable).toBe(false)
+      expect(result.availableSteps.find((step) => step.step === 'implementing')?.isReady).toBe(true)
+      expect(result.availableSteps.find((step) => step.step === 'implementing')?.isPermitted).toBe(
+        false,
+      )
     })
 
     it('does not throw when step is unavailable', async () => {
@@ -2308,6 +2335,7 @@ describe('CompileContext', () => {
       })
       const change = makeChange('my-change', { artifacts: [designArtifact] })
       const schema = makeSchema({ workflow: [workflowStep] })
+      change.transition('ready', testActor)
 
       const { sut } = makeSut({ change, schema })
 
@@ -3267,6 +3295,7 @@ describe('CompileContext', () => {
         artifacts: [completeTasks],
       })
       const schema = makeSchema({ workflow: [workflowStep] })
+      completeChange.transition('ready', testActor)
 
       const incomplete = makeSut({
         change: incompleteChange,

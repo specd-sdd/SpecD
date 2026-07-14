@@ -32,7 +32,13 @@ export type { GraphHealthWarningDto, deriveGraphHealthWarnings } from '../graph-
 export type { GraphStatusDto } from './graph-status.js'
 export type { PreviewResultDto, PreviewResultFileDto } from './preview-result.js'
 export type { ProjectDto, WorkspaceSummaryDto } from './project.js'
-export type { ProjectGraphSummaryDto, ProjectStatusDto } from './project-status.js'
+export {
+  mapProjectStatusDto,
+  type ProjectGraphSummaryDto,
+  type ProjectStatusDto,
+  type ProjectStatusGraphInput,
+  type ProjectStatusMapperInput,
+} from './project-status.js'
 export type { SpecDetailDto } from './spec-detail.js'
 export type { SpecContextDto, SpecContextEntryDto, SpecContextWarningDto } from './spec-context.js'
 export type { SpecSummaryDto } from './spec-summary.js'

@@ -303,6 +303,24 @@ Validation rules for this update:
 - `ValidateArtifacts` MUST NOT fail solely because the current in-change `dependsOn` value differs from the canonical persisted `spec-lock.json` for that spec.
 - Hard consistency checks between archive output and canonical sidecar state are reserved for `ArchiveChange`.
 
+### Requirement: Config-based factory delegates through resolveValidateArtifactsDeps
+
+The config-based `createValidateArtifacts(config, options?)` form MUST derive `ValidateArtifactsDeps` through `resolveValidateArtifactsDeps(resolver)` and then delegate to canonical `createValidateArtifacts(deps)`.
+
+`resolveValidateArtifactsDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `actor: ActorResolver`
+- `hasher: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `lifecycle: LifecycleEngine`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - ValidateArtifacts is the only code path that may call Artifact.markComplete(hash) — enforced by convention and test coverage
@@ -318,13 +336,14 @@ Validation rules for this update:
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — change entity, approval invalidation, and artifact state
-- [`core:change-layout`](../change-layout/spec.md) — expected file paths for new spec artifacts and delta artifacts
-- [`core:change-manifest`](../change-manifest/spec.md) — persisted artifact filenames used by validation
-- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — schema-aware dependency interpretation and recursive blocker resolution
-- [`core:schema-format`](../schema-format/spec.md) — artifact definition, validations, delta behavior, and pre-hash cleanup
-- [`core:delta-format`](../delta-format/spec.md) — parser contract and delta application errors
-- [`core:selector-model`](../selector-model/spec.md) — selector rules for validations and delta validations
-- [`core:storage`](../storage/spec.md) — validation as the only path to `complete`
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — port-per-workspace and manual DI constraints
-- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec ID format for spec-scoped artifacts
+- [`core:change`](../change/spec.md)
+- [`core:change-layout`](../change-layout/spec.md)
+- [`core:change-manifest`](../change-manifest/spec.md)
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+- [`core:delta-format`](../delta-format/spec.md)
+- [`core:selector-model`](../selector-model/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

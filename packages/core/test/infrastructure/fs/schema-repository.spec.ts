@@ -156,7 +156,10 @@ describe('FsSchemaRepository — list', () => {
   })
 
   it('returns empty array when schemasPath directory does not exist', async () => {
-    const repo = createRepo({ schemasPath: path.join(tmpDir, 'nonexistent') })
+    const nonexistentPath = path.join(tmpDir, 'nonexistent')
+    await fs.mkdir(nonexistentPath, { recursive: true })
+    const repo = createRepo({ schemasPath: nonexistentPath })
+    await fs.rm(nonexistentPath, { recursive: true, force: true })
     const entries = await repo.list()
     expect(entries).toEqual([])
   })

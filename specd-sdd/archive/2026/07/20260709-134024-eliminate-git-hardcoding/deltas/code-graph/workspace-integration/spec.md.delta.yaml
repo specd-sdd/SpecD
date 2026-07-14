@@ -1,0 +1,59 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: WorkspaceIndexTarget'
+  content: |
+    `IndexOptions` SHALL accept the orchestrated project structure and graph-specific configuration:
+
+    ```ts
+    interface ProjectGraphConfig {
+      readonly includePaths?: readonly string[]
+      readonly excludePaths?: readonly string[]
+      readonly workspaces?: ReadonlyMap<
+        string,
+        {
+          readonly allowedPaths?: readonly string[]
+          readonly excludePaths?: readonly string[]
+          readonly respectGitignore?: boolean
+        }
+      >
+    }
+
+    interface IndexOptions {
+      readonly projectRoot: string
+      readonly workspaces: readonly ProjectWorkspace[]
+      readonly graphConfig: ProjectGraphConfig
+      readonly onProgress?: IndexProgressCallback
+      readonly chunkBytes?: number
+      readonly vcsRef?: string
+      readonly vcsRoot: string | null
+    }
+    ```
+
+    The `specs` callback on `WorkspaceIndexTarget` is REMOVED. The indexer now pulls data from the `SpecRepository` carried by each `ProjectWorkspace`.
+
+    `ProjectGraphConfig` fields are populated by the CLI/MCP integration layer from `SpecdConfig.graph`.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: .gitignore handling for codeRoot'
+  content: |
+    When discovering files from a `codeRoot`, `.gitignore` handling is controlled by `WorkspaceIndexTarget.respectGitignore` (default `true`):
+
+    When `respectGitignore` is `true`:
+
+    1. Use the provided `vcsRoot` in options, which is resolved upstream from `VcsAdapter.rootDir()`.
+    2. When `vcsRoot` is non-null, load `.gitignore` from that VCS root.
+    3. Load any `.gitignore` files found in subdirectories during the walk.
+    4. Apply rules relative to the directory containing each `.gitignore`.
+    5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files.
+
+    When `vcsRoot` is `null`:
+
+    - repository-root `.gitignore` is not loaded
+    - file discovery MUST NOT probe for `.git/`, `.hg/`, or `.svn/` markers
+
+    When `respectGitignore` is `false`:
+
+    - `.gitignore` files are not loaded or applied
+    - Only `excludePaths` patterns govern file exclusion

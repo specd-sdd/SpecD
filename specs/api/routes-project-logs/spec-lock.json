@@ -10,8 +10,8 @@
   ],
   "implementation": [
     {
-      "file": "api:src/delivery/http/handlers/handler-project-logs.ts",
-      "symbols": ["registerProjectLogsRoutes"]
+      "file": "api:src/composition/create-api-server.ts",
+      "symbols": ["createApiServer"]
     }
   ]
 }

@@ -56,3 +56,14 @@
 - **WHEN** `createGetConfig(config)` is called with a valid `SpecdConfig`
 - **THEN** it returns a `GetConfig` instance
 - **AND** `execute()` returns a readonly snapshot deep-equal to `config`
+
+### Requirement: Config-based factory delegates through resolveGetConfigDeps
+
+#### Scenario: createGetConfig config form derives GetConfigDeps through resolveGetConfigDeps
+
+- **WHEN** `createGetConfig(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetConfigDeps` through `resolveGetConfigDeps(resolver)`
+- **AND** `resolveGetConfigDeps(resolver)` resolves:
+- `config: SpecdConfig`
+- **AND** the factory delegates to canonical `createGetConfig(deps)`

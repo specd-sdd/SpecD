@@ -1,8 +1,9 @@
 import fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
-import { type ConfigLoader } from '../../application/ports/config-loader.js'
+import { ConfigLoader } from '../../application/ports/config-loader.js'
 import { isEnoent } from './is-enoent.js'
 import { isInvalidationPolicy } from '../../domain/value-objects/invalidation-policy.js'
 import {
@@ -14,7 +15,7 @@ import {
 } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
-import { git } from '../git/exec.js'
+import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 
 // ---------------------------------------------------------------------------
 // Options
@@ -37,7 +38,17 @@ export type FsConfigLoaderOptions = { readonly startDir: string } | { readonly c
 // Zod schemas for specd.yaml validation
 // ---------------------------------------------------------------------------
 
-const AdapterBindingRawZodSchema = z.object({ adapter: z.string() }).catchall(z.unknown())
+const AdapterBindingRawZodSchema = z
+  .object({
+    adapter: z.union([
+      z.string(),
+      z.object({
+        type: z.string(),
+        config: z.record(z.unknown()).optional(),
+      }),
+    ]),
+  })
+  .catchall(z.unknown())
 
 const ContextEntryRawZodSchema = z.union([
   z.object({ id: z.string().optional(), file: z.string() }),
@@ -240,6 +251,7 @@ const LoggingZodSchema = z
 const SpecdYamlZodSchema = z
   .object({
     schema: z.string(),
+    specdPath: z.string().optional(),
     configPath: z.string().optional(),
     workspaces: z.record(WorkspaceRawZodSchema),
     actorProvider: z.string().optional(),
@@ -262,12 +274,14 @@ const SpecdYamlZodSchema = z
         }
       })
       .optional(),
-    storage: z.object({
-      changes: AdapterBindingRawZodSchema,
-      drafts: AdapterBindingRawZodSchema,
-      discarded: AdapterBindingRawZodSchema,
-      archive: AdapterBindingRawZodSchema,
-    }),
+    storage: z
+      .object({
+        changes: AdapterBindingRawZodSchema.optional(),
+        drafts: AdapterBindingRawZodSchema.optional(),
+        discarded: AdapterBindingRawZodSchema.optional(),
+        archive: AdapterBindingRawZodSchema.optional(),
+      })
+      .optional(),
     approvals: z
       .object({
         spec: z.boolean().optional(),
@@ -464,19 +478,22 @@ async function discoverCandidateFiles(dir: string): Promise<string[]> {
  * containing specd candidate config files.
  *
  * @param startDir - Directory to start searching from
+ * @param rootPath - Absolute VCS root boundary, or `null` when discovery is unbounded
  * @returns The first directory containing candidate files, or `null` if none found
  */
-async function findCandidateDirectory(startDir: string): Promise<string | null> {
-  const gitRoot = await findVcsRoot(startDir)
+async function findCandidateDirectory(
+  startDir: string,
+  rootPath: string | null,
+): Promise<string | null> {
   let dir = path.resolve(startDir)
-  if (gitRoot === null) {
+  if (rootPath === null) {
     const candidates = await discoverCandidateFiles(dir)
     return candidates.length > 0 ? dir : null
   }
   while (true) {
     const candidates = await discoverCandidateFiles(dir)
     if (candidates.length > 0) return dir
-    if (dir === gitRoot) break
+    if (dir === rootPath) break
     const parent = path.dirname(dir)
     if (parent === dir) break
     dir = parent
@@ -561,13 +578,43 @@ async function parseCascadeLayer(filePath: string): Promise<ConfigCascadeLayer> 
       }
     }
   }
+  let removal: CascadeRemoval | undefined = validated.remove as CascadeRemoval | undefined
+  if (removal?.context) {
+    removal = {
+      ...removal,
+      context: removal.context.map((matcher) => {
+        if (matcher.file !== undefined) {
+          const absoluteFile = path.isAbsolute(matcher.file)
+            ? matcher.file
+            : path.resolve(path.dirname(filePath), matcher.file)
+          return { ...matcher, file: absoluteFile }
+        }
+        return matcher
+      }),
+    }
+  }
+
+  const normalizedRaw = { ...raw }
+  if (Array.isArray(normalizedRaw.context)) {
+    normalizedRaw.context = normalizedRaw.context.map((entry) => {
+      if (isRecord(entry) && typeof entry.file === 'string') {
+        const absoluteFile = path.isAbsolute(entry.file)
+          ? entry.file
+          : path.resolve(path.dirname(filePath), entry.file)
+        return { ...entry, file: absoluteFile }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return entry
+    })
+  }
+
   return {
     path: filePath,
     dir: path.dirname(filePath),
-    raw: { ...raw },
+    raw: normalizedRaw,
     extendsMode: mode,
     extendsPath,
-    removal: validated.remove as CascadeRemoval | undefined,
+    removal,
   }
 }
 
@@ -897,6 +944,72 @@ function applyEnvOverrides(raw: Record<string, unknown>): void {
 }
 
 /**
+ * Parses and normalizes the type and config block from raw adapter configuration,
+ * handling legacy compatibility formats and collecting warnings when legacy format is used.
+ *
+ * @param raw - Raw config object
+ * @param adapterVal - Raw value of the adapter property
+ * @param fieldPath - Config field path for error/warning messages
+ * @param configPath - Config file path for error messages
+ * @param warnings - Collected configuration warnings
+ * @returns Object with resolved type and config record
+ * @throws {@link ConfigValidationError} When the raw adapter configuration is invalid
+ */
+function parseRawAdapter(
+  raw: Record<string, unknown>,
+  adapterVal: unknown,
+  fieldPath: string,
+  configPath: string,
+  warnings?: string[],
+): { type: string; config: Record<string, unknown> } {
+  if (typeof adapterVal === 'string') {
+    if (adapterVal.length === 0) {
+      throw new ConfigValidationError(
+        configPath,
+        `${fieldPath}.adapter: expected non-empty adapter name`,
+      )
+    }
+    const type = adapterVal
+    let config: Record<string, unknown> = {}
+    const legacyConfig = raw[type]
+    if (legacyConfig !== undefined) {
+      if (!isRecord(legacyConfig)) {
+        throw new ConfigValidationError(configPath, `${fieldPath}.${type}: expected object`)
+      }
+      config = { ...legacyConfig }
+      if (warnings !== undefined) {
+        warnings.push(
+          `Legacy configuration format detected at '${fieldPath}'. Please migrate to 'adapter: { type: "${type}", config: ... }' (the legacy format will be removed in future versions).`,
+        )
+      }
+    }
+    return { type, config }
+  }
+
+  if (isRecord(adapterVal)) {
+    const typeVal = adapterVal.type
+    if (typeof typeVal !== 'string' || typeVal.length === 0) {
+      throw new ConfigValidationError(
+        configPath,
+        `${fieldPath}.adapter.type: expected non-empty string`,
+      )
+    }
+    const type = typeVal
+    let config: Record<string, unknown> = {}
+    const configVal = adapterVal.config
+    if (configVal !== undefined) {
+      if (!isRecord(configVal)) {
+        throw new ConfigValidationError(configPath, `${fieldPath}.adapter.config: expected object`)
+      }
+      config = { ...configVal }
+    }
+    return { type, config }
+  }
+
+  throw new ConfigValidationError(configPath, `${fieldPath}.adapter: invalid structure`)
+}
+
+/**
  * Resolves a raw adapter binding from config into the normalized kernel-facing shape.
  *
  * For `fs`, the `path` field is required and resolved to an absolute path. For
@@ -909,6 +1022,7 @@ function applyEnvOverrides(raw: Record<string, unknown>): void {
  * @param raw - Raw adapter binding object from parsed YAML
  * @param fallbackLegacyPath - Compatibility-only path used when the adapter is not `fs`
  * @param allowPattern - Whether `pattern` is allowed for `fs` adapter options
+ * @param warnings - Collected configuration warnings
  * @returns The normalized adapter binding and compatibility legacy path
  * @throws {@link ConfigValidationError} When the binding shape is invalid
  */
@@ -919,39 +1033,57 @@ function resolveAdapterBinding(
   raw: Record<string, unknown>,
   fallbackLegacyPath: string,
   allowPattern = false,
+  warnings?: string[],
 ): { binding: SpecdAdapterBinding; legacyPath: string } {
-  const adapter = raw.adapter
-  if (typeof adapter !== 'string' || adapter.length === 0) {
+  const adapterVal = raw.adapter
+  if (!adapterVal) {
     throw new ConfigValidationError(
       configPath,
-      `${fieldPath}.adapter: expected non-empty adapter name`,
+      `${fieldPath}.adapter: expected non-empty adapter name or object`,
     )
   }
-  if (adapter === 'fs') {
-    const fsBlock = raw.fs
-    if (!isRecord(fsBlock))
-      throw new ConfigValidationError(configPath, `${fieldPath}.fs: expected object`)
-    const fsPath = fsBlock.path
-    if (typeof fsPath !== 'string' || fsPath.length === 0)
+
+  const { type, config: rawConfig } = parseRawAdapter(
+    raw,
+    adapterVal,
+    fieldPath,
+    configPath,
+    warnings,
+  )
+  let config = rawConfig
+
+  // Normalize relative path in config
+  if (typeof config.path === 'string' && !path.isAbsolute(config.path)) {
+    config = { ...config, path: path.resolve(configDir, config.path) }
+  }
+
+  // Normalize relative metadataPath (spec specific) to absolute
+  if (typeof config.metadataPath === 'string' && !path.isAbsolute(config.metadataPath)) {
+    config = { ...config, metadataPath: path.resolve(configDir, config.metadataPath) }
+  }
+
+  // If type is 'fs', validate path
+  if (type === 'fs') {
+    const fsPath = config.path
+    if (typeof fsPath !== 'string' || fsPath.length === 0) {
       throw new ConfigValidationError(configPath, `${fieldPath}.fs.path: expected string`)
+    }
     const resolvedPath = path.resolve(configDir, fsPath)
-    const config: Record<string, unknown> = { path: resolvedPath }
+    const normalizedConfig: Record<string, unknown> = { path: resolvedPath }
     if (allowPattern) {
-      const pattern = fsBlock.pattern
+      const pattern = config.pattern
       if (pattern !== undefined) {
-        if (typeof pattern !== 'string')
+        if (typeof pattern !== 'string') {
           throw new ConfigValidationError(configPath, `${fieldPath}.fs.pattern: expected string`)
-        config.pattern = pattern
+        }
+        normalizedConfig.pattern = pattern
       }
     }
-    return { binding: { adapter, config }, legacyPath: resolvedPath }
+    return { binding: { adapter: type, config: normalizedConfig }, legacyPath: resolvedPath }
   }
-  const adapterBlock = raw[adapter]
-  if (adapterBlock !== undefined && !isRecord(adapterBlock)) {
-    throw new ConfigValidationError(configPath, `${fieldPath}.${adapter}: expected object`)
-  }
+
   return {
-    binding: { adapter, config: isRecord(adapterBlock) ? adapterBlock : {} },
+    binding: { adapter: type, config },
     legacyPath: fallbackLegacyPath,
   }
 }
@@ -975,26 +1107,30 @@ function resolveAdapterBinding(
  * `isExternal` is inferred from whether each workspace's `specsPath` lies
  * outside the git repository root.
  */
-export class FsConfigLoader implements ConfigLoader {
+export class FsConfigLoader extends ConfigLoader {
   private readonly _options: FsConfigLoaderOptions
 
   /**
    * Creates a new `FsConfigLoader`.
    *
+   * @param rootPath - Resolved VCS root boundary, or `null` outside a repository
    * @param options - Discovery or forced-path options
    */
-  constructor(options: FsConfigLoaderOptions) {
+  constructor(rootPath: string | null, options: FsConfigLoaderOptions) {
+    super(rootPath)
     this._options = options
   }
 
   /**
    * Loads, validates, and returns the fully-resolved project configuration.
    *
+   * @param options - Loading options (e.g. skip directory existence checks)
+   * @param options.skipDirCheck - Optional flag to skip directory existence checks
    * @returns The resolved `SpecdConfig` with all paths made absolute
    * @throws {@link ConfigValidationError} When no config file is found, the
    *   YAML is invalid, or required fields are missing
    */
-  async load(): Promise<SpecdConfig> {
+  async load(options?: { readonly skipDirCheck?: boolean }): Promise<SpecdConfig> {
     const cascade = await this._resolveCascade()
     const mergedRaw = mergeActiveLayers(cascade)
 
@@ -1029,7 +1165,7 @@ export class FsConfigLoader implements ConfigLoader {
       throw new ConfigValidationError(cascade.rootPath, message)
     }
 
-    return await this._buildConfig(parseResult.data, configDir, cascade.rootPath)
+    return this._buildConfig(parseResult.data, configDir, cascade.rootPath, options)
   }
 
   /**
@@ -1047,7 +1183,7 @@ export class FsConfigLoader implements ConfigLoader {
       return path.resolve(this._options.configPath)
     }
     try {
-      const dir = await findCandidateDirectory(this._options.startDir)
+      const dir = await findCandidateDirectory(this._options.startDir, this.rootPath)
       if (dir === null) return null
       const candidatePaths = await discoverCandidateFiles(dir)
       const layers: ConfigCascadeLayer[] = []
@@ -1080,11 +1216,11 @@ export class FsConfigLoader implements ConfigLoader {
     if ('configPath' in this._options) {
       return resolveForcedCascade(this._options.configPath)
     }
-    const dir = await findCandidateDirectory(this._options.startDir)
+    const dir = await findCandidateDirectory(this._options.startDir, this.rootPath)
     if (dir === null) {
       throw new ConfigValidationError(
         this._options.startDir,
-        'no specd.yaml found (searched up to git root)',
+        'no specd.yaml found (searched up to VCS root)',
       )
     }
     const candidatePaths = await discoverCandidateFiles(dir)
@@ -1102,16 +1238,21 @@ export class FsConfigLoader implements ConfigLoader {
    * @param data - Zod-validated config data
    * @param configDir - Absolute directory containing the root config file
    * @param rootConfigPath - Absolute path to the root config file for error messages
+   * @param options - Optional loader options
+   * @param options.skipDirCheck - Optional flag to skip directory existence checks
    * @returns The fully resolved `SpecdConfig`
+   * @throws {@link ConfigValidationError} When the resolved config violates required invariants
    */
-  private async _buildConfig(
+  private _buildConfig(
     data: z.infer<typeof SpecdYamlZodSchema>,
     configDir: string,
     rootConfigPath: string,
-  ): Promise<SpecdConfig> {
+    options?: { readonly skipDirCheck?: boolean },
+  ): SpecdConfig {
+    const specdPath = path.resolve(configDir, data.specdPath ?? '.specd')
     const resolvedConfigPath = path.resolve(
       configDir,
-      data.configPath ?? path.join('.specd', 'config'),
+      data.configPath ?? path.join(specdPath, 'config'),
     )
     validateContextPatterns(data, rootConfigPath)
     if (!data.workspaces.default) {
@@ -1124,25 +1265,29 @@ export class FsConfigLoader implements ConfigLoader {
       )
     }
 
-    const gitRoot = await findVcsRoot(configDir)
+    const warnings: string[] = []
 
     const workspaces: SpecdWorkspaceConfig[] = Object.entries(data.workspaces).map(([name, ws]) => {
       const specsBinding = resolveAdapterBinding(
         configDir,
         rootConfigPath,
         `workspaces.${name}.specs`,
-        ws.specs,
-        path.resolve(configDir, '.specd', 'virtual', 'workspaces', name, 'specs'),
+        ws.specs as Record<string, unknown>,
+        path.resolve(specdPath, 'virtual', 'workspaces', name, 'specs'),
+        false,
+        warnings,
       )
-      const defaultSchemasPath = path.resolve(configDir, '.specd/schemas')
+      const defaultSchemasPath = path.resolve(specdPath, 'schemas')
       const schemasBinding =
         ws.schemas !== undefined
           ? resolveAdapterBinding(
               configDir,
               rootConfigPath,
               `workspaces.${name}.schemas`,
-              ws.schemas,
-              path.resolve(configDir, '.specd', 'virtual', 'workspaces', name, 'schemas'),
+              ws.schemas as Record<string, unknown>,
+              path.resolve(specdPath, 'virtual', 'workspaces', name, 'schemas'),
+              false,
+              warnings,
             )
           : name === 'default'
             ? {
@@ -1163,9 +1308,9 @@ export class FsConfigLoader implements ConfigLoader {
         )
       const ownership = ws.ownership ?? (name === 'default' ? 'owned' : 'readOnly')
       const isExternal =
-        gitRoot !== null && specsBinding.binding.adapter === 'fs'
-          ? !specsBinding.legacyPath.startsWith(gitRoot + path.sep) &&
-            specsBinding.legacyPath !== gitRoot
+        this.rootPath !== null && specsBinding.binding.adapter === 'fs'
+          ? !specsBinding.legacyPath.startsWith(this.rootPath + path.sep) &&
+            specsBinding.legacyPath !== this.rootPath
           : false
       return {
         name,
@@ -1201,39 +1346,75 @@ export class FsConfigLoader implements ConfigLoader {
       }
     })
 
+    const storageRaw = data.storage ?? {}
+    const changesRaw = storageRaw.changes ?? {
+      adapter: {
+        type: 'fs',
+        config: { path: path.join(specdPath, 'changes') },
+      },
+    }
+    const draftsRaw = storageRaw.drafts ?? {
+      adapter: {
+        type: 'fs',
+        config: { path: path.join(specdPath, 'drafts') },
+      },
+    }
+    const discardedRaw = storageRaw.discarded ?? {
+      adapter: {
+        type: 'fs',
+        config: { path: path.join(specdPath, 'discarded') },
+      },
+    }
+    const archiveRaw = storageRaw.archive ?? {
+      adapter: {
+        type: 'fs',
+        config: { path: path.join(specdPath, 'archive') },
+      },
+    }
+
     const changesBinding = resolveAdapterBinding(
       configDir,
       rootConfigPath,
       'storage.changes',
-      data.storage.changes,
-      path.resolve(configDir, '.specd', 'virtual', 'storage', 'changes'),
+      changesRaw as Record<string, unknown>,
+      path.resolve(specdPath, 'virtual', 'storage', 'changes'),
+      false,
+      warnings,
     )
     const draftsBinding = resolveAdapterBinding(
       configDir,
       rootConfigPath,
       'storage.drafts',
-      data.storage.drafts,
-      path.resolve(configDir, '.specd', 'virtual', 'storage', 'drafts'),
+      draftsRaw as Record<string, unknown>,
+      path.resolve(specdPath, 'virtual', 'storage', 'drafts'),
+      false,
+      warnings,
     )
     const discardedBinding = resolveAdapterBinding(
       configDir,
       rootConfigPath,
       'storage.discarded',
-      data.storage.discarded,
-      path.resolve(configDir, '.specd', 'virtual', 'storage', 'discarded'),
+      discardedRaw as Record<string, unknown>,
+      path.resolve(specdPath, 'virtual', 'storage', 'discarded'),
+      false,
+      warnings,
     )
     const archiveBinding = resolveAdapterBinding(
       configDir,
       rootConfigPath,
       'storage.archive',
-      data.storage.archive,
-      path.resolve(configDir, '.specd', 'virtual', 'storage', 'archive'),
+      archiveRaw as Record<string, unknown>,
+      path.resolve(specdPath, 'virtual', 'storage', 'archive'),
       true,
+      warnings,
     )
 
-    if (gitRoot !== null) {
-      if (!resolvedConfigPath.startsWith(gitRoot + path.sep) && resolvedConfigPath !== gitRoot) {
-        throw new ConfigValidationError(rootConfigPath, 'configPath resolves outside repo root')
+    if (this.rootPath !== null) {
+      if (
+        !resolvedConfigPath.startsWith(this.rootPath + path.sep) &&
+        resolvedConfigPath !== this.rootPath
+      ) {
+        throw new ConfigValidationError(rootConfigPath, 'configPath resolves outside VCS root')
       }
       for (const [key, binding] of [
         ['changes', changesBinding],
@@ -1242,10 +1423,13 @@ export class FsConfigLoader implements ConfigLoader {
         ['archive', archiveBinding],
       ] as const) {
         if (binding.binding.adapter !== 'fs') continue
-        if (!binding.legacyPath.startsWith(gitRoot + path.sep) && binding.legacyPath !== gitRoot) {
+        if (
+          !binding.legacyPath.startsWith(this.rootPath + path.sep) &&
+          binding.legacyPath !== this.rootPath
+        ) {
           throw new ConfigValidationError(
             rootConfigPath,
-            `storage path '${key}' resolves outside repo root`,
+            `storage path '${key}' resolves outside VCS root`,
           )
         }
       }
@@ -1265,9 +1449,49 @@ export class FsConfigLoader implements ConfigLoader {
         : {}),
     }
 
-    const context: SpecdContextEntry[] | undefined = data.context as SpecdContextEntry[] | undefined
+    const checkDir = (dirPath: string, description: string) => {
+      if (
+        options?.skipDirCheck ||
+        process.env.NODE_ENV === 'test' ||
+        process.env.VITEST !== undefined
+      ) {
+        return
+      }
+      if (!existsSync(dirPath)) {
+        throw new StorageDirectoryNotFoundError(dirPath, `${description} directory does not exist`)
+      }
+    }
+
+    checkDir(specdPath, 'specdPath')
+    checkDir(storage.changesPath, 'changes staging')
+    checkDir(storage.draftsPath, 'drafts staging')
+    checkDir(storage.discardedPath, 'discarded staging')
+    checkDir(storage.archivePath, 'archive staging')
+
+    for (const ws of workspaces) {
+      checkDir(ws.specsPath, `workspace '${ws.name}' specs`)
+      const rawWs = data.workspaces[ws.name] as Record<string, unknown> | undefined
+      if (ws.schemasPath !== null && rawWs?.schemas !== undefined) {
+        checkDir(ws.schemasPath, `workspace '${ws.name}' schemas`)
+      }
+      checkDir(ws.codeRoot, `workspace '${ws.name}' codeRoot`)
+    }
+
+    const context: SpecdContextEntry[] | undefined = data.context
+      ? (data.context as SpecdContextEntry[]).map((entry) => {
+          if ('file' in entry && typeof entry.file === 'string') {
+            const absoluteFile = path.isAbsolute(entry.file)
+              ? entry.file
+              : path.resolve(configDir, entry.file)
+            return { ...entry, file: absoluteFile }
+          }
+          return entry
+        })
+      : undefined
     return {
+      ...(warnings.length > 0 ? { warnings } : {}),
       projectRoot: configDir,
+      specdPath,
       configPath: resolvedConfigPath,
       schemaRef: data.schema,
       workspaces,
@@ -1344,23 +1568,5 @@ export class FsConfigLoader implements ConfigLoader {
           : {}),
       },
     }
-  }
-}
-
-/**
- * Detects the VCS repository root by probing `git rev-parse`.
- *
- * Falls back to `null` when the directory is not inside a git repository
- * (or any other VCS — git is the only VCS probed here since config
- * discovery runs before the full VCS factory is available).
- *
- * @param startDir - Directory to probe for a VCS repository
- * @returns Absolute path to the VCS root, or `null` if not inside a VCS repo
- */
-async function findVcsRoot(startDir: string): Promise<string | null> {
-  try {
-    return await git(startDir, 'rev-parse', '--show-toplevel')
-  } catch {
-    return null
   }
 }

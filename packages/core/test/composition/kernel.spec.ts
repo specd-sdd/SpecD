@@ -7,8 +7,16 @@ import { RegistryConflictError } from '../../src/application/errors/registry-con
 import { createKernel } from '../../src/composition/kernel.js'
 import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 import { SearchSpecs } from '../../src/application/use-cases/search-specs.js'
+import { GetChangeArtifact } from '../../src/application/use-cases/get-change-artifact.js'
+import { GetReadOnlyChangeArtifact } from '../../src/application/use-cases/get-read-only-change-artifact.js'
+import { SaveChangeArtifact } from '../../src/application/use-cases/save-change-artifact.js'
+import { ValidateChangeBatch } from '../../src/application/use-cases/validate-change-batch.js'
+import { OutlineChangeArtifact } from '../../src/application/use-cases/outline-change-artifact.js'
+import { ReadLog } from '../../src/application/use-cases/read-log.js'
 import { type ArtifactParser } from '../../src/application/ports/artifact-parser.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
+import { LogRingBuffer } from '../../src/infrastructure/logging/log-ring-buffer.js'
+import { makeChange } from '../application/use-cases/helpers.js'
 
 let tmpDir: string | undefined
 
@@ -153,5 +161,42 @@ describe('createKernel', () => {
     const kernel = await createKernel(config)
 
     expect(kernel.specs.search).toBeInstanceOf(SearchSpecs)
+  })
+
+  it('exposes retained branch-only kernel capabilities', async () => {
+    const config = await makeConfig()
+    const kernel = await createKernel(config, { logRing: new LogRingBuffer(8) })
+
+    expect(kernel.changes.getArtifact).toBeInstanceOf(GetChangeArtifact)
+    expect(kernel.changes.getReadOnlyChangeArtifact).toBeInstanceOf(GetReadOnlyChangeArtifact)
+    expect(kernel.changes.saveArtifact).toBeInstanceOf(SaveChangeArtifact)
+    expect(kernel.changes.validateBatch).toBeInstanceOf(ValidateChangeBatch)
+    expect(kernel.changes.outlineArtifact).toBeInstanceOf(OutlineChangeArtifact)
+    expect(kernel.logs?.read).toBeInstanceOf(ReadLog)
+  })
+
+  it('reuses shared repository and validator instances for retained branch capabilities', async () => {
+    const config = await makeConfig()
+    const kernel = await createKernel(config)
+    const change = makeChange('feat', { specIds: ['default:a'] })
+
+    const getSpy = vi.spyOn(kernel.changes.repo, 'get').mockResolvedValueOnce(null)
+    await expect(
+      kernel.changes.getArtifact.execute({ name: 'missing', filename: 'proposal.md' }),
+    ).rejects.toThrow(/missing/)
+    expect(getSpy).toHaveBeenCalledWith('missing')
+
+    const validateSpy = vi
+      .spyOn(kernel.changes.validate, 'execute')
+      .mockResolvedValueOnce({ passed: true, failures: [], warnings: [], files: [] })
+    vi.spyOn(kernel.changes.repo, 'get').mockResolvedValueOnce(change)
+
+    const result = await kernel.changes.validateBatch.execute({
+      name: 'feat',
+      artifactId: 'proposal',
+    })
+
+    expect(validateSpy).toHaveBeenCalledWith({ name: 'feat', artifactId: 'proposal' })
+    expect(result).toMatchObject({ passed: true, total: 1 })
   })
 })

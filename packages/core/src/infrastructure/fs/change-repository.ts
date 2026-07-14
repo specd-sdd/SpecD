@@ -1,5 +1,8 @@
 import * as fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import * as path from 'node:path'
+import { z } from 'zod'
+import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import { Change, SYSTEM_ACTOR } from '../../domain/entities/change.js'
 import { type ChangeEvent } from '../../domain/entities/change.js'
 import { ChangeArtifact } from '../../domain/entities/change-artifact.js'
@@ -25,7 +28,7 @@ import { ChangeNotFoundError } from '../../application/errors/change-not-found-e
 import { SchemaMismatchError } from '../../application/errors/schema-mismatch-error.js'
 import {
   ChangeRepository,
-  type ChangeRepositoryConfig,
+  type ChangeRepositoryConfig as BaseChangeRepositoryConfig,
 } from '../../application/ports/change-repository.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { expectedArtifactFilename } from '../../domain/services/artifact-filename.js'
@@ -49,42 +52,27 @@ import {
 } from './manifest.js'
 
 /**
- * Configuration for `FsChangeRepository`.
- *
- * Extends the base `ChangeRepositoryConfig` with the three storage directory
- * paths that `FsChangeRepository` manages.
+ * Extended configuration for `FsChangeRepository`.
  */
-export interface FsChangeRepositoryConfig extends ChangeRepositoryConfig {
-  /** Absolute path to the `changes/` directory for active changes. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory for shelved changes. */
+export interface ChangeRepositoryConfig extends BaseChangeRepositoryConfig {
   readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory for abandoned changes. */
   readonly discardedPath: string
-  /**
-   * Active schema name and version — used to emit a warning when a loaded
-   * manifest records a different schema. Advisory only; the change remains usable.
-   */
   readonly activeSchema?: { name: string; version: number }
-  /**
-   * Resolved artifact types from the active schema. Used to sync the
-   * artifact map on every `get()` and `save()`. When not provided
-   * (e.g. in tests), sync is skipped.
-   */
-  readonly artifactTypes?: readonly ArtifactType[]
-  /**
-   * Async resolver for artifact types. Called lazily on first `get()` or
-   * `save()` when `artifactTypes` is not provided. Allows the repo to
-   * resolve schema asynchronously without requiring it at construction time.
-   */
   readonly resolveArtifactTypes?: () => Promise<readonly ArtifactType[]>
-  /**
-   * Optional async resolver to check whether a spec already exists.
-   *
-   * Used to resolve expected filenames for delta-capable spec artifacts.
-   */
   readonly resolveSpecExists?: (specId: string) => Promise<boolean>
+  readonly artifactTypes?: readonly ArtifactType[]
 }
+
+/**
+ * Configuration options for the filesystem change repository.
+ */
+export interface FsChangeRepositoryConfig {
+  readonly path: string
+}
+
+export const FsChangeOptionsSchema = z.object({
+  path: z.string(),
+})
 
 /**
  * Metadata persisted inside a change lock directory.
@@ -129,20 +117,63 @@ export class FsChangeRepository extends ChangeRepository {
   /**
    * Creates a new `FsChangeRepository` instance.
    *
-   * @param config - Storage paths, workspace configuration, and optional active schema
+   * @param config - Legacy storage paths and repository configuration
    */
-  constructor(config: FsChangeRepositoryConfig) {
-    super(config)
-    this._changesPath = config.changesPath
-    this._draftsPath = config.draftsPath
-    this._discardedPath = config.discardedPath
-    this._locksPath = path.join(config.configPath, 'tmp', 'change-locks')
-    this._activeSchema = config.activeSchema
-    this._artifactTypes = config.artifactTypes ?? []
-    this._resolveArtifactTypes = config.resolveArtifactTypes
-    this._resolveSpecExists = config.resolveSpecExists
-    this._artifactTypesResolved =
-      config.artifactTypes !== undefined && config.artifactTypes.length > 0
+  constructor(config: ChangeRepositoryConfig & { changesPath: string })
+  /**
+   * Creates a new `FsChangeRepository` instance.
+   *
+   * @param context - Shared repository context
+   * @param config - Adapter options
+   */
+  constructor(context: ChangeRepositoryConfig, config: FsChangeRepositoryConfig)
+  /**
+   * Creates a new `FsChangeRepository` instance.
+   *
+   * @param contextOrConfig - Shared repository context or legacy config
+   * @param config - Adapter options or undefined for legacy constructor
+   */
+  constructor(contextOrConfig: unknown, config?: unknown) {
+    let context: ChangeRepositoryConfig
+    let parsedConfig: FsChangeRepositoryConfig
+    if (config === undefined) {
+      const legacy = contextOrConfig as ChangeRepositoryConfig & { changesPath: string }
+      context = legacy
+      parsedConfig = { path: legacy.changesPath }
+    } else {
+      context = contextOrConfig as ChangeRepositoryConfig
+      const typedConfig = config as { readonly path?: string; readonly changesPath?: string }
+      const normalized = {
+        path: typedConfig.path ?? typedConfig.changesPath,
+      }
+      parsedConfig = FsChangeOptionsSchema.parse(normalized)
+    }
+
+    super(context)
+
+    // Verify paths exist on disk
+    if (!existsSync(parsedConfig.path)) {
+      throw new StorageDirectoryNotFoundError(parsedConfig.path, 'Changes directory does not exist')
+    }
+    if (!existsSync(context.draftsPath)) {
+      throw new StorageDirectoryNotFoundError(context.draftsPath, 'Drafts directory does not exist')
+    }
+    if (!existsSync(context.discardedPath)) {
+      throw new StorageDirectoryNotFoundError(
+        context.discardedPath,
+        'Discarded directory does not exist',
+      )
+    }
+
+    this._changesPath = parsedConfig.path
+    this._draftsPath = context.draftsPath
+    this._discardedPath = context.discardedPath
+    this._locksPath = path.join(context.configPath, 'tmp', 'change-locks')
+    this._activeSchema = context.activeSchema
+    this._resolveArtifactTypes = context.resolveArtifactTypes
+    this._resolveSpecExists = context.resolveSpecExists
+    this._artifactTypes = context.artifactTypes ?? []
+    this._artifactTypesResolved = context.artifactTypes !== undefined
   }
 
   /**

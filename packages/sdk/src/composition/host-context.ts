@@ -1,5 +1,5 @@
 import {
-  createConfigLoader,
+  createDefaultConfigLoader,
   createKernel,
   type Kernel,
   type KernelOptions,
@@ -58,7 +58,7 @@ export async function createSdkContext(
  * @returns Loaded config, path, kernel, and graph-provider factory
  */
 export async function openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult> {
-  const loader = createConfigLoader(
+  const loader = await createDefaultConfigLoader(
     input?.configPath !== undefined
       ? { configPath: input.configPath }
       : { startDir: process.cwd() },

@@ -8,5 +8,10 @@
     "core:get-change-artifact",
     "core:change-repository-port"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/outline-change-artifact.ts",
+      "symbols": ["createOutlineChangeArtifact"]
+    }
+  ]
 }

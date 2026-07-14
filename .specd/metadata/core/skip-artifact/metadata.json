@@ -1,7 +1,7 @@
 {
   "title": "SkipArtifact",
   "description": "Not every change needs every optional artifact, but the system must distinguish \"intentionally omitted\" from \"forgotten\" to avoid blocking downstream steps on missing files. The `SkipArtifact` use case explicitly marks an optional artifact as skipped, signalling deliberate omission so that dependency chains and workflow steps treat it as resolved. Only optional artifacts may be skipped — required artifacts MUST be produced.",
-  "dependsOn": ["core:change", "core:composition"],
+  "dependsOn": ["core:change", "core:composition", "core:composition-resolver"],
   "context": [
     "Not every change needs every optional artifact, but the system must distinguish \"intentionally omitted\" from \"forgotten\" to avoid blocking downstream steps on missing files. The `SkipArtifact` use case explicitly marks an optional artifact as skipped, signalling deliberate omission so that dependency chains and workflow steps treat it as resolved. Only optional artifacts may be skipped — required artifacts MUST be produced."
   ],
@@ -40,6 +40,12 @@
       "requirement": "Persistence and output",
       "rules": [
         "After recording and marking, the use case MUST persist the change through `ChangeRepository.mutate(name, fn)`.\n\nInside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the skip event on that instance, marks the artifact as skipped, and returns the updated change. This ensures skip decisions are serialized with other mutations of the same change.\n\n`SkipArtifact.execute` returns the updated `Change` entity produced by that serialized mutation."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveSkipArtifactDeps",
+      "rules": [
+        "The config-based `createSkipArtifact(config, options?)` form MUST derive `SkipArtifactDeps` through `resolveSkipArtifactDeps(resolver)` and then delegate to canonical `createSkipArtifact(deps)`.\n\n`resolveSkipArtifactDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -106,11 +112,30 @@
         "AND the callback records the skip and marks the artifact skipped on the fresh persisted Change",
         "AND the returned value is the Change entity"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveSkipArtifactDeps",
+      "name": "createSkipArtifact config form derives SkipArtifactDeps through resolveSkipArtifactDeps",
+      "when": ["createSkipArtifact(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives SkipArtifactDeps through resolveSkipArtifactDeps(resolver)",
+        "AND resolveSkipArtifactDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createSkipArtifact(deps)"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:skip-artifact",
+        "file": "core:src/composition/use-cases/skip-artifact.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:955d62f23519f0ab2b3b187d3473dc222f2d2e62085d6c67ace21fdedd6fdb01",
-    "verify.md": "sha256:50595075ea1b08306e47b31152fa629485270468d6e3b6bac79e5128e7103b4c"
+    "spec.md": "sha256:20cad6643fe92e27455b61070c54b052e6828b6c8ffd982f3e05d967fd5c57bd",
+    "verify.md": "sha256:34fb3b2a83b3e285f1c97e0383a50e4feb6677cb4993eed3069d518e61c7ea23"
   },
   "generatedBy": "core"
 }

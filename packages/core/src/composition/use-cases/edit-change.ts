@@ -1,140 +1,105 @@
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { EditChange } from '../../application/use-cases/edit-change.js'
-import * as path from 'node:path'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { createSpecRepository } from '../spec-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createEditChange(context, options)`. */
-export interface EditChangeContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createEditChange(context, options)`. */
-export interface FsEditChangeOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
-  /** The project orchestrator. */
+/**
+ * Explicit dependencies for {@link createEditChange}.
+ */
+export interface EditChangeDeps {
+  readonly changes: ChangeRepository
   readonly listWorkspaces: ListWorkspaces
+  readonly actor: ActorResolver
+  readonly schemaProvider: SchemaProvider
 }
 
 /**
- * Constructs an `EditChange` use case with full project config.
+ * Resolves `EditChange` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `EditChange`
+ */
+export function resolveEditChangeDeps(resolver: CompositionResolver): EditChangeDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    listWorkspaces: resolver.getListWorkspaces(),
+    actor: resolver.getActorResolver(),
+    schemaProvider: resolver.getSchemaProvider(),
+  }
+}
+
+/**
+ * Constructs `EditChange` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createEditChange(deps: EditChangeDeps): EditChange
+/**
+ * Constructs `EditChange` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createEditChange(config: SpecdConfig): EditChange
-/**
- * Constructs an `EditChange` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths and workspace names
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createEditChange(
-  context: EditChangeContext,
-  options: FsEditChangeOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): EditChange
 /**
- * Constructs an `EditChange` instance wired with filesystem adapters.
+ * Constructs `EditChange` from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createEditChange(
-  configOrContext: SpecdConfig | EditChangeContext,
-  options?: FsEditChangeOptions,
+  depsOrConfig: EditChangeDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): EditChange {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    const changeRepo = createChangeRepository(
-      'fs',
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-      },
-    )
-    const specRepos = new Map(
-      config.workspaces.map((workspace) => [
-        workspace.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: workspace.name,
-            ownership: workspace.ownership,
-            isExternal: workspace.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: workspace.specsPath,
-            metadataPath: path.join(workspace.specsPath, '..', '.specd', 'metadata'),
-            ...(workspace.prefix !== undefined ? { prefix: workspace.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    const actor = createVcsActorResolver()
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((ws) => ws.schemasPath !== null)
-        .map((ws) => [
-          ws.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws.name,
-              ownership: ws.ownership,
-              isExternal: ws.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: ws.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<
-      string,
-      import('../../application/ports/schema-repository.js').SchemaRepository
-    >
-    const schemas = createSchemaRegistry('fs', {
-      nodeModulesPaths: [path.join(config.projectRoot, 'node_modules')],
-      configDir: config.projectRoot,
-      schemaRepositories: schemaRepos,
-    })
-    const resolveSchema = new ResolveSchema(schemas, config.schemaRef, [], undefined)
-    const schemaProvider = new LazySchemaProvider(resolveSchema)
-    return new EditChange(changeRepo, new ListWorkspaces(config, specRepos), actor, schemaProvider)
+  const normalized = normalizeCompositionFactoryArgs(
+    'createEditChange',
+    depsOrConfig,
+    options,
+    isEditChangeDeps,
+  )
+  return createEditChangeFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `EditChange` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createEditChangeFromNormalized(
+  input: FactoryInput<EditChangeDeps, CompositionResolutionOptions>,
+): EditChange {
+  if (input.kind === 'deps') {
+    const { changes, listWorkspaces, actor, schemaProvider } = input.deps
+    return new EditChange(changes, listWorkspaces, actor, schemaProvider)
   }
-  const opts = options!
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    discardedPath: opts.discardedPath,
-  })
-  const actor = createVcsActorResolver()
-  const schemaProvider: import('../../application/ports/schema-provider.js').SchemaProvider = {
-    get: () =>
-      Promise.reject(
-        new Error('EditChange context factory requires SpecdConfig for schema resolution'),
-      ),
-  }
-  return new EditChange(changeRepo, opts.listWorkspaces, actor, schemaProvider)
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createEditChange(resolveEditChangeDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `EditChangeDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isEditChangeDeps(value: EditChangeDeps | SpecdConfig): value is EditChangeDeps {
+  return (
+    'changes' in value && 'listWorkspaces' in value && 'actor' in value && 'schemaProvider' in value
+  )
 }

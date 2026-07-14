@@ -1,65 +1,112 @@
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
 import { type SchemaRegistry } from '../../application/ports/schema-registry.js'
+import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
 import { type SchemaOperations } from '../../domain/services/merge-schema-layers.js'
 import {
-  createResolveSchemaForConfig,
-  type SchemaResolutionKernelOptions,
-} from '../schema-resolution.js'
-import { createSchemaRegistry } from '../schema-registry.js'
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Filesystem adapter options for `createResolveSchema(options)`. */
-export interface FsResolveSchemaOptions {
-  readonly nodeModulesPaths: readonly string[]
-  readonly configDir: string
+/**
+ * Explicit dependencies for {@link createResolveSchema}.
+ */
+export interface ResolveSchemaDeps {
+  /** Shared schema registry. */
+  readonly schemas: SchemaRegistry
+  /** Active schema reference string. */
   readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
+  /** Optional schema plugin references in declaration order. */
   readonly schemaPlugins?: readonly string[]
+  /** Optional inline schema override operations. */
   readonly schemaOverrides?: SchemaOperations
 }
 
 /**
- * Constructs a `ResolveSchema` use case with full project config.
+ * Resolves {@link ResolveSchemaDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ResolveSchema`
+ */
+export function resolveResolveSchemaDeps(resolver: CompositionResolver): ResolveSchemaDeps {
+  return {
+    schemas: resolver.getSchemaRegistry(),
+    schemaRef: resolver.config.schemaRef,
+    ...(resolver.config.schemaPlugins !== undefined
+      ? { schemaPlugins: resolver.config.schemaPlugins }
+      : {}),
+    ...(resolver.config.schemaOverrides !== undefined
+      ? { schemaOverrides: resolver.config.schemaOverrides }
+      : {}),
+  }
+}
+
+/**
+ * Constructs a `ResolveSchema` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createResolveSchema(deps: ResolveSchemaDeps): ResolveSchema
+/**
+ * Constructs a `ResolveSchema` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param opts - Optional kernel overrides for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createResolveSchema(
   config: SpecdConfig,
-  opts?: SchemaResolutionKernelOptions,
+  options?: CompositionResolutionOptions,
 ): ResolveSchema
 /**
- * Constructs a `ResolveSchema` use case with explicit adapter options.
+ * Constructs a `ResolveSchema` instance from explicit deps or config bootstrap.
  *
- * @param options - Filesystem adapter options for schema resolution
- * @returns The pre-wired use case instance
- */
-export function createResolveSchema(options: FsResolveSchemaOptions): ResolveSchema
-/**
- * Constructs a `ResolveSchema` instance wired with filesystem adapters.
- *
- * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
- * @param kernelOpts - Optional kernel options; only used with `SpecdConfig`
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createResolveSchema(
-  configOrOptions: SpecdConfig | FsResolveSchemaOptions,
-  kernelOpts?: SchemaResolutionKernelOptions,
+  depsOrConfig: ResolveSchemaDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ResolveSchema {
-  if (isSpecdConfig(configOrOptions)) {
-    return createResolveSchemaForConfig(configOrOptions, kernelOpts)
-  }
-  const schemas: SchemaRegistry = createSchemaRegistry('fs', {
-    nodeModulesPaths: configOrOptions.nodeModulesPaths,
-    configDir: configOrOptions.configDir,
-    schemaRepositories: configOrOptions.schemaRepositories,
-  })
-  return new ResolveSchema(
-    schemas,
-    configOrOptions.schemaRef,
-    configOrOptions.schemaPlugins ?? [],
-    configOrOptions.schemaOverrides,
+  const normalized = normalizeCompositionFactoryArgs(
+    'createResolveSchema',
+    depsOrConfig,
+    options,
+    isResolveSchemaDeps,
   )
+  return createResolveSchemaFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ResolveSchema` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createResolveSchemaFromNormalized(
+  input: FactoryInput<ResolveSchemaDeps, CompositionResolutionOptions>,
+): ResolveSchema {
+  if (input.kind === 'deps') {
+    return new ResolveSchema(
+      input.deps.schemas,
+      input.deps.schemaRef,
+      input.deps.schemaPlugins ?? [],
+      input.deps.schemaOverrides,
+    )
+  }
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createResolveSchema(resolveResolveSchemaDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ResolveSchemaDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isResolveSchemaDeps(value: ResolveSchemaDeps | SpecdConfig): value is ResolveSchemaDeps {
+  return 'schemas' in value && 'schemaRef' in value
 }

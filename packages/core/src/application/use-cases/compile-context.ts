@@ -516,7 +516,7 @@ export class CompileContext {
 
     const lifecycle = this._lifecycle.evaluate(change, schema)
     const requestedStepVerdict = lifecycle.availableSteps.find((step) => step.step === input.step)
-    const stepAvailable = requestedStepVerdict?.isReady ?? true
+    const stepAvailable = requestedStepVerdict?.available ?? true
     const blockingArtifacts = [...(requestedStepVerdict?.blockingArtifacts ?? [])]
     Logger.debug('CompileContext projected lifecycle engine availability', {
       change: change.name,

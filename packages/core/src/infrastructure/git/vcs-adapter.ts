@@ -1,5 +1,5 @@
-import { type VcsAdapter } from '../../application/ports/vcs-adapter.js'
-import { git } from './exec.js'
+import { VcsAdapter, type VcsIdentity } from '../../application/ports/vcs-adapter.js'
+import { git, gitSync } from './exec.js'
 
 /**
  * Git CLI implementation of the {@link VcsAdapter} port.
@@ -7,27 +7,44 @@ import { git } from './exec.js'
  * Shells out to the `git` binary for all queries. All methods operate relative
  * to `cwd`, which defaults to `process.cwd()` when not specified.
  */
-export class GitVcsAdapter implements VcsAdapter {
-  private readonly _cwd: string
+export class GitVcsAdapter extends VcsAdapter {
+  private readonly _rootDir: string | null
 
   /**
    * Creates a new `GitVcsAdapter`.
    *
    * @param cwd - Working directory for git commands; defaults to `process.cwd()`
+   * @param rootDir - Optional cached repository root
    */
-  constructor(cwd: string = process.cwd()) {
-    this._cwd = cwd
+  constructor(cwd: string = process.cwd(), rootDir?: string) {
+    super(cwd)
+    this._rootDir = rootDir ?? null
+  }
+
+  /**
+   * Detects whether the provided working directory is inside a git repository.
+   *
+   * @param cwd - Working directory to probe
+   * @returns A configured `GitVcsAdapter`, or `null` when git is not active
+   */
+  static override async detect(cwd: string): Promise<VcsAdapter | null> {
+    try {
+      const rootDir = await git(cwd, 'rev-parse', '--show-toplevel')
+      return new GitVcsAdapter(cwd, rootDir)
+    } catch {
+      return null
+    }
   }
 
   /** @inheritdoc */
-  async rootDir(): Promise<string> {
-    return git(this._cwd, 'rev-parse', '--show-toplevel')
+  rootDir(): string {
+    return this._rootDir ?? gitSync(this.cwd, 'rev-parse', '--show-toplevel')
   }
 
   /** @inheritdoc */
   async branch(): Promise<string> {
     try {
-      return await git(this._cwd, 'symbolic-ref', '--short', 'HEAD')
+      return await git(this.cwd, 'symbolic-ref', '--short', 'HEAD')
     } catch {
       return 'HEAD'
     }
@@ -35,14 +52,14 @@ export class GitVcsAdapter implements VcsAdapter {
 
   /** @inheritdoc */
   async isClean(): Promise<boolean> {
-    const output = await git(this._cwd, 'status', '--porcelain')
+    const output = await git(this.cwd, 'status', '--porcelain')
     return output.length === 0
   }
 
   /** @inheritdoc */
   async ref(): Promise<string | null> {
     try {
-      return await git(this._cwd, 'rev-parse', '--short', 'HEAD')
+      return await git(this.cwd, 'rev-parse', '--short', 'HEAD')
     } catch {
       return null
     }
@@ -51,9 +68,9 @@ export class GitVcsAdapter implements VcsAdapter {
   /** @inheritdoc */
   async refAt(at: string): Promise<string | null> {
     try {
-      const revision = await git(this._cwd, 'rev-list', '-1', `--before=${at}`, 'HEAD')
+      const revision = await git(this.cwd, 'rev-list', '-1', `--before=${at}`, 'HEAD')
       if (revision.length === 0) return null
-      return await git(this._cwd, 'rev-parse', '--short', revision)
+      return await git(this.cwd, 'rev-parse', '--short', revision)
     } catch {
       return null
     }
@@ -62,24 +79,33 @@ export class GitVcsAdapter implements VcsAdapter {
   /** @inheritdoc */
   async modifiedFiles(baseRef: string): Promise<readonly string[]> {
     const diffOutput = await git(
-      this._cwd,
+      this.cwd,
       'diff',
       '--name-only',
       '--diff-filter=ACMR',
       baseRef,
       '--',
     )
-    const untrackedOutput = await git(this._cwd, 'ls-files', '--others', '--exclude-standard')
+    const untrackedOutput = await git(this.cwd, 'ls-files', '--others', '--exclude-standard')
     return normalizePaths(diffOutput, untrackedOutput)
   }
 
   /** @inheritdoc */
   async show(ref: string, filePath: string): Promise<string | null> {
     try {
-      return await git(this._cwd, 'show', `${ref}:${filePath}`)
+      return await git(this.cwd, 'show', `${ref}:${filePath}`)
     } catch {
       return null
     }
+  }
+
+  /** @inheritdoc */
+  async identity(): Promise<VcsIdentity> {
+    const [name, email] = await Promise.all([
+      git(this.cwd, 'config', 'user.name'),
+      git(this.cwd, 'config', 'user.email'),
+    ])
+    return { name, email, provider: 'git' }
   }
 }
 

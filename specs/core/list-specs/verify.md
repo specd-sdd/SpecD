@@ -141,3 +141,16 @@
 
 - **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true })` is called
 - **THEN** entries may contain `summary` and `metadataStatus` in addition to required fields
+
+### Requirement: Config-based factory delegates through resolveListSpecsDeps
+
+#### Scenario: createListSpecs config form derives ListSpecsDeps through resolveListSpecsDeps
+
+- **WHEN** `createListSpecs(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ListSpecsDeps` through `resolveListSpecsDeps(resolver)`
+- **AND** `resolveListSpecsDeps(resolver)` resolves:
+- `listWorkspaces: ListWorkspaces`
+- `hasher: ContentHasher`
+- `yaml: YamlSerializer`
+- **AND** the factory delegates to canonical `createListSpecs(deps)`

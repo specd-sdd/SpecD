@@ -5,7 +5,8 @@
     "core:resolve-schema",
     "core:build-schema",
     "core:schema-registry-port",
-    "core:parse-schema-yaml"
+    "core:parse-schema-yaml",
+    "core:composition-resolver"
   ],
   "context": [
     "Schema validation logic is currently embedded in the resolution pipeline (`ResolveSchema`) and the domain service (`buildSchema`), but there is no dedicated use case that exposes validation as a first-class operation. Delivery mechanisms that need to validate a schema — whether the project's active schema or an external file — must either duplicate orchestration logic or import infrastructure functions directly, violating the architecture spec. `ValidateSchema` is an application use case that encapsulates schema validation for both modes, keeping delivery mechanisms as thin adapters."
@@ -51,6 +52,12 @@
       "requirement": "Extends chain warnings in file and ref modes",
       "rules": [
         "When validating a file or ref that declares `extends` and the extends chain resolves successfully, the use case SHALL include a warning: `extends '<ref>' resolved from <resolvedPath>`. This helps the user understand which parent schema was used.\n\nWhen the extends reference cannot be resolved (e.g. the parent is an npm package not installed), the use case SHALL return a failure result with the resolution error — extends resolution is not optional in file or ref mode."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveValidateSchemaDeps",
+      "rules": [
+        "The config-based `createValidateSchema(config, options?)` form MUST derive `ValidateSchemaDeps` through `resolveValidateSchemaDeps(resolver)` and then delegate to canonical `createValidateSchema(deps)`.\n\n`resolveValidateSchemaDeps(resolver)` MUST resolve:\n\n- `schemas: SchemaRegistry`\n- `schemaRef: string`\n- `buildSchemaFn: ( ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>, )`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -233,11 +240,30 @@
       "given": ["a schema ref that extends @specd/schema-std resolved from /path/to/schema.yaml"],
       "when": ["execute is called with { mode: 'ref', ref: '#default:child' }"],
       "then": ["warnings contains extends '@specd/schema-std' resolved from /path/to/schema.yaml"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveValidateSchemaDeps",
+      "name": "createValidateSchema config form derives ValidateSchemaDeps through resolveValidateSchemaDeps",
+      "when": ["createValidateSchema(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ValidateSchemaDeps through resolveValidateSchemaDeps(resolver)",
+        "AND resolveValidateSchemaDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createValidateSchema(deps)"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:validate-schema",
+        "file": "core:src/composition/use-cases/validate-schema.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e053e7696e1ebf41b9da38a772f041a197244529a11230a601698345c9c0f143",
-    "verify.md": "sha256:a6daab20b95e04dffca746e44f6dae67504236524e59efc42c641c605e375e22"
+    "spec.md": "sha256:0999cb9317324216f3c60f9a81b4e53cb3f1acc327be79f07b59f44c4f53acdd",
+    "verify.md": "sha256:6ffad5abe70096ff03f2e3f6c10bfd64b60ad4ab30e316bc1c400aa1f03760fd"
   },
   "generatedBy": "core"
 }

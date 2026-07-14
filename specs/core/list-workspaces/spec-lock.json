@@ -3,11 +3,15 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:config", "core:workspace", "core:spec-repository-port"],
+  "dependsOn": [
+    "core:config",
+    "core:workspace",
+    "core:spec-repository-port",
+    "core:composition-resolver"
+  ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/list-workspaces.ts",
-      "symbols": ["createListWorkspaces"]
+      "file": "core:src/composition/use-cases/list-workspaces.ts"
     }
   ]
 }

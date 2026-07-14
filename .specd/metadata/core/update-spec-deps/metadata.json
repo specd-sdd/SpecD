@@ -6,7 +6,8 @@
     "core:spec-id-format",
     "core:compile-context",
     "core:composition",
-    "default:_global/error-handling-conventions"
+    "default:_global/error-handling-conventions",
+    "core:composition-resolver"
   ],
   "context": [
     "Spec dependencies must be captured during authoring — before metadata files exist — so that `CompileContext` can resolve the full dependency graph from the start. The `UpdateSpecDeps` use case updates the declared `dependsOn` dependencies for a single spec within a change, storing them in `change.specDependsOn` as the highest-priority source for resolution. It supports three mutually exclusive operations: add, remove, and set (replace all)."
@@ -76,6 +77,12 @@
       "requirement": "Typed errors for dependency update failures",
       "rules": [
         "`UpdateSpecDeps` MUST NOT throw generic `Error` for validation or lookup failures. It SHALL use typed `SpecdError` subclasses (or general core validation errors) for the following scenarios:\n\n- Flag validation (mutually exclusive flags, missing flags).\n- Dependency lookup failures (dependency not found).\n\nEach error MUST follow the [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md) for actionable messaging."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateSpecDepsDeps",
+      "rules": [
+        "The config-based `createUpdateSpecDeps(config, options?)` form MUST derive `UpdateSpecDepsDeps` through `resolveUpdateSpecDepsDeps(resolver)` and then delegate to canonical `createUpdateSpecDeps(deps)`.\n\n`resolveUpdateSpecDepsDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -197,12 +204,30 @@
         "a typed error is thrown",
         "AND the message indicates which dependency was not found"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateSpecDepsDeps",
+      "name": "createUpdateSpecDeps config form derives UpdateSpecDepsDeps through resolveUpdateSpecDepsDeps",
+      "when": ["createUpdateSpecDeps(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives UpdateSpecDepsDeps through resolveUpdateSpecDepsDeps(resolver)",
+        "AND resolveUpdateSpecDepsDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createUpdateSpecDeps(deps)"
+      ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:update-spec-deps",
+        "file": "core:src/composition/use-cases/update-spec-deps.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:9dd1b9737b6f5f0b820b2f6b6d7b0eb86a4a5d6b5d42610d9758587d9fa57833",
-    "verify.md": "sha256:56342d1cc2150660c20044f9be8f2b8988defe775c49e07200796e2967168f43"
+    "spec.md": "sha256:84b8cedb91fa046e993b4f1bae67aa3214c70585ae681256a2ac653759c18098",
+    "verify.md": "sha256:004f29d177cd6acbdab229a6c8ff227191bbf3ab4027282253a146979584933d"
   },
   "generatedBy": "core"
 }

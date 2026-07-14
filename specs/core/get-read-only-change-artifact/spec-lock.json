@@ -10,5 +10,10 @@
     "core:get-discarded",
     "core:get-change-artifact"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/get-read-only-change-artifact.ts",
+      "symbols": ["createGetReadOnlyChangeArtifact"]
+    }
+  ]
 }

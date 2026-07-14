@@ -63,7 +63,7 @@ A delta file is a YAML sequence. Each entry is one delta operation.
     matches: 'Requirement: Load config'
   content: |
     The system must load specd.yaml from the nearest ancestor directory
-    that contains the file, stopping at the git repo root.
+    that contains the file, stopping at the active VCS root.
 
 # Rename the section and update its body in one operation
 - op: modified
@@ -222,10 +222,10 @@ Every delta entry, regardless of operation type, accepts an optional `descriptio
   selector:
     type: section
     matches: 'Requirement: Load config'
-  description: 'Tightened wording to reflect that the walk stops at the git root, not just any ancestor.'
+  description: 'Tightened wording to reflect that the walk stops at the active VCS root, not just any ancestor.'
   content: |
     The system must load specd.yaml from the nearest ancestor directory
-    that contains the file, stopping at the git repo root.
+    that contains the file, stopping at the active VCS root.
 
 - op: added
   description: 'New requirement introduced by ADR-0012 — cache invalidation on file change.'
@@ -360,13 +360,13 @@ A realistic delta for a spec that is gaining a new requirement, updating an exis
 
 # Update the existing discovery requirement with tighter wording
 - op: modified
-  description: 'Clarified that the walk stops at the git root boundary — not just any ancestor.'
+  description: 'Clarified that the walk stops at the active VCS root boundary — not just any ancestor.'
   selector:
     type: section
     matches: 'Requirement: Discover config'
   content: |
     The system must discover specd.yaml by walking up from the current working
-    directory, stopping at the first match or at the git repo root, whichever
+    directory, stopping at the first match or at the active VCS root, whichever
     comes first. The walk never crosses the repo root boundary.
 
 # Add a new caching requirement after the discovery requirement

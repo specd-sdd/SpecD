@@ -98,7 +98,15 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:read-log",
+        "file": "core:src/composition/use-cases/read-log.ts",
+        "symbol": "createReadLog"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:b2a08e2f40a03e229a3a585a797ef62ccd4b7f3249a76b00a38c4a20d6898963",
     "verify.md": "sha256:1bdb2abb83b957cced4f985703adf1a12e846e777cd6cd277c7e385463c30468"

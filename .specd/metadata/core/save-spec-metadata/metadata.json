@@ -1,7 +1,7 @@
 {
   "title": "SaveSpecMetadata",
   "description": "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).",
-  "dependsOn": ["core:spec-metadata", "default:_global/architecture"],
+  "dependsOn": ["core:spec-metadata", "default:_global/architecture", "core:composition-resolver"],
   "context": [
     "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata)."
   ],
@@ -64,6 +64,12 @@
       "requirement": "Constructor dependencies",
       "rules": [
         "The use case receives:\n\n- `specRepos: ReadonlyMap<string, SpecRepository>` — workspace-keyed spec repositories\n\nThe `YamlSerializer` dependency is no longer needed — metadata content is JSON, parsed with `JSON.parse()`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveSaveSpecMetadataDeps",
+      "rules": [
+        "The config-based `createSaveSpecMetadata(config, options?)` form MUST derive `SaveSpecMetadataDeps` through `resolveSaveSpecMetadataDeps(resolver)` and then delegate to canonical `createSaveSpecMetadata(deps)`.\n\n`resolveSaveSpecMetadataDeps(resolver)` MUST resolve:\n\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -292,20 +298,30 @@
       ],
       "when": ["execute() is called with force: true"],
       "then": ["the write succeeds"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveSaveSpecMetadataDeps",
+      "name": "createSaveSpecMetadata config form derives SaveSpecMetadataDeps through resolveSaveSpecMetadataDeps",
+      "when": ["createSaveSpecMetadata(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives SaveSpecMetadataDeps through resolveSaveSpecMetadataDeps(resolver)",
+        "AND resolveSaveSpecMetadataDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createSaveSpecMetadata(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:save-spec-metadata",
-        "file": "core:src/application/use-cases/save-spec-metadata.ts",
-        "symbol": "SaveSpecMetadata"
+        "file": "core:src/composition/use-cases/save-spec-metadata.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a7912d2d65b4ed45c96bfa7c5ab7bf421d51150f59b89c826219e0de09e405a3",
-    "verify.md": "sha256:cf0151020e95e9fe52b0abb6acc38d1f0904902a0dcf673969c4c8c580c26c8d"
+    "spec.md": "sha256:fb1f3305e78e9d7ac31157c9fb8ae6f822163c22f21c8a1fa1e4606899f1fc1f",
+    "verify.md": "sha256:9e783c00644b7d9d44d2b158b43fec9e01af157d317b2efbe344159de8761de8"
   },
   "generatedBy": "core"
 }

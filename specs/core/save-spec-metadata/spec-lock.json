@@ -3,11 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:spec-metadata", "default:_global/architecture"],
+  "dependsOn": ["core:spec-metadata", "default:_global/architecture", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/save-spec-metadata.ts",
-      "symbols": ["SaveSpecMetadata"]
+      "file": "core:src/composition/use-cases/save-spec-metadata.ts"
     }
   ]
 }

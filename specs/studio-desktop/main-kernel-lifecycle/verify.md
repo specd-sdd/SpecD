@@ -55,11 +55,11 @@
 - **WHEN** the desktop package dependencies are inspected
 - **THEN** `@specd/code-graph-electron` is present for desktop-local graph execution
 
-#### Scenario: CLI and API keep the standard graph package
+#### Scenario: CLI and API keep the standard SDK-backed graph runtime
 
-- **WHEN** CLI and API package dependencies are inspected
-- **THEN** they depend on `@specd/code-graph`
-- **AND** they do not depend on `@specd/code-graph-electron`
+- **WHEN** CLI and API package dependencies and bootstrap code are inspected
+- **THEN** they do not depend on `@specd/code-graph-electron`
+- **AND** they access the standard graph runtime through `@specd/sdk`
 
 ### Requirement: desktop main process launches as Electron
 

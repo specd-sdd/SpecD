@@ -2,26 +2,14 @@
 
 ## Purpose
 
-Provides actor identity resolution using the local Mercurial configuration.
+This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`.
 
 ## Requirements
 
-### Requirement: Implementation of AutoDetectActorProvider
+### Requirement: Deprecated
 
-The Hg actor provider MUST implement the `AutoDetectActorProvider` interface.
-
-- **`name`**: MUST be `"hg"`.
-
-### Requirement: Detection logic
-
-The provider MUST detect Hg presence by looking for a `.hg` directory in the `cwd` or its parents.
-
-### Requirement: Identity resolution
-
-The resulting resolver MUST retrieve identity from Hg config.
-
-- `provider`: MUST be set to `"hg"`.
+This specification is deprecated.
 
 ## Spec Dependencies
 
-- [`core:actor-provider`](../actor-provider/spec.md)
+_none_

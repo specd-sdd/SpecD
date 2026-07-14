@@ -88,8 +88,8 @@
     "symbols": [
       {
         "specId": "api:routes-project-logs",
-        "file": "api:src/delivery/http/handlers/handler-project-logs.ts",
-        "symbol": "registerProjectLogsRoutes"
+        "file": "api:src/composition/create-api-server.ts",
+        "symbol": "createApiServer"
       }
     ]
   },

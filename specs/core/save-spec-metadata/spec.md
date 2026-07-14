@@ -77,6 +77,16 @@ The use case receives:
 
 The `YamlSerializer` dependency is no longer needed — metadata content is JSON, parsed with `JSON.parse()`.
 
+### Requirement: Config-based factory delegates through resolveSaveSpecMetadataDeps
+
+The config-based `createSaveSpecMetadata(config, options?)` form MUST derive `SaveSpecMetadataDeps` through `resolveSaveSpecMetadataDeps(resolver)` and then delegate to canonical `createSaveSpecMetadata(deps)`.
+
+`resolveSaveSpecMetadataDeps(resolver)` MUST resolve:
+
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - Content validation uses `strictSpecMetadataSchema` (write-time), not the lenient `specMetadataSchema` (read-time) — this ensures metadata on disk always meets the strict schema requirements
@@ -87,5 +97,6 @@ The `YamlSerializer` dependency is no longer needed — metadata content is JSON
 
 ## Spec Dependencies
 
-- [`core:spec-metadata`](../spec-metadata/spec.md) — defines the `metadata.json` format, the strict and lenient schemas, and the `dependsOn` overwrite protection rules
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — use case layer conventions and dependency injection rules
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

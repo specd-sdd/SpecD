@@ -9,7 +9,7 @@
     {
       "requirement": "rootDir returns the repository root",
       "rules": [
-        "`rootDir()` MUST return a `Promise<string>` resolving to the absolute path of the repository root directory. The returned path MUST be absolute, not relative.\n\nWhen the current working directory is not inside a VCS repository, `rootDir()` MUST reject with an `Error`."
+        "`rootDir()` MUST return a `string` representing the absolute path of the repository root directory. The returned path MUST be absolute, not relative.\n\nWhen the current working directory is not inside a VCS repository, `rootDir()` MUST throw an `Error`."
       ]
     },
     {
@@ -49,15 +49,27 @@
       ]
     },
     {
-      "requirement": "Interface-only declaration",
+      "requirement": "Abstract class base",
       "rules": [
-        "`VcsAdapter` MUST be declared as a TypeScript `interface`, not an abstract class. Unlike repository ports, `VcsAdapter` has no invariant constructor arguments shared across all implementations, so an interface is the appropriate abstraction."
+        "`VcsAdapter` MUST be declared as an abstract class, not a TypeScript interface. It MUST accept `cwd` as a protected read-only constructor parameter, which represents the working directory context."
       ]
     },
     {
       "requirement": "Null fallback implementation",
       "rules": [
-        "A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:\n\n- `rootDir()` MUST reject with an `Error` containing a message indicating no VCS was detected.\n- `branch()` MUST resolve to `\"none\"`.\n- `isClean()` MUST resolve to `true`.\n- `ref()` MUST resolve to `null`.\n- `refAt()` MUST resolve to `null` for any timestamp.\n- `show()` MUST resolve to `null` for any arguments.\n- `modifiedFiles()` MUST resolve to an empty array for any baseline."
+        "A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:\n\n- `rootDir()` MUST throw an `Error` containing a message indicating no VCS was detected.\n- `branch()` MUST resolve to `\"none\"`.\n- `isClean()` MUST resolve to `true`.\n- `ref()` MUST resolve to `null`.\n- `refAt()` MUST resolve to `null` for any timestamp.\n- `show()` MUST resolve to `null` for any arguments.\n- `modifiedFiles()` MUST resolve to an empty array for any baseline.\n- `identity()` MUST resolve to `{ name: 'unknown', email: '', provider: 'null' }`."
+      ]
+    },
+    {
+      "requirement": "identity resolves version control identity",
+      "rules": [
+        "`identity()` MUST return a `Promise<VcsIdentity>` resolving to the version control author identity configured for the repository.\n\nThe returned `VcsIdentity` has the structure:\n\n```typescript\nexport interface VcsIdentity {\n  readonly name: string\n  readonly email: string\n  readonly provider: string\n}\n```\n\n`name` MUST be a non-empty string when resolved successfully, and `email` MAY be empty for backends that do not natively store email (like SVN)."
+      ]
+    },
+    {
+      "requirement": "static detect detects active VCS",
+      "rules": [
+        "`VcsAdapter` MUST define a static `detect(cwd: string): Promise<VcsAdapter | null>` method.\n\nBy default, `VcsAdapter.detect()` MUST return `null`. Concrete subclasses override this to asynchronously detect if the given `cwd` is inside their repository type, resolve the repository root, and return an instance of themselves."
       ]
     }
   ],
@@ -70,13 +82,12 @@
   ],
   "scenarios": [
     {
-      "requirement": "Interface-only declaration",
-      "name": "VcsAdapter is a TypeScript interface",
-      "when": ["the VcsAdapter type is examined"],
+      "requirement": "Abstract class base",
+      "name": "VcsAdapter is an abstract class",
+      "when": ["the VcsAdapter class is examined"],
       "then": [
-        "it is declared as a TypeScript interface",
-        "AND not as an abstract class",
-        "AND implementations can be provided by any concrete class"
+        "it is declared as an abstract class",
+        "AND it has a protected constructor that receives cwd"
       ]
     },
     {
@@ -153,9 +164,9 @@
     },
     {
       "requirement": "Null fallback implementation",
-      "name": "NullVcsAdapter rootDir rejects",
+      "name": "NullVcsAdapter rootDir throws",
       "when": ["rootDir() is called on a NullVcsAdapter"],
-      "then": ["the promise MUST reject with an Error whose message indicates no VCS was detected"]
+      "then": ["it MUST throw an Error whose message indicates no VCS was detected"]
     },
     {
       "requirement": "Null fallback implementation",
@@ -192,6 +203,28 @@
       "name": "NullVcsAdapter modifiedFiles returns empty array",
       "when": ["modifiedFiles(baseRef) is called on a NullVcsAdapter"],
       "then": ["the promise MUST resolve to an empty array"]
+    },
+    {
+      "requirement": "Null fallback implementation",
+      "name": "NullVcsAdapter identity returns null identity",
+      "when": ["identity() is called on a NullVcsAdapter"],
+      "then": ["the promise MUST resolve to { name: \"unknown\", email: \"\", provider: \"null\" }"]
+    },
+    {
+      "requirement": "identity resolves version control identity",
+      "name": "Git user identity resolved",
+      "given": ["git configured with name \"John Doe\" and email \"john@example.com\""],
+      "when": ["identity() is called on a GitVcsAdapter"],
+      "then": [
+        "the promise MUST resolve to { name: \"John Doe\", email: \"john@example.com\", provider: \"git\" }"
+      ]
+    },
+    {
+      "requirement": "static detect detects active VCS",
+      "name": "Git detection inside git repo",
+      "given": ["a directory inside a git repository"],
+      "when": ["VcsAdapter.detect(cwd) is called"],
+      "then": ["the promise MUST resolve to a GitVcsAdapter instance"]
     }
   ],
   "implementation": {
@@ -199,43 +232,18 @@
       {
         "specId": "core:vcs-adapter-port",
         "file": "core:src/application/ports/vcs-adapter.ts",
-        "symbol": "VcsAdapter.rootDir"
+        "symbol": "VcsAdapter"
       },
       {
         "specId": "core:vcs-adapter-port",
         "file": "core:src/application/ports/vcs-adapter.ts",
-        "symbol": "VcsAdapter.branch"
-      },
-      {
-        "specId": "core:vcs-adapter-port",
-        "file": "core:src/application/ports/vcs-adapter.ts",
-        "symbol": "VcsAdapter.isClean"
-      },
-      {
-        "specId": "core:vcs-adapter-port",
-        "file": "core:src/application/ports/vcs-adapter.ts",
-        "symbol": "VcsAdapter.ref"
-      },
-      {
-        "specId": "core:vcs-adapter-port",
-        "file": "core:src/application/ports/vcs-adapter.ts",
-        "symbol": "VcsAdapter.refAt"
-      },
-      {
-        "specId": "core:vcs-adapter-port",
-        "file": "core:src/application/ports/vcs-adapter.ts",
-        "symbol": "VcsAdapter.modifiedFiles"
-      },
-      {
-        "specId": "core:vcs-adapter-port",
-        "file": "core:src/application/ports/vcs-adapter.ts",
-        "symbol": "VcsAdapter.show"
+        "symbol": "VcsIdentity"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c643e4f87f196c468cdf3ccc11a3d31b3ee1f1cf1844ad288d5e018c04750db4",
-    "verify.md": "sha256:a2af9c850d037bf6bde13fd3bb0025ff49139453a003a3f7882f2f8ec3a578bb"
+    "spec.md": "sha256:cb6c37ffcefcec6eb576f2da7dd80fab67dce5f745173f7a73d298521abed75c",
+    "verify.md": "sha256:d3b31ee7b47d4337e8f178715eb7325af932cf54a06fbda2631ee9b49f76bb94"
   },
   "generatedBy": "core"
 }

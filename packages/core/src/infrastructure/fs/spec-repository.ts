@@ -1,5 +1,8 @@
 import * as fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import * as path from 'node:path'
+import { z } from 'zod'
+import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import { randomUUID } from 'node:crypto'
 import { Spec } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -18,7 +21,7 @@ import {
 } from '../../domain/services/parse-spec-lock.js'
 import {
   SpecRepository,
-  type SpecRepositoryConfig,
+  type SpecRepositoryConfig as BaseSpecRepositoryConfig,
   type SpecPublication,
   type ResolveFromPathResult,
   type SpecSearchResult,
@@ -34,36 +37,24 @@ import { checkMetadataFreshness } from '../../application/use-cases/_shared/meta
 const SPEC_LOCK_FILENAME = 'spec-lock.json'
 
 /**
- * Configuration for `FsSpecRepository`.
- *
- * Extends the base `SpecRepositoryConfig` with the root path under which
- * spec directories are stored.
+ * Extended configuration for `FsSpecRepository`.
  */
-export interface FsSpecRepositoryConfig extends SpecRepositoryConfig {
-  /**
-   * Absolute path to the specs root directory for this workspace.
-   *
-   * Each spec lives at `<specsPath>/<specName>/` where `<specName>` is the
-   * slash-separated spec path (e.g. `auth/oauth`).
-   */
-  readonly specsPath: string
-  /**
-   * Optional logical path prefix for all specs in this workspace.
-   *
-   * When set, `list()` prepends prefix segments to discovered `SpecPath`
-   * values, and `get()` / `artifact()` strip prefix segments before
-   * computing the filesystem path.
-   */
+export interface SpecRepositoryConfig extends BaseSpecRepositoryConfig {
   readonly prefix?: string
-  /**
-   * Absolute path to the metadata root directory for this workspace.
-   *
-   * Each spec's metadata lives at `<metadataPath>/<specFsPath>/metadata.json`.
-   * Resolved from workspace config `specs.fs.metadataPath` or auto-derived
-   * at composition time from the VCS root.
-   */
+}
+
+/**
+ * Configuration options for the filesystem spec repository.
+ */
+export interface FsSpecRepositoryConfig {
+  readonly path: string
   readonly metadataPath: string
 }
+
+export const FsSpecOptionsSchema = z.object({
+  path: z.string(),
+  metadataPath: z.string(),
+})
 
 /**
  * Filesystem implementation of `SpecRepository`.
@@ -85,14 +76,63 @@ export class FsSpecRepository extends SpecRepository {
   /**
    * Creates a new `FsSpecRepository` instance.
    *
-   * @param config - Specs root path, workspace configuration, and locality settings
+   * @param config - Legacy specs root path, workspace configuration, and locality settings
    */
-  constructor(config: FsSpecRepositoryConfig) {
-    super(config)
-    this._specsPath = config.specsPath
-    this._metadataPath = config.metadataPath
+  constructor(config: SpecRepositoryConfig & { specsPath: string; metadataPath: string })
+  /**
+   * Creates a new `FsSpecRepository` instance.
+   *
+   * @param context - Shared repository context
+   * @param config - Adapter options
+   */
+  constructor(context: SpecRepositoryConfig, config: FsSpecRepositoryConfig)
+  /**
+   * Creates a new `FsSpecRepository` instance.
+   *
+   * @param contextOrConfig - Shared repository context or legacy config
+   * @param config - Adapter options or undefined for legacy constructor
+   */
+  constructor(contextOrConfig: unknown, config?: unknown) {
+    let context: SpecRepositoryConfig
+    let parsedConfig: FsSpecRepositoryConfig
+    if (config === undefined) {
+      const legacy = contextOrConfig as SpecRepositoryConfig & {
+        specsPath: string
+        metadataPath: string
+      }
+      context = legacy
+      parsedConfig = { path: legacy.specsPath, metadataPath: legacy.metadataPath }
+    } else {
+      context = contextOrConfig as SpecRepositoryConfig
+      const typedConfig = config as {
+        readonly path?: string
+        readonly specsPath?: string
+        readonly metadataPath?: string
+      }
+      const normalized = {
+        path: typedConfig.path ?? typedConfig.specsPath,
+        metadataPath: typedConfig.metadataPath,
+      }
+      parsedConfig = FsSpecOptionsSchema.parse(normalized)
+    }
+
+    super(context)
+
+    // Verify paths exist on disk
+    if (!existsSync(parsedConfig.path)) {
+      throw new StorageDirectoryNotFoundError(parsedConfig.path, 'Specs directory does not exist')
+    }
+    if (!existsSync(parsedConfig.metadataPath)) {
+      throw new StorageDirectoryNotFoundError(
+        parsedConfig.metadataPath,
+        'Metadata directory does not exist',
+      )
+    }
+
+    this._specsPath = parsedConfig.path
+    this._metadataPath = parsedConfig.metadataPath
     this._prefixSegments =
-      config.prefix !== undefined ? config.prefix.split('/').filter((s) => s.length > 0) : []
+      context.prefix !== undefined ? context.prefix.split('/').filter((s) => s.length > 0) : []
   }
 
   /** Canonical specs root path for this workspace repository. */

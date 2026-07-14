@@ -1,81 +1,97 @@
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { DraftChange } from '../../application/use-cases/draft-change.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Domain context for a `ChangeRepository` bound to a single workspace.
+ * Explicit dependencies for {@link createDraftChange}.
  */
-export interface DraftChangeContext {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
+export interface DraftChangeDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Actor resolver used by the use case. */
+  readonly actor: ActorResolver
 }
 
 /**
- * Filesystem adapter paths for `createDraftChange(context, options)`.
+ * Resolves {@link DraftChangeDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `DraftChange`
  */
-export interface FsDraftChangeOptions {
-  /** Absolute path to the `changes/` directory. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
-  readonly discardedPath: string
+export function resolveDraftChangeDeps(resolver: CompositionResolver): DraftChangeDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    actor: resolver.getActorResolver(),
+  }
 }
 
 /**
- * Constructs a `DraftChange` use case wired to the default workspace.
+ * Constructs a `DraftChange` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createDraftChange(deps: DraftChangeDeps): DraftChange
+/**
+ * Constructs a `DraftChange` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createDraftChange(config: SpecdConfig): DraftChange
-/**
- * Constructs a `DraftChange` use case with explicit context and fs paths.
- *
- * @param context - Workspace domain context
- * @param options - Filesystem adapter paths
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createDraftChange(
-  context: DraftChangeContext,
-  options: FsDraftChangeOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): DraftChange
 /**
- * Constructs a `DraftChange` instance wired with filesystem adapters.
+ * Constructs a `DraftChange` instance from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
  * @returns The pre-wired use case instance
  */
 export function createDraftChange(
-  configOrContext: SpecdConfig | DraftChangeContext,
-  options?: FsDraftChangeOptions,
+  depsOrConfig: DraftChangeDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): DraftChange {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    return createDraftChange(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createDraftChange',
+    depsOrConfig,
+    options,
+    isDraftChangeDeps,
+  )
+  return createDraftChangeFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `DraftChange` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createDraftChangeFromNormalized(
+  input: FactoryInput<DraftChangeDeps, CompositionResolutionOptions>,
+): DraftChange {
+  if (input.kind === 'deps') {
+    return new DraftChange(input.deps.changes, input.deps.actor)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const actor = createVcsActorResolver()
-  return new DraftChange(changeRepo, actor)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createDraftChange(resolveDraftChangeDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `DraftChangeDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isDraftChangeDeps(value: DraftChangeDeps | SpecdConfig): value is DraftChangeDeps {
+  return 'changes' in value && 'actor' in value
 }

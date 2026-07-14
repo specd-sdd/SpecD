@@ -222,6 +222,14 @@
 - **WHEN** project context is retrieved
 - **THEN** the result uses `optimized.context`
 
+#### Scenario: Fresh optimized cache is ignored when llmOptimizedContext is disabled
+
+- **GIVEN** `llmOptimizedContext: false`
+- **AND** `project-metadata.json` exists and all hashes match
+- **WHEN** project context is retrieved
+- **THEN** the use case does not return `optimized.context` as the primary response
+- **AND** it continues with the standard compilation flow
+
 #### Scenario: Falls back and warns when project context is stale
 
 - **GIVEN** `llmOptimizedContext` is enabled
@@ -230,3 +238,21 @@
 - **THEN** it falls back to raw compilation
 - **AND** it emits a warning
 - **AND** the warning message mentions `specd-project-context-optimizer`
+
+### Requirement: Config-based factory delegates through resolveGetProjectContextDeps
+
+#### Scenario: createGetProjectContext config form derives GetProjectContextDeps through resolveGetProjectContextDeps
+
+- **WHEN** `createGetProjectContext(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetProjectContextDeps` through `resolveGetProjectContextDeps(resolver)`
+- **AND** `resolveGetProjectContextDeps(resolver)` resolves:
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `files: FileReader`
+- `parsers: ArtifactParserRegistry`
+- `hasher: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `defaultConfig: CompileContextConfig`
+- **AND** the factory delegates to canonical `createGetProjectContext(deps)`

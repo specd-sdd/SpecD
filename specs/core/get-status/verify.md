@@ -327,3 +327,18 @@
 - **GIVEN** lifecycle interpretation finds artifact drift or missing required artifacts
 - **WHEN** `execute()` is called
 - **THEN** the returned `blockers` array contains machine-readable blocker entries describing those conditions
+
+### Requirement: Config-based factory delegates through resolveGetStatusDeps
+
+#### Scenario: createGetStatus config form derives GetStatusDeps through resolveGetStatusDeps
+
+- **WHEN** `createGetStatus(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetStatusDeps` through `resolveGetStatusDeps(resolver)`
+- **AND** `resolveGetStatusDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `schemaProvider: SchemaProvider`
+- `approvals: { readonly spec: boolean; readonly signoff: boolean }`
+- `refreshImplementationTracking: RefreshImplementationTracking`
+- `lifecycle: LifecycleEngine`
+- **AND** the factory delegates to canonical `createGetStatus(deps)`

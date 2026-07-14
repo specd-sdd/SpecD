@@ -8,6 +8,9 @@
     {
       "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
       "symbols": ["buildProjectStatusSnapshot"]
+    },
+    {
+      "file": "sdk:test/orchestration/build-project-status-snapshot.spec.ts"
     }
   ]
 }

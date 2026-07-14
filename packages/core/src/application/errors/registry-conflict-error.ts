@@ -1,7 +1,7 @@
 import { SpecdError } from '../../domain/errors/specd-error.js'
 
 /**
- * Thrown when additive kernel registry inputs would overwrite an existing entry.
+ * Thrown when additive composition-registry inputs would overwrite an existing entry.
  */
 export class RegistryConflictError extends SpecdError {
   /** Machine-readable error code for programmatic handling. */
@@ -16,6 +16,6 @@ export class RegistryConflictError extends SpecdError {
    * @param key - The conflicting name or accepted type
    */
   constructor(registry: string, key: string) {
-    super(`Duplicate registration '${key}' in kernel registry '${registry}'`)
+    super(`Duplicate registration '${key}' in composition registry '${registry}'`)
   }
 }

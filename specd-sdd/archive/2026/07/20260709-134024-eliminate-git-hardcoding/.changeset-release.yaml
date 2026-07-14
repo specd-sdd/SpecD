@@ -1,0 +1,18 @@
+releases:
+  core:vcs-adapter-port: patch
+  core:vcs-adapter: patch
+  core:actor-resolver-port: patch
+  core:actor-resolver: patch
+  core:actor-resolver-git: patch
+  core:actor-resolver-hg: patch
+  core:actor-resolver-svn: patch
+  core:actor-provider: patch
+  core:config-loader: patch
+  code-graph:indexer: patch
+  core:config: patch
+  code-graph:workspace-integration: patch
+  cli:entrypoint: patch
+  cli:host-context: patch
+  core:vcs-actor-resolver: patch
+  core:composition: patch
+  sdk:host-context: patch

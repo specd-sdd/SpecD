@@ -1,0 +1,19 @@
+- op: added
+  description: 'Verify the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveListDraftsDeps
+
+    #### Scenario: createListDrafts config form derives ListDraftsDeps through resolveListDraftsDeps
+
+    - **WHEN** `createListDrafts(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ListDraftsDeps` through `resolveListDraftsDeps(resolver)`
+    - **AND** `resolveListDraftsDeps(resolver)` resolves:
+
+    - `changes: ChangeRepository`
+
+    - **AND** the factory delegates to canonical `createListDrafts(deps)`

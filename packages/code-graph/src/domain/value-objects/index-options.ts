@@ -100,6 +100,12 @@ export interface IndexOptions {
   readonly vcsRef?: string
 
   /**
+   * The resolved VCS root associated with this indexing run.
+   * Passed through to file discovery and `.gitignore` handling.
+   */
+  readonly vcsRoot: string | null
+
+  /**
    * Optional code-graph version string for fingerprinting.
    * Used to detect when a full re-index is required due to logic changes.
    */

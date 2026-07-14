@@ -3,7 +3,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ListDrafts } from '../../../src/application/use-cases/list-drafts.js'
-import { createListDrafts } from '../../../src/composition/use-cases/list-drafts.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
+import {
+  createListDrafts,
+  type ListDraftsDeps,
+} from '../../../src/composition/use-cases/list-drafts.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
@@ -66,5 +70,21 @@ describe('createListDrafts', () => {
     const useCase = createListDrafts(config)
 
     expect(useCase).toBeInstanceOf(ListDrafts)
+  })
+
+  it('accepts explicit deps without config bootstrap', () => {
+    const changes = { listDrafts: async () => [] } as never
+    const deps: ListDraftsDeps = { changes }
+
+    expect(createListDrafts(deps)).toBeInstanceOf(ListDrafts)
+  })
+
+  it('rejects deps plus composition options', () => {
+    const changes = { listDrafts: async () => [] } as never
+    const deps: ListDraftsDeps = { changes }
+
+    expect(() =>
+      createListDrafts(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
+    ).toThrow(InvalidCompositionFactoryArgumentsError)
   })
 })

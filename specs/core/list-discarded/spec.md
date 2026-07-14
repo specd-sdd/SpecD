@@ -30,9 +30,20 @@ When `createListDiscarded(config)` initializes a `ChangeRepository` from `SpecdC
 
 The config-based factory MUST NOT construct a weaker repository variant that can derive different discarded artifact states for the same persisted change than the canonical listing read path.
 
+### Requirement: Config-based factory delegates through resolveListDiscardedDeps
+
+The config-based `createListDiscarded(config, options?)` form MUST derive `ListDiscardedDeps` through `resolveListDiscardedDeps(resolver)` and then delegate to canonical `createListDiscarded(deps)`.
+
+`resolveListDiscardedDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
 - [`core:kernel`](../kernel/spec.md)
 - [`core:discarded-change-view`](../discarded-change-view/spec.md)
 - [`core:change-repository-port`](../change-repository-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

@@ -31,6 +31,16 @@ In all other cases it returns `{ spec: '<workspace>:<path>' }`.
 
 Because the use case intentionally removes `contentHashes` (a required field in `strictSpecMetadataSchema`), it bypasses `SaveSpecMetadata` and writes directly through `SpecRepository.saveMetadata()`. This is the only use case that writes metadata without strict validation.
 
+### Requirement: Config-based factory delegates through resolveInvalidateSpecMetadataDeps
+
+The config-based `createInvalidateSpecMetadata(config, options?)` form MUST derive `InvalidateSpecMetadataDeps` through `resolveInvalidateSpecMetadataDeps(resolver)` and then delegate to canonical `createInvalidateSpecMetadata(deps)`.
+
+`resolveInvalidateSpecMetadataDeps(resolver)` MUST resolve:
+
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case contains no CLI or delivery logic — it operates purely through the `SpecRepository` port
@@ -40,5 +50,6 @@ Because the use case intentionally removes `contentHashes` (a required field in 
 
 ## Spec Dependencies
 
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata file format and staleness detection rules
-- [`core:storage`](../storage/spec.md) — `SpecRepository` port used for read and write
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

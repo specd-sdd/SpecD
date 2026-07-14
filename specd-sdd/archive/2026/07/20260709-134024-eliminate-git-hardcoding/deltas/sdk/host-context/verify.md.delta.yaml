@@ -1,0 +1,21 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: openSpecdHost'
+  content: |
+    #### Scenario: Discovery mode loads config from cwd
+
+    - **GIVEN** a valid `specd.yaml` in the current working directory
+    - **WHEN** `openSpecdHost()` is called without `configPath`
+    - **THEN** config is loaded via `createDefaultConfigLoader()` discovery mode
+    - **AND** `configFilePath` points to the discovered file
+
+    #### Scenario: Forced config path
+
+    - **WHEN** `openSpecdHost({ configPath: '/path/to/specd.yaml' })` is called
+    - **THEN** the loader uses forced mode for that path
+
+    #### Scenario: Kernel options forwarded
+
+    - **WHEN** `openSpecdHost({ kernelOptions: { ... } })` is called
+    - **THEN** `createKernel` receives the provided options

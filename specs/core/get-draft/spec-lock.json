@@ -3,15 +3,15 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:drafted-change-view", "core:change-repository-port", "core:change"],
+  "dependsOn": [
+    "core:drafted-change-view",
+    "core:change-repository-port",
+    "core:change",
+    "core:composition-resolver"
+  ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-draft.ts",
-      "symbols": ["GetDraft"]
-    },
-    {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["createKernel"]
+      "file": "core:src/composition/use-cases/get-draft.ts"
     }
   ]
 }

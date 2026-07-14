@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:actor-resolver-port", "core:vcs-adapter-port"],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/vcs-actor-resolver.ts",
+      "symbols": ["VcsActorResolver"]
+    },
+    {
+      "file": "core:test/infrastructure/vcs-actor-resolver.spec.ts"
+    }
+  ]
+}

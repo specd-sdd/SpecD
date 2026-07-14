@@ -29,6 +29,16 @@ The use case MUST NOT fall back to `ChangeRepository.get(name)` (active storage)
 
 `GetDraft` depends on `ChangeRepository` injected via constructor.
 
+### Requirement: Config-based factory delegates through resolveGetDraftDeps
+
+The config-based `createGetDraft(config, options?)` form MUST derive `GetDraftDeps` through `resolveGetDraftDeps(resolver)` and then delegate to canonical `createGetDraft(deps)`.
+
+`resolveGetDraftDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - This use case is for single-draft inspection. Listing all drafts remains `ListDrafts`.
@@ -36,6 +46,7 @@ The use case MUST NOT fall back to `ChangeRepository.get(name)` (active storage)
 
 ## Spec Dependencies
 
-- [`core:drafted-change-view`](drafted-change-view/spec.md) — return type
-- [`core:change-repository-port`](../../../../specs/core/change-repository-port/spec.md) — `getDraft`
-- [`core:change`](../../../../specs/core/change/spec.md) — drafted semantics
+- [`core:drafted-change-view`](../drafted-change-view/spec.md)
+- [`core:change-repository-port`](../change-repository-port/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

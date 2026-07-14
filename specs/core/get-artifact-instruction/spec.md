@@ -75,6 +75,21 @@ When `delta` is `false`, the `delta` field in the result is `null`.
 
 The caller decides which parts to use. A subagent creating artifacts from scratch uses `rulesPre` + `instruction` + `template` + `rulesPost`. A subagent creating deltas uses `rulesPre` + `delta` + `rulesPost`, and fetches outline details on demand with `specd specs outline <specPath> --artifact <artifactId>`.
 
+### Requirement: Config-based factory delegates through resolveGetArtifactInstructionDeps
+
+The config-based `createGetArtifactInstruction(config, options?)` form MUST derive `GetArtifactInstructionDeps` through `resolveGetArtifactInstructionDeps(resolver)` and then delegate to canonical `createGetArtifactInstruction(deps)`.
+
+`resolveGetArtifactInstructionDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `templates: TemplateExpander`
+- `lifecycle: LifecycleEngine`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - This use case is read-only — it does not modify the change or execute any commands
@@ -86,9 +101,10 @@ The caller decides which parts to use. A subagent creating artifacts from scratc
 
 ## Spec Dependencies
 
-- [`core:schema-format`](../schema-format/spec.md) — artifact `instruction`, `rules.pre`, `rules.post`, `delta`, `deltaInstruction`, `format`
-- [`core:delta-format`](../delta-format/spec.md) — `ArtifactParser` port, `deltaInstructions()`, `outline()`
-- [`core:change`](../change/spec.md) — Change entity, `specIds`, `schemaName`
-- [`core:schema-merge`](../schema-merge/spec.md) — schema composition via `rules.pre`/`rules.post`
-- [`core:template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
-- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — DAG-aware artifact readiness and effective status interpretation
+- [`core:delta-format`](../delta-format/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:schema-merge`](../schema-merge/spec.md)
+- [`core:template-variables`](../template-variables/spec.md)
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

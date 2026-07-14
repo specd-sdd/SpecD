@@ -111,17 +111,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "api:dto-project-status",
-        "file": "api:src/delivery/http/dto/project-status.ts",
-        "symbol": "ProjectStatusDto"
+        "file": "api:src/delivery/http/dto/project-status.ts"
       }
     ]
   },
   "contentHashes": {
     "spec.md": "sha256:8d0d165c926e8637329f90794bc0ae85eb9bcde6e21b6761d246696f3e2a0adc",
-    "verify.md": "sha256:7a29d47392e64f0f97bc90f9a2d66f51550721fb39089a499ef27a37647816a4"
+    "verify.md": "sha256:c118167e52a2f8b26c9051bffef0763c7e2c333111bf5b2748a18d3c7664fdc3"
   },
   "generatedBy": "core"
 }

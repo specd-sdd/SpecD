@@ -1,118 +1,116 @@
-import * as path from 'node:path'
+import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type TemplateExpander } from '../../application/template-expander.js'
 import { GetHookInstructions } from '../../application/use-cases/get-hook-instructions.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createArchiveRepository } from '../archive-repository.js'
-import { createSchemaRepositoriesForConfig } from '../schema-resolution.js'
-import { TemplateExpander } from '../../application/template-expander.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createResolveSchema } from './resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createGetHookInstructions(context, options)`. */
-export interface GetHookInstructionsContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createGetHookInstructions(context, options)`. */
-export interface FsGetHookInstructionsOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
-  readonly archivePath: string
-  readonly archivePattern?: string
-  readonly projectRoot: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  readonly nodeModulesPaths: readonly string[]
+/**
+ * Explicit dependencies for {@link createGetHookInstructions}.
+ */
+export interface GetHookInstructionsDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Archive repository used by the use case. */
+  readonly archive: ArchiveRepository
+  /** Schema provider used by the use case. */
+  readonly schemaProvider: SchemaProvider
+  /** Template expander used by the use case. */
+  readonly templateExpander: TemplateExpander
 }
 
 /**
- * Constructs a `GetHookInstructions` use case with full project config.
+ * Resolves `GetHookInstructions` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetHookInstructions`
+ */
+export function resolveGetHookInstructionsDeps(
+  resolver: CompositionResolver,
+): GetHookInstructionsDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    archive: resolver.getArchiveRepository(),
+    schemaProvider: resolver.getSchemaProvider(),
+    templateExpander: resolver.getTemplateExpander(),
+  }
+}
+
+/**
+ * Constructs `GetHookInstructions` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetHookInstructions(deps: GetHookInstructionsDeps): GetHookInstructions
+/**
+ * Constructs `GetHookInstructions` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel overrides for schema resolution
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetHookInstructions(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): GetHookInstructions
 /**
- * Constructs a `GetHookInstructions` use case with explicit context and options.
+ * Constructs `GetHookInstructions` from explicit deps or config bootstrap.
  *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths and schema wiring
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetHookInstructions(
-  context: GetHookInstructionsContext,
-  options: FsGetHookInstructionsOptions,
-): GetHookInstructions
-/**
- * Constructs a `GetHookInstructions` instance wired with filesystem adapters.
- *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
- * @returns The pre-wired use case instance
- */
-export function createGetHookInstructions(
-  configOrContext: SpecdConfig | GetHookInstructionsContext,
-  options?: FsGetHookInstructionsOptions | { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: GetHookInstructionsDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetHookInstructions {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const ws = getDefaultWorkspace(config)
-    return createGetHookInstructions(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        archivePath: config.storage.archivePath,
-        ...(config.storage.archivePattern !== undefined
-          ? { archivePattern: config.storage.archivePattern }
-          : {}),
-        projectRoot: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: createSchemaRepositoriesForConfig(config),
-        nodeModulesPaths: [
-          path.join(config.projectRoot, 'node_modules'),
-          ...(kernelOpts?.extraNodeModulesPaths ?? []),
-        ],
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetHookInstructions',
+    depsOrConfig,
+    options,
+    isGetHookInstructionsDeps,
+  )
+  return createGetHookInstructionsFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetHookInstructions` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetHookInstructionsFromNormalized(
+  input: FactoryInput<GetHookInstructionsDeps, CompositionResolutionOptions>,
+): GetHookInstructions {
+  if (input.kind === 'deps') {
+    const { changes, archive, schemaProvider, templateExpander } = input.deps
+    return new GetHookInstructions(changes, archive, schemaProvider, templateExpander)
   }
-  const opts = options as FsGetHookInstructionsOptions
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    discardedPath: opts.discardedPath,
-  })
-  const archiveRepo = createArchiveRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    archivePath: opts.archivePath,
-    ...(opts.archivePattern !== undefined ? { pattern: opts.archivePattern } : {}),
-  })
-  const resolveSchema = createResolveSchema({
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.projectRoot,
-    schemaRef: opts.schemaRef,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const expander = new TemplateExpander({ project: { root: opts.projectRoot } })
-  return new GetHookInstructions(changeRepo, archiveRepo, schemaProvider, expander)
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetHookInstructions(resolveGetHookInstructionsDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetHookInstructionsDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetHookInstructionsDeps(
+  value: GetHookInstructionsDeps | SpecdConfig,
+): value is GetHookInstructionsDeps {
+  return (
+    'changes' in value &&
+    'archive' in value &&
+    'schemaProvider' in value &&
+    'templateExpander' in value
+  )
 }

@@ -1,7 +1,12 @@
 {
   "title": "Ipc Handler Registry",
   "description": "Electron desktop host concern — **Ipc Handler Registry**. Local mode uses an SDK-bootstrapped kernel in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP.",
-  "dependsOn": ["client:specd-data-port", "client:ipc-message-envelope", "sdk:host-context"],
+  "dependsOn": [
+    "client:specd-data-port",
+    "client:ipc-message-envelope",
+    "sdk:host-context",
+    "client:dto-project-status"
+  ],
   "context": [
     "Electron desktop host concern — **Ipc Handler Registry**. Local mode uses an SDK-bootstrapped kernel in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP."
   ],
@@ -26,6 +31,12 @@
       "requirement": "graph IPC methods use the Electron graph runtime",
       "rules": [
         "Desktop-local graph IPC methods MUST create and use their graph provider from\n`@specd/code-graph-electron`.\n\nThe Electron main process MUST keep graph execution inside the desktop-local host\nruntime, including the SQLite-backed local graph operations exposed through IPC.\nRenderer code MUST continue to call the shared `SpecdDataPort` surface and MUST\nNOT import graph runtime packages directly."
+      ]
+    },
+    {
+      "requirement": "project status uses the canonical client mapper",
+      "rules": [
+        "The local project-status IPC handler MUST map its kernel, graph-health, and auth inputs through the pure project-status mapper exported by `@specd/client`.\n\nThe IPC result MUST have the same `ProjectStatusDto` shape and optional-field semantics as the HTTP project-status response. The handler MUST NOT maintain a second status presenter."
       ]
     }
   ],
@@ -95,15 +106,26 @@
         "it invokes the shared SpecdDataPort methods through IPC",
         "AND the renderer does not import graph runtime packages directly"
       ]
+    },
+    {
+      "requirement": "project status uses the canonical client mapper",
+      "name": "Local and remote status preserve the same DTO",
+      "given": ["equivalent kernel, graph-health, approval, and auth inputs"],
+      "when": ["desktop IPC and API HTTP map project status"],
+      "then": [
+        "both call the @specd/client project-status mapper",
+        "AND both return structurally equal ProjectStatusDto values"
+      ]
+    },
+    {
+      "requirement": "project status uses the canonical client mapper",
+      "name": "Missing graph health has canonical optional semantics",
+      "given": ["graph health is unavailable"],
+      "when": ["desktop maps local project status"],
+      "then": ["the graph field is omitted exactly as in the HTTP response"]
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "studio-desktop:ipc-handler-registry",
-        "file": "studio-desktop:src/main/index.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "studio-desktop:ipc-handler-registry",
@@ -113,8 +135,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8e9a782f563a188af5ebe672df21ef3eef67e9ee3d139d9b7d34e0badadd34d4",
-    "verify.md": "sha256:3e40bab283f38198c29809e645f607b5a9b0a7186788bc294ddc59e463637a93"
+    "spec.md": "sha256:adef848362c9f544a32ef45080bfb24c584455653968ce64d2f94ccff3052ae8",
+    "verify.md": "sha256:ab81f542dbda7f0a0a015626d92ae4cc6273957e20f9f060902a69a104281afd"
   },
   "generatedBy": "core"
 }

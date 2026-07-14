@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing sdk:host-context verification scenarios already cover Studio host bootstrap; only spec.md needed parity repair.'

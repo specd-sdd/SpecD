@@ -3,7 +3,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
-import { createGetStatus } from '../../../src/composition/use-cases/get-status.js'
+import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
+import {
+  createGetStatus,
+  type GetStatusDeps,
+} from '../../../src/composition/use-cases/get-status.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
@@ -66,5 +70,32 @@ describe('createGetStatus', () => {
     const useCase = createGetStatus(config)
 
     expect(useCase).toBeInstanceOf(GetStatus)
+  })
+
+  it('accepts explicit deps without config bootstrap', () => {
+    const deps: GetStatusDeps = {
+      changes: {} as never,
+      schemaProvider: {} as never,
+      approvals: { spec: false, signoff: false },
+      refreshImplementationTracking: {} as never,
+      lifecycle: {} as never,
+    }
+    const useCase = createGetStatus(deps)
+
+    expect(useCase).toBeInstanceOf(GetStatus)
+  })
+
+  it('rejects deps plus composition options', () => {
+    const deps: GetStatusDeps = {
+      changes: {} as never,
+      schemaProvider: {} as never,
+      approvals: { spec: false, signoff: false },
+      refreshImplementationTracking: {} as never,
+      lifecycle: {} as never,
+    }
+
+    expect(() =>
+      createGetStatus(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
+    ).toThrow(InvalidCompositionFactoryArgumentsError)
   })
 })

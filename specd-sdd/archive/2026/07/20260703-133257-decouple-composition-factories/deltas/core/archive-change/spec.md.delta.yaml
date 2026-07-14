@@ -1,0 +1,52 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveArchiveChangeDeps
+
+    The config-based `createArchiveChange(config, options?)` form MUST derive `ArchiveChangeDeps` through `resolveArchiveChangeDeps(resolver)` and then delegate to canonical `createArchiveChange(deps)`.
+
+    `resolveArchiveChangeDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `archive: ArchiveRepository`
+    - `runStepHooks: RunStepHooks`
+    - `actor: ActorResolver`
+    - `parsers: ArtifactParserRegistry`
+    - `schemaProvider: SchemaProvider`
+    - `generateMetadata: GenerateSpecMetadata`
+    - `saveMetadata: SaveSpecMetadata`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+    - `projectRoot: string`
+    - `batchSnapshot: ArchiveBatchSnapshotPort`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:delta-format`](../delta-format/spec.md)
+    - [`core:validate-artifacts`](../validate-artifacts/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:run-step-hooks`](../run-step-hooks/spec.md)
+    - [`core:hook-execution-model`](../hook-execution-model/spec.md)
+    - [`core:template-variables`](../template-variables/spec.md)
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:content-extraction`](../content-extraction/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:spec-id-format`](../spec-id-format/spec.md)
+    - [`core:spec-overlap`](../spec-overlap/spec.md)
+    - [`default:_global/logging`](../../_global/logging/spec.md)
+    - [`core:spec-lock`](../spec-lock/spec.md)
+    - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

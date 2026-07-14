@@ -1,0 +1,78 @@
+{
+  "title": "FsChangeRepository",
+  "description": "`FsChangeRepository` is the filesystem-backed implementation of the `ChangeRepository` port. It manages active changes, drafts, and discarded changes as distinct subdirectories within local or external storage, validating configuration options strictly against its Zod schema while receiving runtime dependencies via its `context: ChangeRepositoryConfig` parameter.",
+  "dependsOn": ["default:_global/architecture", "core:composition"],
+  "context": [
+    "`FsChangeRepository` is the filesystem-backed implementation of the `ChangeRepository` port. It manages active changes, drafts, and discarded changes as distinct subdirectories within local or external storage, validating configuration options strictly against its Zod schema while receiving runtime dependencies via its `context: ChangeRepositoryConfig` parameter."
+  ],
+  "rules": [
+    {
+      "requirement": "Validate options at construction",
+      "rules": [
+        "`FsChangeRepository` SHALL accept:\n\n1. `context: ChangeRepositoryConfig` containing workspace metadata (`workspace`, `ownership`, `isExternal`, `configPath`), core runtime callbacks (`activeSchema`, `resolveArtifactTypes`, `resolveSpecExists`), and external paths (`draftsPath`, `discardedPath`).\n2. `config: FsChangeRepositoryConfig` containing filesystem configuration options (`path`) for the active changes storage.\n\nIt MUST validate the `config` parameter using a Zod schema to ensure that only configuration properties originating from `specd.yaml` for this storage are validated, and that no runtime dependencies, external paths, or workspace context properties are included in the configuration schema.\n\nThe configuration schema MUST support:\n\n- `path: string`\n\nThe constructor MUST verify that the physical directories for active changes (`path`), drafts (`context.draftsPath`), and discarded changes (`context.discardedPath`) exist on disk. If any of these paths do not exist, it MUST throw a `StorageDirectoryNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "rules": [
+        "`FsChangeRepository` SHALL expose a creator function `createFsChangeStorageFactory()` that returns a `ChangeStorageFactory` instance.\n\nThis factory SHALL construct and return `FsChangeRepository` instances when `create(context, config)` is called, forwarding the parameters without merging."
+      ]
+    }
+  ],
+  "constraints": [
+    "FsChangeRepository is infrastructure-level and lives in infrastructure/fs/",
+    "It MUST implement the ChangeRepository abstract port class"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Validate options at construction",
+      "name": "Valid constructor options pass validation",
+      "given": [
+        "a valid configuration object with path and context with draftsPath and discardedPath",
+        "AND all directories exist on disk"
+      ],
+      "when": ["FsChangeRepository is constructed"],
+      "then": ["it successfully instantiates without error"]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Missing path in config throws error",
+      "given": ["a configuration object with a missing path"],
+      "when": ["FsChangeRepository is constructed"],
+      "then": [
+        "Zod validation throws a validation error identifying the missing configuration field"
+      ]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Non-existent active changes directory throws error",
+      "given": [
+        "a valid configuration object with path",
+        "AND the active changes directory does not exist on disk"
+      ],
+      "when": ["FsChangeRepository is constructed"],
+      "then": ["it throws a StorageDirectoryNotFoundError indicating the directory does not exist"]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "name": "Factory builds repository correctly",
+      "given": ["a ChangeStorageFactory created by createFsChangeStorageFactory()"],
+      "when": ["create is invoked with valid repository context and filesystem options"],
+      "then": ["it returns an instance of FsChangeRepository configured with those options"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:fs-change-repository",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "FsChangeRepository"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:9fe9395feb354718811fa6acd86c555f436dc7bda0911553e8bdb1ad7d59febd",
+    "verify.md": "sha256:fef1e833bd34d934193e1a0288c8920e5f897e53f647d631e33ed2fec720a361"
+  },
+  "generatedBy": "core"
+}

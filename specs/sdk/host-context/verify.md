@@ -34,7 +34,7 @@
 
 - **GIVEN** a valid `specd.yaml` in the current working directory
 - **WHEN** `openSpecdHost()` is called without `configPath`
-- **THEN** config is loaded via `createConfigLoader()` discovery mode
+- **THEN** config is loaded via `createDefaultConfigLoader()` discovery mode
 - **AND** `configFilePath` points to the discovered file
 
 #### Scenario: Forced config path

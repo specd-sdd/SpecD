@@ -1,5 +1,8 @@
 import * as fs from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import * as path from 'node:path'
+import { z } from 'zod'
+import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type Change } from '../../domain/entities/change.js'
 import {
@@ -13,7 +16,7 @@ import {
   type ArchiveListOptions,
   type ArchiveListResult,
   type ArchivePathEntry,
-  type ArchiveRepositoryConfig,
+  type ArchiveRepositoryConfig as BaseArchiveRepositoryConfig,
 } from '../../application/ports/archive-repository.js'
 import { ChangeNotFoundError } from '../../application/errors/change-not-found-error.js'
 import { UnsupportedPatternError } from '../../domain/errors/unsupported-pattern-error.js'
@@ -43,28 +46,24 @@ const DEFAULT_PATTERN = '{{change.archivedName}}'
 
 /**
  * Configuration for `FsArchiveRepository`.
- *
- * Extends the base `ArchiveRepositoryConfig` with filesystem paths for the
- * active changes directory, drafts directory, and archive root, plus an
- * optional layout pattern for the archive directory structure.
  */
-export interface FsArchiveRepositoryConfig extends ArchiveRepositoryConfig {
-  /** Absolute path to the `changes/` directory for active changes. */
+export interface ArchiveRepositoryConfig extends BaseArchiveRepositoryConfig {
   readonly changesPath: string
-  /** Absolute path to the `drafts/` directory for shelved changes. */
   readonly draftsPath: string
-  /** Absolute path to the archive root directory. */
-  readonly archivePath: string
-  /**
-   * Optional pattern controlling the archive directory structure.
-   *
-   * Supported variables: `{{year}}`, `{{month}}`, `{{day}}`,
-   * `{{change.name}}`, `{{change.archivedName}}`. The variable
-   * `{{change.scope}}` is explicitly unsupported and will cause the
-   * constructor to throw. Defaults to `{{change.archivedName}}`.
-   */
+}
+
+/**
+ * Configuration options for the filesystem archive repository.
+ */
+export interface FsArchiveRepositoryConfig {
+  readonly path: string
   readonly pattern?: string
 }
+
+export const FsArchiveOptionsSchema = z.object({
+  path: z.string(),
+  pattern: z.string().optional(),
+})
 
 /**
  * A single line in `index.jsonl`.
@@ -126,21 +125,70 @@ export class FsArchiveRepository extends ArchiveRepository {
   /**
    * Creates a new `FsArchiveRepository` instance.
    *
-   * @param config - Storage paths, archive pattern, and repository configuration
-   * @throws {UnsupportedPatternError} If `config.pattern` contains the unsupported `{{change.scope}}` variable
+   * @param config - Legacy storage paths, archive pattern, and repository configuration
    */
-  constructor(config: FsArchiveRepositoryConfig) {
-    super(config)
-    if ((config.pattern ?? '').includes('{{change.scope}}')) {
+  constructor(config: ArchiveRepositoryConfig & { archivePath: string; pattern?: string })
+  /**
+   * Creates a new `FsArchiveRepository` instance.
+   *
+   * @param context - Shared repository context
+   * @param config - Adapter options
+   */
+  constructor(context: ArchiveRepositoryConfig, config: FsArchiveRepositoryConfig)
+  /**
+   * Creates a new `FsArchiveRepository` instance.
+   *
+   * @param contextOrConfig - Shared repository context or legacy config
+   * @param config - Adapter options or undefined for legacy constructor
+   */
+  constructor(contextOrConfig: unknown, config?: unknown) {
+    let context: ArchiveRepositoryConfig
+    let parsedConfig: FsArchiveRepositoryConfig
+    if (config === undefined) {
+      const legacy = contextOrConfig as ArchiveRepositoryConfig & {
+        archivePath: string
+        pattern?: string
+      }
+      context = legacy
+      parsedConfig = {
+        path: legacy.archivePath,
+        ...(legacy.pattern !== undefined ? { pattern: legacy.pattern } : {}),
+      }
+    } else {
+      context = contextOrConfig as ArchiveRepositoryConfig
+      const parsed = FsArchiveOptionsSchema.parse(config)
+      parsedConfig = {
+        path: parsed.path,
+        ...(parsed.pattern !== undefined ? { pattern: parsed.pattern } : {}),
+      }
+    }
+
+    super(context)
+    if ((parsedConfig.pattern ?? '').includes('{{change.scope}}')) {
       throw new UnsupportedPatternError(
         '{{change.scope}}',
         'scope paths contain "/" which produces ambiguous directory names',
       )
     }
-    this._changesPath = config.changesPath
-    this._draftsPath = config.draftsPath
-    this._archivePath = config.archivePath
-    this._pattern = config.pattern ?? DEFAULT_PATTERN
+
+    // Verify paths exist on disk
+    if (!existsSync(parsedConfig.path)) {
+      throw new StorageDirectoryNotFoundError(parsedConfig.path, 'Archive directory does not exist')
+    }
+    if (!existsSync(context.changesPath)) {
+      throw new StorageDirectoryNotFoundError(
+        context.changesPath,
+        'Changes directory does not exist',
+      )
+    }
+    if (!existsSync(context.draftsPath)) {
+      throw new StorageDirectoryNotFoundError(context.draftsPath, 'Drafts directory does not exist')
+    }
+
+    this._archivePath = parsedConfig.path
+    this._changesPath = context.changesPath
+    this._draftsPath = context.draftsPath
+    this._pattern = parsedConfig.pattern ?? DEFAULT_PATTERN
   }
 
   /**

@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:spec-metadata", "core:storage", "core:composition-resolver"],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/invalidate-spec-metadata.ts"
+    }
+  ]
+}

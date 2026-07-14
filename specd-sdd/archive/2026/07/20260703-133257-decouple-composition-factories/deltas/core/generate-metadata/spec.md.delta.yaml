@@ -1,0 +1,33 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveGenerateSpecMetadataDeps
+
+    The config-based `createGenerateSpecMetadata(config, options?)` form MUST derive `GenerateSpecMetadataDeps` through `resolveGenerateSpecMetadataDeps(resolver)` and then delegate to canonical `createGenerateSpecMetadata(deps)`.
+
+    `resolveGenerateSpecMetadataDeps(resolver)` MUST resolve:
+
+    - `listWorkspaces: ListWorkspaces`
+    - `schemaProvider: SchemaProvider`
+    - `parsers: ArtifactParserRegistry`
+    - `hasher: ContentHasher`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:content-extraction`](../content-extraction/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:spec-id-format`](../spec-id-format/spec.md)
+    - [`core:spec-repository-port`](../spec-repository-port/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

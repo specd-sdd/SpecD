@@ -83,7 +83,15 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:get-read-only-change-artifact",
+        "file": "core:src/composition/use-cases/get-read-only-change-artifact.ts",
+        "symbol": "createGetReadOnlyChangeArtifact"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:88793e909cf2d3a7bdd0ecd651921e069b9b1acedbe03349dabbfe4cf8dff1db",
     "verify.md": "sha256:73f37a3eca8fbefce268c53828d73f4aa31562367389e09f0c65bb00d5af2031"

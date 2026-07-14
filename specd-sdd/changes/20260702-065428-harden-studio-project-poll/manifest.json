@@ -1,7 +1,7 @@
 {
   "name": "harden-studio-project-poll",
   "createdAt": "2026-07-02T06:54:28.717Z",
-  "updatedAt": "2026-07-04T07:53:44.218Z",
+  "updatedAt": "2026-07-13T16:28:06.785Z",
   "description": "Reduce Studio/UI polling churn and isolate host-specific read paths that amplify lifecycle invalidation loops around project and change status.",
   "schema": {
     "name": "schema-std",

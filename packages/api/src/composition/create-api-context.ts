@@ -2,6 +2,7 @@ import {
   type ActorResolver,
   type SdkHostContext,
   type SpecdConfig,
+  createVcsAdapter,
   createVcsActorResolver,
 } from '@specd/sdk'
 import { type ApiActor } from '../domain/auth/api-actor.js'
@@ -46,9 +47,5 @@ export function createApiContext(state: ApiServerState, apiActor: ApiActor | nul
  * @param config - Active project configuration
  */
 export async function resolveKernelActor(config: SpecdConfig): Promise<ActorResolver> {
-  const result = createVcsActorResolver(config.projectRoot)
-  if (result instanceof Promise) {
-    return result
-  }
-  return result
+  return createVcsActorResolver(await createVcsAdapter(config.projectRoot))
 }

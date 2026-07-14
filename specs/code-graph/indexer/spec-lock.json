@@ -15,12 +15,7 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/discover-files.ts",
-      "symbols": ["DEFAULT_BINARY_EXTENSIONS", "discoverFiles"]
-    },
-    {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
-      "symbols": ["IndexCodeGraph"]
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts"
     }
   ]
 }

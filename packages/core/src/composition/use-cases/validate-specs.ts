@@ -1,93 +1,124 @@
-import * as path from 'node:path'
-import { ValidateSpecs } from '../../application/use-cases/validate-specs.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
-import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
-import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { ValidateSpecs } from '../../application/use-cases/validate-specs.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
-import { createSchemaRepositoriesForConfig } from '../schema-resolution.js'
-import { createSharedSpecRepositories } from '../shared-repository-wiring.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Filesystem adapter options for `createValidateSpecs(options)`. */
-export interface FsValidateSpecsOptions {
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
-  readonly nodeModulesPaths: readonly string[]
-  readonly configDir: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Workspace routing metadata for cross-workspace spec reference resolution. */
-  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
+/**
+ * Explicit dependencies for {@link createValidateSpecs}.
+ */
+export interface ValidateSpecsDeps {
+  readonly specs: ReadonlyMap<string, SpecRepository>
+  readonly schemaProvider: SchemaProvider
+  readonly parsers: ArtifactParserRegistry
+  readonly contentHasher: ContentHasher
+  readonly extractorTransforms: ExtractorTransformRegistry
+  readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
 }
 
 /**
- * Constructs a `ValidateSpecs` use case with full project config.
+ * Resolves `ValidateSpecs` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ValidateSpecs`
+ */
+export function resolveValidateSpecsDeps(resolver: CompositionResolver): ValidateSpecsDeps {
+  return {
+    specs: resolver.getSpecRepositories(),
+    schemaProvider: resolver.getSchemaProvider(),
+    parsers: resolver.getArtifactParserRegistry(),
+    contentHasher: resolver.getContentHasher(),
+    extractorTransforms: resolver.getExtractorTransforms(),
+    workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
+  }
+}
+
+/**
+ * Constructs `ValidateSpecs` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createValidateSpecs(deps: ValidateSpecsDeps): ValidateSpecs
+/**
+ * Constructs `ValidateSpecs` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param options - Optional kernel options for schema resolution
- * @param options.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createValidateSpecs(
   config: SpecdConfig,
-  options?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): ValidateSpecs
 /**
- * Constructs a `ValidateSpecs` use case with explicit adapter options.
+ * Constructs `ValidateSpecs` from explicit deps or config bootstrap.
  *
- * @param options - Spec repositories and schema resolution paths
- * @returns The pre-wired use case instance
- */
-export function createValidateSpecs(options: FsValidateSpecsOptions): ValidateSpecs
-/**
- * Constructs a `ValidateSpecs` instance wired with filesystem adapters.
- *
- * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
- * @param options - Optional kernel options; only used with the `SpecdConfig` form
- * @param options.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createValidateSpecs(
-  configOrOptions: SpecdConfig | FsValidateSpecsOptions,
-  options?: { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: ValidateSpecsDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ValidateSpecs {
-  if (isSpecdConfig(configOrOptions)) {
-    const config = configOrOptions
-    const specRepos = createSharedSpecRepositories({ config })
-    const schemaRepos = createSchemaRepositoriesForConfig(config)
-    return createValidateSpecs({
-      specRepositories: specRepos,
-      nodeModulesPaths: [
-        path.join(config.projectRoot, 'node_modules'),
-        ...(options?.extraNodeModulesPaths ?? []),
-      ],
-      configDir: config.projectRoot,
-      schemaRef: config.schemaRef,
-      schemaRepositories: schemaRepos,
-      workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
-    })
+  const normalized = normalizeCompositionFactoryArgs(
+    'createValidateSpecs',
+    depsOrConfig,
+    options,
+    isValidateSpecsDeps,
+  )
+  return createValidateSpecsFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ValidateSpecs` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createValidateSpecsFromNormalized(
+  input: FactoryInput<ValidateSpecsDeps, CompositionResolutionOptions>,
+): ValidateSpecs {
+  if (input.kind === 'deps') {
+    const { specs, schemaProvider, parsers, contentHasher, extractorTransforms, workspaceRoutes } =
+      input.deps
+    return new ValidateSpecs(
+      specs,
+      schemaProvider,
+      parsers,
+      contentHasher,
+      extractorTransforms,
+      workspaceRoutes,
+    )
   }
 
-  const opts = configOrOptions
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.configDir,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const parsers = createArtifactParserRegistry()
-  return new ValidateSpecs(
-    opts.specRepositories,
-    schemaProvider,
-    parsers,
-    new NodeContentHasher(),
-    createBuiltinExtractorTransforms(),
-    opts.workspaceRoutes ?? [],
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createValidateSpecs(resolveValidateSpecsDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ValidateSpecsDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isValidateSpecsDeps(value: ValidateSpecsDeps | SpecdConfig): value is ValidateSpecsDeps {
+  return (
+    'specs' in value &&
+    'schemaProvider' in value &&
+    'parsers' in value &&
+    'contentHasher' in value &&
+    'extractorTransforms' in value &&
+    'workspaceRoutes' in value
   )
 }

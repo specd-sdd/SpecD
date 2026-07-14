@@ -33,7 +33,7 @@
     {
       "requirement": "Returns the VcsAdapter port interface",
       "rules": [
-        "`createVcsAdapter` MUST return a `Promise<VcsAdapter>` — the application port interface defined in `application/ports/vcs-adapter.ts`. The concrete adapter type is an implementation detail not exposed to callers."
+        "`createVcsAdapter` MUST return a `Promise<VcsAdapter>` — the application port interface defined in `application/ports/vcs-adapter.ts`. The concrete adapter type is an implementation detail not exposed to callers. The returned adapter MUST also support the identity resolution contract specified in `core:vcs-adapter-port`."
       ]
     },
     {
@@ -139,6 +139,20 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:test/infrastructure/git/vcs-adapter.spec.ts"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:test/infrastructure/hg/vcs-adapter.spec.ts"
+      },
+      {
+        "specId": "core:vcs-adapter",
+        "file": "core:test/infrastructure/svn/vcs-adapter.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:vcs-adapter",
@@ -147,43 +161,8 @@
       },
       {
         "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/git/vcs-adapter.ts",
-        "symbol": "GitVcsAdapter.refAt"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/git/vcs-adapter.ts",
-        "symbol": "GitVcsAdapter.modifiedFiles"
-      },
-      {
-        "specId": "core:vcs-adapter",
         "file": "core:src/infrastructure/hg/vcs-adapter.ts",
         "symbol": "HgVcsAdapter"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/hg/vcs-adapter.ts",
-        "symbol": "HgVcsAdapter.refAt"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/hg/vcs-adapter.ts",
-        "symbol": "HgVcsAdapter.modifiedFiles"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/null/vcs-adapter.ts",
-        "symbol": "NullVcsAdapter"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/null/vcs-adapter.ts",
-        "symbol": "NullVcsAdapter.refAt"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/null/vcs-adapter.ts",
-        "symbol": "NullVcsAdapter.modifiedFiles"
       },
       {
         "specId": "core:vcs-adapter",
@@ -192,18 +171,13 @@
       },
       {
         "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/svn/vcs-adapter.ts",
-        "symbol": "SvnVcsAdapter.refAt"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/svn/vcs-adapter.ts",
-        "symbol": "SvnVcsAdapter.modifiedFiles"
+        "file": "core:src/infrastructure/null/vcs-adapter.ts",
+        "symbol": "NullVcsAdapter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:22434bdc7aef538264899335e165d50df069493a32b9e46bdda40f3cb532cbf2",
+    "spec.md": "sha256:85bd5fdc6d5402a4296594807c61d837205934834f04dfccf6b6494c34d26f76",
     "verify.md": "sha256:270725eb5017c53692c4fa15174f95b37750fbe90e4d972c72efddcbb46f22f5"
   },
   "generatedBy": "core"

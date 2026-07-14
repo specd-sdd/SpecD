@@ -64,3 +64,18 @@
 - **WHEN** the renderer requests graph data in desktop-local mode
 - **THEN** it invokes the shared `SpecdDataPort` methods through IPC
 - **AND** the renderer does not import graph runtime packages directly
+
+### Requirement: project status uses the canonical client mapper
+
+#### Scenario: Local and remote status preserve the same DTO
+
+- **GIVEN** equivalent kernel, graph-health, approval, and auth inputs
+- **WHEN** desktop IPC and API HTTP map project status
+- **THEN** both call the `@specd/client` project-status mapper
+- **AND** both return structurally equal `ProjectStatusDto` values
+
+#### Scenario: Missing graph health has canonical optional semantics
+
+- **GIVEN** graph health is unavailable
+- **WHEN** desktop maps local project status
+- **THEN** the graph field is omitted exactly as in the HTTP response

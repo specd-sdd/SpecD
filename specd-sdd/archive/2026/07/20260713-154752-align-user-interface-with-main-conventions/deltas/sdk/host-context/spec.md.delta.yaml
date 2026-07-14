@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing sdk:host-context requirement prose already matches the adopted Studio host bootstrap contract.'

@@ -9,7 +9,12 @@
     "core:schema-format",
     "core:schema-registry-port",
     "core:build-schema",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/get-active-schema.ts"
+    }
+  ]
 }

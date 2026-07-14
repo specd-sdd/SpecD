@@ -214,8 +214,12 @@ export interface SpecdStorageConfig {
  * use-case factory functions.
  */
 export interface SpecdConfig {
+  /** Warnings generated during configuration loading, e.g. legacy configuration format warnings. */
+  readonly warnings?: readonly string[]
   /** Absolute path to the directory containing the active `specd.yaml`. */
   readonly projectRoot: string
+  /** Absolute path to the specd workspace folder. */
+  readonly specdPath?: string
   /** Absolute path to the specd-owned config root. */
   readonly configPath: string
   /** Schema reference string as declared in `specd.yaml` (e.g. `'@specd/schema-std'`). */
@@ -284,10 +288,12 @@ export interface SpecdConfig {
 /** Minimal shape check for {@link isSpecdConfig} — validates the structural signature. */
 const specdConfigShape = z.object({
   projectRoot: z.string(),
+  specdPath: z.string().optional(),
   configPath: z.string(),
   schemaRef: z.string(),
   workspaces: z.array(z.object({ name: z.string() })),
   storage: z.object({ changesPath: z.string() }),
+
   approvals: z.object({ spec: z.boolean(), signoff: z.boolean() }),
   graph: z
     .object({

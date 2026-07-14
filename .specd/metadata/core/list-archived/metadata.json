@@ -6,7 +6,8 @@
     "core:storage",
     "core:kernel",
     "default:_global/architecture",
-    "core:archived-change-index-entry"
+    "core:archived-change-index-entry",
+    "core:composition-resolver"
   ],
   "context": [
     "Teams need to browse the history of completed spec work — for audits, onboarding, or tracing when a particular spec was last modified. `ListArchived` retrieves all archived changes in the default workspace as a read-only query with no side effects, no input parameters, and no lifecycle hooks."
@@ -40,6 +41,12 @@
       "requirement": "No side effects",
       "rules": [
         "`ListArchived` MUST NOT mutate any state. It SHALL NOT write to any repository, run hooks, or trigger any lifecycle operations. It is a pure read-only query."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListArchivedDeps",
+      "rules": [
+        "The config-based `createListArchived(config, options?)` form MUST derive `ListArchivedDeps` through `resolveListArchivedDeps(resolver)` and then delegate to canonical `createListArchived(deps)`.\n\n`resolveListArchivedDeps(resolver)` MUST resolve:\n\n- `archive: ArchiveRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -91,20 +98,30 @@
       "given": ["the archive repository state does not change between calls"],
       "when": ["listArchived.execute() is called multiple times"],
       "then": ["each call returns the same result", "AND no repository write methods are invoked"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListArchivedDeps",
+      "name": "createListArchived config form derives ListArchivedDeps through resolveListArchivedDeps",
+      "when": ["createListArchived(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ListArchivedDeps through resolveListArchivedDeps(resolver)",
+        "AND resolveListArchivedDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createListArchived(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:list-archived",
-        "file": "core:src/application/use-cases/list-archived.ts",
-        "symbol": "ListArchived"
+        "file": "core:src/composition/use-cases/list-archived.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:83d23e2dfba34a46c7f397b75006a5bb6ae709215065eece910cb97fa70a2bfb",
-    "verify.md": "sha256:c3acbb9c39cacfc7cb947e44b50d5128b58341f6e91d018e2e746da7d0ac8416"
+    "spec.md": "sha256:7c230c78aed72bedb82d6b5b36eb5bd56813d9cc1a5014a27c7a5a3de07685bc",
+    "verify.md": "sha256:223489d4adcc958077d65603bf101ddc4db27e97e5db852301c6f1867937a63b"
   },
   "generatedBy": "core"
 }

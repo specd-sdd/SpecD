@@ -8,15 +8,22 @@ Delivery mechanisms need to load and validate `specd.yaml` without knowing the d
 
 ### Requirement: Factory signature and return type
 
-`createConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:
+`createDefaultConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:
 
 - `{ startDir: string }` — discovery mode
 - `{ configPath: string }` — forced mode
 
-The returned `ConfigLoader` exposes two methods:
+`createDefaultConfigLoader()` MAY resolve a `VcsAdapter` internally to derive the repository boundary, but that adapter is not part of `FsConfigLoaderOptions`, and the returned `ConfigLoader` MUST depend only on the resolved `rootPath` data.
 
-- `load(): Promise<SpecdConfig>` — loads, validates, and returns the fully-resolved config. Throws `ConfigValidationError` on any failure.
-- `resolvePath(): Promise<string | null>` — resolves and returns the path to the active config file without loading or parsing it. Returns `null` when no config file can be located (discovery mode) or when the adapter has no concept of a file path. Never throws.
+The returned `ConfigLoader` is an abstract class that accepts `rootPath` in its constructor:
+
+```typescript
+export abstract class ConfigLoader {
+  constructor(protected readonly rootPath: string | null) {}
+  abstract load(): Promise<SpecdConfig>
+  abstract resolvePath(): Promise<string | null>
+}
+```
 
 ### Requirement: Path probe
 
@@ -31,7 +38,7 @@ The purpose of `resolvePath()` is to allow delivery mechanisms to probe for conf
 
 ### Requirement: Discovery mode
 
-When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate the nearest directory containing discoverable config candidates, bounded by the nearest git repository root.
+When constructed with `{ startDir }`, the loader MUST walk up from `startDir` to locate the nearest directory containing discoverable config candidates, bounded by the nearest VCS repository root.
 
 Discoverable candidates within one directory are evaluated in this order:
 
@@ -48,9 +55,9 @@ Candidate activation rules are:
 - a file with `extends: true` attaches to the previous active layer
 - a file with `extends: <path>` attaches only when the referenced base file is already active in the current chain; otherwise that candidate is skipped in normal discovery
 
-The walk MUST stop at the git repository root and SHALL NOT traverse above it. If no config candidates are found before or at the git root, `load()` MUST throw `ConfigValidationError`.
+The walk MUST stop at the VCS repository root and SHALL NOT traverse above it. If no config candidates are found before or at the VCS root, `load()` MUST throw `ConfigValidationError`.
 
-When `startDir` is not inside a git repository, the loader MUST check only the starting directory and SHALL NOT walk further up. If no discoverable candidates exist there, `load()` MUST throw `ConfigValidationError`.
+When `startDir` is not inside a VCS repository, the loader MUST check only the starting directory and SHALL NOT walk further up. If no discoverable candidates exist there, `load()` MUST throw `ConfigValidationError`.
 
 ### Requirement: Forced mode
 
@@ -102,15 +109,15 @@ When `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it 
 
 ### Requirement: Storage path containment
 
-When inside a git repository, every resolved storage path (`changes`, `drafts`, `discarded`, `archive`) MUST resolve to a location within or equal to the git repository root. If any storage path resolves outside the git root, `load()` MUST throw `ConfigValidationError` identifying the offending storage key.
+When `rootPath` is non-null, every resolved storage path (`changes`, `drafts`, `discarded`, `archive`) MUST resolve to a location within or equal to `rootPath`. If any storage path resolves outside `rootPath`, `load()` MUST throw `ConfigValidationError` identifying the offending storage key.
 
-When not inside a git repository, the containment check SHALL NOT apply — storage paths are accepted as resolved.
+When `rootPath` is `null`, the containment check SHALL NOT apply — storage paths are accepted as resolved.
 
 ### Requirement: isExternal inference for workspaces
 
-For each workspace, the loader MUST infer the `isExternal` flag by comparing the resolved `specsPath` against the git repository root. A workspace is external when its `specsPath` neither equals the git root nor starts with the git root followed by a path separator.
+For each workspace, the loader MUST infer the `isExternal` flag by comparing the resolved `specsPath` against `rootPath`. A workspace is external when its `specsPath` neither equals `rootPath` nor starts with `rootPath` followed by a path separator.
 
-When not inside a git repository, `isExternal` MUST be `false` for all workspaces.
+When `rootPath` is `null`, `isExternal` MUST be `false` for all workspaces.
 
 ### Requirement: Default values for workspace fields
 
@@ -167,4 +174,5 @@ No generic YAML/runtime exception SHALL escape for configuration validation fail
 - [`core:config`](../config/spec.md) — `SpecdConfig` structure, field semantics, YAML format, and validation rules
 - [`core:composition`](../composition/spec.md) — composition layer design and factory conventions
 - [`core:schema-merge`](../schema-merge/spec.md) — schema merge operations and `schemaOverrides` structure
+- [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — default factory resolves the repository root from the VCS adapter contract
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — port and adapter design

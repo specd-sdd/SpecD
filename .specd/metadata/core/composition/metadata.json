@@ -1,7 +1,13 @@
 {
   "title": "Composition Layer",
   "description": "Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.",
-  "dependsOn": ["default:_global/architecture", "core:resolve-schema", "core:config-writer-port"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:resolve-schema",
+    "core:config-writer-port",
+    "core:kernel-builder",
+    "core:composition-resolver"
+  ],
   "context": [
     "Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer."
   ],
@@ -9,13 +15,31 @@
     {
       "requirement": "Use-case factories are the unit of composition",
       "rules": [
-        "The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.\n\nConfig I/O is an exception: `createConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes."
+        "The composition layer exposes one factory function per domain use case (e.g. `createArchiveChange`, `createCompileContext`). Each factory constructs all ports the use case requires and returns the pre-wired use case instance. Use case constructors are not exported from `index.ts` — callers always go through the factory.\n\nConfig I/O is an exception: `createDefaultConfigLoader()` and `createConfigWriter()` return port instances directly because the port methods are the operation surface. These factories MUST NOT wrap the port in pass-through use-case classes."
       ]
     },
     {
       "requirement": "Use-case factories accept SpecdConfig or explicit options",
       "rules": [
-        "Every use-case factory supports two call signatures:\n\n- `createArchiveChange(config: SpecdConfig)` — extracts all required values from a fully resolved config object\n- `createArchiveChange(context: ArchiveChangeContext, options: FsArchiveChangeOptions)` — accepts domain context and adapter options explicitly\n\nBoth signatures are public exports. The explicit form is used in tests and in scenarios where only a subset of the config is available. The `SpecdConfig` form is used by the kernel and by delivery mechanisms that have already loaded config."
+        "Every kernel-mounted public use-case factory supports two public call shapes:\n\n- `createArchiveChange(deps: ArchiveChangeDeps)` — canonical dependency-based construction\n- `createArchiveChange(config: SpecdConfig, options?)` — convenience bootstrap form that resolves dependencies from config and delegates to the canonical deps form\n\nThe canonical form accepts already-resolved ports, services, and collaborator use cases only. It MUST NOT expose filesystem paths, adapter ids, or fs-specific bootstrap fragments.\n\nThe config-based form MUST use the shared composition-resolver path plus per-use-case dependency assembly helpers. It MUST NOT maintain a separate fs-shaped wiring branch per factory.\n\nComposition options are valid only for the config-based form. When callers use the canonical deps form, composition options MUST be rejected by the shared argument-normalization path."
+      ]
+    },
+    {
+      "requirement": "Shared composition resolver normalizes config-based factory bootstrap",
+      "rules": [
+        "The composition layer SHALL define a shared `CompositionResolver` contract for config-based public factory assembly.\n\nThe resolver MUST:\n\n- be scoped to one composition session, not process-global\n- resolve shared ports and services lazily\n- cache resolved shared dependencies within the resolver instance\n- avoid eagerly instantiating the full kernel dependency graph for a single standalone factory call\n\nThe resolver itself MUST NOT know per-use-case dependency objects. Per-use-case assembly helpers (for example `resolveCreateChangeDeps(resolver)`) derive those deps near their corresponding factories.\n\nPublic `createX(config, options?)` wrappers MUST internally perform: create resolver, assemble `XDeps` through the per-use-case helper, and delegate to canonical `createX(deps)`."
+      ]
+    },
+    {
+      "requirement": "Shared factory-argument validation error",
+      "rules": [
+        "Public composition factories SHALL share one argument-normalization path for their supported call shapes.\n\nWhen callers provide an invalid argument combination, the normalization path MUST throw `InvalidCompositionFactoryArgumentsError`.\n\nThat error MUST identify at least the target factory or use-case name so diagnostics clearly indicate which `createX(...)` entry was invoked incorrectly."
+      ]
+    },
+    {
+      "requirement": "Reusable registry primitives are composition-owned",
+      "rules": [
+        "The reusable registry input, registry view, and built-in capability-merging primitives consumed by public factory bootstrap SHALL belong to composition infrastructure.\n\nThe kernel MAY reuse those primitives, but it SHALL remain a facade over them rather than their semantic owner or naming source of truth."
       ]
     },
     {
@@ -27,7 +51,7 @@
     {
       "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
       "rules": [
-        "Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver()` instead of constructing a specific implementation (e.g. `new GitActorResolver()`). The auto-detect chain (git → hg → svn → null) ensures the correct implementation is selected based on the project's actual VCS.\n\nThe same applies to any factory that needs a `VcsAdapter` — it must call `createVcsAdapter()`."
+        "Standalone use-case factories that need an `ActorResolver` must call `createVcsActorResolver(vcsAdapter)` or resolve the `VcsAdapter` first and pass it, instead of constructing a specific implementation (e.g. `new GitActorResolver()`).\n\nThe same applies to any factory that needs repository-root awareness — it must call `createVcsAdapter()`, derive `rootPath` from that adapter, and pass the resolved `rootPath` data into the downstream port instead of passing the adapter object when the port only needs the root boundary."
       ]
     },
     {
@@ -99,13 +123,13 @@
     {
       "requirement": "Repository factories on public root",
       "rules": [
-        "The `\".\"` public barrel MUST export `createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, and `createSchemaRegistry`, plus their public option/config types (for example `FsSpecRepositoryOptions`).\n\nEach repository factory MUST accept an adapter id as its first argument. Builtin `'fs'` MUST be supported. Future plugin-registered adapter ids (for example `'db'`) are resolved through `*StorageFactory` registration on `./extensions`; full registry dispatch wiring in factories is out of scope for the initial barrel split but the public factory signatures MUST be designed to accept extensible adapter ids.\n\nIntegrators MUST be able to obtain default filesystem storage (for example `createSpecRepository('fs', ...)`) without calling `createKernel`."
+        "The `\".\"` public barrel MUST export `createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, and `createSchemaRegistry`, plus their public option/config types (for example `FsSpecRepositoryOptions`).\n\nEach repository factory MUST accept an adapter id as its first argument. Builtin `'fs'` MUST be supported. Future plugin-registered adapter ids (for example `'db'`) are resolved through `*StorageFactory` registration on `./extensions`; full registry dispatch wiring in factories is out of scope for the initial barrel split but the public factory signatures MUST be designed to accept extensible adapter ids.\n\nIntegrators MUST be able to obtain default filesystem storage (for example `createSpecRepository('fs', ...)`) without calling `createKernel`.\n\n#### Scenario: Repository factories resolve adapter IDs through composition registries\n\n- **WHEN** a public repository factory is called with an adapter type\n- **THEN** it resolves that type through the merged composition registry\n- **AND** it throws an error if the adapter type is unknown\n\n#### Scenario: Options validated by Zod at construction\n\n- **WHEN** a public repository factory instantiates a repository\n- **THEN** options are validated by Zod inside the concrete repository constructor\n- **AND** it throws a validation error if options are invalid"
       ]
     },
     {
       "requirement": "Extension registration surface",
       "rules": [
-        "`\"./extensions\"` MUST export `SpecStorageFactory`, `ChangeStorageFactory`, `ArchiveStorageFactory`, `SchemaStorageFactory`, `KernelRegistryInput`, `KernelRegistryView`, `KernelBuilder`, `createKernelBuilder`, `ActorProvider`, `VcsProvider`, `ExternalHookRunner`, and `RegistryConflictError`. Builtin `FS_*` storage factory markers MUST remain internal.\n\nPlugin authors implement port contracts from `./ports`, expose a `*StorageFactory` from `./extensions`, and register it before calling repository factories with the matching adapter id or before `createKernel` / `createKernelBuilder`."
+        "`\"./extensions\"` MUST export `SpecStorageFactory`, `ChangeStorageFactory`, `ArchiveStorageFactory`, `SchemaStorageFactory`, `CompositionRegistryInput`, `CompositionRegistryView`, `KernelBuilder`, `createKernelBuilder`, `ActorProvider`, `VcsProvider`, `ExternalHookRunner`, and `RegistryConflictError`. Builtin `FS_*` storage factory markers MUST remain internal.\n\nPlugin authors implement port contracts from `./ports`, expose a `*StorageFactory` from `./extensions`, and register it before calling repository factories with the matching adapter id or before `createKernel` / `createKernelBuilder`.\n\n`@specd/core/extensions` MUST stay limited to composition concerns owned by `@specd/core`. Graph-store registration and backend selection belong to `@specd/code-graph`, not to the core extension surface."
       ]
     }
   ],
@@ -144,19 +168,58 @@
     },
     {
       "requirement": "Use-case factories accept SpecdConfig or explicit options",
-      "name": "Factory called with SpecdConfig",
-      "when": ["createArchiveChange(config) is called with a valid SpecdConfig"],
+      "name": "Canonical deps form constructs one use case from resolved dependencies",
+      "when": ["a caller invokes a kernel-mounted public createX(deps) factory"],
       "then": [
-        "it returns a pre-wired ArchiveChange with all ports constructed from the config values"
+        "the factory accepts already-resolved dependencies only",
+        "AND it does not require filesystem paths or adapter ids"
       ]
     },
     {
       "requirement": "Use-case factories accept SpecdConfig or explicit options",
-      "name": "Factory called with explicit context and options",
+      "name": "Config-based form delegates through resolver-backed assembly",
+      "when": ["a caller invokes createX(config, options?)"],
+      "then": [
+        "the factory creates a composition resolver scoped to that composition session",
+        "AND it resolves XDeps through the shared resolver path before delegating to canonical deps construction"
+      ]
+    },
+    {
+      "requirement": "Use-case factories accept SpecdConfig or explicit options",
+      "name": "Invalid deps-plus-options input throws shared error",
+      "when": ["a caller supplies a deps-form invocation plus composition options"],
+      "then": [
+        "the factory path throws InvalidCompositionFactoryArgumentsError",
+        "AND the error identifies the target createX(...) factory"
+      ]
+    },
+    {
+      "requirement": "Shared composition resolver normalizes config-based factory bootstrap",
+      "name": "Config-based public factory delegates through resolver path",
+      "when": ["createX(config, options?) is invoked"],
+      "then": [
+        "the factory creates a resolver, derives XDeps, and delegates to canonical createX(deps)"
+      ]
+    },
+    {
+      "requirement": "Reusable registry primitives are composition-owned",
+      "name": "Kernel does not remain the owner of generic registry semantics",
       "when": [
-        "createArchiveChange(context, options) is called with an explicit context and options object"
+        "public factory bootstrap, kernel assembly, and builder assembly reuse the same merged capability model"
       ],
-      "then": ["it returns a pre-wired ArchiveChange using those values directly"]
+      "then": [
+        "that model is defined as composition infrastructure",
+        "AND the kernel remains a facade over it rather than a second source of truth"
+      ]
+    },
+    {
+      "requirement": "Shared factory-argument validation error",
+      "name": "Invalid deps-plus-options combination throws shared error",
+      "when": ["a public factory receives deps together with composition options"],
+      "then": [
+        "it throws InvalidCompositionFactoryArgumentsError",
+        "AND the error identifies the target factory or use-case name"
+      ]
     },
     {
       "requirement": "Internal ports are never exported",
@@ -166,19 +229,41 @@
     },
     {
       "requirement": "Internal ports are never exported",
-      "name": "Repository factories not in public exports",
+      "name": "Repository factories on public root return port types only",
       "when": ["the public export surface of @specd/core is inspected"],
       "then": [
-        "createSpecRepository, createChangeRepository, and createArchiveRepository are not present"
+        "createSpecRepository, createChangeRepository, and createArchiveRepository are present",
+        "AND they return port contracts rather than concrete adapter classes"
       ]
     },
     {
       "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
-      "name": "Standalone factory uses auto-detect for actor resolution",
+      "name": "Standalone factory uses composition for actor resolution",
       "when": [
         "any standalone use-case factory in composition/use-cases/ constructs an ActorResolver"
       ],
-      "then": ["it calls createVcsActorResolver() instead of new GitActorResolver()"]
+      "then": [
+        "it calls createVcsActorResolver(vcsAdapter) or resolves the VcsAdapter and passes it"
+      ]
+    },
+    {
+      "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
+      "name": "Config loader factory passes root data, not the full adapter",
+      "when": ["createDefaultConfigLoader() constructs FsConfigLoader"],
+      "then": [
+        "it derives rootPath from createVcsAdapter()",
+        "AND it passes the resolved rootPath boundary into the loader instead of retaining the VcsAdapter"
+      ]
+    },
+    {
+      "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
+      "name": "NullVcsAdapter normalizes to null rootPath",
+      "given": ["createVcsAdapter() returns NullVcsAdapter"],
+      "when": ["createDefaultConfigLoader() derives the repository boundary"],
+      "then": [
+        "it treats NullVcsAdapter.rootDir() throwing as rootPath = null",
+        "AND it still constructs FsConfigLoader without propagating the throw"
+      ]
     },
     {
       "requirement": "Use-case factories must use auto-detect for VCS-dependent adapters",
@@ -358,10 +443,30 @@
       "then": ["a SpecRepository is returned without calling createKernel"]
     },
     {
+      "requirement": "Repository factories on public root",
+      "name": "Repository factories resolve adapter IDs through composition registries",
+      "when": ["createSpecRepository('invalid', context, options) is called"],
+      "then": ["it throws UnknownAdapterError"]
+    },
+    {
+      "requirement": "Repository factories on public root",
+      "name": "Options validated by Zod at construction",
+      "when": ["createSpecRepository('fs', context, { path: 123 }) is called"],
+      "then": ["it throws a validation error"]
+    },
+    {
       "requirement": "Extension registration surface",
       "name": "ChangeStorageFactory exported from extensions subpath",
       "when": ["importing from @specd/core/extensions"],
-      "then": ["ChangeStorageFactory and createKernelBuilder are available"]
+      "then": [
+        "ChangeStorageFactory, CompositionRegistryInput, CompositionRegistryView, and createKernelBuilder are available"
+      ]
+    },
+    {
+      "requirement": "Extension registration surface",
+      "name": "Core extensions surface does not export graph-store registration types",
+      "when": ["importing from @specd/core/extensions"],
+      "then": ["graph-store-specific extension hooks are not part of the core extensions surface"]
     },
     {
       "requirement": "Extension registration surface",
@@ -377,37 +482,17 @@
     "files": [
       {
         "specId": "core:composition",
-        "file": "core:src/ports.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:composition",
-        "file": "core:src/public.ts",
-        "symbol": "createKernel"
+        "file": "core:src/composition/index.ts"
       },
       {
         "specId": "core:composition",
-        "file": "core:src/public.ts",
-        "symbol": "createGetStatus"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/public.ts",
-        "symbol": "createSpecRepository"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/extensions.ts",
-        "symbol": "createKernelBuilder"
+        "file": "core:src/public.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1fc28f7db370f3f5623c9b586ea785e675031120781cc07e04c3b276b9fc20a3",
-    "verify.md": "sha256:2cd0dece1fadb6f9c33dba75cd595b70656eea98cea2674cd59d5c60fc54e59f"
+    "spec.md": "sha256:3eebce9d3b54892752f13a7dbe7a95a0df95c5e59276622a9587f12df16e437f",
+    "verify.md": "sha256:fec92a579a42808ec616bea9691cbea45c5530f203dce85c0c8e6325fb6e6e9f"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Core composition surface: factories wire adapters, kernel assembles grouped use cases, public exports stay adapter-agnostic.",
-  "optimizedContext": "# core:composition\n\n## Rules\n- `composition/` = only `@specd/core` layer allowed import `infrastructure/`; delivery talks to composition only.\n- Use-case composition unit = factory, not constructor export. Expose one `createX` per domain use case. Factory builds required ports/adapters internally and returns ready instance.\n- Config I/O exception: `createConfigLoader()` and `createConfigWriter()` return port instances directly; MUST NOT wrap in pass-through use cases.\n- Use-case factories support dual public signatures: `createX(config: SpecdConfig)` and `createX(context, options)` for explicit deps/tests/subset config cases.\n- `SpecdConfig` path uses fully resolved config; explicit path passes domain context + adapter options directly.\n- Internal concrete adapters/ports stay hidden from `\".\"`; public root returns port/use-case types only. Port contracts export from `\"./ports\"`.\n- VCS-dependent factories MUST call `createVcsActorResolver()` / `createVcsAdapter()`; never hardcode git-specific classes.\n- `FsChangeRepositoryOptions` may take `artifactTypes` or lazy `resolveArtifactTypes`; lazy path caches first resolved artifact-type set. With neither, artifact sync becomes no-op.\n- `createKernel(config)` calls composition factories with resolved config and returns grouped use cases; kernel convenient, not mandatory. Single capability callers may use factory directly.\n- Approval gate use cases belong under `kernel.changes`, not `kernel.specs`.\n- Composition public surface also exposes fluent kernel builder. Builder accumulates same additive registrations as `KernelOptions` and must remain semantically equivalent to lower-level kernel construction.\n- `ConfigLoader` = application port with `load(): Promise<SpecdConfig>`; filesystem impl reads `specd.yaml` + `specd.local.yaml`, local overrides base.\n- `ConfigWriter` = application port for `initProject`, `addPlugin`, `removePlugin`; delivery obtains via `createConfigWriter()`, never `FsConfigWriter` directly.\n- `createConfigWriter()` supports default fs-backed writer and injected writer option for tests.\n- `createKernel` MUST NOT wire config mutation (`ConfigWriter`, `InitProject`, `AddPlugin`, `RemovePlugin`). Config mutation reachable only through `createConfigWriter()`.\n- `SpecdConfig` = plain typed object, no methods, defined outside `infrastructure/` and `composition/`. Schema customization fields = `schemaPlugins?` and `schemaOverrides?`; legacy `artifactRules` / `workflow` removed.\n- `createResolveSchema(config)` wires `ResolveSchema` from config schema ref, workspace schema paths, `schemaPlugins`, `schemaOverrides`; `createGetActiveSchema(config)` wraps that resolver.\n- Delivery hosts using core + code-graph bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`), not per-host manual bootstrap. CLI/MCP runtime dependency should be `@specd/sdk` only.\n- Public entry points: `src/public.ts` -> `\".\"`, `src/ports.ts` -> `\"./ports\"`, `src/extensions.ts` -> `\"./extensions\"`, `src/index.ts` -> `\"./internal\"`. Public root MUST NOT `export *` from `domain/`, `application/`, or `composition/`.\n- Public root exports `Kernel`, kernel-mounted use-case types, needed `*Input`/`*Result` types, matching `createX` factories, and port types referenced on `Kernel`.\n- Public root exports repository factories `createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, `createSchemaRegistry` plus option types. First arg = adapter id; builtin `'fs'` required; signatures must stay extensible for registered adapter ids.\n- `\"./extensions\"` exports registry/builder extension surface: `SpecStorageFactory`, `ChangeStorageFactory`, `ArchiveStorageFactory`, `SchemaStorageFactory`, `KernelRegistryInput`, `KernelRegistryView`, `KernelBuilder`, `createKernelBuilder`, `ActorProvider`, `VcsProvider`, `ExternalHookRunner`, `RegistryConflictError`.\n\n## Constraints\n- `composition/` only place allowed import `infrastructure/`.\n- Concrete adapter classes MUST NOT appear on `\".\"`, `\"./ports\"`, or `\"./extensions\"`.\n- Kernel-mounted `createX` factories and repository factories MUST appear on public root.\n- Public root exports `createKernel`, `createConfigLoader`, `createConfigWriter`, `createVcsAdapter`, `Kernel`, kernel-equivalent factories, kernel I/O types, domain entities, `SpecdError` hierarchy.\n- ConfigLoader/ConfigWriter implementations live `infrastructure/`; contracts live `application/ports/` and export from `\"./ports\"`.\n- Kernel groups use cases by domain namespace; no top-level use-case properties.\n- Internal-only symbols like concrete adapters, `kernel-internals`, builtin `FS_*` markers stay on `\"./internal\"` only."
+  "generatedBy": "core"
 }

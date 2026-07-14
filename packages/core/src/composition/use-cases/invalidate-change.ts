@@ -1,89 +1,105 @@
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { InvalidateChange } from '../../application/use-cases/invalidate-change.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { createSchemaProviderForConfig } from '../schema-resolution.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Domain context for `createInvalidateChange(context, options)`. */
-export interface InvalidateChangeContext {
-  readonly workspace: string
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/** Filesystem adapter paths for `createInvalidateChange(context, options)`. */
-export interface FsInvalidateChangeOptions {
-  readonly changesPath: string
-  readonly draftsPath: string
-  readonly discardedPath: string
-  readonly schemaProvider: import('../../application/ports/schema-provider.js').SchemaProvider
+/**
+ * Explicit dependencies for {@link createInvalidateChange}.
+ */
+export interface InvalidateChangeDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Actor resolver used by the use case. */
+  readonly actor: ActorResolver
+  /** Schema provider used by the use case. */
+  readonly schemaProvider: SchemaProvider
 }
 
 /**
- * Constructs an `InvalidateChange` use case with full project config.
+ * Resolves `InvalidateChange` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `InvalidateChange`
+ */
+export function resolveInvalidateChangeDeps(resolver: CompositionResolver): InvalidateChangeDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    actor: resolver.getActorResolver(),
+    schemaProvider: resolver.getSchemaProvider(),
+  }
+}
+
+/**
+ * Constructs `InvalidateChange` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createInvalidateChange(deps: InvalidateChangeDeps): InvalidateChange
+/**
+ * Constructs `InvalidateChange` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel overrides for schema resolution
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createInvalidateChange(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): InvalidateChange
 /**
- * Constructs an `InvalidateChange` use case with explicit context and options.
+ * Constructs `InvalidateChange` from explicit deps or config bootstrap.
  *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths and schema provider
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createInvalidateChange(
-  context: InvalidateChangeContext,
-  options: FsInvalidateChangeOptions,
-): InvalidateChange
-/**
- * Constructs an `InvalidateChange` instance wired with filesystem adapters.
- *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
- * @returns The pre-wired use case instance
- */
-export function createInvalidateChange(
-  configOrContext: SpecdConfig | InvalidateChangeContext,
-  options?: FsInvalidateChangeOptions | { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: InvalidateChangeDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): InvalidateChange {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const ws = getDefaultWorkspace(config)
-    const schemaProvider = createSchemaProviderForConfig(config, kernelOpts)
-    return createInvalidateChange(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        schemaProvider,
-      },
-    )
-  }
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: (options as FsInvalidateChangeOptions).changesPath,
-    draftsPath: (options as FsInvalidateChangeOptions).draftsPath,
-    discardedPath: (options as FsInvalidateChangeOptions).discardedPath,
-  })
-  const actor = createVcsActorResolver()
-  return new InvalidateChange(
-    changeRepo,
-    actor,
-    (options as FsInvalidateChangeOptions).schemaProvider,
+  const normalized = normalizeCompositionFactoryArgs(
+    'createInvalidateChange',
+    depsOrConfig,
+    options,
+    isInvalidateChangeDeps,
   )
+  return createInvalidateChangeFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `InvalidateChange` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createInvalidateChangeFromNormalized(
+  input: FactoryInput<InvalidateChangeDeps, CompositionResolutionOptions>,
+): InvalidateChange {
+  if (input.kind === 'deps') {
+    const { changes, actor, schemaProvider } = input.deps
+    return new InvalidateChange(changes, actor, schemaProvider)
+  }
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createInvalidateChange(resolveInvalidateChangeDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `InvalidateChangeDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isInvalidateChangeDeps(
+  value: InvalidateChangeDeps | SpecdConfig,
+): value is InvalidateChangeDeps {
+  return 'changes' in value && 'actor' in value && 'schemaProvider' in value
 }

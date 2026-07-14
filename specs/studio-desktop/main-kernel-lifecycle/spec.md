@@ -33,7 +33,8 @@ MAY require a local native rebuild when the generated addon is missing or stale 
 the current Electron version, platform, or architecture.
 
 This wiring isolates the native SQLite runtime required by the Electron desktop
-host without retargeting CLI or API away from `@specd/code-graph`.
+host without retargeting CLI or API away from the standard non-Electron graph
+runtime exposed through `@specd/sdk` and backed by `@specd/code-graph`.
 
 ### Requirement: desktop main process launches as Electron
 

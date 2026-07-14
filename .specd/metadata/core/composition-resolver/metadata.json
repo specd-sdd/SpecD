@@ -1,0 +1,177 @@
+{
+  "title": "CompositionResolver",
+  "description": "Config-based public composition needs one shared way to resolve ports and services without forcing every `createX(config, options?)` factory to rebuild bespoke filesystem wiring. `CompositionResolver` defines that shared composition contract: a scoped, lazy, cacheable resolver that turns `SpecdConfig` plus additive composition options into normalized dependencies reused by standalone factories, the kernel facade, and the kernel builder.",
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:kernel",
+    "core:kernel-builder"
+  ],
+  "context": [
+    "Config-based public composition needs one shared way to resolve ports and services without forcing every `createX(config, options?)` factory to rebuild bespoke filesystem wiring. `CompositionResolver` defines that shared composition contract: a scoped, lazy, cacheable resolver that turns `SpecdConfig` plus additive composition options into normalized dependencies reused by standalone factories, the kernel facade, and the kernel builder."
+  ],
+  "rules": [
+    {
+      "requirement": "Resolver is scoped to one composition session",
+      "rules": [
+        "`CompositionResolver` SHALL be created from one `SpecdConfig` plus composition-resolution options.\n\nA resolver instance MUST represent one composition session only. It MUST NOT be a process-wide singleton and MUST NOT be reused across unrelated config or options inputs."
+      ]
+    },
+    {
+      "requirement": "Resolver exposes normalized shared dependencies",
+      "rules": [
+        "The resolver SHALL expose normalized access to shared composition dependencies such as repositories, schema-resolution services, actor resolution, VCS integration, hook execution infrastructure, parsers, and other shared composition primitives required by kernel-mounted public factories.\n\nThe resolver contract MUST expose those dependencies in a way that is independent of fs-shaped public factory inputs.\n\nThe generic registry, merged-registry-view, and built-in-capability primitives consumed below the resolver SHALL belong to composition infrastructure. They MUST NOT be defined as kernel-owned concepts in the architecture contract.\n\nFor `ChangeRepository` resolution, the resolver SHALL assemble the nested options object for drafts and discarded configurations from their separate YAML configs, forwarding the unified options object to the storage factory."
+      ]
+    },
+    {
+      "requirement": "Resolver is lazy and cacheable",
+      "rules": [
+        "The resolver MUST resolve shared dependencies lazily. It MUST NOT eagerly instantiate the entire kernel dependency graph when only one standalone public factory is requested.\n\nA resolver instance MAY cache the shared dependencies it resolves so later reads during the same composition session reuse the same normalized instances."
+      ]
+    },
+    {
+      "requirement": "Resolver does not own per-use-case dependency objects",
+      "rules": [
+        "The resolver MUST NOT centralize knowledge of every `XDeps` contract.\n\nPer-use-case dependency assembly SHALL happen in helpers specific to each public factory, for example `resolveCreateChangeDeps(resolver)`, located with or near the corresponding `createX(...)` factory code."
+      ]
+    },
+    {
+      "requirement": "Public config-based factories delegate through the resolver",
+      "rules": [
+        "For kernel-mounted public composition factories, the convenience form `createX(config, options?)` SHALL:\n\n1. create a resolver instance for that composition session\n2. derive `XDeps` through the per-use-case dependency-assembly helper\n3. delegate to canonical `createX(deps)` construction"
+      ]
+    },
+    {
+      "requirement": "Canonical public factories remain dependency-based",
+      "rules": [
+        "`CompositionResolver` SHALL support public factory composition, but it SHALL NOT replace canonical dependency-based factory contracts.\n\nThe canonical public contract for kernel-mounted factory construction remains `createX(deps)`."
+      ]
+    },
+    {
+      "requirement": "Invalid public argument combinations use one shared error",
+      "rules": [
+        "Argument normalization for public factory wrappers SHALL use one shared typed error: `InvalidCompositionFactoryArgumentsError`.\n\nThat error MUST identify at least the target factory or use-case name so the caller can see which `createX(...)` entry received an invalid argument combination."
+      ]
+    }
+  ],
+  "constraints": [
+    "CompositionResolver is composition infrastructure, not a domain or application service.",
+    "The resolver may reuse registry/view helpers shared with the kernel and builder, but those helpers are composition-owned shared infrastructure rather than kernel-owned abstractions.",
+    "The resolver MUST NOT be exposed as a mandatory third public call shape for every createX(...) factory.",
+    "The resolver MUST NOT require eager full-kernel construction for one standalone public factory call."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Resolver is scoped to one composition session",
+      "name": "Resolver is not process-global",
+      "when": [
+        "two independent composition sessions are created from different config or options inputs"
+      ],
+      "then": [
+        "each receives its own resolver instance",
+        "AND shared dependencies are not mixed across those sessions"
+      ]
+    },
+    {
+      "requirement": "Resolver exposes normalized shared dependencies",
+      "name": "Resolver exposes shared composition primitives",
+      "when": [
+        "a standalone public factory or kernel assembly requests dependencies from the resolver"
+      ],
+      "then": [
+        "it receives normalized shared composition primitives rather than fs-shaped public input fragments",
+        "AND those shared primitives are defined as composition infrastructure rather than kernel-owned registry concepts"
+      ]
+    },
+    {
+      "requirement": "Resolver exposes normalized shared dependencies",
+      "name": "Resolver assembles nested change repository options",
+      "when": ["ChangeRepository is requested from the resolver"],
+      "then": [
+        "the resolver retrieves changes, drafts, and discarded config bindings",
+        "AND it passes drafts and discarded config nested under the options object to the storage factory"
+      ]
+    },
+    {
+      "requirement": "Resolver is lazy and cacheable",
+      "name": "Single standalone factory does not force full-kernel bootstrap",
+      "when": ["one createX(config, options?) call is assembled through the resolver"],
+      "then": [
+        "only the dependencies needed for that factory are resolved",
+        "AND unrelated kernel dependencies are not eagerly instantiated"
+      ]
+    },
+    {
+      "requirement": "Resolver is lazy and cacheable",
+      "name": "Shared dependency is reused within one resolver session",
+      "when": [
+        "two dependency-assembly helpers request the same shared repository or service from one resolver instance"
+      ],
+      "then": ["they receive the same cached normalized instance for that composition session"]
+    },
+    {
+      "requirement": "Resolver does not own per-use-case dependency objects",
+      "name": "Per-use-case dependency assembly lives outside the resolver",
+      "when": ["a factory needs XDeps"],
+      "then": [
+        "those deps are assembled by a per-use-case helper fed from the resolver",
+        "AND the resolver itself does not declare one method per use case"
+      ]
+    },
+    {
+      "requirement": "Public config-based factories delegate through the resolver",
+      "name": "Config-based public factory delegates through resolver path",
+      "when": ["createX(config, options?) is invoked"],
+      "then": [
+        "the factory creates a resolver, derives XDeps, and delegates to canonical createX(deps)"
+      ]
+    },
+    {
+      "requirement": "Canonical public factories remain dependency-based",
+      "name": "Canonical factory contract stays dependency-based",
+      "when": ["a caller uses the canonical public factory form"],
+      "then": [
+        "the call shape is createX(deps)",
+        "AND the resolver is not required as a public third signature"
+      ]
+    },
+    {
+      "requirement": "Invalid public argument combinations use one shared error",
+      "name": "Invalid deps-plus-options combination throws shared error",
+      "when": ["a public factory receives deps together with composition options"],
+      "then": [
+        "it throws InvalidCompositionFactoryArgumentsError",
+        "AND the error identifies the target factory or use-case name"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:composition-resolver",
+        "file": "core:src/composition/composition-resolver.ts",
+        "symbol": "CompositionResolutionOptions"
+      },
+      {
+        "specId": "core:composition-resolver",
+        "file": "core:src/composition/composition-resolver.ts",
+        "symbol": "createCompositionResolver"
+      },
+      {
+        "specId": "core:composition-resolver",
+        "file": "core:src/composition/shared-repository-wiring.ts",
+        "symbol": "createSharedSpecRepositories"
+      },
+      {
+        "specId": "core:composition-resolver",
+        "file": "core:src/composition/shared-repository-wiring.ts",
+        "symbol": "createSharedChangeRepository"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:7d12c6936b3325a9476b13d50e4edc330a397220aa0aae09b43e254ce0a5beab",
+    "verify.md": "sha256:2eeb462004191e2418ab199628f42eac525fd42600f372a309cb70110ad3bcec"
+  },
+  "generatedBy": "core"
+}

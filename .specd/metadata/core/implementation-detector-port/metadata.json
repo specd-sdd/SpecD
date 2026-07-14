@@ -112,5 +112,7 @@
     "spec.md": "sha256:3ebb454526456dc3e625228430e40326684816283a2640668b781f281c8325d7",
     "verify.md": "sha256:49f85123f2d2dc67c3e587a54baa841728d272e7b88fcd42a64eb37a77320526"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Change lifecycle entry points need backend-agnostic way discover potentially relevant implementation files binding themselves directly VCS tools futu…",
+  "optimizedContext": "# core:implementation-detector-port\n\n## Rules\n- Detector interface: implementation detector SHALL expose operation returns modified implementation-file candidates change. - detectModifiedFiles(change, options?) MUST return project-relative file paths representing files changed supplied change context - when options. excludePaths provided, detector MUST exclude any returned path falls under one project-relative portable directory prefixes detector itself owns baseline-resolution policy change context. Callers provide change; do not compute pass raw VCS baseline reference themselves. returned paths candidate inputs tracked implementation review. detector does not itself classify files linked, resolved, ignored.\n- Targeted lifecycle use: Implementation detection MUST demand-driven rather than background-driven. port MUST invoked RefreshImplementationTracking when VCS-backed candidate discovery required. port MUST NOT invoked directly GetStatus, TransitionChange, CompileContext. Change entity itself MUST NOT invoke port.\n- Backend independence: port MUST remain independent any specific backend technology. VCS-backed detection first implementation, but future implementations MAY use other strategies long return same project-relative candidate path contract."
 }

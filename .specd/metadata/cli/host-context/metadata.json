@@ -72,23 +72,8 @@
     "symbols": [
       {
         "specId": "cli:host-context",
-        "file": "cli:src/helpers/cli-context.ts",
-        "symbol": "buildCliKernelOptions"
-      },
-      {
-        "specId": "cli:host-context",
-        "file": "cli:src/helpers/cli-context.ts",
-        "symbol": "resolveCliContext"
-      },
-      {
-        "specId": "cli:host-context",
-        "file": "cli:src/helpers/sdk-host.ts",
-        "symbol": "resolveSdkHostContext"
-      },
-      {
-        "specId": "cli:host-context",
-        "file": "cli:src/helpers/cli-context-types.ts",
-        "symbol": "CliContext"
+        "file": "cli:src/load-config.ts",
+        "symbol": "loadConfig"
       }
     ]
   },

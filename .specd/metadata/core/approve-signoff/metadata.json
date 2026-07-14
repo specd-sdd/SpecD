@@ -1,7 +1,13 @@
 {
   "title": "ApproveSignoff",
   "description": "After implementation, a final human signoff is needed to confirm the change is ready for archival, with artifact hashes captured to detect any post-signoff modifications. The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the signoff gate in the change lifecycle.",
-  "dependsOn": ["core:change", "core:schema-format", "core:composition", "core:kernel"],
+  "dependsOn": [
+    "core:change",
+    "core:schema-format",
+    "core:composition",
+    "core:kernel",
+    "core:composition-resolver"
+  ],
   "context": [
     "After implementation, a final human signoff is needed to confirm the change is ready for archival, with artifact hashes captured to detect any post-signoff modifications. The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the signoff gate in the change lifecycle."
   ],
@@ -46,6 +52,12 @@
       "requirement": "Approval gate baked at construction",
       "rules": [
         "`ApproveSignoff` SHALL accept approval gate configuration at construction time:\n\n```typescript\ntype ApprovalGates = { readonly spec: boolean; readonly signoff: boolean }\n```\n\nThe constructor MUST receive `approvals: ApprovalGates`. `createApproveSignoff(config)` and kernel wiring MUST pass `config.approvals`.\n\n`ApproveSignoff.execute` MUST evaluate the signoff gate using `approvals.signoff` from construction. Callers MUST NOT supply gate flags per invocation."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveApproveSignoffDeps",
+      "rules": [
+        "The config-based `createApproveSignoff(config, options?)` form MUST derive `ApproveSignoffDeps` through `resolveApproveSignoffDeps(resolver)` and then delegate to canonical `createApproveSignoff(deps)`.\n\n`resolveApproveSignoffDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n- `schemaProvider: SchemaProvider`\n- `hasher: ContentHasher`\n- `approvals: ApprovalGates`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -161,20 +173,30 @@
       ],
       "when": ["execute({ name, reason }) is called"],
       "then": ["a SchemaMismatchError is thrown before mutate is invoked"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveApproveSignoffDeps",
+      "name": "createApproveSignoff config form derives ApproveSignoffDeps through resolveApproveSignoffDeps",
+      "when": ["createApproveSignoff(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ApproveSignoffDeps through resolveApproveSignoffDeps(resolver)",
+        "AND resolveApproveSignoffDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createApproveSignoff(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:approve-signoff",
-        "file": "core:src/application/use-cases/approve-signoff.ts",
-        "symbol": "ApproveSignoff"
+        "file": "core:src/composition/use-cases/approve-signoff.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:709abba0ef2c5bfec33c316bffb87d4101e3206da2f4758d9f5c6bdde688452a",
-    "verify.md": "sha256:e66a397e437835721f1f6686c182896c28b79e90ebe67265ac774edcffd920ef"
+    "spec.md": "sha256:3ed0a6e063c24ad4bc9b4d8434870e0e27a86f2162da96dc3ea3338beddf0a9c",
+    "verify.md": "sha256:179bcb338d6cbfdabf9139cc698f3bd5c0462f83e568e0d72ab173f8c86c12b6"
   },
   "generatedBy": "core"
 }

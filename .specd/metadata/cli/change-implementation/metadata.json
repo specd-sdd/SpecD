@@ -1,7 +1,13 @@
 {
   "title": "cli:change-implementation",
   "description": "Implementation traceability needs an explicit workflow surface during an active change so operators and agents can review changed files, confirm spec links, and close the review loop before archive. `specd changes implementation` is the CLI command group that manages tracked implementation files and confirmed implementation links.",
-  "dependsOn": ["core:change", "code-graph:symbol-model"],
+  "dependsOn": [
+    "core:change",
+    "code-graph:symbol-model",
+    "core:update-implementation-tracking",
+    "core:get-implementation-review",
+    "core:refresh-implementation-tracking"
+  ],
   "context": [
     "Implementation traceability needs an explicit workflow surface during an active change so operators and agents can review changed files, confirm spec links, and close the review loop before archive. `specd changes implementation` is the CLI command group that manages tracked implementation files and confirmed implementation links."
   ],
@@ -358,21 +364,19 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:change-implementation",
-        "file": "cli:src/commands/change/implementation.ts",
-        "symbol": "renderImplementationState"
+        "file": "cli:src/commands/change/implementation.ts"
       },
       {
         "specId": "cli:change-implementation",
-        "file": "cli:src/commands/change/_implementation-tracking.ts",
-        "symbol": "enrichImplementationTracking"
+        "file": "cli:src/commands/change/_implementation-tracking.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:58d2224a6f1491fb2bd5ed39dd3bab549cd4ada32220f867d7539acfbbe02b3f",
+    "spec.md": "sha256:dfc2cd200e5227bc91601f2048c6aa4e470d68ae965447ef874befb93ea8085d",
     "verify.md": "sha256:10ebc11764fe0698390681b50f2be9d951b1e556cbbb5d9b8b39046f42abeba5"
   },
   "generatedBy": "core"

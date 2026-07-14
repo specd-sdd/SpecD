@@ -20,7 +20,12 @@
     "core:spec-overlap",
     "default:_global/logging",
     "core:spec-lock",
-    "default:_global/error-handling-conventions"
+    "default:_global/error-handling-conventions",
+    "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/archive-change.ts"
+    }
+  ]
 }

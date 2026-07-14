@@ -152,16 +152,6 @@
         "specId": "api:composition-create-api-server",
         "file": "api:src/composition/create-api-server.ts",
         "symbol": "createApiServer"
-      },
-      {
-        "specId": "api:composition-create-api-server",
-        "file": "api:src/composition/create-api-server.ts",
-        "symbol": "CreateApiServerOptions"
-      },
-      {
-        "specId": "api:composition-create-api-server",
-        "file": "api:src/composition/create-api-server.ts",
-        "symbol": "ApiServer"
       }
     ]
   },

@@ -7,12 +7,12 @@
     "core:change",
     "core:kernel",
     "core:discarded-change-view",
-    "core:change-repository-port"
+    "core:change-repository-port",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/list-discarded.ts",
-      "symbols": ["createListDiscarded"]
+      "file": "core:src/composition/use-cases/list-discarded.ts"
     }
   ]
 }

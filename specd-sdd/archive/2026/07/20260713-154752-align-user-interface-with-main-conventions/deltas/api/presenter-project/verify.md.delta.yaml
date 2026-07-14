@@ -1,0 +1,18 @@
+- op: added
+  description: 'Verify API project-status presentation delegates to the canonical client mapper.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: project status presenter maps graph health diagnostics'
+  content: |
+    ### Requirement: project status presentation uses the canonical client mapper
+
+    #### Scenario: API delegates final status DTO construction
+
+    - **GIVEN** a project status snapshot, graph health, approvals, and effective auth type
+    - **WHEN** the API presenter builds the status response
+    - **THEN** it passes structural input to the `@specd/client` mapper
+    - **AND** the returned value is used as the HTTP DTO without a second field mapping

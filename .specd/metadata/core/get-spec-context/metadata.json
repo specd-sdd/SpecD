@@ -8,7 +8,8 @@
     "core:storage",
     "core:workspace",
     "core:spec-id-format",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "core:composition-resolver"
   ],
   "context": [
     "AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry."
@@ -66,6 +67,12 @@
       "requirement": "Result shape",
       "rules": [
         "`GetSpecContextResult` MUST include:\n\n- `entries` — ordered array of `SpecContextEntry` objects (root first, then dependencies in DFS order).\n- `warnings` — array of `ContextWarning` objects accumulated during resolution.\n\nEach entry MUST include the canonical spec label and its display mode. List entries contain no content fields. Summary entries contain title and description when available. Full entries contain the metadata sections allowed by the section filter."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetSpecContextDeps",
+      "rules": [
+        "The config-based `createGetSpecContext(config, options?)` form MUST derive `GetSpecContextDeps` through `resolveGetSpecContextDeps(resolver)` and then delegate to canonical `createGetSpecContext(deps)`.\n\n`resolveGetSpecContextDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `hasher: ContentHasher`\n- `schemaProvider?: SchemaProvider`\n- `parsers?: ArtifactParserRegistry`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -265,35 +272,31 @@
       "given": ["llmOptimizedContext: true", "AND the spec has optimizedContext populated"],
       "when": ["GetSpecContext is executed"],
       "then": ["the entry uses the optimized content"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetSpecContextDeps",
+      "name": "createGetSpecContext config form derives GetSpecContextDeps through resolveGetSpecContextDeps",
+      "when": ["createGetSpecContext(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetSpecContextDeps through resolveGetSpecContextDeps(resolver)",
+        "AND resolveGetSpecContextDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetSpecContext(deps)"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:get-spec-context",
-        "file": "core:src/application/use-cases/get-spec-context.ts",
-        "symbol": "GetSpecContext"
-      },
-      {
-        "specId": "core:get-spec-context",
-        "file": "core:src/application/use-cases/get-spec-context.ts",
-        "symbol": "execute"
-      },
-      {
-        "specId": "core:get-spec-context",
         "file": "core:src/composition/use-cases/get-spec-context.ts",
         "symbol": "createGetSpecContext"
-      },
-      {
-        "specId": "core:get-spec-context",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:72836fa7bdce8714260fbb8be7767a8c34404e8d344a4f23087b70f9f9e2ac1b",
-    "verify.md": "sha256:5e065fa5cbe8304a598785cc4f071a289bd620e125f32c7daeeb640e3e687753"
+    "spec.md": "sha256:fab3e4b16c2cea7fe2cbeb47a9136462cae0dcf28922f538c39a5c392c230046",
+    "verify.md": "sha256:fa36b9f7162c6bbfab19256b8a37015dcbe220f21d1be4d775967338cbc009ba"
   },
   "generatedBy": "core"
 }

@@ -81,7 +81,15 @@
       "then": ["ChangeNotFoundError throws"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:outline-change-artifact",
+        "file": "core:src/composition/use-cases/outline-change-artifact.ts",
+        "symbol": "createOutlineChangeArtifact"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:163dc64bcf1890ef04f5b265771977c7f9e63f598351518bd0bbb7f17966fb04",
     "verify.md": "sha256:80ce9b994c6ac0752d199bcca618b84a2edf4276a7073a5c886e821f5fdb66d7"

@@ -1,19 +1,45 @@
 /**
+ * Normalized author identity resolved from the active VCS backend.
+ */
+export interface VcsIdentity {
+  readonly name: string
+  readonly email: string
+  readonly provider: string
+}
+
+/**
  * Port for querying version-control system state.
  *
  * Provides technology-neutral VCS operations that use cases and CLI commands
  * need — repository root for path resolution, current branch for context,
  * working-tree cleanliness as a safety guard, current revision reference,
- * and file content retrieval at a given revision.
+ * file content retrieval at a given revision, and author identity lookup.
  *
  * Implementations exist for git, hg, svn, and a null fallback for
  * environments with no VCS.
- *
- * Unlike the repository ports, `VcsAdapter` has no invariant constructor
- * arguments shared across all implementations, so it is declared as an
- * interface rather than an abstract class.
  */
-export interface VcsAdapter {
+export abstract class VcsAdapter {
+  /**
+   * Creates a new `VcsAdapter`.
+   *
+   * @param cwd - Working directory used by the adapter implementation
+   */
+  protected constructor(protected readonly cwd: string) {}
+
+  /**
+   * Detects whether a concrete adapter applies to the provided working directory.
+   *
+   * Concrete subclasses override this to return an initialized instance when
+   * the given directory is inside their repository type.
+   *
+   * @param cwd - Working directory to probe
+   * @returns A concrete adapter instance, or `null` when detection fails
+   */
+  static detect(cwd: string): Promise<VcsAdapter | null> {
+    void cwd
+    return Promise.resolve(null)
+  }
+
   /**
    * Returns the absolute path to the root of the current repository.
    *
@@ -23,7 +49,7 @@ export interface VcsAdapter {
    * @returns Absolute path to the repository root
    * @throws When the current working directory is not inside a VCS repository
    */
-  rootDir(): Promise<string>
+  abstract rootDir(): string
 
   /**
    * Returns the name of the currently checked-out branch.
@@ -33,7 +59,7 @@ export interface VcsAdapter {
    * @returns Current branch name
    * @throws When the current working directory is not inside a VCS repository
    */
-  branch(): Promise<string>
+  abstract branch(): Promise<string>
 
   /**
    * Returns `true` when the working tree has no uncommitted changes.
@@ -41,7 +67,7 @@ export interface VcsAdapter {
    * @returns `true` if working tree is clean, `false` if there are uncommitted changes
    * @throws When the current working directory is not inside a VCS repository
    */
-  isClean(): Promise<boolean>
+  abstract isClean(): Promise<boolean>
 
   /**
    * Returns the short revision identifier for the current commit/changeset.
@@ -50,7 +76,7 @@ export interface VcsAdapter {
    *
    * @returns Short revision hash/id, or `null`
    */
-  ref(): Promise<string | null>
+  abstract ref(): Promise<string | null>
 
   /**
    * Returns the revision that was active at or before a given timestamp.
@@ -60,7 +86,7 @@ export interface VcsAdapter {
    * @param at - ISO-8601 timestamp string
    * @returns Revision identifier active at that time, or `null`
    */
-  refAt(at: string): Promise<string | null>
+  abstract refAt(at: string): Promise<string | null>
 
   /**
    * Returns repository-relative file paths modified since a baseline revision.
@@ -70,7 +96,7 @@ export interface VcsAdapter {
    * @param baseRef - Baseline revision identifier
    * @returns Repository-relative changed file paths
    */
-  modifiedFiles(baseRef: string): Promise<readonly string[]>
+  abstract modifiedFiles(baseRef: string): Promise<readonly string[]>
 
   /**
    * Returns the content of a file at a given revision.
@@ -81,5 +107,12 @@ export interface VcsAdapter {
    * @param filePath - Repository-relative path to the file
    * @returns File content as a string, or `null`
    */
-  show(ref: string, filePath: string): Promise<string | null>
+  abstract show(ref: string, filePath: string): Promise<string | null>
+
+  /**
+   * Resolves the author identity configured for the active VCS backend.
+   *
+   * @returns The normalized VCS identity
+   */
+  abstract identity(): Promise<VcsIdentity>
 }

@@ -86,3 +86,18 @@
 - **GIVEN** `createKernel(config)` is called
 - **WHEN** the returned kernel is inspected
 - **THEN** `kernel.project.getProjectSummary` is a `GetProjectSummary` instance
+
+### Requirement: Config-based factory delegates through resolveGetProjectSummaryDeps
+
+#### Scenario: createGetProjectSummary config form derives GetProjectSummaryDeps through resolveGetProjectSummaryDeps
+
+- **WHEN** `createGetProjectSummary(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)`
+- **AND** `resolveGetProjectSummaryDeps(resolver)` resolves:
+- `listChanges: ListChanges`
+- `listDrafts: ListDrafts`
+- `listDiscarded: ListDiscarded`
+- `listArchived: ListArchived`
+- `listWorkspaces: ListWorkspaces`
+- **AND** the factory delegates to canonical `createGetProjectSummary(deps)`

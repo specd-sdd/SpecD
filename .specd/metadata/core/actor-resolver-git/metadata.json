@@ -1,53 +1,35 @@
 {
   "title": "Actor Resolver Git",
-  "description": "Provides actor identity resolution using the local Git configuration.",
-  "dependsOn": ["core:actor-provider"],
-  "context": ["Provides actor identity resolution using the local Git configuration."],
+  "description": "This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`.",
+  "context": [
+    "This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`."
+  ],
   "rules": [
     {
-      "requirement": "Implementation of AutoDetectActorProvider",
-      "rules": [
-        "The Git actor provider MUST implement the `AutoDetectActorProvider` interface.\n\n- **`name`**: MUST be `\"git\"`."
-      ]
-    },
-    {
-      "requirement": "Detection logic",
-      "rules": [
-        "The provider MUST detect Git presence by looking for a `.git` directory in the `cwd` or its parents."
-      ]
-    },
-    {
-      "requirement": "Identity resolution",
-      "rules": [
-        "The resulting resolver MUST retrieve identity from Git config:\n\n- `name`: `git config user.name`\n- `email`: `git config user.email`\n- `provider`: MUST be set to `\"git\"`."
-      ]
+      "requirement": "Deprecated",
+      "rules": ["This specification is deprecated."]
     }
   ],
   "scenarios": [
     {
-      "requirement": "Implementation of AutoDetectActorProvider",
-      "name": "Interface satisfaction",
-      "given": ["a GitActorProvider instance"],
-      "then": ["it satisfies the AutoDetectActorProvider interface"]
-    },
-    {
-      "requirement": "Detection logic",
-      "name": "Repo detected",
-      "given": ["the directory has a .git folder"],
-      "when": ["detect() is called"],
-      "then": ["it returns a GitActorResolver"]
-    },
-    {
-      "requirement": "Identity resolution",
-      "name": "Identity from config",
-      "given": ["git user.email is \"dev@example.com\""],
-      "when": ["identity() is called"],
-      "then": ["it returns an object with email \"dev@example.com\"", "AND provider is \"git\""]
+      "requirement": "Deprecated",
+      "name": "Spec is deprecated",
+      "when": ["this specification is referenced"],
+      "then": ["it is recognized as deprecated and eliminated"]
     }
   ],
+  "dependsOn": ["core:actor-provider"],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:actor-resolver-git",
+        "file": "core:src/infrastructure/vcs-actor-resolver.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:29b4f7cd7b09f81f5777f98bc76068fd5f8c80f2f42c10f3d50ac4b9c33eaf6f",
-    "verify.md": "sha256:aa2e85728225c3303bf57e49ca954307d2cb482173b0297666d3c44a272e9fa2"
+    "spec.md": "sha256:a001f0711c18d4d78ba42ec75dcd506d3a74c32d1a5e8fb36e46d75d0dc4a217",
+    "verify.md": "sha256:681604d958a0c0dbff40c70ed122ddd5439225432a7fb74461bd0ef96735bd29"
   },
   "generatedBy": "core"
 }

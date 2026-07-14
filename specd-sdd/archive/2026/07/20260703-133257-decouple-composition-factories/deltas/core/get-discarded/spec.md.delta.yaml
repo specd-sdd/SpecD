@@ -1,0 +1,26 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveGetDiscardedDeps
+
+    The config-based `createGetDiscarded(config, options?)` form MUST derive `GetDiscardedDeps` through `resolveGetDiscardedDeps(resolver)` and then delegate to canonical `createGetDiscarded(deps)`.
+
+    `resolveGetDiscardedDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:discarded-change-view`](../discarded-change-view/spec.md)
+    - [`core:change`](../change/spec.md)
+    - [`core:change-repository-port`](../change-repository-port/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

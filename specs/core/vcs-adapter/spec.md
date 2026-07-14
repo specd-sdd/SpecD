@@ -26,7 +26,7 @@ When no VCS is detected (all probes fail), `createVcsAdapter` MUST return a `Nul
 
 ### Requirement: Returns the VcsAdapter port interface
 
-`createVcsAdapter` MUST return a `Promise<VcsAdapter>` — the application port interface defined in `application/ports/vcs-adapter.ts`. The concrete adapter type is an implementation detail not exposed to callers.
+`createVcsAdapter` MUST return a `Promise<VcsAdapter>` — the application port interface defined in `application/ports/vcs-adapter.ts`. The concrete adapter type is an implementation detail not exposed to callers. The returned adapter MUST also support the identity resolution contract specified in `core:vcs-adapter-port`.
 
 ### Requirement: Factory returns modified-file-capable adapters
 

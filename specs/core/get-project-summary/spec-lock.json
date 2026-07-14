@@ -9,16 +9,12 @@
     "core:list-drafts",
     "core:list-discarded",
     "core:list-archived",
-    "core:kernel"
+    "core:kernel",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["createKernel"]
-    },
-    {
-      "file": "core:src/composition/use-cases/get-project-summary.ts",
-      "symbols": ["createGetProjectSummary"]
+      "file": "core:src/composition/use-cases/get-project-summary.ts"
     }
   ]
 }

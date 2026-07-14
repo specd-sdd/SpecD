@@ -1,0 +1,27 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Implementation of AutoDetectActorProvider'
+  rename: 'Requirement: Deprecated'
+  content: |
+    This specification is deprecated.
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Detection logic'
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Identity resolution'
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    _none_

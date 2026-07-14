@@ -116,3 +116,16 @@
 - **GIVEN** `GetActiveSchema` was constructed with specific config
 - **WHEN** `execute()` is called twice without arguments
 - **THEN** both calls produce an equivalent `Schema` object
+
+### Requirement: Config-based factory delegates through resolveGetActiveSchemaDeps
+
+#### Scenario: createGetActiveSchema config form derives GetActiveSchemaDeps through resolveGetActiveSchemaDeps
+
+- **WHEN** `createGetActiveSchema(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetActiveSchemaDeps` through `resolveGetActiveSchemaDeps(resolver)`
+- **AND** `resolveGetActiveSchemaDeps(resolver)` resolves:
+- `resolveSchema: ResolveSchema`
+- `schemas: SchemaRegistry`
+- `buildSchemaFn: ( ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>, )`
+- **AND** the factory delegates to canonical `createGetActiveSchema(deps)`

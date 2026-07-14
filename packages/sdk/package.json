@@ -15,17 +15,17 @@
   },
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./ports": {
-      "import": "./dist/ports.js",
-      "types": "./dist/ports.d.ts"
+      "types": "./dist/ports.d.ts",
+      "import": "./dist/ports.js"
     },
     "./extensions": {
-      "import": "./dist/extensions.js",
-      "types": "./dist/extensions.d.ts"
+      "types": "./dist/extensions.d.ts",
+      "import": "./dist/extensions.js"
     }
   },
   "scripts": {

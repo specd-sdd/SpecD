@@ -5,7 +5,8 @@
     "core:change",
     "core:lifecycle-engine",
     "core:config",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:composition-resolver"
   ],
   "context": [
     "Changes need an explicit way to be invalidated for semantic review without pretending that every invalidation is physical drift. The system also needs one canonical place where policy-aware artifact reopening, approval rollback, focused target handling, and invalidation event recording are coordinated for manual invalidation.\n\nThis spec defines the `InvalidateChange` use case for explicit invalidation requests. It covers target normalization, policy resolution, approval guards, and the contract between the command surface and the `Change` entity's invalidation behavior."
@@ -81,6 +82,12 @@
       "requirement": "Output contract",
       "rules": [
         "On success, the use case MUST return:\n\n- the updated `Change`\n- the effective invalidation policy\n- the final deduplicated affected artifact/file set after policy expansion\n\nThis affected set is the authoritative result for human-facing reporting."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveInvalidateChangeDeps",
+      "rules": [
+        "The config-based `createInvalidateChange(config, options?)` form MUST derive `InvalidateChangeDeps` through `resolveInvalidateChangeDeps(resolver)` and then delegate to canonical `createInvalidateChange(deps)`.\n\n`resolveInvalidateChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n- `schemaProvider: SchemaProvider`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -202,20 +209,30 @@
       "then": [
         "human-facing reporting orders artifact types in schema.artifactDag().topologicalOrder() among affected types"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveInvalidateChangeDeps",
+      "name": "createInvalidateChange config form derives InvalidateChangeDeps through resolveInvalidateChangeDeps",
+      "when": ["createInvalidateChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives InvalidateChangeDeps through resolveInvalidateChangeDeps(resolver)",
+        "AND resolveInvalidateChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createInvalidateChange(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:invalidate-change",
-        "file": "core:src/application/use-cases/invalidate-change.ts",
-        "symbol": "InvalidateChange"
+        "file": "core:src/composition/use-cases/invalidate-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:cd019fc9a2143f33b5bc420426552445cef79322895274003bc8c17558e3a388",
-    "verify.md": "sha256:2212fb2843137d2dc434d13195e0e519b7521fe2d8c3a59de5fd538977de0a34"
+    "spec.md": "sha256:6009cbfbcdfc5fe506c1ed5780777800b3953b6239dff77e982e72e8c433fca7",
+    "verify.md": "sha256:0cf221711c2f1ef5554b3bea55f0b204eecda3cfd69082697c96edc358d0771d"
   },
   "generatedBy": "core"
 }

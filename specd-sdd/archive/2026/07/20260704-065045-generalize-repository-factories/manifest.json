@@ -1,0 +1,4000 @@
+{
+  "name": "generalize-repository-factories",
+  "createdAt": "2026-07-04T06:50:45.711Z",
+  "description": "Track future refactor to remove hardcoded fs dispatch from public repository factories and route adapter resolution through extensible composition wiring.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:composition",
+    "sdk:composition",
+    "core:composition-resolver",
+    "core:kernel-builder",
+    "core:kernel",
+    "core:config",
+    "core:config-writer-port",
+    "cli:config-show",
+    "core:fs-change-repository",
+    "core:fs-spec-repository",
+    "core:fs-archive-repository",
+    "core:fs-schema-repository"
+  ],
+  "specDependsOn": {
+    "core:composition": [
+      "default:_global/architecture",
+      "core:resolve-schema",
+      "core:config-writer-port",
+      "core:kernel-builder",
+      "core:composition-resolver"
+    ],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context"
+    ],
+    "core:composition-resolver": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:kernel",
+      "core:kernel-builder"
+    ],
+    "core:kernel-builder": [
+      "core:kernel",
+      "core:composition",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:save-spec-metadata",
+      "core:invalidate-spec-metadata",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap"
+    ],
+    "core:config": [
+      "core:schema-format",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:storage",
+      "core:spec-metadata",
+      "core:workspace",
+      "default:_global/logging"
+    ],
+    "core:config-writer-port": ["default:_global/architecture", "core:config"],
+    "cli:config-show": ["cli:entrypoint", "core:config"],
+    "core:fs-change-repository": ["default:_global/architecture", "core:composition"],
+    "core:fs-spec-repository": ["default:_global/architecture", "core:composition"],
+    "core:fs-archive-repository": ["default:_global/architecture", "core:composition"],
+    "core:fs-schema-repository": ["default:_global/architecture", "core:composition"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/host-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-change-spec-coverage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-spec-coverage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/index-project-graph/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition-resolver/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel-builder/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/resolve-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/architecture/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/schema-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/archive-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/fs-repository-builders.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/src/composition/repository-factory-options.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/overview.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/composition-resolver.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-builder.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/repository-factories.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/examples/custom-storage-adapter.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/spec.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-archive-repository/verify.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-change-repository/spec.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-change-repository/verify.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-schema-repository/spec.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-schema-repository/verify.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/verify.md",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/composition/kernel-internals.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/errors/storage-directory-not-found-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/schema-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/archive-batch-snapshot-port.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/kernel-internals.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/errors/unknown-adapter-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/config/show.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/load-config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-loader.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/config-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/approvals-and-workflow-hooks.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/multi-repo-coordinator.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/single-repo-local-schema.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/config/examples/single-repo-minimal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/config-writer.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "core_config_preview.txt",
+      "state": "ignored"
+    },
+    {
+      "file": "core_config_writer_port_preview.txt",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/schema-registry.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/schema-repository.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/spec-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSpecRepository"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/schema-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSchemaRepository"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createChangeRepository"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/archive-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createArchiveRepository"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/composition/composition-registries.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createBuiltinCompositionRegistry"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition-resolver",
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CompositionResolutionOptions", "createCompositionResolver"]
+    },
+    {
+      "specId": "core:composition-resolver",
+      "file": "packages/core/src/composition/shared-repository-wiring.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSharedSpecRepositories", "createSharedChangeRepository"]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["KernelOptions", "createKernel"]
+    },
+    {
+      "specId": "core:kernel-builder",
+      "file": "packages/core/src/composition/kernel-builder.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["KernelBuilder", "createKernelBuilder"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/core-reexports.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/specd-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdConfig"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigLoader", "resolveAdapterBinding"]
+    },
+    {
+      "specId": "core:config-writer-port",
+      "file": "packages/core/src/infrastructure/fs/config-writer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsConfigWriter"]
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsChangeRepository"]
+    },
+    {
+      "specId": "core:fs-spec-repository",
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsSpecRepository"]
+    },
+    {
+      "specId": "core:fs-archive-repository",
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsArchiveRepository"]
+    },
+    {
+      "specId": "core:fs-schema-repository",
+      "file": "packages/core/src/infrastructure/fs/schema-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsSchemaRepository"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/test/composition/repository-factories.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/test/barrel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/domain/errors/index.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["StorageDirectoryNotFoundError,UnknownAdapterError"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/domain/errors/storage-directory-not-found-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["StorageDirectoryNotFoundError"]
+    },
+    {
+      "specId": "core:composition",
+      "file": "packages/core/src/domain/errors/unknown-adapter-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["UnknownAdapterError"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:4230f07607e95ccf491e485f31f6b3f394b6f9cf13a8c1ef6682eed31b51782f"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:384a96c928f99a8cd7c6c78736a91f55c539ec237b129ce2293960ca432bc2aa"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:640499e9a7f18b5fa5265e0823a647ae24530e4713f69bda0577c18d366a8b43"
+        },
+        {
+          "key": "core:composition-resolver",
+          "filename": "deltas/core/composition-resolver/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ff7d1aa104ff75a082f8089331e7fcd186eb96f3c144f33f821366dd06ac7557"
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f5636a1f4ed71df7b6f2cf3952fe79e92d8326c83b3975a638b2e573c7204ce9"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a27d9e6d0402ef99fc9b793f66dbab0c42500b19a6e644c229b76e00412c79c"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a1c86e2c6e93d6de1ef016bfd36822b365284fc890793ba350880b0d57dee091"
+        },
+        {
+          "key": "core:config-writer-port",
+          "filename": "deltas/core/config-writer-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c939123712b0338fe9693681b792db62e9b5561eec7884483188367b6d9dc8df"
+        },
+        {
+          "key": "cli:config-show",
+          "filename": "deltas/cli/config-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ffcd7d600e1442edfa6f35c1a1f90999690d4ddc49fed1bc013cb391a4744b0c"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "specs/core/fs-change-repository/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:9ff3c734b8c9a665af635c0063570844a47156e010222ecb8b5dafce17dc64bd"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "specs/core/fs-spec-repository/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:acc208b542b71cd0ef4734949aef1fe1b067041e0945ec605b307e9cf4bb7b21"
+        },
+        {
+          "key": "core:fs-archive-repository",
+          "filename": "specs/core/fs-archive-repository/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:83c9e6a9cc16fdf26ed0d6826d3f62211fdf76fdbf229975aeb082235dd53570"
+        },
+        {
+          "key": "core:fs-schema-repository",
+          "filename": "specs/core/fs-schema-repository/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:607258b8784a81140c99518390237a69c7399cbffb3ff9c438140abe27a11394"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:composition",
+          "filename": "deltas/core/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:80ebda97b26ce542553f64ba8d13e191e74c0ada513f5799e8de63de2708b12f"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ecce132548992ac88ccbdd80c1ca579ca83f5d1fd53e8677de4a0999608b74ca"
+        },
+        {
+          "key": "core:composition-resolver",
+          "filename": "deltas/core/composition-resolver/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a118973355a4b88de21895c77e78181047c6eb4862c13ddd9f461f3fbd5623e4"
+        },
+        {
+          "key": "core:kernel-builder",
+          "filename": "deltas/core/kernel-builder/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8b300eea0df28e6d4b87fbae90a21bef453575f1b6b7280b7c4e6bb029d8df14"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:23693eeb3702e00a8bf997d991b07082afe109ecf594bd67e60659ace8a792c9"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4071516971766af79bcf270b05eba6e07d314fdbee2160c286ec32743cb1309b"
+        },
+        {
+          "key": "core:config-writer-port",
+          "filename": "deltas/core/config-writer-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a20205fcf39b7aa6ecd615c195cece5ce4ef0991f4cfb1b50ec3aff2e9ea8600"
+        },
+        {
+          "key": "cli:config-show",
+          "filename": "deltas/cli/config-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f5dc040f3f84fadec73fd825f4a00c3d5101bd661515275ab3a0898643607a04"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "specs/core/fs-change-repository/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:fef1e833bd34d934193e1a0288c8920e5f897e53f647d631e33ed2fec720a361"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "specs/core/fs-spec-repository/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:ba5829adccb893f012dca05cb895a03c637ad039d46cf76c031f5dc6dd898160"
+        },
+        {
+          "key": "core:fs-archive-repository",
+          "filename": "specs/core/fs-archive-repository/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:06b20e1e3e34a993c2f5e48c3ef2b9b5c3153ff139fa5ffffb94c4d8339d8e9c"
+        },
+        {
+          "key": "core:fs-schema-repository",
+          "filename": "specs/core/fs-schema-repository/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:2140d2ca411963720d993647df23d012f4e85cf5bc1424fe0a33f901c15b142b"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:238cc93916352f03e8b6df80ba58eafce45e8dc8fd6d4f8ab24827c326da988e"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:ad4e24b98a4b8a68eae7dc45948a4a3be356590e3eadbd00483bf630a2f8e00e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-04T06:50:45.711Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-04T06:50:45.719Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T09:49:40.011Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:49:57.023Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T09:49:57.028Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:56:37.862Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T10:24:35.792Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T10:27:59.026Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T10:31:48.208Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T10:51:17.657Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T11:24:57.388Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:21:45.921Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:18.946Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:34.779Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:52.421Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T21:23:00.062Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T21:30:18.074Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T21:30:18.075Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:composition-resolver"
+        },
+        {
+          "type": "verify",
+          "key": "core:composition-resolver"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T21:30:18.103Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition", "sdk:composition", "core:composition-resolver"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition", "sdk:composition", "core:composition-resolver"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T21:30:18.105Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T21:40:47.072Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T21:41:31.009Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T21:41:31.012Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T21:46:16.640Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T21:49:34.771Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T21:50:58.696Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T06:49:10.914Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:composition]; verify [core:composition]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-07T06:49:10.914Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T09:30:37.759Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:composition-resolver, core:kernel, core:kernel-builder, sdk:composition]; verify [core:composition-resolver, core:kernel, core:kernel-builder, sdk:composition]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:composition-resolver",
+            "core:kernel",
+            "core:kernel-builder",
+            "sdk:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition-resolver",
+            "core:kernel",
+            "core:kernel-builder",
+            "sdk:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:15:49.202Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T10:15:49.211Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:18:37.073Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:27:24.992Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:34:09.330Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:48:12.554Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:48:12.641Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T10:48:12.644Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config-writer-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:config-writer-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:59:46.785Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T10:59:46.861Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T10:59:46.865Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:config-show"
+        },
+        {
+          "type": "verify",
+          "key": "cli:config-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-07T11:19:15.926Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-07T11:19:15.929Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-spec-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-archive-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-schema-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-spec-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-archive-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-schema-repository"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-08T15:13:52.151Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T17:41:28.330Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-08T17:48:47.053Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-08T17:50:26.215Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-08T17:51:25.697Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T17:52:41.468Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-08T17:52:41.468Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-08T17:52:54.338Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-08T17:54:15.273Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-08T17:54:15.273Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-08T17:54:22.181Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T06:10:36.570Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:10:36.570Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:10:40.770Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T06:16:51.312Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:fs-archive-repository, core:fs-change-repository, core:fs-schema-repository, core:fs-spec-repository]; verify [core:fs-archive-repository, core:fs-change-repository, core:fs-schema-repository, core:fs-spec-repository]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:fs-archive-repository",
+            "core:fs-change-repository",
+            "core:fs-schema-repository",
+            "core:fs-spec-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:fs-archive-repository",
+            "core:fs-change-repository",
+            "core:fs-schema-repository",
+            "core:fs-spec-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:16:51.312Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:17:25.351Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T06:21:52.808Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:fs-archive-repository, core:fs-change-repository]; verify [core:fs-archive-repository, core:fs-change-repository]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:fs-archive-repository", "core:fs-change-repository"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:fs-archive-repository", "core:fs-change-repository"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:21:52.808Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:22:17.847Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T06:24:34.870Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:24:34.870Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:24:42.916Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T06:26:37.772Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:26:37.772Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:27:31.190Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T06:49:44.590Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:fs-change-repository]; verify [core:fs-change-repository]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:fs-change-repository"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:fs-change-repository"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:49:44.590Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T06:50:11.920Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T07:02:01.381Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:fs-archive-repository, core:fs-change-repository]; verify [core:fs-archive-repository, core:fs-change-repository]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:fs-archive-repository", "core:fs-change-repository"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:fs-archive-repository", "core:fs-change-repository"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:02:01.381Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:02:31.947Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T07:05:10.579Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:fs-archive-repository, core:fs-change-repository, core:fs-schema-repository, core:fs-spec-repository]; verify [core:fs-archive-repository, core:fs-change-repository, core:fs-schema-repository, core:fs-spec-repository]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:fs-archive-repository",
+            "core:fs-change-repository",
+            "core:fs-schema-repository",
+            "core:fs-spec-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:fs-archive-repository",
+            "core:fs-change-repository",
+            "core:fs-schema-repository",
+            "core:fs-spec-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:05:10.579Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:05:40.300Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T07:15:42.647Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:15:42.647Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:16:10.654Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T07:16:36.573Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config]; verify [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:16:36.573Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T07:18:43.902Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:config-show, core:config-writer-port]; verify [core:config-writer-port]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:config-show", "core:config-writer-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config-writer-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:19:51.456Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T07:33:57.045Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:33:57.045Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T07:34:20.477Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T08:32:40.817Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T08:32:40.817Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T08:32:57.086Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T08:35:47.724Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T08:35:47.724Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T08:36:34.843Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config]; verify [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T08:37:03.775Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T08:41:23.840Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:12:39.323Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:12:39.323Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:13:04.484Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:13:07.682Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:15:35.753Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:15:35.753Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:15:48.755Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:15:53.993Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:29:48.881Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:33:08.546Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:33:20.904Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-09T16:33:34.293Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"generalize-repository-factories\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:37:04.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:37:04.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:40:48.997Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "needs revision",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:45:04.285Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "needs revision",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:51:57.043Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:54:36.662Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:config]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:55:09.075Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:59:38.052Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T17:00:26.005Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T17:00:32.480Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T17:07:25.375Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T05:46:12.327Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:composition",
+            "sdk:composition",
+            "core:composition-resolver",
+            "core:kernel-builder",
+            "core:kernel",
+            "core:config",
+            "core:config-writer-port",
+            "cli:config-show",
+            "core:fs-change-repository",
+            "core:fs-spec-repository",
+            "core:fs-archive-repository",
+            "core:fs-schema-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T05:46:12.327Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T05:50:24.186Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T05:50:46.654Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T05:51:16.078Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T05:54:47.729Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T05:59:45.044Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:config]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T05:59:45.044Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T07:01:11.240Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T07:01:37.492Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T07:01:42.528Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T13:44:15.840Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T13:52:13.361Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T13:52:17.537Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-10T14:08:24.980Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:config\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-10T14:08:28.521Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:config\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-10T14:09:01.722Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:composition': extracted dependencies [default:_global/architecture, core:resolve-schema, core:config-writer-port, core:kernel-builder, core:composition-resolver] do not match persisted dependencies [default:_global/architecture, core:resolve-schema, core:config-writer-port, core:config]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-10T14:09:09.717Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:composition-resolver': extracted dependencies [default:_global/architecture, core:composition, core:kernel, core:kernel-builder] do not match persisted dependencies [default:_global/architecture, core:composition, core:kernel, core:kernel-builder, core:config]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-10T14:09:15.266Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-10T14:09:15.550Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

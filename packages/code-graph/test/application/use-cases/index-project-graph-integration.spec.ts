@@ -51,6 +51,7 @@ describe('IndexProjectGraph integration', () => {
     const result = await new IndexProjectGraph().execute({
       provider,
       projectRoot: tempDir,
+      vcsRoot: tempDir,
       workspaces: [
         {
           name: 'default',

@@ -8,12 +8,12 @@
     "core:content-extraction",
     "core:schema-format",
     "core:spec-id-format",
-    "core:spec-repository-port"
+    "core:spec-repository-port",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-      "symbols": ["GenerateSpecMetadata", "projectImplementationMetadata"]
+      "file": "core:src/composition/use-cases/generate-spec-metadata.ts"
     }
   ]
 }

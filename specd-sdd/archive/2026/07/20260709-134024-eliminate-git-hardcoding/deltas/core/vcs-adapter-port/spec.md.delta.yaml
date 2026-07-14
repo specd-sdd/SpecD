@@ -1,0 +1,59 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: rootDir returns the repository root'
+  content: |
+    `rootDir()` MUST return a `string` representing the absolute path of the repository root directory. The returned path MUST be absolute, not relative.
+
+    When the current working directory is not inside a VCS repository, `rootDir()` MUST throw an `Error`.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Interface-only declaration'
+  rename: 'Requirement: Abstract class base'
+  content: |
+    `VcsAdapter` MUST be declared as an abstract class, not a TypeScript interface. It MUST accept `cwd` as a protected read-only constructor parameter, which represents the working directory context.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Null fallback implementation'
+  content: |
+    A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:
+
+    - `rootDir()` MUST throw an `Error` containing a message indicating no VCS was detected.
+    - `branch()` MUST resolve to `"none"`.
+    - `isClean()` MUST resolve to `true`.
+    - `ref()` MUST resolve to `null`.
+    - `refAt()` MUST resolve to `null` for any timestamp.
+    - `show()` MUST resolve to `null` for any arguments.
+    - `modifiedFiles()` MUST resolve to an empty array for any baseline.
+    - `identity()` MUST resolve to `{ name: 'unknown', email: '', provider: 'null' }`.
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Null fallback implementation'
+  content: |
+    ### Requirement: identity resolves version control identity
+
+    `identity()` MUST return a `Promise<VcsIdentity>` resolving to the version control author identity configured for the repository.
+
+    The returned `VcsIdentity` has the structure:
+    ```typescript
+    export interface VcsIdentity {
+      readonly name: string
+      readonly email: string
+      readonly provider: string
+    }
+    ```
+
+    `name` MUST be a non-empty string when resolved successfully, and `email` MAY be empty for backends that do not natively store email (like SVN).
+
+    ### Requirement: static detect detects active VCS
+
+    `VcsAdapter` MUST define a static `detect(cwd: string): Promise<VcsAdapter | null>` method.
+
+    By default, `VcsAdapter.detect()` MUST return `null`. Concrete subclasses override this to asynchronously detect if the given `cwd` is inside their repository type, resolve the repository root, and return an instance of themselves.

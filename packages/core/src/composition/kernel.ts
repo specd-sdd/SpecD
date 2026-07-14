@@ -1,104 +1,202 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { CreateChange } from '../application/use-cases/create-change.js'
-import { GetStatus } from '../application/use-cases/get-status.js'
-import { TransitionChange } from '../application/use-cases/transition-change.js'
-import { DraftChange } from '../application/use-cases/draft-change.js'
-import { RestoreChange } from '../application/use-cases/restore-change.js'
-import { DiscardChange } from '../application/use-cases/discard-change.js'
-import { ArchiveChange } from '../application/use-cases/archive-change.js'
-import { ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
-import { ValidateChangeBatch } from '../application/use-cases/validate-change-batch.js'
-import { CompileContext } from '../application/use-cases/compile-context.js'
-import { ApproveSpec } from '../application/use-cases/approve-spec.js'
-import { ApproveSignoff } from '../application/use-cases/approve-signoff.js'
-import { ListChanges } from '../application/use-cases/list-changes.js'
-import { ListDrafts } from '../application/use-cases/list-drafts.js'
-import { ListDiscarded } from '../application/use-cases/list-discarded.js'
-import { GetDraft } from '../application/use-cases/get-draft.js'
-import { GetDiscarded } from '../application/use-cases/get-discarded.js'
-import { ListArchived } from '../application/use-cases/list-archived.js'
-import { GetArchivedChange } from '../application/use-cases/get-archived-change.js'
-import { EditChange } from '../application/use-cases/edit-change.js'
-import { InvalidateChange } from '../application/use-cases/invalidate-change.js'
-import { UpdateSpecDeps } from '../application/use-cases/update-spec-deps.js'
-import { SkipArtifact } from '../application/use-cases/skip-artifact.js'
-import { ListSpecs } from '../application/use-cases/list-specs.js'
-import { SearchSpecs } from '../application/use-cases/search-specs.js'
-import { GetSpec } from '../application/use-cases/get-spec.js'
-import { SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
-import { InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
-import { GetActiveSchema } from '../application/use-cases/get-active-schema.js'
-import { ResolveSchema } from '../application/use-cases/resolve-schema.js'
-import { GetProjectContext } from '../application/use-cases/get-project-context.js'
-import { GetConfig } from '../application/use-cases/get-config.js'
-import { ValidateSpecs } from '../application/use-cases/validate-specs.js'
-import { GetSpecContext } from '../application/use-cases/get-spec-context.js'
-import { GenerateSpecMetadata } from '../application/use-cases/generate-spec-metadata.js'
-import { RunStepHooks } from '../application/use-cases/run-step-hooks.js'
-import { GetHookInstructions } from '../application/use-cases/get-hook-instructions.js'
-import { GetArtifactInstruction } from '../application/use-cases/get-artifact-instruction.js'
-import { ValidateSchema } from '../application/use-cases/validate-schema.js'
-import { DetectOverlap } from '../application/use-cases/detect-overlap.js'
-import { OutlineChangeArtifact } from '../application/use-cases/outline-change-artifact.js'
-import { PreviewSpec } from '../application/use-cases/preview-spec.js'
-import { GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
-import { UpdateImplementationTracking } from '../application/use-cases/update-implementation-tracking.js'
-import { RefreshImplementationTracking } from '../application/use-cases/refresh-implementation-tracking.js'
-import { GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
-import { SaveChangeArtifact } from '../application/use-cases/save-change-artifact.js'
-import { GetChangeArtifact } from '../application/use-cases/get-change-artifact.js'
-import { GetReadOnlyChangeArtifact } from '../application/use-cases/get-read-only-change-artifact.js'
-import { ReadLog } from '../application/use-cases/read-log.js'
-import { UpdateSpecMetadata } from '../application/use-cases/update-spec-metadata.js'
-import { UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
-import { GetProjectMetadata } from '../application/use-cases/get-project-metadata.js'
-import { ListWorkspaces } from '../application/use-cases/list-workspaces.js'
-import { GetProjectSummary } from '../application/use-cases/get-project-summary.js'
-import { createGetProjectSummary } from './use-cases/get-project-summary.js'
-import { LifecycleEngine } from '../domain/services/lifecycle-engine.js'
+import { type ArchiveChange } from '../application/use-cases/archive-change.js'
+import { type ApproveSignoff } from '../application/use-cases/approve-signoff.js'
+import { type ApproveSpec } from '../application/use-cases/approve-spec.js'
+import { type CompileContext } from '../application/use-cases/compile-context.js'
+import { type CreateChange } from '../application/use-cases/create-change.js'
+import { type DetectOverlap } from '../application/use-cases/detect-overlap.js'
+import { type DiscardChange } from '../application/use-cases/discard-change.js'
+import { type DraftChange } from '../application/use-cases/draft-change.js'
+import { type EditChange } from '../application/use-cases/edit-change.js'
+import { type GenerateSpecMetadata } from '../application/use-cases/generate-spec-metadata.js'
+import { type GetActiveSchema } from '../application/use-cases/get-active-schema.js'
+import { type GetArchivedChange } from '../application/use-cases/get-archived-change.js'
+import { type GetArtifactInstruction } from '../application/use-cases/get-artifact-instruction.js'
+import {
+  GetChangeArtifact,
+  type GetChangeArtifact as GetChangeArtifactUseCase,
+} from '../application/use-cases/get-change-artifact.js'
+import { type GetConfig } from '../application/use-cases/get-config.js'
+import { type GetDiscarded } from '../application/use-cases/get-discarded.js'
+import { type GetDraft } from '../application/use-cases/get-draft.js'
+import { type GetHookInstructions } from '../application/use-cases/get-hook-instructions.js'
+import { type GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
+import { type GetProjectContext } from '../application/use-cases/get-project-context.js'
+import { type GetProjectMetadata } from '../application/use-cases/get-project-metadata.js'
+import { type GetProjectSummary } from '../application/use-cases/get-project-summary.js'
+import {
+  GetReadOnlyChangeArtifact,
+  type GetReadOnlyChangeArtifact as GetReadOnlyChangeArtifactUseCase,
+} from '../application/use-cases/get-read-only-change-artifact.js'
+import { type GetSpec } from '../application/use-cases/get-spec.js'
+import { type GetSpecContext } from '../application/use-cases/get-spec-context.js'
+import { type GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
+import { type GetStatus } from '../application/use-cases/get-status.js'
+import { type InvalidateChange } from '../application/use-cases/invalidate-change.js'
+import { type InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
+import { type ListArchived } from '../application/use-cases/list-archived.js'
+import { type ListChanges } from '../application/use-cases/list-changes.js'
+import { type ListDiscarded } from '../application/use-cases/list-discarded.js'
+import { type ListDrafts } from '../application/use-cases/list-drafts.js'
+import { type ListSpecs } from '../application/use-cases/list-specs.js'
+import { type ListWorkspaces } from '../application/use-cases/list-workspaces.js'
+import { type PreviewSpec } from '../application/use-cases/preview-spec.js'
+import { type RefreshImplementationTracking } from '../application/use-cases/refresh-implementation-tracking.js'
+import { type ResolveSchema } from '../application/use-cases/resolve-schema.js'
+import { ReadLog, type ReadLog as ReadLogUseCase } from '../application/use-cases/read-log.js'
+import { type RestoreChange } from '../application/use-cases/restore-change.js'
+import { type RunStepHooks } from '../application/use-cases/run-step-hooks.js'
+import {
+  SaveChangeArtifact,
+  type SaveChangeArtifact as SaveChangeArtifactUseCase,
+} from '../application/use-cases/save-change-artifact.js'
+import { type SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
+import { type SearchSpecs } from '../application/use-cases/search-specs.js'
+import { type SkipArtifact } from '../application/use-cases/skip-artifact.js'
+import { type TransitionChange } from '../application/use-cases/transition-change.js'
+import { type UpdateImplementationTracking } from '../application/use-cases/update-implementation-tracking.js'
+import { type UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
+import { type UpdateSpecDeps } from '../application/use-cases/update-spec-deps.js'
+import { type UpdateSpecMetadata } from '../application/use-cases/update-spec-metadata.js'
+import { type ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
+import {
+  ValidateChangeBatch,
+  type ValidateChangeBatch as ValidateChangeBatchUseCase,
+} from '../application/use-cases/validate-change-batch.js'
+import { type ValidateSchema } from '../application/use-cases/validate-schema.js'
+import { type ValidateSpecs } from '../application/use-cases/validate-specs.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { Logger } from '../application/logger.js'
+import { type LogFormatter } from '../application/ports/log-formatter.port.js'
+import { type LogDestination } from '../application/ports/logger.port.js'
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
 import { type SpecdConfig } from '../application/specd-config.js'
-import { Logger } from '../application/logger.js'
-import { type LogDestination } from '../application/ports/logger.port.js'
-import type { LogFormatter } from '../application/ports/log-formatter.port.js'
+import {
+  OutlineChangeArtifact,
+  type OutlineChangeArtifact as OutlineChangeArtifactUseCase,
+} from '../application/use-cases/outline-change-artifact.js'
 import { createLogFormatter } from './create-log-formatter.js'
 import { type LogRingBuffer } from '../infrastructure/logging/log-ring-buffer.js'
-import { createBuiltinKernelRegistry, createKernelInternals } from './kernel-internals.js'
-import {
-  createKernelRegistryView,
-  type KernelRegistryInput,
-  type KernelRegistryView,
-} from './kernel-registries.js'
-import { LazySchemaProvider } from './lazy-schema-provider.js'
-import { createSpecWorkspaceRoutes } from './spec-workspace-routes.js'
-import { buildCompileContextConfig } from './build-compile-context-config.js'
 import { createDefaultLogger } from '../infrastructure/logging/pino-logger.js'
-import { VcsImplementationDetector } from '../infrastructure/vcs/vcs-implementation-detector.js'
-import { buildSchema } from '../domain/services/build-schema.js'
+import {
+  createCompositionResolver,
+  type CompositionResolutionOptions,
+} from './composition-resolver.js'
+import { createApproveSignoff, resolveApproveSignoffDeps } from './use-cases/approve-signoff.js'
+import { createApproveSpec, resolveApproveSpecDeps } from './use-cases/approve-spec.js'
+import { createArchiveChange, resolveArchiveChangeDeps } from './use-cases/archive-change.js'
+import { createCompileContext, resolveCompileContextDeps } from './use-cases/compile-context.js'
+import { createCreateChange, resolveCreateChangeDeps } from './use-cases/create-change.js'
+import { createDetectOverlap, resolveDetectOverlapDeps } from './use-cases/detect-overlap.js'
+import { createDiscardChange, resolveDiscardChangeDeps } from './use-cases/discard-change.js'
+import { createDraftChange, resolveDraftChangeDeps } from './use-cases/draft-change.js'
+import { createEditChange, resolveEditChangeDeps } from './use-cases/edit-change.js'
+import {
+  createGenerateSpecMetadata,
+  resolveGenerateSpecMetadataDeps,
+} from './use-cases/generate-spec-metadata.js'
+import { createGetActiveSchema, resolveGetActiveSchemaDeps } from './use-cases/get-active-schema.js'
+import {
+  createGetArchivedChange,
+  resolveGetArchivedChangeDeps,
+} from './use-cases/get-archived-change.js'
+import {
+  createGetArtifactInstruction,
+  resolveGetArtifactInstructionDeps,
+} from './use-cases/get-artifact-instruction.js'
+import { createGetConfig } from './use-cases/get-config.js'
+import { createGetDiscarded, resolveGetDiscardedDeps } from './use-cases/get-discarded.js'
+import { createGetDraft, resolveGetDraftDeps } from './use-cases/get-draft.js'
+import {
+  createGetHookInstructions,
+  resolveGetHookInstructionsDeps,
+} from './use-cases/get-hook-instructions.js'
+import {
+  createGetImplementationReview,
+  resolveGetImplementationReviewDeps,
+} from './use-cases/get-implementation-review.js'
+import {
+  createGetProjectContext,
+  resolveGetProjectContextDeps,
+} from './use-cases/get-project-context.js'
+import { createGetProjectMetadata } from './use-cases/get-project-metadata.js'
+import {
+  createGetProjectSummary,
+  resolveGetProjectSummaryDeps,
+} from './use-cases/get-project-summary.js'
+import { createGetSpec, resolveGetSpecDeps } from './use-cases/get-spec.js'
+import { createGetSpecContext, resolveGetSpecContextDeps } from './use-cases/get-spec-context.js'
+import { createGetSpecOutline, resolveGetSpecOutlineDeps } from './use-cases/get-spec-outline.js'
+import { createGetStatus, resolveGetStatusDeps } from './use-cases/get-status.js'
+import {
+  createInvalidateChange,
+  resolveInvalidateChangeDeps,
+} from './use-cases/invalidate-change.js'
+import {
+  createInvalidateSpecMetadata,
+  resolveInvalidateSpecMetadataDeps,
+} from './use-cases/invalidate-spec-metadata.js'
+import { createListArchived, resolveListArchivedDeps } from './use-cases/list-archived.js'
+import { createListChanges, resolveListChangesDeps } from './use-cases/list-changes.js'
+import { createListDiscarded, resolveListDiscardedDeps } from './use-cases/list-discarded.js'
+import { createListDrafts, resolveListDraftsDeps } from './use-cases/list-drafts.js'
+import { createListSpecs, resolveListSpecsDeps } from './use-cases/list-specs.js'
+import { createListWorkspaces, resolveListWorkspacesDeps } from './use-cases/list-workspaces.js'
+import { createPreviewSpec, resolvePreviewSpecDeps } from './use-cases/preview-spec.js'
+import {
+  createRefreshImplementationTracking,
+  resolveRefreshImplementationTrackingDeps,
+} from './use-cases/refresh-implementation-tracking.js'
+import { createResolveSchema, resolveResolveSchemaDeps } from './use-cases/resolve-schema.js'
+import { createRestoreChange, resolveRestoreChangeDeps } from './use-cases/restore-change.js'
+import { createRunStepHooks, resolveRunStepHooksDeps } from './use-cases/run-step-hooks.js'
+import {
+  createSaveSpecMetadata,
+  resolveSaveSpecMetadataDeps,
+} from './use-cases/save-spec-metadata.js'
+import { createSearchSpecs, resolveSearchSpecsDeps } from './use-cases/search-specs.js'
+import { createSkipArtifact, resolveSkipArtifactDeps } from './use-cases/skip-artifact.js'
+import {
+  createTransitionChange,
+  resolveTransitionChangeDeps,
+} from './use-cases/transition-change.js'
+import {
+  createUpdateImplementationTracking,
+  resolveUpdateImplementationTrackingDeps,
+} from './use-cases/update-implementation-tracking.js'
+import { createUpdateProjectMetadata } from './use-cases/update-project-metadata.js'
+import { createUpdateSpecDeps, resolveUpdateSpecDepsDeps } from './use-cases/update-spec-deps.js'
+import { createUpdateSpecMetadata } from './use-cases/update-spec-metadata.js'
+import {
+  createValidateArtifacts,
+  resolveValidateArtifactsDeps,
+} from './use-cases/validate-artifacts.js'
+import { createValidateSchema, resolveValidateSchemaDeps } from './use-cases/validate-schema.js'
+import { createValidateSpecs, resolveValidateSpecsDeps } from './use-cases/validate-specs.js'
+import { type CompositionRegistryView } from './composition-registries.js'
 
 /**
  * All use cases instantiated from a single `SpecdConfig`, grouped by domain area.
  */
 export interface Kernel {
-  registry: KernelRegistryView
+  registry: CompositionRegistryView
   schemas: SchemaRegistry
   changes: {
     repo: ChangeRepository
     create: CreateChange
     status: GetStatus
-    getArtifact: GetChangeArtifact
-    getReadOnlyChangeArtifact: GetReadOnlyChangeArtifact
-    saveArtifact: SaveChangeArtifact
+    getArtifact: GetChangeArtifactUseCase
+    getReadOnlyChangeArtifact: GetReadOnlyChangeArtifactUseCase
+    saveArtifact: SaveChangeArtifactUseCase
     transition: TransitionChange
     draft: DraftChange
     restore: RestoreChange
     discard: DiscardChange
     archive: ArchiveChange
     validate: ValidateArtifacts
-    validateBatch: ValidateChangeBatch
+    validateBatch: ValidateChangeBatchUseCase
     compile: CompileContext
     list: ListChanges
     listDrafts: ListDrafts
@@ -119,7 +217,7 @@ export interface Kernel {
     getImplementationReview: GetImplementationReview
     detectOverlap: DetectOverlap
     preview: PreviewSpec
-    outlineArtifact: OutlineChangeArtifact
+    outlineArtifact: OutlineChangeArtifactUseCase
     approveSpec: ApproveSpec
     approveSignoff: ApproveSignoff
   }
@@ -148,14 +246,12 @@ export interface Kernel {
     updateMetadata: UpdateProjectMetadata
   }
   readonly logs?: {
-    read: ReadLog
+    read: ReadLogUseCase
   }
 }
 
 /** Options for {@link createKernel}. */
-export interface KernelOptions extends KernelRegistryInput {
-  readonly extraNodeModulesPaths?: readonly string[]
-  readonly graphStoreId?: string
+export interface KernelOptions extends CompositionResolutionOptions {
   readonly additionalDestinations?: readonly LogDestination[]
   readonly logRing?: LogRingBuffer
   readonly logFormatter?: LogFormatter
@@ -169,11 +265,6 @@ export interface KernelOptions extends KernelRegistryInput {
  * @returns The fully-wired specd kernel
  */
 export async function createKernel(config: SpecdConfig, options?: KernelOptions): Promise<Kernel> {
-  const registry = createKernelRegistryView(createBuiltinKernelRegistry(), options)
-  const i = await createKernelInternals(config, registry, options)
-  const workspaceRoutes = createSpecWorkspaceRoutes(config.workspaces)
-  const defaultCompileContextConfig = buildCompileContextConfig(config)
-
   const logDir = path.join(config.configPath, 'log')
   const logFilePath = path.join(logDir, 'specd.log')
   await fs.mkdir(logDir, { recursive: true })
@@ -193,232 +284,172 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       level: 'trace',
       format: 'json',
       onLog: (entry) => {
-        options.logRing!.push(entry)
+        options.logRing?.push(entry)
       },
     })
   }
   Logger.setImplementation(createDefaultLogger(destinations, { formatter: logFormatter }))
 
-  const resolveSchema = new ResolveSchema(
-    i.schemas,
-    i.schemaRef,
-    i.schemaPlugins,
-    i.schemaOverrides,
-  )
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const runStepHooks = new RunStepHooks(
-    i.changes,
-    i.archive,
-    i.hooks,
-    i.registry.externalHookRunners,
-    schemaProvider,
-  )
+  const resolver = createCompositionResolver(config, options)
 
-  const previewSpec = new PreviewSpec(i.changes, i.specs, schemaProvider, i.parsers)
-  const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
-  const implementationDetector = new VcsImplementationDetector(config.projectRoot, i.vcs)
-  const listWorkspaces = new ListWorkspaces(config, i.specs)
-  const refreshImplementationTracking = new RefreshImplementationTracking(
-    i.changes,
-    i.archive,
-    implementationDetector,
-    i.files,
-    config.projectRoot,
-  )
+  const changesRepo = resolver.getChangeRepository()
+  const specsRepos = resolver.getSpecRepositories()
+  const schemas = resolver.getSchemaRegistry()
 
-  const generateMetadata = new GenerateSpecMetadata(
+  const listWorkspaces = createListWorkspaces(resolveListWorkspacesDeps(resolver))
+  const listChanges = createListChanges(resolveListChangesDeps(resolver))
+  const listDrafts = createListDrafts(resolveListDraftsDeps(resolver))
+  const listDiscarded = createListDiscarded(resolveListDiscardedDeps(resolver))
+  const listArchived = createListArchived(resolveListArchivedDeps(resolver))
+  const getDraft = createGetDraft(resolveGetDraftDeps(resolver))
+  const getDiscarded = createGetDiscarded(resolveGetDiscardedDeps(resolver))
+  const getArchived = createGetArchivedChange(resolveGetArchivedChangeDeps(resolver))
+  const resolveSchema = createResolveSchema(resolveResolveSchemaDeps(resolver))
+  const getActiveSchema = createGetActiveSchema(resolveGetActiveSchemaDeps(resolver))
+  const runStepHooks = createRunStepHooks(resolveRunStepHooksDeps(resolver))
+  const refreshImplementationTracking = createRefreshImplementationTracking(
+    resolveRefreshImplementationTrackingDeps(resolver),
+  )
+  const detectOverlap = createDetectOverlap(resolveDetectOverlapDeps(resolver))
+  const preview = createPreviewSpec(resolvePreviewSpecDeps(resolver))
+  const generateMetadata = createGenerateSpecMetadata(resolveGenerateSpecMetadataDeps(resolver))
+  const saveMetadata = createSaveSpecMetadata(resolveSaveSpecMetadataDeps(resolver))
+
+  const create = createCreateChange(resolveCreateChangeDeps(resolver))
+  const status = createGetStatus(resolveGetStatusDeps(resolver))
+  const transition = createTransitionChange(resolveTransitionChangeDeps(resolver))
+  const draft = createDraftChange(resolveDraftChangeDeps(resolver))
+  const restore = createRestoreChange(resolveRestoreChangeDeps(resolver))
+  const discard = createDiscardChange(resolveDiscardChangeDeps(resolver))
+  const archive = createArchiveChange(resolveArchiveChangeDeps(resolver))
+  const validate = createValidateArtifacts(resolveValidateArtifactsDeps(resolver))
+  const validateBatch = new ValidateChangeBatch(changesRepo, resolver.getSchemaProvider(), validate)
+  const compile = createCompileContext(resolveCompileContextDeps(resolver))
+  const edit = createEditChange(resolveEditChangeDeps(resolver))
+  const invalidate = createInvalidateChange(resolveInvalidateChangeDeps(resolver))
+  const skipArtifact = createSkipArtifact(resolveSkipArtifactDeps(resolver))
+  const updateSpecDeps = createUpdateSpecDeps(resolveUpdateSpecDepsDeps(resolver))
+  const getHookInstructions = createGetHookInstructions(resolveGetHookInstructionsDeps(resolver))
+  const getArtifactInstruction = createGetArtifactInstruction(
+    resolveGetArtifactInstructionDeps(resolver),
+  )
+  const updateImplementationTracking = createUpdateImplementationTracking(
+    resolveUpdateImplementationTrackingDeps(resolver),
+  )
+  const getImplementationReview = createGetImplementationReview(
+    resolveGetImplementationReviewDeps(resolver),
+  )
+  const approveSpec = createApproveSpec(resolveApproveSpecDeps(resolver))
+  const approveSignoff = createApproveSignoff(resolveApproveSignoffDeps(resolver))
+
+  const listSpecs = createListSpecs(resolveListSpecsDeps(resolver))
+  const searchSpecs = createSearchSpecs(resolveSearchSpecsDeps(resolver))
+  const getSpec = createGetSpec(resolveGetSpecDeps(resolver))
+  const getOutline = createGetSpecOutline(resolveGetSpecOutlineDeps(resolver))
+  const invalidateMetadata = createInvalidateSpecMetadata(
+    resolveInvalidateSpecMetadataDeps(resolver),
+  )
+  const validateSchema = createValidateSchema(resolveValidateSchemaDeps(resolver))
+  const validateSpecs = createValidateSpecs(resolveValidateSpecsDeps(resolver))
+  const updateMetadata = createUpdateSpecMetadata({
+    generateMetadata: resolveGenerateSpecMetadataDeps(resolver),
+    saveMetadata: resolveSaveSpecMetadataDeps(resolver),
+  })
+  const getContext = createGetSpecContext(resolveGetSpecContextDeps(resolver))
+
+  const getProjectSummary = createGetProjectSummary(resolveGetProjectSummaryDeps(resolver))
+  const getProjectContext = createGetProjectContext(resolveGetProjectContextDeps(resolver))
+  const getConfig = createGetConfig({ config: resolver.config })
+  const getArtifact = new GetChangeArtifact(changesRepo)
+  const getReadOnlyChangeArtifact = new GetReadOnlyChangeArtifact(
+    changesRepo,
+    resolver.getArchiveRepository(),
+  )
+  const saveArtifact = new SaveChangeArtifact(
+    changesRepo,
+    resolver.getSchemaProvider(),
+    resolver.getContentHasher(),
+  )
+  const outlineArtifact = new OutlineChangeArtifact(
+    changesRepo,
+    resolver.getArtifactParserRegistry(),
+  )
+  const getMetadata = createGetProjectMetadata({
+    config: resolver.config,
+    fileReader: resolver.getFileReader(),
+  })
+  const updateProjectMetadata = createUpdateProjectMetadata({
+    config: resolver.config,
     listWorkspaces,
-    schemaProvider,
-    i.parsers,
-    i.hasher,
-    i.registry.extractorTransforms,
-    workspaceRoutes,
-  )
-
-  const saveMetadata = new SaveSpecMetadata(i.specs)
-  const updateSpecMetadata = new UpdateSpecMetadata(generateMetadata, saveMetadata)
-  const updateProjectMetadata = new UpdateProjectMetadata(
-    config,
-    listWorkspaces,
-    i.specs,
-    i.files,
-    i.fileWriter,
-    i.hasher,
-  )
-  const getProjectMetadata = new GetProjectMetadata(config, i.files)
-
-  const getActiveSchema = new GetActiveSchema(
-    resolveSchema,
-    i.schemas,
-    buildSchema,
-    config.schemaRef,
-  )
-  const detectOverlap = new DetectOverlap(i.changes)
-  const validateArtifacts = new ValidateArtifacts(
-    i.changes,
-    listWorkspaces,
-    schemaProvider,
-    i.parsers,
-    i.actor,
-    i.hasher,
-    i.registry.extractorTransforms,
-    workspaceRoutes,
-    lifecycle,
-  )
+    specRepositories: specsRepos,
+    fileReader: resolver.getFileReader(),
+    fileWriter: resolver.getFileWriter(),
+    contentHasher: resolver.getContentHasher(),
+  })
 
   return {
-    registry,
-    schemas: i.schemas,
+    registry: resolver.registry,
+    schemas,
     changes: {
-      repo: i.changes,
-      create: new CreateChange(i.changes, listWorkspaces, i.actor, getActiveSchema, detectOverlap),
-      status: new GetStatus(
-        i.changes,
-        schemaProvider,
-        {
-          spec: config.approvals.spec,
-          signoff: config.approvals.signoff,
-        },
-        refreshImplementationTracking,
-        lifecycle,
-      ),
-      transition: new TransitionChange(
-        i.changes,
-        i.actor,
-        schemaProvider,
-        runStepHooks,
-        refreshImplementationTracking,
-        {
-          spec: config.approvals.spec,
-          signoff: config.approvals.signoff,
-        },
-        lifecycle,
-      ),
-      getArtifact: new GetChangeArtifact(i.changes),
-      getReadOnlyChangeArtifact: new GetReadOnlyChangeArtifact(i.changes, i.archive),
-      saveArtifact: new SaveChangeArtifact(i.changes, schemaProvider, i.hasher),
-      draft: new DraftChange(i.changes, i.actor),
-      restore: new RestoreChange(i.changes, i.actor),
-      discard: new DiscardChange(i.changes, i.actor),
-      archive: new ArchiveChange(
-        i.changes,
-        listWorkspaces,
-        i.archive,
-        runStepHooks,
-        i.actor,
-        i.parsers,
-        schemaProvider,
-        generateMetadata,
-        saveMetadata,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-        config.projectRoot,
-      ),
-      validate: validateArtifacts,
-      validateBatch: new ValidateChangeBatch(i.changes, schemaProvider, validateArtifacts),
-      compile: new CompileContext(
-        i.changes,
-        listWorkspaces,
-        schemaProvider,
-        i.files,
-        i.parsers,
-        i.hasher,
-        previewSpec,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-        lifecycle,
-        defaultCompileContextConfig,
-      ),
-      list: new ListChanges(i.changes),
-      listDrafts: new ListDrafts(i.changes),
-      getDraft: new GetDraft(i.changes),
-      listDiscarded: new ListDiscarded(i.changes),
-      getDiscarded: new GetDiscarded(i.changes),
-      edit: new EditChange(i.changes, listWorkspaces, i.actor, schemaProvider),
-      invalidate: new InvalidateChange(i.changes, i.actor, schemaProvider),
-      skipArtifact: new SkipArtifact(i.changes, i.actor),
-      updateSpecDeps: new UpdateSpecDeps(i.changes),
-      listArchived: new ListArchived(i.archive),
-      getArchived: new GetArchivedChange(i.archive),
+      repo: changesRepo,
+      create,
+      status,
+      getArtifact,
+      getReadOnlyChangeArtifact,
+      saveArtifact,
+      transition,
+      draft,
+      restore,
+      discard,
+      archive,
+      validate,
+      validateBatch,
+      compile,
+      list: listChanges,
+      listDrafts,
+      getDraft,
+      listDiscarded,
+      getDiscarded,
+      edit,
+      invalidate,
+      skipArtifact,
+      updateSpecDeps,
+      listArchived,
+      getArchived,
       runStepHooks,
-      getHookInstructions: new GetHookInstructions(
-        i.changes,
-        i.archive,
-        schemaProvider,
-        i.expander,
-      ),
-      detectOverlap,
-      preview: previewSpec,
-      outlineArtifact: new OutlineChangeArtifact(i.changes, i.parsers),
-      updateImplementationTracking: new UpdateImplementationTracking(
-        i.changes,
-        i.files,
-        config.projectRoot,
-      ),
+      getHookInstructions,
+      getArtifactInstruction,
+      updateImplementationTracking,
       refreshImplementationTracking,
-      getImplementationReview: new GetImplementationReview(i.changes),
-      getArtifactInstruction: new GetArtifactInstruction(
-        i.changes,
-        i.specs,
-        schemaProvider,
-        i.parsers,
-        i.expander,
-        lifecycle,
-      ),
-      approveSpec: new ApproveSpec(i.changes, i.actor, schemaProvider, i.hasher, {
-        spec: config.approvals.spec,
-        signoff: config.approvals.signoff,
-      }),
-      approveSignoff: new ApproveSignoff(i.changes, i.actor, schemaProvider, i.hasher, {
-        spec: config.approvals.spec,
-        signoff: config.approvals.signoff,
-      }),
+      getImplementationReview,
+      detectOverlap,
+      preview,
+      outlineArtifact,
+      approveSpec,
+      approveSignoff,
     },
     specs: {
-      repos: i.specs,
-      list: new ListSpecs(listWorkspaces, i.hasher, i.yaml),
-      search: new SearchSpecs(listWorkspaces, i.hasher, i.yaml),
-      get: new GetSpec(i.specs),
-      getOutline: new GetSpecOutline(i.specs, schemaProvider, i.parsers),
+      repos: specsRepos,
+      list: listSpecs,
+      search: searchSpecs,
+      get: getSpec,
+      getOutline,
       saveMetadata,
-      invalidateMetadata: new InvalidateSpecMetadata(i.specs),
+      invalidateMetadata,
       getActiveSchema,
       resolve: resolveSchema,
-      validateSchema: new ValidateSchema(i.schemas, config.schemaRef, buildSchema, resolveSchema),
-      validate: new ValidateSpecs(
-        i.specs,
-        schemaProvider,
-        i.parsers,
-        i.hasher,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-      ),
+      validateSchema,
+      validate: validateSpecs,
       generateMetadata,
-      updateMetadata: updateSpecMetadata,
-      getContext: new GetSpecContext(
-        listWorkspaces,
-        i.hasher,
-        schemaProvider,
-        i.parsers,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-      ),
+      updateMetadata,
+      getContext,
     },
     project: {
       listWorkspaces,
-      getProjectSummary: createGetProjectSummary(config),
-      getProjectContext: new GetProjectContext(
-        listWorkspaces,
-        schemaProvider,
-        i.files,
-        i.parsers,
-        i.hasher,
-        i.registry.extractorTransforms,
-        workspaceRoutes,
-        defaultCompileContextConfig,
-      ),
-      getConfig: new GetConfig(config),
-      getMetadata: getProjectMetadata,
+      getProjectSummary,
+      getProjectContext,
+      getConfig,
+      getMetadata,
       updateMetadata: updateProjectMetadata,
     },
     ...(options?.logRing !== undefined

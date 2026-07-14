@@ -6,8 +6,8 @@
   "dependsOn": ["core:change-repository-port", "core:change"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-change-artifact.ts",
-      "symbols": ["GetChangeArtifact"]
+      "file": "core:src/composition/use-cases/get-change-artifact.ts",
+      "symbols": ["createGetChangeArtifact"]
     }
   ]
 }

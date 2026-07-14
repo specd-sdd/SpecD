@@ -1,46 +1,28 @@
 import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
-import { type VcsProvider } from './kernel-registries.js'
+import { type VcsProvider } from './vcs-provider.js'
 import { GitVcsAdapter } from '../infrastructure/git/vcs-adapter.js'
 import { HgVcsAdapter } from '../infrastructure/hg/vcs-adapter.js'
 import { SvnVcsAdapter } from '../infrastructure/svn/vcs-adapter.js'
 import { NullVcsAdapter } from '../infrastructure/null/vcs-adapter.js'
-import { git } from '../infrastructure/git/exec.js'
-import { hg } from '../infrastructure/hg/exec.js'
-import { svn } from '../infrastructure/svn/exec.js'
 
 /** Built-in VCS providers in their default detection order. */
 export const BUILTIN_VCS_PROVIDERS: readonly VcsProvider[] = [
   {
     name: 'git',
     async detect(cwd: string): Promise<VcsAdapter | null> {
-      try {
-        await git(cwd, 'rev-parse', '--is-inside-work-tree')
-        return new GitVcsAdapter(cwd)
-      } catch {
-        return null
-      }
+      return GitVcsAdapter.detect(cwd)
     },
   },
   {
     name: 'hg',
     async detect(cwd: string): Promise<VcsAdapter | null> {
-      try {
-        await hg(cwd, 'root')
-        return new HgVcsAdapter(cwd)
-      } catch {
-        return null
-      }
+      return HgVcsAdapter.detect(cwd)
     },
   },
   {
     name: 'svn',
     async detect(cwd: string): Promise<VcsAdapter | null> {
-      try {
-        await svn(cwd, 'info', '--show-item', 'wc-root')
-        return new SvnVcsAdapter(cwd)
-      } catch {
-        return null
-      }
+      return SvnVcsAdapter.detect(cwd)
     },
   },
 ]

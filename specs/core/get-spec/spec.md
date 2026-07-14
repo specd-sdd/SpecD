@@ -32,6 +32,16 @@ The use case SHALL return a `GetSpecResult` containing:
 - `workspace` — the workspace name (string).
 - `specPath` — a `SpecPath` value object identifying the spec within the workspace.
 
+### Requirement: Config-based factory delegates through resolveGetSpecDeps
+
+The config-based `createGetSpec(config, options?)` form MUST derive `GetSpecDeps` through `resolveGetSpecDeps(resolver)` and then delegate to canonical `createGetSpec(deps)`.
+
+`resolveGetSpecDeps(resolver)` MUST resolve:
+
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories.
@@ -40,6 +50,7 @@ The use case SHALL return a `GetSpecResult` containing:
 
 ## Spec Dependencies
 
-- [`core:storage`](../storage/spec.md) — `SpecRepository` and `SpecArtifact` contracts
-- [`core:workspace`](../workspace/spec.md) — workspace resolution
-- [`core:spec-id-format`](../spec-id-format/spec.md) — qualified spec identifier format
+- [`core:storage`](../storage/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

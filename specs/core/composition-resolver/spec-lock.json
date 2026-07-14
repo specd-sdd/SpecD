@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:kernel",
+    "core:kernel-builder"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["CompositionResolutionOptions", "createCompositionResolver"]
+    },
+    {
+      "file": "core:src/composition/shared-repository-wiring.ts",
+      "symbols": ["createSharedSpecRepositories", "createSharedChangeRepository"]
+    }
+  ]
+}

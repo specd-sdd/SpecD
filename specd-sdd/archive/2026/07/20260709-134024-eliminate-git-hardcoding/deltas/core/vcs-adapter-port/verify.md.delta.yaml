@@ -1,0 +1,83 @@
+- op: modified
+  description: 'Rename requirement to Abstract class base. Needs #### Scenario: placeholder for validator regex.'
+  selector:
+    type: section
+    matches: 'Requirement: Interface-only declaration'
+  rename: 'Requirement: Abstract class base'
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: VcsAdapter is a TypeScript interface'
+  rename: 'Scenario: VcsAdapter is an abstract class'
+  content: |
+    - **WHEN** the `VcsAdapter` class is examined
+    - **THEN** it is declared as an abstract class
+    - **AND** it has a protected constructor that receives `cwd`
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Null fallback implementation'
+  content: |
+    #### Scenario: NullVcsAdapter rootDir throws
+
+    - **WHEN** `rootDir()` is called on a `NullVcsAdapter`
+    - **THEN** it MUST throw an `Error` whose message indicates no VCS was detected
+
+    #### Scenario: NullVcsAdapter branch returns sentinel
+
+    - **WHEN** `branch()` is called on a `NullVcsAdapter`
+    - **THEN** the promise MUST resolve to `"none"`
+
+    #### Scenario: NullVcsAdapter isClean returns true
+
+    - **WHEN** `isClean()` is called on a `NullVcsAdapter`
+    - **THEN** the promise MUST resolve to `true`
+
+    #### Scenario: NullVcsAdapter ref returns null
+
+    - **WHEN** `ref()` is called on a `NullVcsAdapter`
+    - **THEN** the promise MUST resolve to `null`
+
+    #### Scenario: NullVcsAdapter refAt returns null
+
+    - **WHEN** `refAt(at)` is called on a `NullVcsAdapter`
+    - **THEN** the promise MUST resolve to `null`
+
+    #### Scenario: NullVcsAdapter show returns null
+
+    - **WHEN** `show()` is called on a `NullVcsAdapter` with any arguments
+    - **THEN** the promise MUST resolve to `null`
+
+    #### Scenario: NullVcsAdapter modifiedFiles returns empty array
+
+    - **WHEN** `modifiedFiles(baseRef)` is called on a `NullVcsAdapter`
+    - **THEN** the promise MUST resolve to an empty array
+
+    #### Scenario: NullVcsAdapter identity returns null identity
+
+    - **WHEN** `identity()` is called on a `NullVcsAdapter`
+    - **THEN** the promise MUST resolve to `{ name: "unknown", email: "", provider: "null" }`
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Null fallback implementation'
+  content: |
+    ### Requirement: identity resolves version control identity
+
+    #### Scenario: Git user identity resolved
+
+    - **GIVEN** git configured with name "John Doe" and email "john@example.com"
+    - **WHEN** `identity()` is called on a `GitVcsAdapter`
+    - **THEN** the promise MUST resolve to `{ name: "John Doe", email: "john@example.com", provider: "git" }`
+
+    ### Requirement: static detect detects active VCS
+
+    #### Scenario: Git detection inside git repo
+
+    - **GIVEN** a directory inside a git repository
+    - **WHEN** `VcsAdapter.detect(cwd)` is called
+    - **THEN** the promise MUST resolve to a `GitVcsAdapter` instance

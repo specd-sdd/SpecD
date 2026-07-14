@@ -10,24 +10,12 @@
     "core:schema-format",
     "core:config",
     "core:lifecycle-engine",
-    "core:refresh-implementation-tracking"
+    "core:refresh-implementation-tracking",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["createKernel"]
-    },
-    {
-      "file": "core:src/composition/use-cases/get-status.ts",
-      "symbols": ["createGetStatus"]
-    },
-    {
-      "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus", "execute"]
-    },
-    {
-      "file": "core:src/composition/use-cases/validate-change-batch.ts",
-      "symbols": ["createValidateChangeBatch"]
+      "file": "core:src/composition/use-cases/get-status.ts"
     }
   ]
 }

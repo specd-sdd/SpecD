@@ -124,6 +124,14 @@
 - **AND** `result.stepAvailable` matches the engine's verdict
 - **AND** `result.blockingArtifacts` is populated from the engine's blockers
 
+#### Scenario: Step unavailable when artifacts are ready but transition is not permitted
+
+- **GIVEN** the lifecycle engine reports `isReady: true`
+- **AND** the lifecycle engine reports `isPermitted: false`
+- **WHEN** `CompileContext.execute` is called for that step
+- **THEN** `result.stepAvailable` is `false`
+- **AND** `availableSteps` preserves the distinct `isReady` and `isPermitted` values
+
 #### Scenario: Step available when all required artifacts are complete
 
 - **GIVEN** `workflow.implementing.requires: ['tasks']`
@@ -434,3 +442,24 @@
 - **WHEN** context is compiled
 - **THEN** it emits a `stale-optimization` warning
 - **AND** the message mentions `specd-spec-context-optimizer`
+
+### Requirement: Config-based factory delegates through resolveCompileContextDeps
+
+#### Scenario: createCompileContext config form derives CompileContextDeps through resolveCompileContextDeps
+
+- **WHEN** `createCompileContext(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `CompileContextDeps` through `resolveCompileContextDeps(resolver)`
+- **AND** `resolveCompileContextDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `files: FileReader`
+- `parsers: ArtifactParserRegistry`
+- `hasher: ContentHasher`
+- `previewSpec: PreviewSpec`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `lifecycle: LifecycleEngine`
+- `defaultConfig: CompileContextConfig`
+- **AND** the factory delegates to canonical `createCompileContext(deps)`

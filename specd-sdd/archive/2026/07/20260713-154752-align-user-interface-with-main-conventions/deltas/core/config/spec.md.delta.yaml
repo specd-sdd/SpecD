@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The existing specification already defines the required behavior; implementation must be aligned with it during the mainline merge.'

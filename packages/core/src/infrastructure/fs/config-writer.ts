@@ -43,21 +43,19 @@ export class FsConfigWriter implements ConfigWriter {
       ? options.specsPath
       : `${options.specsPath}/`
 
-    // Build the yaml document — workspaces is a record keyed by workspace name.
-    // Each adapter field follows the { adapter: 'fs', fs: { path } } shape.
-    const fsAdapter = (p: string) => ({ adapter: 'fs', fs: { path: p } })
     const configDoc = {
       schema: options.schemaRef,
       workspaces: {
         [options.workspaceId]: {
-          specs: fsAdapter(specsRelPath),
+          specs: {
+            adapter: {
+              type: 'fs',
+              config: {
+                path: specsRelPath,
+              },
+            },
+          },
         },
-      },
-      storage: {
-        changes: fsAdapter('.specd/changes/'),
-        drafts: fsAdapter('.specd/drafts/'),
-        discarded: fsAdapter('.specd/discarded/'),
-        archive: fsAdapter('.specd/archive/'),
       },
     }
 
@@ -70,6 +68,9 @@ export class FsConfigWriter implements ConfigWriter {
     await fs.mkdir(path.join(storageBase, 'drafts'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'discarded'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'archive'), { recursive: true })
+
+    // Create workspace specs directory
+    await fs.mkdir(path.join(options.projectRoot, options.specsPath), { recursive: true })
 
     // Append specd.local.yaml to .gitignore if not already present
     const gitignorePath = path.join(options.projectRoot, '.gitignore')

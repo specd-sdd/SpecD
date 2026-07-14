@@ -3,14 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:composition"],
+  "dependsOn": ["core:change", "core:composition", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/edit-change.ts",
-      "symbols": ["EditChange", "execute"]
-    },
-    {
-      "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts"
+      "file": "core:src/composition/use-cases/edit-change.ts"
     }
   ]
 }

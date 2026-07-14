@@ -128,3 +128,17 @@
 - **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "implementing"`, `phase: "post"`
 - **THEN** `ChangeNotFoundError` is thrown immediately
 - **AND** `ArchiveRepository.get()` is not called
+
+### Requirement: Config-based factory delegates through resolveGetHookInstructionsDeps
+
+#### Scenario: createGetHookInstructions config form derives GetHookInstructionsDeps through resolveGetHookInstructionsDeps
+
+- **WHEN** `createGetHookInstructions(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetHookInstructionsDeps` through `resolveGetHookInstructionsDeps(resolver)`
+- **AND** `resolveGetHookInstructionsDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `archive: ArchiveRepository`
+- `schemaProvider: SchemaProvider`
+- `templates: TemplateExpander`
+- **AND** the factory delegates to canonical `createGetHookInstructions(deps)`

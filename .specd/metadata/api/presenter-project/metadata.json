@@ -1,7 +1,13 @@
 {
   "title": "Presenter Project",
   "description": "Maps kernel or graph results into the matching `dto-*` response for **Presenter Project**. Presenters are pure formatting at the HTTP boundary so handlers do not embed lifecycle or validation logic.",
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "api:dto-project"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "api:dto-project",
+    "client:dto-project-status",
+    "api:dto-project-status"
+  ],
   "context": [
     "Maps kernel or graph results into the matching `dto-*` response for **Presenter Project**. Presenters are pure formatting at the HTTP boundary so handlers do not embed lifecycle or validation logic."
   ],
@@ -22,6 +28,12 @@
       "requirement": "project status presenter maps graph health diagnostics",
       "rules": [
         "When mapping `buildProjectStatusSnapshot.graphHealth`, the project presenter MUST populate the `graph` slice on [`api:dto-project-status`](../dto-project-status/spec.md) with the same diagnostic fields and `warnings[]` derivation rules as `toGraphStatusDto` in [`api:presenter-graph`](../presenter-graph/spec.md).\n\nCount fields (`symbolCount`, `specCount`, `indexed`) MUST continue to reflect graph statistics when graph health is included."
+      ]
+    },
+    {
+      "requirement": "project status presentation uses the canonical client mapper",
+      "rules": [
+        "The API project-status presenter MUST delegate final DTO construction to the pure mapper exported by `@specd/client`.\n\nAPI-specific code MAY assemble structural inputs from SDK results and server auth state, but MUST NOT maintain a divergent project-status field mapping."
       ]
     }
   ],
@@ -79,6 +91,16 @@
       "given": ["buildProjectStatusSnapshot with graphHealth fixture"],
       "when": ["project status DTO is built"],
       "then": ["graph.warnings matches toGraphStatusDto output for the same health result"]
+    },
+    {
+      "requirement": "project status presentation uses the canonical client mapper",
+      "name": "API delegates final status DTO construction",
+      "given": ["a project status snapshot, graph health, approvals, and effective auth type"],
+      "when": ["the API presenter builds the status response"],
+      "then": [
+        "it passes structural input to the @specd/client mapper",
+        "AND the returned value is used as the HTTP DTO without a second field mapping"
+      ]
     }
   ],
   "implementation": {
@@ -87,17 +109,12 @@
         "specId": "api:presenter-project",
         "file": "api:src/delivery/http/presenters/presenter-project.ts",
         "symbol": "toProjectStatusDtoFromSnapshot"
-      },
-      {
-        "specId": "api:presenter-project",
-        "file": "api:src/delivery/http/presenters/presenter-project.ts",
-        "symbol": "toProjectGraphSummaryDto"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:f721caf4272236599c2a1925255013320f72b8a31fa058eecf6fd5db3d9e5931",
-    "verify.md": "sha256:ac7820f65823503116317c0cb92202d90cbe3e2e72c73a2ea119868f44f2118b"
+    "spec.md": "sha256:fb8fe6d6f2bbe097f06fbd3fef5a257483ed6d5f6850fa62928c2ec45d275e75",
+    "verify.md": "sha256:b8abbffd9f45c81eebce1ce45c78e0c19c5b608ab4bbeb90c70e7468f19606ec"
   },
   "generatedBy": "core"
 }

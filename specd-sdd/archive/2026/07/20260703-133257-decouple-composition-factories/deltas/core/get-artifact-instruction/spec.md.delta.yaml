@@ -1,0 +1,34 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveGetArtifactInstructionDeps
+
+    The config-based `createGetArtifactInstruction(config, options?)` form MUST derive `GetArtifactInstructionDeps` through `resolveGetArtifactInstructionDeps(resolver)` and then delegate to canonical `createGetArtifactInstruction(deps)`.
+
+    `resolveGetArtifactInstructionDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `specs: ReadonlyMap<string, SpecRepository>`
+    - `schemaProvider: SchemaProvider`
+    - `parsers: ArtifactParserRegistry`
+    - `templates: TemplateExpander`
+    - `lifecycle: LifecycleEngine`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:delta-format`](../delta-format/spec.md)
+    - [`core:change`](../change/spec.md)
+    - [`core:schema-merge`](../schema-merge/spec.md)
+    - [`core:template-variables`](../template-variables/spec.md)
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

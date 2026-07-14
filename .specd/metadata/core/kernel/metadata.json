@@ -68,7 +68,13 @@
     {
       "requirement": "createKernel constructs shared adapters once",
       "rules": [
-        "`createKernel(config, options?)` instantiates every shared dependency once, wires them\ntogether, and returns a `Kernel` object. The construction MUST include:\n\n- One `ChangeRepository` instance (shared by all change use cases)\n- One `SpecRepository` per workspace\n- One `SchemaRegistry` instance\n- One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. If resolution fails, the error propagates directly — the provider does not cache failures. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.\n- One `HookRunner` instance\n- One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)\n- One `ContentHasher` instance\n- One `ArtifactParserRegistry` instance\n\nNo use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied. `get()` throws `SchemaNotFoundError` or `SchemaValidationError` on failure — it never returns `null`.\n\n`RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`."
+        "`createKernel(config, options?)` instantiates one shared composition resolver path, resolves the shared dependencies it needs once, wires them together, and returns a `Kernel` object. The kernel MUST assemble its mounted use cases through the same reusable factory semantics as standalone public `createX(...)` factories rather than maintaining a parallel composition source.\n\nThe construction MUST include:\n\n- One `ChangeRepository` instance (shared by all change use cases)\n- One `SpecRepository` per workspace\n- One `SchemaRegistry` instance\n- One `SchemaProvider` instance — a lazy, caching provider that resolves the schema (with plugins and overrides) on first access via `ResolveSchema`, then returns the cached result. If resolution fails, the error propagates directly — the provider does not cache failures. All use cases that need the schema MUST receive this provider instead of the raw `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple.\n- One `HookRunner` instance\n- One `RunStepHooks` instance (shared by `TransitionChange`, `ArchiveChange`, and exposed directly)\n- One `ContentHasher` instance\n- One `ArtifactParserRegistry` instance\n\nNo use case constructor may call `SchemaRegistry.resolve()` directly. Schema access is exclusively through `SchemaProvider.get()`, which returns the fully-resolved schema with extends chains, plugins, and `schemaOverrides` applied. `get()` throws `SchemaNotFoundError` or `SchemaValidationError` on failure — it never returns `null`.\n\n`RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks — all hooks are merged into the schema by `ResolveSchema` via `schemaOverrides`. The kernel does not read `config.workflow`."
+      ]
+    },
+    {
+      "requirement": "Kernel is a facade over composition-owned registry primitives",
+      "rules": [
+        "`createKernel(...)` MAY reuse shared registry input, registry view, and built-in capability-merging helpers from the composition layer.\n\nThose helpers SHALL be treated as composition-owned shared infrastructure that is also reused by `CompositionResolver` and `createKernelBuilder()`.\n\nThe kernel MUST NOT define a second merged-registry source of truth beneath its facade."
       ]
     },
     {
@@ -92,25 +98,25 @@
     {
       "requirement": "createKernel accepts optional KernelOptions",
       "rules": [
-        "`createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.\n\n`KernelOptions` SHALL also support graph-store composition inputs:\n\n- **`graphStoreId`** (`string`, optional) — the backend id selected from the merged graph-store registry for this kernel construction path\n- additive graph-store factory registrations that extend the built-in graph-store registry without replacing it\n\nWhen `graphStoreId` is omitted, the kernel uses the current built-in default graph-store id exposed by the code-graph composition layer."
+        "`createKernel(config, options?)` accepts an optional `KernelOptions` object. The `extraNodeModulesPaths` option appends additional `node_modules` directories to the schema search path, so that globally-installed schema packages are found even when the project has no local copy.\n\n#### Scenario: Repository overrides provided in KernelOptions\n\n- **GIVEN** a `KernelOptions` with injected repository overrides\n- **WHEN** `createKernel(config, options)` is called\n- **THEN** the kernel reuses the injected repository instances for use case execution\n- **AND** does not instantiate new ones"
       ]
     },
     {
       "requirement": "KernelOptions supports additive registries",
       "rules": [
-        "`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:\n\n- storage factories\n- graph-store factories\n- VCS providers\n- actor providers\n- artifact parsers\n- external hook runners\n\nThese registrations SHALL extend the built-in capability set rather than replacing it."
+        "`KernelOptions` SHALL support additive registration of external capabilities before kernel construction. At minimum, it SHALL include extension points for:\n\n- storage factories\n- VCS providers\n- actor providers\n- artifact parsers\n- external hook runners\n\nThese registrations SHALL extend the built-in capability set rather than replacing it.\n\nCode-graph graph-store registration is not part of the core kernel contract."
       ]
     },
     {
       "requirement": "Kernel exposes merged registries",
       "rules": [
-        "The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, graph stores, parsers, providers, and external hook runners are available from the built kernel.\n\nThe exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller."
+        "The `Kernel` interface SHALL expose the merged built-in plus external registries used during construction. The exposed registry view SHALL let consumers inspect which storages, parsers, providers, and external hook runners are available from the built kernel.\n\nThe exposed registries MUST reflect the final additive capability set actually used during construction — not just the raw external registrations supplied by the caller.\n\nThis registry view is limited to capability categories owned by `@specd/core`. Graph-store backends remain owned by `@specd/code-graph`."
       ]
     },
     {
       "requirement": "Kernel rejects invalid registry references",
       "rules": [
-        "Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.\n\nConflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, external hook type, or graph-store id that is not present in the merged registry set."
+        "Kernel composition MUST reject conflicting registrations and unknown registry references with clear errors.\n\nConflicting registrations include attempts to overwrite an existing built-in or already-registered external entry for the same registry category. Unknown references include configuration or workflow data that names an adapter, parser, provider, or external hook type that is not present in the merged registry set."
       ]
     },
     {
@@ -476,27 +482,22 @@
     },
     {
       "requirement": "createKernel accepts optional KernelOptions",
-      "name": "Graph-store id can be selected in KernelOptions",
-      "given": ["a KernelOptions with graphStoreId: 'ladybug'"],
-      "when": ["createKernel(config, options) is called"],
-      "then": [
-        "the built kernel carries that backend selection through the merged registry view and downstream graph composition"
-      ]
+      "name": "No options provided",
+      "when": ["createKernel(config) is called without options"],
+      "then": ["the schema registry searches only the project's own node_modules"]
     },
     {
       "requirement": "createKernel accepts optional KernelOptions",
-      "name": "No options provided",
-      "when": ["createKernel(config) is called without options"],
-      "then": [
-        "the schema registry searches only the project's own node_modules",
-        "AND the current built-in default graph-store id is used"
-      ]
+      "name": "Repository overrides provided in KernelOptions",
+      "given": ["a mock ChangeRepository passed in options.repositories"],
+      "when": ["createKernel(config, options) is called"],
+      "then": ["kernel.changes.repo is the mock instance"]
     },
     {
       "requirement": "KernelOptions supports additive registries",
       "name": "External registrations extend built-ins",
       "given": [
-        "built-in storages, graph stores, parsers, VCS providers, actor providers, and external hook runners are available"
+        "built-in storages, parsers, VCS providers, actor providers, and external hook runners are available"
       ],
       "when": [
         "createKernel(config, options) is called with additional registrations in one or more categories"
@@ -512,7 +513,7 @@
       "given": ["external registrations were provided during kernel construction"],
       "when": ["the built kernel's registry view is inspected"],
       "then": [
-        "it exposes the final merged set of storage factories, graph-store factories, parsers, providers, and external hook runners actually used for construction",
+        "it exposes the final merged set of storage factories, parsers, providers, and external hook runners actually used for construction",
         "AND the view includes built-ins as well as accepted external registrations"
       ]
     },
@@ -541,22 +542,6 @@
       ]
     },
     {
-      "requirement": "Kernel rejects invalid registry references",
-      "name": "Unknown graphStoreId fails clearly",
-      "given": ["KernelOptions selects graphStoreId: 'missing-backend'"],
-      "when": ["createKernel(config, options) resolves the merged graph-store registry"],
-      "then": ["kernel construction fails with a clear unknown-backend error"]
-    },
-    {
-      "requirement": "Kernel rejects invalid registry references",
-      "name": "Conflicting graph-store registrations fail clearly",
-      "given": [
-        "external graph-store registrations include a duplicate id that collides with a built-in or previously registered backend"
-      ],
-      "when": ["createKernel(config, options) processes those registrations"],
-      "then": ["kernel construction fails with a clear conflict error"]
-    },
-    {
       "requirement": "Kernel is a plain object, not a class",
       "name": "Kernel has no methods or lifecycle",
       "when": ["the kernel object is inspected"],
@@ -572,14 +557,39 @@
       "then": [
         "the kernel object and its nested groups are not expected to change — there is no addUseCase() or removeUseCase() mechanism"
       ]
+    },
+    {
+      "requirement": "Kernel is a facade over composition-owned registry primitives",
+      "name": "Kernel does not own merged-registry semantics",
+      "when": ["createKernel(...) assembles use cases and exposes merged capabilities"],
+      "then": [
+        "it reuses composition-owned registry primitives also consumed by the resolver and builder",
+        "AND it does not maintain a separate registry-merging source of truth"
+      ]
     }
   ],
-  "implementation": {},
-  "contentHashes": {
-    "spec.md": "sha256:40d61c9c9c0abe949b7a0807aeb37fc3095bcaf25f7e4aa3add69fcace944c78",
-    "verify.md": "sha256:04c482dd066b69d30452c4a06d81dc3ce3c182b633b6b2e736ee5f286f48d623"
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:kernel",
+        "file": "core:test/composition/kernel.spec.ts"
+      },
+      {
+        "specId": "core:kernel",
+        "file": "core:test/composition/use-cases/retained-branch-factories.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:kernel",
+        "file": "core:src/composition/kernel.ts",
+        "symbol": "createKernel"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Kernel is pure composition: grouped use-case surface, shared resolved dependencies, additive registries, no config mutation.",
-  "optimizedContext": "# core:kernel\n\n## Rules\n- `Kernel` exposes grouped domain surface only: `changes`, `specs`, `project`. Use cases MUST NOT appear at root level.\n- Group intent: `changes` = lifecycle/change operations, `specs` = spec/schema operations, `project` = readonly project/config metadata queries. Config mutation is outside kernel.\n- Every exported standalone use case from `application/use-cases/` MUST have matching kernel entry and be wired in `createKernel`, except internal shared helpers under `application/use-cases/_shared/`.\n- Kernel entries are typed as concrete use case classes. Callers invoke use cases directly, e.g. `kernel.changes.create.execute(...)`; kernel does not wrap them in extra abstractions.\n- `createKernel(config, options?)` constructs shared dependencies once and reuses them: one `ChangeRepository`, one `SpecRepository` per workspace, one `SchemaRegistry`, one lazy caching `SchemaProvider`, one `HookRunner`, one shared `RunStepHooks`, one `ContentHasher`, one `ArtifactParserRegistry`.\n- Schema access path is centralized: use cases needing schema receive `SchemaProvider`, never raw `SchemaRegistry` + config tuple. `SchemaProvider.get()` resolves extends/plugins/`schemaOverrides`, propagates resolution failures, and never returns `null`.\n- No use case constructor may call `SchemaRegistry.resolve()` directly.\n- `RunStepHooks` and `GetHookInstructions` do not receive project-level workflow hooks; hook customization comes from schema resolved through `ResolveSchema` and `schemaOverrides`. Kernel does not read `config.workflow`.\n- Project-level VCS/actor wiring must use `createVcsAdapter(config.projectRoot)` and `createVcsActorResolver(config.projectRoot)`. Same auto-detect rule applies to standalone composition factories needing actor resolution.\n- On `ChangeRepository.get()`, drifted previously validated artifact files can trigger eager invalidation with cause `artifact-drift` when change is beyond `designing` or has active approval. Payload must preserve affected artifact/file keys. Historical `artifact-change` invalidations remain readable and normalize to current semantics.\n- Kernel exposes adapter access points: `kernel.changes.repo` = underlying `ChangeRepository`; `kernel.specs.repos` = `ReadonlyMap<string, SpecRepository>`.\n- `KernelOptions` may extend schema search via `extraNodeModulesPaths`.\n- `KernelOptions` also supports graph-store composition input `graphStoreId` plus additive graph-store registrations; omitted id uses current built-in default backend.\n- `KernelOptions` additive registries extend, never replace, built-ins. Minimum extension categories: storage factories, graph-store factories, VCS providers, actor providers, artifact parsers, external hook runners.\n- `Kernel` exposes merged registry view actually used during construction, including built-ins plus accepted external registrations.\n- Composition must reject conflicting registrations and unknown references with clear errors. Applies to adapters, parsers, providers, external hook types, and graph-store ids.\n- Kernel path mapping in spec is binding and exhaustive: every documented path must exist at runtime with documented type; undocumented entries are violations.\n- `kernel.project.getConfig` is `GetConfig` and returns readonly construction-time `SpecdConfig` snapshot. Plugin declarations live on that snapshot (`plugins`), not a dedicated kernel use case.\n- `kernel.project` MUST NOT expose `listPlugins`, `init`, `addPlugin`, `removePlugin`, `recordSkillInstall`, or `getSkillsManifest`.\n- Public surface MUST NOT export `InitProject`, `AddPlugin`, `RemovePlugin`, `RecordSkillInstall`, `GetSkillsManifest`, or their `createX` factories. Config writes go through `createConfigWriter()`.\n- Construction-time data such as `SpecdConfig`, approval gates, and `KernelOptions` belong in constructors, not `execute()` inputs. Callers needing config read `kernel.project.getConfig.execute()` or reuse original config object.\n- Allowed runtime override inputs are limited to documented per-call controls: context-shaping fields for `CompileContext`, `GetProjectContext`, `GetSpecContext`; transition/archive hook-skip or archive-scope options; `RunStepHooks.only`; `GetStatus.refreshImplementationTracking`; `CreateChange.includeOverlapCheck`; `ValidateArtifacts.specPath` / `artifactId`.\n- `createKernel` returns plain immutable object literal conforming to `Kernel`; no lifecycle methods, event system, or dynamic add/remove use-case API.\n\n## Constraints\n- `Kernel` is mandatory entry point for domain use cases mounted on kernel; config mutation uses `createConfigWriter()` instead.\n- Adding exported use case without kernel entry is spec violation unless capability is config I/O owned by ConfigWriter path.\n- Removing kernel use case is breaking change and follows breaking-change commit convention.\n- Kernel contains no business logic; wiring/grouping only.\n- `createKernelInternals` stays internal, not public export.\n- `Kernel` interface and `createKernel` are public `@specd/core` exports."
+  "contentHashes": {
+    "spec.md": "sha256:b9194f15193b68599a976bc4eb4f4be5d6bdb3d53aa2810511108a1f4c15b035",
+    "verify.md": "sha256:d261481ce6d6432aa5344ec39969e018b04376572ca3026309fd30e941e08f3a"
+  },
+  "generatedBy": "core"
 }

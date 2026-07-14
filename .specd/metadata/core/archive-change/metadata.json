@@ -18,7 +18,8 @@
     "core:spec-overlap",
     "default:_global/logging",
     "core:spec-lock",
-    "default:_global/error-handling-conventions"
+    "default:_global/error-handling-conventions",
+    "core:composition-resolver"
   ],
   "context": [
     "Once a change has completed its full lifecycle, its spec modifications need to be applied to the project and the change itself preserved for posterity — but this finalization involves delta merging, hook execution, and metadata generation that must happen atomically and in the right order. `ArchiveChange` is the use case that merges delta artifacts into project specs, moves the change directory to the archive, and fires lifecycle hooks before and after. It is gated on `archivable` state."
@@ -196,6 +197,12 @@
       "requirement": "Out-of-scope sidecar update guard",
       "rules": [
         "Archive-time implementation integrity maintenance MAY discover that preserving a consistent implementation map would require sidecar updates outside the immediately archived spec scope.\n\nBy default, `ArchiveChange` MUST fail when those out-of-scope updates would occur.\n\nProceeding with those external sidecar updates requires an explicit `--allow-out-of-scope` override."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveArchiveChangeDeps",
+      "rules": [
+        "The config-based `createArchiveChange(config, options?)` form MUST derive `ArchiveChangeDeps` through `resolveArchiveChangeDeps(resolver)` and then delegate to canonical `createArchiveChange(deps)`.\n\n`resolveArchiveChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `listWorkspaces: ListWorkspaces`\n- `archive: ArchiveRepository`\n- `runStepHooks: RunStepHooks`\n- `actor: ActorResolver`\n- `parsers: ArtifactParserRegistry`\n- `schemaProvider: SchemaProvider`\n- `generateMetadata: GenerateSpecMetadata`\n- `saveMetadata: SaveSpecMetadata`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `projectRoot: string`\n- `batchSnapshot: ArchiveBatchSnapshotPort`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -1069,14 +1076,30 @@
       ],
       "when": ["ArchiveChange is executed"],
       "then": ["ArchiveImplementationStateError is thrown"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveArchiveChangeDeps",
+      "name": "createArchiveChange config form derives ArchiveChangeDeps through resolveArchiveChangeDeps",
+      "when": ["createArchiveChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ArchiveChangeDeps through resolveArchiveChangeDeps(resolver)",
+        "AND resolveArchiveChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createArchiveChange(deps)"
+      ]
     }
   ],
-  "implementation": {},
-  "contentHashes": {
-    "spec.md": "sha256:df826a7856bf8d0464c76fb6383c93e7c8c8e58cb859a4328c057334fa95085c",
-    "verify.md": "sha256:7d2d468c9b9f76ace5dde1e7e1fb0a9e8e3ec338e82b60cc08a3d14a5b259c6a"
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:archive-change",
+        "file": "core:src/composition/use-cases/archive-change.ts"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`ArchiveChange` preflights, publishes, archives, and regenerates metadata for fully completed changes with staged rollback semantics.",
-  "optimizedContext": "# ArchiveChange\n\n## Rules\n- Accept archive input for one change; use injected repositories, hooks, metadata generation, and archive repository services; never construct `ArchivedChange` directly.\n- Require change to be `archivable`; enforce schema-name compatibility, read-only workspace guard, overlap guard, and tracked implementation review guard before any snapshots or canonical writes.\n- Run pre-archive hooks first; any failure aborts archive with no lifecycle transition and no permanent write.\n- Prepare full archive plan before commit: resolve tracked artifact files only, merge deltas, verify delta bases, compute metadata, validate dependency consistency, and ensure later batch failures block earlier publication.\n- Write batch snapshots of canonical specs before publication; detect orphan backups from prior failed attempts and auto-restore before aborting current run.\n- Transition to `archiving` only after preflight plus snapshot success, immediately before first staged canonical publication.\n- Publish per spec with staged commit semantics, including `spec-lock.json`; if any commit-phase failure happens, restore every previously published spec from backup, then roll lifecycle back to `archivable` after successful restore.\n- After canonical publication succeeds, move change through archive repository, update archive index metadata, run post-archive hooks, then generate spec metadata.\n- `spec-lock.json` persists immutable schema identity plus final `dependsOn`; archive fails on extracted-vs-persisted dependency mismatch; sidecar may be opportunistically backfilled for compatible legacy specs.\n- Materialize confirmed implementation links into sidecar; reject links outside workspace `codeRoot` and block out-of-scope sidecar maintenance unless explicit override allows it.\n\n## Constraints\n- `change.assertArchivable()` happens before hooks, snapshots, or file modification.\n- Preflight guards run while state still `archivable`.\n- Commit-phase failure must restore canonical state before returning.\n- Successful archive is not rolled back for later metadata or post-hook failure.\n- All hook execution routes through `RunStepHooks`.\n"
+  "contentHashes": {
+    "spec.md": "sha256:d74ef1b306cbf4a31bc5b9247b8fb1fb3f733dd841581c10bb844f08a8581f6c",
+    "verify.md": "sha256:dd1012f53ac80b52424ae4b34966705c331fd6281b9009f90f19ce8ffd767db8"
+  },
+  "generatedBy": "core"
 }

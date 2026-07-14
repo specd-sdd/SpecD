@@ -620,3 +620,22 @@
 - **AND** the current change is intentionally editing dependencies for that spec
 - **WHEN** `ValidateArtifacts.execute` validates the in-progress artifact successfully
 - **THEN** validation passes without comparing the in-change value against the canonical sidecar as a hard error
+
+### Requirement: Config-based factory delegates through resolveValidateArtifactsDeps
+
+#### Scenario: createValidateArtifacts config form derives ValidateArtifactsDeps through resolveValidateArtifactsDeps
+
+- **WHEN** `createValidateArtifacts(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ValidateArtifactsDeps` through `resolveValidateArtifactsDeps(resolver)`
+- **AND** `resolveValidateArtifactsDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `actor: ActorResolver`
+- `hasher: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `lifecycle: LifecycleEngine`
+- **AND** the factory delegates to canonical `createValidateArtifacts(deps)`

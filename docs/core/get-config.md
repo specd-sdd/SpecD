@@ -11,9 +11,9 @@ Location:
 ## Usage
 
 ```typescript
-import { createKernel, createConfigLoader } from '@specd/core'
+import { createKernel, createDefaultConfigLoader } from '@specd/core'
 
-const config = await createConfigLoader({ startDir: process.cwd() }).load()
+const config = await (await createDefaultConfigLoader({ startDir: process.cwd() })).load()
 const kernel = await createKernel(config)
 
 const snapshot = kernel.project.getConfig.execute()

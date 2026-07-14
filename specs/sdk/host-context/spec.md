@@ -32,7 +32,7 @@ The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST 
 
 `openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:
 
-1. Use `createConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`
+1. Use `createDefaultConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`
 2. Await `createSdkContext(config, input.kernelOptions)`
 3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
 
@@ -44,12 +44,23 @@ Host context bootstrap MUST NOT perform config file writes. `initProject`, `addP
 
 ### Requirement: Studio host bootstrap
 
-`@specd/api` and the Electron desktop main process MUST obtain their process-scoped kernel and `createGraphProvider` factory through `createSdkContext` (or `openSpecdHost`) from `@specd/sdk`.
+Delivery hosts that bootstrap project-local kernels SHALL compose through
+`createSdkContext` instead of calling `createKernel` from `@specd/core`
+directly.
 
-API server state (`ApiServerState`) and per-request API context (`ApiContext`) MAY extend `SdkHostContext` with host-specific fields (for example resolved `SpecdConfig`, auth type, and request actor) but MUST NOT construct a parallel kernel or graph provider outside the SDK bootstrap path.
+At minimum:
+
+- `createApiServer` MUST create one SDK host context per process bootstrap and
+  derive request handling from that shared context
+- desktop main-process local project bootstrap MUST call `createSdkContext`
+  when opening a project and MUST NOT import `createKernel` directly for that
+  host path
+
+This keeps API and desktop host wiring aligned on the same kernel plus
+graph-provider composition contract.
 
 ## Spec Dependencies
 
 - [`sdk:composition`](../composition/spec.md) — package placement and export surface
-- [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type constructed inside `createSdkContext`
-- [`core:composition`](../../../../specs/core/composition/spec.md) — config loader factory used by `openSpecdHost`
+- [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type and `createKernel`
+- [`core:composition`](../../../../specs/core/composition/spec.md) — `createDefaultConfigLoader` factory

@@ -42,3 +42,15 @@
 - **WHEN** `ListWorkspaces.execute()` returns `ProjectWorkspace.specRepo`
 - **THEN** each returned repository uses canonical metadata-path semantics for that workspace
 - **AND** the config-based factory does not expose a weaker spec repository view than the canonical composition bootstrap
+
+### Requirement: Config-based factory delegates through resolveListWorkspacesDeps
+
+#### Scenario: createListWorkspaces config form derives ListWorkspacesDeps through resolveListWorkspacesDeps
+
+- **WHEN** `createListWorkspaces(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `ListWorkspacesDeps` through `resolveListWorkspacesDeps(resolver)`
+- **AND** `resolveListWorkspacesDeps(resolver)` resolves:
+- `config: SpecdConfig`
+- `specRepos: ReadonlyMap<string, SpecRepository>`
+- **AND** the factory delegates to canonical `createListWorkspaces(deps)`

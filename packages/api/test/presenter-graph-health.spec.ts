@@ -29,21 +29,48 @@ describe('graph health presenters', () => {
   })
 
   it('toProjectStatusDtoFromSnapshot maps graph slice warnings', () => {
-    const dto = toProjectStatusDtoFromSnapshot({
-      summary: {
-        activeCount: 1,
-        draftCount: 0,
-        discardedCount: 0,
-        archivedCount: 0,
-        workspaceCount: 1,
-        specsByWorkspace: { core: 1 },
+    const dto = toProjectStatusDtoFromSnapshot(
+      {
+        summary: {
+          activeCount: 1,
+          draftCount: 0,
+          discardedCount: 0,
+          archivedCount: 0,
+          workspaceCount: 1,
+          specsByWorkspace: { core: 1 },
+        },
+        approvals: { specEnabled: false, signoffEnabled: false },
+        llmOptimizedContext: false,
+        graphHealth: baseHealth,
       },
-      approvals: { specEnabled: false, signoffEnabled: false },
-      llmOptimizedContext: false,
-      graphHealth: baseHealth,
-    })
-    expect(dto.graph.warnings).toHaveLength(2)
-    expect(dto.graph.specCount).toBe(5)
-    expect(dto.graph.documentCount).toBe(2)
+      'disabled',
+    )
+    expect(dto.graph?.warnings).toHaveLength(2)
+    expect(dto.graph?.specCount).toBe(5)
+    expect(dto.graph?.documentCount).toBe(2)
+  })
+
+  it('omits graph when snapshot has no graph health and preserves auth plus approvals', () => {
+    const dto = toProjectStatusDtoFromSnapshot(
+      {
+        summary: {
+          activeCount: 2,
+          draftCount: 1,
+          discardedCount: 0,
+          archivedCount: 3,
+          workspaceCount: 2,
+          specsByWorkspace: { api: 4, core: 8 },
+        },
+        approvals: { specEnabled: true, signoffEnabled: false },
+        llmOptimizedContext: false,
+        graphHealth: null,
+      },
+      'session',
+    )
+
+    expect(dto.graph).toBeUndefined()
+    expect(dto.auth).toEqual({ type: 'session' })
+    expect(dto.approvals).toEqual({ specEnabled: true, signoffEnabled: false })
+    expect(dto.specsByWorkspace).toEqual({ api: 4, core: 8 })
   })
 })

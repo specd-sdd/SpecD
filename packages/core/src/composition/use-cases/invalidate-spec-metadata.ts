@@ -1,61 +1,97 @@
-import * as path from 'node:path'
-import { InvalidateSpecMetadata } from '../../application/use-cases/invalidate-spec-metadata.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
+import { InvalidateSpecMetadata } from '../../application/use-cases/invalidate-spec-metadata.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Filesystem adapter options for `createInvalidateSpecMetadata(options)`. */
-export interface FsInvalidateSpecMetadataOptions {
+/**
+ * Explicit dependencies for {@link createInvalidateSpecMetadata}.
+ */
+export interface InvalidateSpecMetadataDeps {
+  /** Pre-built spec repositories keyed by workspace. */
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
 }
 
 /**
- * Constructs an `InvalidateSpecMetadata` use case with full project config.
+ * Resolves {@link InvalidateSpecMetadataDeps} from the shared composition resolver.
  *
- * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `InvalidateSpecMetadata`
  */
-export function createInvalidateSpecMetadata(config: SpecdConfig): InvalidateSpecMetadata
+export function resolveInvalidateSpecMetadataDeps(
+  resolver: CompositionResolver,
+): InvalidateSpecMetadataDeps {
+  return { specRepositories: resolver.getSpecRepositories() }
+}
+
 /**
- * Constructs an `InvalidateSpecMetadata` use case with explicit adapter options.
+ * Constructs an `InvalidateSpecMetadata` use case from explicit dependencies.
  *
- * @param options - Pre-built spec repositories keyed by workspace
+ * @param deps - Explicit use-case dependencies
  * @returns The pre-wired use case instance
  */
 export function createInvalidateSpecMetadata(
-  options: FsInvalidateSpecMetadataOptions,
+  deps: InvalidateSpecMetadataDeps,
 ): InvalidateSpecMetadata
 /**
- * Constructs an `InvalidateSpecMetadata` instance wired with filesystem adapters.
+ * Constructs an `InvalidateSpecMetadata` use case from project configuration.
  *
- * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
+ * @param config - The fully-resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createInvalidateSpecMetadata(
-  configOrOptions: SpecdConfig | FsInvalidateSpecMetadataOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): InvalidateSpecMetadata
+/**
+ * Constructs an `InvalidateSpecMetadata` instance from explicit deps or config bootstrap.
+ *
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
+ * @returns The pre-wired use case instance
+ */
+export function createInvalidateSpecMetadata(
+  depsOrConfig: InvalidateSpecMetadataDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): InvalidateSpecMetadata {
-  if (isSpecdConfig(configOrOptions)) {
-    const config = configOrOptions
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    return new InvalidateSpecMetadata(specRepos)
+  const normalized = normalizeCompositionFactoryArgs(
+    'createInvalidateSpecMetadata',
+    depsOrConfig,
+    options,
+    isInvalidateSpecMetadataDeps,
+  )
+  return createInvalidateSpecMetadataFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `InvalidateSpecMetadata` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createInvalidateSpecMetadataFromNormalized(
+  input: FactoryInput<InvalidateSpecMetadataDeps, CompositionResolutionOptions>,
+): InvalidateSpecMetadata {
+  if (input.kind === 'deps') {
+    return new InvalidateSpecMetadata(input.deps.specRepositories)
   }
-  return new InvalidateSpecMetadata(configOrOptions.specRepositories)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createInvalidateSpecMetadata(resolveInvalidateSpecMetadataDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `InvalidateSpecMetadataDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isInvalidateSpecMetadataDeps(
+  value: InvalidateSpecMetadataDeps | SpecdConfig,
+): value is InvalidateSpecMetadataDeps {
+  return 'specRepositories' in value
 }

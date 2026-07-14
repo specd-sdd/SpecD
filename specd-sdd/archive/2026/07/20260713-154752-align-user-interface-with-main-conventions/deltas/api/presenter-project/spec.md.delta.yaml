@@ -1,0 +1,26 @@
+- op: added
+  description: 'Share project-status presentation with desktop through the canonical client mapper.'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: project status presenter maps graph health diagnostics'
+  content: |
+    ### Requirement: project status presentation uses the canonical client mapper
+
+    The API project-status presenter MUST delegate final DTO construction to the pure mapper exported by `@specd/client`.
+
+    API-specific code MAY assemble structural inputs from SDK results and server auth state, but MUST NOT maintain a divergent project-status field mapping.
+- op: modified
+  description: 'Declare the canonical client mapper and project-status wire contract.'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
+    - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+    - [`api:dto-project`](../dto-project/spec.md) — project wire shape
+    - [`api:dto-project-status`](../dto-project-status/spec.md) — project-status wire shape
+    - [`client:dto-project-status`](../../client/dto-project-status/spec.md) — canonical status DTO and pure mapper shared with IPC

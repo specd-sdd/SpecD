@@ -1,0 +1,13 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Builder accumulates additive kernel registrations'
+    after:
+      type: section
+      matches: 'Scenario: Registrations accumulate before build'
+  content: |
+    #### Scenario: Repository overrides in builder
+
+    - **WHEN** repository overrides are set on the builder
+    - **THEN** they are passed to the kernel options when `build()` is called

@@ -1,7 +1,12 @@
 {
   "title": "RestoreChange",
   "description": "Drafted changes are only useful if they can be brought back into the active working set when the user is ready to resume. The `RestoreChange` use case recovers a drafted change by appending a `restored` event to its history, and the repository implementation moves the change directory from `drafts/` back to `changes/` when persisted.",
-  "dependsOn": ["core:change", "core:draft-change", "default:_global/architecture"],
+  "dependsOn": [
+    "core:change",
+    "core:draft-change",
+    "default:_global/architecture",
+    "core:composition-resolver"
+  ],
   "context": [
     "Drafted changes are only useful if they can be brought back into the active working set when the user is ready to resume. The `RestoreChange` use case recovers a drafted change by appending a `restored` event to its history, and the repository implementation moves the change directory from `drafts/` back to `changes/` when persisted."
   ],
@@ -40,6 +45,12 @@
       "requirement": "Dependencies",
       "rules": [
         "`RestoreChange` depends on two ports injected via constructor:\n\n- `ChangeRepository` — for loading and persistence\n- `ActorResolver` — for resolving the current actor identity"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveRestoreChangeDeps",
+      "rules": [
+        "The config-based `createRestoreChange(config, options?)` form MUST derive `RestoreChangeDeps` through `resolveRestoreChangeDeps(resolver)` and then delegate to canonical `createRestoreChange(deps)`.\n\n`resolveRestoreChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -117,22 +128,30 @@
       "name": "Uses ActorResolver port",
       "when": ["RestoreChange is instantiated"],
       "then": ["it requires an ActorResolver port in its constructor"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveRestoreChangeDeps",
+      "name": "createRestoreChange config form derives RestoreChangeDeps through resolveRestoreChangeDeps",
+      "when": ["createRestoreChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives RestoreChangeDeps through resolveRestoreChangeDeps(resolver)",
+        "AND resolveRestoreChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createRestoreChange(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:restore-change",
-        "file": "core:src/application/use-cases/restore-change.ts",
-        "symbol": "RestoreChange"
+        "file": "core:src/composition/use-cases/restore-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:bea0a1e842538d86c016b6ce88e9bd86baefda0cb41c19b6f622d720aa9d02c1",
-    "verify.md": "sha256:6d76763d828250e775424124d13bf52cc53c72642deb28a19d6303102b06d407"
+    "spec.md": "sha256:351bafa0de071047a5a0864938f8d4ed40b170623a0f1d39f614387ba4420989",
+    "verify.md": "sha256:3a74ee908447ce05509cb7ec7103e71d57f211e25b890a6c45cc3dce5db147be"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`RestoreChange` resumes drafted change by appending `restored` history and moving persisted storage from `drafts/` back to `changes/`.",
-  "optimizedContext": "# RestoreChange\n\n## Rules\n- `RestoreChangeInput` requires `name`.\n- Verify drafted existence via `ChangeRepository.getDraft(name)`; if null throw `ChangeNotFoundError`; do not load through `get(name)`.\n- Resolve actor via `ActorResolver` and record it in `restored` event.\n- Append restore history via `change.restore(actor)`.\n- Persist through `ChangeRepository.mutateDraft(name, fn)`; repository writes fresh manifest and relocates directory from `drafts/` to `changes/`; return restored `change`.\n\n## Constraints\n- No lifecycle transition; restore is orthogonal to lifecycle state.\n- Directory relocation belongs to repository layer.\n- `isDrafted` derives from latest drafted/restored history event.\n"
+  "generatedBy": "core"
 }

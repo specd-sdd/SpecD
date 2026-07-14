@@ -106,6 +106,7 @@ interface IndexOptions {
   readonly onProgress?: IndexProgressCallback
   readonly chunkBytes?: number
   readonly vcsRef?: string
+  readonly vcsRoot: string | null
 }
 ```
 
@@ -140,11 +141,16 @@ When discovering files from a `codeRoot`, `.gitignore` handling is controlled by
 
 When `respectGitignore` is `true`:
 
-1. Find the git root by walking up from `codeRoot` looking for `.git/`
-2. Load `.gitignore` from the git root
-3. Load any `.gitignore` files found in subdirectories during the walk
-4. Apply rules relative to the directory containing each `.gitignore`
-5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files
+1. Use the provided `vcsRoot` in options, which is resolved upstream from `VcsAdapter.rootDir()`.
+2. When `vcsRoot` is non-null, load `.gitignore` from that VCS root.
+3. Load any `.gitignore` files found in subdirectories during the walk.
+4. Apply rules relative to the directory containing each `.gitignore`.
+5. `.gitignore` exclusions have absolute priority — `excludePaths` cannot re-include gitignored files.
+
+When `vcsRoot` is `null`:
+
+- repository-root `.gitignore` is not loaded
+- file discovery MUST NOT probe for `.git/`, `.hg/`, or `.svn/` markers
 
 When `respectGitignore` is `false`:
 

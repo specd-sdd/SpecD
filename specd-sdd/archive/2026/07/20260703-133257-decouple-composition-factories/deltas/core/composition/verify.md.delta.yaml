@@ -1,0 +1,114 @@
+- op: modified
+  description: 'Verify canonical deps form and shared resolver-backed config form'
+  selector:
+    type: section
+    matches: 'Requirement: Use-case factories accept SpecdConfig or explicit options'
+  content: |
+    #### Scenario: Canonical deps form constructs one use case from resolved dependencies
+
+    - **WHEN** a caller invokes a kernel-mounted public `createX(deps)` factory
+    - **THEN** the factory accepts already-resolved dependencies only
+    - **AND** it does not require filesystem paths or adapter ids
+
+    #### Scenario: Config-based form delegates through resolver-backed assembly
+
+    - **WHEN** a caller invokes `createX(config, options?)`
+    - **THEN** the factory creates a composition resolver scoped to that composition session
+    - **AND** it resolves `XDeps` through the shared resolver path before delegating to canonical deps construction
+
+    #### Scenario: Invalid deps-plus-options input throws shared error
+
+    - **WHEN** a caller supplies a deps-form invocation plus composition options
+    - **THEN** the factory path throws `InvalidCompositionFactoryArgumentsError`
+    - **AND** the error identifies the target `createX(...)` factory
+
+- op: added
+  description: 'Verify shared resolver requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Use-case factories accept SpecdConfig or explicit options'
+  content: |
+    ### Requirement: Shared composition resolver normalizes config-based factory bootstrap
+
+    #### Scenario: Config-based public factory delegates through resolver path
+
+    - **WHEN** `createX(config, options?)` is invoked
+    - **THEN** the factory creates a resolver, derives `XDeps`, and delegates to canonical `createX(deps)`
+
+- op: added
+  description: 'Verify shared invalid-arguments requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Shared composition resolver normalizes config-based factory bootstrap'
+  content: |
+    ### Requirement: Shared factory-argument validation error
+
+    #### Scenario: Invalid deps-plus-options combination throws shared error
+
+    - **WHEN** a public factory receives deps together with composition options
+    - **THEN** it throws `InvalidCompositionFactoryArgumentsError`
+    - **AND** the error identifies the target factory or use-case name
+
+- op: added
+  description: 'Verify composition-owned registry primitives'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Shared composition resolver normalizes config-based factory bootstrap'
+  content: |
+    ### Requirement: Reusable registry primitives are composition-owned
+
+    #### Scenario: Kernel does not remain the owner of generic registry semantics
+
+    - **WHEN** public factory bootstrap, kernel assembly, and builder assembly reuse the same merged capability model
+    - **THEN** that model is defined as composition infrastructure
+    - **AND** the kernel remains a facade over it rather than a second source of truth
+
+- op: modified
+  description: 'Align internal-port export verification with public repository factory contract'
+  selector:
+    type: section
+    matches: 'Requirement: Internal ports are never exported'
+  content: |
+    #### Scenario: NodeHookRunner not in public exports
+
+    - **WHEN** the public export surface of `@specd/core` is inspected
+    - **THEN** `NodeHookRunner`, `GitVcsAdapter`, and `FsFileReader` are not present
+
+    #### Scenario: Repository factories on public root return port types only
+
+    - **WHEN** the public export surface of `@specd/core` is inspected
+    - **THEN** `createSpecRepository`, `createChangeRepository`, and `createArchiveRepository` are present
+    - **AND** they return port contracts rather than concrete adapter classes
+- op: modified
+  description: 'Verify extension registration surface uses composition-owned names and excludes graph-store hooks'
+  selector:
+    type: section
+    matches: 'Requirement: Extension registration surface'
+  content: |
+    #### Scenario: ChangeStorageFactory exported from extensions subpath
+
+    - **WHEN** importing from `@specd/core/extensions`
+    - **THEN** `ChangeStorageFactory`, `CompositionRegistryInput`, `CompositionRegistryView`, and `createKernelBuilder` are available
+
+    #### Scenario: Core extensions surface does not export graph-store registration types
+
+    - **WHEN** importing from `@specd/core/extensions`
+    - **THEN** graph-store-specific extension hooks are not part of the core extensions surface
+
+    #### Scenario: Builtin FS storage factory markers stay internal
+
+    - **WHEN** importing from `@specd/core/internal`
+    - **THEN** builtin `FS_*` storage factory markers are not required on `"."` or `"./extensions"`
+    - **AND** `FS_CHANGE_STORAGE_FACTORY` is not exported from `"."`

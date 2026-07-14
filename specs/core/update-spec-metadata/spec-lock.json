@@ -3,11 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:spec-metadata", "core:save-spec-metadata"],
+  "dependsOn": ["core:spec-metadata", "core:save-spec-metadata", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/update-spec-metadata.ts",
-      "symbols": ["UpdateSpecMetadataInput", "UpdateSpecMetadataResult", "UpdateSpecMetadata"]
+      "file": "core:src/composition/use-cases/update-spec-metadata.ts"
     }
   ]
 }

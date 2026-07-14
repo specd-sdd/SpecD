@@ -3,11 +3,16 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:change", "core:schema-format", "core:composition", "core:kernel"],
+  "dependsOn": [
+    "core:change",
+    "core:schema-format",
+    "core:composition",
+    "core:kernel",
+    "core:composition-resolver"
+  ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/approve-spec.ts",
-      "symbols": ["ApproveSpec"]
+      "file": "core:src/composition/use-cases/approve-spec.ts"
     }
   ]
 }

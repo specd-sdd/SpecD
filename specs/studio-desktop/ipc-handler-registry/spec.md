@@ -30,8 +30,15 @@ runtime, including the SQLite-backed local graph operations exposed through IPC.
 Renderer code MUST continue to call the shared `SpecdDataPort` surface and MUST
 NOT import graph runtime packages directly.
 
+### Requirement: project status uses the canonical client mapper
+
+The local project-status IPC handler MUST map its kernel, graph-health, and auth inputs through the pure project-status mapper exported by `@specd/client`.
+
+The IPC result MUST have the same `ProjectStatusDto` shape and optional-field semantics as the HTTP project-status response. The handler MUST NOT maintain a second status presenter.
+
 ## Spec Dependencies
 
 - [`sdk:host-context`](../../sdk/host-context/spec.md) — SDK bootstrap for IPC main process
 - [`client:specd-data-port`](../../../../../../specs/client/specd-data-port/spec.md) — IPC data contract implemented by the desktop adapter
 - [`client:ipc-message-envelope`](../../../../../../specs/client/ipc-message-envelope/spec.md) — IPC envelope types used by preload bridge
+- [`client:dto-project-status`](../../client/dto-project-status/spec.md) — canonical status DTO and pure mapper shared with HTTP

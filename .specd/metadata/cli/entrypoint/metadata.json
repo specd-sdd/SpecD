@@ -364,16 +364,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:entrypoint",
-        "file": "cli:package.json"
+        "file": "cli:src/load-config.ts",
+        "symbol": "loadConfig"
       }
     ]
   },
   "contentHashes": {
     "spec.md": "sha256:e5293050d50b803eaf2e0202e5b3e9fe7e7cec37fa03eb508acb3190d57bc638",
-    "verify.md": "sha256:f90b6ed89df73a690148b0ece6f836854c2090a170837b8bae186bccd79a56e2"
+    "verify.md": "sha256:a81f05998f0ec3714665c3f3fdb90d87e64cb9a25a476b8d4c825448ee297db7"
   },
   "generatedBy": "core"
 }

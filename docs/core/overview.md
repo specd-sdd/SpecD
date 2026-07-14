@@ -40,7 +40,7 @@ If you are using the `specd` CLI or MCP server as an end user, you do not need t
 └──────────────────────────────────────────┘
 ```
 
-The `infrastructure/` layer is internal — never import from it directly. Infrastructure adapters are created exclusively through the factory functions in `composition/`, which is the only layer permitted to instantiate them. Factories accept a discriminated union config (e.g. `{ type: 'fs', ... }`) and return the abstract port type, keeping callers decoupled from the concrete implementation.
+The `infrastructure/` layer is internal — never import from it directly. Infrastructure adapters are created exclusively through the factory functions in `composition/`, which is the only layer permitted to instantiate them. Public use-case factories accept either explicit dependencies (`createX(deps)`) or a resolved `SpecdConfig` plus optional additive registrations (`createX(config, options?)`), while lower-level repository factories still accept adapter-specific configuration.
 
 ## Public exports
 
@@ -232,30 +232,27 @@ Everything exported is a domain type (entity, value object, error, service), an 
 
 **From the composition layer — kernel:**
 
-| Export                | Kind      | Description                                                                                            |
-| --------------------- | --------- | ------------------------------------------------------------------------------------------------------ |
-| `createKernel`        | function  | Constructs all use cases from a `SpecdConfig` and returns them as a grouped `Kernel`.                  |
-| `Kernel`              | interface | The fully-wired set of use cases, grouped as `kernel.changes.*`, `kernel.specs.*`, `kernel.project.*`. |
-| `KernelOptions`       | interface | Options for `createKernel`, including extra `node_modules` paths for schema discovery.                 |
-| `createKernelBuilder` | function  | Creates a fluent builder for additive kernel registrations before `build()`.                           |
-| `KernelBuilder`       | interface | Fluent registration surface for parsers, storages, providers, and external hook runners.               |
+| Export          | Kind      | Description                                                                                            |
+| --------------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| `createKernel`  | function  | Constructs all use cases from a `SpecdConfig` and returns them as a grouped `Kernel`.                  |
+| `Kernel`        | interface | The fully-wired set of use cases, grouped as `kernel.changes.*`, `kernel.specs.*`, `kernel.project.*`. |
+| `KernelOptions` | interface | Options for `createKernel`, including extra `node_modules` paths for schema discovery.                 |
+
+`createKernelBuilder` and `KernelBuilder` are exported from `@specd/core/extensions`, not from the root `@specd/core` barrel.
 
 **From the composition layer — repository and schema factories:**
 
-| Export                         | Kind      | Description                                                                                |
-| ------------------------------ | --------- | ------------------------------------------------------------------------------------------ |
-| `createSchemaRegistry`         | function  | Constructs a `SchemaRegistry` for the given adapter type (`'fs'`).                         |
-| `createSchemaRepository`       | function  | Constructs a `SchemaRepository` for the given adapter type.                                |
-| `createConfigLoader`           | function  | Creates a filesystem-backed `ConfigLoader` that discovers and parses `specd.yaml`.         |
-| `createArtifactParserRegistry` | function  | Creates the default `ArtifactParserRegistry` with all built-in format adapters registered. |
-| `KernelRegistryInput`          | type      | Additive registration inputs accepted by `createKernel` and `createKernelBuilder`.         |
-| `KernelRegistryView`           | type      | Final merged registry surface exposed as `kernel.registry`.                                |
-| `SpecStorageFactory`           | interface | Named storage factory for workspace specs repositories.                                    |
-| `SchemaStorageFactory`         | interface | Named storage factory for workspace schema repositories.                                   |
-| `ChangeStorageFactory`         | interface | Named storage factory for active and shelved changes.                                      |
-| `ArchiveStorageFactory`        | interface | Named storage factory for archived changes.                                                |
-| `VcsProvider`                  | interface | External-first VCS detection provider used by the kernel registry.                         |
-| `ActorProvider`                | interface | External-first actor detection provider used by the kernel registry.                       |
+| Export                      | Kind      | Description                                                                        |
+| --------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `createSchemaRegistry`      | function  | Constructs a `SchemaRegistry` for the given adapter type (`'fs'`).                 |
+| `createSchemaRepository`    | function  | Constructs a `SchemaRepository` for the given adapter type.                        |
+| `createDefaultConfigLoader` | function  | Creates a filesystem-backed `ConfigLoader` that discovers and parses `specd.yaml`. |
+| `SpecStorageFactory`        | interface | Named storage factory for workspace specs repositories.                            |
+| `SchemaStorageFactory`      | interface | Named storage factory for workspace schema repositories.                           |
+| `ChangeStorageFactory`      | interface | Named storage factory for active and shelved changes.                              |
+| `ArchiveStorageFactory`     | interface | Named storage factory for archived changes.                                        |
+| `VcsProvider`               | interface | External-first VCS detection provider used by the composition registry layer.      |
+| `ActorProvider`             | interface | External-first actor detection provider used by the composition registry layer.    |
 
 **From the composition layer — VCS and actor adapters:**
 
@@ -263,51 +260,47 @@ Everything exported is a domain type (entity, value object, error, service), an 
 | ------------------------ | -------- | ------------------------------------------------------------------------- |
 | `createVcsAdapter`       | function | Auto-detects the active VCS (git/hg/svn/null) and returns a `VcsAdapter`. |
 | `createVcsActorResolver` | function | Auto-detects the active VCS and returns an `ActorResolver`.               |
-| `GitVcsAdapter`          | class    | `VcsAdapter` implementation for git repositories.                         |
-| `HgVcsAdapter`           | class    | `VcsAdapter` implementation for Mercurial repositories.                   |
-| `SvnVcsAdapter`          | class    | `VcsAdapter` implementation for Subversion repositories.                  |
-| `NullVcsAdapter`         | class    | No-op `VcsAdapter` for projects without version control.                  |
-| `GitActorResolver`       | class    | `ActorResolver` that reads actor identity from git config.                |
-| `HgActorResolver`        | class    | `ActorResolver` that reads actor identity from hg config.                 |
-| `SvnActorResolver`       | class    | `ActorResolver` that reads actor identity from svn info.                  |
-| `NullActorResolver`      | class    | `ActorResolver` that returns a fixed anonymous identity.                  |
 | `NodeContentHasher`      | class    | `ContentHasher` implementation using Node.js `crypto` (SHA-256).          |
-| `NodeYamlSerializer`     | class    | `YamlSerializer` implementation using the `yaml` npm package.             |
 
-**From the composition layer — use case creator functions (fs-wired):**
+**From the composition layer — use case creator functions:**
 
-These functions wire a single use case to the filesystem, creating a self-contained async function. Each accepts an options object with the relevant paths and config flags, and returns a callable function. Use them when you need only one or two use cases without constructing a full `Kernel`.
+These functions expose the canonical standalone composition contract:
 
-| Export                         | Description                                          |
-| ------------------------------ | ---------------------------------------------------- |
-| `createCreateChange`           | Wires `CreateChange` to the fs.                      |
-| `createGetStatus`              | Wires `GetStatus` to the fs.                         |
-| `createTransitionChange`       | Wires `TransitionChange` to the fs.                  |
-| `createDraftChange`            | Wires `DraftChange` to the fs.                       |
-| `createRestoreChange`          | Wires `RestoreChange` to the fs.                     |
-| `createDiscardChange`          | Wires `DiscardChange` to the fs.                     |
-| `createApproveSpec`            | Wires `ApproveSpec` to the fs.                       |
-| `createApproveSignoff`         | Wires `ApproveSignoff` to the fs.                    |
-| `createArchiveChange`          | Wires `ArchiveChange` to the fs.                     |
-| `createValidateArtifacts`      | Wires `ValidateArtifacts` to the fs.                 |
-| `createCompileContext`         | Wires `CompileContext` to the fs.                    |
-| `createListChanges`            | Wires `ListChanges` to the fs.                       |
-| `createListDrafts`             | Wires `ListDrafts` to the fs.                        |
-| `createListDiscarded`          | Wires `ListDiscarded` to the fs.                     |
-| `createListArchived`           | Wires `ListArchived` to the fs.                      |
-| `createGetArchivedChange`      | Wires `GetArchivedChange` to the fs.                 |
-| `createEditChange`             | Wires `EditChange` to the fs.                        |
-| `createSkipArtifact`           | Wires `SkipArtifact` to the fs.                      |
-| `createListSpecs`              | Wires `ListSpecs` to the fs.                         |
-| `createGetSpec`                | Wires `GetSpec` to the fs.                           |
-| `createSaveSpecMetadata`       | Wires `SaveSpecMetadata` to the fs.                  |
-| `createInvalidateSpecMetadata` | Wires `InvalidateSpecMetadata` to the fs.            |
-| `createGetActiveSchema`        | Wires `GetActiveSchema` to the fs.                   |
-| `createValidateSpecs`          | Wires `ValidateSpecs` to the fs.                     |
-| `createGetSpecContext`         | Wires `GetSpecContext` to the fs.                    |
-| `createConfigWriter`           | Filesystem-backed `ConfigWriter` for yaml mutations. |
-| `createGetProjectContext`      | Wires `GetProjectContext` to the fs.                 |
-| `createGetProjectSummary`      | Wires `GetProjectSummary` to the fs.                 |
+- `createX(deps)` for fully explicit dependency injection
+- `createX(config, options?)` for convenience bootstrap through the shared composition resolver
+
+Use them when you need only one or two use cases without constructing a full `Kernel`.
+
+| Export                         | Description                                                              |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| `createCreateChange`           | Wires `CreateChange` from explicit deps or from `SpecdConfig`.           |
+| `createGetStatus`              | Wires `GetStatus` from explicit deps or from `SpecdConfig`.              |
+| `createTransitionChange`       | Wires `TransitionChange` from explicit deps or from `SpecdConfig`.       |
+| `createDraftChange`            | Wires `DraftChange` from explicit deps or from `SpecdConfig`.            |
+| `createRestoreChange`          | Wires `RestoreChange` from explicit deps or from `SpecdConfig`.          |
+| `createDiscardChange`          | Wires `DiscardChange` from explicit deps or from `SpecdConfig`.          |
+| `createApproveSpec`            | Wires `ApproveSpec` from explicit deps or from `SpecdConfig`.            |
+| `createApproveSignoff`         | Wires `ApproveSignoff` from explicit deps or from `SpecdConfig`.         |
+| `createArchiveChange`          | Wires `ArchiveChange` from explicit deps or from `SpecdConfig`.          |
+| `createValidateArtifacts`      | Wires `ValidateArtifacts` from explicit deps or from `SpecdConfig`.      |
+| `createCompileContext`         | Wires `CompileContext` from explicit deps or from `SpecdConfig`.         |
+| `createListChanges`            | Wires `ListChanges` from explicit deps or from `SpecdConfig`.            |
+| `createListDrafts`             | Wires `ListDrafts` from explicit deps or from `SpecdConfig`.             |
+| `createListDiscarded`          | Wires `ListDiscarded` from explicit deps or from `SpecdConfig`.          |
+| `createListArchived`           | Wires `ListArchived` from explicit deps or from `SpecdConfig`.           |
+| `createGetArchivedChange`      | Wires `GetArchivedChange` from explicit deps or from `SpecdConfig`.      |
+| `createEditChange`             | Wires `EditChange` from explicit deps or from `SpecdConfig`.             |
+| `createSkipArtifact`           | Wires `SkipArtifact` from explicit deps or from `SpecdConfig`.           |
+| `createListSpecs`              | Wires `ListSpecs` from explicit deps or from `SpecdConfig`.              |
+| `createGetSpec`                | Wires `GetSpec` from explicit deps or from `SpecdConfig`.                |
+| `createSaveSpecMetadata`       | Wires `SaveSpecMetadata` from explicit deps or from `SpecdConfig`.       |
+| `createInvalidateSpecMetadata` | Wires `InvalidateSpecMetadata` from explicit deps or from `SpecdConfig`. |
+| `createGetActiveSchema`        | Wires `GetActiveSchema` from explicit deps or from `SpecdConfig`.        |
+| `createValidateSpecs`          | Wires `ValidateSpecs` to the fs.                                         |
+| `createGetSpecContext`         | Wires `GetSpecContext` to the fs.                                        |
+| `createConfigWriter`           | Filesystem-backed `ConfigWriter` for yaml mutations.                     |
+| `createGetProjectContext`      | Wires `GetProjectContext` to the fs.                                     |
+| `createGetProjectSummary`      | Wires `GetProjectSummary` to the fs.                                     |
 
 ## Where to go next
 

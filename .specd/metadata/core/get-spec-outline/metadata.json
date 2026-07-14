@@ -1,7 +1,12 @@
 {
   "title": "Get Spec Outline",
   "description": "To provide a unified application service for retrieving the navigable structure (outline) of a spec artifact. This use case decouples the CLI and other delivery mechanisms from the details of artifact retrieval, parsing, and outline generation.",
-  "dependsOn": ["core:get-spec", "core:artifact-parser-port", "core:get-active-schema"],
+  "dependsOn": [
+    "core:get-spec",
+    "core:artifact-parser-port",
+    "core:get-active-schema",
+    "core:composition-resolver"
+  ],
   "context": [
     "To provide a unified application service for retrieving the navigable structure (outline) of a spec artifact. This use case decouples the CLI and other delivery mechanisms from the details of artifact retrieval, parsing, and outline generation."
   ],
@@ -28,6 +33,12 @@
       "requirement": "Result",
       "rules": [
         "The use case SHALL return a list of outline results, where each result contains:\n\n- `filename`: the resolved artifact filename.\n- `outline`: the hierarchical tree of `OutlineEntry` objects.\n\nWhen hint mode is enabled by the caller, each result also contains:\n\n- `selectorHints`: a root-level object keyed by node type with placeholder guidance.\n\n`selectorHints` MUST be sourced from parser-provided hint metadata, so new parsers can define their own type-level guidance without use-case changes.\n\n`selectorHints` entries MUST use placeholder values (for example `\"<value>\"`, `\"<contains>\"`, `\"<level>\"`) and MUST NOT duplicate per-node concrete values already visible in `outline` labels.\n\n`outline` entries MUST remain structural and sufficient for selector derivation without embedding repeated hint payload in each node."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetSpecOutlineDeps",
+      "rules": [
+        "The config-based `createGetSpecOutline(config, options?)` form MUST derive `GetSpecOutlineDeps` through `resolveGetSpecOutlineDeps(resolver)` and then delegate to canonical `createGetSpecOutline(deps)`.\n\n`resolveGetSpecOutlineDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -116,11 +127,30 @@
         "AND hint values use placeholders such as \"<value>\", \"<contains>\", \"<level>\"",
         "AND per-node outline entries do not duplicate hints"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetSpecOutlineDeps",
+      "name": "createGetSpecOutline config form derives GetSpecOutlineDeps through resolveGetSpecOutlineDeps",
+      "when": ["createGetSpecOutline(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetSpecOutlineDeps through resolveGetSpecOutlineDeps(resolver)",
+        "AND resolveGetSpecOutlineDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetSpecOutline(deps)"
+      ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:get-spec-outline",
+        "file": "core:src/composition/use-cases/get-spec-outline.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:91c3973380533ec2314bb2884591fe0fa90344c05d769e61b73d83e97e1f5e9b",
-    "verify.md": "sha256:e5dd84c9697cb2e69f7dee6eefbe789c83fa30242dfaf30f124b19a7a8ab66b7"
+    "spec.md": "sha256:7e4614c2273261e0d5b02f230f9c180a06500c9733ff1af0ac857b2b7d3293c3",
+    "verify.md": "sha256:1ea32ad1e785fd3bd1c5436400eb785b8f7df1650ac4d0b85e495454b4c07c82"
   },
   "generatedBy": "core"
 }

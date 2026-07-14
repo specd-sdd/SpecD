@@ -9,12 +9,12 @@
     "core:schema-merge",
     "core:template-variables",
     "core:lifecycle-engine",
-    "core:schema-format"
+    "core:schema-format",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-artifact-instruction.ts",
-      "symbols": ["GetArtifactInstruction"]
+      "file": "core:src/composition/use-cases/get-artifact-instruction.ts"
     }
   ]
 }

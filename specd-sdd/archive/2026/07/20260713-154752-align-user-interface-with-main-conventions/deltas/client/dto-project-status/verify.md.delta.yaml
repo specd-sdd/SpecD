@@ -1,0 +1,24 @@
+- op: modified
+  description: 'Verify the canonical mapper is pure, structural, and shared by delivery adapters.'
+  selector:
+    type: section
+    matches: 'Requirement: types are shared or generated from API schemas'
+  content: |
+    #### Scenario: Structural input maps all canonical status fields
+
+    - **GIVEN** structural input containing counts, graph diagnostics, approvals, and auth
+    - **WHEN** the client mapper is called
+    - **THEN** it returns the canonical `ProjectStatusDto` without renaming or dropping fields
+    - **AND** optional fields are omitted only when their source values are absent
+
+    #### Scenario: Client mapper has no core or SDK dependency
+
+    - **WHEN** the client package dependency graph and public mapper signature are inspected
+    - **THEN** neither imports `@specd/core` nor `@specd/sdk`
+    - **AND** the mapper accepts serializable structural data rather than domain entities
+
+    #### Scenario: HTTP and IPC use one mapper implementation
+
+    - **WHEN** API and desktop project-status presenters are inspected
+    - **THEN** both import the mapper from `@specd/client`
+    - **AND** neither defines a parallel `ProjectStatusDto` mapping

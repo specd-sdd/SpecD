@@ -1,0 +1,20 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: openSpecdHost'
+  content: |
+    `openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:
+
+    1. Use `createDefaultConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`
+    2. Await `createSdkContext(config, input.kernelOptions)`
+    3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
+
+    `OpenSpecdHostInput` MAY include optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations).
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`sdk:composition`](../composition/spec.md) — package placement and export surface
+    - [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type and `createKernel`
+    - [`core:composition`](../../../../specs/core/composition/spec.md) — `createDefaultConfigLoader` factory

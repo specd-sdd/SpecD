@@ -1,4 +1,4 @@
-import type { SpecdConfig } from '@specd/core'
+import type { SpecdConfig } from '@specd/sdk'
 import type { UiPlugin } from '@specd/plugin-manager'
 
 /**

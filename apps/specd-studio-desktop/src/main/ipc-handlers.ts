@@ -11,22 +11,23 @@ import { getSetting, setSetting, removeSetting } from './settings-store.js'
 
 import {
   type SymbolKind,
+  buildProjectGraphConfig,
   createCodeGraphProvider,
+  createIndexProjectGraph,
   type IndexResult,
 } from '@specd/code-graph-electron'
 import {
   acquireGraphIndexLock,
   assertGraphIndexUnlocked,
-  buildProjectStatusSnapshot,
   codeGraphVersion,
-  createConfigLoader,
+  createDefaultConfigLoader,
   createGetGraphHealth,
   createLogFormatter,
   createSdkContext,
+  createVcsAdapter,
   createVcsActorResolver,
   Logger,
   LogRingBuffer,
-  runIndexProjectGraph,
   SpecPath,
   type ArchivedChange,
   type Change,
@@ -43,7 +44,6 @@ import {
   type ProjectWorkspace,
   type ReadOnlyChangeView,
   type SaveChangeArtifactResult,
-  type SdkHostContext,
   type SpecdConfig,
   type SpecListEntry,
   type SpecSearchEntry,
@@ -87,6 +87,7 @@ import {
   type WorkspaceSpecTreeDto,
   type WorkspaceSummaryDto,
   deriveGraphHealthWarnings,
+  mapProjectStatusDto,
 } from '@specd/client'
 import type {
   OutlineChangeArtifactInput,
@@ -210,14 +211,6 @@ interface DesktopHostContext {
   readonly createGraphProvider: () => ReturnType<typeof createCodeGraphProvider>
 }
 
-function toSdkHostContext(host: DesktopHostContext): SdkHostContext {
-  return {
-    kernel: host.kernel,
-    createGraphProvider:
-      host.createGraphProvider as unknown as SdkHostContext['createGraphProvider'],
-  }
-}
-
 /**
  * Formats a date as an ISO string.
  *
@@ -267,7 +260,9 @@ async function getHost(): Promise<DesktopHostContext> {
   if (hostPromise === undefined || hostPromiseGeneration !== gen) {
     hostPromiseGeneration = gen
     hostPromise = (async () => {
-      const loader = createConfigLoader({ startDir: activeProjectRoot ?? process.cwd() })
+      const loader = await createDefaultConfigLoader({
+        startDir: activeProjectRoot ?? process.cwd(),
+      })
       const config = await loader.load()
       logRing = new LogRingBuffer(1000)
       const { kernel } = await createSdkContext(config, {
@@ -673,47 +668,74 @@ function toWorkspaceSummaryDtos(
   })
 }
 
-function toProjectGraphSummaryDto(
-  graphHealth: GetGraphHealthResult | null,
-): NonNullable<ProjectStatusDto['graph']> {
-  if (graphHealth === null) {
-    return {
-      indexed: false,
-      warnings: [],
-    }
-  }
-  const warnings = deriveGraphHealthWarnings({
-    stale: graphHealth.stale,
-    fingerprintMismatch: graphHealth.fingerprintMismatch,
-    lastIndexedRef: graphHealth.lastIndexedRef,
-    currentRef: graphHealth.currentRef,
-  })
-  return {
-    indexed: true,
-    lastIndexedAt: graphHealth.lastIndexedAt ?? null,
-    lastIndexedRef: graphHealth.lastIndexedRef ?? null,
-    stale: graphHealth.stale,
-    currentRef: graphHealth.currentRef,
-    fingerprintMismatch: graphHealth.fingerprintMismatch,
-    fileCount: graphHealth.fileCount,
-    documentCount: graphHealth.documentCount,
-    symbolCount: graphHealth.symbolCount,
-    specCount: graphHealth.specCount,
-    warnings,
-  }
-}
-
 function toProjectStatusDtoFromSnapshot(
-  snapshot: Awaited<ReturnType<typeof buildProjectStatusSnapshot>>,
+  snapshot: Awaited<ReturnType<typeof buildDesktopProjectStatusSnapshot>>,
   config: SpecdConfig,
 ): ProjectStatusDto {
-  return {
+  return mapProjectStatusDto({
     activeChanges: snapshot.summary.activeCount,
     drafts: snapshot.summary.draftCount,
     discarded: snapshot.summary.discardedCount,
     archived: snapshot.summary.archivedCount,
-    graph: toProjectGraphSummaryDto(snapshot.graphHealth),
-    auth: { type: config.api?.auth.type ?? 'disabled' },
+    specsByWorkspace: snapshot.summary.specsByWorkspace,
+    graph:
+      snapshot.graphHealth === null
+        ? null
+        : {
+            lastIndexedAt: snapshot.graphHealth.lastIndexedAt ?? null,
+            lastIndexedRef: snapshot.graphHealth.lastIndexedRef ?? null,
+            stale: snapshot.graphHealth.stale,
+            currentRef: snapshot.graphHealth.currentRef,
+            fingerprintMismatch: snapshot.graphHealth.fingerprintMismatch,
+            fileCount: snapshot.graphHealth.fileCount,
+            documentCount: snapshot.graphHealth.documentCount,
+            symbolCount: snapshot.graphHealth.symbolCount,
+            specCount: snapshot.graphHealth.specCount,
+          },
+    approvals: snapshot.approvals,
+    authType: config.api?.auth.type ?? 'disabled',
+  })
+}
+
+/**
+ * Builds the desktop-owned project status snapshot using the Electron graph runtime.
+ *
+ * @param host - Active desktop host context
+ * @returns Structured project and optional graph status snapshot
+ */
+async function buildDesktopProjectStatusSnapshot(host: DesktopHostContext): Promise<{
+  readonly summary: Awaited<ReturnType<Kernel['project']['getProjectSummary']['execute']>>
+  readonly graphHealth: GetGraphHealthResult | null
+  readonly approvals: { readonly specEnabled: boolean; readonly signoffEnabled: boolean }
+}> {
+  const summary = await host.kernel.project.getProjectSummary.execute()
+  const config = host.kernel.project.getConfig.execute()
+  const approvals = {
+    specEnabled: config.approvals?.spec ?? false,
+    signoffEnabled: config.approvals?.signoff ?? false,
+  }
+
+  let graphHealth: GetGraphHealthResult | null = null
+  try {
+    graphHealth = await withGraphProvider(async (provider) => {
+      const workspaces = await host.kernel.project.listWorkspaces.execute()
+      const getGraphHealth = createGetGraphHealth()
+      return getGraphHealth.execute({
+        config,
+        provider,
+        codeGraphVersion,
+        workspaces: [...workspaces],
+        assertUnlocked: false,
+      })
+    })
+  } catch {
+    graphHealth = null
+  }
+
+  return {
+    summary,
+    graphHealth,
+    approvals,
   }
 }
 
@@ -1239,9 +1261,7 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       return createIpcSuccess(envelope.id, toProjectDto(config))
     case 'getProjectStatus': {
       const host = await getHost()
-      const snapshot = await buildProjectStatusSnapshot(toSdkHostContext(host), {
-        includeGraph: true,
-      })
+      const snapshot = await buildDesktopProjectStatusSnapshot(host)
       return createIpcSuccess(envelope.id, toProjectStatusDtoFromSnapshot(snapshot, host.config))
     }
     case 'listChanges': {
@@ -1436,7 +1456,10 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
         string,
         { content: string; originalHash: string; force?: boolean },
       ]
-      const actor = await createVcsActorResolver().identity()
+      const host = await getHost()
+      const actor = await createVcsActorResolver(
+        await createVcsAdapter(host.config.projectRoot),
+      ).identity()
       const result = await kernel.changes.saveArtifact.execute({
         name,
         filename,
@@ -1768,11 +1791,33 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     case 'indexGraph': {
       const [input = {}] = params as [GraphIndexInput?]
       const host = await getHost()
-      const indexResult = await runIndexProjectGraph(toSdkHostContext(host), {
-        ...(input?.force === true ? { force: true } : {}),
-        beforeOpen: async () => {
-          await Promise.resolve(acquireGraphIndexLock(host.config))
-        },
+      const indexResult = await withGraphProvider(async (provider) => {
+        await Promise.resolve(acquireGraphIndexLock(host.config))
+        const workspaces = await host.kernel.project.listWorkspaces.execute()
+        const graphConfig = buildProjectGraphConfig(host.config)
+        const vcs = await createVcsAdapter(host.config.projectRoot).catch(() => null)
+        const vcsRef = (await vcs?.ref()) ?? undefined
+        const vcsRoot =
+          vcs === null
+            ? null
+            : (() => {
+                try {
+                  return vcs.rootDir()
+                } catch {
+                  return null
+                }
+              })()
+        const indexProjectGraph = createIndexProjectGraph()
+        return indexProjectGraph.execute({
+          provider,
+          projectRoot: host.config.projectRoot,
+          workspaces,
+          graphConfig,
+          codeGraphVersion,
+          vcsRoot,
+          ...(input?.force === true ? { force: true } : {}),
+          ...(vcsRef !== undefined ? { vcsRef } : {}),
+        })
       })
       return createIpcSuccess(envelope.id, toGraphIndexResultDto(indexResult))
     }
@@ -2127,7 +2172,7 @@ export async function dispatchIpc(envelope: IpcRequestEnvelope): Promise<IpcResp
       const dir = result.filePaths[0]!
 
       try {
-        const loader = createConfigLoader({ startDir: dir })
+        const loader = await createDefaultConfigLoader({ startDir: dir })
         const tempConfig = await loader.load()
 
         resetDesktopKernel()
@@ -2151,7 +2196,7 @@ export async function dispatchIpc(envelope: IpcRequestEnvelope): Promise<IpcResp
     if (envelope.method === 'openLocalProject') {
       const dir = envelope.payload as string
       try {
-        const loader = createConfigLoader({ startDir: dir })
+        const loader = await createDefaultConfigLoader({ startDir: dir })
         const tempConfig = await loader.load()
 
         resetDesktopKernel()

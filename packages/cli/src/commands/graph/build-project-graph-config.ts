@@ -1,5 +1,4 @@
-import { type SpecdConfig } from '@specd/core'
-import { type ProjectGraphConfig, DEFAULT_EXCLUDE_PATHS } from '@specd/code-graph'
+import { type SpecdConfig, type ProjectGraphConfig, DEFAULT_EXCLUDE_PATHS } from '@specd/sdk'
 
 /**
  * Optional CLI-level overrides for graph configuration assembly.

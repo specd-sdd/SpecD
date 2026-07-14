@@ -1,0 +1,13 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Detection probes in priority order'
+  rename: 'Requirement: VCS adapter composition'
+  content: |
+    `createVcsActorResolver` MUST receive a `VcsAdapter` instance (or resolve one using the active VCS factory) and return an `ActorResolver` wired to that adapter (e.g. `VcsActorResolver`). It SHALL NOT perform separate VCS detection.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Fallback to NullActorResolver'
+  content: |
+    When the active or provided adapter is a `NullVcsAdapter`, `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw.

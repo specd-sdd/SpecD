@@ -44,9 +44,10 @@ workspaces:
   default:
     prefix: _global
     specs:
-      adapter: fs
-      fs:
-        path: specs/_global
+      adapter:
+        type: fs
+        config:
+          path: specs/_global
     ownership: owned
     graph:
       excludePaths:
@@ -66,9 +67,10 @@ workspaces:
 
   core:
     specs:
-      adapter: fs
-      fs:
-        path: specs/core
+      adapter:
+        type: fs
+        config:
+          path: specs/core
     codeRoot: packages/core
     ownership: owned
     contextIncludeSpecs:
@@ -76,105 +78,118 @@ workspaces:
 
   schema-std:
     specs:
-      adapter: fs
-      fs:
-        path: specs/schema-std
+      adapter:
+        type: fs
+        config:
+          path: specs/schema-std
     codeRoot: packages/schema-std
     ownership: owned
 
   cli:
     specs:
-      adapter: fs
-      fs:
-        path: specs/cli
+      adapter:
+        type: fs
+        config:
+          path: specs/cli
     codeRoot: packages/cli
     ownership: owned
 
   code-graph:
     specs:
-      adapter: fs
-      fs:
-        path: specs/code-graph
+      adapter:
+        type: fs
+        config:
+          path: specs/code-graph
     codeRoot: packages/code-graph
     ownership: owned
 
   sdk:
     specs:
-      adapter: fs
-      fs:
-        path: specs/sdk
+      adapter:
+        type: fs
+        config:
+          path: specs/sdk
     codeRoot: packages/sdk
     ownership: owned
 
   skills:
     specs:
-      adapter: fs
-      fs:
-        path: specs/skills
+      adapter:
+        type: fs
+        config:
+          path: specs/skills
     codeRoot: packages/skills
     ownership: owned
 
   plugin-manager:
     specs:
-      adapter: fs
-      fs:
-        path: specs/plugins-manager
+      adapter:
+        type: fs
+        config:
+          path: specs/plugins-manager
     codeRoot: packages/plugin-manager
     ownership: owned
 
   plugin-agent-claude:
     specs:
-      adapter: fs
-      fs:
-        path: specs/plugins-claude
+      adapter:
+        type: fs
+        config:
+          path: specs/plugins-claude
     codeRoot: packages/plugin-agent-claude
     ownership: owned
 
   plugin-agent-copilot:
     specs:
-      adapter: fs
-      fs:
-        path: specs/plugins-copilot
+      adapter:
+        type: fs
+        config:
+          path: specs/plugins-copilot
     codeRoot: packages/plugin-agent-copilot
     ownership: owned
 
   plugin-agent-codex:
     specs:
-      adapter: fs
-      fs:
-        path: specs/plugins-codex
+      adapter:
+        type: fs
+        config:
+          path: specs/plugins-codex
     codeRoot: packages/plugin-agent-codex
     ownership: owned
 
   plugin-agent-opencode:
     specs:
-      adapter: fs
-      fs:
-        path: specs/plugins-opencode
+      adapter:
+        type: fs
+        config:
+          path: specs/plugins-opencode
     codeRoot: packages/plugin-agent-opencode
     ownership: owned
 
   plugin-agent-standard:
     specs:
-      adapter: fs
-      fs:
-        path: specs/plugins-agent-standard
+      adapter:
+        type: fs
+        config:
+          path: specs/plugins-agent-standard
     codeRoot: packages/plugin-agent-standard
     ownership: owned
 
   specd-metapackage:
     specs:
-      adapter: fs
-      fs:
-        path: specs/specd
+      adapter:
+        type: fs
+        config:
+          path: specs/specd
     codeRoot: packages/specd
     ownership: owned
 
   public-web:
     specs:
-      adapter: fs
-      fs:
-        path: specs/public-web
+      adapter:
+        type: fs
+        config:
+          path: specs/public-web
     codeRoot: apps/public-web
     ownership: owned
     graph:
@@ -183,78 +198,89 @@ workspaces:
 
   api:
     specs:
-      adapter: fs
-      fs:
-        path: specs/api
+      adapter:
+        type: fs
+        config:
+          path: specs/api
     codeRoot: packages/api
     ownership: owned
 
   client:
     specs:
-      adapter: fs
-      fs:
-        path: specs/client
+      adapter:
+        type: fs
+        config:
+          path: specs/client
     codeRoot: packages/client
     ownership: owned
 
   ui:
     specs:
-      adapter: fs
-      fs:
-        path: specs/ui
+      adapter:
+        type: fs
+        config:
+          path: specs/ui
     codeRoot: packages/ui
     ownership: owned
 
   studio-desktop:
     specs:
-      adapter: fs
-      fs:
-        path: specs/studio-desktop
+      adapter:
+        type: fs
+        config:
+          path: specs/studio-desktop
     codeRoot: apps/specd-studio-desktop
     ownership: owned
 
   studio-web:
     specs:
-      adapter: fs
-      fs:
-        path: specs/studio-web
+      adapter:
+        type: fs
+        config:
+          path: specs/studio-web
     codeRoot: apps/specd-studio-web
     ownership: owned
 
   code-graph-electron:
     specs:
-      adapter: fs
-      fs:
-        path: specs/code-graph-electron
+      adapter:
+        type: fs
+        config:
+          path: specs/code-graph-electron
     codeRoot: packages/code-graph-electron
     ownership: owned
 
   plugin-ui-studio:
     specs:
-      adapter: fs
-      fs:
-        path: specs/plugin-ui-studio
+      adapter:
+        type: fs
+        config:
+          path: specs/plugin-ui-studio
     codeRoot: packages/plugin-ui-studio
     ownership: owned
 
 storage:
   changes:
-    adapter: fs
-    fs:
-      path: specd-sdd/changes
+    adapter:
+      type: fs
+      config:
+        path: specd-sdd/changes
   drafts:
-    adapter: fs
-    fs:
-      path: .specd/drafts
+    adapter:
+      type: fs
+      config:
+        path: .specd/drafts
   discarded:
-    adapter: fs
-    fs:
-      path: .specd/discarded
+    adapter:
+      type: fs
+      config:
+        path: .specd/discarded
   archive:
-    adapter: fs
-    fs:
-      path: specd-sdd/archive
-      pattern: '{{year}}/{{month}}/{{change.archivedName}}'
+    adapter:
+      type: fs
+      config:
+        path: specd-sdd/archive
+        pattern: '{{year}}/{{month}}/{{change.archivedName}}'
 
 approvals:
   spec: false

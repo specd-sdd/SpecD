@@ -69,3 +69,14 @@
 
 - **WHEN** `GetArchivedChange` is instantiated
 - **THEN** it requires an `ArchiveRepository` in its constructor
+
+### Requirement: Config-based factory delegates through resolveGetArchivedChangeDeps
+
+#### Scenario: createGetArchivedChange config form derives GetArchivedChangeDeps through resolveGetArchivedChangeDeps
+
+- **WHEN** `createGetArchivedChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetArchivedChangeDeps` through `resolveGetArchivedChangeDeps(resolver)`
+- **AND** `resolveGetArchivedChangeDeps(resolver)` resolves:
+- `archive: ArchiveRepository`
+- **AND** the factory delegates to canonical `createGetArchivedChange(deps)`

@@ -95,6 +95,7 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
   },
   ProjectStatusDto: {
     type: 'object',
+    required: ['activeChanges', 'drafts', 'discarded', 'archived', 'auth'],
     properties: {
       activeChanges: { type: 'integer' },
       drafts: { type: 'integer' },
@@ -104,6 +105,7 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
       graph: {
         type: 'object',
         properties: {
+          indexed: { type: 'boolean' },
           lastIndexedAt: { type: 'string', nullable: true },
           lastIndexedRef: { type: 'string', nullable: true },
           stale: { type: 'boolean', nullable: true },
@@ -130,6 +132,13 @@ export const API_OPENAPI_SCHEMAS: Record<string, JsonSchema> = {
         properties: {
           specEnabled: { type: 'boolean' },
           signoffEnabled: { type: 'boolean' },
+        },
+      },
+      auth: {
+        type: 'object',
+        required: ['type'],
+        properties: {
+          type: { type: 'string' },
         },
       },
     },

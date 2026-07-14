@@ -1,0 +1,21 @@
+- op: added
+  description: 'Verify the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveValidateSchemaDeps
+
+    #### Scenario: createValidateSchema config form derives ValidateSchemaDeps through resolveValidateSchemaDeps
+
+    - **WHEN** `createValidateSchema(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ValidateSchemaDeps` through `resolveValidateSchemaDeps(resolver)`
+    - **AND** `resolveValidateSchemaDeps(resolver)` resolves:
+
+    - `schemas: SchemaRegistry`
+    - `schemaRef: string`
+    - `buildSchemaFn: ( ref: string, data: SchemaYamlData, templates: ReadonlyMap<string, string>, )`
+
+    - **AND** the factory delegates to canonical `createValidateSchema(deps)`

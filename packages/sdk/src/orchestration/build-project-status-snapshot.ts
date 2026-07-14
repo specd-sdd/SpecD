@@ -80,6 +80,7 @@ export async function buildProjectStatusSnapshot(
         try {
           hotspots = await provider.getHotspots()
         } catch {
+          graphHealth = null
           hotspots = null
         }
       }

@@ -45,5 +45,16 @@
     "core:resolve-schema",
     "core:spec-overlap"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel"]
+    },
+    {
+      "file": "core:test/composition/kernel.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/retained-branch-factories.spec.ts"
+    }
+  ]
 }

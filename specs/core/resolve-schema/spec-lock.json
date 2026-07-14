@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:schema-format",
+    "core:schema-merge",
+    "core:build-schema",
+    "core:schema-registry-port",
+    "core:config",
+    "default:_global/architecture",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/resolve-schema.ts"
+    }
+  ]
+}

@@ -181,6 +181,20 @@ If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present w
 
 The use case MUST NOT throw when schema resolution fails — it degrades the lifecycle fields silently. It MUST wrap the `SchemaProvider.get()` call in a `try/catch` to achieve this.
 
+### Requirement: Config-based factory delegates through resolveGetStatusDeps
+
+The config-based `createGetStatus(config, options?)` form MUST derive `GetStatusDeps` through `resolveGetStatusDeps(resolver)` and then delegate to canonical `createGetStatus(deps)`.
+
+`resolveGetStatusDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `schemaProvider: SchemaProvider`
+- `approvals: { readonly spec: boolean; readonly signoff: boolean }`
+- `refreshImplementationTracking: RefreshImplementationTracking`
+- `lifecycle: LifecycleEngine`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case does not modify the change — it is a read-only query
@@ -191,10 +205,11 @@ The use case MUST NOT throw when schema resolution fails — it degrades the lif
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — change entity and artifact state model
-- [`core:kernel`](../kernel/spec.md) — kernel wiring for `GetStatus`
-- [`core:transition-change`](../transition-change/spec.md) — lifecycle gating and transition rules
-- [`core:schema-format`](../schema-format/spec.md) — `SchemaProvider`, workflow, and artifact definitions
-- [`core:config`](../config/spec.md) — project approval configuration
-- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — authoritative schema-aware lifecycle interpretation reused by status, validation, and transition flows
-- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — primitive invoked by default before active-change status loads
+- [`core:change`](../change/spec.md)
+- [`core:kernel`](../kernel/spec.md)
+- [`core:transition-change`](../transition-change/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:config`](../config/spec.md)
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

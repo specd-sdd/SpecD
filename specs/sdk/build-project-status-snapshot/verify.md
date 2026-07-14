@@ -23,6 +23,15 @@
 - **THEN** `graphHealth` is `null`
 - **AND** the function resolves without throwing
 
+#### Scenario: Hotspots failure clears the whole graph snapshot
+
+- **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: true, includeHotspots: true })` is called
+- **AND** graph health loads successfully
+- **AND** hotspot loading fails afterwards
+- **THEN** `graphHealth` is `null`
+- **AND** `hotspots` is `null`
+- **AND** the function resolves without throwing
+
 #### Scenario: Hotspots included when requested
 
 - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: true, includeHotspots: true })` is called

@@ -1,0 +1,82 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default), the command prints the resolved config as structured key-value output:
+
+    ```
+    projectRoot:  <absolute-path>
+    specdPath:    <absolute-path>
+    schemaRef:    <schema-ref>
+    approvals:    spec=<true|false>  signoff=<true|false>
+
+    workspaces:
+      <name>  <ownership>  [type: <adapter-type>]  config: <serialized-config>
+      ...
+
+    storage:
+      changes:   [type: <adapter-type>]  config: <serialized-config>
+      drafts:    [type: <adapter-type>]  config: <serialized-config>
+      discarded: [type: <adapter-type>]  config: <serialized-config>
+      archive:   [type: <adapter-type>]  config: <serialized-config>
+    ```
+
+    Optional fields are shown only when present in the config:
+
+    ```
+    storage:
+      pattern: <archive-pattern>
+
+    context:
+      file: <path>
+      instruction: <text>
+      ...
+
+    contextIncludeSpecs: <pattern>, <pattern>, ...
+    contextExcludeSpecs: <pattern>, <pattern>, ...
+    llmOptimizedContext: <true|false>
+    schemaPlugins: <ref>, <ref>, ...
+
+    plugins:
+      agents:
+        <name>  (present)
+        ...
+
+    schemaOverrides: (present)
+    ```
+
+    The text view is intentionally summarized. It shows the resolved workspace and storage paths used by humans for diagnosis, but it does not expand the full adapter-binding structure.
+
+    In `json` or `toon` mode, the command MUST serialize the `SpecdConfig` object directly — no manual field selection. The output is the config as-is, encoded in the respective format. This ensures that new fields added to `SpecdConfig`, including named adapter bindings such as `specsAdapter`, `schemasAdapter`, `changesAdapter`, `draftsAdapter`, `discardedAdapter`, and `archiveAdapter`, appear automatically without CLI changes. Optional fields that are `undefined` are omitted by the serializer.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Examples'
+  content: |
+    ```
+    $ specd config show
+    projectRoot:  /home/user/project
+    specdPath:    /home/user/project/.specd
+    schemaRef:    @specd/schema-std
+    approvals:    spec=false  signoff=false
+
+    workspaces:
+      default   owned   [type: fs]  config: {"path":"/home/user/project/specs"}
+
+    storage:
+      changes:   [type: fs]  config: {"path":"/home/user/project/.specd/changes"}
+      drafts:    [type: fs]  config: {"path":"/home/user/project/.specd/drafts"}
+      discarded: [type: fs]  config: {"path":"/home/user/project/.specd/discarded"}
+      archive:   [type: fs]  config: {"path":"/home/user/project/.specd/archive"}
+
+    contextIncludeSpecs: default:*
+    llmOptimizedContext: true
+
+    plugins:
+      agents:
+        @specd/plugin-agent-claude  (present)
+
+    schemaOverrides: (present)
+    ```

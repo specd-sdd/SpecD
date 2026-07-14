@@ -1,184 +1,150 @@
-import * as path from 'node:path'
-import { ValidateArtifacts } from '../../application/use-cases/validate-artifacts.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { Logger } from '../../application/logger.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
-import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
-import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
-import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { ValidateArtifacts } from '../../application/use-cases/validate-artifacts.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
+import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Domain context for the primary (default) workspace used by `ValidateArtifacts`.
+ * Explicit dependencies for {@link createValidateArtifacts}.
  */
-export interface ValidateArtifactsContext {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
-}
-
-/**
- * Filesystem adapter paths and pre-built port instances for
- * `createValidateArtifacts(context, options)`.
- */
-export interface FsValidateArtifactsOptions {
-  /** Absolute path to the `changes/` directory. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
-  readonly discardedPath: string
-  /**
-   * The project orchestrator.
-   */
+export interface ValidateArtifactsDeps {
+  readonly changes: ChangeRepository
   readonly listWorkspaces: ListWorkspaces
-  /** Absolute path to the `node_modules` directory for schema resolution. */
-  readonly nodeModulesPaths: readonly string[]
-  /** Project root directory for resolving relative schema paths. */
-  readonly configDir: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Workspace routing metadata for cross-workspace spec reference resolution. */
-  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
+  readonly schemaProvider: SchemaProvider
+  readonly parsers: ArtifactParserRegistry
+  readonly actor: ActorResolver
+  readonly contentHasher: ContentHasher
+  readonly extractorTransforms: ExtractorTransformRegistry
+  readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
+  readonly lifecycle: LifecycleEngine
 }
 
 /**
- * Constructs a `ValidateArtifacts` use case wired to all configured workspaces.
+ * Resolves `ValidateArtifacts` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ValidateArtifacts`
+ */
+export function resolveValidateArtifactsDeps(resolver: CompositionResolver): ValidateArtifactsDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    listWorkspaces: resolver.getListWorkspaces(),
+    schemaProvider: resolver.getSchemaProvider(),
+    parsers: resolver.getArtifactParserRegistry(),
+    actor: resolver.getActorResolver(),
+    contentHasher: resolver.getContentHasher(),
+    extractorTransforms: resolver.getExtractorTransforms(),
+    workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
+    lifecycle: resolver.getLifecycleEngine(),
+  }
+}
+
+/**
+ * Constructs `ValidateArtifacts` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createValidateArtifacts(deps: ValidateArtifactsDeps): ValidateArtifacts
+/**
+ * Constructs `ValidateArtifacts` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel-level overrides
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createValidateArtifacts(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): ValidateArtifacts
 /**
- * Constructs a `ValidateArtifacts` use case with explicit context and options.
+ * Constructs `ValidateArtifacts` from explicit deps or config bootstrap.
  *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths and pre-built spec repositories
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createValidateArtifacts(
-  context: ValidateArtifactsContext,
-  options: FsValidateArtifactsOptions,
-): ValidateArtifacts
-/**
- * Constructs a `ValidateArtifacts` instance wired with filesystem adapters.
- *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
- * @returns The pre-wired use case instance
- */
-export function createValidateArtifacts(
-  configOrContext: SpecdConfig | ValidateArtifactsContext,
-  options?: FsValidateArtifactsOptions | { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: ValidateArtifactsDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ValidateArtifacts {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const kernelOpts = options as { extraNodeModulesPaths?: readonly string[] } | undefined
-    const defaultWs = getDefaultWorkspace(config)
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((ws) => ws.schemasPath !== null)
-        .map((ws) => [
-          ws.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws.name,
-              ownership: ws.ownership,
-              isExternal: ws.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: ws.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
-    return createValidateArtifacts(
-      {
-        workspace: defaultWs.name,
-        ownership: defaultWs.ownership,
-        isExternal: defaultWs.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        listWorkspaces: new ListWorkspaces(config, specRepos),
-        nodeModulesPaths: [
-          path.join(config.projectRoot, 'node_modules'),
-          ...(kernelOpts?.extraNodeModulesPaths ?? []),
-        ],
-        configDir: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: schemaRepos,
-        workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
-      },
+  const normalized = normalizeCompositionFactoryArgs(
+    'createValidateArtifacts',
+    depsOrConfig,
+    options,
+    isValidateArtifactsDeps,
+  )
+  return createValidateArtifactsFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ValidateArtifacts` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createValidateArtifactsFromNormalized(
+  input: FactoryInput<ValidateArtifactsDeps, CompositionResolutionOptions>,
+): ValidateArtifacts {
+  if (input.kind === 'deps') {
+    const {
+      changes,
+      listWorkspaces,
+      schemaProvider,
+      parsers,
+      actor,
+      contentHasher,
+      extractorTransforms,
+      workspaceRoutes,
+      lifecycle,
+    } = input.deps
+    return new ValidateArtifacts(
+      changes,
+      listWorkspaces,
+      schemaProvider,
+      parsers,
+      actor,
+      contentHasher,
+      extractorTransforms,
+      workspaceRoutes,
+      lifecycle,
     )
   }
-  const opts = options as FsValidateArtifactsOptions
-  const changeRepo = createChangeRepository('fs', configOrContext, {
-    changesPath: opts.changesPath,
-    draftsPath: opts.draftsPath,
-    discardedPath: opts.discardedPath,
-  })
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.configDir,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const parsers = createArtifactParserRegistry()
-  const actor = createVcsActorResolver()
-  const hasher = new NodeContentHasher()
-  return new ValidateArtifacts(
-    changeRepo,
-    opts.listWorkspaces,
-    schemaProvider,
-    parsers,
-    actor,
-    hasher,
-    createBuiltinExtractorTransforms(),
-    opts.workspaceRoutes ?? [],
-    new LifecycleEngine(Logger.debug.bind(Logger)),
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createValidateArtifacts(resolveValidateArtifactsDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ValidateArtifactsDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isValidateArtifactsDeps(
+  value: ValidateArtifactsDeps | SpecdConfig,
+): value is ValidateArtifactsDeps {
+  return (
+    'changes' in value &&
+    'listWorkspaces' in value &&
+    'schemaProvider' in value &&
+    'parsers' in value &&
+    'actor' in value &&
+    'contentHasher' in value &&
+    'extractorTransforms' in value &&
+    'workspaceRoutes' in value &&
+    'lifecycle' in value
   )
 }

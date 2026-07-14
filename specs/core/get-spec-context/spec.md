@@ -82,6 +82,21 @@ The use case MUST NOT read `spec-lock.json` through generic artifact access in o
 
 Each entry MUST include the canonical spec label and its display mode. List entries contain no content fields. Summary entries contain title and description when available. Full entries contain the metadata sections allowed by the section filter.
 
+### Requirement: Config-based factory delegates through resolveGetSpecContextDeps
+
+The config-based `createGetSpecContext(config, options?)` form MUST derive `GetSpecContextDeps` through `resolveGetSpecContextDeps(resolver)` and then delegate to canonical `createGetSpecContext(deps)`.
+
+`resolveGetSpecContextDeps(resolver)` MUST resolve:
+
+- `listWorkspaces: ListWorkspaces`
+- `hasher: ContentHasher`
+- `schemaProvider?: SchemaProvider`
+- `parsers?: ArtifactParserRegistry`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case MUST obtain repository access through the orchestrated `ListWorkspaces` result and MUST NOT mutate the returned workspace entities or their repositories.
@@ -91,10 +106,11 @@ Each entry MUST include the canonical spec label and its display mode. List entr
 
 ## Spec Dependencies
 
-- [`core:config`](../config/spec.md) — workspace routing and project-level context settings
-- [`core:compile-context`](../compile-context/spec.md) — shared context assembly conventions
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata used in context output
-- [`core:storage`](../storage/spec.md) — repository access and artifact layout assumptions
-- [`core:workspace`](../workspace/spec.md) — workspace identity resolution
-- [`core:spec-id-format`](../spec-id-format/spec.md) — spec identity parsing and validation
-- [`core:list-workspaces`](../list-workspaces/spec.md) — orchestrated repository resolution source
+- [`core:config`](../config/spec.md)
+- [`core:compile-context`](../compile-context/spec.md)
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:list-workspaces`](../list-workspaces/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

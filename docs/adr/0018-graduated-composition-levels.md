@@ -31,7 +31,7 @@ Chosen option: "Three levels", because each level serves a distinct consumer pro
 
 **Level 1 — Use-case factories** (lowest level):
 
-Each use case has a factory function (e.g. `createArchiveChange`) that accepts either a `SpecdConfig` or explicit `(context, options)` arguments. The explicit form is the lowest public composition level and avoids kernel/config loading. In current code it is primarily explicit fs-oriented wiring; tests that need full dependency control may still instantiate use cases directly.
+Each use case has a factory function (e.g. `createArchiveChange`) that accepts either a `SpecdConfig` or an explicit dependency object. The explicit deps form is the lowest public composition level; the config form is a convenience wrapper that bootstraps those deps through the shared `CompositionResolver`. Tests that need full dependency control may still instantiate use cases directly or call `createX(deps)`.
 
 **Level 2 — Kernel** (mid level):
 
@@ -64,13 +64,13 @@ The graduated design means consumers bind at exactly the level they need:
 The composition API has grown since this ADR was written:
 
 - `createKernel(...)` is now asynchronous.
-- `@specd/core` also exposes `createKernelBuilder(...)` as a fluent composition surface over the same additive registrations accepted by `createKernel(...)`.
+- `@specd/core/extensions` also exposes `createKernelBuilder(...)` as a fluent composition surface over the same additive registrations accepted by `createKernel(...)`.
 - Built kernels now expose `kernel.registry`, making the merged registry surface part of the public API for integrators.
 
 ### Original confirmation criteria
 
-- Every use-case factory accepts both `(context, options)` and `(config: SpecdConfig)` signatures
-- At decision time, tests were expected to prefer the explicit `(context, options)` form rather than `createKernel`
+- Every use-case factory accepts both `createX(deps)` and `createX(config, options?)` signatures
+- At decision time, tests were expected to prefer the explicit deps form rather than `createKernel`
 - CLI and MCP use `createKernel` — no direct factory calls in delivery code
 - `ConfigLoader` is defined as a port in `application/ports/` and implemented in `infrastructure/`
 

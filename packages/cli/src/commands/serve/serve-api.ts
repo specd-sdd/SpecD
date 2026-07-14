@@ -1,5 +1,5 @@
 import { createApiServer, defaultAuthAdapterRegistry } from '@specd/api'
-import type { SpecdApiAuthConfig } from '@specd/core'
+import type { SpecdApiAuthConfig } from '@specd/sdk'
 import { type Command } from 'commander'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'

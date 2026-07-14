@@ -3,17 +3,20 @@ import { RegistryConflictError } from '../application/errors/registry-conflict-e
 import { type ExternalHookRunner } from '../application/ports/external-hook-runner.js'
 import { type SpecdConfig } from '../application/specd-config.js'
 import { type ExtractorTransform } from '../domain/services/content-extraction.js'
-import { createBuiltinKernelRegistry } from './kernel-internals.js'
+import { type ChangeRepository } from '../application/ports/change-repository.js'
+import { type ArchiveRepository } from '../application/ports/archive-repository.js'
+import { type SpecRepository } from '../application/ports/spec-repository.js'
+import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import {
-  createKernelRegistryView,
+  createBuiltinCompositionRegistry,
+  createCompositionRegistryView,
   type ActorProvider,
   type ArchiveStorageFactory,
   type ChangeStorageFactory,
-  type GraphStoreFactory,
   type SchemaStorageFactory,
   type SpecStorageFactory,
   type VcsProvider,
-} from './kernel-registries.js'
+} from './composition-registries.js'
 import { createKernel, type Kernel, type KernelOptions } from './kernel.js'
 
 /**
@@ -21,17 +24,21 @@ import { createKernel, type Kernel, type KernelOptions } from './kernel.js'
  */
 interface KernelBuilderState {
   readonly extraNodeModulesPaths?: string[]
-  graphStoreId?: string
   readonly specStorageFactories: Record<string, SpecStorageFactory>
   readonly schemaStorageFactories: Record<string, SchemaStorageFactory>
   readonly changeStorageFactories: Record<string, ChangeStorageFactory>
   readonly archiveStorageFactories: Record<string, ArchiveStorageFactory>
-  readonly graphStoreFactories: Record<string, GraphStoreFactory>
   readonly parsers: Record<string, ArtifactParser>
   readonly extractorTransforms: Record<string, ExtractorTransform>
   readonly vcsProviders: VcsProvider[]
   readonly actorProviders: ActorProvider[]
   readonly externalHookRunners: ExternalHookRunner[]
+  readonly repositories: {
+    changes?: ChangeRepository
+    archive?: ArchiveRepository
+    specs?: ReadonlyMap<string, SpecRepository>
+    schemas?: ReadonlyMap<string, SchemaRepository>
+  }
 }
 
 /**
@@ -79,23 +86,36 @@ export interface KernelBuilder {
   registerArchiveStorage(adapter: string, factory: ArchiveStorageFactory): this
 
   /**
-   * Registers a named graph-store factory.
+   * Registers a direct ChangeRepository instance override.
    *
-   * @param id - Stable backend id to register
-   * @param factory - Factory implementation for that backend
+   * @param repo - The repository instance to use
    * @returns The same builder for fluent chaining
-   * @throws {@link RegistryConflictError} When the backend id already exists
    */
-  registerGraphStore(id: string, factory: GraphStoreFactory): this
+  registerChangeRepository(repo: ChangeRepository): this
 
   /**
-   * Selects the active graph-store backend id for the kernel being built.
+   * Registers a direct ArchiveRepository instance override.
    *
-   * @param id - Registered graph-store backend id to select
+   * @param repo - The repository instance to use
    * @returns The same builder for fluent chaining
-   * @throws {Error} When the backend id is not registered
    */
-  useGraphStore(id: string): this
+  registerArchiveRepository(repo: ArchiveRepository): this
+
+  /**
+   * Registers a direct SpecRepository map override.
+   *
+   * @param repos - The map of workspace name to SpecRepository instance to use
+   * @returns The same builder for fluent chaining
+   */
+  registerSpecRepositories(repos: ReadonlyMap<string, SpecRepository>): this
+
+  /**
+   * Registers a direct SchemaRepository map override.
+   *
+   * @param repos - The map of workspace name to SchemaRepository instance to use
+   * @returns The same builder for fluent chaining
+   */
+  registerSchemaRepositories(repos: ReadonlyMap<string, SchemaRepository>): this
 
   /**
    * Registers an artifact parser for a named format.
@@ -190,17 +210,18 @@ function cloneOptions(base?: Partial<KernelOptions>): KernelBuilderState {
     ...(base?.extraNodeModulesPaths !== undefined
       ? { extraNodeModulesPaths: [...base.extraNodeModulesPaths] }
       : {}),
-    ...(base?.graphStoreId !== undefined ? { graphStoreId: base.graphStoreId } : {}),
     specStorageFactories: { ...(base?.specStorageFactories ?? {}) },
     schemaStorageFactories: { ...(base?.schemaStorageFactories ?? {}) },
     changeStorageFactories: { ...(base?.changeStorageFactories ?? {}) },
     archiveStorageFactories: { ...(base?.archiveStorageFactories ?? {}) },
-    graphStoreFactories: { ...(base?.graphStoreFactories ?? {}) },
     parsers: normalizeParsers(base?.parsers),
     extractorTransforms: normalizeExtractorTransforms(base?.extractorTransforms),
     vcsProviders: [...(base?.vcsProviders ?? [])],
     actorProviders: [...(base?.actorProviders ?? [])],
     externalHookRunners: [...(base?.externalHookRunners ?? [])],
+    repositories: {
+      ...(base?.repositories ?? {}),
+    },
   }
 }
 
@@ -215,7 +236,6 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
     ...(state.extraNodeModulesPaths !== undefined
       ? { extraNodeModulesPaths: [...state.extraNodeModulesPaths] }
       : {}),
-    ...(state.graphStoreId !== undefined ? { graphStoreId: state.graphStoreId } : {}),
     ...(Object.keys(state.specStorageFactories).length > 0
       ? { specStorageFactories: { ...state.specStorageFactories } }
       : {}),
@@ -228,9 +248,6 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
     ...(Object.keys(state.archiveStorageFactories).length > 0
       ? { archiveStorageFactories: { ...state.archiveStorageFactories } }
       : {}),
-    ...(Object.keys(state.graphStoreFactories).length > 0
-      ? { graphStoreFactories: { ...state.graphStoreFactories } }
-      : {}),
     ...(Object.keys(state.parsers).length > 0 ? { parsers: { ...state.parsers } } : {}),
     ...(Object.keys(state.extractorTransforms).length > 0
       ? { extractorTransforms: { ...state.extractorTransforms } }
@@ -239,6 +256,9 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
     ...(state.actorProviders.length > 0 ? { actorProviders: [...state.actorProviders] } : {}),
     ...(state.externalHookRunners.length > 0
       ? { externalHookRunners: [...state.externalHookRunners] }
+      : {}),
+    ...(state.repositories && Object.keys(state.repositories).length > 0
+      ? { repositories: { ...state.repositories } }
       : {}),
   }
 }
@@ -250,7 +270,7 @@ function toKernelOptions(state: KernelBuilderState): KernelOptions {
  * @returns The merged registry view
  */
 function currentRegistry(state: KernelBuilderState) {
-  return createKernelRegistryView(createBuiltinKernelRegistry(), toKernelOptions(state))
+  return createCompositionRegistryView(createBuiltinCompositionRegistry(), toKernelOptions(state))
 }
 
 /**
@@ -299,19 +319,23 @@ export function createKernelBuilder(
       return builder
     },
 
-    registerGraphStore(id: string, factory: GraphStoreFactory): KernelBuilder {
-      if (currentRegistry(options).graphStores.has(id)) {
-        throw new RegistryConflictError('graphStoreFactories', id)
-      }
-      options.graphStoreFactories[id] = factory
+    registerChangeRepository(repo: ChangeRepository): KernelBuilder {
+      options.repositories.changes = repo
       return builder
     },
 
-    useGraphStore(id: string): KernelBuilder {
-      if (!currentRegistry(options).graphStores.has(id)) {
-        throw new Error(`graph store '${id}' is not registered`)
-      }
-      options.graphStoreId = id
+    registerArchiveRepository(repo: ArchiveRepository): KernelBuilder {
+      options.repositories.archive = repo
+      return builder
+    },
+
+    registerSpecRepositories(repos: ReadonlyMap<string, SpecRepository>): KernelBuilder {
+      options.repositories.specs = repos
+      return builder
+    },
+
+    registerSchemaRepositories(repos: ReadonlyMap<string, SchemaRepository>): KernelBuilder {
+      options.repositories.schemas = repos
       return builder
     },
 

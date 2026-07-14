@@ -175,6 +175,17 @@ export function mergeSpecs(
 ): Spec
 ```
 
+### Requirement: Public composition-surface documentation stays aligned
+
+Documentation under `docs/` SHALL be updated when the public composition surface of `@specd/core` changes.
+
+When composition factories change their public contract shape, the documentation MUST describe at least:
+
+- the canonical `createX(deps)` form
+- the convenience `createX(config, options?)` form
+- the role split between standalone factories, `createKernel(...)`, and `createKernelBuilder()`
+- the shared `CompositionResolver` path used for config-based bootstrap
+
 ## Constraints
 
 - All documentation files use Markdown

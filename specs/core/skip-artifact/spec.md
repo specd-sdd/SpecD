@@ -42,6 +42,17 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 `SkipArtifact.execute` returns the updated `Change` entity produced by that serialized mutation.
 
+### Requirement: Config-based factory delegates through resolveSkipArtifactDeps
+
+The config-based `createSkipArtifact(config, options?)` form MUST derive `SkipArtifactDeps` through `resolveSkipArtifactDeps(resolver)` and then delegate to canonical `createSkipArtifact(deps)`.
+
+`resolveSkipArtifactDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case validates artifact optionality before resolving actor identity — the actor is not resolved if the artifact is required or nonexistent
@@ -49,5 +60,6 @@ Inside the mutation callback, the repository supplies the fresh persisted `Chang
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — `Change` entity, `getArtifact`, `recordArtifactSkipped`
-- [`core:composition`](../composition/spec.md) — wiring and port injection
+- [`core:change`](../change/spec.md)
+- [`core:composition`](../composition/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

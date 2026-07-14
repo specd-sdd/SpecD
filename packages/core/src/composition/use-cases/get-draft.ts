@@ -1,50 +1,91 @@
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { GetDraft } from '../../application/use-cases/get-draft.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { type FsListDraftsOptions, type ListDraftsContext } from './list-drafts.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Constructs a `GetDraft` use case with full project config.
+ * Explicit dependencies for {@link createGetDraft}.
+ */
+export interface GetDraftDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+}
+
+/**
+ * Resolves {@link GetDraftDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetDraft`
+ */
+export function resolveGetDraftDeps(resolver: CompositionResolver): GetDraftDeps {
+  return { changes: resolver.getChangeRepository() }
+}
+
+/**
+ * Constructs a `GetDraft` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetDraft(deps: GetDraftDeps): GetDraft
+/**
+ * Constructs a `GetDraft` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createGetDraft(config: SpecdConfig): GetDraft
-/**
- * Constructs a `GetDraft` use case with explicit context and options.
- *
- * @param context - Domain context for the primary workspace
- * @param options - Filesystem paths for draft resolution
- * @returns The pre-wired use case instance
- */
-export function createGetDraft(context: ListDraftsContext, options: FsListDraftsOptions): GetDraft
-/**
- * Implementation overload for {@link createGetDraft}.
- *
- * @param configOrContext - Project config or explicit context
- * @param options - Filesystem paths when using explicit context
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetDraft(
-  configOrContext: SpecdConfig | ListDraftsContext,
-  options?: FsListDraftsOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): GetDraft
+/**
+ * Constructs a `GetDraft` instance from explicit deps or config bootstrap.
+ *
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
+ * @returns The pre-wired use case instance
+ */
+export function createGetDraft(
+  depsOrConfig: GetDraftDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetDraft {
-  if (isSpecdConfig(configOrContext)) {
-    return createGetDraft(
-      {
-        workspace: getDefaultWorkspace(configOrContext).name,
-        ownership: getDefaultWorkspace(configOrContext).ownership,
-        isExternal: getDefaultWorkspace(configOrContext).isExternal,
-        configPath: configOrContext.configPath,
-      },
-      {
-        changesPath: configOrContext.storage.changesPath,
-        draftsPath: configOrContext.storage.draftsPath,
-        discardedPath: configOrContext.storage.discardedPath,
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetDraft',
+    depsOrConfig,
+    options,
+    isGetDraftDeps,
+  )
+  return createGetDraftFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetDraft` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetDraftFromNormalized(
+  input: FactoryInput<GetDraftDeps, CompositionResolutionOptions>,
+): GetDraft {
+  if (input.kind === 'deps') {
+    return new GetDraft(input.deps.changes)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  return new GetDraft(changeRepo)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetDraft(resolveGetDraftDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetDraftDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetDraftDeps(value: GetDraftDeps | SpecdConfig): value is GetDraftDeps {
+  return 'changes' in value
 }

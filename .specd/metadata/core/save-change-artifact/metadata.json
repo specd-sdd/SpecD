@@ -142,8 +142,8 @@
     "symbols": [
       {
         "specId": "core:save-change-artifact",
-        "file": "core:src/application/use-cases/save-change-artifact.ts",
-        "symbol": "SaveChangeArtifact"
+        "file": "core:src/composition/use-cases/save-change-artifact.ts",
+        "symbol": "createSaveChangeArtifact"
       }
     ]
   },

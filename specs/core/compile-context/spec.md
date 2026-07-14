@@ -176,7 +176,7 @@ A skipped optional artifact satisfies the requirement in the same way a complete
 
 If the step is not available, `CompileContext` must include the availability status and the list of blocking artifacts in the result. It must not throw — unavailability is surfaced to the caller, not treated as an error.
 
-For backward compatibility, the top-level `stepAvailable` and `blockingArtifacts` fields remain part of the result. The richer per-step blocker diagnostics are exposed through `availableSteps`.
+For backward compatibility, the top-level `stepAvailable` and `blockingArtifacts` fields remain part of the result. `stepAvailable` MUST mirror the lifecycle-engine `available` verdict for the requested step rather than `isReady` alone. The richer per-step blocker diagnostics are exposed through `availableSteps`.
 
 ### Requirement: Structured result assembly
 
@@ -271,6 +271,26 @@ When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimizatio
 
 The warning message MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
 
+### Requirement: Config-based factory delegates through resolveCompileContextDeps
+
+The config-based `createCompileContext(config, options?)` form MUST derive `CompileContextDeps` through `resolveCompileContextDeps(resolver)` and then delegate to canonical `createCompileContext(deps)`.
+
+`resolveCompileContextDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `schemaProvider: SchemaProvider`
+- `files: FileReader`
+- `parsers: ArtifactParserRegistry`
+- `hasher: ContentHasher`
+- `previewSpec: PreviewSpec`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `lifecycle: LifecycleEngine`
+- `defaultConfig: CompileContextConfig`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - Project `context` entries always appear first in `projectContext`, before spec entries
@@ -325,17 +345,18 @@ const result = await compileContext.execute({
 
 ## Spec Dependencies
 
-- [`core:change`](../change/spec.md) — Change entity, `effectiveStatus`, active workspaces
-- [`core:config`](../config/spec.md) — 5-step context spec resolution, include/exclude patterns, workspace-level patterns
-- [`core:spec-metadata`](../spec-metadata/spec.md) — `.specd-metadata.yaml` format, `dependsOn` traversal, staleness detection
-- [`core:schema-format`](../schema-format/spec.md) — `metadataExtraction` (fallback path), `workflow`
-- [`core:delta-format`](../delta-format/spec.md) — `ArtifactParser` port (for metadataExtraction fallback)
-- [`core:selector-model`](../selector-model/spec.md) — selector fields used in `metadataExtraction` extractors
-- [`core:spec-id-format`](../spec-id-format/spec.md) — canonical `workspace:capabilityPath` format, parsing rules for `specIds`
-- [`core:workspace`](../workspace/spec.md) — active workspace determination, workspace-level context patterns, port-per-workspace pattern
-- [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md) — artifact instructions (separate concern)
-- [`core:get-hook-instructions`](../get-hook-instructions/spec.md) — step hook instructions (separate concern)
-- [`core:preview-spec`](../preview-spec/spec.md) — delta merge for materialized spec views in context
-- [`core:lifecycle-engine`](../lifecycle-engine/spec.md) — shared schema-aware lifecycle interpretation for step availability and blocker diagnostics
-- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md) — optional upstream refresh before context compilation; not invoked by `CompileContext` itself
-- [`core:project-metadata`](../project-metadata/spec.md) — for project-level optimization storage
+- [`core:change`](../change/spec.md)
+- [`core:config`](../config/spec.md)
+- [`core:spec-metadata`](../spec-metadata/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:delta-format`](../delta-format/spec.md)
+- [`core:selector-model`](../selector-model/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md)
+- [`core:get-hook-instructions`](../get-hook-instructions/spec.md)
+- [`core:preview-spec`](../preview-spec/spec.md)
+- [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+- [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+- [`core:core/project-metadata`](../core/project-metadata/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

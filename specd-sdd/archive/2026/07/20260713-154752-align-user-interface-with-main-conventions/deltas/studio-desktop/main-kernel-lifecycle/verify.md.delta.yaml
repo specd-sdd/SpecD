@@ -1,0 +1,32 @@
+- op: modified
+  description: 'Verify desktop-local Electron graph wiring while keeping CLI and API on the standard SDK-backed graph runtime.'
+  selector:
+    type: section
+    matches: 'Requirement: desktop startup prepares the Electron SQLite graph runtime'
+  content: |
+    #### Scenario: Desktop package exposes Electron graph rebuild wiring
+
+    - **WHEN** the desktop package scripts are inspected
+    - **THEN** `rebuild:graph-sqlite-electron` rebuilds the locally generated vendored
+      Electron SQLite addon
+    - **AND** `rebuild:graph-electron` aliases that rebuild
+    - **AND** `prestart` executes the Electron SQLite rebuild before app startup
+
+    #### Scenario: Desktop startup does not require git-tracked vendor artifacts
+
+    - **GIVEN** a fresh clone without committed vendored sqlite artifacts
+    - **WHEN** desktop startup preparation runs
+    - **THEN** it triggers the Electron sqlite rebuild workflow
+    - **AND** desktop local graph startup does not depend on vendored sqlite files being
+      present in git
+
+    #### Scenario: Desktop local host depends on the Electron graph package
+
+    - **WHEN** the desktop package dependencies are inspected
+    - **THEN** `@specd/code-graph-electron` is present for desktop-local graph execution
+
+    #### Scenario: CLI and API keep the standard SDK-backed graph runtime
+
+    - **WHEN** CLI and API package dependencies and bootstrap code are inspected
+    - **THEN** they do not depend on `@specd/code-graph-electron`
+    - **AND** they access the standard graph runtime through `@specd/sdk`

@@ -1,97 +1,132 @@
-import * as path from 'node:path'
-import { GetSpecContext } from '../../application/use-cases/get-spec-context.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
-import { createBuiltinExtractorTransforms } from '../extractor-transforms/index.js'
-import { createSpecWorkspaceRoutes } from '../spec-workspace-routes.js'
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
-import { ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
-import { createSchemaRepositoriesForConfig } from '../schema-resolution.js'
-import { createSharedSpecRepositories } from '../shared-repository-wiring.js'
+import { GetSpecContext } from '../../application/use-cases/get-spec-context.js'
+import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Filesystem adapter options for `createGetSpecContext(options)`. */
-export interface FsGetSpecContextOptions {
-  /** The project orchestrator. */
+/**
+ * Explicit dependencies for {@link createGetSpecContext}.
+ */
+export interface GetSpecContextDeps {
   readonly listWorkspaces: ListWorkspaces
-  /** Absolute path to the `node_modules` directory for schema resolution. */
-  readonly nodeModulesPaths: readonly string[]
-  /** Project root directory for resolving relative schema paths. */
-  readonly configDir: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Workspace routing metadata for cross-workspace spec reference resolution. */
-  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
+  readonly contentHasher: ContentHasher
+  readonly schemaProvider: SchemaProvider
+  readonly parsers: ArtifactParserRegistry
+  readonly extractorTransforms: ExtractorTransformRegistry
+  readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
 }
 
 /**
- * Constructs a `GetSpecContext` use case wired to all configured workspaces.
+ * Resolves `GetSpecContext` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetSpecContext`
+ */
+export function resolveGetSpecContextDeps(resolver: CompositionResolver): GetSpecContextDeps {
+  return {
+    listWorkspaces: resolver.getListWorkspaces(),
+    contentHasher: resolver.getContentHasher(),
+    schemaProvider: resolver.getSchemaProvider(),
+    parsers: resolver.getArtifactParserRegistry(),
+    extractorTransforms: resolver.getExtractorTransforms(),
+    workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
+  }
+}
+
+/**
+ * Constructs `GetSpecContext` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetSpecContext(deps: GetSpecContextDeps): GetSpecContext
+/**
+ * Constructs `GetSpecContext` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param options - Optional kernel options (e.g. extra node_modules paths)
- * @param options.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetSpecContext(
   config: SpecdConfig,
-  options?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): GetSpecContext
 /**
- * Constructs a `GetSpecContext` use case with explicit adapter options.
+ * Constructs `GetSpecContext` from explicit deps or config bootstrap.
  *
- * @param options - Pre-built spec repositories and schema resolution paths
- * @returns The pre-wired use case instance
- */
-export function createGetSpecContext(options: FsGetSpecContextOptions): GetSpecContext
-/**
- * Constructs a `GetSpecContext` instance wired with filesystem adapters.
- *
- * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
- * @param options - Optional kernel options; only used with the `SpecdConfig` form
- * @param options.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetSpecContext(
-  configOrOptions: SpecdConfig | FsGetSpecContextOptions,
-  options?: { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: GetSpecContextDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetSpecContext {
-  if (isSpecdConfig(configOrOptions)) {
-    const config = configOrOptions
-    const specRepos = createSharedSpecRepositories({ config })
-    const schemaRepos = createSchemaRepositoriesForConfig(config)
-    return createGetSpecContext({
-      listWorkspaces: new ListWorkspaces(config, specRepos),
-      nodeModulesPaths: [
-        path.join(config.projectRoot, 'node_modules'),
-        ...(options?.extraNodeModulesPaths ?? []),
-      ],
-      configDir: config.projectRoot,
-      schemaRef: config.schemaRef,
-      schemaRepositories: schemaRepos,
-      workspaceRoutes: createSpecWorkspaceRoutes(config.workspaces),
-    })
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetSpecContext',
+    depsOrConfig,
+    options,
+    isGetSpecContextDeps,
+  )
+  return createGetSpecContextFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetSpecContext` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetSpecContextFromNormalized(
+  input: FactoryInput<GetSpecContextDeps, CompositionResolutionOptions>,
+): GetSpecContext {
+  if (input.kind === 'deps') {
+    const {
+      listWorkspaces,
+      contentHasher,
+      schemaProvider,
+      parsers,
+      extractorTransforms,
+      workspaceRoutes,
+    } = input.deps
+    return new GetSpecContext(
+      listWorkspaces,
+      contentHasher,
+      schemaProvider,
+      parsers,
+      extractorTransforms,
+      workspaceRoutes,
+    )
   }
 
-  const opts = configOrOptions
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: opts.nodeModulesPaths,
-    configDir: opts.configDir,
-    schemaRepositories: opts.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, opts.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const parsers = createArtifactParserRegistry()
-  const hasher = new NodeContentHasher()
-  return new GetSpecContext(
-    opts.listWorkspaces,
-    hasher,
-    schemaProvider,
-    parsers,
-    createBuiltinExtractorTransforms(),
-    opts.workspaceRoutes ?? [],
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetSpecContext(resolveGetSpecContextDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetSpecContextDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetSpecContextDeps(
+  value: GetSpecContextDeps | SpecdConfig,
+): value is GetSpecContextDeps {
+  return (
+    'listWorkspaces' in value &&
+    'contentHasher' in value &&
+    'schemaProvider' in value &&
+    'parsers' in value &&
+    'extractorTransforms' in value &&
+    'workspaceRoutes' in value
   )
 }

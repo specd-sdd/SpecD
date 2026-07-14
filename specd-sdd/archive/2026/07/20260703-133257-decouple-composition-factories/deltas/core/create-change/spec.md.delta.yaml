@@ -1,0 +1,31 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveCreateChangeDeps
+
+    The config-based `createCreateChange(config, options?)` form MUST derive `CreateChangeDeps` through `resolveCreateChangeDeps(resolver)` and then delegate to canonical `createCreateChange(deps)`.
+
+    `resolveCreateChangeDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `actor: ActorResolver`
+    - `getActiveSchema: GetActiveSchema`
+    - `detectOverlap: DetectOverlap`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:get-active-schema`](../get-active-schema/spec.md)
+    - [`core:spec-overlap`](../spec-overlap/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

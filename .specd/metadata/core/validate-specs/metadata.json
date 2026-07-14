@@ -6,7 +6,8 @@
     "core:schema-format",
     "core:storage",
     "core:workspace",
-    "core:spec-id-format"
+    "core:spec-id-format",
+    "core:composition-resolver"
   ],
   "context": [
     "Spec artifacts can drift from the schema's structural expectations over time, and there is no other mechanism to catch these violations before they cause downstream failures. The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules, supporting three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded."
@@ -64,6 +65,18 @@
       "requirement": "Format inference and parser resolution",
       "rules": [
         "When an artifact type does not specify an explicit `format`, the use case SHALL infer it from the filename via `inferFormat`. If no parser is found for the resolved format, the artifact MUST be skipped without recording a failure or warning."
+      ]
+    },
+    {
+      "requirement": "Canonical metadata consistency validation",
+      "rules": [
+        "After per-artifact and cross-artifact validation for one spec, `ValidateSpecs` SHALL validate the canonical metadata state exposed through `SpecRepository.metadata()` and the repository's persisted semantic dependency operations.\n\nValidation rules:\n\n1. If metadata exists and its freshness checks indicate stale content hashes, record a `ValidationFailure` indicating that `metadata.json` must be regenerated.\n2. If metadata exists and `metadata.json.dependsOn` differs from `SpecRepository.readPersistedDependsOn(spec)`, record a `ValidationFailure` indicating that the canonical dependency projection is stale or inconsistent.\n3. If the active schema declares `metadataExtraction.dependsOn` for the spec and extraction yields a dependency set that differs from the persisted dependency state, record a `ValidationFailure`.\n4. If the schema omits dependency extraction, validation MUST still accept `metadata.json.dependsOn` when it matches the persisted dependency state.\n\nThese checks validate canonical metadata as a cache of persisted spec semantics without treating `spec-lock.json` as a normal schema artifact."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveValidateSpecsDeps",
+      "rules": [
+        "The config-based `createValidateSpecs(config, options?)` form MUST derive `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then delegate to canonical `createValidateSpecs(deps)`.\n\n`resolveValidateSpecsDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `hasher?: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -279,35 +292,31 @@
       ],
       "when": ["ValidateSpecs validates that spec"],
       "then": ["no dependency-projection failure is recorded for that check"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveValidateSpecsDeps",
+      "name": "createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps",
+      "when": ["createValidateSpecs(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives ValidateSpecsDeps through resolveValidateSpecsDeps(resolver)",
+        "AND resolveValidateSpecsDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createValidateSpecs(deps)"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:validate-specs",
-        "file": "core:src/application/use-cases/validate-specs.ts",
-        "symbol": "ValidateSpecs"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/application/use-cases/validate-specs.ts",
-        "symbol": "execute"
-      },
-      {
-        "specId": "core:validate-specs",
         "file": "core:src/composition/use-cases/validate-specs.ts",
         "symbol": "createValidateSpecs"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:fdef9ec739e7c532b8b05f6e0113ef0659025f24952a4d19b6793650fb3c70d2",
-    "verify.md": "sha256:3029658c2d5e434372b4be8493ca31385fa59eb8ffa8cdf6bdc52a8fb3caba2d"
+    "spec.md": "sha256:c1d89aaa38003ad89430a507c44bc8276e85da378d92ff1c06c8d735c4dc5553",
+    "verify.md": "sha256:e5ad18afae1212419c01b41f999b0eb80708c03a12039c49df01ba5252da55c7"
   },
   "generatedBy": "core"
 }

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing verification scenarios remain valid for the implementation alignment.'

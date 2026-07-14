@@ -1,0 +1,102 @@
+{
+  "title": "GetImplementationReview",
+  "description": "Implementation-traceability workflows need a read-only way to inspect the current tracked implementation files and confirmed implementation links of a change without mutating anything. `GetImplementationReview` provides that read model: it loads one active change, projects its implementation-tracking state, and returns the current in-scope spec IDs so delivery adapters can review implementation coverage against change scope.",
+  "dependsOn": [
+    "core:change",
+    "core:update-implementation-tracking",
+    "core:refresh-implementation-tracking",
+    "core:composition-resolver"
+  ],
+  "context": [
+    "Implementation-traceability workflows need a read-only way to inspect the current tracked implementation files and confirmed implementation links of a change without mutating anything. `GetImplementationReview` provides that read model: it loads one active change, projects its implementation-tracking state, and returns the current in-scope spec IDs so delivery adapters can review implementation coverage against change scope."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": ["`GetImplementationReview.execute` SHALL accept a change name."]
+    },
+    {
+      "requirement": "Change must exist",
+      "rules": [
+        "If no active change with the given name exists, the use case MUST throw `ChangeNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Result projection",
+      "rules": [
+        "The use case MUST return:\n\n- `implementationTracking` — the raw `ImplementationTrackingProjection` for the change\n- `specIds` — the change's current in-scope spec IDs\n\nThe implementation-tracking projection MUST be derived from persisted change state and MUST NOT mutate that state during the read."
+      ]
+    },
+    {
+      "requirement": "Delivery-agnostic read boundary",
+      "rules": [
+        "The use case MUST expose a delivery-agnostic read model only. It MUST NOT embed CLI formatting, symbol-graph rendering, or archive-time materialization logic."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetImplementationReviewDeps",
+      "rules": [
+        "The config-based `createGetImplementationReview(config, options?)` form MUST derive `GetImplementationReviewDeps` through `resolveGetImplementationReviewDeps(resolver)` and then delegate to canonical `createGetImplementationReview(deps)`.\n\n`resolveGetImplementationReviewDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case is read-only.",
+    "The use case operates on active changes through persisted change state.",
+    "The use case does not perform autodetection or mutation; those belong to RefreshImplementationTracking and UpdateImplementationTracking."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "Execute accepts change name",
+      "when": ["GetImplementationReview.execute({ name }) is called"],
+      "then": ["it accepts the target change name"]
+    },
+    {
+      "requirement": "Change must exist",
+      "name": "Unknown change throws ChangeNotFoundError",
+      "when": ["GetImplementationReview.execute({ name: \"missing\" }) is called"],
+      "then": ["it throws ChangeNotFoundError"]
+    },
+    {
+      "requirement": "Result projection",
+      "name": "Review result returns implementation tracking and spec scope",
+      "given": ["an active change exists"],
+      "when": ["GetImplementationReview.execute({ name }) succeeds"],
+      "then": ["the result includes implementationTracking", "AND it includes the change specIds"]
+    },
+    {
+      "requirement": "Delivery-agnostic read boundary",
+      "name": "Use case returns raw review model without delivery formatting",
+      "when": ["the use case is reviewed"],
+      "then": [
+        "it returns delivery-agnostic data only",
+        "AND it does not embed CLI formatting or archive-time materialization logic"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetImplementationReviewDeps",
+      "name": "createGetImplementationReview config form derives GetImplementationReviewDeps through resolveGetImplementationReviewDeps",
+      "when": ["createGetImplementationReview(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetImplementationReviewDeps through resolveGetImplementationReviewDeps(resolver)",
+        "AND resolveGetImplementationReviewDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetImplementationReview(deps)"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:get-implementation-review",
+        "file": "core:src/composition/use-cases/get-implementation-review.ts"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:1e9cdf9590b7c90c679cf074e743e9e403289dd5c75264b0084e414d2731eb21",
+    "verify.md": "sha256:3c7c4ba9af91a53ab7f1d2a772c5879e53092f3bdff867f0da55fd1b010ca6bf"
+  },
+  "generatedBy": "core"
+}

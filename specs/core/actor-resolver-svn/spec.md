@@ -2,26 +2,14 @@
 
 ## Purpose
 
-Provides actor identity resolution for Subversion working copies.
+This specification is deprecated and has been eliminated. Its responsibilities have been merged into `core:vcs-adapter-port` and `core:vcs-actor-resolver`.
 
 ## Requirements
 
-### Requirement: Implementation of AutoDetectActorProvider
+### Requirement: Deprecated
 
-The Svn actor provider MUST implement the `AutoDetectActorProvider` interface.
-
-- **`name`**: MUST be `"svn"`.
-
-### Requirement: Detection logic
-
-The provider MUST detect SVN presence by looking for a `.svn` directory in the `cwd` or its parents.
-
-### Requirement: Identity resolution
-
-The resulting resolver MUST retrieve identity from SVN environment.
-
-- `provider`: MUST be set to `"svn"`.
+This specification is deprecated.
 
 ## Spec Dependencies
 
-- [`core:actor-provider`](../actor-provider/spec.md)
+_none_

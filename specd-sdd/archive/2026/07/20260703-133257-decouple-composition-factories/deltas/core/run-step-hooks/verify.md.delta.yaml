@@ -1,0 +1,23 @@
+- op: added
+  description: 'Verify the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveRunStepHooksDeps
+
+    #### Scenario: createRunStepHooks config form derives RunStepHooksDeps through resolveRunStepHooksDeps
+
+    - **WHEN** `createRunStepHooks(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `RunStepHooksDeps` through `resolveRunStepHooksDeps(resolver)`
+    - **AND** `resolveRunStepHooksDeps(resolver)` resolves:
+
+    - `changes: ChangeRepository`
+    - `archive: ArchiveRepository`
+    - `hooks: HookRunner`
+    - `externalHookRunners: ReadonlyMap<string, ExternalHookRunner>`
+    - `schemaProvider: SchemaProvider`
+
+    - **AND** the factory delegates to canonical `createRunStepHooks(deps)`

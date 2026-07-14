@@ -1,0 +1,36 @@
+- op: modified
+  description: 'Rename requirement. Needs #### Scenario: placeholder for validator regex.'
+  selector:
+    type: section
+    matches: 'Requirement: Detection probes in priority order'
+  rename: 'Requirement: VCS adapter composition'
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Git repository detected'
+  rename: 'Scenario: Resolver constructed with VCS adapter'
+  content: |
+    - **GIVEN** a valid `VcsAdapter` instance
+    - **WHEN** `createVcsActorResolver(vcsAdapter)` is called
+    - **THEN** it returns an `ActorResolver` wired to that adapter
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Mercurial repository detected'
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: SVN working copy detected'
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Git takes priority over hg'
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: No VCS detected'
+  rename: 'Scenario: NullVcsAdapter fallback'
+  content: |
+    - **GIVEN** a `NullVcsAdapter` instance
+    - **WHEN** `createVcsActorResolver(nullAdapter)` is called
+    - **THEN** it returns a `NullActorResolver`

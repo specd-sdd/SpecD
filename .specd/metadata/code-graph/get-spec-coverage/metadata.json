@@ -90,5 +90,7 @@
     "spec.md": "sha256:d55baba031c472eae25d95d7d68edd82c7a89fe42ef66780f63ae388a4921fdb",
     "verify.md": "sha256:ee98f7d08e172a39fc39208b1230f9bf56ee2e84bbf5255d39f69ba01f167267"
   },
-  "generatedBy": "core"
+  "generatedBy": "agent",
+  "optimizedDescription": "Returns one spec coverage snapshot from open graph provider with found state, covered relations, and unique file and symbol counts.",
+  "optimizedContext": "# GetSpecCoverage\n## Rules\n- `GetSpecCoverage.execute(input)` MUST return `GetSpecCoverageResult` for input `specId`.\n- Result MUST include `found`, `coveredFiles`, `coveredSymbols`, `fileCount`, `symbolCount`.\n- `found` MUST be `true` when `provider.getSpec(specId)` returns node.\n- `coveredFiles` MUST come from `provider.getCoveredFiles(specId)`; `coveredSymbols` MUST come from `provider.getCoveredSymbols(specId)`.\n- `fileCount` MUST count unique file targets in `coveredFiles`; `symbolCount` MUST count unique symbol targets in `coveredSymbols`.\n- If spec not indexed, arrays MUST be empty and counts MUST be zero.\n- `GetSpecCoverageInput` MUST include opened `provider` and `specId`.\n- `createGetSpecCoverage()` MUST return stateless `GetSpecCoverage`.\n## Constraints\n- MUST NOT open or close provider.\n- MUST NOT throw when spec absent from graph; return `found: false`.\n- MUST NOT load spec artifact content from `SpecRepository`."
 }

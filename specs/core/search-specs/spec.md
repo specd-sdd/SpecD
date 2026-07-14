@@ -44,6 +44,18 @@ Errors encountered while searching an individual workspace MUST be silently caug
 
 When no specs match across all searched workspaces, the use case MUST return an empty array (not an error).
 
+### Requirement: Config-based factory delegates through resolveSearchSpecsDeps
+
+The config-based `createSearchSpecs(config, options?)` form MUST derive `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)` and then delegate to canonical `createSearchSpecs(deps)`.
+
+`resolveSearchSpecsDeps(resolver)` MUST resolve:
+
+- `listWorkspaces: ListWorkspaces`
+- `hasher: ContentHasher`
+- `yaml: YamlSerializer`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - The use case SHALL depend on `ListWorkspaces` for consistent project traversal during fallback search.
@@ -51,7 +63,8 @@ When no specs match across all searched workspaces, the use case MUST return an 
 
 ## Spec Dependencies
 
-- [`core:spec-repository-port`](../spec-repository-port/spec.md) — repository-backed search contract
-- [`core:list-specs`](../list-specs/spec.md) — shared listing and result-shaping model
-- [`core:workspace`](../workspace/spec.md) — workspace attribution in search results
-- [`core:list-workspaces`](../list-workspaces/spec.md) — orchestrated workspace source for fallback search
+- [`core:spec-repository-port`](../spec-repository-port/spec.md)
+- [`core:list-specs`](../list-specs/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:list-workspaces`](../list-workspaces/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

@@ -100,3 +100,19 @@
 - **GIVEN** every artifact is effectively `complete` or `skipped`
 - **WHEN** `GetArtifactInstruction.execute` is called without `artifactId`
 - **THEN** `ArtifactNotFoundError` is thrown
+
+### Requirement: Config-based factory delegates through resolveGetArtifactInstructionDeps
+
+#### Scenario: createGetArtifactInstruction config form derives GetArtifactInstructionDeps through resolveGetArtifactInstructionDeps
+
+- **WHEN** `createGetArtifactInstruction(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `GetArtifactInstructionDeps` through `resolveGetArtifactInstructionDeps(resolver)`
+- **AND** `resolveGetArtifactInstructionDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `templates: TemplateExpander`
+- `lifecycle: LifecycleEngine`
+- **AND** the factory delegates to canonical `createGetArtifactInstruction(deps)`

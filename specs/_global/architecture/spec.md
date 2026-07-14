@@ -44,11 +44,13 @@ Dependencies are wired manually at the application entry point of each package. 
 
 Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:
 
-- **Kernel** — `createKernel(config: SpecdConfig)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.
+- **Kernel** — `createKernel(config: SpecdConfig, options?)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.
 - **Config loader port** — `createConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.
 - **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml`. Delivery mechanisms call port methods on the returned instance.
 
-Every capability mounted on `Kernel` MUST also be obtainable without `createKernel`: public `createX` use-case factories for each kernel-mounted use case, and public repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, `createSchemaRegistry`) for storage wired on the kernel. Repository factories accept an adapter id (for example `'fs'`; extensible to plugin-registered ids via `*StorageFactory` on `./extensions`). `createKernel` is the recommended full-bootstrap path, not the only path.
+Every capability mounted on `Kernel` MUST also be obtainable without `createKernel`. Public use-case factories MUST expose canonical dependency-based construction as `createX(deps)` and MAY expose a convenience bootstrap form as `createX(config, options?)`. The config-based form MUST delegate through one shared composition-resolver path that resolves normalized dependencies from config instead of reintroducing per-factory fs-specific wiring branches.
+
+`createKernel` is a convenience orchestration layer over the same reusable factory logic. `createKernelBuilder` is a convenience surface for full-kernel additive registration over that same resolver path; neither one defines a second source of truth for per-use-case composition semantics.
 
 Concrete adapter classes are never exported from public entry points. Delivery hosts (`@specd/cli`, `@specd/mcp`) that use both core and code-graph MUST import from `@specd/sdk` per the import policy in `sdk:composition`.
 

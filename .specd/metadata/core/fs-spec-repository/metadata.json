@@ -1,0 +1,78 @@
+{
+  "title": "FsSpecRepository",
+  "description": "`FsSpecRepository` is the filesystem-backed implementation of the `SpecRepository` port. It manages specifications and their associated metadata on the filesystem, validating configuration options strictly against its Zod schema.",
+  "dependsOn": ["default:_global/architecture", "core:composition"],
+  "context": [
+    "`FsSpecRepository` is the filesystem-backed implementation of the `SpecRepository` port. It manages specifications and their associated metadata on the filesystem, validating configuration options strictly against its Zod schema."
+  ],
+  "rules": [
+    {
+      "requirement": "Validate options at construction",
+      "rules": [
+        "`FsSpecRepository` SHALL accept:\n\n1. `context: SpecRepositoryConfig` containing workspace metadata (`workspace`, `ownership`, `isExternal`, `configPath`, `prefix`).\n2. `config: FsSpecRepositoryConfig` containing filesystem configuration options (`path`, `metadataPath`).\n\nIt MUST validate the `config` parameter using a Zod schema to ensure that only configuration properties originating from `specd.yaml` are validated, and that no workspace context properties are included in the configuration schema.\n\nThe configuration schema MUST support:\n\n- `path: string`\n- `metadataPath: string`\n\nThe constructor MUST verify that the physical directories for specs (`path`) and metadata (`metadataPath`) exist on disk. If either does not exist, it MUST throw a `StorageDirectoryNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "rules": [
+        "`FsSpecRepository` SHALL expose a creator function `createFsSpecStorageFactory()` that returns a `SpecStorageFactory` instance.\n\nThis factory SHALL construct and return `FsSpecRepository` instances when `create(context, config)` is called, forwarding the parameters without merging."
+      ]
+    }
+  ],
+  "constraints": [
+    "FsSpecRepository is infrastructure-level and lives in infrastructure/fs/",
+    "It MUST implement the SpecRepository abstract port class"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Validate options at construction",
+      "name": "Valid constructor options pass validation",
+      "given": [
+        "a valid configuration object with path and metadataPath",
+        "AND the spec and metadata directories exist on disk"
+      ],
+      "when": ["FsSpecRepository is constructed with valid context"],
+      "then": ["it successfully instantiates without error"]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Missing path in options throws error",
+      "given": ["a configuration object with a missing path"],
+      "when": ["FsSpecRepository is constructed"],
+      "then": [
+        "Zod validation throws a validation error identifying the missing configuration field"
+      ]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Non-existent spec directory throws error",
+      "given": [
+        "a valid configuration object with path",
+        "AND the spec directory does not exist on disk"
+      ],
+      "when": ["FsSpecRepository is constructed"],
+      "then": ["it throws a StorageDirectoryNotFoundError indicating the directory does not exist"]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "name": "Factory builds repository correctly",
+      "given": ["a SpecStorageFactory created by createFsSpecStorageFactory()"],
+      "when": ["create is invoked with valid repository context and filesystem options"],
+      "then": ["it returns an instance of FsSpecRepository configured with those options"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:fs-spec-repository",
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "FsSpecRepository"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e90ae02a75a0a8c76a1729def5deb51439235eadb252458821dc5cb943d0c1dc",
+    "verify.md": "sha256:ba5829adccb893f012dca05cb895a03c637ad039d46cf76c031f5dc6dd898160"
+  },
+  "generatedBy": "core"
+}

@@ -1,0 +1,78 @@
+{
+  "title": "FsArchiveRepository",
+  "description": "`FsArchiveRepository` is the filesystem-backed implementation of the `ArchiveRepository` port. It manages archived changes, validating configuration options strictly against its Zod schema while receiving runtime dependencies (like paths of active changes and drafts) via its `context: ArchiveRepositoryConfig` parameter.",
+  "dependsOn": ["default:_global/architecture", "core:composition"],
+  "context": [
+    "`FsArchiveRepository` is the filesystem-backed implementation of the `ArchiveRepository` port. It manages archived changes, validating configuration options strictly against its Zod schema while receiving runtime dependencies (like paths of active changes and drafts) via its `context: ArchiveRepositoryConfig` parameter."
+  ],
+  "rules": [
+    {
+      "requirement": "Validate options at construction",
+      "rules": [
+        "`FsArchiveRepository` SHALL accept:\n\n1. `context: ArchiveRepositoryConfig` containing workspace metadata (`workspace`, `ownership`, `isExternal`, `configPath`) and core runtime dependencies (`changesPath`, `draftsPath`).\n2. `config: FsArchiveRepositoryConfig` containing filesystem configuration options (`path`, `pattern`).\n\nIt MUST validate the `config` parameter using a Zod schema to ensure that only configuration properties originating from `specd.yaml` are validated, and that no runtime dependencies or workspace context properties are included in the configuration schema.\n\nThe configuration schema MUST support:\n\n- `path: string`\n- `pattern?: string`\n\nThe constructor MUST verify that the physical directories for the archive (`path`), active changes (`context.changesPath`), and drafts (`context.draftsPath`) exist on disk. If any of these paths do not exist, it MUST throw a `StorageDirectoryNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "rules": [
+        "`FsArchiveRepository` SHALL expose a creator function `createFsArchiveStorageFactory()` that returns an `ArchiveStorageFactory` instance.\n\nThis factory SHALL construct and return `FsArchiveRepository` instances when `create(context, config)` is called, forwarding the parameters without merging."
+      ]
+    }
+  ],
+  "constraints": [
+    "FsArchiveRepository is infrastructure-level and lives in infrastructure/fs/",
+    "It MUST implement the ArchiveRepository abstract port class"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Validate options at construction",
+      "name": "Valid constructor options pass validation",
+      "given": [
+        "a valid configuration object with path and pattern",
+        "AND the archive, active changes, and drafts directories exist on disk"
+      ],
+      "when": ["FsArchiveRepository is constructed with valid context and config options"],
+      "then": ["it successfully instantiates without error"]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Missing path in options throws error",
+      "given": ["a configuration object with a missing path"],
+      "when": ["FsArchiveRepository is constructed"],
+      "then": [
+        "Zod validation throws a validation error identifying the missing configuration field"
+      ]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Non-existent archive directory throws error",
+      "given": [
+        "a valid configuration object with path",
+        "AND the archive directory does not exist on disk"
+      ],
+      "when": ["FsArchiveRepository is constructed"],
+      "then": ["it throws a StorageDirectoryNotFoundError indicating the directory does not exist"]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "name": "Factory builds repository correctly",
+      "given": ["a ArchiveStorageFactory created by createFsArchiveStorageFactory()"],
+      "when": ["create is invoked with valid repository context and filesystem options"],
+      "then": ["it returns an instance of FsArchiveRepository configured with those options"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:fs-archive-repository",
+        "file": "core:src/infrastructure/fs/archive-repository.ts",
+        "symbol": "FsArchiveRepository"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:2880009814d405e47b2c6d8aa4b48fcf78917162c84927d0a443f0bc1b7e03ae",
+    "verify.md": "sha256:06b20e1e3e34a993c2f5e48c3ef2b9b5c3153ff139fa5ffffb94c4d8339d8e9c"
+  },
+  "generatedBy": "core"
+}

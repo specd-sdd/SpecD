@@ -1,93 +1,102 @@
-import * as path from 'node:path'
-import { GetSpecOutline } from '../../application/use-cases/get-spec-outline.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { createSpecRepository } from '../spec-repository.js'
-import { createSchemaRepositoriesForConfig } from '../schema-resolution.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
+import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
-import { createArtifactParserRegistry } from '../../infrastructure/artifact-parser/registry.js'
-import { createResolveSchema } from './resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
+import { GetSpecOutline } from '../../application/use-cases/get-spec-outline.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Filesystem adapter options for `createGetSpecOutline(options)`. */
-export interface FsGetSpecOutlineOptions {
-  readonly specRepositories: ReadonlyMap<string, SpecRepository>
-  readonly nodeModulesPaths: readonly string[]
-  readonly configDir: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
+/**
+ * Explicit dependencies for {@link createGetSpecOutline}.
+ */
+export interface GetSpecOutlineDeps {
+  readonly specs: ReadonlyMap<string, SpecRepository>
+  readonly schemaProvider: SchemaProvider
+  readonly parsers: ArtifactParserRegistry
 }
 
 /**
- * Constructs a `GetSpecOutline` use case with full project config.
+ * Resolves `GetSpecOutline` dependencies from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `GetSpecOutline`
+ */
+export function resolveGetSpecOutlineDeps(resolver: CompositionResolver): GetSpecOutlineDeps {
+  return {
+    specs: resolver.getSpecRepositories(),
+    schemaProvider: resolver.getSchemaProvider(),
+    parsers: resolver.getArtifactParserRegistry(),
+  }
+}
+
+/**
+ * Constructs `GetSpecOutline` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createGetSpecOutline(deps: GetSpecOutlineDeps): GetSpecOutline
+/**
+ * Constructs `GetSpecOutline` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @param kernelOpts - Optional kernel overrides for schema resolution
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetSpecOutline(
   config: SpecdConfig,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  options?: CompositionResolutionOptions,
 ): GetSpecOutline
 /**
- * Constructs a `GetSpecOutline` use case with explicit adapter options.
+ * Constructs `GetSpecOutline` from explicit deps or config bootstrap.
  *
- * @param options - Spec repositories and schema resolution paths
- * @returns The pre-wired use case instance
- */
-export function createGetSpecOutline(options: FsGetSpecOutlineOptions): GetSpecOutline
-/**
- * Constructs a `GetSpecOutline` instance wired with filesystem adapters.
- *
- * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
- * @param kernelOpts - Optional kernel options; only used with `SpecdConfig`
- * @param kernelOpts.extraNodeModulesPaths - Additional node_modules paths for schema resolution
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createGetSpecOutline(
-  configOrOptions: SpecdConfig | FsGetSpecOutlineOptions,
-  kernelOpts?: { extraNodeModulesPaths?: readonly string[] },
+  depsOrConfig: GetSpecOutlineDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): GetSpecOutline {
-  if (isSpecdConfig(configOrOptions)) {
-    const config = configOrOptions
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    return createGetSpecOutline({
-      specRepositories: specRepos,
-      nodeModulesPaths: [
-        path.join(config.projectRoot, 'node_modules'),
-        ...(kernelOpts?.extraNodeModulesPaths ?? []),
-      ],
-      configDir: config.projectRoot,
-      schemaRef: config.schemaRef,
-      schemaRepositories: createSchemaRepositoriesForConfig(config),
-    })
+  const normalized = normalizeCompositionFactoryArgs(
+    'createGetSpecOutline',
+    depsOrConfig,
+    options,
+    isGetSpecOutlineDeps,
+  )
+  return createGetSpecOutlineFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `GetSpecOutline` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createGetSpecOutlineFromNormalized(
+  input: FactoryInput<GetSpecOutlineDeps, CompositionResolutionOptions>,
+): GetSpecOutline {
+  if (input.kind === 'deps') {
+    const { specs, schemaProvider, parsers } = input.deps
+    return new GetSpecOutline(specs, schemaProvider, parsers)
   }
-  const resolveSchema = createResolveSchema({
-    nodeModulesPaths: configOrOptions.nodeModulesPaths,
-    configDir: configOrOptions.configDir,
-    schemaRef: configOrOptions.schemaRef,
-    schemaRepositories: configOrOptions.schemaRepositories,
-  })
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const parsers = createArtifactParserRegistry()
-  return new GetSpecOutline(configOrOptions.specRepositories, schemaProvider, parsers)
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createGetSpecOutline(resolveGetSpecOutlineDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `GetSpecOutlineDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isGetSpecOutlineDeps(
+  value: GetSpecOutlineDeps | SpecdConfig,
+): value is GetSpecOutlineDeps {
+  return 'specs' in value && 'schemaProvider' in value && 'parsers' in value
 }

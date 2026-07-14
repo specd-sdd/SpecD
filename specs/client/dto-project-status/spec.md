@@ -16,7 +16,11 @@ The TypeScript `ProjectStatusDto` / embedded `graph` summary in `@specd/client` 
 
 ### Requirement: types are shared or generated from API schemas
 
-DTO types MUST be imported from a shared package or generated from the same schema source used by API presenters and OpenAPI.
+`@specd/client` SHALL own the canonical `ProjectStatusDto` type and SHALL export a pure mapper from structural project-status input to that DTO.
+
+The mapper input MUST describe only serializable status, graph-health, approval, and auth data. It MUST NOT import or accept `@specd/core` or `@specd/sdk` entities as part of its public contract.
+
+API HTTP presentation and desktop IPC presentation MUST use this mapper so both adapters preserve the same fields and optional-property semantics.
 
 ## Constraints
 

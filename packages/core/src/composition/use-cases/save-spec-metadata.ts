@@ -1,59 +1,93 @@
-import * as path from 'node:path'
-import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
-import { createSpecRepository } from '../spec-repository.js'
+import { SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
-/** Filesystem adapter options for `createSaveSpecMetadata(options)`. */
-export interface FsSaveSpecMetadataOptions {
+/**
+ * Explicit dependencies for {@link createSaveSpecMetadata}.
+ */
+export interface SaveSpecMetadataDeps {
+  /** Pre-built spec repositories keyed by workspace. */
   readonly specRepositories: ReadonlyMap<string, SpecRepository>
 }
 
 /**
- * Constructs a `SaveSpecMetadata` use case with full project config.
+ * Resolves {@link SaveSpecMetadataDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `SaveSpecMetadata`
+ */
+export function resolveSaveSpecMetadataDeps(resolver: CompositionResolver): SaveSpecMetadataDeps {
+  return { specRepositories: resolver.getSpecRepositories() }
+}
+
+/**
+ * Constructs a `SaveSpecMetadata` use case from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createSaveSpecMetadata(deps: SaveSpecMetadataDeps): SaveSpecMetadata
+/**
+ * Constructs a `SaveSpecMetadata` use case from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createSaveSpecMetadata(config: SpecdConfig): SaveSpecMetadata
-/**
- * Constructs a `SaveSpecMetadata` use case with explicit adapter options.
- *
- * @param options - Pre-built spec repositories keyed by workspace
- * @returns The pre-wired use case instance
- */
-export function createSaveSpecMetadata(options: FsSaveSpecMetadataOptions): SaveSpecMetadata
-/**
- * Constructs a `SaveSpecMetadata` instance wired with filesystem adapters.
- *
- * @param configOrOptions - A fully-resolved `SpecdConfig` or explicit adapter options
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createSaveSpecMetadata(
-  configOrOptions: SpecdConfig | FsSaveSpecMetadataOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): SaveSpecMetadata
+/**
+ * Constructs a `SaveSpecMetadata` instance from explicit deps or config bootstrap.
+ *
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations for config-based bootstrap
+ * @returns The pre-wired use case instance
+ */
+export function createSaveSpecMetadata(
+  depsOrConfig: SaveSpecMetadataDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): SaveSpecMetadata {
-  if (isSpecdConfig(configOrOptions)) {
-    const config = configOrOptions
-    const specRepos = new Map(
-      config.workspaces.map((ws) => [
-        ws.name,
-        createSpecRepository(
-          'fs',
-          {
-            workspace: ws.name,
-            ownership: ws.ownership,
-            isExternal: ws.isExternal,
-            configPath: config.configPath,
-          },
-          {
-            specsPath: ws.specsPath,
-            metadataPath: path.join(ws.specsPath, '..', '.specd', 'metadata'),
-            ...(ws.prefix !== undefined ? { prefix: ws.prefix } : {}),
-          },
-        ),
-      ]),
-    )
-    return new SaveSpecMetadata(specRepos)
+  const normalized = normalizeCompositionFactoryArgs(
+    'createSaveSpecMetadata',
+    depsOrConfig,
+    options,
+    isSaveSpecMetadataDeps,
+  )
+  return createSaveSpecMetadataFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `SaveSpecMetadata` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createSaveSpecMetadataFromNormalized(
+  input: FactoryInput<SaveSpecMetadataDeps, CompositionResolutionOptions>,
+): SaveSpecMetadata {
+  if (input.kind === 'deps') {
+    return new SaveSpecMetadata(input.deps.specRepositories)
   }
-  return new SaveSpecMetadata(configOrOptions.specRepositories)
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createSaveSpecMetadata(resolveSaveSpecMetadataDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `SaveSpecMetadataDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isSaveSpecMetadataDeps(
+  value: SaveSpecMetadataDeps | SpecdConfig,
+): value is SaveSpecMetadataDeps {
+  return 'specRepositories' in value
 }

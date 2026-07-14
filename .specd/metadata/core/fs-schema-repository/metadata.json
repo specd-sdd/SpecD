@@ -1,0 +1,78 @@
+{
+  "title": "FsSchemaRepository",
+  "description": "`FsSchemaRepository` is the filesystem-backed implementation of the `SchemaRepository` port. It manages schemas on the filesystem, validating configuration options strictly against its Zod schema.",
+  "dependsOn": ["default:_global/architecture", "core:composition"],
+  "context": [
+    "`FsSchemaRepository` is the filesystem-backed implementation of the `SchemaRepository` port. It manages schemas on the filesystem, validating configuration options strictly against its Zod schema."
+  ],
+  "rules": [
+    {
+      "requirement": "Validate options at construction",
+      "rules": [
+        "`FsSchemaRepository` SHALL accept:\n\n1. `context: RepositoryConfig` containing workspace metadata (`workspace`, `ownership`, `isExternal`, `configPath`).\n2. `config: FsSchemaRepositoryConfig` containing filesystem configuration options (`path`).\n\nIt MUST validate the `config` parameter using a Zod schema to ensure that only configuration properties originating from `specd.yaml` are validated, and that no workspace context properties are included in the configuration schema.\n\nThe configuration schema MUST support:\n\n- `path: string`\n\nThe constructor MUST verify that the physical directory for schemas (`path`) exists on disk. If it does not exist, it MUST throw a `StorageDirectoryNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "rules": [
+        "`FsSchemaRepository` SHALL expose a creator function `createFsSchemaStorageFactory()` that returns a `SchemaStorageFactory` instance.\n\nThis factory SHALL construct and return `FsSchemaRepository` instances when `create(context, config)` is called, forwarding the parameters without merging."
+      ]
+    }
+  ],
+  "constraints": [
+    "FsSchemaRepository is infrastructure-level and lives in infrastructure/fs/",
+    "It MUST implement the SchemaRepository abstract port class"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Validate options at construction",
+      "name": "Valid constructor options pass validation",
+      "given": [
+        "a valid configuration object with path",
+        "AND the schema directory exists on disk"
+      ],
+      "when": ["FsSchemaRepository is constructed with valid context"],
+      "then": ["it successfully instantiates without error"]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Missing path in options throws error",
+      "given": ["a configuration object with a missing path"],
+      "when": ["FsSchemaRepository is constructed"],
+      "then": [
+        "Zod validation throws a validation error identifying the missing configuration field"
+      ]
+    },
+    {
+      "requirement": "Validate options at construction",
+      "name": "Non-existent schema directory throws error",
+      "given": [
+        "a valid configuration object with path",
+        "AND the schema directory does not exist on disk"
+      ],
+      "when": ["FsSchemaRepository is constructed"],
+      "then": ["it throws a StorageDirectoryNotFoundError indicating the directory does not exist"]
+    },
+    {
+      "requirement": "Storage factory registration",
+      "name": "Factory builds repository correctly",
+      "given": ["a SchemaStorageFactory created by createFsSchemaStorageFactory()"],
+      "when": ["create is invoked with valid repository context and filesystem options"],
+      "then": ["it returns an instance of FsSchemaRepository configured with those options"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:fs-schema-repository",
+        "file": "core:src/infrastructure/fs/schema-repository.ts",
+        "symbol": "FsSchemaRepository"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:bcd5b03e6f18852009823bb9e4d7d3c203da6f932770955c6d89cedd57dd5b78",
+    "verify.md": "sha256:2140d2ca411963720d993647df23d012f4e85cf5bc1424fe0a33f901c15b142b"
+  },
+  "generatedBy": "core"
+}

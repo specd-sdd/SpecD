@@ -13,9 +13,6 @@
     {
       "file": "api:src/delivery/http/handlers/handler-project.ts",
       "symbols": ["registerProjectRoutes"]
-    },
-    {
-      "file": "api:src/delivery/http/handlers/handler-project-logs.ts"
     }
   ]
 }

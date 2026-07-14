@@ -119,7 +119,26 @@
       "then": ["errors or skips are explicit and documented"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:validate-change-batch",
+        "file": "core:src/composition/use-cases/index.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:validate-change-batch",
+        "file": "core:src/composition/use-cases/validate-change-batch.ts",
+        "symbol": "createValidateChangeBatch"
+      },
+      {
+        "specId": "core:validate-change-batch",
+        "file": "core:src/composition/use-cases/validate-change-batch.ts",
+        "symbol": "resolveValidateChangeBatchDeps"
+      }
+    ]
+  },
   "contentHashes": {
     "spec.md": "sha256:ae41e9457b3caf6d3081aedb08408a78e122d4d9a92c3364158f6b684300adb5",
     "verify.md": "sha256:b529bdf935c780786de04e26a06940d952c24544c9b2a6adc962da1cdef286ad"

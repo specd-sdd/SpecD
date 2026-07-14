@@ -5,7 +5,8 @@
     "core:change",
     "core:implementation-detector-port",
     "core:storage",
-    "core:archive-repository-port"
+    "core:archive-repository-port",
+    "core:composition-resolver"
   ],
   "context": [
     "Delivery adapters need a single application-layer operation to refresh a change's tracked implementation files from an `ImplementationDetector` without duplicating detection merge logic across hosts. `RefreshImplementationTracking` runs targeted VCS-backed detection when a change has historically entered `implementing`, identifies files that have been physically removed from disk, handles the re-appearance of previously removed files, merges candidate paths into `trackedImplementationFiles`, and persists the result.\n\n`GetStatus` and `TransitionChange` invoke this use case by default for active changes. Hosts MAY still call `RefreshImplementationTracking` explicitly when they need a standalone refresh. Other read-only use cases such as `CompileContext` project persisted state only unless a future change adds orchestration there."
@@ -81,6 +82,12 @@
       "requirement": "Delivery-agnostic boundary",
       "rules": [
         "This use case MUST NOT reference CLI commands, MCP servers, filesystem watchers, or other delivery mechanisms.\n\nIt exposes only the VCS-backed refresh contract. Other adapters MAY update tracked files through different strategies without calling this use case."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveRefreshImplementationTrackingDeps",
+      "rules": [
+        "The config-based `createRefreshImplementationTracking(config, options?)` form MUST derive `RefreshImplementationTrackingDeps` through `resolveRefreshImplementationTrackingDeps(resolver)` and then delegate to canonical `createRefreshImplementationTracking(deps)`.\n\n`resolveRefreshImplementationTrackingDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `archives: ArchiveRepository`\n- `implementationDetector: ImplementationDetector`\n- `files: FileReader`\n- `projectRoot: string`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -229,20 +236,30 @@
       "then": [
         "its requirements do not reference CLI commands, MCP servers, or filesystem watchers"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveRefreshImplementationTrackingDeps",
+      "name": "createRefreshImplementationTracking config form derives RefreshImplementationTrackingDeps through resolveRefreshImplementationTrackingDeps",
+      "when": ["createRefreshImplementationTracking(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives RefreshImplementationTrackingDeps through resolveRefreshImplementationTrackingDeps(resolver)",
+        "AND resolveRefreshImplementationTrackingDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createRefreshImplementationTracking(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:refresh-implementation-tracking",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
+        "file": "core:src/composition/use-cases/refresh-implementation-tracking.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:cf52142a918f3e30f83c4dd960532345ee8e5ea9f0fedfc7e4ae984f5597a8bb",
-    "verify.md": "sha256:921fb6ddff3a9b05581fbf5926dadbda6d9eff3d663a68a2045a73a1a644f358"
+    "spec.md": "sha256:686b760faca66b59a7fa0023327d975f519cc0b26c7b7cb3dac39594257a042c",
+    "verify.md": "sha256:e5c2ad4cc7f38b82abe8b3ca46ac4e709522f847f5563496a787e400d9264f6d"
   },
   "generatedBy": "core"
 }

@@ -1,7 +1,12 @@
 {
   "title": "GetDraft",
   "description": "Callers need to load a single drafted change by name for inspection without receiving a mutable aggregate or searching the active working set. `GetDraft` is the application use case that resolves a name in `drafts/` and returns a `DraftedChangeView`.",
-  "dependsOn": ["core:drafted-change-view", "core:change-repository-port", "core:change"],
+  "dependsOn": [
+    "core:drafted-change-view",
+    "core:change-repository-port",
+    "core:change",
+    "core:composition-resolver"
+  ],
   "context": [
     "Callers need to load a single drafted change by name for inspection without receiving a mutable aggregate or searching the active working set. `GetDraft` is the application use case that resolves a name in `drafts/` and returns a `DraftedChangeView`."
   ],
@@ -27,6 +32,12 @@
     {
       "requirement": "Dependencies",
       "rules": ["`GetDraft` depends on `ChangeRepository` injected via constructor."]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetDraftDeps",
+      "rules": [
+        "The config-based `createGetDraft(config, options?)` form MUST derive `GetDraftDeps` through `resolveGetDraftDeps(resolver)` and then delegate to canonical `createGetDraft(deps)`.\n\n`resolveGetDraftDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
     }
   ],
   "constraints": [
@@ -141,25 +152,30 @@
       "name": "Does not require SchemaProvider",
       "when": ["GetDraft.execute runs"],
       "then": ["SchemaProvider is not consulted"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetDraftDeps",
+      "name": "createGetDraft config form derives GetDraftDeps through resolveGetDraftDeps",
+      "when": ["createGetDraft(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives GetDraftDeps through resolveGetDraftDeps(resolver)",
+        "AND resolveGetDraftDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createGetDraft(deps)"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "core:get-draft",
-        "file": "core:src/application/use-cases/get-draft.ts",
-        "symbol": "GetDraft"
-      },
-      {
-        "specId": "core:get-draft",
-        "file": "core:src/composition/kernel.ts",
-        "symbol": "createKernel"
+        "file": "core:src/composition/use-cases/get-draft.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:97166bdca6620f7fedbaf7a3e0a255c81128709949520eb6c15f6ee15a91e039",
-    "verify.md": "sha256:8c78c4459b040818119dc4c3b253fb8bc51dafa7ee5c230393899a53ae84f11a"
+    "spec.md": "sha256:8b68e7d5b09e8c9b621e2d28cdd066fc0c64f680d637f6f648f3f03de87cb7d7",
+    "verify.md": "sha256:ade81de4afecfac151a1425f3c22592ad4f7baf216d7b374a920caaaddf4ca83"
   },
   "generatedBy": "core"
 }

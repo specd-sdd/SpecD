@@ -131,3 +131,18 @@
 
 - **WHEN** the `core:refresh-implementation-tracking` spec is reviewed
 - **THEN** its requirements do not reference CLI commands, MCP servers, or filesystem watchers
+
+### Requirement: Config-based factory delegates through resolveRefreshImplementationTrackingDeps
+
+#### Scenario: createRefreshImplementationTracking config form derives RefreshImplementationTrackingDeps through resolveRefreshImplementationTrackingDeps
+
+- **WHEN** `createRefreshImplementationTracking(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `RefreshImplementationTrackingDeps` through `resolveRefreshImplementationTrackingDeps(resolver)`
+- **AND** `resolveRefreshImplementationTrackingDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `archives: ArchiveRepository`
+- `implementationDetector: ImplementationDetector`
+- `files: FileReader`
+- `projectRoot: string`
+- **AND** the factory delegates to canonical `createRefreshImplementationTracking(deps)`

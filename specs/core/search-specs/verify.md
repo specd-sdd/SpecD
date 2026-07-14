@@ -74,3 +74,16 @@
 - **GIVEN** no spec in any workspace matches the query
 - **WHEN** `execute("zzzznonexistent")` is called
 - **THEN** the result is an empty array (not an error)
+
+### Requirement: Config-based factory delegates through resolveSearchSpecsDeps
+
+#### Scenario: createSearchSpecs config form derives SearchSpecsDeps through resolveSearchSpecsDeps
+
+- **WHEN** `createSearchSpecs(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)`
+- **AND** `resolveSearchSpecsDeps(resolver)` resolves:
+- `listWorkspaces: ListWorkspaces`
+- `hasher: ContentHasher`
+- `yaml: YamlSerializer`
+- **AND** the factory delegates to canonical `createSearchSpecs(deps)`

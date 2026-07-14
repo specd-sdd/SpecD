@@ -1,0 +1,17 @@
+- op: added
+  path: [sections, -1]
+  value:
+    title: 'Scenario: discoverFiles uses adapter-resolved vcsRoot'
+    content: |
+      - **WHEN** the indexer invokes `discoverFiles()` for a workspace or project-global root
+      - **THEN** it passes `vcsRoot` that was resolved upstream from `VcsAdapter.rootDir()`
+      - **AND** `discoverFiles()` does not perform repository-marker probing on its own
+- op: added
+  path: [sections, -1]
+  value:
+    title: 'Scenario: indexer passes null vcsRoot outside VCS'
+    content: |
+      - **GIVEN** upstream VCS resolution returns no repository root
+      - **WHEN** the indexer invokes `discoverFiles()`
+      - **THEN** it passes `vcsRoot: null` explicitly
+      - **AND** discovery still does not perform repository-marker probing

@@ -1,0 +1,28 @@
+- op: added
+  description: 'Define the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveListArchivedDeps
+
+    The config-based `createListArchived(config, options?)` form MUST derive `ListArchivedDeps` through `resolveListArchivedDeps(resolver)` and then delegate to canonical `createListArchived(deps)`.
+
+    `resolveListArchivedDeps(resolver)` MUST resolve:
+
+    - `archive: ArchiveRepository`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: 'Preserve existing spec dependencies while adding composition-resolver-backed composition contract dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:archive-change`](../archive-change/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:kernel`](../kernel/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

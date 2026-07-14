@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:hook-execution-model",
+    "core:schema-format",
+    "core:config",
+    "core:change",
+    "core:template-variables",
+    "core:archive-repository-port",
+    "core:composition-resolver"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/get-hook-instructions.ts"
+    }
+  ]
+}

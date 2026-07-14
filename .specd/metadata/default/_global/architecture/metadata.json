@@ -56,7 +56,7 @@
     {
       "requirement": "Composition layer for use-case wiring",
       "rules": [
-        "Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:\n\n- **Kernel** — `createKernel(config: SpecdConfig)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.\n- **Config loader port** — `createConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.\n- **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml`. Delivery mechanisms call port methods on the returned instance.\n\nEvery capability mounted on `Kernel` MUST also be obtainable without `createKernel`: public `createX` use-case factories for each kernel-mounted use case, and public repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, `createSchemaRegistry`) for storage wired on the kernel. Repository factories accept an adapter id (for example `'fs'`; extensible to plugin-registered ids via `*StorageFactory` on `./extensions`). `createKernel` is the recommended full-bootstrap path, not the only path.\n\nConcrete adapter classes are never exported from public entry points. Delivery hosts (`@specd/cli`, `@specd/mcp`) that use both core and code-graph MUST import from `@specd/sdk` per the import policy in `sdk:composition`."
+        "Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:\n\n- **Kernel** — `createKernel(config: SpecdConfig, options?)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.\n- **Config loader port** — `createConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.\n- **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml`. Delivery mechanisms call port methods on the returned instance.\n\nEvery capability mounted on `Kernel` MUST also be obtainable without `createKernel`. Public use-case factories MUST expose canonical dependency-based construction as `createX(deps)` and MAY expose a convenience bootstrap form as `createX(config, options?)`. The config-based form MUST delegate through one shared composition-resolver path that resolves normalized dependencies from config instead of reintroducing per-factory fs-specific wiring branches.\n\n`createKernel` is a convenience orchestration layer over the same reusable factory logic. `createKernelBuilder` is a convenience surface for full-kernel additive registration over that same resolver path; neither one defines a second source of truth for per-use-case composition semantics.\n\nConcrete adapter classes are never exported from public entry points. Delivery hosts (`@specd/cli`, `@specd/mcp`) that use both core and code-graph MUST import from `@specd/sdk` per the import policy in `sdk:composition`."
       ]
     },
     {
@@ -229,39 +229,19 @@
     },
     {
       "requirement": "Composition layer for use-case wiring",
-      "name": "Dependency injection is manual and explicit",
-      "when": ["a package wires its use cases"],
+      "name": "Config-based public factory delegates through shared resolver path",
+      "when": ["a kernel-mounted public createX(config, options?) factory is implemented"],
       "then": [
-        "it must do so in a dedicated composition layer",
-        "AND every dependency must be passed explicitly via constructor without using a container"
+        "it resolves dependencies through the shared composition-resolver path",
+        "AND it delegates to canonical createX(deps) construction"
       ]
     },
     {
       "requirement": "Composition layer for use-case wiring",
-      "name": "Composition is the only layer importing infrastructure",
-      "when": ["checking imports in the composition/ directory"],
+      "name": "Kernel and builder do not define separate per-use-case semantics",
+      "when": ["createKernel(...) or createKernelBuilder() assembles kernel-mounted use cases"],
       "then": [
-        "it may import from infrastructure/",
-        "AND no other layer (domain/, application/) may contain such imports"
-      ]
-    },
-    {
-      "requirement": "Composition layer for use-case wiring",
-      "name": "Delivery uses createConfigWriter for yaml mutation",
-      "when": ["a delivery mechanism in @specd/cli mutates specd.yaml"],
-      "then": [
-        "it obtains a ConfigWriter via createConfigWriter() from @specd/core",
-        "AND it does not import FsConfigWriter or construct use cases InitProject, AddPlugin, or RemovePlugin"
-      ]
-    },
-    {
-      "requirement": "Composition layer for use-case wiring",
-      "name": "Kernel use cases receive config at construction",
-      "given": ["a delivery mechanism has called createKernel(config) with a resolved SpecdConfig"],
-      "when": ["it invokes a kernel use case other than getConfig"],
-      "then": [
-        "it does not pass config or config-derived approval/plugin subtrees in the execute() input",
-        "AND it reads config from kernel.project.getConfig.execute() when a fresh snapshot is needed"
+        "both reuse the same underlying factory assembly semantics as standalone createX(...) factories"
       ]
     },
     {
@@ -299,10 +279,21 @@
     }
   ],
   "dependsOn": [],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "default:_global/architecture",
+        "file": "default:packages/core/src/composition/composition-resolver.ts"
+      },
+      {
+        "specId": "default:_global/architecture",
+        "file": "default:packages/core/src/composition/kernel.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:1e58ce2a5b1b3424684b8d6ee4a0c2848c41ac467a0f6e324c51037b701dc9cd",
-    "verify.md": "sha256:1041babb977953d8fadc68cf2489a9175a32300c88d744949b5273c426c4ae8e"
+    "spec.md": "sha256:b8c47e23fa35e458966a6e48f73fab146b486aa2066acd628c6eecebd87f4d8e",
+    "verify.md": "sha256:7533bac95d85ea501e5d586fbe87f0e25ba33281f57b0e94f7c58a8ca4618bd2"
   },
   "generatedBy": "core"
 }

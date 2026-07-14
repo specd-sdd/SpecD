@@ -211,3 +211,17 @@
 
 - **WHEN** `EditChange` is instantiated
 - **THEN** it requires a `ReadonlyMap<string, SpecRepository>` for spec existence checks and persisted dependency seeding
+
+### Requirement: Config-based factory delegates through resolveEditChangeDeps
+
+#### Scenario: createEditChange config form derives EditChangeDeps through resolveEditChangeDeps
+
+- **WHEN** `createEditChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `EditChangeDeps` through `resolveEditChangeDeps(resolver)`
+- **AND** `resolveEditChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `listWorkspaces: ListWorkspaces`
+- `actor: ActorResolver`
+- `schemaProvider: SchemaProvider`
+- **AND** the factory delegates to canonical `createEditChange(deps)`

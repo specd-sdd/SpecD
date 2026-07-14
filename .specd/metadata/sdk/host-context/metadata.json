@@ -21,7 +21,7 @@
     {
       "requirement": "openSpecdHost",
       "rules": [
-        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Use `createConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`\n2. Await `createSdkContext(config, input.kernelOptions)`\n3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\n`OpenSpecdHostInput` MAY include optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
+        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Use `createDefaultConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`\n2. Await `createSdkContext(config, input.kernelOptions)`\n3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\n`OpenSpecdHostInput` MAY include optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
       ]
     },
     {
@@ -33,7 +33,7 @@
     {
       "requirement": "Studio host bootstrap",
       "rules": [
-        "`@specd/api` and the Electron desktop main process MUST obtain their process-scoped kernel and `createGraphProvider` factory through `createSdkContext` (or `openSpecdHost`) from `@specd/sdk`.\n\nAPI server state (`ApiServerState`) and per-request API context (`ApiContext`) MAY extend `SdkHostContext` with host-specific fields (for example resolved `SpecdConfig`, auth type, and request actor) but MUST NOT construct a parallel kernel or graph provider outside the SDK bootstrap path."
+        "Delivery hosts that bootstrap project-local kernels SHALL compose through\n`createSdkContext` instead of calling `createKernel` from `@specd/core`\ndirectly.\n\nAt minimum:\n\n- `createApiServer` MUST create one SDK host context per process bootstrap and\n  derive request handling from that shared context\n- desktop main-process local project bootstrap MUST call `createSdkContext`\n  when opening a project and MUST NOT import `createKernel` directly for that\n  host path\n\nThis keeps API and desktop host wiring aligned on the same kernel plus\ngraph-provider composition contract."
       ]
     }
   ],
@@ -76,7 +76,7 @@
       "given": ["a valid specd.yaml in the current working directory"],
       "when": ["openSpecdHost() is called without configPath"],
       "then": [
-        "config is loaded via createConfigLoader() discovery mode",
+        "config is loaded via createDefaultConfigLoader() discovery mode",
         "AND configFilePath points to the discovered file"
       ]
     },
@@ -124,32 +124,12 @@
         "specId": "sdk:host-context",
         "file": "sdk:src/composition/host-context.ts",
         "symbol": "createSdkContext"
-      },
-      {
-        "specId": "sdk:host-context",
-        "file": "sdk:src/composition/host-context.ts",
-        "symbol": "SdkHostContext"
-      },
-      {
-        "specId": "sdk:host-context",
-        "file": "sdk:src/composition/host-context.ts",
-        "symbol": "OpenSpecdHostInput"
-      },
-      {
-        "specId": "sdk:host-context",
-        "file": "sdk:src/composition/host-context.ts",
-        "symbol": "OpenSpecdHostResult"
-      },
-      {
-        "specId": "sdk:host-context",
-        "file": "sdk:src/composition/host-context.ts",
-        "symbol": "openSpecdHost"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:fe53a95437603360c6da7d5659ade1001639a073eb535c5e635adf4f5c43df85",
-    "verify.md": "sha256:25b9675238b3d51b6d4e3c0165ab88ca6a7753428856c44010732772fa2add60"
+    "spec.md": "sha256:2e2a94e54e1163030b2e183901f5cb3b267df5ed018f5e0e9df612f1ea09de08",
+    "verify.md": "sha256:1059c051c91ee7b560061896e44c8593ff75997b258df20ce37bfd019aac1f02"
   },
   "generatedBy": "core"
 }

@@ -6,7 +6,8 @@
   "dependsOn": ["core:config"],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/index-options.ts"
+      "file": "code-graph:src/application/use-cases/index-project-graph.ts",
+      "symbols": ["indexProjectGraph"]
     }
   ]
 }

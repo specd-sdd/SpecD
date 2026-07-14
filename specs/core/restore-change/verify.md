@@ -68,3 +68,15 @@
 
 - **WHEN** `RestoreChange` is instantiated
 - **THEN** it requires an `ActorResolver` port in its constructor
+
+### Requirement: Config-based factory delegates through resolveRestoreChangeDeps
+
+#### Scenario: createRestoreChange config form derives RestoreChangeDeps through resolveRestoreChangeDeps
+
+- **WHEN** `createRestoreChange(config, options?)` is invoked
+- **THEN** it creates a composition resolver for that composition session
+- **AND** it derives `RestoreChangeDeps` through `resolveRestoreChangeDeps(resolver)`
+- **AND** `resolveRestoreChangeDeps(resolver)` resolves:
+- `changes: ChangeRepository`
+- `actor: ActorResolver`
+- **AND** the factory delegates to canonical `createRestoreChange(deps)`

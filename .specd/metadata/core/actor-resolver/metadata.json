@@ -7,9 +7,9 @@
   ],
   "rules": [
     {
-      "requirement": "Detection probes in priority order",
+      "requirement": "VCS adapter composition",
       "rules": [
-        "`createVcsActorResolver` MUST determine the provider to use based on the following precedence:\n\n1. **Forced Provider**: If `actorProvider` is configured, the factory MUST attempt to load that specific provider by name. If not found, it SHALL throw. If found, it MUST call `create()` on that provider, bypassing all other probes.\n2. **Auto-Detection**: If no forced provider is set, the factory MUST iterate through all registered `AutoDetectActorProvider` instances (e.g. git, hg, svn) in priority order and call `detect()`.\n\nThe first successful provider (manual or auto) determines the base resolver."
+        "`createVcsActorResolver` MUST receive a `VcsAdapter` instance (or resolve one using the active VCS factory) and return an `ActorResolver` wired to that adapter (e.g. `VcsActorResolver`). It SHALL NOT perform separate VCS detection."
       ]
     },
     {
@@ -21,7 +21,7 @@
     {
       "requirement": "Fallback to NullActorResolver",
       "rules": [
-        "When no VCS is detected (all probes fail), `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw."
+        "When the active or provided adapter is a `NullVcsAdapter`, `createVcsActorResolver` MUST return a `NullActorResolver`. It SHALL NOT throw."
       ]
     },
     {
@@ -50,34 +50,11 @@
   ],
   "scenarios": [
     {
-      "requirement": "Detection probes in priority order",
-      "name": "Git repository detected",
-      "given": ["actorProvider: \"git\" is configured", "AND the environment has an hg repository"],
-      "when": ["createVcsActorResolver() is called"],
-      "then": ["it returns the git resolver without probing for hg"]
-    },
-    {
-      "requirement": "Detection probes in priority order",
-      "name": "Mercurial repository detected",
-      "given": ["the target directory is inside an hg repository but not a git repository"],
-      "when": ["createVcsActorResolver(cwd) is called"],
-      "then": ["it returns an HgActorResolver", "AND the svn probe is never executed"]
-    },
-    {
-      "requirement": "Detection probes in priority order",
-      "name": "SVN working copy detected",
-      "given": [
-        "the target directory is inside an svn working copy but not a git or hg repository"
-      ],
-      "when": ["createVcsActorResolver(cwd) is called"],
-      "then": ["it returns an SvnActorResolver"]
-    },
-    {
-      "requirement": "Detection probes in priority order",
-      "name": "Git takes priority over hg",
-      "given": ["the target directory is inside both a git and hg repository"],
-      "when": ["createVcsActorResolver(cwd) is called"],
-      "then": ["it returns a GitActorResolver"]
+      "requirement": "VCS adapter composition",
+      "name": "Resolver constructed with VCS adapter",
+      "given": ["a valid VcsAdapter instance"],
+      "when": ["createVcsActorResolver(vcsAdapter) is called"],
+      "then": ["it returns an ActorResolver wired to that adapter"]
     },
     {
       "requirement": "External providers run before built-in probes",
@@ -107,10 +84,10 @@
     },
     {
       "requirement": "Fallback to NullActorResolver",
-      "name": "No VCS detected",
-      "given": ["the target directory is not inside any VCS repository"],
-      "when": ["createVcsActorResolver(cwd) is called"],
-      "then": ["it returns a NullActorResolver", "AND the call does not throw"]
+      "name": "NullVcsAdapter fallback",
+      "given": ["a NullVcsAdapter instance"],
+      "when": ["createVcsActorResolver(nullAdapter) is called"],
+      "then": ["it returns a NullActorResolver"]
     },
     {
       "requirement": "Optional cwd parameter",
@@ -140,9 +117,23 @@
       ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:actor-resolver",
+        "file": "core:src/composition/actor-resolver.ts",
+        "symbol": "createVcsActorResolver"
+      },
+      {
+        "specId": "core:actor-resolver",
+        "file": "core:src/composition/actor-resolver.ts",
+        "symbol": "createLazyVcsActorResolver"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:eae7a3dc3f0791d8c5834debe5b4049ee5d9efea5a8661006b858beeff33572f",
-    "verify.md": "sha256:be643fc5fa42d95c7cbdadcbf45332ab455a29ba0300e3bf71916029997703f2"
+    "spec.md": "sha256:e50056a0e8b785a8d19a7bdbfec30894a9588e8a5adf34ab99543694a7a7fafb",
+    "verify.md": "sha256:29bb522853cce2fda61acc6941aec95e531870d8979be2e29765394cdbe79a75"
   },
   "generatedBy": "core"
 }

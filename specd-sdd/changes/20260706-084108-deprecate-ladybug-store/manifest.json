@@ -1,0 +1,2300 @@
+{
+  "name": "deprecate-ladybug-store",
+  "createdAt": "2026-07-06T08:41:08.887Z",
+  "updatedAt": "2026-07-14T12:22:09.512Z",
+  "description": "Deprecate Ladybug graph store, implement Symbol.asyncDispose in CodeGraphProvider, and refactor hosts to use await using",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:ladybug-graph-store",
+    "code-graph:composition",
+    "sdk:with-open-graph-provider",
+    "sdk:composition",
+    "cli:graph-cli-context",
+    "sdk:build-project-status-snapshot",
+    "sdk:run-index-project-graph",
+    "cli:graph-stats",
+    "cli:graph-impact",
+    "cli:graph-hotspots",
+    "cli:graph-search",
+    "code-graph:sqlite-graph-store",
+    "plugin-manager:specd-plugin-type",
+    "core:config"
+  ],
+  "specDependsOn": {
+    "code-graph:ladybug-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:get-graph-health",
+      "code-graph:index-project-graph",
+      "code-graph:get-spec-coverage",
+      "code-graph:get-change-spec-coverage"
+    ],
+    "sdk:with-open-graph-provider": ["sdk:host-context", "code-graph:composition"],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context"
+    ],
+    "cli:graph-cli-context": [
+      "cli:host-context",
+      "cli:entrypoint",
+      "core:config",
+      "sdk:with-open-graph-provider",
+      "sdk:composition"
+    ],
+    "sdk:build-project-status-snapshot": [
+      "sdk:host-context",
+      "core:get-project-summary",
+      "code-graph:get-graph-health"
+    ],
+    "sdk:run-index-project-graph": [
+      "sdk:with-open-graph-provider",
+      "code-graph:index-project-graph",
+      "core:list-workspaces"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:staleness-detection",
+      "core:list-workspaces",
+      "code-graph:get-graph-health",
+      "sdk:with-open-graph-provider",
+      "sdk:host-context"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "cli:graph-cli-context",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration"
+    ],
+    "cli:graph-hotspots": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "cli:graph-cli-context"
+    ],
+    "cli:graph-search": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model",
+      "code-graph:graph-store",
+      "cli:graph-cli-context"
+    ],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "plugin-manager:specd-plugin-type": ["core:config", "default:_global/architecture"],
+    "core:config": [
+      "core:schema-format",
+      "core:schema-merge",
+      "default:_global/architecture",
+      "core:storage",
+      "core:spec-metadata",
+      "core:workspace",
+      "default:_global/logging"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "drifted-pending-review",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "drifted-pending-review",
+          "validatedHash": "sha256:d4fb5cae88e680a5d656ccc9fb985e25ab676681efef54a68d861acf209bf94d",
+          "hasDrift": true
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:with-open-graph-provider",
+          "filename": "deltas/sdk/with-open-graph-provider/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-cli-context",
+          "filename": "deltas/cli/graph-cli-context/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-hotspots",
+          "filename": "deltas/cli/graph-hotspots/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:with-open-graph-provider",
+          "filename": "deltas/sdk/with-open-graph-provider/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-cli-context",
+          "filename": "deltas/cli/graph-cli-context/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-hotspots",
+          "filename": "deltas/cli/graph-hotspots/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "plugin-manager:specd-plugin-type",
+          "filename": "deltas/plugin-manager/specd-plugin-type/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "missing",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "missing",
+          "validatedHash": null
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-06T08:41:08.887Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "code-graph:ladybug-graph-store",
+        "code-graph:composition",
+        "sdk:with-open-graph-provider",
+        "sdk:composition",
+        "cli:graph-cli-context",
+        "sdk:build-project-status-snapshot",
+        "sdk:run-index-project-graph",
+        "cli:graph-stats",
+        "cli:graph-impact",
+        "cli:graph-hotspots",
+        "cli:graph-search"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T08:41:08.906Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-hotspots"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-hotspots"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T08:44:36.811Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T08:44:36.811Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T08:44:36.816Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T08:44:39.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T08:44:39.436Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T08:44:42.575Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T08:44:42.581Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T08:56:06.839Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:01:36.777Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:05:06.706Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:06:30.245Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:10:55.753Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "core:kernel",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T09:10:55.757Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:10:58.479Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "core:kernel-builder",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T09:10:58.482Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "core:kernel-builder"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel-builder"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:22:36.634Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T09:22:36.647Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:22:39.784Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-06T09:22:39.787Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T09:25:44.539Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T11:24:57.415Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T11:26:38.991Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:21:45.935Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: sdk:build-project-status-snapshot",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:18.955Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: sdk:build-project-status-snapshot",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:34.795Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: sdk:build-project-status-snapshot",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:52.429Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: sdk:build-project-status-snapshot",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:33:34.265Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:08:24.940Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:08:28.508Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:01.438Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:09.414Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:09:14.769Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'generalize-repository-factories' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-10T14:10:35.245Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:25:43.094Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:08.083Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:18.930Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:31.156Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-13T15:26:42.375Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'eliminate-git-hardcoding' was archived with overlapping specs: core:config",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:20:13.704Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:20:32.986Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:20:54.402Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:10.508Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:27.750Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:45.575Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:52.365Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:21:57.716Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:22:03.627Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T12:22:09.512Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'align-user-interface-with-main-conventions' was archived with overlapping specs: core:config, sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

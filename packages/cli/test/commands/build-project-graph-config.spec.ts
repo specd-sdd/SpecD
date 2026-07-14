@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_EXCLUDE_PATHS } from '@specd/code-graph'
+import { DEFAULT_EXCLUDE_PATHS } from '@specd/sdk'
 import { makeMockConfig } from './helpers.js'
 import { buildProjectGraphConfig } from '../../src/commands/graph/build-project-graph-config.js'
 

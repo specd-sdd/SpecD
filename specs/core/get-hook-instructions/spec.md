@@ -71,6 +71,19 @@ When `only` is provided, the result MUST contain only the hook whose `id` matche
 
 When no `instruction:` hooks exist for the step+phase, the result is `{ phase, instructions: [] }`.
 
+### Requirement: Config-based factory delegates through resolveGetHookInstructionsDeps
+
+The config-based `createGetHookInstructions(config, options?)` form MUST derive `GetHookInstructionsDeps` through `resolveGetHookInstructionsDeps(resolver)` and then delegate to canonical `createGetHookInstructions(deps)`.
+
+`resolveGetHookInstructionsDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `archive: ArchiveRepository`
+- `schemaProvider: SchemaProvider`
+- `templates: TemplateExpander`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - This use case is read-only — it does not modify the change or execute any commands
@@ -80,9 +93,10 @@ When no `instruction:` hooks exist for the step+phase, the result is `{ phase, i
 
 ## Spec Dependencies
 
-- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook types, instruction hooks as passive text, ordering
-- [`core:schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `instruction:` entries
-- [`core:config`](../config/spec.md) — project-level hooks via `schemaOverrides`
-- [`core:change`](../change/spec.md) — Change entity, `schemaName`
-- [`core:template-variables`](../template-variables/spec.md) — `TemplateExpander`, `TemplateVariables`, expansion semantics
-- [`core:archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`
+- [`core:hook-execution-model`](../hook-execution-model/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:config`](../config/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:template-variables`](../template-variables/spec.md)
+- [`core:archive-repository-port`](../archive-repository-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

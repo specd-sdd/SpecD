@@ -1,7 +1,7 @@
 {
   "title": "EditChange",
   "description": "As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes.",
-  "dependsOn": ["core:change", "core:composition"],
+  "dependsOn": ["core:change", "core:composition", "core:composition-resolver"],
   "context": [
     "As a change evolves, its spec scope often needs to grow or shrink — but modifying the spec list has approval implications that must be enforced consistently. The `EditChange` use case adds or removes spec IDs on an existing change, derives workspaces from the resulting `specIds` via the `Change.workspaces` getter, and triggers approval invalidation whenever the spec list effectively changes."
   ],
@@ -88,6 +88,12 @@
       "requirement": "Dependencies",
       "rules": [
         "`EditChange` depends on the following ports injected via constructor:\n\n- `ChangeRepository` — for loading, persisting, scaffolding, and unscaffolding changes\n- `ActorResolver` — for resolving the current actor identity\n- `specs: ReadonlyMap<string, SpecRepository>` — spec repositories keyed by workspace name, used for the `specExists` check during scaffolding and for reading persisted dependency state when seeding `change.specDependsOn`"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveEditChangeDeps",
+      "rules": [
+        "The config-based `createEditChange(config, options?)` form MUST derive `EditChangeDeps` through `resolveEditChangeDeps(resolver)` and then delegate to canonical `createEditChange(deps)`.\n\n`resolveEditChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `listWorkspaces: ListWorkspaces`\n- `actor: ActorResolver`\n- `schemaProvider: SchemaProvider`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -344,31 +350,30 @@
       "then": [
         "it requires a ReadonlyMap<string, SpecRepository> for spec existence checks and persisted dependency seeding"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveEditChangeDeps",
+      "name": "createEditChange config form derives EditChangeDeps through resolveEditChangeDeps",
+      "when": ["createEditChange(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives EditChangeDeps through resolveEditChangeDeps(resolver)",
+        "AND resolveEditChangeDeps(resolver) resolves:",
+        "AND the factory delegates to canonical createEditChange(deps)"
+      ]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "core:edit-change",
-        "file": "core:src/application/use-cases/_shared/load-persisted-spec-depends-on.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:edit-change",
-        "file": "core:src/application/use-cases/edit-change.ts",
-        "symbol": "EditChange"
-      },
-      {
-        "specId": "core:edit-change",
-        "file": "core:src/application/use-cases/edit-change.ts",
-        "symbol": "execute"
+        "file": "core:src/composition/use-cases/edit-change.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:39b2115b520ce4f31de579e68d19ead242a49bb07b0b8946f9a8199229825471",
-    "verify.md": "sha256:9baa49f0afa39456b279a3b776bc31a2ace816c76d8d29a94ec4621ad7989580"
+    "spec.md": "sha256:e20bf90ee763107c47abe00746ed8c31bdf8cafa51582c6ba76e10a20d6a416c",
+    "verify.md": "sha256:daa0439f0b9842aa119000e5436bf4858f9d5485d8a1a7281471114d11e67068"
   },
   "generatedBy": "core"
 }

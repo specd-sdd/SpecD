@@ -8,12 +8,12 @@
     "core:content-extraction",
     "core:storage",
     "core:workspace",
-    "core:list-workspaces"
+    "core:list-workspaces",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/list-specs.ts",
-      "symbols": ["ListSpecs"]
+      "file": "core:src/composition/use-cases/list-specs.ts"
     }
   ]
 }

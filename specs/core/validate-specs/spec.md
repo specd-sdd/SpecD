@@ -83,21 +83,6 @@ Each `SpecValidationEntry` MUST include:
 
 When an artifact type does not specify an explicit `format`, the use case SHALL infer it from the filename via `inferFormat`. If no parser is found for the resolved format, the artifact MUST be skipped without recording a failure or warning.
 
-## Constraints
-
-- The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories.
-- `input.specPath` takes precedence: when provided, `input.workspace` is ignored.
-- Validation rules come exclusively from the resolved schema — the use case does not define its own rules.
-- The `ValidationFailure` and `ValidationWarning` types are shared with the `ValidateArtifacts` use case.
-
-## Spec Dependencies
-
-- [`core:validate-artifacts`](../validate-artifacts/spec.md) — shared `ValidationFailure` and `ValidationWarning` types, `evaluateRules` behaviour
-- [`core:schema-format`](../schema-format/spec.md) — schema structure, artifact types, and scope semantics
-- [`core:storage`](../storage/spec.md) — `SpecRepository` contract
-- [`core:workspace`](../workspace/spec.md) — workspace resolution
-- [`core:spec-id-format`](../spec-id-format/spec.md) — `parseSpecId` behaviour
-
 ### Requirement: Canonical metadata consistency validation
 
 After per-artifact and cross-artifact validation for one spec, `ValidateSpecs` SHALL validate the canonical metadata state exposed through `SpecRepository.metadata()` and the repository's persisted semantic dependency operations.
@@ -110,3 +95,34 @@ Validation rules:
 4. If the schema omits dependency extraction, validation MUST still accept `metadata.json.dependsOn` when it matches the persisted dependency state.
 
 These checks validate canonical metadata as a cache of persisted spec semantics without treating `spec-lock.json` as a normal schema artifact.
+
+### Requirement: Config-based factory delegates through resolveValidateSpecsDeps
+
+The config-based `createValidateSpecs(config, options?)` form MUST derive `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then delegate to canonical `createValidateSpecs(deps)`.
+
+`resolveValidateSpecsDeps(resolver)` MUST resolve:
+
+- `specs: ReadonlyMap<string, SpecRepository>`
+- `schemaProvider: SchemaProvider`
+- `parsers: ArtifactParserRegistry`
+- `hasher?: ContentHasher`
+- `extractorTransforms: ExtractorTransformRegistry`
+- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+## Constraints
+
+- The use case receives a `ReadonlyMap<string, SpecRepository>` — it MUST NOT modify the map or the repositories.
+- `input.specPath` takes precedence: when provided, `input.workspace` is ignored.
+- Validation rules come exclusively from the resolved schema — the use case does not define its own rules.
+- The `ValidationFailure` and `ValidationWarning` types are shared with the `ValidateArtifacts` use case.
+
+## Spec Dependencies
+
+- [`core:validate-artifacts`](../validate-artifacts/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:storage`](../storage/spec.md)
+- [`core:workspace`](../workspace/spec.md)
+- [`core:spec-id-format`](../spec-id-format/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

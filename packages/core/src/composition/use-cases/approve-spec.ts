@@ -1,122 +1,117 @@
+import { type ActorResolver } from '../../application/ports/actor-resolver.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type ContentHasher } from '../../application/ports/content-hasher.js'
+import { type SchemaProvider } from '../../application/ports/schema-provider.js'
+import { type ApprovalGates } from '../../application/use-cases/transition-change.js'
 import { ApproveSpec } from '../../application/use-cases/approve-spec.js'
-import { type SpecdConfig, isSpecdConfig } from '../../application/specd-config.js'
-import { getDefaultWorkspace } from '../get-default-workspace.js'
-import { createChangeRepository } from '../change-repository.js'
-import { createSchemaRegistry } from '../schema-registry.js'
-import { type SchemaRepository } from '../../application/ports/schema-repository.js'
-import { createSchemaRepository } from '../schema-repository.js'
-import { ResolveSchema } from '../../application/use-cases/resolve-schema.js'
-import { LazySchemaProvider } from '../lazy-schema-provider.js'
-import { createVcsActorResolver } from '../actor-resolver.js'
-import { NodeContentHasher } from '../../infrastructure/node/content-hasher.js'
+import { type SpecdConfig } from '../../application/specd-config.js'
+import {
+  createCompositionResolver,
+  type CompositionResolver,
+  type CompositionResolutionOptions,
+} from '../composition-resolver.js'
+import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
- * Domain context for a `ChangeRepository` bound to a single workspace.
+ * Explicit dependencies for {@link createApproveSpec}.
  */
-export interface ApproveSpecContext {
-  /** The workspace name from `specd.yaml` (e.g. `'default'`). */
-  readonly workspace: string
-  /** Ownership level of this workspace. */
-  readonly ownership: 'owned' | 'shared' | 'readOnly'
-  /** Whether the workspace's specs live outside the current git root. */
-  readonly isExternal: boolean
-  readonly configPath: string
+export interface ApproveSpecDeps {
+  /** Change repository used by the use case. */
+  readonly changes: ChangeRepository
+  /** Actor resolver used by the use case. */
+  readonly actor: ActorResolver
+  /** Schema provider used by the use case. */
+  readonly schemaProvider: SchemaProvider
+  /** Content hasher used by the use case. */
+  readonly contentHasher: ContentHasher
+  /** Approval gate configuration used by the use case. */
+  readonly approvals: ApprovalGates
 }
 
 /**
- * Filesystem adapter paths for `createApproveSpec(context, options)`.
+ * Resolves {@link ApproveSpecDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `ApproveSpec`
  */
-export interface FsApproveSpecOptions {
-  /** Absolute path to the `changes/` directory. */
-  readonly changesPath: string
-  /** Absolute path to the `drafts/` directory. */
-  readonly draftsPath: string
-  /** Absolute path to the `discarded/` directory. */
-  readonly discardedPath: string
-  /** Absolute path to the project root (for schema resolution). */
-  readonly projectRoot: string
-  readonly schemaRef: string
-  readonly schemaRepositories: ReadonlyMap<string, SchemaRepository>
-  /** Approval gate configuration from project config. */
-  readonly approvals: { readonly spec: boolean; readonly signoff: boolean }
+export function resolveApproveSpecDeps(resolver: CompositionResolver): ApproveSpecDeps {
+  return {
+    changes: resolver.getChangeRepository(),
+    actor: resolver.getActorResolver(),
+    schemaProvider: resolver.getSchemaProvider(),
+    contentHasher: resolver.getContentHasher(),
+    approvals: resolver.config.approvals,
+  }
 }
 
 /**
- * Constructs an `ApproveSpec` use case wired to the default workspace.
+ * Constructs `ApproveSpec` from explicit dependencies.
+ *
+ * @param deps - Explicit use-case dependencies
+ * @returns The pre-wired use case instance
+ */
+export function createApproveSpec(deps: ApproveSpecDeps): ApproveSpec
+/**
+ * Constructs `ApproveSpec` from project configuration.
  *
  * @param config - The fully-resolved project configuration
- * @returns The pre-wired use case instance
- */
-export function createApproveSpec(config: SpecdConfig): ApproveSpec
-/**
- * Constructs an `ApproveSpec` use case with explicit context and fs paths.
- *
- * @param context - Workspace domain context
- * @param options - Filesystem adapter paths
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createApproveSpec(
-  context: ApproveSpecContext,
-  options: FsApproveSpecOptions,
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ApproveSpec
 /**
- * Constructs an `ApproveSpec` instance wired with filesystem adapters.
+ * Constructs `ApproveSpec` from explicit deps or config bootstrap.
  *
- * @param configOrContext - A fully-resolved `SpecdConfig` or an explicit context object
- * @param options - Filesystem path options; required when `configOrContext` is a context object
+ * @param depsOrConfig - Explicit deps or resolved project configuration
+ * @param options - Optional additive composition registrations
  * @returns The pre-wired use case instance
  */
 export function createApproveSpec(
-  configOrContext: SpecdConfig | ApproveSpecContext,
-  options?: FsApproveSpecOptions,
+  depsOrConfig: ApproveSpecDeps | SpecdConfig,
+  options?: CompositionResolutionOptions,
 ): ApproveSpec {
-  if (isSpecdConfig(configOrContext)) {
-    const config = configOrContext
-    const ws = getDefaultWorkspace(config)
-    const schemaRepos = new Map(
-      config.workspaces
-        .filter((ws2) => ws2.schemasPath !== null)
-        .map((ws2) => [
-          ws2.name,
-          createSchemaRepository(
-            'fs',
-            {
-              workspace: ws2.name,
-              ownership: ws2.ownership,
-              isExternal: ws2.isExternal,
-              configPath: config.configPath,
-            },
-            { schemasPath: ws2.schemasPath! },
-          ),
-        ]),
-    ) as ReadonlyMap<string, SchemaRepository>
-    return createApproveSpec(
-      {
-        workspace: ws.name,
-        ownership: ws.ownership,
-        isExternal: ws.isExternal,
-        configPath: config.configPath,
-      },
-      {
-        changesPath: config.storage.changesPath,
-        draftsPath: config.storage.draftsPath,
-        discardedPath: config.storage.discardedPath,
-        projectRoot: config.projectRoot,
-        schemaRef: config.schemaRef,
-        schemaRepositories: schemaRepos,
-        approvals: config.approvals,
-      },
-    )
+  const normalized = normalizeCompositionFactoryArgs(
+    'createApproveSpec',
+    depsOrConfig,
+    options,
+    isApproveSpecDeps,
+  )
+  return createApproveSpecFromNormalized(normalized)
+}
+
+/**
+ * Applies normalized `ApproveSpec` factory inputs.
+ *
+ * @param input - Normalized public factory input
+ * @returns The pre-wired use case instance
+ */
+function createApproveSpecFromNormalized(
+  input: FactoryInput<ApproveSpecDeps, CompositionResolutionOptions>,
+): ApproveSpec {
+  if (input.kind === 'deps') {
+    const { changes, actor, schemaProvider, contentHasher, approvals } = input.deps
+    return new ApproveSpec(changes, actor, schemaProvider, contentHasher, approvals)
   }
-  const changeRepo = createChangeRepository('fs', configOrContext, options!)
-  const actor = createVcsActorResolver()
-  const schemas = createSchemaRegistry('fs', {
-    nodeModulesPaths: [options!.projectRoot + '/node_modules'],
-    configDir: options!.projectRoot,
-    schemaRepositories: options!.schemaRepositories,
-  })
-  const resolveSchema = new ResolveSchema(schemas, options!.schemaRef, [], undefined)
-  const schemaProvider = new LazySchemaProvider(resolveSchema)
-  const hasher = new NodeContentHasher()
-  return new ApproveSpec(changeRepo, actor, schemaProvider, hasher, options!.approvals)
+
+  const resolver = createCompositionResolver(input.config, input.options)
+  return createApproveSpec(resolveApproveSpecDeps(resolver))
+}
+
+/**
+ * Type guard for explicit `ApproveSpecDeps`.
+ *
+ * @param value - Candidate public factory input
+ * @returns `true` when the input is explicit deps
+ */
+function isApproveSpecDeps(value: ApproveSpecDeps | SpecdConfig): value is ApproveSpecDeps {
+  return (
+    'changes' in value &&
+    'actor' in value &&
+    'schemaProvider' in value &&
+    'contentHasher' in value &&
+    'approvals' in value
+  )
 }

@@ -7,15 +7,7 @@
   "implementation": [
     {
       "file": "core:src/application/ports/vcs-adapter.ts",
-      "symbols": [
-        "VcsAdapter.rootDir",
-        "VcsAdapter.branch",
-        "VcsAdapter.isClean",
-        "VcsAdapter.ref",
-        "VcsAdapter.refAt",
-        "VcsAdapter.modifiedFiles",
-        "VcsAdapter.show"
-      ]
+      "symbols": ["VcsAdapter", "VcsIdentity"]
     }
   ]
 }

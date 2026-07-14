@@ -7,12 +7,12 @@
     "core:change",
     "core:lifecycle-engine",
     "core:config",
-    "default:_global/architecture"
+    "default:_global/architecture",
+    "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/invalidate-change.ts",
-      "symbols": ["InvalidateChange"]
+      "file": "core:src/composition/use-cases/invalidate-change.ts"
     }
   ]
 }

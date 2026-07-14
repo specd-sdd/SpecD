@@ -4,5 +4,13 @@
     "version": 1
   },
   "dependsOn": ["core:validate-artifacts", "core:change"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/composition/use-cases/index.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/validate-change-batch.ts",
+      "symbols": ["createValidateChangeBatch", "resolveValidateChangeBatchDeps"]
+    }
+  ]
 }

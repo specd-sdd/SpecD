@@ -122,6 +122,20 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 
 `RunStepHooks` MUST work for any valid `ChangeState`, including `archiving`. While `ArchiveChange` delegates hook execution to `RunStepHooks`, `RunStepHooks` can also be called independently — for example, to run a pre-archive check without performing the full archive, or to retry a failed post-archive hook.
 
+### Requirement: Config-based factory delegates through resolveRunStepHooksDeps
+
+The config-based `createRunStepHooks(config, options?)` form MUST derive `RunStepHooksDeps` through `resolveRunStepHooksDeps(resolver)` and then delegate to canonical `createRunStepHooks(deps)`.
+
+`resolveRunStepHooksDeps(resolver)` MUST resolve:
+
+- `changes: ChangeRepository`
+- `archive: ArchiveRepository`
+- `hooks: HookRunner`
+- `externalHookRunners: ReadonlyMap<string, ExternalHookRunner>`
+- `schemaProvider: SchemaProvider`
+
+The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
 ## Constraints
 
 - `RunStepHooks` MUST NOT perform any state transition on the Change entity — it only executes hooks
@@ -133,11 +147,12 @@ When no hooks match (empty `run:` hook list for the step+phase, or the step has 
 
 ## Spec Dependencies
 
-- [`core:hook-execution-model`](../hook-execution-model/spec.md) — hook types, execution modes, failure semantics, ordering
-- [`core:hook-runner-port`](../hook-runner-port/spec.md) — `HookRunner` interface, `HookResult`, `HookVariables`
-- [`core:external-hook-runner-port`](../external-hook-runner-port/spec.md) — external hook runner contract and accepted-type dispatch
-- [`core:schema-format`](../schema-format/spec.md) — `workflow[].hooks` structure, `run:`, `instruction:`, and explicit external entries
-- [`core:config`](../config/spec.md) — project-level workflow hooks from `specd.yaml`
-- [`core:change`](../change/spec.md) — Change entity, `schemaName`, `workspaces`
-- [`core:template-variables`](../template-variables/spec.md) — `TemplateVariables` map, variable namespaces
-- [`core:archive-repository-port`](../archive-repository-port/spec.md) — `ArchiveRepository` port, `get()`, `archivePath()`, `ArchivedChange`
+- [`core:hook-execution-model`](../hook-execution-model/spec.md)
+- [`core:hook-runner-port`](../hook-runner-port/spec.md)
+- [`core:external-hook-runner-port`](../external-hook-runner-port/spec.md)
+- [`core:schema-format`](../schema-format/spec.md)
+- [`core:config`](../config/spec.md)
+- [`core:change`](../change/spec.md)
+- [`core:template-variables`](../template-variables/spec.md)
+- [`core:archive-repository-port`](../archive-repository-port/spec.md)
+- [`core:composition-resolver`](../composition-resolver/spec.md)

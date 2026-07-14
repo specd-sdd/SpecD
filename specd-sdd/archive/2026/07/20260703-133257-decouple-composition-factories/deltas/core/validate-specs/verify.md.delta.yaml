@@ -1,0 +1,24 @@
+- op: added
+  description: 'Verify the use-case-local resolver helper contract for config-based factory bootstrap'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveValidateSpecsDeps
+
+    #### Scenario: createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps
+
+    - **WHEN** `createValidateSpecs(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)`
+    - **AND** `resolveValidateSpecsDeps(resolver)` resolves:
+
+    - `specs: ReadonlyMap<string, SpecRepository>`
+    - `schemaProvider: SchemaProvider`
+    - `parsers: ArtifactParserRegistry`
+    - `hasher?: ContentHasher`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+
+    - **AND** the factory delegates to canonical `createValidateSpecs(deps)`
