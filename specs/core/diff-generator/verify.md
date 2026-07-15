@@ -39,6 +39,22 @@
 - **THEN** the diff identifies the base side as `a/spec.md (base)`
 - **AND** it identifies the merged side as `b/spec.md (merged)`
 
+### Requirement: Error contract
+
+#### Scenario: Default implementation raises DiffGenerationError for unusable diff results
+
+- **GIVEN** the concrete diff-generation mechanism fails to produce a usable unified diff
+- **WHEN** the default `DiffGenerator` implementation handles that failure
+- **THEN** it raises `DiffGenerationError`
+- **AND** it does not leak an anonymous library-specific error as the caller-facing contract
+
+#### Scenario: Callers can distinguish diff-surface failure from merge failure
+
+- **GIVEN** `PreviewSpec` invokes `DiffGenerator` after merge already succeeded
+- **WHEN** `DiffGenerator` raises `DiffGenerationError`
+- **THEN** the caller can treat that failure as a non-fatal review-surface problem
+- **AND** the caller can preserve the successful merged preview result separately from the diff failure
+
 ### Requirement: Default context lines
 
 #### Scenario: Omitted contextLines uses default of 3

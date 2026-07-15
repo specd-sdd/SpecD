@@ -275,11 +275,14 @@ Use the command shape that matches artifact scope:
 
 If validation fails: fix and re-validate.
 
-When validating a single spec-scoped artifact, review merged output with the same
-artifact filter to avoid reading unrelated files:
+When validating a single spec-scoped artifact backed by an existing delta, review the
+inline diff shown by `specd changes validate` when it is available.
+
+If that inline diff is unavailable and you still need the merged diff for the same
+artifact, use:
 
 ```bash
-specd changes spec-preview <name> <specId> --artifact <artifactId> --format text
+specd changes spec-preview <name> <specId> --diff --artifact <artifactId> --format text
 ```
 
 Do not use `spec-preview` for change-scoped artifacts (`proposal`, `design`, `tasks`);

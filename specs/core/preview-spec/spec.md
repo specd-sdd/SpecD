@@ -82,7 +82,13 @@ When `includeDiff` is `false` or omitted, `PreviewSpec` SHALL NOT invoke `DiffGe
 
 Preview entries with status `no-op` or `missing` MUST NOT include generated diff output.
 
-If diff generation fails for one file, `PreviewSpec` MUST add a warning describing the failure and continue returning the preview entry's `base`, `merged`, and `status`. Diff-generation failure SHALL NOT downgrade a successfully merged preview entry to `missing`.
+If `DiffGenerator` raises the dedicated `DiffGenerationError` for one file, `PreviewSpec` MUST:
+
+- add a warning describing the diff-generation failure
+- continue returning the preview entry's `base`, `merged`, and `status`
+- omit the `diff` field for that entry
+
+Handling `DiffGenerationError` SHALL NOT downgrade a successfully merged preview entry to `missing`.
 
 ### Requirement: Result shape
 
@@ -128,6 +134,8 @@ If delta application fails for an artifact file (e.g. selector resolution failur
 
 1. Add a warning describing the failure and the affected filename
 2. Include the file in the result with status `missing`
+
+If diff generation fails through the dedicated `DiffGenerationError`, `PreviewSpec` MUST also avoid throwing. It treats that case as a warning-producing partial result rather than as a failed preview.
 
 The preview MUST always succeed — partial results are acceptable, total failure is not.
 

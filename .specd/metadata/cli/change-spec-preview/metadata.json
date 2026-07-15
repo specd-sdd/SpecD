@@ -257,25 +257,7 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "cli:change-spec-preview",
-        "file": "cli:package.json"
-      },
-      {
-        "specId": "cli:change-spec-preview",
-        "file": "cli:test/commands/change/spec-preview.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "cli:change-spec-preview",
-        "file": "cli:src/commands/change/spec-preview.ts",
-        "symbol": "registerChangeSpecPreview"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:e3dd21fee67f57b29cb031d890b7a494be119da9e762af5bc8ef0013e3b9521d",
     "verify.md": "sha256:dbcd44ed95fb906c3f118d144ca140627aa9abe8b8d61142630264ba830852c3"

@@ -1022,14 +1022,7 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:validate-artifacts",
-        "file": "core:src/composition/use-cases/validate-artifacts.ts"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
     "spec.md": "sha256:e81e0d09662f752635b86fdc617e1f6bed41ab1e2866c739991ddabeb0504be6",
     "verify.md": "sha256:872ddd33b3601324a39c9cdb119fc223087d2df36f9cc61c90869935046a0309"

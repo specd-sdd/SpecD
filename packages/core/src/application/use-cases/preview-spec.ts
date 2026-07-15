@@ -2,7 +2,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
-import { type DiffGenerator } from '../ports/diff-generator.js'
+import { DiffGenerationError, type DiffGenerator } from '../ports/diff-generator.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
@@ -277,6 +277,10 @@ export class PreviewSpec {
             }),
           }
         } catch (error) {
+          if (error instanceof DiffGenerationError) {
+            warnings.push(`Failed to generate diff for ${file.filename}: ${error.message}`)
+            continue
+          }
           const message = error instanceof Error ? error.message : String(error)
           warnings.push(`Failed to generate diff for ${file.filename}: ${message}`)
         }

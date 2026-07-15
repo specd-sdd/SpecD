@@ -45,7 +45,7 @@
     {
       "requirement": "Structural Validation and Content Review",
       "rules": [
-        "Agents SHALL treat `specd changes validate` as structural/state validation only. A successful validation MUST NOT be interpreted as semantic approval of artifact content.\n\nAgents MUST perform content review of requirements, constraints, and intent alignment before progressing lifecycle steps that depend on artifact correctness.\n\nWhen overlap or drift risk exists for spec deltas, agents SHALL verify merged content with `specd changes spec-preview <change-name> <specId>` before accepting the delta outcome.\n\nWhen review only needs one spec-scoped artifact, agents SHOULD prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to reduce unnecessary output volume."
+        "Agents SHALL treat `specd changes validate` as structural/state validation only. A successful validation MUST NOT be interpreted as semantic approval of artifact content.\n\nAgents MUST perform content review of requirements, constraints, and intent alignment before progressing lifecycle steps that depend on artifact correctness.\n\nFor successful individual validation of an existing delta-backed `scope: spec` artifact, agents SHALL review the inline diff shown by `specd changes validate` as the immediate review surface for unintended removals, contract breakage, or other risky edits.\n\nIf that inline diff is unavailable because validation failed or because diff generation reported the dedicated non-fatal failure path, agents SHALL fall back to:\n\n`specd changes spec-preview <change-name> <specId> --diff --artifact <artifactId>`\n\nWhen overlap or drift risk exists for broader spec-delta review outside that narrow single-validate path, agents SHALL verify merged content with `specd changes spec-preview <change-name> <specId>` before accepting the delta outcome.\n\nWhen review only needs one spec-scoped artifact, agents SHOULD prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to reduce unnecessary output volume."
       ]
     },
     {
@@ -160,6 +160,30 @@
     },
     {
       "requirement": "Structural Validation and Content Review",
+      "name": "Successful single-artifact spec validation uses inline diff review",
+      "given": [
+        "an existing delta-backed scope: spec artifact is validated with specd changes validate <change-name> <specId> --artifact <artifactId>",
+        "AND validation succeeds"
+      ],
+      "when": ["the command renders an inline diff for that artifact"],
+      "then": [
+        "the agent reviews that inline diff as the immediate surface for unintended removals, contract breakage, or other risky edits"
+      ]
+    },
+    {
+      "requirement": "Structural Validation and Content Review",
+      "name": "Inline diff unavailability falls back to diff preview command",
+      "given": [
+        "review is needed for an existing delta-backed scope: spec artifact",
+        "AND inline diff is unavailable because validation failed or because diff generation reported its dedicated non-fatal failure"
+      ],
+      "when": ["the agent chooses a review surface"],
+      "then": [
+        "it runs specd changes spec-preview <change-name> <specId> --diff --artifact <artifactId>"
+      ]
+    },
+    {
+      "requirement": "Structural Validation and Content Review",
       "name": "Overlap or drift risk requires merged preview",
       "given": ["overlap or drift risk is detected for a spec delta"],
       "when": ["the agent assesses whether delta output is safe to accept"],
@@ -211,13 +235,21 @@
     "files": [
       {
         "specId": "skills:workflow-automation",
+        "file": "skills:templates/skills/specd-design/SKILL.md.tpl"
+      },
+      {
+        "specId": "skills:workflow-automation",
+        "file": "skills:templates/skills/specd-verify/SKILL.md.tpl"
+      },
+      {
+        "specId": "skills:workflow-automation",
         "file": "skills:templates/shared/shared.md.tpl"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e90d045393495ad00ac1d6d3efc844dfdaf7df9bcf90f95f04b32d643ee3c49e",
-    "verify.md": "sha256:424fc58a62dfc99fe96abbc93f9e63ca074ed7faef7b55d82190af191e02de42"
+    "spec.md": "sha256:b6dc905d620ba69ef503e6f2b6b3b5a35b3e12126da12d54e27057b0c90f33d8",
+    "verify.md": "sha256:0163d75e677fb924e7bab04db37c1901ef7c321d0680cf0b8972ea5e5fa2f89a"
   },
   "generatedBy": "core"
 }

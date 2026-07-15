@@ -3,11 +3,17 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "core:change", "core:validate-artifacts", "core:spec-id-format"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change",
+    "core:validate-artifacts",
+    "core:spec-id-format",
+    "core:preview-spec"
+  ],
   "implementation": [
     {
       "file": "cli:src/commands/change/validate.ts",
-      "symbols": ["executeBatch"]
+      "symbols": ["registerChangeValidate", "executeSingle", "executeBatch"]
     }
   ]
 }

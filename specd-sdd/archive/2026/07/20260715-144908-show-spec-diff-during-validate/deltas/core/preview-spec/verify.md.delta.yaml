@@ -1,0 +1,67 @@
+- op: modified
+  description: Add scenarios for dedicated DiffGenerationError handling while preserving merged preview entries.
+  selector:
+    type: section
+    matches: '^Requirement: Diff generation$'
+  content: |
+    #### Scenario: Merged entry includes generated diff
+
+    - **GIVEN** a preview entry with status `merged`, `filename`, `base`, and `merged` content
+    - **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+    - **THEN** `DiffGenerator` is invoked for that file
+    - **AND** the returned diff string is included on the preview entry
+
+    #### Scenario: New spec entry uses empty base for diff generation
+
+    - **GIVEN** a new spec artifact whose preview entry has `base: null` and status `merged`
+    - **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+    - **THEN** `DiffGenerator` receives an empty string for the base side
+    - **AND** the preview entry still includes the generated diff output
+
+    #### Scenario: no-op and missing entries omit diff output
+
+    - **GIVEN** preview entries with status `no-op` and `missing`
+    - **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+    - **THEN** those entries do not include generated diff output
+    - **AND** `DiffGenerator` is not invoked for them
+
+    #### Scenario: DiffGenerationError produces warning without downgrading merged entry
+
+    - **GIVEN** a preview entry with status `merged`
+    - **AND** `DiffGenerator` raises `DiffGenerationError` while generating its diff
+    - **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+    - **THEN** the result includes a warning describing the diff-generation failure
+    - **AND** the entry keeps status `merged`
+    - **AND** the entry still returns its `base` and `merged` content
+    - **AND** the entry omits the `diff` field
+
+- op: modified
+  description: Clarify that dedicated diff-generation failures remain non-fatal partial preview results.
+  selector:
+    type: section
+    matches: '^Requirement: Error handling$'
+  content: |
+    #### Scenario: Delta application failure produces warning and missing status
+
+    - **GIVEN** a delta with a selector that does not match any node in the base spec
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** the result includes a warning describing the failure
+    - **AND** the failing file is included in `files` with status `missing`
+    - **AND** the use case does not throw
+
+    #### Scenario: Other files still returned on partial failure
+
+    - **GIVEN** a change with two delta files — one valid, one with a bad selector
+    - **WHEN** `PreviewSpec.execute` is called
+    - **THEN** both files appear in `files`
+    - **AND** the valid one has status `merged`
+    - **AND** the failing one has status `missing`
+
+    #### Scenario: DiffGenerationError remains a warning-only partial result
+
+    - **GIVEN** one merged preview entry generates successfully and another raises `DiffGenerationError`
+    - **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+    - **THEN** the use case does not throw
+    - **AND** both preview entries remain present in `files`
+    - **AND** only the failing diff entry omits `diff`
+    - **AND** warnings record the diff-generation failure separately from merge failures

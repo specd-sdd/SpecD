@@ -6,34 +6,20 @@
   "dependsOn": [],
   "implementation": [
     {
-      "file": "core:src/application/ports/diff-generator.ts",
-      "symbols": ["DiffGeneratorInput", "DiffGenerator"]
-    },
-    {
-      "file": "core:package.json"
-    },
-    {
       "file": "core:src/infrastructure/diff/diff-generator.ts",
       "symbols": ["DiffDiffGenerator"]
     },
     {
+      "file": "core:src/application/ports/diff-generator.ts",
+      "symbols": ["DiffGenerationError"]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["getDiffGenerator"]
+    },
+    {
       "file": "core:src/composition/diff-generator.ts",
       "symbols": ["createDefaultDiffGenerator"]
-    },
-    {
-      "file": "core:src/ports.ts"
-    },
-    {
-      "file": "core:src/application/ports/index.ts"
-    },
-    {
-      "file": "core:src/composition/index.ts"
-    },
-    {
-      "file": "core:test/composition/diff-generator.spec.ts"
-    },
-    {
-      "file": "core:test/infrastructure/diff/diff-generator.spec.ts"
     }
   ]
 }

@@ -1,0 +1,34 @@
+- op: added
+  description: 'Add a typed error contract for controllable diff-generation failures.'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Output contract$'
+  content: |
+    ### Requirement: Error contract
+
+    `DiffGenerator` SHALL define a dedicated typed failure for diff production: `DiffGenerationError`.
+
+    `DiffGenerationError` MUST represent diff-generation failures that callers may handle as a non-fatal review-surface problem after merge has already succeeded.
+
+    The default implementation MUST raise `DiffGenerationError` when its concrete diff-generation mechanism fails to produce a usable unified diff result.
+
+    This error contract exists so callers such as `PreviewSpec` can distinguish:
+
+    - a failed diff surface
+    - from a failed merge or failed artifact preview
+
+- op: modified
+  description: 'Extend constraints to require typed, controllable diff-generation failures.'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The port lives in `application/ports/` per core's hexagonal structure
+    - The port itself MUST NOT depend directly on any concrete diff library
+    - The capability returns plain text data only; colorization and other host presentation remain outside the port
+    - The capability models file-to-file unified diffs; it does not model semantic review comments or artifact filtering behavior
+    - Diff-generation failures intended for caller handling MUST surface through the dedicated `DiffGenerationError` contract rather than through anonymous library-specific errors

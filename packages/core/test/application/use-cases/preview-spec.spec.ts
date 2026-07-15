@@ -16,6 +16,7 @@ import {
   type DeltaEntry,
 } from '../../../src/application/ports/artifact-parser.js'
 import {
+  DiffGenerationError,
   type DiffGenerator,
   type DiffGeneratorInput,
 } from '../../../src/application/ports/diff-generator.js'
@@ -559,12 +560,12 @@ describe('PreviewSpec', () => {
       })
     })
 
-    it('retains merged preview and warning when diff generation fails', async () => {
+    it('retains merged preview and warning when diff generation raises DiffGenerationError', async () => {
       const artifactFilename = `changes/${CHANGE_NAME}/core/core/config/spec.md`
       const changeArtifact = makeSpecArtifact('specs', SPEC_ID, artifactFilename)
       const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
       const diffGenerator = makeDiffGenerator(() => {
-        throw new Error('diff failed')
+        throw new DiffGenerationError('diff failed')
       })
       const { useCase } = makeSut({
         change,

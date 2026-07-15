@@ -73,7 +73,9 @@ describe('change validate', () => {
     expect(stdout()).toContain('file: deltas/default/auth/login/spec.md.delta.yaml')
     expect(stdout()).toContain('validation is structural')
     expect(stdout()).toContain('review artifact content separately')
-    expect(stdout()).toContain('specd changes spec-preview feat default:auth/login')
+    expect(stdout()).toContain(
+      'inspect merged spec output with `specd changes spec-preview feat default:auth/login`',
+    )
   })
 
   it('prints failures and exits 1 when validation fails', async () => {
@@ -103,7 +105,9 @@ describe('change validate', () => {
     expect(stdout()).toContain('missing required section')
     expect(stdout()).toContain('validation is structural')
     expect(stdout()).toContain('review artifact content separately')
-    expect(stdout()).toContain('specd changes spec-preview feat default:auth/login')
+    expect(stdout()).toContain(
+      'inspect merged spec output with `specd changes spec-preview feat default:auth/login`',
+    )
   })
 
   it('preserves status-aware dependency-block descriptions in text output', async () => {
@@ -150,17 +154,33 @@ describe('change validate', () => {
     expect(out).toContain('validation is structural')
   })
 
-  it('adds --artifact to preview note when validating a spec-scoped artifact', async () => {
+  it('adds --artifact to preview note when validating a non-inline-review spec-scoped artifact', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.getActiveSchema.execute.mockResolvedValue({
-      raw: false,
-      schema: {
-        name: () => 'test-schema',
-        version: () => 1,
-        artifacts: () => [{ id: 'specs', scope: 'spec', output: 'spec.md' }],
-      },
+    kernel.specs.getActiveSchema.execute.mockResolvedValue(
+      mockBatchSchema([
+        new ArtifactType({
+          id: 'specs',
+          scope: 'spec',
+          output: 'spec.md',
+          requires: [],
+          validations: [],
+          deltaValidations: [],
+          preHashCleanup: [],
+        }),
+      ]),
+    )
+    kernel.changes.validate.execute.mockResolvedValue({
+      failures: [],
+      notes: [],
+      files: [
+        {
+          artifactId: 'specs',
+          key: 'default:auth/login',
+          filename: 'specs/default/auth/login/spec.md',
+          status: 'validated',
+        },
+      ],
     })
-    kernel.changes.validate.execute.mockResolvedValue({ failures: [], notes: [], files: [] })
 
     const program = makeProgram()
     registerChangeValidate(program.command('change'))
@@ -176,8 +196,147 @@ describe('change validate', () => {
     ])
 
     expect(stdout()).toContain(
-      'specd changes spec-preview feat default:auth/login --artifact specs',
+      'inspect merged spec output with `specd changes spec-preview feat default:auth/login --artifact specs`',
     )
+  })
+
+  it('renders inline diff for successful delta-backed single-artifact spec validation', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
+    kernel.changes.validate.execute.mockResolvedValue({
+      failures: [],
+      notes: [],
+      files: [
+        {
+          artifactId: 'specs',
+          key: 'default:auth/login',
+          filename: 'deltas/default/auth/login/spec.md.delta.yaml',
+          status: 'validated',
+        },
+      ],
+    })
+    kernel.changes.preview.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      changeName: 'feat',
+      warnings: [],
+      files: [
+        {
+          filename: 'spec.md',
+          base: '# Old\n',
+          merged: '# New\n',
+          diff: '--- a/spec.md (base)\n+++ b/spec.md (merged)\n@@ -1 +1 @@\n-# Old\n+# New',
+          status: 'merged',
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'validate',
+      'feat',
+      'auth/login',
+      '--artifact',
+      'specs',
+    ])
+
+    const out = stdout()
+    expect(out).toContain('validated feat/default:auth/login: all artifacts pass')
+    expect(out).toContain('file: deltas/default/auth/login/spec.md.delta.yaml')
+    expect(out).toContain('--- a/spec.md (base)')
+    expect(out).toContain('+++ b/spec.md (merged)')
+    expect(out).toContain('+# New')
+    expect(out).not.toContain('inspect merged spec output with')
+  })
+
+  it('falls back to artifact-filtered diff preview note when diff generation is unavailable', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
+    kernel.changes.validate.execute.mockResolvedValue({
+      failures: [],
+      notes: [],
+      files: [
+        {
+          artifactId: 'specs',
+          key: 'default:auth/login',
+          filename: 'deltas/default/auth/login/spec.md.delta.yaml',
+          status: 'validated',
+        },
+      ],
+    })
+    kernel.changes.preview.execute.mockResolvedValue({
+      specId: 'default:auth/login',
+      changeName: 'feat',
+      warnings: ['Failed to generate diff for spec.md: diff failed'],
+      files: [
+        {
+          filename: 'spec.md',
+          base: '# Old\n',
+          merged: '# New\n',
+          status: 'merged',
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'validate',
+      'feat',
+      'auth/login',
+      '--artifact',
+      'specs',
+    ])
+
+    const out = stdout()
+    expect(out).toContain('validated feat/default:auth/login: all artifacts pass')
+    expect(out).not.toContain('--- a/spec.md (base)')
+    expect(out).toContain(
+      'inspect merged diff with `specd changes spec-preview feat default:auth/login --diff --artifact specs`',
+    )
+  })
+
+  it('does not emit inline diff review when validation fails for a spec-scoped artifact', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.getActiveSchema.execute.mockResolvedValue(mockBatchSchema())
+    kernel.changes.validate.execute.mockResolvedValue({
+      failures: [{ artifactId: 'specs', description: 'missing section' }],
+      notes: [],
+      files: [
+        {
+          artifactId: 'specs',
+          key: 'default:auth/login',
+          filename: 'deltas/default/auth/login/spec.md.delta.yaml',
+          status: 'missing',
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeValidate(program.command('change'))
+    await program
+      .parseAsync([
+        'node',
+        'specd',
+        'change',
+        'validate',
+        'feat',
+        'auth/login',
+        '--artifact',
+        'specs',
+      ])
+      .catch(() => {})
+
+    const out = stdout()
+    expect(out).toContain('validation failed feat/default:auth/login')
+    expect(out).not.toContain('--- a/spec.md (base)')
+    expect(kernel.changes.preview.execute).not.toHaveBeenCalled()
   })
 
   it('outputs JSON with passed flag', async () => {
@@ -404,10 +563,10 @@ describe('change validate', () => {
       expect.objectContaining({ artifactId: 'proposal', specPath: 'default:auth/logout' }),
     )
     expect(stdout()).toContain(
-      'specd changes spec-preview feat default:auth/login --artifact proposal',
+      'inspect merged spec output with `specd changes spec-preview feat default:auth/login --artifact proposal`',
     )
     expect(stdout()).toContain(
-      'specd changes spec-preview feat default:auth/logout --artifact proposal',
+      'inspect merged spec output with `specd changes spec-preview feat default:auth/logout --artifact proposal`',
     )
   })
 

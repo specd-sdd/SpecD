@@ -52,7 +52,7 @@
     {
       "requirement": "Diff generation",
       "rules": [
-        "When `includeDiff` is `true`, `PreviewSpec` MUST generate a plain unified diff for each preview entry whose status is `merged`.\n\nDiff generation MUST use the injected `DiffGenerator` capability and the same file entry's preview content:\n\n- `filename` — the artifact filename being previewed\n- `base` — the original content before delta application; when `base` is `null`, the diff generator MUST receive an empty string as the base side\n- `merged` — the merged content after delta application\n\nWhen `includeDiff` is `false` or omitted, `PreviewSpec` SHALL NOT invoke `DiffGenerator`.\n\nPreview entries with status `no-op` or `missing` MUST NOT include generated diff output.\n\nIf diff generation fails for one file, `PreviewSpec` MUST add a warning describing the failure and continue returning the preview entry's `base`, `merged`, and `status`. Diff-generation failure SHALL NOT downgrade a successfully merged preview entry to `missing`."
+        "When `includeDiff` is `true`, `PreviewSpec` MUST generate a plain unified diff for each preview entry whose status is `merged`.\n\nDiff generation MUST use the injected `DiffGenerator` capability and the same file entry's preview content:\n\n- `filename` — the artifact filename being previewed\n- `base` — the original content before delta application; when `base` is `null`, the diff generator MUST receive an empty string as the base side\n- `merged` — the merged content after delta application\n\nWhen `includeDiff` is `false` or omitted, `PreviewSpec` SHALL NOT invoke `DiffGenerator`.\n\nPreview entries with status `no-op` or `missing` MUST NOT include generated diff output.\n\nIf `DiffGenerator` raises the dedicated `DiffGenerationError` for one file, `PreviewSpec` MUST:\n\n- add a warning describing the diff-generation failure\n- continue returning the preview entry's `base`, `merged`, and `status`\n- omit the `diff` field for that entry\n\nHandling `DiffGenerationError` SHALL NOT downgrade a successfully merged preview entry to `missing`."
       ]
     },
     {
@@ -64,7 +64,7 @@
     {
       "requirement": "Error handling",
       "rules": [
-        "If delta application fails for an artifact file (e.g. selector resolution failure, parser error), `PreviewSpec` MUST NOT throw. Instead, it MUST:\n\n1. Add a warning describing the failure and the affected filename\n2. Include the file in the result with status `missing`\n\nThe preview MUST always succeed — partial results are acceptable, total failure is not."
+        "If delta application fails for an artifact file (e.g. selector resolution failure, parser error), `PreviewSpec` MUST NOT throw. Instead, it MUST:\n\n1. Add a warning describing the failure and the affected filename\n2. Include the file in the result with status `missing`\n\nIf diff generation fails through the dedicated `DiffGenerationError`, `PreviewSpec` MUST also avoid throwing. It treats that case as a warning-producing partial result rather than as a failed preview.\n\nThe preview MUST always succeed — partial results are acceptable, total failure is not."
       ]
     },
     {
@@ -231,16 +231,17 @@
     },
     {
       "requirement": "Diff generation",
-      "name": "Diff generation failure does not discard merged preview",
+      "name": "DiffGenerationError produces warning without downgrading merged entry",
       "given": [
         "a preview entry with status merged",
-        "AND DiffGenerator throws while generating its diff"
+        "AND DiffGenerator raises DiffGenerationError while generating its diff"
       ],
       "when": ["PreviewSpec.execute is called with includeDiff: true"],
       "then": [
         "the result includes a warning describing the diff-generation failure",
         "AND the entry keeps status merged",
-        "AND the entry still returns its base and merged content"
+        "AND the entry still returns its base and merged content",
+        "AND the entry omits the diff field"
       ]
     },
     {
@@ -302,6 +303,20 @@
       ]
     },
     {
+      "requirement": "Error handling",
+      "name": "DiffGenerationError remains a warning-only partial result",
+      "given": [
+        "one merged preview entry generates successfully and another raises DiffGenerationError"
+      ],
+      "when": ["PreviewSpec.execute is called with includeDiff: true"],
+      "then": [
+        "the use case does not throw",
+        "AND both preview entries remain present in files",
+        "AND only the failing diff entry omits diff",
+        "AND warnings record the diff-generation failure separately from merge failures"
+      ]
+    },
+    {
       "requirement": "Schema name guard",
       "name": "Schema mismatch throws",
       "given": [
@@ -323,51 +338,11 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:preview-spec",
-        "file": "core:test/application/use-cases/preview-spec.spec.ts"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:test/composition/use-cases/preview-spec.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:preview-spec",
         "file": "core:src/application/use-cases/preview-spec.ts",
-        "symbol": "PreviewSpecInput"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:src/application/use-cases/preview-spec.ts",
-        "symbol": "PreviewSpecFileEntry"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:src/application/use-cases/preview-spec.ts",
-        "symbol": "PreviewSpecResult"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:src/application/use-cases/preview-spec.ts",
         "symbol": "PreviewSpec"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:src/composition/composition-resolver.ts",
-        "symbol": "CompositionResolver"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:src/composition/composition-resolver.ts",
-        "symbol": "createCompositionResolver"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:src/composition/use-cases/preview-spec.ts",
-        "symbol": "PreviewSpecDeps"
       },
       {
         "specId": "core:preview-spec",
@@ -378,17 +353,12 @@
         "specId": "core:preview-spec",
         "file": "core:src/composition/use-cases/preview-spec.ts",
         "symbol": "createPreviewSpec"
-      },
-      {
-        "specId": "core:preview-spec",
-        "file": "core:test/application/use-cases/helpers.ts",
-        "symbol": "makeStubPreviewSpec"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:18cc31c9e83a9c27b47e007104d21ba305861b35b4347c79fce1a0477d7e8efe",
-    "verify.md": "sha256:db9f9c0494cc9c7d590dab3ff63e0d74edf8b3e3a7229de29a1a503cd83c1437"
+    "spec.md": "sha256:2128d8fbf6f678b774a309f9895b1f657cb6a31120933bf9e8b537f75bc9c0f0",
+    "verify.md": "sha256:e3b815852212caa31b7dad16194ac4bc90c2c24e1e21727bdec6d9b3e6e4732a"
   },
   "generatedBy": "core"
 }

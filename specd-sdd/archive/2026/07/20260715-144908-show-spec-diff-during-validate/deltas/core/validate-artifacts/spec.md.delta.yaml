@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Current proposal keeps ValidateArtifacts structural; inline diff review may be implemented through CLI plus PreviewSpec without changing this spec.md contract.'

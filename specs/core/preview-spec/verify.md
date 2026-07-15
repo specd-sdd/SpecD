@@ -117,14 +117,15 @@
 - **THEN** those entries do not include generated diff output
 - **AND** `DiffGenerator` is not invoked for them
 
-#### Scenario: Diff generation failure does not discard merged preview
+#### Scenario: DiffGenerationError produces warning without downgrading merged entry
 
 - **GIVEN** a preview entry with status `merged`
-- **AND** `DiffGenerator` throws while generating its diff
+- **AND** `DiffGenerator` raises `DiffGenerationError` while generating its diff
 - **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
 - **THEN** the result includes a warning describing the diff-generation failure
 - **AND** the entry keeps status `merged`
 - **AND** the entry still returns its `base` and `merged` content
+- **AND** the entry omits the `diff` field
 
 ### Requirement: Result shape
 
@@ -173,6 +174,15 @@
 - **THEN** both files appear in `files`
 - **AND** the valid one has status `merged`
 - **AND** the failing one has status `missing`
+
+#### Scenario: DiffGenerationError remains a warning-only partial result
+
+- **GIVEN** one merged preview entry generates successfully and another raises `DiffGenerationError`
+- **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+- **THEN** the use case does not throw
+- **AND** both preview entries remain present in `files`
+- **AND** only the failing diff entry omits `diff`
+- **AND** warnings record the diff-generation failure separately from merge failures
 
 ### Requirement: Schema name guard
 

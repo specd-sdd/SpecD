@@ -13,6 +13,31 @@ export interface DiffGeneratorInput {
 }
 
 /**
+ * Raised when unified diff generation fails after merge content is already available.
+ */
+export class DiffGenerationError extends Error {
+  /**
+   * Creates a typed diff-generation failure.
+   *
+   * @param message - Human-readable failure description
+   * @param options - Optional error cause
+   * @param options.cause - Underlying diff-generation failure, when available
+   */
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message)
+    this.name = 'DiffGenerationError'
+    if (options?.cause !== undefined) {
+      Object.defineProperty(this, 'cause', {
+        value: options.cause,
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      })
+    }
+  }
+}
+
+/**
  * Generates plain unified diff text for preview file contents.
  */
 export interface DiffGenerator {

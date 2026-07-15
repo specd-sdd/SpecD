@@ -30,6 +30,19 @@ The diff output MUST identify the two sides using the preview filename:
 - base side label: `a/<filename> (base)`
 - merged side label: `b/<filename> (merged)`
 
+### Requirement: Error contract
+
+`DiffGenerator` SHALL define a dedicated typed failure for diff production: `DiffGenerationError`.
+
+`DiffGenerationError` MUST represent diff-generation failures that callers may handle as a non-fatal review-surface problem after merge has already succeeded.
+
+The default implementation MUST raise `DiffGenerationError` when its concrete diff-generation mechanism fails to produce a usable unified diff result.
+
+This error contract exists so callers such as `PreviewSpec` can distinguish:
+
+- a failed diff surface
+- from a failed merge or failed artifact preview
+
 ### Requirement: Default context lines
 
 When `contextLines` is omitted, the default implementation MUST generate the diff with 3 lines of context so preview output remains compatible with the current CLI behavior.
@@ -48,6 +61,7 @@ Core MUST provide a default implementation factory for this capability so config
 - The port itself MUST NOT depend directly on any concrete diff library
 - The capability returns plain text data only; colorization and other host presentation remain outside the port
 - The capability models file-to-file unified diffs; it does not model semantic review comments or artifact filtering behavior
+- Diff-generation failures intended for caller handling MUST surface through the dedicated `DiffGenerationError` contract rather than through anonymous library-specific errors
 
 ## Spec Dependencies
 

@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -38,6 +39,21 @@ interface ValidateResult {
 
 /** Artifact scope supported by schema-defined artifact types. */
 type ArtifactScope = 'change' | 'spec'
+
+/** Preview entry shape consumed for inline diff review. */
+interface PreviewFileEntry {
+  readonly filename: string
+  readonly merged: string
+  readonly base: string | null
+  readonly diff?: string
+  readonly status: 'merged' | 'no-op' | 'missing'
+}
+
+/** Inline diff outcome for a qualifying successful validation. */
+interface InlineDiffReview {
+  readonly diffLines: readonly string[]
+  readonly fallbackNote?: string
+}
 
 /**
  * Returns true when the value is a plain object record.
@@ -128,6 +144,115 @@ function buildPreviewCommand(name: string, specPath: string, previewArtifactId?:
     return `specd changes spec-preview ${name} ${specPath}`
   }
   return `specd changes spec-preview ${name} ${specPath} --artifact ${previewArtifactId}`
+}
+
+/**
+ * Builds the suggested preview note shown in validation output.
+ *
+ * @param name - Change name
+ * @param specPath - Target spec ID
+ * @param previewArtifactId - Optional artifact filter for spec-scoped previews
+ * @returns Formatted preview note
+ */
+function buildPreviewHint(name: string, specPath: string, previewArtifactId?: string): string {
+  return `note: inspect merged spec output with \`${buildPreviewCommand(name, specPath, previewArtifactId)}\``
+}
+
+/**
+ * Builds the artifact-filtered diff preview command used as inline-diff fallback.
+ *
+ * @param name - Change name
+ * @param specPath - Target spec ID
+ * @param artifactId - Validated artifact ID
+ * @returns Preview command with diff flag enabled
+ */
+function buildDiffPreviewCommand(name: string, specPath: string, artifactId: string): string {
+  return `specd changes spec-preview ${name} ${specPath} --diff --artifact ${artifactId}`
+}
+
+/**
+ * Returns whether a validation result represents an existing delta-backed artifact target.
+ *
+ * @param result - Structured validation result
+ * @param artifactId - Requested artifact ID
+ * @returns Whether inline diff review should be attempted
+ */
+function isDeltaBackedValidatedTarget(result: ValidateResult, artifactId: string): boolean {
+  return result.files.some(
+    (file) =>
+      file.artifactId === artifactId &&
+      file.status === 'validated' &&
+      file.filename.endsWith('.delta.yaml'),
+  )
+}
+
+/**
+ * Returns whether the value is a preview file entry.
+ *
+ * @param value - Candidate preview entry
+ * @returns Whether the entry matches the preview shape
+ */
+function isPreviewFileEntry(value: unknown): value is PreviewFileEntry {
+  if (!isRecord(value)) return false
+  return (
+    typeof value['filename'] === 'string' &&
+    typeof value['merged'] === 'string' &&
+    (value['base'] === null || typeof value['base'] === 'string') &&
+    (value['diff'] === undefined || typeof value['diff'] === 'string') &&
+    (value['status'] === 'merged' || value['status'] === 'no-op' || value['status'] === 'missing')
+  )
+}
+
+/**
+ * Loads inline diff output for a successful single-artifact spec validation.
+ *
+ * @param kernel - The wired kernel instance
+ * @param name - Change name
+ * @param specPath - Fully-qualified spec ID
+ * @param artifactId - Validated artifact ID
+ * @returns Inline diff lines or a fallback note when diff generation was unavailable
+ */
+async function loadInlineDiffReview(
+  kernel: import('@specd/sdk').Kernel,
+  name: string,
+  specPath: string,
+  artifactId: string,
+): Promise<InlineDiffReview | null> {
+  const schemaResult = await kernel.specs.getActiveSchema.execute()
+  if (schemaResult.raw) {
+    return null
+  }
+
+  const artifactType = schemaResult.schema.artifact(artifactId)
+  if (artifactType === null || artifactType.scope !== 'spec') {
+    return null
+  }
+
+  const preview = await kernel.changes.preview.execute({
+    name,
+    specId: specPath,
+    includeDiff: true,
+  })
+  const targetFilename = path.basename(artifactType.output)
+  const targetFile = Array.isArray(preview.files)
+    ? preview.files.find(
+        (file): file is PreviewFileEntry =>
+          isPreviewFileEntry(file) && file.filename === targetFilename,
+      )
+    : undefined
+
+  if (targetFile?.status !== 'merged' || targetFile.base === null) {
+    return null
+  }
+
+  if (typeof targetFile.diff === 'string' && targetFile.diff.length > 0) {
+    return { diffLines: targetFile.diff.split('\n') }
+  }
+
+  return {
+    diffLines: [],
+    fallbackNote: `note: inspect merged diff with \`${buildDiffPreviewCommand(name, specPath, artifactId)}\``,
+  }
 }
 
 /**
@@ -263,16 +388,35 @@ async function executeSingle(
     )
     const structuralNote =
       'note: validation is structural; review artifact content separately before relying on it'
-    const previewNote = isChangeScopedArtifact
+    let previewNote = isChangeScopedArtifact
       ? null
-      : `note: verify merged output with: ${buildPreviewCommand(
+      : buildPreviewHint(
           name,
           fullSpecPath,
           requestedArtifactScope === 'spec' ? opts.artifact : undefined,
-        )}`
+        )
+    let inlineDiffLines: readonly string[] = []
+
+    if (
+      passed &&
+      opts.artifact !== undefined &&
+      requestedArtifactScope === 'spec' &&
+      isDeltaBackedValidatedTarget(result, opts.artifact)
+    ) {
+      const inlineDiffReview = await loadInlineDiffReview(kernel, name, fullSpecPath, opts.artifact)
+      if (inlineDiffReview !== null) {
+        inlineDiffLines = inlineDiffReview.diffLines
+        if (inlineDiffLines.length > 0) {
+          previewNote = null
+        } else if (inlineDiffReview.fallbackNote !== undefined) {
+          previewNote = inlineDiffReview.fallbackNote
+        }
+      }
+    }
 
     if (passed) {
-      const sharedLines = previewNote === null ? [structuralNote] : [structuralNote, previewNote]
+      const sharedLines =
+        previewNote === null ? [structuralNote, ...inlineDiffLines] : [structuralNote, previewNote]
       if (result.notes.length > 0) {
         const noteLines = result.notes.map((n) => `note: ${n.artifactId} — ${n.description}`)
         output(
@@ -420,7 +564,7 @@ async function executeBatch(
       const previewNote =
         isChangeScopedArtifact || r.spec === null
           ? null
-          : `note: verify merged output with: ${buildPreviewCommand(name, r.spec, r.artifact)}`
+          : buildPreviewHint(name, r.spec, r.artifact)
       const sharedLines = previewNote === null ? [structuralNote] : [structuralNote, previewNote]
 
       if (r.passed) {

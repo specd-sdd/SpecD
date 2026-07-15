@@ -24,6 +24,12 @@
       ]
     },
     {
+      "requirement": "Error contract",
+      "rules": [
+        "`DiffGenerator` SHALL define a dedicated typed failure for diff production: `DiffGenerationError`.\n\n`DiffGenerationError` MUST represent diff-generation failures that callers may handle as a non-fatal review-surface problem after merge has already succeeded.\n\nThe default implementation MUST raise `DiffGenerationError` when its concrete diff-generation mechanism fails to produce a usable unified diff result.\n\nThis error contract exists so callers such as `PreviewSpec` can distinguish:\n\n- a failed diff surface\n- from a failed merge or failed artifact preview"
+      ]
+    },
+    {
       "requirement": "Default context lines",
       "rules": [
         "When `contextLines` is omitted, the default implementation MUST generate the diff with 3 lines of context so preview output remains compatible with the current CLI behavior."
@@ -46,7 +52,8 @@
     "The port lives in application/ports/ per core's hexagonal structure",
     "The port itself MUST NOT depend directly on any concrete diff library",
     "The capability returns plain text data only; colorization and other host presentation remain outside the port",
-    "The capability models file-to-file unified diffs; it does not model semantic review comments or artifact filtering behavior"
+    "The capability models file-to-file unified diffs; it does not model semantic review comments or artifact filtering behavior",
+    "Diff-generation failures intended for caller handling MUST surface through the dedicated DiffGenerationError contract rather than through anonymous library-specific errors"
   ],
   "scenarios": [
     {
@@ -92,6 +99,26 @@
       ]
     },
     {
+      "requirement": "Error contract",
+      "name": "Default implementation raises DiffGenerationError for unusable diff results",
+      "given": ["the concrete diff-generation mechanism fails to produce a usable unified diff"],
+      "when": ["the default DiffGenerator implementation handles that failure"],
+      "then": [
+        "it raises DiffGenerationError",
+        "AND it does not leak an anonymous library-specific error as the caller-facing contract"
+      ]
+    },
+    {
+      "requirement": "Error contract",
+      "name": "Callers can distinguish diff-surface failure from merge failure",
+      "given": ["PreviewSpec invokes DiffGenerator after merge already succeeded"],
+      "when": ["DiffGenerator raises DiffGenerationError"],
+      "then": [
+        "the caller can treat that failure as a non-fatal review-surface problem",
+        "AND the caller can preserve the successful merged preview result separately from the diff failure"
+      ]
+    },
+    {
       "requirement": "Default context lines",
       "name": "Omitted contextLines uses default of 3",
       "when": ["generate is called without contextLines"],
@@ -120,47 +147,21 @@
   ],
   "dependsOn": [],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:diff-generator",
-        "file": "core:package.json"
-      },
-      {
-        "specId": "core:diff-generator",
-        "file": "core:src/ports.ts"
-      },
-      {
-        "specId": "core:diff-generator",
-        "file": "core:src/application/ports/index.ts"
-      },
-      {
-        "specId": "core:diff-generator",
-        "file": "core:src/composition/index.ts"
-      },
-      {
-        "specId": "core:diff-generator",
-        "file": "core:test/composition/diff-generator.spec.ts"
-      },
-      {
-        "specId": "core:diff-generator",
-        "file": "core:test/infrastructure/diff/diff-generator.spec.ts"
-      }
-    ],
     "symbols": [
-      {
-        "specId": "core:diff-generator",
-        "file": "core:src/application/ports/diff-generator.ts",
-        "symbol": "DiffGeneratorInput"
-      },
-      {
-        "specId": "core:diff-generator",
-        "file": "core:src/application/ports/diff-generator.ts",
-        "symbol": "DiffGenerator"
-      },
       {
         "specId": "core:diff-generator",
         "file": "core:src/infrastructure/diff/diff-generator.ts",
         "symbol": "DiffDiffGenerator"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/application/ports/diff-generator.ts",
+        "symbol": "DiffGenerationError"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/composition/composition-resolver.ts",
+        "symbol": "getDiffGenerator"
       },
       {
         "specId": "core:diff-generator",
@@ -170,8 +171,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:cb3ecb8eee901ba5484d8139fb0de47e2e7a882a03c8088a3de656e9ee1cde2e",
-    "verify.md": "sha256:9be3ab1bda4f0ed652fbdf0366a9ab6c814daed97ef1154edd3924c7a2884a19"
+    "spec.md": "sha256:cc0ad557b02909e665fd9470d6213b45f71a64050b59100dcfa27dfaaf4426e1",
+    "verify.md": "sha256:c61622d8b4fc2a7e1c49303ceecf0d9dbda3d021fba219a8c8ec9c288d0abbf8"
   },
   "generatedBy": "core"
 }
