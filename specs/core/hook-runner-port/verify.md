@@ -64,6 +64,14 @@
 - **WHEN** `run` is called
 - **THEN** `stdout()` contains the standard output and `stderr()` contains the standard error
 
+#### Scenario: Final result remains complete after progress updates
+
+- **GIVEN** a progress callback is supplied
+- **AND** the command emits output before exiting
+- **WHEN** `run` completes
+- **THEN** the returned `HookResult` still contains the complete captured stdout and stderr
+- **AND** the final exit code remains available from the returned result
+
 #### Scenario: Run always resolves, never rejects
 
 - **GIVEN** a command that fails or crashes
@@ -89,10 +97,11 @@
 
 ### Requirement: Run method signature
 
-#### Scenario: run method accepts command and variables
+#### Scenario: run method accepts command, variables, and optional progress callback
 
 - **WHEN** `HookRunner.run` is called
 - **THEN** it accepts `command: string` and `variables: HookVariables`
+- **AND** it accepts an optional progress callback for in-flight hook execution updates
 - **AND** returns `Promise<HookResult>`
 
 #### Scenario: run method always resolves
@@ -100,6 +109,23 @@
 - **GIVEN** a command that throws or exits with non-zero code
 - **WHEN** `HookRunner.run` is called
 - **THEN** the promise resolves with a `HookResult` (never rejects)
+
+### Requirement: Live progress reporting
+
+#### Scenario: Runner reports stdout and stderr activity while the hook is active
+
+- **GIVEN** a progress callback is supplied to `HookRunner.run`
+- **AND** the command writes to both stdout and stderr before exiting
+- **WHEN** the hook is executed
+- **THEN** the callback receives progress updates before process completion
+- **AND** those updates preserve whether the activity came from stdout or stderr
+
+#### Scenario: Runner reports liveness when the hook is quiet but still active
+
+- **GIVEN** a progress callback is supplied to `HookRunner.run`
+- **AND** the command remains alive for a meaningful interval without emitting new output
+- **WHEN** the hook is executed
+- **THEN** the callback receives a liveness signal before the process exits
 
 ### Requirement: Hook type distinction
 

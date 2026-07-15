@@ -689,7 +689,7 @@ export function makeContentHasher(): ContentHasher {
  */
 export function makeHookRunner(exitCode = 0): HookRunner {
   return {
-    run: async () => new HookResult(exitCode, '', ''),
+    run: async (_command, _variables, _onProgress) => new HookResult(exitCode, '', ''),
   }
 }
 
@@ -710,7 +710,7 @@ export function makeRunStepHooks(
       (async (): Promise<RunStepHooksResult> => ({
         success: true,
         hooks: [],
-        failedHook: null,
+        failedHooks: [],
       })),
   } as unknown as RunStepHooks
 }

@@ -8,7 +8,7 @@ Agent-driven workflow steps declare `run:` hooks that need to be executed at ste
 
 ### Requirement: Ports and constructor
 
-`RunStepHooks` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `HookRunner`, and `SchemaProvider`.
+`RunStepHooks` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `HookRunner`, a `ReadonlyMap<string, ExternalHookRunner>`, and `SchemaProvider`.
 
 ```typescript
 class RunStepHooks {
@@ -16,12 +16,15 @@ class RunStepHooks {
     changes: ChangeRepository,
     archive: ArchiveRepository,
     hooks: HookRunner,
+    externalHookRunners: ReadonlyMap<string, ExternalHookRunner>,
     schemaProvider: SchemaProvider,
   )
 }
 ```
 
 `HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.
+
+The external hook runner registry is indexed by accepted external type and is used only for explicit `external` hook entries.
 
 `SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time, not passed per invocation.
 
@@ -36,10 +39,28 @@ class RunStepHooks {
 
 ### Requirement: Progress callback
 
-`RunStepHooks.execute` SHALL accept an optional second parameter `onProgress?: OnHookProgress`. Progress events are:
+`RunStepHooks.execute` SHALL accept an optional second parameter `onProgress?: OnHookProgress`.
+
+Progress events MUST include:
 
 - `{ type: 'hook-start', hookId: string, command: string }` — emitted before each hook execution
+- `{ type: 'hook-output', hookId: string, stream: 'stdout' | 'stderr', line: string }` — emitted when new hook output becomes observable
+- `{ type: 'hook-heartbeat', hookId: string, elapsedMs: number }` — emitted when the hook remains active without new output for a meaningful interval
 - `{ type: 'hook-done', hookId: string, success: boolean, exitCode: number }` — emitted after each hook execution
+
+The use case MUST preserve hook ordering in the emitted progress stream so consumers can correlate output and liveness events with the correct hook.
+
+### Requirement: Runner progress relay
+
+For shell `run:` hooks, `RunStepHooks` MUST relay progress received from `HookRunner` into the `onProgress` callback without waiting for hook completion.
+
+The relayed progress MUST allow downstream consumers to distinguish:
+
+- which hook is active
+- whether the signal came from stdout, stderr, or liveness heartbeat
+- when the hook has completed
+
+This relay MUST NOT change fail-fast or fail-soft semantics.
 
 ### Requirement: Change lookup
 
@@ -55,7 +76,7 @@ After obtaining the schema from `SchemaProvider`, `RunStepHooks` MUST compare `s
 
 `RunStepHooks` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.
 
-If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this step), the use case returns `{ hooks: [], success: true, failedHook: null }` — no error is thrown.
+If the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this step), the use case returns `{ hooks: [], success: true, failedHooks: [] }` — no error is thrown.
 
 ### Requirement: Hook collection
 
@@ -96,11 +117,11 @@ Built-in variables (e.g. `project.root`) are already present in the `TemplateExp
 
 ### Requirement: Pre-phase execution (fail-fast)
 
-When `phase` is `'pre'`, `RunStepHooks` MUST execute hooks sequentially in collection order. If any hook returns a non-zero exit code, execution MUST stop immediately — subsequent hooks are not run. The result includes all hooks that were executed (including the failed one) and identifies the failed hook.
+When `phase` is `'pre'`, `RunStepHooks` MUST execute hooks sequentially in collection order. If any hook returns a non-zero exit code, execution MUST stop immediately — subsequent hooks are not run. The result includes all hooks that were executed (including the failed one), and `failedHooks` contains exactly the failed hook result that aborted the phase.
 
 ### Requirement: Post-phase execution (fail-soft)
 
-When `phase` is `'post'`, `RunStepHooks` MUST execute all hooks sequentially in collection order regardless of individual failures. Every hook runs even if earlier hooks fail. The result includes all hooks and identifies any that failed.
+When `phase` is `'post'`, `RunStepHooks` MUST execute all hooks sequentially in collection order regardless of individual failures. Every hook runs even if earlier hooks fail. The result includes all hooks, and `failedHooks` contains every failed hook result in execution order.
 
 ### Requirement: Result shape
 
@@ -114,9 +135,9 @@ When `phase` is `'post'`, `RunStepHooks` MUST execute all hooks sequentially in 
   - `stderr` (string) — captured stderr
   - `success` (boolean) — `true` when exit code is 0
 - `success` (boolean) — `true` when all executed hooks succeeded
-- `failedHook` (object | null) — if a pre-hook failed (fail-fast), the failed hook result; `null` otherwise
+- `failedHooks` (array) — the subset of executed hook results whose `success` is `false`, in execution order; empty when every executed hook succeeded
 
-When no hooks match (empty `run:` hook list for the step+phase, or the step has no hooks), the result is `{ hooks: [], success: true, failedHook: null }`.
+Progress reporting during execution MUST be additive only. It does not replace the final result object, which MUST still contain the complete captured stdout/stderr and final exit information for every executed hook.
 
 ### Requirement: Works for any step
 

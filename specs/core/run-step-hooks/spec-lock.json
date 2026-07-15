@@ -16,7 +16,11 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/run-step-hooks.ts"
+      "file": "core:src/application/use-cases/run-step-hooks.ts",
+      "symbols": ["HookProgressEvent", "RunStepHooks"]
+    },
+    {
+      "file": "core:test/application/use-cases/run-step-hooks.spec.ts"
     }
   ]
 }

@@ -27,6 +27,24 @@ export function parseFormat(raw: string): OutputFormat {
 }
 
 /**
+ * Serializes a value into the selected output format without appending a newline.
+ *
+ * @param data - The data to serialize.
+ * @param format - The output format.
+ * @returns The serialized representation.
+ */
+export function serializeOutput(data: unknown, format: OutputFormat): string {
+  switch (format) {
+    case 'text':
+      return data as string
+    case 'json':
+      return JSON.stringify(data)
+    case 'toon':
+      return encodeToon(data)
+  }
+}
+
+/**
  * Writes formatted output to stdout.
  *
  * For `text`, `data` must be a pre-formatted string.
@@ -36,15 +54,5 @@ export function parseFormat(raw: string): OutputFormat {
  * @param format - The output format
  */
 export function output(data: unknown, format: OutputFormat): void {
-  switch (format) {
-    case 'text':
-      process.stdout.write(`${data as string}\n`)
-      break
-    case 'json':
-      process.stdout.write(`${JSON.stringify(data, null, 2)}\n`)
-      break
-    case 'toon':
-      process.stdout.write(`${encodeToon(data)}\n`)
-      break
-  }
+  process.stdout.write(`${serializeOutput(data, format)}\n`)
 }

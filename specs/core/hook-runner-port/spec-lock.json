@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture"],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/hook-runner.ts",
+      "symbols": ["HookRunnerProgressEvent", "OnHookRunnerProgress", "HookRunner"]
+    },
+    {
+      "file": "core:src/infrastructure/node/hook-runner.ts",
+      "symbols": ["NodeHookRunner"]
+    },
+    {
+      "file": "core:test/application/use-cases/helpers.ts",
+      "symbols": ["makeHookRunner"]
+    },
+    {
+      "file": "core:test/infrastructure/node/hook-runner.spec.ts"
+    }
+  ]
+}

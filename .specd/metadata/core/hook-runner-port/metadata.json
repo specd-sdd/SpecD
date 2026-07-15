@@ -1,9 +1,9 @@
 {
   "title": "HookRunner Port",
-  "description": "Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface.",
+  "description": "Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface.\n\nLong-running hooks also need to remain observable while they are still running. The port therefore covers both final hook completion and in-flight progress reporting for shell hook execution, while keeping the application layer decoupled from platform-specific process streaming details.",
   "dependsOn": ["default:_global/architecture"],
   "context": [
-    "Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface."
+    "Workflow entries can declare `run:` hooks that execute shell commands, but the application layer must not depend on subprocess APIs, shell detection, or platform-specific execution details. `HookRunner` is the application-layer port that defines the contract for executing these hook commands, abstracting template variable expansion and shell concerns behind a single interface.\n\nLong-running hooks also need to remain observable while they are still running. The port therefore covers both final hook completion and in-flight progress reporting for shell hook execution, while keeping the application layer decoupled from platform-specific process streaming details."
   ],
   "rules": [
     {
@@ -15,7 +15,13 @@
     {
       "requirement": "Run method signature",
       "rules": [
-        "The `run` method MUST accept two parameters:\n\n1. `command: string` — the shell command string, optionally containing `{{key.path}}` template variables\n2. `variables: HookVariables` — values for template variable substitution\n\nIt MUST return `Promise<HookResult>`."
+        "The `run` method MUST accept:\n\n1. `command: string` — the shell command string, optionally containing `{{key.path}}` template variables\n2. `variables: HookVariables` — values for template variable substitution\n3. an optional progress callback for in-flight hook execution updates\n\nIt MUST return `Promise<HookResult>`."
+      ]
+    },
+    {
+      "requirement": "Live progress reporting",
+      "rules": [
+        "When a progress callback is provided, the runner MUST report hook execution progress while the subprocess is still running.\n\nThe progress model MUST support, at minimum:\n\n- progress when the subprocess emits standard output\n- progress when the subprocess emits standard error\n- liveness signalling when the subprocess remains active without emitting new output\n\nThe contract MUST preserve stream identity so callers can distinguish stdout-derived activity from stderr-derived activity.\n\nThe runner MAY emit multiple progress updates for a single hook, but it MUST preserve the final `HookResult` contract after the process exits."
       ]
     },
     {
@@ -33,7 +39,7 @@
     {
       "requirement": "HookResult contract",
       "rules": [
-        "The `run` method MUST always resolve (never reject) and return a `HookResult` containing:\n\n- `exitCode()` — the process exit code (0 for success, non-zero for failure)\n- `stdout()` — all captured standard output as a string\n- `stderr()` — all captured standard error as a string\n- `isSuccess()` — returns `true` when exit code is 0"
+        "The `run` method MUST always resolve (never reject) and return a `HookResult` containing:\n\n- `exitCode()` — the process exit code (0 for success, non-zero for failure)\n- `stdout()` — all captured standard output as a string\n- `stderr()` — all captured standard error as a string\n- `isSuccess()` — returns `true` when exit code is 0\n\nLive progress reporting MUST NOT weaken or replace this final result contract. Callers MUST still receive the complete captured stdout/stderr and final exit code after hook completion, even when progress events were emitted during execution."
       ]
     },
     {
@@ -65,7 +71,8 @@
     "The port lives in application/ports/ per the hexagonal architecture rule",
     "No direct dependency on child_process, shell detection, or any I/O at the port level",
     "HookResult and HookVariables are domain value objects re-exported by the port module",
-    "The run method MUST always resolve — subprocess failures are captured in HookResult, not thrown as exceptions"
+    "The run method MUST always resolve — subprocess failures are captured in HookResult, not thrown as exceptions",
+    "Progress callbacks are observational only — they MUST NOT change hook success/failure semantics or replace final captured results"
   ],
   "scenarios": [
     {
@@ -141,6 +148,16 @@
     },
     {
       "requirement": "HookResult contract",
+      "name": "Final result remains complete after progress updates",
+      "given": ["a progress callback is supplied", "AND the command emits output before exiting"],
+      "when": ["run completes"],
+      "then": [
+        "the returned HookResult still contains the complete captured stdout and stderr",
+        "AND the final exit code remains available from the returned result"
+      ]
+    },
+    {
+      "requirement": "HookResult contract",
       "name": "Run always resolves, never rejects",
       "given": ["a command that fails or crashes"],
       "when": ["run is called"],
@@ -165,10 +182,11 @@
     },
     {
       "requirement": "Run method signature",
-      "name": "run method accepts command and variables",
+      "name": "run method accepts command, variables, and optional progress callback",
       "when": ["HookRunner.run is called"],
       "then": [
         "it accepts command: string and variables: HookVariables",
+        "AND it accepts an optional progress callback for in-flight hook execution updates",
         "AND returns Promise<HookResult>"
       ]
     },
@@ -178,6 +196,29 @@
       "given": ["a command that throws or exits with non-zero code"],
       "when": ["HookRunner.run is called"],
       "then": ["the promise resolves with a HookResult (never rejects)"]
+    },
+    {
+      "requirement": "Live progress reporting",
+      "name": "Runner reports stdout and stderr activity while the hook is active",
+      "given": [
+        "a progress callback is supplied to HookRunner.run",
+        "AND the command writes to both stdout and stderr before exiting"
+      ],
+      "when": ["the hook is executed"],
+      "then": [
+        "the callback receives progress updates before process completion",
+        "AND those updates preserve whether the activity came from stdout or stderr"
+      ]
+    },
+    {
+      "requirement": "Live progress reporting",
+      "name": "Runner reports liveness when the hook is quiet but still active",
+      "given": [
+        "a progress callback is supplied to HookRunner.run",
+        "AND the command remains alive for a meaningful interval without emitting new output"
+      ],
+      "when": ["the hook is executed"],
+      "then": ["the callback receives a liveness signal before the process exits"]
     },
     {
       "requirement": "Hook type distinction",
@@ -210,11 +251,44 @@
       ]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:5a414ac884589d9841584b6945172c5d9b28faf9fe0465786da323a7f325e1e9",
-    "verify.md": "sha256:904df32d49283c13ffb42eb0e9b922d094b67c15f66df0f120f63b872ceeef41"
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:hook-runner-port",
+        "file": "core:test/infrastructure/node/hook-runner.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:hook-runner-port",
+        "file": "core:src/application/ports/hook-runner.ts",
+        "symbol": "HookRunnerProgressEvent"
+      },
+      {
+        "specId": "core:hook-runner-port",
+        "file": "core:src/application/ports/hook-runner.ts",
+        "symbol": "OnHookRunnerProgress"
+      },
+      {
+        "specId": "core:hook-runner-port",
+        "file": "core:src/application/ports/hook-runner.ts",
+        "symbol": "HookRunner"
+      },
+      {
+        "specId": "core:hook-runner-port",
+        "file": "core:src/infrastructure/node/hook-runner.ts",
+        "symbol": "NodeHookRunner"
+      },
+      {
+        "specId": "core:hook-runner-port",
+        "file": "core:test/application/use-cases/helpers.ts",
+        "symbol": "makeHookRunner"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Workflow entries can declare run: hooks execute shell commands, but application layer must not depend subprocess APIs, shell detection, platform-spec…",
-  "optimizedContext": "# HookRunner Port\n\n## Rules\n- Interface shape: port MUST declared TypeScript interface named HookRunner single method run. SHALL NOT abstract class, because there no invariant constructor arguments shared across all implementations.\n- Run method signature: run method MUST accept two parameters: 1. command: string — shell command string, optionally containing {{key. path}} template variables 2. variables: HookVariables — values template variable substitution MUST return Promise<HookResult>.\n- Template variable expansion: Before executing command, implementations MUST expand all {{key. path}} template variables traversing variables using dot-separated key paths. Unknown variable paths MUST left unexpanded original {{key. path}} token preserved command string).\n- Shell escaping: All substituted variable values MUST shell-escaped before interpolation prevent shell injection attacks. Only string, number, boolean values SHALL substituted; complex types (objects, arrays) MUST left unexpanded.\n- HookResult contract: run method MUST always resolve (never reject) return HookResult containing: - exitCode() — process exit code (0 success, non-zero failure) - stdout() — all captured standard output string - stderr() — all captured standard error string - isSuccess() — returns true when exit code 0\n- HookVariables shape: HookVariables type MUST contain: - change? (optional) — object name: string, workspace: string, path: string fields representing active change context. Absent lifecycle points no active change. - project (required) — object root: string representing absolute path git repository root.\n- Hook type distinction: port executes only run: hooks (deterministic shell commands). instruction: hooks not executed port — injected text agent context different mechanism. port SHALL NOT handle interpret instruction: hook types.\n- HookRunner is shell-only: HookRunner SHALL remain internal shell runner built-in run: hooks only. MUST NOT become contract externally dispatched hook backends. External hooks use separate runner abstraction own dispatch rules accepted-type declaration.\n- Lifecycle execution guarantees: port itself does not enforce lifecycle semantics, but callers rely following guarantees: - pre-* hooks: non-zero exit code signals caller abort operation - post-* CLI-owned operations: caller runs post hooks before returning - post-* agent-driven operations: not supported via run: hooks (use instruction: hooks instead)"
+  "contentHashes": {
+    "spec.md": "sha256:c34382072dcd74d3f625d5e7f5bd12c7d6f2f8ea1a40e2871ee8fd3f69fb7910",
+    "verify.md": "sha256:6da47a39add774257d6dcc395ab2ff5c0799ffcce38258dd01f0903413916fa9"
+  },
+  "generatedBy": "core"
 }

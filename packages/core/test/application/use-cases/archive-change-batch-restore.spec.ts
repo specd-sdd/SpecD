@@ -712,7 +712,7 @@ describe('ArchiveChange batch snapshot integration', () => {
         if (input.phase === 'post') {
           postHookSpy(input)
         }
-        return { hooks: [], success: true, failedHook: null }
+        return { hooks: [], success: true, failedHooks: [] }
       },
     })
 

@@ -4,6 +4,8 @@
 
 Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default.
 
+Because transitions may trigger long-running hooks, the command must also keep hook execution observable while those hooks are in flight.
+
 ## Requirements
 
 ### Requirement: Command signature
@@ -68,33 +70,64 @@ The CLI maps the `--skip-hooks` option to a `skipHookPhases` set on `TransitionC
 
 ### Requirement: Progress output
 
-The CLI passes an `onProgress` callback to the use case that renders step-by-step feedback to stdout:
+The CLI passes an `onProgress` callback to the use case that renders step-by-step feedback in `text` format and preserves structured progress for machine-oriented formats.
 
-- `requires-check` → `✓ artifactId [complete]` or `✗ artifactId [status]`
-- `hook-start` → spinner `⠋ phase › hookId: command`
-- `hook-done` → `✓ hookId (exit 0)` or `✗ hookId (exit N)`
-- `transitioned` → `✓ from → to`
+For hook execution during a transition, progress output MUST allow the caller to observe:
 
-Progress output is only rendered in `text` format. JSON and toon formats include progress data in the structured output.
+- hook start
+- the active hook ID and command
+- recent hook output while the hook is still running
+- liveness signals when the hook remains active without new output
+- hook completion
+
+In `text` mode, the active hook MAY use a lightweight running label, but that label is only a visual aid and MUST NOT be the only signal that work is still progressing.
+
+Progress output for previously completed hooks MUST remain understandable instead of being fully overwritten by the currently running hook.
+
+In `json` and `toon`, progress MUST be emitted on stdout as newline-delimited structured stream records. Hook lifecycle events use `stream: "hook-progress"`. Transition lifecycle events such as `requires-check` and `transitioned` use `stream: "change-transition"`.
+
+### Requirement: Transition hook observability
+
+When transition hook execution exposes progress information, the command MUST surface that progress during the transition instead of appearing silent until the hook exits.
+
+This applies even when the transition ultimately fails before the lifecycle state changes.
+
+### Requirement: Shared hook progress presentation
+
+The command MUST use the same hook progress presentation model as `specd change run-hooks` for equivalent hook events.
+
+The CLI implementation MUST centralize that presentation logic in a shared helper so the two commands do not drift in:
+
+- running-status labels
+- recent-output tail rendering
+- liveness signalling
+- failed-hook full-output rendering
 
 ### Requirement: Output on success
 
-On success, output depends on `--format`:
+On success, output depends on `--format`.
 
-- `text` (default): prints a single line to stdout:
-- `json` or `toon`: outputs the following to stdout (encoded in the respective format):
+In `text` (default), the command prints a final human-readable confirmation to stdout after progress reporting completes.
 
-where `<to>` is the effective target state after routing.
+In `json` and `toon`, the command MUST emit one terminal stdout stream record with:
+
+- `stream: "change-transition"`
+- `event.type: "complete"`
+- `event.result` containing `result`, `name`, `from`, and `to`
+
+The final result MUST remain part of the same structured stream as the in-flight progress records rather than appearing as a standalone object outside the stream.
 
 ### Requirement: Post-hook failure warning
 
-Since both hook phases (source.post and target.pre) are fail-fast, a hook failure causes the command to exit with code 1 and print an `error:` message to stderr. The previous `postHookFailures` warning (exit code 2) is removed — there are no post-transition hook failures to report.
+Since both hook phases (source.post and target.pre) are fail-fast, a hook failure causes the command to exit with code 2 and print an `error:` message to stderr. Richer progress reporting does not introduce a separate post-transition hook warning state.
+
+If hook progress was rendered before the failure, the failure output MUST still leave the caller with enough visible context to understand which hook was active and what output preceded the error.
 
 ### Requirement: Invalid transition error
 
 If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.
 
-When the transition fails (e.g. `InvalidStateTransitionError`, `HookFailedError`), the command MUST render a **Repair Guide** to stdout:
+When the transition fails (e.g. `InvalidStateTransitionError`, `HookFailedError`), the command MUST render a **Repair Guide** in text mode:
 
 ```
 error: cannot transition to <step>
@@ -106,9 +139,9 @@ repair guide:
   reason:  <reason>
 ```
 
-The repair guide uses the `nextAction` data from the `GetStatusResult` (which the command SHOULD fetch internally on failure to provide better diagnostics). The `! <CODE>` line uses the blocker codes identified in the `GetStatus` spec (e.g., `MISSING_ARTIFACT`, `ARTIFACT_DRIFT`).
+The repair guide uses the `nextAction` data from the `GetStatusResult`. The `! <CODE>` line uses the blocker codes identified in the `GetStatus` spec (e.g., `MISSING_ARTIFACT`, `ARTIFACT_DRIFT`).
 
-When `format` is `json` or `toon`, the output MUST include a `blockers` array and the `nextAction` object, mirroring the `change status` format.
+When `format` is `json` or `toon`, the command MUST keep failure reporting on stdout as part of the structured stream by emitting a terminal `stream: "change-transition"` record with `event.type: "complete"` and `event.result` containing `result: "failure"`, `name`, `from`, `to`, `blockers`, and `nextAction`.
 
 When the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.
 
@@ -126,6 +159,8 @@ If the target workflow step has `requires` and any required artifact is not `com
 
 - The user specifies the logical target state; the CLI never exposes the routing logic in its help text
 - Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (`TransitionChange` failure plus `GetStatus`), not recomputed in the CLI layer
+- In `text`, progress is rendered to stderr and the final human-readable confirmation remains on stdout
+- In `json` and `toon`, machine-readable progress and the terminal `complete` record are emitted on stdout; stderr is reserved for non-structured diagnostics
 
 ## Examples
 

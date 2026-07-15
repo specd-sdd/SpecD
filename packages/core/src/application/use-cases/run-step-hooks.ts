@@ -5,7 +5,12 @@ import { HookNotFoundError } from '../../domain/errors/hook-not-found-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ExternalHookRunner } from '../ports/external-hook-runner.js'
-import { type HookResult, type HookRunner, type TemplateVariables } from '../ports/hook-runner.js'
+import {
+  type HookResult,
+  type HookRunner,
+  type HookRunnerProgressEvent,
+  type TemplateVariables,
+} from '../ports/hook-runner.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ExternalHookTypeNotRegisteredError } from '../errors/external-hook-type-not-registered-error.js'
@@ -17,6 +22,8 @@ const CHANGE_STATES = Object.keys(VALID_TRANSITIONS) as ChangeState[]
 /** Progress event emitted during hook execution. */
 export type HookProgressEvent =
   | { type: 'hook-start'; hookId: string; command: string }
+  | { type: 'hook-output'; hookId: string; stream: 'stdout' | 'stderr'; line: string }
+  | { type: 'hook-heartbeat'; hookId: string; elapsedMs: number }
   | { type: 'hook-done'; hookId: string; success: boolean; exitCode: number }
 
 /** Callback for receiving hook execution progress events. */
@@ -44,7 +51,7 @@ export interface RunStepHookEntry {
 export interface RunStepHooksResult {
   readonly hooks: readonly RunStepHookEntry[]
   readonly success: boolean
-  readonly failedHook: RunStepHookEntry | null
+  readonly failedHooks: readonly RunStepHookEntry[]
 }
 
 /**
@@ -115,7 +122,7 @@ export class RunStepHooks {
 
         const workflowStep = schema.workflowStep(input.step)
         if (workflowStep === null) {
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         }
 
         let runHooks = this._collectHooks(workflowStep.hooks[input.phase])
@@ -133,7 +140,7 @@ export class RunStepHooks {
         }
 
         if (runHooks.length === 0) {
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         }
 
         const workspace = archived.specIds[0]?.split(':')[0] ?? 'default'
@@ -165,7 +172,7 @@ export class RunStepHooks {
 
     const workflowStep = schema.workflowStep(input.step)
     if (workflowStep === null) {
-      return { hooks: [], success: true, failedHook: null }
+      return { hooks: [], success: true, failedHooks: [] }
     }
 
     // Collect executable hooks from schema
@@ -185,7 +192,7 @@ export class RunStepHooks {
     }
 
     if (runHooks.length === 0) {
-      return { hooks: [], success: true, failedHook: null }
+      return { hooks: [], success: true, failedHooks: [] }
     }
 
     // Build contextual variables
@@ -228,14 +235,33 @@ export class RunStepHooks {
     onProgress?: OnHookProgress,
   ): Promise<RunStepHooksResult> {
     const results: RunStepHookEntry[] = []
-    let failedHook: RunStepHookEntry | null = null
+    const failedHooks: RunStepHookEntry[] = []
 
     for (const hook of runHooks) {
       const command = hook.type === 'run' ? hook.command : `external:${hook.externalType}`
       onProgress?.({ type: 'hook-start', hookId: hook.id, command })
+      const relayRunnerProgress = (event: HookRunnerProgressEvent): void => {
+        switch (event.type) {
+          case 'output':
+            onProgress?.({
+              type: 'hook-output',
+              hookId: hook.id,
+              stream: event.stream,
+              line: event.line,
+            })
+            break
+          case 'heartbeat':
+            onProgress?.({
+              type: 'hook-heartbeat',
+              hookId: hook.id,
+              elapsedMs: event.elapsedMs,
+            })
+            break
+        }
+      }
       const result =
         hook.type === 'run'
-          ? await this._hooks.run(hook.command, variables)
+          ? await this._hooks.run(hook.command, variables, relayRunnerProgress)
           : await this._runExternalHook(hook, variables)
       const entry: RunStepHookEntry = {
         id: hook.id,
@@ -254,17 +280,17 @@ export class RunStepHooks {
       })
 
       if (!result.isSuccess()) {
+        failedHooks.push(entry)
         if (phase === 'pre') {
-          return { hooks: results, success: false, failedHook: entry }
+          return { hooks: results, success: false, failedHooks }
         }
-        if (failedHook === null) failedHook = entry
       }
     }
 
     return {
       hooks: results,
       success: results.every((r) => r.success),
-      failedHook,
+      failedHooks,
     }
   }
 

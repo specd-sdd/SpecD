@@ -4,6 +4,8 @@
 
 Agent-driven workflow steps declare `run:` hooks that must be executed at step boundaries, but agents interact with specd through CLI commands — they cannot call use cases directly. `specd change run-hooks` is the CLI command that lets agents execute `run:` hooks for a given step and phase, with clear exit codes that signal whether to proceed or stop. It delegates to the `RunStepHooks` use case and formats the results for agent or human consumption.
 
+For long-running hooks, the command must also make in-flight execution visible instead of appearing silent until process exit.
+
 ## Requirements
 
 ### Requirement: Command signature
@@ -26,11 +28,23 @@ The command MUST delegate all hook resolution and execution to the `RunStepHooks
 
 When all hooks execute successfully (or no hooks match), the command exits with code 0.
 
-When no `run:` hooks exist for the given step+phase, the command prints `no hooks to run` to stdout (text format) or `{ "result": "ok", "hooks": [] }` (json/toon format) and exits with code 0.
+When no `run:` hooks exist for the given step+phase:
+
+- `text` prints `no hooks to run` to stdout
+- `json` and `toon` emit a terminal stdout `stream: "run-hooks"` record with `event.type: "complete"` and `result: { result: "ok", hooks: [] }`
+
+When hooks do run successfully:
+
+- `text` leaves progress on stderr and emits a final human-readable summary on stdout
+- `json` and `toon` emit a terminal stdout `stream: "run-hooks"` `complete` record carrying the successful hook results
 
 ### Requirement: Exit code 2 on hook failure
 
-When any `run:` hook exits with a non-zero code, the command exits with code 2 (per the entrypoint spec's hook failure convention). The hook's stdout and stderr are forwarded to the CLI's stdout and stderr respectively.
+When any `run:` hook exits with a non-zero code, the command exits with code 2 (per the entrypoint spec's hook failure convention).
+
+In `text`, in-flight progress and failed-hook context are rendered to stderr, and stdout still carries the final human-readable summary.
+
+In `json` and `toon`, stdout emits a terminal `stream: "run-hooks"` `complete` record whose result identifies `code: "HOOK_FAILED"`, the executed hooks, and `failedHooks`.
 
 ### Requirement: Exit code 1 on domain errors
 
@@ -44,50 +58,54 @@ The command exits with code 1 for:
 
 ### Requirement: Text output format
 
-When `--format` is `text` (default):
+When `--format` is `text` (default), the command MUST render append-only progress that keeps previously executed hooks visible.
 
-- For each executed hook, print a result line to stdout:
-  - Success: `ok: <hook-id>`
-  - Failure: `failed: <hook-id> (exit code <n>)` followed by the hook's stderr on subsequent lines
+For a running hook, the text output MUST show:
 
-- When all hooks succeed: no additional summary line
-- When a pre-hook fails: only the hooks up to and including the failure are printed (fail-fast)
-- When post-hooks fail: all hooks are printed, with failures clearly marked
+- the hook status, which MAY include a lightweight spinner such as `[⠋ running]`
+- the hook ID
+- the command being executed
+- recent observable output while the hook remains active
+
+When a hook completes successfully, the command MUST leave a visible historical record for that hook instead of erasing it while the next hook starts.
+
+When a hook fails, the command MUST show the full output for the failed hook rather than only a short summary line.
+
+When all hooks succeed, the rendered history MUST remain understandable without requiring the user to infer what happened from a single final line.
+
+### Requirement: Long-running hook observability
+
+The command MUST NOT remain silent for the full duration of a long-running hook when progress information is available from the hook execution pipeline.
+
+If a hook stays active without emitting new stdout/stderr, the command MUST surface liveness through progress output rather than forcing the caller to wait for final process exit to learn that the hook is still running.
+
+### Requirement: Shared hook progress presentation
+
+The command MUST use the same hook progress presentation model as `specd change transition` for equivalent hook events.
+
+The CLI implementation MUST centralize that presentation logic in a shared helper so the two commands do not drift in:
+
+- running-status labels
+- recent-output tail rendering
+- liveness signalling
+- failed-hook full-output rendering
 
 ### Requirement: JSON output format
 
-When `--format` is `json` or `toon`, output to stdout:
+When `--format` is `json` or `toon`, all machine-readable output MUST be emitted on stdout as a newline-delimited structured stream.
 
-On success:
+Hook lifecycle updates MUST be emitted as `stream: "hook-progress"` records so consumers can observe:
 
-```json
-{
-  "result": "ok",
-  "hooks": [{ "id": "<hook-id>", "command": "<expanded-command>", "exitCode": 0, "success": true }]
-}
-```
+- hook start
+- hook output activity
+- liveness signals for long-running hooks without new output
+- hook completion
 
-On failure:
+After execution completes, the command MUST emit one terminal `stream: "run-hooks"` record whose event type is `complete`.
 
-```json
-{
-  "result": "error",
-  "code": "HOOK_FAILED",
-  "hooks": [
-    { "id": "<hook-id>", "command": "<expanded-command>", "exitCode": 0, "success": true },
-    {
-      "id": "<hook-id>",
-      "command": "<expanded-command>",
-      "exitCode": 1,
-      "success": false,
-      "stderr": "<stderr>"
-    }
-  ],
-  "failedHook": { "id": "<hook-id>", "exitCode": 1 }
-}
-```
+That terminal record MUST contain the final hook results with `id`, `command`, `exitCode`, and `success`, plus any captured output required by the error contract.
 
-`failedHook` is present only for pre-phase failures (fail-fast). For post-phase failures, `failedHook` is omitted and the consumer inspects the `hooks` array.
+The terminal `complete` record MUST expose `failedHooks` so consumers can identify every failed hook result without re-deriving that subset from raw output.
 
 ### Requirement: Works for any step including archiving
 
@@ -99,7 +117,8 @@ The command MUST accept any step name defined in the schema, including `archivin
 - The command does not perform state transitions — it only executes hooks
 - The command does not validate step availability — the agent is responsible for calling it at the appropriate time
 - Exit code 2 is used exclusively for hook failures, consistent with the entrypoint spec
-- Hook stdout/stderr is forwarded verbatim in text mode; captured in JSON mode
+- In `text`, progress is rendered to stderr and the final human-readable summary is rendered to stdout
+- In `json` and `toon`, machine-readable progress and the final `complete` record are emitted on stdout; stderr is reserved for non-structured diagnostics
 
 ## Examples
 

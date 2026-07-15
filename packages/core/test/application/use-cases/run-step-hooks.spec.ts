@@ -14,6 +14,7 @@ import { type HookEntry } from '../../../src/domain/value-objects/workflow-step.
 import { type ExternalHookRunner } from '../../../src/application/ports/external-hook-runner.js'
 import {
   type HookRunner,
+  type OnHookRunnerProgress,
   type TemplateVariables,
 } from '../../../src/application/ports/hook-runner.js'
 import {
@@ -122,7 +123,7 @@ describe('RunStepHooks', () => {
       })
 
       const result = await uc.execute({ name: 'my-change', step: 'archiving', phase: 'pre' })
-      expect(result).toEqual({ hooks: [], success: true, failedHook: null })
+      expect(result).toEqual({ hooks: [], success: true, failedHooks: [] })
     })
 
     it('returns empty result when step is valid but schema has no workflowStep', async () => {
@@ -136,7 +137,7 @@ describe('RunStepHooks', () => {
 
       const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
 
-      expect(result).toEqual({ hooks: [], success: true, failedHook: null })
+      expect(result).toEqual({ hooks: [], success: true, failedHooks: [] })
     })
   })
 
@@ -310,7 +311,7 @@ describe('RunStepHooks', () => {
 
       const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
 
-      expect(result).toEqual({ hooks: [], success: true, failedHook: null })
+      expect(result).toEqual({ hooks: [], success: true, failedHooks: [] })
     })
   })
 
@@ -341,8 +342,8 @@ describe('RunStepHooks', () => {
 
       expect(result.success).toBe(false)
       expect(result.hooks).toHaveLength(1)
-      expect(result.failedHook).not.toBeNull()
-      expect(result.failedHook!.id).toBe('fail-hook')
+      expect(result.failedHooks).toHaveLength(1)
+      expect(result.failedHooks[0]!.id).toBe('fail-hook')
       expect(commands).toEqual(['fail'])
     })
 
@@ -361,7 +362,7 @@ describe('RunStepHooks', () => {
 
       expect(result.success).toBe(true)
       expect(result.hooks).toHaveLength(2)
-      expect(result.failedHook).toBeNull()
+      expect(result.failedHooks).toEqual([])
     })
 
     it('post-phase fail-soft: continues after failure, all hooks run', async () => {
@@ -388,8 +389,33 @@ describe('RunStepHooks', () => {
 
       expect(result.success).toBe(false)
       expect(result.hooks).toHaveLength(2)
-      expect(result.failedHook!.id).toBe('notify')
+      expect(result.failedHooks.map((hook) => hook.id)).toEqual(['notify'])
       expect(commands).toEqual(['notify', 'cleanup'])
+    })
+
+    it('post-phase failures: failedHooks keeps every failed hook in execution order', async () => {
+      const change = makeChange('my-change')
+      const hookA: HookEntry = { id: 'notify', type: 'run', command: 'notify' }
+      const hookB: HookEntry = { id: 'cleanup', type: 'run', command: 'cleanup' }
+      const hookC: HookEntry = { id: 'report', type: 'run', command: 'report' }
+
+      const hookRunner = {
+        async run(command: string, _variables: TemplateVariables): Promise<HookResult> {
+          if (command === 'cleanup') return new HookResult(0, '', '')
+          return new HookResult(1, '', `${command} failed`)
+        },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([], [hookA, hookB, hookC]),
+        hookRunner,
+      })
+
+      const result = await uc.execute({ name: 'my-change', step: 'implementing', phase: 'post' })
+
+      expect(result.success).toBe(false)
+      expect(result.failedHooks.map((hook) => hook.id)).toEqual(['notify', 'report'])
     })
 
     it('post-phase success: all hooks run, success is true', async () => {
@@ -407,7 +433,7 @@ describe('RunStepHooks', () => {
 
       expect(result.success).toBe(true)
       expect(result.hooks).toHaveLength(2)
-      expect(result.failedHook).toBeNull()
+      expect(result.failedHooks).toEqual([])
     })
   })
 
@@ -525,6 +551,80 @@ describe('RunStepHooks', () => {
         success: false,
         exitCode: 1,
       })
+    })
+
+    it('relays output and heartbeat progress before hook completion', async () => {
+      const change = makeChange('my-change')
+      const hook: HookEntry = { id: 'lint', type: 'run', command: 'pnpm lint' }
+
+      const hookRunner = {
+        async run(
+          _command: string,
+          _variables: TemplateVariables,
+          onProgress?: OnHookRunnerProgress,
+        ): Promise<HookResult> {
+          onProgress?.({ type: 'output', stream: 'stdout', line: 'running lint' })
+          onProgress?.({ type: 'heartbeat', elapsedMs: 5000 })
+          return new HookResult(0, 'running lint\n', '')
+        },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([hook]),
+        hookRunner,
+      })
+
+      const events: HookProgressEvent[] = []
+      await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' }, (event) =>
+        events.push(event),
+      )
+
+      expect(events).toEqual([
+        { type: 'hook-start', hookId: 'lint', command: 'pnpm lint' },
+        { type: 'hook-output', hookId: 'lint', stream: 'stdout', line: 'running lint' },
+        { type: 'hook-heartbeat', hookId: 'lint', elapsedMs: 5000 },
+        { type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 },
+      ])
+    })
+
+    it('emits progress before fail-fast aborts later pre hooks', async () => {
+      const change = makeChange('my-change')
+      const hookA: HookEntry = { id: 'fail-hook', type: 'run', command: 'fail' }
+      const hookB: HookEntry = { id: 'skip-hook', type: 'run', command: 'skip' }
+
+      const hookRunner = {
+        async run(
+          command: string,
+          _variables: TemplateVariables,
+          onProgress?: OnHookRunnerProgress,
+        ): Promise<HookResult> {
+          if (command === 'fail') {
+            onProgress?.({ type: 'output', stream: 'stderr', line: 'about to fail' })
+            onProgress?.({ type: 'heartbeat', elapsedMs: 5000 })
+            return new HookResult(1, '', 'about to fail\n')
+          }
+          return new HookResult(0, '', '')
+        },
+      }
+
+      const uc = makeUseCase({
+        changes: makeChangeRepository([change]),
+        schema: makeSchemaWithHooks([hookA, hookB]),
+        hookRunner,
+      })
+
+      const events: HookProgressEvent[] = []
+      await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' }, (event) =>
+        events.push(event),
+      )
+
+      expect(events).toEqual([
+        { type: 'hook-start', hookId: 'fail-hook', command: 'fail' },
+        { type: 'hook-output', hookId: 'fail-hook', stream: 'stderr', line: 'about to fail' },
+        { type: 'hook-heartbeat', hookId: 'fail-hook', elapsedMs: 5000 },
+        { type: 'hook-done', hookId: 'fail-hook', success: false, exitCode: 1 },
+      ])
     })
   })
 

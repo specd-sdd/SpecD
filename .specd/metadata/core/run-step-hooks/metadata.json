@@ -19,7 +19,7 @@
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`RunStepHooks` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `HookRunner`, and `SchemaProvider`.\n\n```typescript\nclass RunStepHooks {\n  constructor(\n    changes: ChangeRepository,\n    archive: ArchiveRepository,\n    hooks: HookRunner,\n    schemaProvider: SchemaProvider,\n  )\n}\n```\n\n`HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.\n\n`SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time, not passed per invocation."
+        "`RunStepHooks` receives at construction time: `ChangeRepository`, `ArchiveRepository`, `HookRunner`, a `ReadonlyMap<string, ExternalHookRunner>`, and `SchemaProvider`.\n\n```typescript\nclass RunStepHooks {\n  constructor(\n    changes: ChangeRepository,\n    archive: ArchiveRepository,\n    hooks: HookRunner,\n    externalHookRunners: ReadonlyMap<string, ExternalHookRunner>,\n    schemaProvider: SchemaProvider,\n  )\n}\n```\n\n`HookRunner` uses `TemplateExpander.expandForShell()` internally — `RunStepHooks` does not call the expander directly. It builds the `TemplateVariables` map and passes it to `HookRunner.run()`.\n\nThe external hook runner registry is indexed by accepted external type and is used only for explicit `external` hook entries.\n\n`SchemaProvider` returns the fully-resolved schema with plugins and overrides applied — all workflow hooks (including those added via `schemaOverrides`) are already present in the schema's workflow steps. All dependencies are injected at kernel composition time, not passed per invocation."
       ]
     },
     {
@@ -31,7 +31,13 @@
     {
       "requirement": "Progress callback",
       "rules": [
-        "`RunStepHooks.execute` SHALL accept an optional second parameter `onProgress?: OnHookProgress`. Progress events are:\n\n- `{ type: 'hook-start', hookId: string, command: string }` — emitted before each hook execution\n- `{ type: 'hook-done', hookId: string, success: boolean, exitCode: number }` — emitted after each hook execution"
+        "`RunStepHooks.execute` SHALL accept an optional second parameter `onProgress?: OnHookProgress`.\n\nProgress events MUST include:\n\n- `{ type: 'hook-start', hookId: string, command: string }` — emitted before each hook execution\n- `{ type: 'hook-output', hookId: string, stream: 'stdout' | 'stderr', line: string }` — emitted when new hook output becomes observable\n- `{ type: 'hook-heartbeat', hookId: string, elapsedMs: number }` — emitted when the hook remains active without new output for a meaningful interval\n- `{ type: 'hook-done', hookId: string, success: boolean, exitCode: number }` — emitted after each hook execution\n\nThe use case MUST preserve hook ordering in the emitted progress stream so consumers can correlate output and liveness events with the correct hook."
+      ]
+    },
+    {
+      "requirement": "Runner progress relay",
+      "rules": [
+        "For shell `run:` hooks, `RunStepHooks` MUST relay progress received from `HookRunner` into the `onProgress` callback without waiting for hook completion.\n\nThe relayed progress MUST allow downstream consumers to distinguish:\n\n- which hook is active\n- whether the signal came from stdout, stderr, or liveness heartbeat\n- when the hook has completed\n\nThis relay MUST NOT change fail-fast or fail-soft semantics."
       ]
     },
     {
@@ -49,7 +55,7 @@
     {
       "requirement": "Step resolution",
       "rules": [
-        "`RunStepHooks` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.\n\nIf the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this step), the use case returns `{ hooks: [], success: true, failedHook: null }` — no error is thrown."
+        "`RunStepHooks` validates that `step` is a valid `ChangeState` (a lifecycle state defined by the domain, which includes `archiving`). If it is not, it MUST throw `StepNotValidError`.\n\nIf the step is a valid lifecycle state, `RunStepHooks` looks up the workflow step entry via `schema.workflowStep(step)`. If no matching entry exists (the schema does not declare hooks for this step), the use case returns `{ hooks: [], success: true, failedHooks: [] }` — no error is thrown."
       ]
     },
     {
@@ -79,19 +85,19 @@
     {
       "requirement": "Pre-phase execution (fail-fast)",
       "rules": [
-        "When `phase` is `'pre'`, `RunStepHooks` MUST execute hooks sequentially in collection order. If any hook returns a non-zero exit code, execution MUST stop immediately — subsequent hooks are not run. The result includes all hooks that were executed (including the failed one) and identifies the failed hook."
+        "When `phase` is `'pre'`, `RunStepHooks` MUST execute hooks sequentially in collection order. If any hook returns a non-zero exit code, execution MUST stop immediately — subsequent hooks are not run. The result includes all hooks that were executed (including the failed one), and `failedHooks` contains exactly the failed hook result that aborted the phase."
       ]
     },
     {
       "requirement": "Post-phase execution (fail-soft)",
       "rules": [
-        "When `phase` is `'post'`, `RunStepHooks` MUST execute all hooks sequentially in collection order regardless of individual failures. Every hook runs even if earlier hooks fail. The result includes all hooks and identifies any that failed."
+        "When `phase` is `'post'`, `RunStepHooks` MUST execute all hooks sequentially in collection order regardless of individual failures. Every hook runs even if earlier hooks fail. The result includes all hooks, and `failedHooks` contains every failed hook result in execution order."
       ]
     },
     {
       "requirement": "Result shape",
       "rules": [
-        "`RunStepHooks.execute` MUST return a result object containing:\n\n- `hooks` — array of per-hook results, each with:\n  - `id` (string) — the hook's `id` from the schema or project config\n  - `command` (string) — the expanded command string (after template variable substitution)\n  - `exitCode` (number) — the process exit code\n  - `stdout` (string) — captured stdout\n  - `stderr` (string) — captured stderr\n  - `success` (boolean) — `true` when exit code is 0\n- `success` (boolean) — `true` when all executed hooks succeeded\n- `failedHook` (object | null) — if a pre-hook failed (fail-fast), the failed hook result; `null` otherwise\n\nWhen no hooks match (empty `run:` hook list for the step+phase, or the step has no hooks), the result is `{ hooks: [], success: true, failedHook: null }`."
+        "`RunStepHooks.execute` MUST return a result object containing:\n\n- `hooks` — array of per-hook results, each with:\n  - `id` (string) — the hook's `id` from the schema or project config\n  - `command` (string) — the expanded command string (after template variable substitution)\n  - `exitCode` (number) — the process exit code\n  - `stdout` (string) — captured stdout\n  - `stderr` (string) — captured stderr\n  - `success` (boolean) — `true` when exit code is 0\n- `success` (boolean) — `true` when all executed hooks succeeded\n- `failedHooks` (array) — the subset of executed hook results whose `success` is `false`, in execution order; empty when every executed hook succeeded\n\nProgress reporting during execution MUST be additive only. It does not replace the final result object, which MUST still contain the complete captured stdout/stderr and final exit information for every executed hook."
       ]
     },
     {
@@ -121,7 +127,7 @@
       "name": "Constructor receives required dependencies",
       "when": ["RunStepHooks is instantiated"],
       "then": [
-        "it receives ChangeRepository, ArchiveRepository, HookRunner, and SchemaProvider",
+        "it receives ChangeRepository, ArchiveRepository, HookRunner, ReadonlyMap<string, ExternalHookRunner>, and SchemaProvider",
         "AND they are stored as instance properties for use during execute"
       ]
     },
@@ -136,12 +142,37 @@
     },
     {
       "requirement": "Progress callback",
-      "name": "Progress callback receives hook start and done events",
+      "name": "Progress callback receives hook start, output, heartbeat, and done events",
       "given": ["onProgress callback is provided to execute"],
       "when": ["hooks are executed"],
       "then": [
         "the callback receives { type: 'hook-start', hookId, command } before each hook",
+        "AND receives output events that preserve hook ID and stdout/stderr identity while the hook is running",
+        "AND receives heartbeat events when a hook remains active without new output",
         "AND receives { type: 'hook-done', hookId, success, exitCode } after each hook"
+      ]
+    },
+    {
+      "requirement": "Runner progress relay",
+      "name": "Shell hook progress is relayed before completion",
+      "given": [
+        "a shell run: hook emits output while running",
+        "AND onProgress callback is provided to RunStepHooks.execute"
+      ],
+      "when": ["the hook is executed"],
+      "then": [
+        "RunStepHooks forwards that progress through onProgress before the hook completes",
+        "AND the relayed events identify the active hook"
+      ]
+    },
+    {
+      "requirement": "Runner progress relay",
+      "name": "Relayed progress does not change fail-fast behaviour",
+      "given": ["a pre-phase shell hook emits progress and then exits with a non-zero code"],
+      "when": ["the phase is executed"],
+      "then": [
+        "the progress events are still emitted before failure",
+        "AND subsequent pre hooks are still skipped"
       ]
     },
     {
@@ -210,7 +241,7 @@
       "name": "Valid state without workflow entry returns empty",
       "given": ["a schema with workflow steps [designing, implementing, verifying, archiving]"],
       "when": ["RunStepHooks.execute is called with step: \"ready\" and phase: \"pre\""],
-      "then": ["the result is { hooks: [], success: true, failedHook: null }"]
+      "then": ["the result is { hooks: [], success: true, failedHooks: [] }"]
     },
     {
       "requirement": "Hook collection",
@@ -308,7 +339,7 @@
         "the result contains one hook result (for test) with success: false",
         "AND lint was never executed",
         "AND result.success is false",
-        "AND result.failedHook identifies the test hook"
+        "AND result.failedHooks contains exactly the test hook result"
       ]
     },
     {
@@ -322,7 +353,7 @@
       "then": [
         "the result contains two hook results, both with success: true",
         "AND result.success is true",
-        "AND result.failedHook is null"
+        "AND result.failedHooks is empty"
       ]
     },
     {
@@ -338,7 +369,7 @@
         "both hooks are executed",
         "AND the result contains two hook results",
         "AND result.success is false",
-        "AND result.failedHook is null (fail-soft, no single failed hook)"
+        "AND result.failedHooks contains exactly the test hook result"
       ]
     },
     {
@@ -348,7 +379,27 @@
         "a step with no run: hooks in the pre phase (only instruction: hooks or no hooks at all)"
       ],
       "when": ["RunStepHooks.execute is called with phase: \"pre\""],
-      "then": ["the result is { hooks: [], success: true, failedHook: null }"]
+      "then": ["the result is { hooks: [], success: true, failedHooks: [] }"]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "Final hook result remains complete after in-flight progress",
+      "given": ["a hook emits output progress before exiting"],
+      "when": ["RunStepHooks.execute completes"],
+      "then": [
+        "the returned hook entry still contains the complete captured stdout and stderr",
+        "AND the final hook entry still includes the final exit code and success flag"
+      ]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "failedHooks includes every failed hook result in execution order",
+      "given": ["multiple hooks are executed and more than one exits with a non-zero code"],
+      "when": ["RunStepHooks.execute completes"],
+      "then": [
+        "failedHooks contains each failed hook result in the order those hooks were executed",
+        "AND successful hook results remain present only in hooks"
+      ]
     },
     {
       "requirement": "Works for any step",
@@ -373,13 +424,25 @@
     "files": [
       {
         "specId": "core:run-step-hooks",
-        "file": "core:src/composition/use-cases/run-step-hooks.ts"
+        "file": "core:test/application/use-cases/run-step-hooks.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:run-step-hooks",
+        "file": "core:src/application/use-cases/run-step-hooks.ts",
+        "symbol": "HookProgressEvent"
+      },
+      {
+        "specId": "core:run-step-hooks",
+        "file": "core:src/application/use-cases/run-step-hooks.ts",
+        "symbol": "RunStepHooks"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5d9d64c507dcc1952dc57660a5cc50892c9c726668c52c1e5dbd9f8e1bfce89a",
-    "verify.md": "sha256:9901f9af61eb5cea105d8244d571bc63a4498a7279175ebce2c6b40629019137"
+    "spec.md": "sha256:83171315608ad989da7271a4dfeac4e083a5617199e864307b1bd77104878696",
+    "verify.md": "sha256:d9cfc31026721911de4282f211d3256d44565dc4d950e09b2bc47027cd3cf6e9"
   },
   "generatedBy": "core"
 }

@@ -110,6 +110,22 @@
 - **THEN** stdout contains `transitioned my-change: drafting → designing`
 - **AND** the process exits with code 0
 
+#### Scenario: Structured success result is emitted as terminal complete record
+
+- **GIVEN** `specd change transition my-change designing --format json` succeeds from `drafting`
+- **WHEN** the command finishes
+- **THEN** the final stdout record is `stream: "change-transition"`
+- **AND** its event type is `complete`
+- **AND** its result contains `result: "ok"`, `name: "my-change"`, `from: "drafting"`, and `to: "designing"`
+
+#### Scenario: Structured failure result is emitted as terminal complete record
+
+- **GIVEN** a transition fails in `json` mode with lifecycle blockers
+- **WHEN** the command finishes
+- **THEN** the final stdout record is `stream: "change-transition"`
+- **AND** its event type is `complete`
+- **AND** its result contains `result: "failure"`, `blockers`, and `nextAction`
+
 ### Requirement: Invalid transition error
 
 #### Scenario: Illegal state transition
@@ -143,12 +159,6 @@
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message naming the blocking artifact
 
-#### Scenario: JSON output on successful transition
-
-- **WHEN** `specd change transition my-change designing --format json` succeeds and the change was in `drafting` state
-- **THEN** stdout is valid JSON with `result` equal to `"ok"`, `name` equal to `"my-change"`, `from` equal to `"drafting"`, and `to` equal to `"designing"`
-- **AND** the process exits with code 0
-
 ### Requirement: Hook execution
 
 #### Scenario: --skip-hooks all skips all hooks
@@ -181,10 +191,50 @@
 
 ### Requirement: Progress output
 
-#### Scenario: Text mode renders progress feedback
+#### Scenario: Text mode renders active hook status with recent output
 
+- **GIVEN** a transition hook emits output while it is still running
 - **WHEN** `specd change transition my-change designing` is run in text mode
-- **THEN** lifecycle progress feedback may be rendered to stdout while the transition runs
+- **THEN** the progress feedback shows the active hook and command
+- **AND** recent hook output remains visible while the hook is running
+
+#### Scenario: Text mode preserves completed hook history
+
+- **GIVEN** multiple hooks execute during the transition
+- **WHEN** progress is rendered in text mode
+- **THEN** previously completed hooks remain understandable after later hooks start
+- **AND** the currently active hook does not fully overwrite the earlier hook history
+
+#### Scenario: Text mode shows liveness for quiet hook
+
+- **GIVEN** a transition hook remains active without new output for a meaningful interval
+- **WHEN** progress is rendered in text mode
+- **THEN** the output still signals that the hook remains active before completion
+
+#### Scenario: Structured formats emit progress on stdout
+
+- **GIVEN** a transition emits hook and lifecycle progress events
+- **WHEN** `specd change transition my-change designing --format json` is run
+- **THEN** stdout emits newline-delimited structured records during the transition
+- **AND** hook lifecycle events use `stream: "hook-progress"`
+- **AND** transition lifecycle events use `stream: "change-transition"`
+
+### Requirement: Transition hook observability
+
+#### Scenario: Transition exposes hook progress before hook-triggered failure
+
+- **GIVEN** a transition hook emits progress and then fails before the state transition completes
+- **WHEN** `specd change transition my-change <step>` is run
+- **THEN** hook progress is surfaced before the failure is reported
+- **AND** the caller can identify which hook was active when the failure occurred
+
+### Requirement: Shared hook progress presentation
+
+#### Scenario: Equivalent hook events render with the same presentation contract as run-hooks
+
+- **GIVEN** `specd change transition` and `specd change run-hooks` observe the same sequence of hook events
+- **WHEN** both commands render hook progress in the same output format
+- **THEN** running status, recent output, liveness, and failed-hook output follow the same presentation rules
 
 ### Requirement: Post-hook failure warning
 
@@ -192,7 +242,14 @@
 
 - **GIVEN** a hook fails during transition execution
 - **WHEN** the command runs
-- **THEN** it exits with code 1 and prints an `error:` message instead of a separate post-hook warning state
+- **THEN** it exits with code 2 and prints an `error:` message instead of a separate post-hook warning state
+
+#### Scenario: Hook failure leaves visible execution context
+
+- **GIVEN** progress was rendered for the active hook before failure
+- **WHEN** the transition aborts on hook failure
+- **THEN** the visible output still identifies the hook that failed
+- **AND** retains enough preceding hook context to understand the failure
 
 ### Requirement: Unsatisfied requires error
 

@@ -124,6 +124,19 @@ The resolved target still goes through the normal `TransitionChange` flow, so
 approval-gate routing, `requires` checks, task completion gating, and hook
 execution behave exactly as they do for an explicit target.
 
+When transition hooks run, `change transition` uses the same hook-progress
+presentation as `change run-hooks`:
+
+- In `text` format, completed hooks stay visible, the active hook shows a
+  running state, recent output remains visible, and quiet hooks still emit
+  liveness updates.
+- In `json` and `toon`, all machine-readable output is emitted on `stdout` as a
+  newline-delimited stream of structured records. Hook events use
+  `stream: "hook-progress"`. Transition lifecycle events use
+  `stream: "change-transition"`. The final result is emitted as a terminal
+  `complete` event in that same stream. `stderr` is reserved for text-mode
+  progress and non-structured process diagnostics.
+
 | Option                      | Description                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `--next`                    | Resolve the next logical lifecycle target from the current state. Mutually exclusive with `<step>`.                |
@@ -532,6 +545,20 @@ specd changes run-hooks <name> <step> [options]
 ```
 
 Execute the `run:` hooks defined for a lifecycle step outside of a transition. Useful for re-running hooks after a failure or for manual invocation.
+
+`change run-hooks` shares the same live hook-progress presentation as
+`change transition`:
+
+- In `text` format, progress is visible while the hook is still running. The
+  active hook shows its command, recent output, and liveness updates. Completed
+  hooks remain visible instead of being overwritten by the next hook.
+- In `json` and `toon`, all machine-readable output is emitted on `stdout` as a
+  newline-delimited stream of structured records. Hook progress uses
+  `stream: "hook-progress"`, and the final result is emitted as a terminal
+  `stream: "run-hooks"` record with `event.type: "complete"`. `stderr` is
+  reserved for text-mode progress and non-structured process diagnostics.
+- On hook failure, the failed hook's full output is shown instead of only a
+  short summary line.
 
 | Option                      | Description                        |
 | --------------------------- | ---------------------------------- |

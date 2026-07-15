@@ -1289,7 +1289,7 @@ The `execute` method accepts an optional `onProgress: OnHookProgress` callback.
 interface RunStepHooksResult {
   hooks: readonly RunStepHookEntry[]
   success: boolean
-  failedHook: RunStepHookEntry | null
+  failedHooks: readonly RunStepHookEntry[]
 }
 
 interface RunStepHookEntry {

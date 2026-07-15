@@ -1111,7 +1111,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             callOrder.push('pnpm test')
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1150,17 +1150,19 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'run-tests',
-                command: 'pnpm test',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'test failed',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'run-tests',
+                  command: 'pnpm test',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'test failed',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1197,17 +1199,19 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'fail-hook',
-                command: 'fail',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'error',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'fail-hook',
+                  command: 'fail',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'error',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1236,7 +1240,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             callOrder.push('schema-pre', 'project-pre')
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1264,7 +1268,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'post') {
             callOrder.push('schema-post', 'project-post')
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1300,17 +1304,19 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'project-pre',
-                command: 'project-pre',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'fail',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'project-pre',
+                  command: 'project-pre',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'fail',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1345,17 +1351,19 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'project-post',
-                command: 'project-post',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'fail',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'project-post',
+                  command: 'project-post',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'fail',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1505,17 +1513,19 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'post-fail',
-                command: 'post-fail',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'fail',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'post-fail',
+                  command: 'post-fail',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'fail',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1541,7 +1551,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1569,7 +1579,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -1601,7 +1611,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           executeSpy(input)
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -2329,7 +2339,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'post') {
             callOrder.push('git commit -m archive')
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -2374,17 +2384,19 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'git-push',
-                command: 'git push',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'post hook failed',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'git-push',
+                  command: 'git push',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'post hook failed',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -2412,7 +2424,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -2437,7 +2449,7 @@ describe('ArchiveChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input: RunStepHooksInput): Promise<RunStepHooksResult> => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -2483,17 +2495,27 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'hook-a',
-                command: 'npm run lint',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'lint failed',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'hook-a',
+                  command: 'npm run lint',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'lint failed',
+                  success: false,
+                },
+                {
+                  id: 'hook-b',
+                  command: 'npm run deploy',
+                  exitCode: 2,
+                  stdout: '',
+                  stderr: 'deploy failed',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -2540,17 +2562,19 @@ describe('ArchiveChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'block-hook',
-                command: 'pnpm test',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'tests failed',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'block-hook',
+                  command: 'pnpm test',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'tests failed',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
@@ -2581,7 +2605,7 @@ describe('ArchiveChange', () => {
           if (input.phase === 'pre') {
             stateAtHookTime = repo.store.get('my-change')?.state
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
 
