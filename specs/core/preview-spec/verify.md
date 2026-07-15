@@ -7,7 +7,7 @@
 #### Scenario: Constructor receives required dependencies
 
 - **WHEN** `PreviewSpec` is instantiated
-- **THEN** it receives `ChangeRepository`, a `ReadonlyMap<string, SpecRepository>`, `SchemaProvider`, and `ArtifactParserRegistry`
+- **THEN** it receives `ChangeRepository`, a `ReadonlyMap<string, SpecRepository>`, `SchemaProvider`, `ArtifactParserRegistry`, and `DiffGenerator`
 - **AND** they are stored as instance properties for use during `execute`
 
 ### Requirement: Input
@@ -17,6 +17,17 @@
 - **WHEN** `PreviewSpec.execute` is invoked
 - **THEN** it receives `name: string` (the change name) and `specId: string` (the fully-qualified spec ID)
 - **AND** `specId` must be one of the change's `specIds`
+
+#### Scenario: includeDiff is opt-in
+
+- **WHEN** `PreviewSpec.execute` is invoked without `includeDiff`
+- **THEN** preview execution succeeds without requiring diff output
+- **AND** the use case does not attempt to generate unified diffs
+
+#### Scenario: includeDiff enables diff generation
+
+- **WHEN** `PreviewSpec.execute` is invoked with `includeDiff: true`
+- **THEN** preview execution requests unified diff output for `merged` entries
 
 ### Requirement: Spec ID validation
 
@@ -83,6 +94,38 @@
 - **WHEN** `PreviewSpec.execute` returns
 - **THEN** the order is `spec.md`, `config.yaml`, `verify.md`
 
+### Requirement: Diff generation
+
+#### Scenario: Merged entry includes generated diff
+
+- **GIVEN** a preview entry with status `merged`, `filename`, `base`, and `merged` content
+- **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+- **THEN** `DiffGenerator` is invoked for that file
+- **AND** the returned diff string is included on the preview entry
+
+#### Scenario: New spec entry uses empty base for diff generation
+
+- **GIVEN** a new spec artifact whose preview entry has `base: null` and status `merged`
+- **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+- **THEN** `DiffGenerator` receives an empty string for the base side
+- **AND** the preview entry still includes the generated diff output
+
+#### Scenario: no-op and missing entries omit diff output
+
+- **GIVEN** preview entries with status `no-op` and `missing`
+- **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+- **THEN** those entries do not include generated diff output
+- **AND** `DiffGenerator` is not invoked for them
+
+#### Scenario: Diff generation failure does not discard merged preview
+
+- **GIVEN** a preview entry with status `merged`
+- **AND** `DiffGenerator` throws while generating its diff
+- **WHEN** `PreviewSpec.execute` is called with `includeDiff: true`
+- **THEN** the result includes a warning describing the diff-generation failure
+- **AND** the entry keeps status `merged`
+- **AND** the entry still returns its `base` and `merged` content
+
 ### Requirement: Result shape
 
 #### Scenario: Base content and status included for delta files
@@ -100,6 +143,18 @@
 - **THEN** the `PreviewSpecFileEntry` has status `merged`
 - **AND** `base: null`
 - **AND** `merged` is set to the new file content
+
+#### Scenario: diff field is omitted when diff generation is disabled
+
+- **GIVEN** a merged preview result produced without `includeDiff`
+- **WHEN** the file entries are inspected
+- **THEN** they do not include a `diff` field
+
+#### Scenario: diff field is present for merged entries when enabled
+
+- **GIVEN** a merged preview result produced with `includeDiff: true`
+- **WHEN** a `merged` file entry is inspected
+- **THEN** it includes a plain unified diff string in `diff`
 
 ### Requirement: Error handling
 
@@ -139,4 +194,5 @@
 - `specs: ReadonlyMap<string, SpecRepository>`
 - `schemaProvider: SchemaProvider`
 - `parsers: ArtifactParserRegistry`
+- `diffGenerator: DiffGenerator`
 - **AND** the factory delegates to canonical `createPreviewSpec(deps)`

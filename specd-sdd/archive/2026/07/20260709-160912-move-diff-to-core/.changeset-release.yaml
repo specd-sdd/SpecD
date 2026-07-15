@@ -1,0 +1,4 @@
+releases:
+  core:preview-spec: minor
+  cli:change-spec-preview: patch
+  core:diff-generator: minor

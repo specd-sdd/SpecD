@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Make diff mode consume diff data returned by PreviewSpec instead of generating it locally'
+  selector:
+    type: section
+    matches: '^Requirement: Text output .*diff mode'
+  content: |
+    When `--diff` is present, the command MUST request diff-enabled preview output from `PreviewSpec` and consume the `diff` field returned on preview file entries. The CLI SHALL NOT generate unified diffs locally from `base` and `merged`.
+
+    The diff MUST be colorized using `chalk`:
+
+    - Lines starting with `+` (additions) — green
+    - Lines starting with `-` (removals) — red
+    - Lines starting with `@@` (hunk headers) — cyan
+    - All other lines (context) — dim
+
+    Each file's diff MUST be preceded by a `--- <filename> ---` separator line. Files without returned diff output MUST be omitted from diff mode output entirely; this includes `no-op` and `missing` entries.
+
+    If `--artifact <name>` is provided, the command MUST only output the diff for the requested artifact. If the requested artifact has no diff output, the command SHALL exit with code 0 and output nothing (or a message indicating no changes if applicable to text format), matching the default diff behavior for individual files.
+- op: modified
+  description: 'Forward structured diff data from PreviewSpec instead of synthesizing it in CLI'
+  selector:
+    type: section
+    matches: '^Requirement: JSON/TOON output$'
+  content: |
+    JSON and TOON output MUST return the `PreviewSpecResult` object from the use case. When `--diff` is present, the CLI MUST request diff-enabled preview output and forward the returned `diff` fields unchanged. The CLI SHALL NOT synthesize diff strings for structured output.
+
+    When `--diff` is absent, file entries include `base` and `merged` fields as returned by the use case.
+
+    If `--artifact <name>` is provided, the `files` array in the result object SHALL contain exactly one entry for the requested artifact.
+- op: modified
+  description: 'Move diff generation ownership from CLI to PreviewSpec'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The CLI command delegates merge logic and diff generation to `PreviewSpec`; CLI-specific responsibilities are artifact filtering, text rendering, warning presentation, and ANSI colorization
+    - Colorization applies only to text format output; JSON/TOON output is never colorized
+    - The `chalk` library (already a dependency of `@specd/cli`) is used for colorization
+    - The concrete diff-generation library is not a responsibility of `@specd/cli`; it belongs to core's default `DiffGenerator` implementation
+    - Artifact filtering resolve IDs to filenames using the same logic as `specd spec show`

@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:preview-spec"],
+  "implementation": [
+    {
+      "file": "cli:package.json"
+    },
+    {
+      "file": "cli:src/commands/change/spec-preview.ts",
+      "symbols": ["registerChangeSpecPreview"]
+    },
+    {
+      "file": "cli:test/commands/change/spec-preview.spec.ts"
+    }
+  ]
+}

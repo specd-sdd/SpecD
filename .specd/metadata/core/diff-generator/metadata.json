@@ -1,0 +1,177 @@
+{
+  "title": "DiffGenerator",
+  "description": "`PreviewSpec` needs to produce unified diff output from previewed artifact files, but the use case must not depend directly on a specific diff library. `DiffGenerator` defines the small application-layer capability that turns preview file content into a plain unified diff string, while allowing core to swap the concrete implementation later without changing the use-case contract.",
+  "context": [
+    "`PreviewSpec` needs to produce unified diff output from previewed artifact files, but the use case must not depend directly on a specific diff library. `DiffGenerator` defines the small application-layer capability that turns preview file content into a plain unified diff string, while allowing core to swap the concrete implementation later without changing the use-case contract."
+  ],
+  "rules": [
+    {
+      "requirement": "Interface shape",
+      "rules": [
+        "The capability MUST be declared as a TypeScript `interface` named `DiffGenerator`. It SHALL expose a single method named `generate`. It SHALL NOT be an abstract class, because there are no shared constructor invariants across all implementations."
+      ]
+    },
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`DiffGenerator.generate` MUST accept a single parameter object with these fields:\n\n- `filename: string` — the artifact filename being diffed (for example `spec.md` or `verify.md`)\n- `base: string` — the original content before change application\n- `merged: string` — the resulting content after change application\n- `contextLines?: number` — optional number of context lines to include around changes\n\nThe port MUST allow callers to provide an empty string for `base` when the previewed artifact is newly introduced and has no canonical base file yet."
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "rules": [
+        "`DiffGenerator.generate` MUST return a plain unified diff string. The returned value MUST be presentation-neutral data: no ANSI color codes, no terminal control sequences, and no host-specific separator lines.\n\nThe diff output MUST identify the two sides using the preview filename:\n\n- base side label: `a/<filename> (base)`\n- merged side label: `b/<filename> (merged)`"
+      ]
+    },
+    {
+      "requirement": "Default context lines",
+      "rules": [
+        "When `contextLines` is omitted, the default implementation MUST generate the diff with 3 lines of context so preview output remains compatible with the current CLI behavior."
+      ]
+    },
+    {
+      "requirement": "Default implementation",
+      "rules": [
+        "Core MUST provide a default implementation factory for this capability so config-based composition can construct `PreviewSpec` without requiring every caller to supply a custom diff generator. The default implementation MAY use any concrete diff library chosen by the project, but that library choice SHALL remain encapsulated behind `DiffGenerator`."
+      ]
+    },
+    {
+      "requirement": "Usage boundary",
+      "rules": [
+        "`DiffGenerator` is an internal core capability for shared preview behavior. It MUST be suitable for use by `PreviewSpec`, but it SHALL NOT force delivery mechanisms to use it directly for unrelated diff workflows."
+      ]
+    }
+  ],
+  "constraints": [
+    "The port lives in application/ports/ per core's hexagonal structure",
+    "The port itself MUST NOT depend directly on any concrete diff library",
+    "The capability returns plain text data only; colorization and other host presentation remain outside the port",
+    "The capability models file-to-file unified diffs; it does not model semantic review comments or artifact filtering behavior"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Interface shape",
+      "name": "Implementation satisfies the contract",
+      "given": ["a concrete class implementing DiffGenerator"],
+      "when": ["the class implements generate(input): string"],
+      "then": ["it compiles and can be instantiated"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "Existing file diff uses provided input fields",
+      "given": ["filename, base, and merged strings for an existing artifact file"],
+      "when": ["generate is called with that input"],
+      "then": ["the implementation can produce a unified diff using those values"]
+    },
+    {
+      "requirement": "Input contract",
+      "name": "New file diff accepts empty base",
+      "given": ["a previewed artifact that has no canonical base file yet"],
+      "when": ["generate is called with base: \"\""],
+      "then": [
+        "the implementation accepts the input without requiring a separate missing-file sentinel"
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "name": "Returned diff is plain text",
+      "when": ["generate returns a unified diff"],
+      "then": [
+        "the returned value is a plain string",
+        "AND it contains no ANSI color codes or terminal control sequences"
+      ]
+    },
+    {
+      "requirement": "Output contract",
+      "name": "Returned diff labels both sides with preview filename",
+      "given": ["filename: \"spec.md\""],
+      "when": ["generate returns a unified diff"],
+      "then": [
+        "the diff identifies the base side as a/spec.md (base)",
+        "AND it identifies the merged side as b/spec.md (merged)"
+      ]
+    },
+    {
+      "requirement": "Default context lines",
+      "name": "Omitted contextLines uses default of 3",
+      "when": ["generate is called without contextLines"],
+      "then": ["the default implementation produces a diff with 3 lines of context"]
+    },
+    {
+      "requirement": "Default implementation",
+      "name": "Config-based composition can obtain a default implementation",
+      "given": ["core composition constructs PreviewSpec from project configuration"],
+      "when": ["no custom diff generator is supplied by the caller"],
+      "then": ["the composition layer provides a default DiffGenerator implementation"]
+    },
+    {
+      "requirement": "Default implementation",
+      "name": "Library choice stays hidden behind the port",
+      "when": ["the default implementation uses a concrete diff library"],
+      "then": ["callers still depend only on the DiffGenerator interface"]
+    },
+    {
+      "requirement": "Usage boundary",
+      "name": "PreviewSpec can use DiffGenerator without host presentation concerns",
+      "given": ["a merged preview entry with filename, base, and merged"],
+      "when": ["PreviewSpec invokes DiffGenerator"],
+      "then": ["it receives plain diff data suitable for host-specific rendering"]
+    }
+  ],
+  "dependsOn": [],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:diff-generator",
+        "file": "core:package.json"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/ports.ts"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/application/ports/index.ts"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/composition/index.ts"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:test/composition/diff-generator.spec.ts"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:test/infrastructure/diff/diff-generator.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/application/ports/diff-generator.ts",
+        "symbol": "DiffGeneratorInput"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/application/ports/diff-generator.ts",
+        "symbol": "DiffGenerator"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/infrastructure/diff/diff-generator.ts",
+        "symbol": "DiffDiffGenerator"
+      },
+      {
+        "specId": "core:diff-generator",
+        "file": "core:src/composition/diff-generator.ts",
+        "symbol": "createDefaultDiffGenerator"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:cb3ecb8eee901ba5484d8139fb0de47e2e7a882a03c8088a3de656e9ee1cde2e",
+    "verify.md": "sha256:9be3ab1bda4f0ed652fbdf0366a9ab6c814daed97ef1154edd3924c7a2884a19"
+  },
+  "generatedBy": "core"
+}

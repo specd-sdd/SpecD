@@ -1,6 +1,7 @@
 {
   "name": "deprecate-ladybug-store",
   "createdAt": "2026-07-06T08:41:08.887Z",
+  "updatedAt": "2026-07-15T11:00:37.287Z",
   "description": "Deprecate Ladybug graph store, implement Symbol.asyncDispose in CodeGraphProvider, and refactor hosts to use await using",
   "schema": {
     "name": "schema-std",

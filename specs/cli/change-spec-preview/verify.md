@@ -38,40 +38,47 @@
 
 #### Scenario: Additions colored green
 
-- **GIVEN** a delta that adds lines to a spec
+- **GIVEN** a diff-enabled preview result that contains added lines
 - **WHEN** the command is invoked with `--diff --format text`
 - **THEN** lines starting with `+` are rendered in green
 
 #### Scenario: Removals colored red
 
-- **GIVEN** a delta that removes lines from a spec
+- **GIVEN** a diff-enabled preview result that contains removed lines
 - **WHEN** the command is invoked with `--diff --format text`
 - **THEN** lines starting with `-` are rendered in red
 
 #### Scenario: Hunk headers colored cyan
 
-- **GIVEN** a delta producing a diff
+- **GIVEN** a diff-enabled preview result that contains hunk headers
 - **WHEN** the command is invoked with `--diff --format text`
 - **THEN** lines starting with `@@` are rendered in cyan
 
 #### Scenario: Context lines dimmed
 
-- **GIVEN** a delta producing a diff with context lines
+- **GIVEN** a diff-enabled preview result with context lines
 - **WHEN** the command is invoked with `--diff --format text`
 - **THEN** unchanged context lines are rendered in dim
 
 #### Scenario: No-change files omitted in diff mode
 
-- **GIVEN** a change with a no-op delta for one artifact and a real delta for another
+- **GIVEN** a diff-enabled preview result where one file has `diff` output and another does not
 - **WHEN** the command is invoked with `--diff`
-- **THEN** only the artifact with real changes appears in the output
+- **THEN** only the file with returned diff output appears in the text output
 
 #### Scenario: Filtered artifact in diff mode
 
-- **GIVEN** a change with deltas in `spec.md` and `verify.md`
+- **GIVEN** a change with diff output for `spec.md` and `verify.md`
 - **WHEN** `specd change spec-preview my-change my-spec --diff --artifact specs` is run
 - **THEN** stdout contains `--- spec.md ---` and the colorized diff for `spec.md`
 - **AND** stdout DOES NOT contain `--- verify.md ---`
+
+#### Scenario: CLI does not synthesize unified diff text
+
+- **GIVEN** `PreviewSpec` returns a precomputed `diff` string for a merged file
+- **WHEN** the command is invoked with `--diff`
+- **THEN** the CLI renders that returned diff
+- **AND** it does not regenerate a unified diff from `base` and `merged`
 
 ### Requirement: JSON/TOON output
 
@@ -81,11 +88,12 @@
 - **WHEN** the command is invoked with `--format json`
 - **THEN** the output is a valid JSON object matching the `PreviewSpecResult` shape
 
-#### Scenario: JSON diff output includes non-colorized diff
+#### Scenario: JSON diff output forwards non-colorized diff
 
-- **GIVEN** a valid change with deltas
+- **GIVEN** a valid change with diff-enabled preview output
 - **WHEN** the command is invoked with `--diff --format json`
-- **THEN** each file entry includes a `diff` field as a plain string without ANSI color codes
+- **THEN** each file entry includes the `diff` field returned by `PreviewSpec`
+- **AND** the string contains no ANSI color codes
 
 #### Scenario: JSON output with artifact filtering
 

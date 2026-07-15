@@ -2,6 +2,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { SpecNotInChangeError } from '../errors/spec-not-in-change-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
+import { type DiffGenerator } from '../ports/diff-generator.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
@@ -15,6 +16,8 @@ export interface PreviewSpecInput {
   readonly name: string
   /** The fully-qualified spec ID to preview (e.g. `core:core/compile-context`). */
   readonly specId: string
+  /** Whether unified diff output should be included for merged entries. */
+  readonly includeDiff?: boolean
 }
 
 /** A single artifact file in the preview result. */
@@ -25,6 +28,8 @@ export interface PreviewSpecFileEntry {
   readonly base: string | null
   /** The merged content (after delta application). */
   readonly merged: string
+  /** Optional unified diff generated from `base` and `merged`. */
+  readonly diff?: string
   /**
    * The preview status of this file.
    * - 'merged': delta applied successfully with changes, or new spec file
@@ -55,6 +60,7 @@ export interface PreviewSpecResult {
  */
 export class PreviewSpec {
   private readonly _changes: ChangeRepository
+  private readonly _diffGenerator: DiffGenerator
   private readonly _specs: ReadonlyMap<string, SpecRepository>
   private readonly _schemaProvider: SchemaProvider
   private readonly _parsers: ArtifactParserRegistry
@@ -66,14 +72,17 @@ export class PreviewSpec {
    * @param specs - Spec repositories keyed by workspace name
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
+   * @param diffGenerator - Unified diff generator for merged preview entries
    */
   constructor(
     changes: ChangeRepository,
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
+    diffGenerator: DiffGenerator,
   ) {
     this._changes = changes
+    this._diffGenerator = diffGenerator
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
@@ -250,6 +259,29 @@ export class PreviewSpec {
       if (b.filename === 'spec.md') return 1
       return a.filename.localeCompare(b.filename)
     })
+
+    if (input.includeDiff === true) {
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index]
+        if (file === undefined || file.status !== 'merged') {
+          continue
+        }
+
+        try {
+          files[index] = {
+            ...file,
+            diff: this._diffGenerator.generate({
+              filename: file.filename,
+              base: file.base ?? '',
+              merged: file.merged,
+            }),
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          warnings.push(`Failed to generate diff for ${file.filename}: ${message}`)
+        }
+      }
+    }
 
     return {
       specId: input.specId,

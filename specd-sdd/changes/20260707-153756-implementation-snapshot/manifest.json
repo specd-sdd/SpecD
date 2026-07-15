@@ -1,6 +1,7 @@
 {
   "name": "implementation-snapshot",
   "createdAt": "2026-07-07T15:37:56.057Z",
+  "updatedAt": "2026-07-15T11:11:25.484Z",
   "description": "Add VCS-agnostic working tree snapshot capability with mtime+hash baseline filtering and indexed patch restore as safety net against accidental data loss",
   "schema": {
     "name": "schema-std",

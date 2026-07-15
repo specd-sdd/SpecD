@@ -1,6 +1,7 @@
 {
   "name": "graph-staleness-dirty-fingerprint",
   "createdAt": "2026-06-29T08:10:09.775Z",
+  "updatedAt": "2026-07-15T11:11:26.725Z",
   "description": "Improve code-graph freshness detection with vcs-group/workspace content scopes, diff fingerprints, and cached stale state without persisting user paths",
   "schema": {
     "name": "schema-std",

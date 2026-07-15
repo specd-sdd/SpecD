@@ -16,6 +16,10 @@ import {
   type DeltaEntry,
 } from '../../../src/application/ports/artifact-parser.js'
 import {
+  type DiffGenerator,
+  type DiffGeneratorInput,
+} from '../../../src/application/ports/diff-generator.js'
+import {
   makeChangeRepository,
   makeSpecRepository,
   makeSchemaProvider,
@@ -69,6 +73,15 @@ function makeSpec(workspace: string, capPath: string): Spec {
   return new Spec(workspace, SpecPath.parse(capPath), ['spec.md'])
 }
 
+/** Creates a stub diff generator for `PreviewSpec` tests. */
+function makeDiffGenerator(
+  generate: (input: DiffGeneratorInput) => string = () => 'diff',
+): DiffGenerator {
+  return {
+    generate: vi.fn(generate),
+  }
+}
+
 /** Sets up the SUT (PreviewSpec) with full control over each port. */
 function makeSut(opts: {
   change?: Change
@@ -77,6 +90,7 @@ function makeSut(opts: {
   artifactContent?: string | null
   baseArtifact?: string | null
   parsers?: ArtifactParserRegistry
+  diffGenerator?: DiffGenerator
 }) {
   const schemaName = opts.schemaName ?? SCHEMA_NAME
   const artifactType = makeArtifactType('specs', { scope: 'spec', delta: true })
@@ -95,9 +109,10 @@ function makeSut(opts: {
   const specRepos: Map<string, ReturnType<typeof makeSpecRepository>> = opts.specRepos ?? new Map()
 
   const parsers: ArtifactParserRegistry = opts.parsers ?? makeParsers()
+  const diffGenerator = opts.diffGenerator ?? makeDiffGenerator()
 
-  const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
-  return { useCase, changes, specRepos, schema, artifactFn }
+  const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers, diffGenerator)
+  return { useCase, changes, specRepos, schema, artifactFn, diffGenerator }
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +213,13 @@ describe('PreviewSpec', () => {
       const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
       const schemaProvider = makeSchemaProvider(schema)
 
-      const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
+      const useCase = new PreviewSpec(
+        changes,
+        specRepos,
+        schemaProvider,
+        parsers,
+        makeDiffGenerator(),
+      )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
       expect(result.files).toHaveLength(1)
@@ -239,7 +260,13 @@ describe('PreviewSpec', () => {
       const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
       const schemaProvider = makeSchemaProvider(schema)
 
-      const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
+      const useCase = new PreviewSpec(
+        changes,
+        specRepos,
+        schemaProvider,
+        parsers,
+        makeDiffGenerator(),
+      )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
       expect(result.files).toHaveLength(1)
@@ -261,6 +288,7 @@ describe('PreviewSpec', () => {
         new Map(),
         schemaProvider,
         makeParsers(),
+        makeDiffGenerator(),
       )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
@@ -284,6 +312,7 @@ describe('PreviewSpec', () => {
         new Map(),
         schemaProvider,
         makeParsers(),
+        makeDiffGenerator(),
       )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
@@ -327,7 +356,13 @@ describe('PreviewSpec', () => {
       const schema = makeSchema({ artifacts: [artifactType], name: SCHEMA_NAME })
       const schemaProvider = makeSchemaProvider(schema)
 
-      const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
+      const useCase = new PreviewSpec(
+        changes,
+        specRepos,
+        schemaProvider,
+        parsers,
+        makeDiffGenerator(),
+      )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
       expect(result.files).toHaveLength(1)
@@ -407,7 +442,13 @@ describe('PreviewSpec', () => {
       const schema = makeSchema({ artifacts: [specsType, verifyType], name: SCHEMA_NAME })
       const schemaProvider = makeSchemaProvider(schema)
 
-      const useCase = new PreviewSpec(changes, specRepos, schemaProvider, parsers)
+      const useCase = new PreviewSpec(
+        changes,
+        specRepos,
+        schemaProvider,
+        parsers,
+        makeDiffGenerator(),
+      )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
       expect(result.files).toHaveLength(2)
@@ -441,6 +482,7 @@ describe('PreviewSpec', () => {
         new Map(),
         schemaProvider,
         makeParsers(),
+        makeDiffGenerator(),
       )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
@@ -464,12 +506,82 @@ describe('PreviewSpec', () => {
         new Map(),
         schemaProvider,
         makeParsers(),
+        makeDiffGenerator(),
       )
       const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
 
       expect(result.files).toHaveLength(2)
       expect(result.files[0]?.filename).toBe('spec.md')
       expect(result.files.find((f) => f.filename === 'other.md')).toBeDefined()
+    })
+  })
+
+  describe('diff generation', () => {
+    it('does not invoke DiffGenerator when includeDiff is omitted', async () => {
+      const artifactFilename = `changes/${CHANGE_NAME}/core/core/config/spec.md`
+      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, artifactFilename)
+      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
+      const diffGenerator = makeDiffGenerator()
+      const { useCase } = makeSut({
+        change,
+        artifactContent: '# New Spec\n',
+        diffGenerator,
+      })
+
+      const result = await useCase.execute({ name: CHANGE_NAME, specId: SPEC_ID })
+
+      expect(result.files[0]?.diff).toBeUndefined()
+      expect(diffGenerator.generate).not.toHaveBeenCalled()
+    })
+
+    it('includes diff for merged entries when includeDiff is true', async () => {
+      const artifactFilename = `changes/${CHANGE_NAME}/core/core/config/spec.md`
+      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, artifactFilename)
+      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
+      const diffGenerator = makeDiffGenerator((input) => `diff:${input.filename}`)
+      const { useCase } = makeSut({
+        change,
+        artifactContent: '# New Spec\n',
+        diffGenerator,
+      })
+
+      const result = await useCase.execute({
+        name: CHANGE_NAME,
+        specId: SPEC_ID,
+        includeDiff: true,
+      })
+
+      expect(result.files[0]?.diff).toBe('diff:spec.md')
+      expect(diffGenerator.generate).toHaveBeenCalledWith({
+        filename: 'spec.md',
+        base: '',
+        merged: '# New Spec\n',
+      })
+    })
+
+    it('retains merged preview and warning when diff generation fails', async () => {
+      const artifactFilename = `changes/${CHANGE_NAME}/core/core/config/spec.md`
+      const changeArtifact = makeSpecArtifact('specs', SPEC_ID, artifactFilename)
+      const change = makeChangeWithArtifacts([SPEC_ID], [changeArtifact])
+      const diffGenerator = makeDiffGenerator(() => {
+        throw new Error('diff failed')
+      })
+      const { useCase } = makeSut({
+        change,
+        artifactContent: '# New Spec\n',
+        diffGenerator,
+      })
+
+      const result = await useCase.execute({
+        name: CHANGE_NAME,
+        specId: SPEC_ID,
+        includeDiff: true,
+      })
+
+      expect(result.files[0]?.status).toBe('merged')
+      expect(result.files[0]?.merged).toBe('# New Spec\n')
+      expect(result.files[0]?.diff).toBeUndefined()
+      expect(result.warnings.some((warning) => warning.includes('diff failed'))).toBe(true)
     })
   })
 })

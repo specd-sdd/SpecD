@@ -1,27 +1,28 @@
 {
   "title": "PreviewSpec",
-  "description": "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, without mutating anything. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by the CLI preview command (for human review).",
+  "description": "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — and some delivery mechanisms also need a reusable unified diff view of those changes — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, with optional unified diff output when explicitly requested. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by preview-oriented delivery mechanisms.",
   "dependsOn": [
     "core:delta-format",
     "core:artifact-parser-port",
     "core:change-layout",
     "core:file-reader-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:diff-generator"
   ],
   "context": [
-    "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, without mutating anything. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by the CLI preview command (for human review)."
+    "During an active change, agents and humans need to see what a spec will look like after its deltas are applied — and some delivery mechanisms also need a reusable unified diff view of those changes — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, with optional unified diff output when explicitly requested. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by preview-oriented delivery mechanisms."
   ],
   "rules": [
     {
       "requirement": "Ports and constructor",
       "rules": [
-        "`PreviewSpec` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, and `ArtifactParserRegistry`.\n\n```typescript\nclass PreviewSpec {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n  )\n}\n```\n\nAll are injected at kernel composition time, not passed per invocation."
+        "`PreviewSpec` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, and `DiffGenerator`.\n\n```typescript\nclass PreviewSpec {\n  constructor(\n    changes: ChangeRepository,\n    specs: ReadonlyMap<string, SpecRepository>,\n    schemaProvider: SchemaProvider,\n    parsers: ArtifactParserRegistry,\n    diffGenerator: DiffGenerator,\n  )\n}\n```\n\nAll are injected at kernel composition time, not passed per invocation."
       ]
     },
     {
       "requirement": "Input",
       "rules": [
-        "`PreviewSpec.execute` receives:\n\n- `name` — the change name\n- `specId` — the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`"
+        "`PreviewSpec.execute` receives:\n\n- `name` — the change name\n- `specId` — the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`\n- `includeDiff` — optional boolean flag; when `true`, `PreviewSpec` SHALL generate unified diff output for preview entries whose status is `merged`. When omitted or `false`, `PreviewSpec` SHALL NOT generate diff output."
       ]
     },
     {
@@ -49,9 +50,15 @@
       ]
     },
     {
+      "requirement": "Diff generation",
+      "rules": [
+        "When `includeDiff` is `true`, `PreviewSpec` MUST generate a plain unified diff for each preview entry whose status is `merged`.\n\nDiff generation MUST use the injected `DiffGenerator` capability and the same file entry's preview content:\n\n- `filename` — the artifact filename being previewed\n- `base` — the original content before delta application; when `base` is `null`, the diff generator MUST receive an empty string as the base side\n- `merged` — the merged content after delta application\n\nWhen `includeDiff` is `false` or omitted, `PreviewSpec` SHALL NOT invoke `DiffGenerator`.\n\nPreview entries with status `no-op` or `missing` MUST NOT include generated diff output.\n\nIf diff generation fails for one file, `PreviewSpec` MUST add a warning describing the failure and continue returning the preview entry's `base`, `merged`, and `status`. Diff-generation failure SHALL NOT downgrade a successfully merged preview entry to `missing`."
+      ]
+    },
+    {
       "requirement": "Result shape",
       "rules": [
-        "`PreviewSpec.execute` MUST return a `PreviewSpecResult`:\n\n```typescript\ninterface PreviewSpecFileEntry {\n  /** The artifact filename (e.g. `spec.md`, `verify.md`). */\n  readonly filename: string\n  /** The original base content (before delta application). `null` for new specs. */\n  readonly base: string | null\n  /** The merged content (after delta application). */\n  readonly merged: string\n  /**\n   * The preview status of this file.\n   * - 'merged': delta applied successfully with changes, or new spec file\n   * - 'no-op': delta applied but resulted in no changes to base content\n   * - 'missing': delta file or base artifact not found, or delta application failed\n   */\n  readonly status: 'merged' | 'no-op' | 'missing'\n}\n\ninterface PreviewSpecResult {\n  /** The spec ID that was previewed. */\n  readonly specId: string\n  /** The change name. */\n  readonly changeName: string\n  /** Per-file preview entries, ordered per the artifact file ordering requirement. */\n  readonly files: readonly PreviewSpecFileEntry[]\n  /** Warnings encountered during preview (e.g. parser errors, missing base). */\n  readonly warnings: readonly string[]\n}\n```"
+        "`PreviewSpec.execute` MUST return a `PreviewSpecResult`:\n\n```typescript\ninterface PreviewSpecFileEntry {\n  /** The artifact filename (e.g. `spec.md`, `verify.md`). */\n  readonly filename: string\n  /** The original base content (before delta application). `null` for new specs. */\n  readonly base: string | null\n  /** The merged content (after delta application). */\n  readonly merged: string\n  /**\n   * Optional unified diff generated from `base` and `merged`.\n   * Present only when `includeDiff` is true and the file status is `merged`.\n   */\n  readonly diff?: string\n  /**\n   * The preview status of this file.\n   * - 'merged': delta applied successfully with changes, or new spec file\n   * - 'no-op': delta applied but resulted in no changes to base content\n   * - 'missing': delta file or base artifact not found, or delta application failed\n   */\n  readonly status: 'merged' | 'no-op' | 'missing'\n}\n\ninterface PreviewSpecResult {\n  /** The spec ID that was previewed. */\n  readonly specId: string\n  /** The change name. */\n  readonly changeName: string\n  /** Per-file preview entries, ordered per the artifact file ordering requirement. */\n  readonly files: readonly PreviewSpecFileEntry[]\n  /** Warnings encountered during preview (e.g. parser errors, missing base, diff-generation failures). */\n  readonly warnings: readonly string[]\n}\n```"
       ]
     },
     {
@@ -69,13 +76,14 @@
     {
       "requirement": "Config-based factory delegates through resolvePreviewSpecDeps",
       "rules": [
-        "The config-based `createPreviewSpec(config, options?)` form MUST derive `PreviewSpecDeps` through `resolvePreviewSpecDeps(resolver)` and then delegate to canonical `createPreviewSpec(deps)`.\n\n`resolvePreviewSpecDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createPreviewSpec(config, options?)` form MUST derive `PreviewSpecDeps` through `resolvePreviewSpecDeps(resolver)` and then delegate to canonical `createPreviewSpec(deps)`.\n\n`resolvePreviewSpecDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `diffGenerator: DiffGenerator`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
   "constraints": [
     "PreviewSpec is read-only — it MUST NOT mutate any canonical spec content, change state, or artifact status",
-    "Diff generation is NOT part of PreviewSpec — it is the CLI adapter's responsibility. PreviewSpec returns base and merged only.",
+    "Diff generation is part of PreviewSpec only when includeDiff is explicitly requested; callers that do not request it MUST keep the existing preview path without generated diff output",
+    "PreviewSpec returns plain data only — it MUST NOT apply ANSI colorization or host-specific presentation formatting to diff output",
     "PreviewSpec does not validate deltas — validation is ValidateArtifacts' concern",
     "PreviewSpec does not check whether deltas are validated (complete status) — it applies whatever delta files exist; callers like CompileContext may choose to skip unvalidated deltas"
   ],
@@ -85,7 +93,7 @@
       "name": "Constructor receives required dependencies",
       "when": ["PreviewSpec is instantiated"],
       "then": [
-        "it receives ChangeRepository, a ReadonlyMap<string, SpecRepository>, SchemaProvider, and ArtifactParserRegistry",
+        "it receives ChangeRepository, a ReadonlyMap<string, SpecRepository>, SchemaProvider, ArtifactParserRegistry, and DiffGenerator",
         "AND they are stored as instance properties for use during execute"
       ]
     },
@@ -97,6 +105,21 @@
         "it receives name: string (the change name) and specId: string (the fully-qualified spec ID)",
         "AND specId must be one of the change's specIds"
       ]
+    },
+    {
+      "requirement": "Input",
+      "name": "includeDiff is opt-in",
+      "when": ["PreviewSpec.execute is invoked without includeDiff"],
+      "then": [
+        "preview execution succeeds without requiring diff output",
+        "AND the use case does not attempt to generate unified diffs"
+      ]
+    },
+    {
+      "requirement": "Input",
+      "name": "includeDiff enables diff generation",
+      "when": ["PreviewSpec.execute is invoked with includeDiff: true"],
+      "then": ["preview execution requests unified diff output for merged entries"]
     },
     {
       "requirement": "Spec ID validation",
@@ -177,6 +200,50 @@
       "then": ["the order is spec.md, config.yaml, verify.md"]
     },
     {
+      "requirement": "Diff generation",
+      "name": "Merged entry includes generated diff",
+      "given": ["a preview entry with status merged, filename, base, and merged content"],
+      "when": ["PreviewSpec.execute is called with includeDiff: true"],
+      "then": [
+        "DiffGenerator is invoked for that file",
+        "AND the returned diff string is included on the preview entry"
+      ]
+    },
+    {
+      "requirement": "Diff generation",
+      "name": "New spec entry uses empty base for diff generation",
+      "given": ["a new spec artifact whose preview entry has base: null and status merged"],
+      "when": ["PreviewSpec.execute is called with includeDiff: true"],
+      "then": [
+        "DiffGenerator receives an empty string for the base side",
+        "AND the preview entry still includes the generated diff output"
+      ]
+    },
+    {
+      "requirement": "Diff generation",
+      "name": "no-op and missing entries omit diff output",
+      "given": ["preview entries with status no-op and missing"],
+      "when": ["PreviewSpec.execute is called with includeDiff: true"],
+      "then": [
+        "those entries do not include generated diff output",
+        "AND DiffGenerator is not invoked for them"
+      ]
+    },
+    {
+      "requirement": "Diff generation",
+      "name": "Diff generation failure does not discard merged preview",
+      "given": [
+        "a preview entry with status merged",
+        "AND DiffGenerator throws while generating its diff"
+      ],
+      "when": ["PreviewSpec.execute is called with includeDiff: true"],
+      "then": [
+        "the result includes a warning describing the diff-generation failure",
+        "AND the entry keeps status merged",
+        "AND the entry still returns its base and merged content"
+      ]
+    },
+    {
       "requirement": "Result shape",
       "name": "Base content and status included for delta files",
       "given": ["a delta applied to an existing spec"],
@@ -197,6 +264,20 @@
         "AND base: null",
         "AND merged is set to the new file content"
       ]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "diff field is omitted when diff generation is disabled",
+      "given": ["a merged preview result produced without includeDiff"],
+      "when": ["the file entries are inspected"],
+      "then": ["they do not include a diff field"]
+    },
+    {
+      "requirement": "Result shape",
+      "name": "diff field is present for merged entries when enabled",
+      "given": ["a merged preview result produced with includeDiff: true"],
+      "when": ["a merged file entry is inspected"],
+      "then": ["it includes a plain unified diff string in diff"]
     },
     {
       "requirement": "Error handling",
@@ -245,13 +326,69 @@
     "files": [
       {
         "specId": "core:preview-spec",
-        "file": "core:src/composition/use-cases/preview-spec.ts"
+        "file": "core:test/application/use-cases/preview-spec.spec.ts"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:test/composition/use-cases/preview-spec.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/application/use-cases/preview-spec.ts",
+        "symbol": "PreviewSpecInput"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/application/use-cases/preview-spec.ts",
+        "symbol": "PreviewSpecFileEntry"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/application/use-cases/preview-spec.ts",
+        "symbol": "PreviewSpecResult"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/application/use-cases/preview-spec.ts",
+        "symbol": "PreviewSpec"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/composition/composition-resolver.ts",
+        "symbol": "CompositionResolver"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/composition/composition-resolver.ts",
+        "symbol": "createCompositionResolver"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/composition/use-cases/preview-spec.ts",
+        "symbol": "PreviewSpecDeps"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/composition/use-cases/preview-spec.ts",
+        "symbol": "resolvePreviewSpecDeps"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:src/composition/use-cases/preview-spec.ts",
+        "symbol": "createPreviewSpec"
+      },
+      {
+        "specId": "core:preview-spec",
+        "file": "core:test/application/use-cases/helpers.ts",
+        "symbol": "makeStubPreviewSpec"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:697aabba71f39c17135a7d80b4da3bbb4cf480d94eab26767a250a90db0eecce",
-    "verify.md": "sha256:029437afcee56e1e73469e4cc96e4d804f5159471d2f73fdb045b4dab05a7197"
+    "spec.md": "sha256:18cc31c9e83a9c27b47e007104d21ba305861b35b4347c79fce1a0477d7e8efe",
+    "verify.md": "sha256:db9f9c0494cc9c7d590dab3ff63e0d74edf8b3e3a7229de29a1a503cd83c1437"
   },
   "generatedBy": "core"
 }

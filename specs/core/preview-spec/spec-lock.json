@@ -8,11 +8,31 @@
     "core:artifact-parser-port",
     "core:change-layout",
     "core:file-reader-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:diff-generator"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/preview-spec.ts"
+      "file": "core:src/application/use-cases/preview-spec.ts",
+      "symbols": ["PreviewSpecInput", "PreviewSpecFileEntry", "PreviewSpecResult", "PreviewSpec"]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["CompositionResolver", "createCompositionResolver"]
+    },
+    {
+      "file": "core:src/composition/use-cases/preview-spec.ts",
+      "symbols": ["PreviewSpecDeps", "resolvePreviewSpecDeps", "createPreviewSpec"]
+    },
+    {
+      "file": "core:test/application/use-cases/helpers.ts",
+      "symbols": ["makeStubPreviewSpec"]
+    },
+    {
+      "file": "core:test/application/use-cases/preview-spec.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/preview-spec.spec.ts"
     }
   ]
 }

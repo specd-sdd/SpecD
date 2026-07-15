@@ -1,5 +1,6 @@
 import { type ArtifactParserRegistry } from '../../application/ports/artifact-parser.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type DiffGenerator } from '../../application/ports/diff-generator.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { PreviewSpec } from '../../application/use-cases/preview-spec.js'
@@ -9,6 +10,7 @@ import {
   type CompositionResolver,
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
+import { createDefaultDiffGenerator } from '../diff-generator.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 
 /**
@@ -19,6 +21,7 @@ export interface PreviewSpecDeps {
   readonly specs: ReadonlyMap<string, SpecRepository>
   readonly schemaProvider: SchemaProvider
   readonly parsers: ArtifactParserRegistry
+  readonly diffGenerator?: DiffGenerator
 }
 
 /**
@@ -33,6 +36,7 @@ export function resolvePreviewSpecDeps(resolver: CompositionResolver): PreviewSp
     specs: resolver.getSpecRepositories(),
     schemaProvider: resolver.getSchemaProvider(),
     parsers: resolver.getArtifactParserRegistry(),
+    diffGenerator: resolver.getDiffGenerator(),
   }
 }
 
@@ -85,7 +89,8 @@ function createPreviewSpecFromNormalized(
 ): PreviewSpec {
   if (input.kind === 'deps') {
     const { changes, specs, schemaProvider, parsers } = input.deps
-    return new PreviewSpec(changes, specs, schemaProvider, parsers)
+    const diffGenerator = input.deps.diffGenerator ?? createDefaultDiffGenerator()
+    return new PreviewSpec(changes, specs, schemaProvider, parsers, diffGenerator)
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

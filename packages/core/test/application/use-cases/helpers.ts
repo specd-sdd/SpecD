@@ -774,6 +774,8 @@ export function makeStubFileReader(files: Record<string, string> = {}): FileRead
 export function makeStubPreviewSpec(): PreviewSpec {
   return {
     execute: async () => ({
+      specId: '',
+      changeName: '',
       files: [],
       warnings: [],
     }),
