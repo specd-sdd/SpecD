@@ -21,7 +21,7 @@
     {
       "requirement": "openSpecdHost",
       "rules": [
-        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Use `createDefaultConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`\n2. Await `createSdkContext(config, input.kernelOptions)`\n3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\n`OpenSpecdHostInput` MAY include optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
+        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Reject any call that provides both `input.configPath` and `input.startDir`, because forced-file bootstrap and discovery-root bootstrap are distinct modes and the caller MUST choose one explicitly\n2. Use `createDefaultConfigLoader()` to load config:\n   - `input.configPath` maps to loader forced mode when provided\n   - otherwise `input.startDir` maps to loader discovery mode when provided\n   - otherwise discovery mode starts from `process.cwd()`\n3. Await `createSdkContext(config, input.kernelOptions)`\n4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\n`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots and optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
       ]
     },
     {
@@ -76,9 +76,30 @@
     },
     {
       "requirement": "openSpecdHost",
+      "name": "Discovery mode can start from explicit startDir",
+      "given": ["a host selects a project directory explicitly"],
+      "when": ["openSpecdHost({ startDir: '/path/to/project/subdir' }) is called"],
+      "then": [
+        "the loader uses discovery mode from that startDir",
+        "AND the call does not rely on mutating process.cwd()"
+      ]
+    },
+    {
+      "requirement": "openSpecdHost",
       "name": "Forced config path",
       "when": ["openSpecdHost({ configPath: '/path/to/specd.yaml' }) is called"],
       "then": ["the loader uses forced mode for that path"]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "name": "Mixed bootstrap inputs are rejected",
+      "when": [
+        "openSpecdHost({ configPath: '/path/to/specd.yaml', startDir: '/path/to/project' }) is called"
+      ],
+      "then": [
+        "the call fails before loader bootstrap proceeds",
+        "AND the error tells the caller to choose either configPath or startDir"
+      ]
     },
     {
       "requirement": "openSpecdHost",
@@ -94,7 +115,18 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:test/composition/host-context.spec.ts"
+      }
+    ],
     "symbols": [
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "OpenSpecdHostInput"
+      },
       {
         "specId": "sdk:host-context",
         "file": "sdk:src/composition/host-context.ts",
@@ -103,8 +135,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:7a3944d1fb5e7222e3d901b9a2ab0b70912eb8f2008424ea24354888528a1854",
-    "verify.md": "sha256:a7ed7512d09b662c39b99ab83a77029400deaea22a3b752d94176bda94e835ef"
+    "spec.md": "sha256:af26a0c1078d76f4295f85c13abe54efe8e0856b5110e959e84e59067eee9a99",
+    "verify.md": "sha256:f9e6b201f1e92711021771556a1f15bb87f7f9aa9002bfaec0457da6d61261b9"
   },
   "generatedBy": "core"
 }

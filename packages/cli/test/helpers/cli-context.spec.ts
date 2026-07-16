@@ -32,6 +32,7 @@ describe('resolveCliContext', () => {
 
     expect(openSpecdHost).toHaveBeenCalled()
     const call = vi.mocked(openSpecdHost).mock.calls[0]?.[0]
+    expect(call?.startDir).toBeUndefined()
     expect(call?.kernelOptions?.additionalDestinations?.[0]).toMatchObject({
       target: 'console',
       level: 'trace',

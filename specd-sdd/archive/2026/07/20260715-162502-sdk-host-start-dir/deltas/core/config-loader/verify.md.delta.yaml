@@ -1,0 +1,20 @@
+- op: modified
+  description: 'Verify that startDir remains the public discovery-mode input for host bootstrap'
+  selector:
+    type: section
+    matches: '^Requirement: Factory signature and return type$'
+  content: |
+    #### Scenario: Factory returns a ConfigLoader
+
+    - **WHEN** `createDefaultConfigLoader({ startDir: '/some/dir' })` is called
+    - **THEN** the returned object satisfies the `ConfigLoader` interface (abstract class)
+    - **AND** it is bounded by a resolved `rootPath` value rather than retaining a `VcsAdapter`
+    - **AND** it exposes a `load()` method returning `Promise<SpecdConfig>`
+    - **AND** it exposes a `resolvePath()` method returning `Promise<string | null>`
+
+    #### Scenario: startDir preserves discovery semantics for host-selected roots
+
+    - **GIVEN** a delivery host knows the directory it wants to bootstrap from
+    - **WHEN** it constructs the loader with `{ startDir: '/selected/project/subdir' }`
+    - **THEN** the loader performs normal discovery from that directory
+    - **AND** the host does not need to substitute `{ configPath }` for directory-based discovery

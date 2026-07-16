@@ -37,10 +37,23 @@
 - **THEN** config is loaded via `createDefaultConfigLoader()` discovery mode
 - **AND** `configFilePath` points to the discovered file
 
+#### Scenario: Discovery mode can start from explicit startDir
+
+- **GIVEN** a host selects a project directory explicitly
+- **WHEN** `openSpecdHost({ startDir: '/path/to/project/subdir' })` is called
+- **THEN** the loader uses discovery mode from that `startDir`
+- **AND** the call does not rely on mutating `process.cwd()`
+
 #### Scenario: Forced config path
 
 - **WHEN** `openSpecdHost({ configPath: '/path/to/specd.yaml' })` is called
 - **THEN** the loader uses forced mode for that path
+
+#### Scenario: Mixed bootstrap inputs are rejected
+
+- **WHEN** `openSpecdHost({ configPath: '/path/to/specd.yaml', startDir: '/path/to/project' })` is called
+- **THEN** the call fails before loader bootstrap proceeds
+- **AND** the error tells the caller to choose either `configPath` or `startDir`
 
 #### Scenario: Kernel options forwarded
 

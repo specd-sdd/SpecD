@@ -25,6 +25,8 @@ A discovered file without `extends` becomes a standalone root from that point. A
 
 The search never goes above the VCS repository root. This prevents accidentally picking up a config from a parent repository in nested or sibling monorepo layouts.
 
+Hosts that expose their own bootstrap API MAY accept an explicit discovery root instead of relying on the process current working directory. When they do, they MUST apply the same discovery strategy from that supplied directory. This discovery-root mode remains distinct from explicit file-entry modes such as `--config`, which always mean forced-file bootstrap rather than directory-based discovery.
+
 Some command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file entrypoint, never a repository root selector.
 
 ### Requirement: Privacy settings

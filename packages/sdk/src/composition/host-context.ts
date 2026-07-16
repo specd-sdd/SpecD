@@ -17,10 +17,18 @@ export interface SdkHostContext {
   readonly createGraphProvider: () => CodeGraphProvider
 }
 
-/** Input for {@link openSpecdHost}. */
+/**
+ * Input for {@link openSpecdHost}.
+ *
+ * Callers may bootstrap from one explicit config file via `configPath`, from one
+ * discovery root via `startDir`, or from `process.cwd()` by omitting both fields.
+ * `configPath` and `startDir` must never be provided together.
+ */
 export interface OpenSpecdHostInput {
   /** Absolute path to `specd.yaml` for forced load mode. */
   readonly configPath?: string
+  /** Directory to start config discovery from without mutating `process.cwd()`. */
+  readonly startDir?: string
   /** Optional kernel construction overrides (e.g. logging). */
   readonly kernelOptions?: KernelOptions
 }
@@ -54,14 +62,26 @@ export async function createSdkContext(
 /**
  * Loads config and builds the SDK host context.
  *
- * @param input - Optional config path and kernel overrides
+ * Supports three bootstrap modes:
+ * - forced-file mode via `configPath`
+ * - discovery-root mode via `startDir`
+ * - default discovery from `process.cwd()` when neither is provided
+ *
+ * @param input - Optional bootstrap input and kernel overrides
  * @returns Loaded config, path, kernel, and graph-provider factory
+ * @throws {Error} When both `configPath` and `startDir` are provided together
  */
 export async function openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult> {
+  if (input?.configPath !== undefined && input.startDir !== undefined) {
+    throw new Error('openSpecdHost accepts either configPath or startDir, but never both')
+  }
+
   const loader = await createDefaultConfigLoader(
     input?.configPath !== undefined
       ? { configPath: input.configPath }
-      : { startDir: process.cwd() },
+      : input?.startDir !== undefined
+        ? { startDir: input.startDir }
+        : { startDir: process.cwd() },
   )
   const [config, configFilePath] = await Promise.all([loader.load(), loader.resolvePath()])
   const ctx = await createSdkContext(config, input?.kernelOptions)

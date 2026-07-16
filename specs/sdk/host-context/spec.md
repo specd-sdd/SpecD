@@ -32,11 +32,15 @@ The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST 
 
 `openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:
 
-1. Use `createDefaultConfigLoader()` to load config — `input.configPath` maps to loader forced mode when provided; otherwise discovery mode from `process.cwd()`
-2. Await `createSdkContext(config, input.kernelOptions)`
-3. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
+1. Reject any call that provides both `input.configPath` and `input.startDir`, because forced-file bootstrap and discovery-root bootstrap are distinct modes and the caller MUST choose one explicitly
+2. Use `createDefaultConfigLoader()` to load config:
+   - `input.configPath` maps to loader forced mode when provided
+   - otherwise `input.startDir` maps to loader discovery mode when provided
+   - otherwise discovery mode starts from `process.cwd()`
+3. Await `createSdkContext(config, input.kernelOptions)`
+4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
 
-`OpenSpecdHostInput` MAY include optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations).
+`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots and optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations).
 
 ### Requirement: Config mutation boundary
 

@@ -16,6 +16,13 @@
 - **WHEN** config discovery runs
 - **THEN** it checks only the current working directory
 
+#### Scenario: Host bootstrap may supply an explicit discovery root
+
+- **GIVEN** a host bootstrap API accepts a discovery root input
+- **WHEN** discovery runs from that supplied directory
+- **THEN** it uses the same candidate ordering and VCS-bounded walk as cwd-based discovery
+- **AND** it remains distinct from explicit file-entry modes such as `--config`
+
 ### Requirement: Privacy settings
 
 #### Scenario: Mode hash requires salt

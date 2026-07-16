@@ -61,6 +61,7 @@ describe('openSpecdHost', () => {
 
   it('loads config via discovery when configPath is omitted', async () => {
     const result = await openSpecdHost()
+    expect(createDefaultConfigLoader).toHaveBeenCalledWith({ startDir: process.cwd() })
     expect(load).toHaveBeenCalled()
     expect(result.config).toBe(sampleConfig)
     expect(result.configFilePath).toBe('/tmp/project/specd.yaml')
@@ -76,5 +77,22 @@ describe('openSpecdHost', () => {
   it('uses forced configPath when provided', async () => {
     await openSpecdHost({ configPath: '/forced/specd.yaml' })
     expect(createDefaultConfigLoader).toHaveBeenCalledWith({ configPath: '/forced/specd.yaml' })
+  })
+
+  it('uses discovery mode from an explicit startDir when provided', async () => {
+    await openSpecdHost({ startDir: '/selected/project/subdir' })
+    expect(createDefaultConfigLoader).toHaveBeenCalledWith({
+      startDir: '/selected/project/subdir',
+    })
+  })
+
+  it('rejects mixed configPath and startDir inputs before loader creation', async () => {
+    await expect(
+      openSpecdHost({
+        configPath: '/forced/specd.yaml',
+        startDir: '/selected/project',
+      }),
+    ).rejects.toThrow('openSpecdHost accepts either configPath or startDir, but never both')
+    expect(createDefaultConfigLoader).not.toHaveBeenCalled()
   })
 })

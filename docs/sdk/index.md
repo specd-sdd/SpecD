@@ -24,13 +24,25 @@ Use `@specd/sdk` when building a host that needs:
 ```typescript
 import { openSpecdHost, createSdkContext } from '@specd/sdk'
 
-// Full host bootstrap (loads specd.yaml)
+// Forced-file bootstrap when the host already knows the exact config file
 const host = await openSpecdHost({ configPath: '/path/to/specd.yaml' })
+
+// Discovery-root bootstrap when the host chooses a directory at runtime
+const selectedHost = await openSpecdHost({ startDir: '/path/to/project/subdir' })
+
 const config = await host.kernel.project.getConfig.execute()
 
 // Kernel-only when you already have a resolved SpecdConfig
 const { kernel } = await createSdkContext(config)
 ```
+
+Choose exactly one bootstrap input:
+
+- `configPath` for forced-file mode
+- `startDir` for discovery-root mode
+- neither field to fall back to discovery from `process.cwd()`
+
+Do not pass `configPath` and `startDir` together.
 
 `openSpecdHost` returns:
 

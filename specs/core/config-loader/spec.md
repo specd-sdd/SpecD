@@ -13,6 +13,8 @@ Delivery mechanisms need to load and validate `specd.yaml` without knowing the d
 - `{ startDir: string }` — discovery mode
 - `{ configPath: string }` — forced mode
 
+Delivery hosts that select a project directory at runtime MAY pass `{ startDir }` to preserve normal config discovery semantics without mutating `process.cwd()`. They MUST NOT treat `{ configPath }` as an equivalent substitute for directory-based discovery.
+
 `createDefaultConfigLoader()` MAY resolve a `VcsAdapter` internally to derive the repository boundary, but that adapter is not part of `FsConfigLoaderOptions`, and the returned `ConfigLoader` MUST depend only on the resolved `rootPath` data.
 
 The returned `ConfigLoader` is an abstract class that accepts `rootPath` in its constructor:
