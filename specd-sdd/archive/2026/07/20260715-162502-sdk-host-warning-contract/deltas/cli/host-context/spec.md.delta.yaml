@@ -1,0 +1,14 @@
+- op: modified
+  description: Require CLI to consume bootstrap warnings from config.warnings and emit them exactly once.
+  selector:
+    type: section
+    matches: '^Requirement: resolveCliContext delegates to openSpecdHost$'
+  content: |
+    `resolveCliContext` in `packages/cli/src/helpers/cli-context.ts` MUST call `openSpecdHost` from `@specd/sdk` with:
+
+    - `configPath` from caller options when provided
+    - `kernelOptions` derived from CLI-specific logging configuration (verbosity from argv, console log destination, optional callback destination)
+
+    It MUST return `{ config, configFilePath, kernel }` as `CliContext`.
+
+    When the loaded config contains warnings, CLI MUST treat `config.warnings` as the canonical bootstrap warning source. It MUST emit each warning at most once per `resolveCliContext` call and MUST NOT depend on a duplicate top-level `warnings` field on `OpenSpecdHostResult`.

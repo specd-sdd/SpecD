@@ -721,6 +721,19 @@
 - **THEN** it resolves successfully
 - **AND** `config.warnings` is undefined or does not contain warnings for storage
 
+#### Scenario: Warning-bearing config remains non-fatal
+
+- **GIVEN** config loading detects a legacy-compatible warning condition
+- **WHEN** the config is resolved
+- **THEN** loading succeeds without converting the warning into a startup error
+
+#### Scenario: Hosts can consume warnings from resolved config
+
+- **GIVEN** config loading resolves warnings
+- **WHEN** a delivery host receives the resolved `SpecdConfig`
+- **THEN** the host can read those diagnostics from `config.warnings`
+- **AND** the host does not need to recompute or reinterpret the warning messages
+
 ### Requirement: Project context instructions
 
 #### Scenario: Context entries injected before spec content

@@ -159,7 +159,7 @@
     {
       "requirement": "Legacy configuration warnings",
       "rules": [
-        "To encourage migration to the new generalized configuration format, the loader MUST collect a warning when a legacy configuration block is resolved:\n\n- A warning string is generated: `\"Legacy configuration format detected at '<field-path>'. Please migrate to 'adapter: { type: \\\"fs\\\", config: ... }' (the legacy format will be removed in future versions).\"`\n- The warnings are exposed via `config.warnings` as a list of strings: `readonly warnings?: readonly string[]`.\n- Delivery hosts MUST print these warnings to standard error (`console.warn`) upon successful loading of the configuration."
+        "Legacy-compatible config parsing SHALL surface advisory warnings through `SpecdConfig.warnings`.\n\nThese warnings MUST be non-fatal diagnostics about configuration shape or compatibility, not startup-blocking errors. They SHALL be produced during config loading, preserved on the resolved config object, and remain available for host bootstrap consumers to report without recomputing or reformatting them.\n\n#### Scenario: Legacy config format emits warnings\n\n- **GIVEN** a config file declares a legacy workspace spec adapter format:\n- **WHEN** config is loaded\n- **THEN** it resolves successfully\n- **AND** `config.warnings` contains a warning string for `'workspaces.default.specs'`\n\n#### Scenario: Omitted storage defaults do not emit legacy configuration warnings\n\n- **GIVEN** a config file that completely omits the `storage` key\n- **WHEN** config is loaded\n- **THEN** it resolves successfully\n- **AND** `config.warnings` is undefined or does not contain warnings for storage"
       ]
     },
     {
@@ -1139,6 +1139,23 @@
       ]
     },
     {
+      "requirement": "Legacy configuration warnings",
+      "name": "Warning-bearing config remains non-fatal",
+      "given": ["config loading detects a legacy-compatible warning condition"],
+      "when": ["the config is resolved"],
+      "then": ["loading succeeds without converting the warning into a startup error"]
+    },
+    {
+      "requirement": "Legacy configuration warnings",
+      "name": "Hosts can consume warnings from resolved config",
+      "given": ["config loading resolves warnings"],
+      "when": ["a delivery host receives the resolved SpecdConfig"],
+      "then": [
+        "the host can read those diagnostics from config.warnings",
+        "AND the host does not need to recompute or reinterpret the warning messages"
+      ]
+    },
+    {
       "requirement": "Project context instructions",
       "name": "Context entries injected before spec content",
       "given": [
@@ -1280,10 +1297,23 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:config",
+        "file": "core:src/application/specd-config.ts",
+        "symbol": "SpecdConfig"
+      },
+      {
+        "specId": "core:config",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "parseRawAdapter"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:e093f441a89c5df65c76732ebdb8f5109d703eaa2300599479ab6fd4421bb7aa",
-    "verify.md": "sha256:061433adf79dfdc84ce620ab275e862d720293fa9de71132d20248344510767d"
+    "spec.md": "sha256:db7078b00bc4b8304872e041cce20c77217f4d0a20d212e83c0679abecca951c",
+    "verify.md": "sha256:de2b436010b6e5bb7aa3085e4cd89af29305e089faf971b522419fd3d5f9b143"
   },
   "generatedBy": "core"
 }

@@ -553,11 +553,23 @@ These validation failures remain domain-level configuration errors and therefore
 
 ### Requirement: Legacy configuration warnings
 
-To encourage migration to the new generalized configuration format, the loader MUST collect a warning when a legacy configuration block is resolved:
+Legacy-compatible config parsing SHALL surface advisory warnings through `SpecdConfig.warnings`.
 
-- A warning string is generated: `"Legacy configuration format detected at '<field-path>'. Please migrate to 'adapter: { type: \"fs\", config: ... }' (the legacy format will be removed in future versions)."`
-- The warnings are exposed via `config.warnings` as a list of strings: `readonly warnings?: readonly string[]`.
-- Delivery hosts MUST print these warnings to standard error (`console.warn`) upon successful loading of the configuration.
+These warnings MUST be non-fatal diagnostics about configuration shape or compatibility, not startup-blocking errors. They SHALL be produced during config loading, preserved on the resolved config object, and remain available for host bootstrap consumers to report without recomputing or reformatting them.
+
+#### Scenario: Legacy config format emits warnings
+
+- **GIVEN** a config file declares a legacy workspace spec adapter format:
+- **WHEN** config is loaded
+- **THEN** it resolves successfully
+- **AND** `config.warnings` contains a warning string for `'workspaces.default.specs'`
+
+#### Scenario: Omitted storage defaults do not emit legacy configuration warnings
+
+- **GIVEN** a config file that completely omits the `storage` key
+- **WHEN** config is loaded
+- **THEN** it resolves successfully
+- **AND** `config.warnings` is undefined or does not contain warnings for storage
 
 ### Requirement: Project-level graph configuration
 

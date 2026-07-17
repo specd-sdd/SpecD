@@ -21,7 +21,7 @@
     {
       "requirement": "openSpecdHost",
       "rules": [
-        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Reject any call that provides both `input.configPath` and `input.startDir`, because forced-file bootstrap and discovery-root bootstrap are distinct modes and the caller MUST choose one explicitly\n2. Use `createDefaultConfigLoader()` to load config:\n   - `input.configPath` maps to loader forced mode when provided\n   - otherwise `input.startDir` maps to loader discovery mode when provided\n   - otherwise discovery mode starts from `process.cwd()`\n3. Await `createSdkContext(config, input.kernelOptions)`\n4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\n`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots and optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
+        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Reject any call that provides both `input.configPath` and `input.startDir`, because forced-file bootstrap and discovery-root bootstrap are distinct modes and the caller MUST choose one explicitly\n2. Use `createDefaultConfigLoader()` to load config:\n   - `input.configPath` maps to loader forced mode when provided\n   - otherwise `input.startDir` maps to loader discovery mode when provided\n   - otherwise discovery mode starts from `process.cwd()`\n3. Await `createSdkContext(config, input.kernelOptions)`\n4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\nConfiguration warnings exposed through `SpecdConfig.warnings` SHALL remain attached to the returned `config` object unchanged. `OpenSpecdHostResult` MUST NOT add a separate top-level `warnings` field or any alternate warning collection that duplicates `config.warnings`.\n\n`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots and optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
       ]
     },
     {
@@ -108,6 +108,22 @@
       "then": ["createKernel receives the provided options"]
     },
     {
+      "requirement": "openSpecdHost",
+      "name": "Config warnings remain on returned config",
+      "given": ["config loading resolves successfully with advisory warnings"],
+      "when": ["openSpecdHost() returns"],
+      "then": ["the returned config.warnings value matches the loader output unchanged"]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "name": "Host result does not duplicate warnings",
+      "when": ["a caller inspects OpenSpecdHostResult"],
+      "then": [
+        "warning diagnostics are available through config.warnings",
+        "AND no separate top-level warnings field is required or exposed"
+      ]
+    },
+    {
       "requirement": "Config mutation boundary",
       "name": "Host context has no write methods",
       "when": ["inspecting SdkHostContext type exports"],
@@ -125,7 +141,7 @@
       {
         "specId": "sdk:host-context",
         "file": "sdk:src/composition/host-context.ts",
-        "symbol": "OpenSpecdHostInput"
+        "symbol": "OpenSpecdHostResult"
       },
       {
         "specId": "sdk:host-context",
@@ -135,8 +151,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:af26a0c1078d76f4295f85c13abe54efe8e0856b5110e959e84e59067eee9a99",
-    "verify.md": "sha256:f9e6b201f1e92711021771556a1f15bb87f7f9aa9002bfaec0457da6d61261b9"
+    "spec.md": "sha256:1f84f6ccd6cf5796e34b809135dd4f52ce04fc443e69bd9f6c417cbcf17e1655",
+    "verify.md": "sha256:25ce5242cd5272ea4e675d28d3c7f6143b79548d8f94861b35fd1f3bf9974173"
   },
   "generatedBy": "core"
 }

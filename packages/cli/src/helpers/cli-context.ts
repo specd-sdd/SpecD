@@ -78,6 +78,9 @@ export function buildCliKernelOptions(options?: {
 /**
  * Loads config and creates the CLI kernel via the SDK host facade.
  *
+ * Configuration warnings are consumed from `config.warnings` and emitted once
+ * per successful bootstrap attempt at the CLI boundary.
+ *
  * @param options - Optional overrides
  * @param options.configPath - Path to specd.yaml config file
  * @param options.onLog - Optional callback to handle log entries
@@ -91,6 +94,7 @@ export async function resolveCliContext(options?: {
     ...(options?.configPath !== undefined ? { configPath: options.configPath } : {}),
     kernelOptions: buildCliKernelOptions({ onLog: options?.onLog }),
   })
+  // SDK returns warnings on config; CLI owns formatting and emission.
   if (host.config.warnings !== undefined && host.config.warnings.length > 0) {
     for (const warning of host.config.warnings) {
       console.warn(`warning: ${warning}`)

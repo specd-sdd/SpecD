@@ -68,6 +68,36 @@ describe('openSpecdHost', () => {
     expect(result.kernel).toBe(mockKernel)
   })
 
+  it('preserves loader warnings on the returned config', async () => {
+    const warningConfig = {
+      ...sampleConfig,
+      warnings: ['legacy config warning'],
+    } as SpecdConfig
+    load.mockResolvedValue(warningConfig)
+
+    const result = await openSpecdHost()
+
+    expect(result.config.warnings).toEqual(['legacy config warning'])
+  })
+
+  it('keeps warnings on config instead of duplicating them on the host result', async () => {
+    const warningConfig = {
+      ...sampleConfig,
+      warnings: ['legacy config warning'],
+    } as SpecdConfig
+    load.mockResolvedValue(warningConfig)
+
+    const result = await openSpecdHost()
+
+    expect(result).toMatchObject({
+      config: warningConfig,
+      configFilePath: '/tmp/project/specd.yaml',
+      kernel: mockKernel,
+      createGraphProvider: expect.any(Function),
+    })
+    expect('warnings' in result).toBe(false)
+  })
+
   it('forwards kernelOptions to createKernel', async () => {
     const kernelOptions = { additionalDestinations: [] }
     await openSpecdHost({ kernelOptions })

@@ -51,6 +51,10 @@ Do not pass `configPath` and `startDir` together.
 - `kernel` — wired specd kernel
 - `createGraphProvider()` — factory bound to the same config
 
+Bootstrap warnings remain on `config.warnings`. `openSpecdHost` does not expose a
+duplicate top-level `warnings` field, so hosts should consume diagnostics from the
+resolved config and decide how to present them.
+
 Config **reads** go through `kernel.project.getConfig`. Config **writes** (`initProject`, `addPlugin`, `removePlugin`) use `createConfigWriter()` from `@specd/sdk` — not the kernel.
 
 ## Graph lifecycle

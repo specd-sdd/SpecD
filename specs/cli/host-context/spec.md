@@ -15,6 +15,8 @@ Most CLI commands need a loaded `SpecdConfig`, config file path, and wired `Kern
 
 It MUST return `{ config, configFilePath, kernel }` as `CliContext`.
 
+When the loaded config contains warnings, CLI MUST treat `config.warnings` as the canonical bootstrap warning source. It MUST emit each warning at most once per `resolveCliContext` call and MUST NOT depend on a duplicate top-level `warnings` field on `OpenSpecdHostResult`.
+
 ### Requirement: CLI kernel options preservation
 
 CLI-specific kernel wiring (verbosity-based log levels, TTY-aware console format, optional `onLog` callback destination) MUST remain in the CLI layer and MUST be passed through `openSpecdHost` input.

@@ -1,0 +1,459 @@
+{
+  "name": "sdk-host-warning-contract",
+  "createdAt": "2026-07-15T16:25:02.225Z",
+  "description": "Define a single SDK host-bootstrap contract for configuration warnings by keeping config.warnings as the canonical diagnostic surface exposed through openSpecdHost. The change aligns CLI bootstrap behavior with that contract, reinforces the behavior with SDK and CLI tests, and documents that OpenSpecdHostResult remains a thin wrapper rather than a duplicate warning model.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["sdk:host-context", "cli:host-context", "core:config"],
+  "specDependsOn": {
+    "sdk:host-context": ["sdk:composition", "core:kernel", "core:composition"],
+    "cli:host-context": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
+    "core:config": ["core:vcs-adapter-port", "default:_global/architecture"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "MAIN_FOLLOW_UPS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/specd-config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/src/composition/host-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["OpenSpecdHostResult", "openSpecdHost"]
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/src/helpers/cli-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveCliContext"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/application/specd-config.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecdConfig"]
+    },
+    {
+      "specId": "core:config",
+      "file": "packages/core/src/infrastructure/fs/config-loader.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["parseRawAdapter"]
+    },
+    {
+      "specId": "sdk:host-context",
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:host-context",
+      "file": "packages/cli/test/helpers/cli-context.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:8964b20dd7c3b8005e0105c8bc605b59b0fd8feedcd84ad15c9c4905c8f3d440"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60dbada7d61231875663090a007ae022e3b7a39df195c97190dc2ced09f157d9"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a454d53566b7ca06548cd4a2af606d1f62a159bb26ff98c503c80ad2c7631663"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7cba160f43f6891b6b23eb6098d4b17930104b397d4bbef22a83e0fb37e0f1a8"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "sdk:host-context",
+          "filename": "deltas/sdk/host-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:eef29ccf8e55d7701431393569b06904561a56c5dea4b779f9673006d234e7d3"
+        },
+        {
+          "key": "cli:host-context",
+          "filename": "deltas/cli/host-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3263c79cc281bc3c8468e4f629cd39057df0b51689234d690567b1ad75e09b7a"
+        },
+        {
+          "key": "core:config",
+          "filename": "deltas/core/config/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b75c4a64cc8869eee36fd4929f1132878214595db86ee07db71a4e58840802df"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:94339742b93f5f8e04217938220804145209b354584764b04f68c2d5cfd0e0f9"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:b06957c761c7de36f96ce3009076202ddc2fa83e6a13919e7838a55c6d6e3967"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-15T16:25:02.225Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["sdk:host-context", "cli:host-context", "core:config"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-15T16:25:02.237Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:host-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-16T08:37:38.830Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-host-start-dir' was archived with overlapping specs: core:config, sdk:host-context",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:host-context", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:host-context", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-16T08:37:38.830Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-16T08:38:06.527Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-host-start-dir' was archived with overlapping specs: core:config, sdk:host-context",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:host-context", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:host-context", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-16T08:38:24.494Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-host-start-dir' was archived with overlapping specs: core:config, sdk:host-context",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:host-context", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:host-context", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-16T10:58:39.257Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["sdk:host-context", "cli:host-context", "core:config"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:host-context", "cli:host-context", "core:config"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-16T11:23:35.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-16T11:24:32.672Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-16T11:32:57.292Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-17T07:59:00.745Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-17T07:59:31.413Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-17T08:07:52.319Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Define a single SDK host-bootstrap contract for configuration warnings by keeping config.warnings as the canonical diagnostic surface exposed through openSpecdHost. The change aligns CLI bootstrap behavior with that contract, reinforces the behavior with SDK and CLI tests, and documents that OpenSpecdHostResult remains a thin wrapper rather than a duplicate warning model."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-17T08:08:32.919Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-17T08:08:33.003Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

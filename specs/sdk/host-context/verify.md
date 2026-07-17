@@ -60,6 +60,18 @@
 - **WHEN** `openSpecdHost({ kernelOptions: { ... } })` is called
 - **THEN** `createKernel` receives the provided options
 
+#### Scenario: Config warnings remain on returned config
+
+- **GIVEN** config loading resolves successfully with advisory warnings
+- **WHEN** `openSpecdHost()` returns
+- **THEN** the returned `config.warnings` value matches the loader output unchanged
+
+#### Scenario: Host result does not duplicate warnings
+
+- **WHEN** a caller inspects `OpenSpecdHostResult`
+- **THEN** warning diagnostics are available through `config.warnings`
+- **AND** no separate top-level `warnings` field is required or exposed
+
 ### Requirement: Config mutation boundary
 
 #### Scenario: Host context has no write methods

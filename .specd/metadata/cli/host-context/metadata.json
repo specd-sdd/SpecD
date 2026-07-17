@@ -9,7 +9,7 @@
     {
       "requirement": "resolveCliContext delegates to openSpecdHost",
       "rules": [
-        "`resolveCliContext` in `packages/cli/src/helpers/cli-context.ts` MUST call `openSpecdHost` from `@specd/sdk` with:\n\n- `configPath` from caller options when provided\n- `kernelOptions` derived from CLI-specific logging configuration (verbosity from argv, console log destination, optional callback destination)\n\nIt MUST return `{ config, configFilePath, kernel }` as `CliContext`."
+        "`resolveCliContext` in `packages/cli/src/helpers/cli-context.ts` MUST call `openSpecdHost` from `@specd/sdk` with:\n\n- `configPath` from caller options when provided\n- `kernelOptions` derived from CLI-specific logging configuration (verbosity from argv, console log destination, optional callback destination)\n\nIt MUST return `{ config, configFilePath, kernel }` as `CliContext`.\n\nWhen the loaded config contains warnings, CLI MUST treat `config.warnings` as the canonical bootstrap warning source. It MUST emit each warning at most once per `resolveCliContext` call and MUST NOT depend on a duplicate top-level `warnings` field on `OpenSpecdHostResult`."
       ]
     },
     {
@@ -49,6 +49,26 @@
       "then": ["openSpecdHost receives kernelOptions with elevated console log level"]
     },
     {
+      "requirement": "resolveCliContext delegates to openSpecdHost",
+      "name": "CLI reads bootstrap warnings from config",
+      "given": ["openSpecdHost returns a config with warning strings"],
+      "when": ["resolveCliContext completes successfully"],
+      "then": [
+        "CLI consumes the warnings from config.warnings",
+        "AND it does not require a top-level warnings field on OpenSpecdHostResult"
+      ]
+    },
+    {
+      "requirement": "resolveCliContext delegates to openSpecdHost",
+      "name": "CLI emits each warning once per bootstrap",
+      "given": ["config.warnings contains multiple advisory messages"],
+      "when": ["resolveCliContext completes successfully"],
+      "then": [
+        "CLI emits each warning once for that bootstrap attempt",
+        "AND it does not duplicate the same warning through a second host-result warning surface"
+      ]
+    },
+    {
       "requirement": "CLI kernel options preservation",
       "name": "Optional onLog callback wired",
       "given": ["resolveCliContext is called with an onLog callback"],
@@ -69,17 +89,23 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "cli:host-context",
+        "file": "cli:test/helpers/cli-context.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "cli:host-context",
-        "file": "cli:src/load-config.ts",
-        "symbol": "loadConfig"
+        "file": "cli:src/helpers/cli-context.ts",
+        "symbol": "resolveCliContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:da5cf666bf91a0ebca76f464a189d8c8f6dc8cffe7c69d722c1ae2ea0931070a",
-    "verify.md": "sha256:b80b12fdf3382e7d166c20860102b8a4fe6a43d94eb3c742999e1975f207665a"
+    "spec.md": "sha256:37fb69fa0728c8e19b85a4761093288575620cbc8e7d98522caaf10918d36e96",
+    "verify.md": "sha256:d20c328ff47aed80f173f7b279cee4722f8a1b9e04636eb8a9e163b66bd4baf4"
   },
   "generatedBy": "core"
 }

@@ -198,7 +198,11 @@ export interface SpecdStorageConfig {
  * use-case factory functions.
  */
 export interface SpecdConfig {
-  /** Warnings generated during configuration loading, e.g. legacy configuration format warnings. */
+  /**
+   * Non-fatal diagnostics generated during configuration loading, for example
+   * legacy configuration format warnings. Hosts consume and report these from
+   * the resolved config object.
+   */
   readonly warnings?: readonly string[]
   /** Absolute path to the directory containing the active `specd.yaml`. */
   readonly projectRoot: string

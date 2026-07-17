@@ -1,0 +1,31 @@
+- op: modified
+  description: Add coverage for canonical warning consumption and single-emission behavior in CLI host bootstrap.
+  selector:
+    type: section
+    matches: '^Requirement: resolveCliContext delegates to openSpecdHost$'
+  content: |
+    #### Scenario: Host bootstrap uses SDK
+
+    - **WHEN** any CLI command calls `resolveCliContext`
+    - **THEN** it invokes `openSpecdHost` from `@specd/sdk`
+    - **AND** it returns `config`, `configFilePath`, and `kernel` from the host result
+
+    #### Scenario: Kernel options forwarded for verbosity
+
+    - **GIVEN** the process argv includes `-vv` or `--verbose`
+    - **WHEN** `resolveCliContext` runs
+    - **THEN** `openSpecdHost` receives `kernelOptions` with elevated console log level
+
+    #### Scenario: CLI reads bootstrap warnings from config
+
+    - **GIVEN** `openSpecdHost` returns a config with warning strings
+    - **WHEN** `resolveCliContext` completes successfully
+    - **THEN** CLI consumes the warnings from `config.warnings`
+    - **AND** it does not require a top-level `warnings` field on `OpenSpecdHostResult`
+
+    #### Scenario: CLI emits each warning once per bootstrap
+
+    - **GIVEN** `config.warnings` contains multiple advisory messages
+    - **WHEN** `resolveCliContext` completes successfully
+    - **THEN** CLI emits each warning once for that bootstrap attempt
+    - **AND** it does not duplicate the same warning through a second host-result warning surface

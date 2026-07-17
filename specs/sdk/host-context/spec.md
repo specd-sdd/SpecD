@@ -40,6 +40,8 @@ The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST 
 3. Await `createSdkContext(config, input.kernelOptions)`
 4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
 
+Configuration warnings exposed through `SpecdConfig.warnings` SHALL remain attached to the returned `config` object unchanged. `OpenSpecdHostResult` MUST NOT add a separate top-level `warnings` field or any alternate warning collection that duplicates `config.warnings`.
+
 `OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots and optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations).
 
 ### Requirement: Config mutation boundary

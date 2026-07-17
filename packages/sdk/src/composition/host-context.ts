@@ -33,9 +33,15 @@ export interface OpenSpecdHostInput {
   readonly kernelOptions?: KernelOptions
 }
 
-/** Result of {@link openSpecdHost} including loaded config metadata. */
+/**
+ * Result of {@link openSpecdHost} including loaded config metadata.
+ *
+ * This is a thin bootstrap wrapper over the loaded {@link SpecdConfig} and the
+ * shared {@link SdkHostContext}. Configuration warnings remain on
+ * `config.warnings`; this result does not duplicate them as a top-level field.
+ */
 export interface OpenSpecdHostResult extends SdkHostContext {
-  /** Resolved project configuration. */
+  /** Resolved project configuration, including any load-time advisory warnings. */
   readonly config: SpecdConfig
   /** Absolute path to the loaded config file, or `null` when not locatable. */
   readonly configFilePath: string | null
@@ -68,7 +74,8 @@ export async function createSdkContext(
  * - default discovery from `process.cwd()` when neither is provided
  *
  * @param input - Optional bootstrap input and kernel overrides
- * @returns Loaded config, path, kernel, and graph-provider factory
+ * @returns Loaded config, path, kernel, and graph-provider factory. Any
+ * configuration warnings remain attached to `config.warnings`.
  * @throws {Error} When both `configPath` and `startDir` are provided together
  */
 export async function openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult> {
