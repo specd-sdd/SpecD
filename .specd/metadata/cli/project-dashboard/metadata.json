@@ -15,19 +15,19 @@
     {
       "requirement": "Text dashboard",
       "rules": [
-        "In `text` mode the command outputs:\n\n1. **Banner** — the SpecD ASCII logo rendered above the dashboard box.\n2. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.\n3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border. The minimum inner width of this box MUST be at least the default `boxen` width plus 10 characters to accommodate typical project root paths.\n4. **Project box** — an inner box labelled `Project` showing:\n   - `root:` — absolute path to the project root. If the value would cause the row to overflow the outer box width, the value wraps to a new line indented to align with the start of the value column (i.e. the column position where values begin).\n   - `schema:` — the schema reference from `specd.yaml`.\n   - `workspaces:` — comma-separated list of workspace names.\n5. **Specs box** — an inner box labelled `Specs` showing total spec count and a per-workspace breakdown.\n6. **Changes box** — an inner box labelled `Changes` showing active count, draft count, discarded count, and a per-state breakdown of active changes.\n7. **Layout** — the Project box occupies the full width on its own row; the Specs and Changes boxes are rendered side by side on the row below."
+        "In `text` mode the command outputs:\n\n1. **Banner** — the SpecD ASCII logo rendered above the dashboard box.\n2. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.\n3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border.\n4. **Project box** — a full-width inner box labelled `Project` showing:\n   - `root:` — absolute path to the project root. If the value would cause the row to overflow the inner box width, the value wraps to continuation lines indented to align with the start of the value column.\n   - `schema:` — the schema reference from `specd.yaml`.\n   - `workspaces:` — comma-separated list of workspace names. If the value exceeds available inner width, it wraps to continuation lines indented to align with the start of the value column, wrapping on word/comma boundaries without splitting workspace names mid-word.\n5. **Specs box** — an inner box labelled `Specs` rendering a 2-column aligned table of total spec count and per-workspace breakdown (including empty workspaces with 0 count), dynamically padded to the longest workspace name.\n6. **Changes box** — an inner box labelled `Changes` rendering a 2-column aligned table with each change state on its own line (`active`, `drafts`, `discarded`, `archived`).\n7. **Graph box** — an inner box labelled `Graph` showing graph freshness timestamp, staleness indicator, document count (`docs:`), file count (`files:`), symbol count (`symbols:`), relation count (`relations:`), and indexed languages (`languages:`) when graph diagnostics are available.\n8. **Layout** — the Project and Graph boxes span the full inner width of the dashboard; Specs and Changes sub-boxes are rendered side by side, matching the full container width."
       ]
     },
     {
       "requirement": "JSON and toon output",
       "rules": [
-        "In `json` or `toon` mode the command outputs a single object:\n\n```json\n{\n  \"projectRoot\": \"<absolute-path>\",\n  \"schemaRef\": \"<schema-ref>\",\n  \"workspaces\": [\"<id>\", ...],\n  \"specs\": {\n    \"total\": <number>,\n    \"byWorkspace\": { \"<workspace-id>\": <number>, ... }\n  },\n  \"changes\": {\n    \"active\": <number>,\n    \"drafts\": <number>,\n    \"discarded\": <number>\n  }\n}\n```\n\nNo config line, banner, or box decoration is included in non-text output."
+        "In `json` or `toon` mode, `specd project dashboard` delegates execution directly to `specd project status`, producing the canonical project status JSON/TOON output schema without executing separate dashboard formatting."
       ]
     },
     {
       "requirement": "Data sources",
       "rules": [
-        "All data is fetched via the kernel:\n\n- `kernel.specs.list` — list all specs across all workspaces.\n- `kernel.changes.list` — list active changes.\n- `kernel.changes.listDrafts` — list draft changes.\n- `kernel.changes.listDiscarded` — list discarded changes.\n\nAll four queries run in parallel."
+        "All metrics and diagnostics are fetched via `buildProjectStatusSnapshot(host, { includeGraph: true })` from `@specd/sdk` (or host composition), ensuring complete parity with `specd project status`."
       ]
     },
     {
@@ -39,10 +39,10 @@
   ],
   "constraints": [
     "The outer dashboard box MUST have a minimum inner width of at least the default boxen width plus 10 characters.",
-    "When the root: value would overflow the outer box width, it MUST wrap to the next line, indented to align with the value column start position.",
+    "When root: or workspaces: values would overflow the inner box width, they MUST wrap to continuation lines, indented to align with the value column start position.",
     "ANSI escape codes must be stripped before measuring string lengths for column alignment and overflow detection.",
     "The command is read-only; it never modifies any files.",
-    "The Using config: line is always printed to stdout in text mode, even when the banner is suppressed (no suppression flag exists; this note is for future-proofing)."
+    "The Using config: line is always printed to stdout in text mode, even when the banner is suppressed."
   ],
   "scenarios": [
     {
@@ -101,10 +101,12 @@
     },
     {
       "requirement": "Text dashboard",
-      "name": "Changes box shows active, drafts, and discarded",
-      "given": ["a project with 2 active changes, 1 draft, and 1 discarded change"],
+      "name": "Changes box shows active, drafts, discarded, and archived",
+      "given": ["a project with 2 active changes, 1 draft, 1 discarded, and 5 archived changes"],
       "when": ["specd project dashboard is run"],
-      "then": ["stdout contains 2 active, drafts: 1, and discarded: 1"]
+      "then": [
+        "stdout contains active, drafts, discarded, and archived as separate aligned table rows in the Changes box"
+      ]
     },
     {
       "requirement": "Text dashboard",
@@ -117,11 +119,31 @@
       ]
     },
     {
+      "requirement": "Text dashboard",
+      "name": "Long workspaces list wraps to value column",
+      "given": ["a project with 15 workspaces whose combined names exceed the inner box width"],
+      "when": ["specd project dashboard is run"],
+      "then": [
+        "the workspaces list wraps to continuation lines indented to the value column start",
+        "AND the box border remains intact"
+      ]
+    },
+    {
+      "requirement": "Text dashboard",
+      "name": "Graph box displays health diagnostics when graph is available",
+      "given": ["a project with indexed code graph"],
+      "when": ["specd project dashboard is run in text mode"],
+      "then": [
+        "stdout contains a Graph box displaying graph freshness, document count (docs:), file/symbol counts, relation count (relations:), and indexed languages (languages:)"
+      ]
+    },
+    {
       "requirement": "JSON and toon output",
       "name": "JSON output is valid JSON with expected fields",
       "when": ["specd project dashboard --format json is run"],
       "then": [
-        "stdout is valid JSON containing projectRoot, schemaRef, workspaces, specs, and changes keys"
+        "execution is redirected to specd project status --format json",
+        "AND stdout is valid JSON containing projectRoot, schemaRef, workspaces, specs, changes, and graph keys"
       ]
     },
     {
@@ -141,11 +163,11 @@
     },
     {
       "requirement": "Data sources",
-      "name": "All four data queries run before output is produced",
+      "name": "Dashboard metrics match buildProjectStatusSnapshot",
       "given": ["a valid project"],
       "when": ["specd project dashboard is run"],
       "then": [
-        "the output reflects specs, active changes, drafts, and discarded counts simultaneously"
+        "the spec, change, and graph metrics match the data produced by buildProjectStatusSnapshot"
       ]
     },
     {
@@ -156,10 +178,18 @@
       "then": ["the process exits with code 1", "AND stderr contains an error: message"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:project-dashboard",
+        "file": "cli:src/commands/project/dashboard.ts",
+        "symbol": "registerProjectDashboard"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:4827c1f8e7dabd0559e4e62646046ed9004198aeee3cd0f6d162f16710300f93",
-    "verify.md": "sha256:c0571294cd14da6cac99efbb1eb36d0e4c54cbbcfd2f6434353026a1724e1b63"
+    "spec.md": "sha256:8328d1c50619b6729b82ac0d5da2e96def5c3ec0ccbcd97991536975f7a8c2bf",
+    "verify.md": "sha256:2e6d9e8ebd17ff1d18caa5197c7c3e9f537df9b4f61f79f534d5b8de4748e6f8"
   },
   "generatedBy": "core"
 }

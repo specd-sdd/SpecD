@@ -50,11 +50,11 @@
 - **WHEN** `specd project dashboard` is run
 - **THEN** stdout contains `3` as total and per-workspace lines for `default` (2) and `billing` (1)
 
-#### Scenario: Changes box shows active, drafts, and discarded
+#### Scenario: Changes box shows active, drafts, discarded, and archived
 
-- **GIVEN** a project with 2 active changes, 1 draft, and 1 discarded change
+- **GIVEN** a project with 2 active changes, 1 draft, 1 discarded, and 5 archived changes
 - **WHEN** `specd project dashboard` is run
-- **THEN** stdout contains `2 active`, `drafts: 1`, and `discarded: 1`
+- **THEN** stdout contains `active`, `drafts`, `discarded`, and `archived` as separate aligned table rows in the `Changes` box
 
 #### Scenario: Long project root wraps to value column
 
@@ -63,12 +63,26 @@
 - **THEN** the root path wraps to the next line indented to the value column start
 - **AND** the box border is not broken
 
+#### Scenario: Long workspaces list wraps to value column
+
+- **GIVEN** a project with 15 workspaces whose combined names exceed the inner box width
+- **WHEN** `specd project dashboard` is run
+- **THEN** the workspaces list wraps to continuation lines indented to the value column start
+- **AND** the box border remains intact
+
+#### Scenario: Graph box displays health diagnostics when graph is available
+
+- **GIVEN** a project with indexed code graph
+- **WHEN** `specd project dashboard` is run in text mode
+- **THEN** stdout contains a Graph box displaying graph freshness, document count (`docs:`), file/symbol counts, relation count (`relations:`), and indexed languages (`languages:`)
+
 ### Requirement: JSON and toon output
 
 #### Scenario: JSON output is valid JSON with expected fields
 
 - **WHEN** `specd project dashboard --format json` is run
-- **THEN** stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `specs`, and `changes` keys
+- **THEN** execution is redirected to `specd project status --format json`
+- **AND** stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `specs`, `changes`, and `graph` keys
 
 #### Scenario: JSON output contains no banner, config line, or box characters
 
@@ -83,11 +97,11 @@
 
 ### Requirement: Data sources
 
-#### Scenario: All four data queries run before output is produced
+#### Scenario: Dashboard metrics match buildProjectStatusSnapshot
 
 - **GIVEN** a valid project
 - **WHEN** `specd project dashboard` is run
-- **THEN** the output reflects specs, active changes, drafts, and discarded counts simultaneously
+- **THEN** the spec, change, and graph metrics match the data produced by `buildProjectStatusSnapshot`
 
 ### Requirement: Config dependency
 

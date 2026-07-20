@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["cli:entrypoint", "core:config"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/project/dashboard.ts",
+      "symbols": ["registerProjectDashboard"]
+    }
+  ]
 }

@@ -1029,12 +1029,12 @@ Display the full contents of the `project-metadata.json` file.
 specd project dashboard [options]
 ````
 
-Display a project-level dashboard showing schema, workspaces, spec counts, and change activity. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)).
+Display a project-level dashboard showing schema, workspaces, spec counts, change activity (including archived changes), and Code Graph diagnostics. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)). In `json` or `toon` mode, execution delegates directly to `specd project status --format <fmt>`.
 
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
+| Option                      | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| `--format text\|json\|toon` | Output format. `json` and `toon` delegate to `project status`. |
+| `--config <path>`           | Config file path.                                              |
 
 ### project status
 
